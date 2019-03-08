@@ -14,7 +14,7 @@ Tests holograms (1.8-1.13.2)
 | Expected Functionality                    | 1.13.2 | 1.12.2 | 1.11.2 | 1.10.2 | 1.9.4 | 1.9.2 | 1.8.8 |
 |-------------------------------------------|--------|--------|--------|--------|-------|-------|-------|
 | Holograms Work `/holo new a`              |        |        |        |        |       |       |       |
-| Holograms Glow Particles are visible      |        |        |        |        |       |       |       |
+| Hologram Glow Particles are visible       |        |        |        |        |       |       |       |
 | Holograms Move `/holo move`               |        |        |        |        |       |       |       |
 | Holograms Editable `/holo edit`           |        |        |        |        |       |       |       |
 | Holograms Line Edit `/holo line`          |        |        |        |        |       |       |       |
