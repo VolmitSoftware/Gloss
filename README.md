@@ -15,6 +15,7 @@ Tests holograms (1.8-1.13.2)
 |-------------------------------------------|--------|--------|--------|--------|-------|-------|-------|
 | Holograms Work `/holo new a`              |        |        |        |        |       |       |       |
 | Hologram Glow Particles are visible       |        |        |        |        |       |       |       |
+| Modify Holograms via File (hotloads)      |        |        |        |        |       |       |       |
 | Holograms Move `/holo move`               |        |        |        |        |       |       |       |
 | Holograms Editable `/holo edit`           |        |        |        |        |       |       |       |
 | Holograms Line Edit `/holo line`          |        |        |        |        |       |       |       |
