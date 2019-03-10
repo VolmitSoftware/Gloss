@@ -36,7 +36,7 @@ Tests Emoji (1.8-1.13.2)
 
 | Expected Functionality                   | 1.13.2 | 1.12.2 | 1.11.2 | 1.10.2 | 1.9.4 | 1.9.2 | 1.8.8 |
 |------------------------------------------|--------|--------|--------|--------|-------|-------|-------|
-| Type `:air` and press <TAB> (completion) |  FAIL      | PASS | PASS | PASS |       |       |       |
+| Type `:air` and press <TAB> (completion) |  FAIL (#46)     | PASS | PASS | PASS |       |       |       |
 | Use /gloss emoji                         |  PASS      | PASS | PASS | PASS |       |       |       |
 | Edit the heart emoji (json) Hotloads.    |  PASS      | PASS | PASS | PASS |       |       |       |
 | Create new emoji, and `/gloss reload`.   |  PASS      | PASS | PASS | PASS |       |       |       |
