@@ -47,5 +47,5 @@ Tests Groups and tablist names (1.8-1.13.2)
 | Expected Functionality                               | 1.13.2 | 1.12.2 | 1.11.2 | 1.10.2 | 1.9.4 | 1.9.2 | 1.8.8 |
 |------------------------------------------------------|--------|--------|--------|--------|-------|-------|-------|
 | Edit the `op.yml`file `/gloss reload` check tablist. |        | PASS |        |        |       |       |       |
-| Create `derp.yml` and create permission group "derp" |        | PASS |        |        |       |       |       |
-| Make a board and set derp.yml to default it.         |        | PASS |        |        |       |       |       |
+| Create `derp.yml` and create permission group "derp" |        |      |        |        |       |       |       |
+| Make a board and set derp.yml to default it.         |        |      |        |        |       |       |       |
