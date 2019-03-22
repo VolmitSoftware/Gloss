@@ -14,7 +14,7 @@ Tests holograms (1.8-1.13.2)
 | Expected Functionality                    | 1.13.2 | 1.12.2 | 1.11.2 | 1.10.2 | 1.9.4 | 1.9.2 | 1.8.8 |
 |-------------------------------------------|--------|--------|--------|--------|-------|-------|-------|
 | Holograms Work `/holo new a`              |   PASS     | PASS | PASS | PASS |       |       |       |
-| Hologram Glow Particles are visible       |   FAIL (#37)    | PASS | PASS | PASS |       |       |       |
+| Hologram Glow Particles are visible       |   PASS    | PASS | PASS | PASS |       |       |       |
 | Modify Holograms via File (hotloads)      |   PASS   | PASS | PASS | PASS |       |       |       |
 | Holograms Move `/holo move`               |   PASS     | PASS | PASS | PASS |       |       |       |
 | Holograms Editable `/holo edit`           |   PASS     | PASS | PASS | PASS |       |       |       |
