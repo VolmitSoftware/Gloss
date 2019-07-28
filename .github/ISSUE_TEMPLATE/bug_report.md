@@ -25,9 +25,9 @@ If applicable, add screenshots or video recordings to help explain your problem.
 
 **Server and Plugin Informations**
  - Installed plugins:
- - React Version:
+ - Gloss and Mortar Version:
  - Server Platform and Version [eg: PaperSpigot 1.14.4]:
  - Operating System (if applicable):
 
 **Additional context**
-Add any other context about the problem here, server timings reports, React dump information, complete console log etc. Please do not make Pastebin dumps or screenshot expire.
+Add any other context about the problem here, server timings reports, React dump information, complete console log etc. Please do not make Pastebin dumps or screenshots expire.
