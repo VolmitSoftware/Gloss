@@ -1,51 +1,53 @@
-# Gloss Tests
-Test the following versions
-* 1.8.8
-* 1.9.2
-* 1.9.4
-* 1.10.2
-* 1.11.2
-* 1.12.2
-* 1.13.2
+<div align="center">
 
-## Holograms
-Tests holograms (1.8-1.13.2)
+<img src="images/icon/gloss-256.png" alt="Gloss" width="128"/>
 
-| Expected Functionality                    | 1.13.2 | 1.12.2 | 1.11.2 | 1.10.2 | 1.9.4 | 1.9.2 | 1.8.8 |
-|-------------------------------------------|--------|--------|--------|--------|-------|-------|-------|
-| Holograms Work `/holo new a`              |   PASS     | PASS | PASS | PASS |       |       |       |
-| Hologram Glow Particles are visible       |   PASS    | PASS | PASS | PASS |       |       |       |
-| Modify Holograms via File (hotloads)      |   PASS   | PASS | PASS | PASS |       |       |       |
-| Holograms Move `/holo move`               |   PASS     | PASS | PASS | PASS |       |       |       |
-| Holograms Editable `/holo edit`           |   PASS     | PASS | PASS | PASS |       |       |       |
-| Holograms Line Edit `/holo line`          |   PASS     | PASS | PASS | PASS |       |       |       |
-| Holograms Listed `/holo list` (delete/tp) |   PASS     | PASS | PASS | PASS |       |       |       |
+# Gloss
 
-## Boards
-Tests boards (1.8-1.13.2)
+Server polish and display suite: holograms, scoreboards, tablist, emoji chat, chat bubbles and damage indicators — in one plugin.
 
-| Expected Functionality                    | 1.13.2 | 1.12.2 | 1.11.2 | 1.10.2 | 1.9.4 | 1.9.2 | 1.8.8 |
-|-------------------------------------------|--------|--------|--------|--------|-------|-------|-------|
-| Boards Work `/board new a`                |   PASS     | PASS | PASS | PASS |       |       |       |
-| Boards Hide/Show `/board [hide/show <a>]` |   PASS     | PASS | PASS | PASS |       |       |       |
-| Boards Default `/board default a` (relog) |   PASS     | PASS | PASS | PASS |       |       |       |
-| Boards Edited, Hotload                    |   PASS     | PASS | PASS | PASS |       |       |       |
+</div>
 
-## Emoji
-Tests Emoji (1.8-1.13.2)
+## Features
 
-| Expected Functionality                   | 1.13.2 | 1.12.2 | 1.11.2 | 1.10.2 | 1.9.4 | 1.9.2 | 1.8.8 |
-|------------------------------------------|--------|--------|--------|--------|-------|-------|-------|
-| Type `:air` and press <TAB> (completion) |  FAIL (#46)     | PASS | PASS | PASS |       |       |       |
-| Use /gloss emoji                         |  PASS      | PASS | PASS | PASS |       |       |       |
-| Edit the heart emoji (json) Hotloads.    |  PASS      | PASS | PASS | PASS |       |       |       |
-| Create new emoji, and `/gloss reload`.   |  PASS      | PASS | PASS | PASS |       |       |       |
-  
-## Groups & Tablist
-Tests Groups and tablist names (1.8-1.13.2)
+- **Holograms** — TextDisplay-based floating text with per-player placeholder rendering, hotloadable JSON files, text-to-block-art rendering and full command management.
+- **Scoreboards** — JSON-defined sidebars with primary/world defaults, permission-gated boards and per-group defaults.
+- **Tablist** — configurable header/footer and per-group player list names.
+- **Emoji** — `:emoji:` and trigger replacement in chat with tab completion and per-emoji permissions.
+- **Chat bubbles** — messages float above the speaker's head, stack, and fly away as they expire.
+- **Damage indicators** — floating damage and heal numbers with ballistic motion, measured from actual applied health deltas.
+- **Animations** — frame-based text animations usable in any hologram, board or tablist line via `|animation.<id>|`.
+- **MOTD** — randomized, color-filtered server list MOTD.
 
-| Expected Functionality                               | 1.13.2 | 1.12.2 | 1.11.2 | 1.10.2 | 1.9.4 | 1.9.2 | 1.8.8 |
-|------------------------------------------------------|--------|--------|--------|--------|-------|-------|-------|
-| Edit the `_op.yml`file `/gloss reload` check tablist. |  PASS      | PASS | PASS | PASS |       |       |       |
-| Create `derp.yml` and create permission group "derp" |   PASS     |      |        |        |       |       |       |
-| Make a board and set derp.yml to default it.         |   PASS     |      |        |        |       |       |       |
+## Requirements
+
+- A 26.1.2 – 26.2 server: Paper, Purpur, Leaf, Folia, Canvas or Spigot.
+- Java 25.
+- Optional: PlaceholderAPI (placeholders in any rendered line), Vault (permission-group tablist names and default boards).
+
+## Commands
+
+`/gloss` (aliases `gl`, `glo`, `gg`) is the root; `/hologram` (`holo`, `h`) and `/board` (`sb`, `bd`) jump straight into their subtrees. Run `/gloss help` in game for the full paged menu.
+
+## Building
+
+```
+./gradlew build       # full gate: tests + spigot-compatibility compile + shaded jar
+./gradlew shadowJar   # just the plugin jar
+```
+
+Java 25 is required. The local `VolmLib` sibling checkout is resolved automatically as a composite build; pass `-PuseLocalVolmLib=false` to resolve it remotely instead.
+
+## Data layout
+
+```
+plugins/Gloss/
+├── config.yml
+├── holograms/<id>.json
+├── boards/<id>.json
+├── emoji/<id>.json
+├── animations/<id>.json
+└── groups/<name>.yml
+```
+
+All data files hotload — edit them on disk and the change applies in game without a reload.

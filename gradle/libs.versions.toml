@@ -1,0 +1,15 @@
+[versions]
+shadow = "9.0.0-rc3"
+paper = "26.1.2.build.74-stable"
+bstats = "3.2.1"
+junit = "5.10.2"
+junitPlatform = "1.10.2"
+
+[libraries]
+paper = { module = "io.papermc.paper:paper-api", version.ref = "paper" }
+bstats = { module = "org.bstats:bstats-bukkit", version.ref = "bstats" }
+junitJupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "junit" }
+junitPlatformLauncher = { module = "org.junit.platform:junit-platform-launcher", version.ref = "junitPlatform" }
+
+[plugins]
+shadow = { id = "com.gradleup.shadow", version.ref = "shadow" }

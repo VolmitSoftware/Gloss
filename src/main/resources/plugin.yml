@@ -1,0 +1,97 @@
+name: ${name}
+version: ${version}
+main: ${main}
+api-version: ${apiVersion}
+load: POSTWORLD
+description: Holograms, scoreboards, tablist, emoji chat, chat bubbles and damage indicators.
+authors: [ VolmitSoftware ]
+website: VolmitSoftware.com
+softdepend: [ PlaceholderAPI, Vault ]
+commands:
+  gloss:
+    description: Gloss base command.
+    aliases: [ gl, glo, gg ]
+    usage: /<command> help
+  hologram:
+    description: Gloss hologram commands.
+    aliases: [ holo, h ]
+    usage: /<command> help
+  board:
+    description: Gloss scoreboard commands.
+    aliases: [ sb, bd ]
+    usage: /<command> help
+permissions:
+  gloss.*:
+    description: Gives access to all Gloss permissions.
+    default: op
+    children:
+      gloss.admin: true
+      gloss.holograms: true
+      gloss.boards: true
+      gloss.emoji.use: true
+      gloss.chat.color: true
+      gloss.bubbles.send: true
+      gloss.indicators.show: true
+  gloss.admin:
+    description: Allows reloading Gloss, viewing status and managing groups.
+    default: op
+  gloss.holograms:
+    description: Gives access to all Gloss hologram permissions.
+    default: op
+    children:
+      gloss.holograms.create: true
+      gloss.holograms.edit: true
+      gloss.holograms.delete: true
+      gloss.holograms.move: true
+      gloss.holograms.teleport: true
+  gloss.holograms.create:
+    description: Allows creating holograms.
+    default: op
+  gloss.holograms.edit:
+    description: Allows editing hologram lines.
+    default: op
+  gloss.holograms.delete:
+    description: Allows deleting holograms.
+    default: op
+  gloss.holograms.move:
+    description: Allows moving holograms.
+    default: op
+  gloss.holograms.teleport:
+    description: Allows teleporting to holograms.
+    default: op
+  gloss.boards:
+    description: Gives access to all Gloss scoreboard permissions.
+    default: op
+    children:
+      gloss.boards.create: true
+      gloss.boards.edit: true
+      gloss.boards.delete: true
+      gloss.boards.show: true
+      gloss.boards.hide: true
+  gloss.boards.create:
+    description: Allows creating scoreboards.
+    default: op
+  gloss.boards.edit:
+    description: Allows editing scoreboards, primary boards and board permissions.
+    default: op
+  gloss.boards.delete:
+    description: Allows deleting scoreboards.
+    default: op
+  gloss.boards.show:
+    description: Allows showing scoreboards to yourself.
+    default: op
+  gloss.boards.hide:
+    description: Allows hiding your scoreboard.
+    default: op
+  gloss.emoji.use:
+    description: Allows using emoji in chat.
+    default: true
+  gloss.chat.color:
+    description: Allows using color codes in chat.
+    default: op
+  gloss.bubbles.send:
+    description: Chat messages from this player display as chat bubbles.
+    default: true
+  gloss.indicators.show:
+    description: Shows damage and heal indicators to this player.
+    default: true

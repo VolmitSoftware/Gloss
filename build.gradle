@@ -1,0 +1,181 @@
+import org.gradle.api.tasks.Copy
+import org.gradle.api.tasks.compile.JavaCompile
+import org.gradle.jvm.toolchain.JavaLanguageVersion
+
+plugins {
+    id 'java-library'
+    alias(libs.plugins.shadow)
+}
+
+group = 'art.arcane'
+version = '2.0.0-26.2'
+def apiVersion = '26.1'
+def main = 'art.arcane.gloss.Gloss'
+def lib = 'art.arcane.gloss.libs'
+def spigotApiVersion = '26.2-R0.1-SNAPSHOT'
+String volmLibCoordinate = providers.gradleProperty('volmLibCoordinate')
+    .orElse('com.github.VolmitSoftware:VolmLib:master-SNAPSHOT')
+    .get()
+String authTokenProperty = providers.gradleProperty('authToken').orNull
+String jitpackAuthToken = authTokenProperty ?: providers.gradleProperty('jitpackAuthToken').orNull
+
+def shadowJarTask = tasks.named('shadowJar', com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar)
+
+tasks.register('buildPsychoLT', Copy) {
+    group = 'development'
+    description = 'Builds and deploys Gloss to the managed Minecraft test-server dropins.'
+    outputs.upToDateWhen { false }
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    dependsOn(tasks.named('check'), shadowJarTask)
+    from(shadowJarTask.flatMap { it.archiveFile })
+    into(layout.projectDirectory.dir('../../[Minecraft Server]/consumers/plugin-consumers/dropins/plugins'))
+    rename { String ignored -> 'Gloss.jar' }
+}
+
+tasks.named('jar').configure {
+    enabled = false
+}
+
+def apiJarTask = tasks.register('apiJar', Jar) {
+    group = 'build'
+    description = 'Packages only the public third-party API so other plugins can compile against it.'
+    archiveClassifier.set('api')
+    from(sourceSets.main.output) {
+        include 'art/arcane/gloss/api/**'
+    }
+}
+
+tasks.named('build').configure {
+    dependsOn(shadowJarTask, apiJarTask)
+}
+
+shadowJarTask.configure {
+    archiveClassifier.set('')
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    minimize()
+    relocate('org.bstats', "${lib}.bstats")
+}
+
+tasks.named('processResources').configure {
+    def pluginProperties = [
+        name      : rootProject.name,
+        version   : project.version,
+        main      : main,
+        apiVersion: apiVersion,
+    ]
+
+    inputs.properties(pluginProperties)
+    filesMatching(['**/paper-plugin.yml', '**/plugin.yml']) {
+        expand(pluginProperties)
+    }
+}
+
+tasks.named('compileJava', JavaCompile).configure {
+    options.compilerArgs.add('-parameters')
+    options.encoding = 'UTF-8'
+    options.debugOptions.debugLevel = 'none'
+    options.release.set(25)
+}
+
+tasks.named('test').configure {
+    useJUnitPlatform()
+    systemProperty('gloss.projectVersion', project.version.toString())
+}
+
+configurations {
+    spigotCompatibility
+}
+
+tasks.register('compileSpigotCompatibility', JavaCompile) {
+    source = fileTree('src/main/java') {
+        exclude '**/paper/**'
+    }
+    classpath = files(sourceSets.main.compileClasspath.filter { File dependency ->
+        !dependency.name.startsWith('paper-api-')
+    }) + configurations.spigotCompatibility
+    destinationDirectory.set(layout.buildDirectory.dir('classes/java/spigotCompatibility'))
+    options.compilerArgs.add('-parameters')
+    options.encoding = 'UTF-8'
+    options.debugOptions.debugLevel = 'none'
+    options.release.set(25)
+}
+
+gradle.includedBuilds.find { includedBuild -> includedBuild.name == 'VolmLib' }?.with { includedBuild ->
+    File spigotClasses = new File(includedBuild.projectDir, 'shared/build/classes/java/spigotCompatibility')
+    tasks.named('compileSpigotCompatibility').configure {
+        dependsOn(includedBuild.task(':shared:compileSpigotCompatibility'))
+        classpath = files(spigotClasses) + classpath
+    }
+}
+
+tasks.named('check').configure {
+    dependsOn(tasks.named('compileSpigotCompatibility'))
+}
+
+repositories {
+    mavenCentral()
+    maven {
+        url = uri('https://repo.papermc.io/repository/maven-public/')
+    }
+    maven {
+        url = uri('https://hub.spigotmc.org/nexus/content/repositories/snapshots/')
+    }
+    maven {
+        url = uri('https://repo.extendedclip.com/content/repositories/placeholderapi/')
+    }
+    maven {
+        url = uri('https://jitpack.io')
+        if (jitpackAuthToken != null) {
+            credentials {
+                username = jitpackAuthToken
+                password = '.'
+            }
+        }
+    }
+}
+
+dependencies {
+    compileOnly('me.clip:placeholderapi:2.11.6') { transitive = false }
+    compileOnly('com.github.MilkBowl:VaultAPI:1.7') { transitive = false }
+    compileOnly(libs.paper)
+    spigotCompatibility("org.spigotmc:spigot-api:${spigotApiVersion}")
+    implementation(libs.bstats)
+    implementation(volmLibCoordinate) {
+        changing = true
+        transitive = false
+    }
+    testImplementation('me.clip:placeholderapi:2.11.6') { transitive = false }
+    testImplementation('com.github.MilkBowl:VaultAPI:1.7') { transitive = false }
+    testImplementation(libs.paper)
+    testImplementation(libs.junitJupiter)
+    testRuntimeOnly(libs.junitPlatformLauncher)
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(25)
+    }
+}
+
+configurations.configureEach {
+    resolutionStrategy.cacheChangingModulesFor(0, 'seconds')
+    resolutionStrategy.cacheDynamicVersionsFor(0, 'seconds')
+}
+
+if (!JavaVersion.current().isCompatibleWith(JavaVersion.VERSION_25)) {
+    System.err.println()
+    System.err.println('=========================================================================================================')
+    System.err.println('You must run gradle on Java 25 or newer. You are using ' + JavaVersion.current())
+    System.err.println()
+    System.err.println('=== For IDEs ===')
+    System.err.println('1. Configure the project for Java 25')
+    System.err.println('2. Configure the bundled gradle to use Java 25 in settings')
+    System.err.println()
+    System.err.println('=== For Command Line (gradlew) ===')
+    System.err.println('1. Install JDK 25 from https://adoptium.net/temurin/releases/?version=25')
+    System.err.println('2. Set JAVA_HOME environment variable to the new jdk installation folder')
+    System.err.println('3. Open a new command prompt window to get the new environment variables if need be.')
+    System.err.println('=========================================================================================================')
+    System.err.println()
+    System.exit(69)
+}

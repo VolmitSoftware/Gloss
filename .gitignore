@@ -1,0 +1,24 @@
+build/
+
+.gradle/
+
+.idea/
+run/
+
+.DS_Store
+
+# Legacy Maven leftovers
+target/
+dependency-reduced-pom.xml
+
+.codegraph/
+
+.qa/
+
+logs/
+
+.claude/
+
+AGENTS.md
+
+.run/
