@@ -60,7 +60,7 @@ public class CommandGlossItem {
     }
 
     List<ProviderStatus> statuses = Gloss.instance.getItemProviders().providerStatuses();
-    GlossCommandPager.Window window = GlossCommandPager.window(statuses.size(), page, GlossCommandPager.TEXT_PAGE_SIZE);
+    GlossCommandPager.Window window = GlossCommandPager.window(statuses.size(), page, GlossCommandPager.ITEM_STATUS_PAGE_SIZE);
     DirectorMiniMenu.Theme theme = GlossCommandService.menuTheme();
     List<String> lines = new ArrayList<>();
     lines.add(DirectorMiniMenu.banner(Gloss.instance.getLocalization().text(GlossMessages.ITEMS_STATUS_HEADER), theme));

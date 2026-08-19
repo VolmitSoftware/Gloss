@@ -25,7 +25,7 @@ public class MenuMoveActionTest {
     assertTrue(move.getChildren().isEmpty());
     assertEquals("/menu move", move.path());
 
-    Optional<DirectorMiniMenu.DirectorHelpPage> page = DirectorMiniMenu.resolveHelp(engine, List.of("move"), 9);
+    Optional<DirectorMiniMenu.DirectorHelpPage> page = DirectorMiniMenu.resolveHelp(engine, List.of("move"));
     assertTrue(page.isEmpty());
   }
 

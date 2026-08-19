@@ -41,7 +41,6 @@ import java.util.logging.Level;
 
 public final class BoardService implements Listener {
     private static final int MAX_LINES = 15;
-    private static final int MAX_TITLE_LENGTH = 32;
 
     private static final DocumentReviser<BoardDoc> REVISER = new DocumentReviser<>() {
         @Override
@@ -385,7 +384,7 @@ public final class BoardService implements Listener {
             if (rendered == null) {
                 return "";
             }
-            return rendered.length() > MAX_TITLE_LENGTH ? rendered.substring(0, MAX_TITLE_LENGTH) : rendered;
+            return rendered;
         }
 
         @Override
@@ -410,13 +409,13 @@ public final class BoardService implements Listener {
         }
 
         @Override
-        public boolean hideScores(Player player) {
+        public boolean hideScoreNumbers(Player player) {
             GlossBoardMeta meta = selectedMeta(player);
             return meta != null && meta.hideNumbers();
         }
 
         private GlossBoardMeta.RenderPlan plan(GlossBoardMeta meta) {
-            return meta.renderPlan(TextPipeline.emojiGeneration(), MAX_TITLE_LENGTH, MAX_LINES, staticRender);
+            return meta.renderPlan(TextPipeline.emojiGeneration(), MAX_LINES, staticRender);
         }
     }
 }

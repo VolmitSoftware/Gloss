@@ -19,6 +19,8 @@ Server polish and display suite: holograms, scoreboards, tablist, emoji chat, ch
 - **Animations** — frame-based text animations usable in any hologram, board or tablist line via `|animation.<id>|`.
 - **MOTD** — randomized, color-filtered server list MOTD.
 
+Rendered text supports bounded `{{ ... }}` expressions with native `player.*` and `server.*` values. PlaceholderAPI remains optional: `papi(...)` and `papiNumber(...)` use it when installed, while the standard player and server keys resolve from Gloss itself when it is absent.
+
 ## Requirements
 
 - A 26.1.2 – 26.2 server: Paper, Purpur, Leaf, Folia, Canvas or Spigot.

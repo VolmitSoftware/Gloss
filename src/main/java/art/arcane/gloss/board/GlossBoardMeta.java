@@ -143,21 +143,20 @@ public final class GlossBoardMeta {
      * rebuilding it when either changed. Lines without placeholders and functions are
      * viewer-independent, so their rendered value is computed once and shared.
      */
-    RenderPlan renderPlan(long emojiGeneration, int maxTitleLength, int maxLines, UnaryOperator<String> staticRender) {
+    RenderPlan renderPlan(long emojiGeneration, int maxLines, UnaryOperator<String> staticRender) {
         RenderPlan current = renderPlan;
         long generation = contentGeneration.get();
         if (current != null && current.matches(generation, emojiGeneration)) {
             return current;
         }
-        RenderPlan built = RenderPlan.build(generation, emojiGeneration, title, content,
-            maxTitleLength, maxLines, staticRender);
+        RenderPlan built = RenderPlan.build(generation, emojiGeneration, title, content, maxLines, staticRender);
         renderPlan = built;
         return built;
     }
 
     /**
      * Immutable per-board render memo. {@code staticTitle}/{@code staticLines} entries are
-     * pre-rendered (already truncated for the title); a {@code null} entry means the value
+     * pre-rendered; a {@code null} entry means the value
      * is viewer-dependent and must be rendered per player from the corresponding raw value.
      */
     static final class RenderPlan {
@@ -181,11 +180,11 @@ public final class GlossBoardMeta {
         }
 
         static RenderPlan build(long contentGeneration, long emojiGeneration, String title, List<String> content,
-                                int maxTitleLength, int maxLines, UnaryOperator<String> staticRender) {
+                                int maxLines, UnaryOperator<String> staticRender) {
             String rawTitle = title == null ? "" : title;
             String staticTitle = null;
             if ((TextPipeline.classify(rawTitle) & DYNAMIC_FLAGS) == 0) {
-                staticTitle = truncate(renderValue(rawTitle, staticRender), maxTitleLength);
+                staticTitle = renderValue(rawTitle, staticRender);
             }
 
             Object[] snapshot = content.toArray();
@@ -208,10 +207,6 @@ public final class GlossBoardMeta {
             }
             String rendered = staticRender.apply(raw);
             return rendered == null ? "" : rendered;
-        }
-
-        private static String truncate(String value, int maxLength) {
-            return value.length() > maxLength ? value.substring(0, maxLength) : value;
         }
 
         boolean matches(long contentGeneration, long emojiGeneration) {

@@ -29,7 +29,7 @@ public class MenuBuilderActionTest {
     assertTrue(builder.isInvocable());
     assertTrue(builder.getChildren().isEmpty());
 
-    Optional<DirectorMiniMenu.DirectorHelpPage> page = DirectorMiniMenu.resolveHelp(engine, List.of("builder"), 9);
+    Optional<DirectorMiniMenu.DirectorHelpPage> page = DirectorMiniMenu.resolveHelp(engine, List.of("builder"));
     assertTrue(page.isEmpty());
   }
 

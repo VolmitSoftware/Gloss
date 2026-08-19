@@ -55,7 +55,7 @@ class GlossCommandHelpDeliveryTest {
 
   private static DirectorMiniMenu.DirectorHelpPage rootHelpPage() {
     DirectorRuntimeEngine engine = DirectorEngineFactory.create(new CommandGloss(null));
-    Optional<DirectorMiniMenu.DirectorHelpPage> page = DirectorMiniMenu.resolveHelp(engine, List.of(), 9);
+    Optional<DirectorMiniMenu.DirectorHelpPage> page = DirectorMiniMenu.resolveHelp(engine, List.of());
     return page.orElseThrow(() -> new IllegalStateException("no root help page"));
   }
 

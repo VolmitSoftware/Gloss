@@ -94,8 +94,6 @@ public final class GlossCommandService implements CommandExecutor, TabCompleter,
     private static final Set<String> SCOPED_POSITIONAL_ROOTS = Set.of(
             "menu", "menus", "panel", "panels", "preview", "previews", "item", "items", "sync", "import"
     );
-    private static final int HELP_PAGE_SIZE = 8;
-
     private final Gloss plugin;
     private final DirectorTheme theme;
     private final AtomicCache<Tree> directorCache = new AtomicCache<>();
@@ -598,11 +596,8 @@ public final class GlossCommandService implements CommandExecutor, TabCompleter,
     }
 
     private boolean sendHelpIfRequested(CommandSender sender, String[] args) {
-        Optional<DirectorMiniMenu.DirectorHelpPage> page = DirectorMiniMenu.resolveHelp(
-                getDirector(),
-                Arrays.asList(normalizeHelpArgs(args)),
-                HELP_PAGE_SIZE
-        );
+        List<String> helpArgs = Arrays.asList(normalizeHelpArgs(args));
+        Optional<DirectorMiniMenu.DirectorHelpPage> page = DirectorMiniMenu.resolveHelp(getDirector(), helpArgs);
         if (page.isEmpty()) {
             return false;
         }

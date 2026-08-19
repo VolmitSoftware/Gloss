@@ -15,7 +15,6 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
 class GlossBoardMetaRenderPlanTest {
-    private static final int MAX_TITLE_LENGTH = 32;
     private static final int MAX_LINES = 15;
 
     private final List<String> rendered = new ArrayList<>();
@@ -107,8 +106,8 @@ class GlossBoardMetaRenderPlanTest {
     void anEmojiRegistryChangeRebuildsThePlan() {
         GlossBoardMeta meta = new GlossBoardMeta("stats");
         meta.addLine(":heart:");
-        GlossBoardMeta.RenderPlan first = meta.renderPlan(1L, MAX_TITLE_LENGTH, MAX_LINES, staticRender);
-        GlossBoardMeta.RenderPlan second = meta.renderPlan(2L, MAX_TITLE_LENGTH, MAX_LINES, staticRender);
+        GlossBoardMeta.RenderPlan first = meta.renderPlan(1L, MAX_LINES, staticRender);
+        GlossBoardMeta.RenderPlan second = meta.renderPlan(2L, MAX_LINES, staticRender);
 
         assertNotSame(first, second);
         assertEquals(2, rendered.size());
@@ -127,14 +126,13 @@ class GlossBoardMetaRenderPlanTest {
     }
 
     @Test
-    void theStaticTitleIsTruncatedToTheBoardLimit() {
+    void theStaticTitleIsPreservedForSharedBoardFitting() {
         GlossBoardMeta meta = new GlossBoardMeta("stats");
-        meta.setTitle("&aabcdefghijklmnopqrstuvwxyz");
+        meta.setTitle("&aabcdefghijklmnopqrstuvwxyz\uD840\uDC00tail");
 
-        GlossBoardMeta.RenderPlan plan = meta.renderPlan(0L, 8, MAX_LINES, staticRender);
+        GlossBoardMeta.RenderPlan plan = meta.renderPlan(0L, MAX_LINES, staticRender);
 
-        assertEquals(8, plan.staticTitle().length());
-        assertEquals("&AABCDEF", plan.staticTitle());
+        assertEquals("&AABCDEFGHIJKLMNOPQRSTUVWXYZ\uD840\uDC00TAIL", plan.staticTitle());
     }
 
     @Test
@@ -152,12 +150,12 @@ class GlossBoardMetaRenderPlanTest {
         GlossBoardMeta meta = new GlossBoardMeta("stats");
         meta.addLine("&7Online");
 
-        GlossBoardMeta.RenderPlan plan = meta.renderPlan(0L, MAX_TITLE_LENGTH, MAX_LINES, raw -> null);
+        GlossBoardMeta.RenderPlan plan = meta.renderPlan(0L, MAX_LINES, raw -> null);
 
         assertEquals("", plan.staticLine(0));
     }
 
     private GlossBoardMeta.RenderPlan plan(GlossBoardMeta meta) {
-        return meta.renderPlan(0L, MAX_TITLE_LENGTH, MAX_LINES, staticRender);
+        return meta.renderPlan(0L, MAX_LINES, staticRender);
     }
 }

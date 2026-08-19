@@ -5,8 +5,12 @@ import art.arcane.gloss.Gloss;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.logging.Level;
@@ -41,6 +45,32 @@ public final class ShippedDefaults {
 
     public List<String> resetToDefault(String nameOrStar) {
         return extract(normalize(nameOrStar), true);
+    }
+
+    public boolean replaceIfExact(String name, byte[] expected) {
+        Objects.requireNonNull(expected, "expected");
+        if (!names.contains(name)) {
+            return false;
+        }
+        Path file = new File(folder, name + EXTENSION).toPath();
+        if (!Files.isRegularFile(file)) {
+            return false;
+        }
+        try {
+            if (!matchesExact(file, expected)) {
+                return false;
+            }
+            byte[] replacement = readResource(name);
+            if (replacement == null) {
+                Gloss.log(Level.WARNING, "%s/%s%s: missing from the jar, not upgraded.", kind, name, EXTENSION);
+                return false;
+            }
+            return replaceAtomically(file, expected, replacement);
+        } catch (IOException failure) {
+            Gloss.log(Level.WARNING, "%s/%s%s: %s", kind, name, EXTENSION,
+                failure.getMessage() == null ? failure.getClass().getSimpleName() : failure.getMessage());
+            return false;
+        }
     }
 
     public static String normalize(String nameOrStar) {
@@ -78,5 +108,38 @@ public final class ShippedDefaults {
             }
         }
         return written;
+    }
+
+    private byte[] readResource(String name) throws IOException {
+        try (InputStream stream = ShippedDefaults.class.getResourceAsStream(resourcePath(name))) {
+            return stream == null ? null : stream.readAllBytes();
+        }
+    }
+
+    private boolean matchesExact(Path file, byte[] expected) throws IOException {
+        if (Files.size(file) != expected.length) {
+            return false;
+        }
+        try (InputStream stream = Files.newInputStream(file)) {
+            return Arrays.equals(stream.readNBytes(expected.length), expected) && stream.read() == -1;
+        }
+    }
+
+    private boolean replaceAtomically(Path file, byte[] expected, byte[] content) throws IOException {
+        Path temporary = Files.createTempFile(file.getParent(), "." + file.getFileName(), ".tmp");
+        try {
+            Files.write(temporary, content);
+            if (!matchesExact(file, expected)) {
+                return false;
+            }
+            try {
+                Files.move(temporary, file, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+            } catch (AtomicMoveNotSupportedException unsupported) {
+                Files.move(temporary, file, StandardCopyOption.REPLACE_EXISTING);
+            }
+            return true;
+        } finally {
+            Files.deleteIfExists(temporary);
+        }
     }
 }

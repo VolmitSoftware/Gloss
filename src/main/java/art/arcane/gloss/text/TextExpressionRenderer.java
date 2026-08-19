@@ -13,22 +13,28 @@ import org.bukkit.entity.Player;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.DoubleSupplier;
+import java.util.function.IntSupplier;
 
 public final class TextExpressionRenderer {
     private static final int CACHE_LIMIT = 4096;
     private static final int SOURCE_LIMIT = 1024;
 
     private final Gloss plugin;
-    private final DoubleSupplier serverTps;
+    private final RuntimeValues runtimeValues;
     private final Map<String, Expr> cache;
     private final Set<String> failed;
 
     TextExpressionRenderer(Gloss plugin, DoubleSupplier serverTps) {
+        this(plugin, RuntimeValues.bukkit(serverTps));
+    }
+
+    TextExpressionRenderer(Gloss plugin, RuntimeValues runtimeValues) {
         this.plugin = plugin;
-        this.serverTps = serverTps;
+        this.runtimeValues = Objects.requireNonNull(runtimeValues, "runtimeValues");
         this.cache = new ConcurrentHashMap<>();
         this.failed = ConcurrentHashMap.newKeySet();
     }
@@ -112,9 +118,9 @@ public final class TextExpressionRenderer {
                 case "time.ms" -> (double) nowMs;
                 case "time.seconds" -> nowMs / 1000.0D;
                 case "time.ticks" -> nowMs / 50.0D;
-                case "server.online" -> (double) Bukkit.getOnlinePlayers().size();
-                case "server.maxPlayers" -> (double) Bukkit.getMaxPlayers();
-                case "server.tps" -> serverTps.getAsDouble();
+                case "server.online" -> (double) runtimeValues.onlinePlayers().getAsInt();
+                case "server.maxPlayers" -> (double) runtimeValues.maxPlayers().getAsInt();
+                case "server.tps" -> runtimeValues.serverTps().getAsDouble();
                 case "player.name" -> viewer == null ? null : viewer.getName();
                 case "player.ping" -> viewer == null ? null : (double) viewer.getPing();
                 case "player.health" -> viewer == null ? null : viewer.getHealth();
@@ -140,8 +146,14 @@ public final class TextExpressionRenderer {
             }
             Object fallback = args.size() == 2 ? args.get(1) : null;
             validateFallback(numeric, fallback);
-            String token = name.startsWith("%") && name.endsWith("%") ? name : "%" + name + "%";
+            boolean wrapped = name.length() >= 2 && name.startsWith("%") && name.endsWith("%");
+            String key = wrapped ? name.substring(1, name.length() - 1) : name;
+            String token = wrapped ? name : "%" + name + "%";
             if (viewer == null) {
+                Object nativeValue = nativePapiValue(key);
+                if (nativeValue != null) {
+                    return convertPapiValue(nativeValue, numeric, fallback);
+                }
                 if (fallback != null) {
                     return fallback;
                 }
@@ -151,11 +163,42 @@ public final class TextExpressionRenderer {
                 return token;
             }
             String value = Placeholders.setPlaceholders(viewer, token);
-            if (value.equals(token) && fallback != null) {
+            if (!value.equals(token)) {
+                return convertPapiValue(value, numeric, fallback);
+            }
+            Object nativeValue = nativePapiValue(key);
+            if (nativeValue != null) {
+                return convertPapiValue(nativeValue, numeric, fallback);
+            }
+            if (fallback != null) {
                 return fallback;
             }
             if (!numeric) {
                 return value;
+            }
+            return convertPapiValue(value, true, null);
+        }
+
+        private Object nativePapiValue(String key) {
+            String variableName = switch (key) {
+                case "player_name" -> "player.name";
+                case "player_ping" -> "player.ping";
+                case "player_health" -> "player.health";
+                case "player_level" -> "player.level";
+                case "server_online" -> "server.online";
+                case "server_max_players" -> "server.maxPlayers";
+                case "server_tps" -> "server.tps";
+                default -> null;
+            };
+            return variableName == null ? null : variable(variableName);
+        }
+
+        private Object convertPapiValue(Object value, boolean numeric, Object fallback) {
+            if (!numeric) {
+                return ExprFunctions.call("str", List.of(value));
+            }
+            if (value instanceof Number number) {
+                return number.doubleValue();
             }
             try {
                 return ExprFunctions.call("number", List.of(value));
@@ -198,8 +241,23 @@ public final class TextExpressionRenderer {
         }
 
         private Double metric(String key) {
+            if ("react.tps".equals(key)) {
+                return runtimeValues.serverTps().getAsDouble();
+            }
             IntegrationBridgeService service = plugin == null ? null : plugin.getIntegrationBridge();
             return service == null ? null : service.bridge().value(key, nowMs);
+        }
+    }
+
+    record RuntimeValues(IntSupplier onlinePlayers, IntSupplier maxPlayers, DoubleSupplier serverTps) {
+        RuntimeValues {
+            Objects.requireNonNull(onlinePlayers, "onlinePlayers");
+            Objects.requireNonNull(maxPlayers, "maxPlayers");
+            Objects.requireNonNull(serverTps, "serverTps");
+        }
+
+        static RuntimeValues bukkit(DoubleSupplier serverTps) {
+            return new RuntimeValues(() -> Bukkit.getOnlinePlayers().size(), Bukkit::getMaxPlayers, serverTps);
         }
     }
 }

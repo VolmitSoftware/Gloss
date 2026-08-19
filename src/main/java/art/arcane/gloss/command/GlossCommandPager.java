@@ -10,9 +10,10 @@ import org.bukkit.command.CommandSender;
 import java.util.List;
 
 final class GlossCommandPager {
-    static final int TEXT_PAGE_SIZE = 12;
-    static final int EMOJI_PAGE_SIZE = 24;
+    static final int TEXT_PAGE_SIZE = DirectorMiniMenu.MENU_LINE_COUNT - 4;
+    static final int ITEM_STATUS_PAGE_SIZE = DirectorMiniMenu.MENU_LINE_COUNT - 6;
     static final int EMOJI_COLUMNS = 3;
+    static final int EMOJI_PAGE_SIZE = TEXT_PAGE_SIZE * EMOJI_COLUMNS;
 
     private GlossCommandPager() {
     }

@@ -3,6 +3,7 @@ package art.arcane.gloss.command;
 import art.arcane.gloss.locale.GlossLocalization;
 import art.arcane.gloss.locale.GlossMessages;
 import art.arcane.volmlib.util.director.compat.DirectorEngineFactory;
+import art.arcane.volmlib.util.director.help.DirectorMiniMenu;
 import art.arcane.volmlib.util.director.runtime.DirectorParameterDescriptor;
 import art.arcane.volmlib.util.director.runtime.DirectorRuntimeEngine;
 import art.arcane.volmlib.util.director.runtime.DirectorRuntimeNode;
@@ -195,6 +196,22 @@ class GlossCommandTreeTest {
             String resolved = GlossLocalization.globalDirectorText(textKey, MessageArgs.empty());
             Assertions.assertEquals(textKey.english(), resolved, key.id());
         }
+    }
+
+    @Test
+    void rootAndSubmenuHelpStayWithinNineteenLines() {
+        DirectorRuntimeEngine engine = DirectorEngineFactory.create(new CommandGloss(null));
+        DirectorMiniMenu.DirectorHelpPage root = DirectorMiniMenu.resolveHelp(
+                engine, List.of()).orElseThrow();
+        DirectorMiniMenu.DirectorHelpPage submenu = DirectorMiniMenu.resolveHelp(
+                engine, List.of("panel")).orElseThrow();
+
+        Assertions.assertEquals(16, root.entries().size());
+        Assertions.assertEquals(18, DirectorMiniMenu.render(
+                root, GlossCommandService.menuTheme(), GlossLocalization.globalDirectorResolver()).size());
+        Assertions.assertEquals(16, submenu.entries().size());
+        Assertions.assertEquals(DirectorMiniMenu.MENU_LINE_COUNT, DirectorMiniMenu.render(
+                submenu, GlossCommandService.menuTheme(), GlossLocalization.globalDirectorResolver()).size());
     }
 
     private static DirectorRuntimeNode glossRoot() {

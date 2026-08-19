@@ -9,14 +9,31 @@ import art.arcane.gloss.text.TextPipeline;
 import art.arcane.volmlib.util.math.M;
 
 import java.io.File;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.logging.Level;
 
 public final class AnimationService {
     private static final String FUNCTION_PREFIX = "animation.";
+    private static final String RAINBOW_NAME = "rainbow";
+    private static final String LEGACY_RAINBOW_DEFAULT = """
+        {
+          "schemaVersion": 1,
+          "revision": 1,
+          "mode": "ascend",
+          "frameIntervalMs": 500,
+          "frames": [
+            "&cGloss",
+            "&6Gloss",
+            "&aGloss",
+            "&bGloss"
+          ]
+        }
+        """;
 
     private final Gloss plugin;
     private final File folder;
@@ -43,6 +60,10 @@ public final class AnimationService {
             return;
         }
         defaults.extractMissing();
+        if (upgradeLegacyRainbowDefault(defaults)) {
+            Gloss.log(Level.INFO,
+                "animations/rainbow.json: upgraded the unchanged legacy shipped default.");
+        }
         registry.reload();
         rebuild();
         plugin.watchdog().register("animations", this::pollRegistry);
@@ -80,6 +101,10 @@ public final class AnimationService {
 
     public List<String> resetToDefault(String nameOrStar) {
         return defaults.resetToDefault(nameOrStar);
+    }
+
+    static boolean upgradeLegacyRainbowDefault(ShippedDefaults defaults) {
+        return defaults.replaceIfExact(RAINBOW_NAME, LEGACY_RAINBOW_DEFAULT.getBytes(StandardCharsets.UTF_8));
     }
 
     private void pollRegistry() {
