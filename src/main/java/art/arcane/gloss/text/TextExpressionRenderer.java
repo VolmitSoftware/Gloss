@@ -157,7 +157,7 @@ public final class TextExpressionRenderer {
 
         private Double metric(String key) {
             IntegrationBridgeService service = plugin == null ? null : plugin.getIntegrationBridge();
-            return service == null ? null : service.bridge().published().get(key);
+            return service == null ? null : service.bridge().value(key, nowMs);
         }
     }
 }

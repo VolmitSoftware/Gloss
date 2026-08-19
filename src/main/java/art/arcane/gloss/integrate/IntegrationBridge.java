@@ -105,6 +105,11 @@ public final class IntegrationBridge {
         return rendered == null ? "" : rendered;
     }
 
+    public Double value(String key, long nowMs) {
+        references.reference(key, nowMs);
+        return publication.values().get(key);
+    }
+
     public Map<String, Object> previewValues(String namespace, long nowMs) {
         Map<String, Double> published = publication.values();
         Map<String, Object> out = new HashMap<>();
