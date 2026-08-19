@@ -16,54 +16,10 @@ class BoardSelectionTest {
         return meta;
     }
 
-    @Test
-    void groupDefaultBoardWinsOverEverything() {
-        List<GlossBoardMeta> boards = List.of(
-            board("gated", false, "vip"),
-            board("group-board", false, "default"),
-            board("main", true, "default")
-        );
-
-        String chosen = BoardService.selectBoardId("group-board", boards, node -> true);
-
-        assertEquals("group-board", chosen);
-    }
-
-    @Test
-    void missingGroupDefaultFallsThroughToPermissionGated() {
-        List<GlossBoardMeta> boards = List.of(
-            board("gated", false, "vip"),
-            board("main", true, "default")
-        );
-
-        String chosen = BoardService.selectBoardId("gone", boards, Set.of("gloss.board.vip")::contains);
-
-        assertEquals("gated", chosen);
-    }
-
-    @Test
-    void nullGroupDefaultUsesFirstGrantedGatedBoard() {
-        List<GlossBoardMeta> boards = List.of(
-            board("alpha", false, "alpha"),
-            board("beta", false, "beta"),
-            board("main", true, "default")
-        );
-
-        String chosen = BoardService.selectBoardId(null, boards, Set.of("gloss.board.beta")::contains);
-
-        assertEquals("beta", chosen);
-    }
-
-    @Test
-    void blankGroupDefaultBehavesLikeNull() {
-        List<GlossBoardMeta> boards = List.of(
-            board("gated", false, "vip"),
-            board("main", true, "default")
-        );
-
-        String chosen = BoardService.selectBoardId("   ", boards, node -> true);
-
-        assertEquals("gated", chosen);
+    private static GlossBoardMeta board(String id, boolean primary, String permission, List<String> groups) {
+        GlossBoardMeta meta = board(id, primary, permission);
+        meta.setGroups(groups);
+        return meta;
     }
 
     @Test
@@ -76,6 +32,18 @@ class BoardSelectionTest {
         String chosen = BoardService.selectBoardId(null, boards, node -> true);
 
         assertEquals("first", chosen);
+    }
+
+    @Test
+    void grantedGatedBoardWinsOverPrimary() {
+        List<GlossBoardMeta> boards = List.of(
+            board("gated", false, "vip"),
+            board("main", true, "default")
+        );
+
+        String chosen = BoardService.selectBoardId(null, boards, Set.of("gloss.board.vip")::contains);
+
+        assertEquals("gated", chosen);
     }
 
     @Test
@@ -129,6 +97,97 @@ class BoardSelectionTest {
 
     @Test
     void emptyBoardListYieldsNull() {
-        assertNull(BoardService.selectBoardId("anything", List.of(), node -> true));
+        assertNull(BoardService.selectBoardId("anygroup", List.of(), node -> true));
+    }
+
+    @Test
+    void groupMatchedBoardWinsOverPermissionAndPrimary() {
+        List<GlossBoardMeta> boards = List.of(
+            board("gated", false, "vip"),
+            board("staff-board", false, "default", List.of("staff")),
+            board("main", true, "default")
+        );
+
+        String chosen = BoardService.selectBoardId("staff", boards, node -> true);
+
+        assertEquals("staff-board", chosen);
+    }
+
+    @Test
+    void unmatchedPrimaryGroupFallsThrough() {
+        List<GlossBoardMeta> boards = List.of(
+            board("staff-board", false, "default", List.of("staff")),
+            board("main", true, "default")
+        );
+
+        String chosen = BoardService.selectBoardId("builders", boards, node -> false);
+
+        assertEquals("main", chosen);
+    }
+
+    @Test
+    void nullOrBlankPrimaryGroupSkipsGroupMatching() {
+        List<GlossBoardMeta> boards = List.of(
+            board("staff-board", false, "default", List.of("staff")),
+            board("main", true, "default")
+        );
+
+        assertEquals("main", BoardService.selectBoardId(null, boards, node -> false));
+        assertEquals("main", BoardService.selectBoardId("  ", boards, node -> false));
+    }
+
+    @Test
+    void aGroupMatchedBoardTheViewerLacksPermissionForIsSkipped() {
+        List<GlossBoardMeta> boards = List.of(
+            board("staff-board", false, "vip", List.of("staff")),
+            board("staff-open", false, "default", List.of("staff")),
+            board("main", true, "default")
+        );
+
+        assertEquals("staff-open", BoardService.selectBoardId("staff", boards, node -> false));
+        assertEquals("staff-board", BoardService.selectBoardId("staff", boards, node -> true));
+    }
+
+    @Test
+    void aGroupMatchIsStillOnlyReachedThroughItsOwnPermission() {
+        List<GlossBoardMeta> boards = List.of(
+            board("staff-board", false, "vip", List.of("staff")),
+            board("main", true, "default")
+        );
+
+        assertEquals("main", BoardService.selectBoardId("staff", boards, node -> false));
+        assertEquals("staff-board",
+            BoardService.selectBoardId("staff", boards, Set.of("gloss.board.vip")::contains));
+    }
+
+    @Test
+    void aPrimaryBoardTheViewerLacksPermissionForIsSkipped() {
+        List<GlossBoardMeta> boards = List.of(
+            board("primary-gated", true, "vip"),
+            board("primary-open", true, "default")
+        );
+
+        assertEquals("primary-open", BoardService.selectBoardId(null, boards, node -> false));
+    }
+
+    @Test
+    void aGatedPrimaryBoardIsTheOnlyCandidateAndIsDeniedToAViewerWithoutIt() {
+        List<GlossBoardMeta> boards = List.of(board("primary-gated", true, "vip"));
+
+        assertNull(BoardService.selectBoardId(null, boards, node -> false));
+        assertEquals("primary-gated",
+            BoardService.selectBoardId(null, boards, Set.of("gloss.board.vip")::contains));
+    }
+
+    @Test
+    void firstGroupMatchedBoardWinsInOrder() {
+        List<GlossBoardMeta> boards = List.of(
+            board("first", false, "default", List.of("staff")),
+            board("second", false, "default", List.of("staff"))
+        );
+
+        String chosen = BoardService.selectBoardId("staff", boards, node -> false);
+
+        assertEquals("first", chosen);
     }
 }

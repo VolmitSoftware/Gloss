@@ -10,8 +10,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 class EmojiReplacerTest {
     private final EmojiReplacer replacer = new EmojiReplacer(List.of(
         new EmojiEntry("heart", "<3", "❤", true),
-        new EmojiEntry("star", EmojiEntry.NO_TRIGGER, "✳", true),
-        new EmojiEntry("off", EmojiEntry.NO_TRIGGER, "X", false)
+        new EmojiEntry("star", "", "✳", true),
+        new EmojiEntry("off", "", "X", false)
     ));
 
     @Test

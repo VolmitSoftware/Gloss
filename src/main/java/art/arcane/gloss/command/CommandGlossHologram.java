@@ -2,6 +2,7 @@ package art.arcane.gloss.command;
 
 import art.arcane.gloss.Gloss;
 import art.arcane.gloss.api.Hologram;
+import art.arcane.gloss.hologram.HologramBaselines;
 import art.arcane.gloss.locale.GlossLocalization;
 import art.arcane.gloss.locale.GlossMessages;
 import art.arcane.volmlib.util.director.DirectorOrigin;
@@ -19,7 +20,7 @@ import java.util.List;
 
 @Director(name = "hologram", aliases = {"holo", "h"}, descriptionKey = "command.help.hologram", description = "Create and manage holograms")
 public class CommandGlossHologram {
-    private static final String DEFAULT_LINE = "&dNew hologram";
+    private static final String LIST_COMMAND = "/gloss hologram list";
 
     private final Gloss plugin;
 
@@ -39,7 +40,7 @@ public class CommandGlossHologram {
         }
 
         Hologram hologram = plugin.holograms().create(id, player.getLocation());
-        hologram.addLine(DEFAULT_LINE);
+        hologram.setLines(HologramBaselines.defaultLines());
         GlossCommandMessages.send(player, GlossMessages.HOLOGRAM_CREATED, MessageArgument.untrusted("id", id));
     }
 
@@ -188,21 +189,23 @@ public class CommandGlossHologram {
     }
 
     @Director(name = "list", descriptionKey = "command.help.hologram.list", description = "List holograms; click one to teleport")
-    public void list(@Param(name = "sender", contextual = true) CommandSender sender) {
+    public void list(@Param(name = "sender", contextual = true) CommandSender sender,
+                     @Param(name = "page", defaultValue = "1", descriptionKey = "command.help.arg.list_page", description = "One-based list page") int page) {
         List<Hologram> holograms = plugin.holograms().all();
         if (holograms.isEmpty()) {
             GlossCommandMessages.send(sender, GlossMessages.HOLOGRAM_LIST_EMPTY);
             return;
         }
 
+        GlossCommandPager.Window window = GlossCommandPager.window(holograms.size(), page, GlossCommandPager.TEXT_PAGE_SIZE);
         DirectorMiniMenu.Theme theme = GlossCommandService.menuTheme();
-        String hover = DirectorMiniMenu.escapeText(GlossLocalization.english()
-                .directorText(GlossMessages.HOLOGRAM_LIST_HOVER, MessageArgs.empty()));
-        List<String> lines = new ArrayList<>(holograms.size() + 2);
-        lines.add(DirectorMiniMenu.banner("/gloss hologram list", theme));
-        for (Hologram hologram : holograms) {
+        String hover = DirectorMiniMenu.escapeText(GlossLocalization.globalDirectorText(GlossMessages.HOLOGRAM_LIST_HOVER, MessageArgs.empty()));
+        List<String> lines = new ArrayList<>();
+        lines.add(DirectorMiniMenu.banner(LIST_COMMAND, theme));
+        for (Hologram hologram : holograms.subList(window.startIndex(), window.endIndex())) {
             lines.add(renderListEntry(hologram, theme, hover));
         }
+        GlossCommandPager.appendFooter(lines, window, LIST_COMMAND, theme);
         lines.add(DirectorMiniMenu.bar(theme));
         DirectorMiniMenu.deliver(sender, lines);
     }
@@ -280,7 +283,7 @@ public class CommandGlossHologram {
     private String renderListEntry(Hologram hologram, DirectorMiniMenu.Theme theme, String hover) {
         String display = DirectorMiniMenu.escapeText(hologram.id());
         String click = "/gloss hologram tp " + hologram.id().replace("'", "");
-        String suffix = DirectorMiniMenu.escapeText(GlossLocalization.english().directorText(
+        String suffix = DirectorMiniMenu.escapeText(GlossLocalization.globalDirectorText(
                 GlossMessages.HOLOGRAM_LIST_LINES,
                 GlossLocalization.args(MessageArgument.trusted("count", hologram.lines().size()))));
         return "<hover:show_text:'" + hover + "'><click:run_command:'" + click + "'>"

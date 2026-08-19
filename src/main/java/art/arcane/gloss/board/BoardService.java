@@ -1,17 +1,18 @@
 package art.arcane.gloss.board;
 
 import art.arcane.gloss.Gloss;
-import art.arcane.gloss.group.GlossGroup;
+import art.arcane.gloss.doc.DocumentDelta;
+import art.arcane.gloss.doc.DocumentRegistry;
+import art.arcane.gloss.doc.DocumentReviser;
+import art.arcane.gloss.doc.DocumentStore;
+import art.arcane.gloss.doc.GlossDocument;
+import art.arcane.gloss.doc.ShippedDefaults;
+import art.arcane.gloss.doc.ShippedDocumentCatalog;
 import art.arcane.volmlib.util.board.Board;
 import art.arcane.volmlib.util.board.BoardManager;
 import art.arcane.volmlib.util.board.BoardProvider;
 import art.arcane.volmlib.util.board.BoardSettings;
 import art.arcane.volmlib.util.board.ScoreDirection;
-import art.arcane.volmlib.util.io.FolderWatcher;
-import art.arcane.volmlib.util.io.IO;
-import art.arcane.volmlib.util.json.JSONException;
-import art.arcane.volmlib.util.json.JSONObject;
-import art.arcane.volmlib.util.math.M;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -25,7 +26,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -33,36 +34,51 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Predicate;
+import java.util.logging.Level;
 
 public final class BoardService implements Listener {
     private static final int MAX_LINES = 15;
     private static final int MAX_TITLE_LENGTH = 32;
-    private static final long SELF_WRITE_SUPPRESS_MS = 10000L;
-    private static final String BOARD_FILE_SUFFIX = ".json";
+
+    private static final DocumentReviser<BoardDoc> REVISER = new DocumentReviser<>() {
+        @Override
+        public long revisionOf(BoardDoc value) {
+            return value.revision();
+        }
+
+        @Override
+        public BoardDoc withRevision(BoardDoc value, long revision) {
+            return value.withRevision(revision);
+        }
+    };
 
     private final Gloss plugin;
+    private final ShippedDefaults defaults;
+    private final DocumentRegistry<BoardDoc> registry;
+    private final DocumentStore<BoardDoc> store;
     private final Map<String, GlossBoardMeta> metas;
     private final Map<UUID, String> selections;
     private final Set<UUID> sticky;
-    private final Map<String, Long> selfWrites;
     private volatile BoardManager<Board> manager;
     private volatile int managerIntervalTicks;
-    private volatile FolderWatcher watcher;
-    private volatile int watcherTaskId;
 
     public BoardService(Gloss plugin) {
         this.plugin = plugin;
+        File folder = new File(plugin.getDataFolder(), BoardDoc.KIND);
+        this.store = new DocumentStore<>(BoardDoc.KIND, folder, REVISER);
+        this.defaults = new ShippedDefaults(BoardDoc.KIND, folder, ShippedDocumentCatalog.BOARDS.names());
+        this.registry = DocumentRegistry.folder(BoardDoc.KIND, folder, BoardDoc::parse, BoardDoc::revision,
+            store::isOwnWrite);
         this.metas = new ConcurrentHashMap<>();
         this.selections = new ConcurrentHashMap<>();
         this.sticky = ConcurrentHashMap.newKeySet();
-        this.selfWrites = new ConcurrentHashMap<>();
-        this.watcherTaskId = -1;
     }
 
-    public static String selectBoardId(String groupDefaultBoard, List<GlossBoardMeta> boards, Predicate<String> permissionTest) {
-        if (groupDefaultBoard != null && !groupDefaultBoard.isBlank()) {
+    public static String selectBoardId(String primaryGroup, List<GlossBoardMeta> boards,
+                                       Predicate<String> permissionTest) {
+        if (primaryGroup != null && !primaryGroup.isBlank()) {
             for (GlossBoardMeta meta : boards) {
-                if (meta.id().equals(groupDefaultBoard)) {
+                if (meta.groups().contains(primaryGroup) && permitted(meta, permissionTest)) {
                     return meta.id();
                 }
             }
@@ -73,44 +89,44 @@ public final class BoardService implements Listener {
             }
         }
         for (GlossBoardMeta meta : boards) {
-            if (meta.primary()) {
+            if (meta.primary() && permitted(meta, permissionTest)) {
                 return meta.id();
             }
         }
         return null;
     }
 
+    private static boolean permitted(GlossBoardMeta meta, Predicate<String> permissionTest) {
+        return !meta.permissionGated() || permissionTest.test(meta.permissionNode());
+    }
+
     public void enable() {
+        defaults.extractMissing();
         loadAllBoards();
-        watcher = new FolderWatcher(boardsFolder());
         Bukkit.getPluginManager().registerEvents(this, plugin);
         if (plugin.cfg().boards().enabled()) {
             createManager();
         }
-        startWatcherTask();
+        plugin.watchdog().register("boards", this::pollRegistry);
         plugin.scheduler().s(this::selectAllAutomatically, 1);
     }
 
     public void disable() {
         HandlerList.unregisterAll(this);
-        stopWatcherTask();
+        plugin.watchdog().unregister("boards");
         BoardManager<Board> activeManager = manager;
         manager = null;
         if (activeManager != null) {
             activeManager.onDisable();
         }
-        watcher = null;
         selections.clear();
         sticky.clear();
-        selfWrites.clear();
         metas.clear();
+        store.forgetAll();
     }
 
     public void reload() {
         loadAllBoards();
-        watcher = new FolderWatcher(boardsFolder());
-        stopWatcherTask();
-        startWatcherTask();
         boolean enabled = plugin.cfg().boards().enabled();
         BoardManager<Board> activeManager = manager;
         if (enabled && activeManager == null) {
@@ -146,10 +162,10 @@ public final class BoardService implements Listener {
         if (removed == null) {
             return false;
         }
-        File file = boardFile(boardId);
-        selfWrites.put(file.getAbsolutePath(), M.ms());
-        if (file.exists() && !file.delete()) {
-            Gloss.warn("Unable to delete board file " + file.getName());
+        try {
+            store.delete(boardId);
+        } catch (IOException failure) {
+            Gloss.warn("Unable to delete board file " + boardId + ".json: " + failure.getMessage());
         }
         for (Player player : Bukkit.getOnlinePlayers()) {
             if (boardId.equals(selections.get(player.getUniqueId()))) {
@@ -171,9 +187,12 @@ public final class BoardService implements Listener {
             return;
         }
         metas.put(meta.id(), meta);
-        String payload = meta.toJson().toString(4);
-        File file = boardFile(meta.id());
-        plugin.scheduler().a(() -> writeBoardFile(file, payload), 0);
+        BoardDoc doc = meta.toDoc(meta.nextRevision());
+        plugin.scheduler().a(() -> writeBoard(meta.id(), doc), 0);
+    }
+
+    public List<String> resetToDefault(String nameOrStar) {
+        return defaults.resetToDefault(nameOrStar);
     }
 
     public Optional<String> boardIdFor(Player player) {
@@ -227,17 +246,6 @@ public final class BoardService implements Listener {
         }
     }
 
-    private void startWatcherTask() {
-        watcherTaskId = plugin.scheduler().ar(this::pollWatcher, plugin.cfg().hotload().watchIntervalTicks());
-    }
-
-    private void stopWatcherTask() {
-        if (watcherTaskId != -1) {
-            plugin.scheduler().car(watcherTaskId);
-            watcherTaskId = -1;
-        }
-    }
-
     private void createManager() {
         int intervalTicks = plugin.cfg().boards().updateIntervalTicks();
         BoardSettings settings = new BoardSettings(new SelectionBoardProvider(), ScoreDirection.DOWN, intervalTicks);
@@ -252,11 +260,8 @@ public final class BoardService implements Listener {
     }
 
     private void selectAutomatically(Player player) {
-        String groupDefault = plugin.groups().groupFor(player)
-            .map(GlossGroup::defaultBoard)
-            .filter(board -> !board.isBlank())
-            .orElse(null);
-        String chosen = selectBoardId(groupDefault, boards(), player::hasPermission);
+        String primaryGroup = plugin.groups().primaryGroupFor(player).orElse(null);
+        String chosen = selectBoardId(primaryGroup, boards(), player::hasPermission);
         if (chosen == null) {
             selections.remove(player.getUniqueId());
         } else {
@@ -298,94 +303,48 @@ public final class BoardService implements Listener {
     }
 
     private void loadAllBoards() {
-        Map<String, GlossBoardMeta> loaded = new HashMap<>();
-        File[] files = boardsFolder().listFiles((directory, name) -> name.endsWith(BOARD_FILE_SUFFIX));
-        if (files != null) {
-            for (File file : files) {
-                GlossBoardMeta meta = readBoardFile(file);
-                if (meta != null) {
-                    loaded.put(meta.id(), meta);
-                }
-            }
+        registry.reload();
+        Set<String> present = new HashSet<>();
+        for (GlossDocument<BoardDoc> document : registry.snapshot().values()) {
+            present.add(document.id());
+            metas.put(document.id(), GlossBoardMeta.fromDoc(document.id(), document.value()));
         }
-        metas.putAll(loaded);
-        metas.keySet().retainAll(loaded.keySet());
+        metas.keySet().retainAll(present);
     }
 
-    private GlossBoardMeta readBoardFile(File file) {
+    private void writeBoard(String id, BoardDoc doc) {
         try {
-            JSONObject json = new JSONObject(IO.readAll(file));
-            return GlossBoardMeta.fromJson(boardId(file), json);
-        } catch (JSONException failure) {
-            Gloss.warn("Invalid board json in " + file.getName() + ": " + failure.getMessage());
+            store.write(id, doc);
         } catch (IOException failure) {
-            Gloss.warn("Unable to read board file " + file.getName() + ": " + failure.getMessage());
-        }
-        return null;
-    }
-
-    private void writeBoardFile(File file, String payload) {
-        selfWrites.put(file.getAbsolutePath(), M.ms());
-        try {
-            IO.writeAll(file, payload);
-        } catch (IOException failure) {
-            Gloss.warn("Unable to save board file " + file.getName() + ": " + failure.getMessage());
+            Gloss.warn("Unable to save board file " + id + ".json: " + failure.getMessage());
         }
     }
 
-    private void pollWatcher() {
-        FolderWatcher activeWatcher = watcher;
-        if (activeWatcher == null || !activeWatcher.checkModified()) {
+    private void pollRegistry() {
+        DocumentDelta delta = registry.poll();
+        if (delta.isEmpty()) {
             return;
         }
         boolean dirty = false;
-        List<File> touched = new ArrayList<>(activeWatcher.getCreated());
-        touched.addAll(activeWatcher.getChanged());
-        for (File file : touched) {
-            if (!file.getName().endsWith(BOARD_FILE_SUFFIX) || suppressed(file)) {
+        for (String id : delta.loaded()) {
+            GlossDocument<BoardDoc> document = registry.get(id);
+            if (document == null) {
                 continue;
             }
-            GlossBoardMeta meta = readBoardFile(file);
-            if (meta != null) {
-                metas.put(meta.id(), meta);
-                dirty = true;
-            }
+            metas.put(id, GlossBoardMeta.fromDoc(id, document.value()));
+            Gloss.log(Level.INFO, "Board document \"%s\" changed and was reloaded.", id);
+            dirty = true;
         }
-        for (File file : activeWatcher.getDeleted()) {
-            if (!file.getName().endsWith(BOARD_FILE_SUFFIX) || suppressed(file)) {
-                continue;
-            }
-            dirty = metas.remove(boardId(file)) != null || dirty;
+        for (String id : delta.removed()) {
+            dirty = metas.remove(id) != null || dirty;
         }
         if (dirty) {
             reselectAll();
         }
     }
 
-    private boolean suppressed(File file) {
-        Long stamp = selfWrites.remove(file.getAbsolutePath());
-        return stamp != null && M.ms() - stamp < SELF_WRITE_SUPPRESS_MS;
-    }
-
     private String normalizeId(String id) {
         return id == null ? "" : id.trim().replace(" ", "-");
-    }
-
-    private String boardId(File file) {
-        String name = file.getName();
-        return name.substring(0, name.length() - BOARD_FILE_SUFFIX.length()).replace(" ", "-");
-    }
-
-    private File boardFile(String boardId) {
-        return new File(boardsFolder(), boardId + BOARD_FILE_SUFFIX);
-    }
-
-    private File boardsFolder() {
-        File folder = new File(plugin.getDataFolder(), "boards");
-        if (!folder.exists() && !folder.mkdirs()) {
-            Gloss.warn("Unable to create boards folder at " + folder.getAbsolutePath());
-        }
-        return folder;
     }
 
     private final class SelectionBoardProvider implements BoardProvider {

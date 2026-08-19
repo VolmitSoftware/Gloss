@@ -2,14 +2,26 @@ package art.arcane.gloss.api;
 
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
+import org.bukkit.plugin.Plugin;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 public interface GlossAPI {
     static GlossAPI get() {
         return GlossAPIProvider.get();
     }
+
+    HoloMenuHandle open(Plugin owner, Player player, HoloMenu menu);
+
+    HoloMenuHandle open(Plugin owner, Player player, String menuId);
+
+    boolean close(Player player);
+
+    boolean isOpen(Player player);
+
+    Set<String> menuIds();
 
     Hologram createHologram(String id, Location location);
 

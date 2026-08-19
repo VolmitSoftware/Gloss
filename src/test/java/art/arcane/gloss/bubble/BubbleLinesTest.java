@@ -18,6 +18,11 @@ class BubbleLinesTest {
     }
 
     @Test
+    void wrapsAtWordBoundariesInsteadOfHardCuttingMidWord() {
+        assertEquals(List.of("one two", "three", "four"), BubbleLines.split("one two three four", 9));
+    }
+
+    @Test
     void stripsSectionColorCodesBeforeWrapping() {
         assertEquals(List.of("hello world"), BubbleLines.split("§7hello §aworld", 32));
     }

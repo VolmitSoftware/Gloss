@@ -99,4 +99,20 @@ class AnimationClipTest {
         assertTrue(FRAMES.contains(clip.frameAt(System.currentTimeMillis())));
         assertTrue(FRAMES.contains(clip.frameAt(Long.MAX_VALUE / 2L)));
     }
+
+    @Test
+    void frameIndexMatchesFrameAtForEveryMode() {
+        for (AnimationMode mode : AnimationMode.values()) {
+            AnimationClip clip = new AnimationClip("i", 8.0D, mode, FRAMES);
+            for (long now = 0L; now < 2000L; now += 63L) {
+                assertEquals(clip.frameAt(now), FRAMES.get(clip.frameIndexAt(now)), mode + " @ " + now);
+            }
+        }
+    }
+
+    @Test
+    void frameIndexOfDegenerateClipsIsZero() {
+        assertEquals(0, new AnimationClip("s", 2.0D, AnimationMode.RANDOM, List.of("only")).frameIndexAt(987654L));
+        assertEquals(0, new AnimationClip("e", 2.0D, AnimationMode.ASCEND, List.of()).frameIndexAt(987654L));
+    }
 }

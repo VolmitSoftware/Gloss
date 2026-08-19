@@ -71,6 +71,40 @@ public final class TextPipeline implements TextRenderer {
         return render(null, raw);
     }
 
+    public String renderMenuText(Player viewer, String raw) {
+        if (raw == null || raw.isEmpty()) {
+            return "";
+        }
+        return applyColors(applyEmoji(viewer, raw));
+    }
+
+    public String applyEmoji(Player viewer, String raw) {
+        if (raw == null || raw.isEmpty()) {
+            return "";
+        }
+        BiFunction<Player, String, String> viewerEmoji = chatEmojiFilter;
+        if (viewer != null && viewerEmoji != null) {
+            return viewerEmoji.apply(viewer, raw);
+        }
+        UnaryOperator<String> emoji = emojiFilter;
+        return emoji == null ? raw : emoji.apply(raw);
+    }
+
+    public static String menuText(Player viewer, String raw) {
+        TextPipeline pipeline = active();
+        return pipeline == null ? raw : pipeline.renderMenuText(viewer, raw);
+    }
+
+    public static String emojiText(String raw) {
+        TextPipeline pipeline = active();
+        return pipeline == null ? raw : pipeline.applyEmoji(null, raw);
+    }
+
+    private static TextPipeline active() {
+        Gloss plugin = Gloss.instance;
+        return plugin == null ? null : plugin.text();
+    }
+
     @Override
     public String chat(Player sender, String message) {
         Player activeSender = Objects.requireNonNull(sender);
@@ -98,6 +132,10 @@ public final class TextPipeline implements TextRenderer {
 
         functions.put(name, resolver);
         failedFunctions.remove(name);
+    }
+
+    public boolean isFunction(String name) {
+        return name != null && functions.containsKey(name);
     }
 
     @Override

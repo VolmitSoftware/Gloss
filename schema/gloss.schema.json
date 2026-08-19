@@ -1,0 +1,991 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://volmit.com/gloss/schema.json",
+  "title": "Gloss Menu Config",
+  "description": "Defines a Gloss hologram menu and all its components. Documents live in plugins/Gloss/menus/ and are hot reloaded. Documentation grade only: the Java parser is the format's source of truth. See the Gloss docs pages /gloss/09-menus, /gloss/10-components-hitboxes, /gloss/11-icons and /gloss/12-actions in the central VolmitSoftware/docs repo.",
+  "type": "object",
+  "required": [
+    "offset",
+    "components"
+  ],
+  "properties": {
+    "offset": {
+      "description": "Offset from the player's feet location (Player#getLocation), which acts as the menu centre. Component rotation pivots on the eye; the X component is negated on load. Not scaled by uiScale.",
+      "$ref": "#/$defs/vector3"
+    },
+    "lockPosition": {
+      "description": "Defines whether the player is able to move while a menu is open, or will be frozen in place.",
+      "type": "boolean"
+    },
+    "followPlayer": {
+      "description": "Defines whether the menu follows the player, or will be frozen in place.",
+      "type": "boolean"
+    },
+    "maxDistance": {
+      "description": "Defines the maximum distance between the player and menu before it closes.",
+      "type": "number"
+    },
+    "closeOnDeath": {
+      "description": "Defines whether the menu closes when the player dies. Defaults to false.",
+      "type": "boolean"
+    },
+    "closeOnTeleport": {
+      "description": "Defines whether the menu closes when the player teleports. Defaults to false. A teleport that leaves the menu's world or its range closes the menu regardless.",
+      "type": "boolean"
+    },
+    "components": {
+      "description": "A list of menu components present in this menu.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/component"
+      }
+    }
+  },
+  "$defs": {
+    "vector3": {
+      "title": "3D Vector",
+      "description": "Represents a 3D floating-point vector.",
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": {
+        "type": "number"
+      }
+    },
+    "component": {
+      "title": "Gloss Component Object",
+      "description": "Defines the basic properties of a component.",
+      "type": "object",
+      "required": [
+        "id",
+        "offset",
+        "data"
+      ],
+      "properties": {
+        "id": {
+          "description": "A unique identifier for this menu option.",
+          "type": "string"
+        },
+        "offset": {
+          "description": "The offset relative to the menu's center point.",
+          "$ref": "#/$defs/vector3"
+        },
+        "data": {
+          "description": "The type and associated data of the object.",
+          "$ref": "#/$defs/componentData"
+        }
+      }
+    },
+    "componentData": {
+      "title": "Component Data Object",
+      "description": "Defines the type and data of a component.",
+      "type": "object",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "type": "string",
+          "description": "Defines the type of component.",
+          "enum": [
+            "button",
+            "decoration",
+            "toggle"
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "button"
+              }
+            }
+          },
+          "then": {
+            "$ref": "#/$defs/buttonComponent"
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "decoration"
+              }
+            }
+          },
+          "then": {
+            "$ref": "#/$defs/decoComponent"
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "toggle"
+              }
+            }
+          },
+          "then": {
+            "$ref": "#/$defs/toggleComponent"
+          }
+        }
+      ]
+    },
+    "action": {
+      "title": "Component Action Data Object",
+      "description": "Describes the actual effects of a interact-able component.",
+      "type": "object",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "type": "string",
+          "description": "Defines the type of action.",
+          "enum": [
+            "command",
+            "sound",
+            "message",
+            "teleport",
+            "connect",
+            "navigate"
+          ]
+        },
+        "trigger": {
+          "description": "Optional click binding. Omitted or null matches every accepted main-hand click.",
+          "default": "any",
+          "oneOf": [
+            {
+              "type": "string",
+              "enum": [
+                "any",
+                "left_click",
+                "right_click",
+                "shift_left_click",
+                "shift_right_click"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "command"
+              }
+            }
+          },
+          "then": {
+            "$ref": "#/$defs/commandAction"
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "sound"
+              }
+            }
+          },
+          "then": {
+            "$ref": "#/$defs/soundAction"
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "message"
+              }
+            }
+          },
+          "then": {
+            "$ref": "#/$defs/messageAction"
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "teleport"
+              }
+            }
+          },
+          "then": {
+            "$ref": "#/$defs/teleportAction"
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "connect"
+              }
+            }
+          },
+          "then": {
+            "$ref": "#/$defs/connectAction"
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "navigate"
+              }
+            }
+          },
+          "then": {
+            "$ref": "#/$defs/navigationAction"
+          }
+        }
+      ]
+    },
+    "iconDisplayStyle": {
+      "title": "Icon Display Style",
+      "description": "Optional display-entity metadata shared by text, image, item, block, and custom-item icons. Packet entity icons do not accept this object.",
+      "type": "object",
+      "dependentRequired": {
+        "blockLight": [
+          "skyLight"
+        ],
+        "skyLight": [
+          "blockLight"
+        ]
+      },
+      "properties": {
+        "billboard": {
+          "type": "string",
+          "enum": [
+            "fixed",
+            "vertical",
+            "horizontal",
+            "center"
+          ],
+          "default": "fixed"
+        },
+        "shadow": {
+          "type": "boolean",
+          "default": false
+        },
+        "seeThrough": {
+          "type": "boolean",
+          "default": false
+        },
+        "textAlignment": {
+          "type": "string",
+          "enum": [
+            "center",
+            "left",
+            "right"
+          ],
+          "default": "center"
+        },
+        "backgroundArgb": {
+          "type": "string",
+          "pattern": "^#[0-9A-Fa-f]{8}$",
+          "default": "#00000000"
+        },
+        "textOpacity": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 255,
+          "default": 255
+        },
+        "lineWidth": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 16384,
+          "default": 2000
+        },
+        "blockLight": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 15
+        },
+        "skyLight": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 15
+        },
+        "viewRange": {
+          "type": "number",
+          "minimum": 0.01,
+          "maximum": 64,
+          "default": 1
+        },
+        "shadowRadius": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 64,
+          "default": 0
+        },
+        "shadowStrength": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 0
+        },
+        "cullingWidth": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 4096,
+          "default": 0
+        },
+        "cullingHeight": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 4096,
+          "default": 0
+        },
+        "glowColor": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^#[0-9A-Fa-f]{8}$"
+        },
+        "scaleX": {
+          "type": "number",
+          "minimum": 0.01,
+          "maximum": 64,
+          "default": 1
+        },
+        "scaleY": {
+          "type": "number",
+          "minimum": 0.01,
+          "maximum": 64,
+          "default": 1
+        },
+        "scaleZ": {
+          "type": "number",
+          "minimum": 0.01,
+          "maximum": 64,
+          "default": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "icon": {
+      "title": "Component Icon Data Object",
+      "description": "Defines the visual parts of a component.",
+      "type": "object",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "type": "string",
+          "description": "Defines the type of icon.",
+          "enum": [
+            "text",
+            "textImage",
+            "animatedTextImage",
+            "item",
+            "block",
+            "customItem",
+            "entity"
+          ]
+        },
+        "style": {
+          "description": "Optional display styling. Omitted uses fixed, fully visible, unlit-override defaults at uniform scale 1.",
+          "oneOf": [
+            {
+              "$ref": "#/$defs/iconDisplayStyle"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "text"
+              }
+            }
+          },
+          "then": {
+            "$ref": "#/$defs/textIcon"
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "textImage"
+              }
+            }
+          },
+          "then": {
+            "$ref": "#/$defs/textImageIcon"
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "animatedTextImage"
+              }
+            }
+          },
+          "then": {
+            "$ref": "#/$defs/animatedTextImageIcon"
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "item"
+              }
+            }
+          },
+          "then": {
+            "$ref": "#/$defs/itemIcon"
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "block"
+              }
+            }
+          },
+          "then": {
+            "$ref": "#/$defs/blockIcon"
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "customItem"
+              }
+            }
+          },
+          "then": {
+            "$ref": "#/$defs/customItemIcon"
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "entity"
+              }
+            }
+          },
+          "then": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/entityIcon"
+              },
+              {
+                "not": {
+                  "required": [
+                    "style"
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "hitbox": {
+      "title": "Button Hitbox",
+      "description": "Optional click-plane dimensions, anchor and displacement in blocks before uiScale is applied.",
+      "type": "object",
+      "minProperties": 1,
+      "dependentRequired": {
+        "width": [
+          "height"
+        ],
+        "height": [
+          "width"
+        ]
+      },
+      "properties": {
+        "width": {
+          "description": "Click-plane width in blocks at uiScale 1.",
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "height": {
+          "description": "Click-plane height in blocks at uiScale 1.",
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "offset": {
+          "description": "Displacement from the selected anchor in right, up, forward blocks at uiScale 1.",
+          "$ref": "#/$defs/vector3"
+        },
+        "anchor": {
+          "description": "Whether offset is relative to the button or the menu centre. Menu anchoring detaches button and plane movement.",
+          "type": "string",
+          "enum": [
+            "button",
+            "menu"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "buttonComponent": {
+      "title": "Button Component Data Object",
+      "description": "Defines the data for a button component.",
+      "type": "object",
+      "required": [
+        "actions",
+        "icon"
+      ],
+      "properties": {
+        "highlightModifier": {
+          "description": "Defines by how much a highlighted button moves towards the player.",
+          "type": "number"
+        },
+        "actions": {
+          "description": "Defines what happens upon a interaction.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/action"
+          }
+        },
+        "icon": {
+          "description": "Defines the visual part of the component.",
+          "$ref": "#/$defs/icon"
+        },
+        "hitbox": {
+          "description": "Optional dimensions and displacement for the click plane. Omitted dimensions remain automatic; omitted offset remains icon-aligned.",
+          "$ref": "#/$defs/hitbox"
+        }
+      }
+    },
+    "decoComponent": {
+      "title": "Decoration Component Data Object",
+      "description": "Defines the data for a decorative component.",
+      "type": "object",
+      "required": [
+        "icon"
+      ],
+      "properties": {
+        "icon": {
+          "description": "Defines the visual parts of a component.",
+          "$ref": "#/$defs/icon"
+        }
+      }
+    },
+    "toggleComponent": {
+      "title": "Toggle Component Data Object",
+      "description": "Defines the data for a toggle component.",
+      "type": "object",
+      "required": [
+        "condition",
+        "expectedValue",
+        "trueActions",
+        "falseActions",
+        "trueIcon",
+        "falseIcon"
+      ],
+      "properties": {
+        "highlightModifier": {
+          "description": "Defines by how much a highlighted button moves towards the player.",
+          "type": "number"
+        },
+        "condition": {
+          "description": "Defines what placeholder value is used to determine the toggles initial state.",
+          "type": "string"
+        },
+        "expectedValue": {
+          "description": "Defines what the condition is checked against to determine the toggles initial state.",
+          "type": "string"
+        },
+        "trueActions": {
+          "description": "Defines what happens upon a interaction that enters the true state, so upon a interaction while the toggle is false.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/action"
+          }
+        },
+        "falseActions": {
+          "description": "Defines what happens upon a interaction that enters the false state, so upon a interaction while the toggle is true.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/action"
+          }
+        },
+        "trueIcon": {
+          "description": "Defines the visual part of the component while the toggle is in the true state.",
+          "$ref": "#/$defs/icon"
+        },
+        "falseIcon": {
+          "description": "Defines the visual part of the component while the toggle is in the false state.",
+          "$ref": "#/$defs/icon"
+        }
+      }
+    },
+    "commandAction": {
+      "title": "Command Action Data Object",
+      "description": "Defines the data for a command action.",
+      "type": "object",
+      "required": [
+        "command"
+      ],
+      "properties": {
+        "command": {
+          "description": "Defines the command run by this action.",
+          "type": "string",
+          "minLength": 1,
+          "pattern": "[^\\s/]"
+        },
+        "source": {
+          "description": "Defines the source of this command. Defaults to \"player\", so the command runs as the clicking player unless \"server\" is written explicitly.",
+          "type": "string",
+          "enum": [
+            "server",
+            "player"
+          ]
+        }
+      }
+    },
+    "soundAction": {
+      "title": "Sound Action Data Object",
+      "description": "Defines the data for a sound action.",
+      "type": "object",
+      "required": [
+        "sound"
+      ],
+      "properties": {
+        "sound": {
+          "description": "Defines the sound played by this action. An unknown sound key is logged when the component resolves its actions and the action is dropped.",
+          "type": "string"
+        },
+        "source": {
+          "description": "Defines the audio channel of this sound. Defaults to \"master\".",
+          "type": "string",
+          "enum": [
+            "master",
+            "music",
+            "record",
+            "weather",
+            "block",
+            "hostile",
+            "neutral",
+            "player",
+            "ambient",
+            "voice"
+          ]
+        },
+        "volume": {
+          "description": "Defines the volume modifier for this sound. Defaults to 1.0.",
+          "type": "number"
+        },
+        "pitch": {
+          "description": "Defines the pitch modifier for this sound. Defaults to 1.0.",
+          "type": "number"
+        }
+      }
+    },
+    "messageAction": {
+      "title": "Player Message Action Data Object",
+      "description": "Sends a MiniMessage-formatted message to the clicking player.",
+      "type": "object",
+      "required": [
+        "message"
+      ],
+      "properties": {
+        "message": {
+          "description": "MiniMessage text sent to the player. %player% and PlaceholderAPI placeholders are resolved for the clicking player before parsing.",
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        }
+      }
+    },
+    "teleportAction": {
+      "title": "Player Teleport Action Data Object",
+      "description": "Teleports the clicking player asynchronously to an already-loaded namespaced world.",
+      "type": "object",
+      "required": [
+        "world",
+        "x",
+        "y",
+        "z",
+        "yaw",
+        "pitch"
+      ],
+      "properties": {
+        "world": {
+          "description": "Explicit lowercase namespace:key of an already-loaded Bukkit world.",
+          "type": "string",
+          "maxLength": 255,
+          "pattern": "^[a-z0-9._-]+:[a-z0-9/._-]+$"
+        },
+        "x": {
+          "description": "Finite destination X coordinate.",
+          "type": "number"
+        },
+        "y": {
+          "description": "Finite destination Y coordinate.",
+          "type": "number"
+        },
+        "z": {
+          "description": "Finite destination Z coordinate.",
+          "type": "number"
+        },
+        "yaw": {
+          "description": "Finite destination yaw in degrees.",
+          "type": "number"
+        },
+        "pitch": {
+          "description": "Finite destination pitch in degrees.",
+          "type": "number"
+        }
+      }
+    },
+    "connectAction": {
+      "title": "Proxy Server Connect Action Data Object",
+      "description": "Requests a BungeeCord-compatible proxy connection for the clicking player.",
+      "type": "object",
+      "required": [
+        "server"
+      ],
+      "properties": {
+        "server": {
+          "description": "Configured proxy server name. Only letters, numbers, dot, underscore, and hyphen are accepted.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$"
+        }
+      }
+    },
+    "navigationAction": {
+      "title": "Navigation Action Data Object",
+      "description": "Changes the current viewer's native menu page stack. Navigation is terminal for actions matching the current click trigger.",
+      "type": "object",
+      "properties": {
+        "target": {
+          "description": "Exact menu id opened by push or replace navigation.",
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "mode": {
+          "description": "Page-stack operation. Defaults to push.",
+          "type": "string",
+          "enum": [
+            "push",
+            "replace",
+            "back",
+            "home",
+            "close"
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "mode": {
+                "enum": [
+                  "back",
+                  "home",
+                  "close"
+                ]
+              }
+            },
+            "required": [
+              "mode"
+            ]
+          },
+          "else": {
+            "required": [
+              "target"
+            ]
+          }
+        }
+      ]
+    },
+    "textIcon": {
+      "title": "Text Icon Data Object",
+      "description": "Defines the data for a text icon.",
+      "type": "object",
+      "required": [
+        "text"
+      ],
+      "properties": {
+        "text": {
+          "description": "Defines the text displayed by this icon. Supports ampersand color codes, placeholders, and line breaks.",
+          "type": "string"
+        },
+        "refreshTicks": {
+          "description": "Ticks between live PlaceholderAPI updates. Omitted defaults to 10; 0 disables updates after the initial render.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1200,
+          "default": 10
+        }
+      }
+    },
+    "textImageIcon": {
+      "title": "Text Image Icon Data Object",
+      "description": "Defines the data for a text-image icon.",
+      "type": "object",
+      "required": [
+        "path"
+      ],
+      "properties": {
+        "path": {
+          "description": "Defines the path to the image displayed, relative to the \"images\" directory.",
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        }
+      }
+    },
+    "animatedTextImageIcon": {
+      "title": "Animated Text Image Icon Data Object",
+      "description": "Defines the data for an animated text-image icon.",
+      "type": "object",
+      "required": [
+        "source"
+      ],
+      "properties": {
+        "source": {
+          "description": "Defines the paths to the animation frames, relative to the \"images\" directory. A single path is accepted in place of the array.",
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "\\S"
+            },
+            {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "pattern": "\\S"
+              }
+            }
+          ]
+        },
+        "speed": {
+          "description": "Defines the amount of ticks between frame advances. Values of 1 or less advance every tick.",
+          "type": "integer"
+        }
+      }
+    },
+    "itemIcon": {
+      "title": "Item Icon Data Object",
+      "description": "Defines the data for an item icon.",
+      "type": "object",
+      "required": [
+        "item"
+      ],
+      "properties": {
+        "item": {
+          "description": "Defines the type of item displayed.",
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "count": {
+          "description": "Defines the count of the item stack constructed from the material.",
+          "type": "integer"
+        },
+        "customModelValue": {
+          "description": "Defines the custom model data property for use with resource packs.",
+          "type": "integer"
+        }
+      }
+    },
+    "customItemIcon": {
+      "title": "Custom Item Icon Data Object",
+      "description": "Defines the data for a custom-item icon resolved through an installed item-provider plugin.",
+      "type": "object",
+      "required": [
+        "item"
+      ],
+      "properties": {
+        "provider": {
+          "description": "Defines the item provider that resolves the item. Omitted, blank or \"auto\" tries every active provider in activation order.",
+          "type": "string"
+        },
+        "item": {
+          "description": "Defines the provider-specific item id, passed through verbatim.",
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "count": {
+          "description": "Defines the count of the resolved item stack. Zero and negative values become 1.",
+          "type": "integer"
+        }
+      }
+    },
+    "blockIcon": {
+      "title": "Block Icon Data Object",
+      "description": "Defines a packet-only block display using the material's default block state. It renders and receives an automatic click plane at 0.75 blocks square before UI and display-style scaling.",
+      "type": "object",
+      "required": [
+        "block"
+      ],
+      "properties": {
+        "block": {
+          "description": "Lowercase Bukkit material id. An omitted namespace defaults to minecraft. The resolved material must be a block.",
+          "type": "string",
+          "pattern": "^([a-z0-9_.-]+:)?[a-z0-9_./-]+$"
+        }
+      }
+    },
+    "entityIcon": {
+      "title": "Entity Icon Data Object",
+      "description": "Defines a packet-only spawnable living entity. The component anchor is the entity's feet; width and height define its automatic click plane and editor footprint in blocks at uiScale 1.",
+      "type": "object",
+      "required": [
+        "entity"
+      ],
+      "properties": {
+        "entity": {
+          "description": "Lowercase Bukkit entity registry id. An omitted namespace defaults to minecraft; only spawnable living entity types are accepted.",
+          "type": "string",
+          "pattern": "^([a-z0-9_.-]+:)?[a-z0-9_./-]+$"
+        },
+        "width": {
+          "description": "Automatic click-plane width in blocks at uiScale 1. Omitted defaults to 1.",
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 64,
+          "default": 1
+        },
+        "height": {
+          "description": "Automatic click-plane height in blocks at uiScale 1. Omitted defaults to 1 and the plane is centered half this height above the component anchor.",
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 64,
+          "default": 1
+        }
+      }
+    }
+  }
+}

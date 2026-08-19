@@ -1,101 +1,363 @@
 package art.arcane.gloss.locale;
 
+import art.arcane.gloss.Gloss;
 import art.arcane.volmlib.util.director.DirectorTextResolver;
+import art.arcane.volmlib.util.io.FileWatcher;
+import art.arcane.volmlib.util.localization.LocaleOverlay;
 import art.arcane.volmlib.util.localization.LocalizationCandidate;
+import art.arcane.volmlib.util.localization.LocalizationIssue;
 import art.arcane.volmlib.util.localization.LocalizationManager;
+import art.arcane.volmlib.util.localization.LocalizationReloadResult;
 import art.arcane.volmlib.util.localization.LocalizationSnapshot;
-import art.arcane.volmlib.util.localization.MessageArgs;
 import art.arcane.volmlib.util.localization.MessageArgument;
 import art.arcane.volmlib.util.localization.MessageArgumentKind;
+import art.arcane.volmlib.util.localization.MessageArgs;
+import art.arcane.volmlib.util.localization.MessageCatalog;
 import art.arcane.volmlib.util.localization.MessageKey;
+import art.arcane.volmlib.util.localization.PluralKey;
 import art.arcane.volmlib.util.localization.PluralSelector;
 import art.arcane.volmlib.util.localization.ResolvedText;
 import art.arcane.volmlib.util.localization.TextKey;
-import net.md_5.bungee.api.ChatColor;
+import art.arcane.volmlib.util.localization.VolmitLocales;
+import org.bukkit.ChatColor;
+import org.bukkit.configuration.ConfigurationSection;
+import org.bukkit.configuration.file.YamlConfiguration;
+
+import java.io.File;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 public final class GlossLocalization {
-    private static final GlossLocalization ENGLISH = new GlossLocalization();
+  private static final long MAX_LANGUAGE_BYTES = 2L * 1024L * 1024L;
+  private static final int MAX_REPORTED_ISSUES = 12;
+  private static final MessageCatalog CATALOG = GlossMessages.catalog();
 
-    private final LocalizationManager manager;
+  private static final char YAML_PATH_SEPARATOR = '/';
 
-    public GlossLocalization() {
-        manager = new LocalizationManager(LocalizationCandidate.english(
-                GlossMessages.catalog(),
-                PluralSelector.oneOther()
-        ));
+  private final File languageFile;
+  private final Logger logger;
+  private final LocalizationManager manager;
+  private final FileWatcher watcher;
+  private volatile String activeLocale;
+
+  public GlossLocalization(File dataFolder, Logger logger) {
+    this.languageFile = new File(dataFolder, "language.yml");
+    this.logger = logger;
+    this.manager = new LocalizationManager(LocalizationCandidate.english(CATALOG, PluralSelector.oneOther()));
+    this.activeLocale = CATALOG.englishLocale();
+    ensureDefaultFile();
+    reload();
+    this.watcher = new FileWatcher(languageFile);
+  }
+
+  public String activeLocale() {
+    return activeLocale;
+  }
+
+  public File languageFile() {
+    return languageFile;
+  }
+
+  LocalizationSnapshot snapshot() {
+    return manager.snapshot();
+  }
+
+  public void update() {
+    if (watcher.checkModified()) {
+      reload();
+    }
+  }
+
+  public synchronized boolean reload() {
+    if (!languageFile.exists()) {
+      ensureDefaultFile();
     }
 
-    public static GlossLocalization english() {
-        return ENGLISH;
+    LocalizationReloadResult result = manager.reload(this::loadCandidate);
+    if (!result.applied()) {
+      reportRejectedReload(result);
+      return false;
     }
 
-    public static MessageArgs args(MessageArgument... arguments) {
-        MessageArgs.Builder builder = MessageArgs.builder();
-        for (MessageArgument argument : arguments) {
-            builder.add(argument);
+    activeLocale = result.current().overlays().isEmpty()
+        ? CATALOG.englishLocale()
+        : result.current().overlays().get(0).locale();
+    return true;
+  }
+
+  public String text(TextKey key) {
+    return text(key, MessageArgs.empty());
+  }
+
+  public String text(TextKey key, MessageArgs arguments) {
+    return render(manager.snapshot().resolve(key, arguments), false);
+  }
+
+  public String legacy(TextKey key) {
+    return legacy(key, MessageArgs.empty());
+  }
+
+  public String legacy(TextKey key, MessageArgs arguments) {
+    return render(manager.snapshot().resolve(key, arguments), true);
+  }
+
+  public DirectorTextResolver directorResolver() {
+    return (key, arguments) -> {
+      MessageKey definition = CATALOG.key(key.id());
+      if (!(definition instanceof TextKey textKey)) {
+        return DirectorTextResolver.ENGLISH.resolve(key, arguments);
+      }
+      String rendered = ChatColor.translateAlternateColorCodes('&', text(textKey, arguments));
+      String plain = ChatColor.stripColor(rendered);
+      return plain == null ? DirectorTextResolver.ENGLISH.resolve(key, arguments) : plain;
+    };
+  }
+
+  public static MessageArgs args(MessageArgument... arguments) {
+    MessageArgs.Builder builder = MessageArgs.builder();
+    for (MessageArgument argument : arguments) {
+      builder.add(argument);
+    }
+    return builder.build();
+  }
+
+  public static String globalText(TextKey key) {
+    return globalText(key, MessageArgs.empty());
+  }
+
+  public static String globalText(TextKey key, MessageArgs arguments) {
+    Gloss plugin = Gloss.instance;
+    GlossLocalization localization = plugin == null ? null : plugin.getLocalization();
+    return localization == null ? renderEnglish(key, arguments, false) : localization.text(key, arguments);
+  }
+
+  public static String globalLegacy(TextKey key) {
+    return globalLegacy(key, MessageArgs.empty());
+  }
+
+  public static String globalLegacy(TextKey key, MessageArgs arguments) {
+    Gloss plugin = Gloss.instance;
+    GlossLocalization localization = plugin == null ? null : plugin.getLocalization();
+    return localization == null ? renderEnglish(key, arguments, true) : localization.legacy(key, arguments);
+  }
+
+  public static String globalDirectorText(TextKey key, MessageArgs arguments) {
+    Gloss plugin = Gloss.instance;
+    GlossLocalization localization = plugin == null ? null : plugin.getLocalization();
+    if (localization != null) {
+      return localization.directorResolver().resolve(key, arguments);
+    }
+    MessageKey definition = CATALOG.key(key.id());
+    if (!(definition instanceof TextKey textKey)) {
+      return DirectorTextResolver.ENGLISH.resolve(key, arguments);
+    }
+    String rendered = ChatColor.translateAlternateColorCodes('&', renderEnglish(textKey, arguments, false));
+    String plain = ChatColor.stripColor(rendered);
+    return plain == null ? DirectorTextResolver.ENGLISH.resolve(key, arguments) : plain;
+  }
+
+  public static DirectorTextResolver globalDirectorResolver() {
+    return GlossLocalization::globalDirectorText;
+  }
+
+  private LocalizationCandidate loadCandidate() throws Exception {
+    if (!languageFile.isFile()) {
+      throw new IllegalArgumentException("Language source is not a regular file: " + languageFile.getPath());
+    }
+    if (languageFile.length() > MAX_LANGUAGE_BYTES) {
+      throw new IllegalArgumentException("Language source is too large: " + languageFile.getPath());
+    }
+
+    YamlConfiguration yaml = new YamlConfiguration();
+    yaml.options().pathSeparator(YAML_PATH_SEPARATOR);
+    yaml.load(languageFile);
+    String locale = yaml.getString("locale", CATALOG.englishLocale());
+    if (locale == null || locale.isBlank()) {
+      locale = CATALOG.englishLocale();
+    }
+
+    String selectedLocale = locale.trim();
+    LocaleOverlay.Builder overlay = LocaleOverlay.builder(languageFile.getPath(), selectedLocale);
+    ConfigurationSection messages = yaml.getConfigurationSection("messages");
+    if (messages != null) {
+      appendMessages(messages, overlay);
+    }
+
+    List<LocaleOverlay> overlays = new ArrayList<>();
+    overlays.add(overlay.build());
+    LocaleOverlay bundled = loadBundledOverlay(selectedLocale);
+    if (bundled != null) {
+      overlays.add(bundled);
+    }
+    return new LocalizationCandidate(CATALOG, overlays, PluralSelector.oneOther());
+  }
+
+  private LocaleOverlay loadBundledOverlay(String locale) throws Exception {
+    if (VolmitLocales.ENGLISH.equals(locale)) {
+      return null;
+    }
+
+    String resourcePath = "/languages/" + locale + ".yml";
+    InputStream input = GlossLocalization.class.getResourceAsStream(resourcePath);
+    if (input == null) {
+      if (VolmitLocales.isBundled(locale)) {
+        throw new IllegalArgumentException("Missing bundled language resource: " + resourcePath);
+      }
+      return null;
+    }
+
+    try (InputStream stream = input; InputStreamReader reader = new InputStreamReader(stream, StandardCharsets.UTF_8)) {
+      YamlConfiguration yaml = new YamlConfiguration();
+      yaml.options().pathSeparator(YAML_PATH_SEPARATOR);
+      yaml.load(reader);
+      String declaredLocale = yaml.getString("locale");
+      if (!locale.equals(declaredLocale)) {
+        throw new IllegalArgumentException(resourcePath + " must declare locale: " + locale);
+      }
+
+      LocaleOverlay.Builder overlay = LocaleOverlay.builder(resourcePath, locale);
+      ConfigurationSection messages = yaml.getConfigurationSection("messages");
+      if (messages != null) {
+        appendMessages(messages, overlay);
+      }
+      return overlay.build();
+    }
+  }
+
+  private void appendMessages(ConfigurationSection messages, LocaleOverlay.Builder overlay) {
+    Map<String, Map<String, String>> pluralForms = new LinkedHashMap<>();
+    for (String path : messages.getKeys(true)) {
+      if (messages.isConfigurationSection(path)) {
+        continue;
+      }
+
+      Object value = messages.get(path);
+      String id = path.replace(YAML_PATH_SEPARATOR, '.');
+      if (!(value instanceof String template)) {
+        throw new IllegalArgumentException("Language value must be text: " + id);
+      }
+
+      MessageKey key = CATALOG.key(id);
+      if (key instanceof TextKey) {
+        overlay.text(id, template);
+        continue;
+      }
+
+      int separator = id.lastIndexOf('.');
+      String pluralId = separator < 0 ? "" : id.substring(0, separator);
+      if (CATALOG.key(pluralId) instanceof PluralKey) {
+        String category = id.substring(separator + 1);
+        pluralForms.computeIfAbsent(pluralId, ignored -> new LinkedHashMap<>()).put(category, template);
+        continue;
+      }
+
+      overlay.text(id, template);
+    }
+
+    for (Map.Entry<String, Map<String, String>> entry : pluralForms.entrySet()) {
+      overlay.plural(entry.getKey(), entry.getValue());
+    }
+  }
+
+  private void ensureDefaultFile() {
+    if (languageFile.exists()) {
+      return;
+    }
+
+    try {
+      Files.createDirectories(languageFile.toPath().getParent());
+      YamlConfiguration yaml = new YamlConfiguration();
+      yaml.set("locale", CATALOG.englishLocale());
+      yaml.save(languageFile);
+    } catch (Exception exception) {
+      logger.log(Level.SEVERE, "Unable to create the default language file", exception);
+    }
+  }
+
+  private void reportRejectedReload(LocalizationReloadResult result) {
+    logger.severe("Rejected language reload; continuing with " + activeLocale + ".");
+    List<LocalizationIssue> issues = result.validation().errors();
+    for (int index = 0; index < Math.min(issues.size(), MAX_REPORTED_ISSUES); index++) {
+      LocalizationIssue issue = issues.get(index);
+      logger.severe(issue.source() + " [" + issue.key() + "]: " + issue.detail());
+    }
+    if (issues.size() > MAX_REPORTED_ISSUES) {
+      logger.severe((issues.size() - MAX_REPORTED_ISSUES) + " additional language errors were omitted.");
+    }
+    if (result.failure() != null) {
+      logger.log(Level.SEVERE, "Language reload failed", result.failure());
+    }
+  }
+
+  private static String render(ResolvedText resolved, boolean legacy) {
+    return renderTemplate(resolved.template(), resolved.arguments(), legacy);
+  }
+
+  private static String renderEnglish(TextKey key, MessageArgs arguments, boolean legacy) {
+    return renderTemplate(key.english(), arguments, legacy);
+  }
+
+  private static String renderTemplate(String template, MessageArgs arguments, boolean legacy) {
+    String prepared = template;
+    List<RenderedArgument> replacements = new ArrayList<>(arguments.size());
+    int index = 0;
+    for (MessageArgument argument : arguments.arguments().values()) {
+      String token = "\uE000" + index + "\uE001";
+      prepared = prepared.replace("{" + argument.name() + "}", token);
+      replacements.add(new RenderedArgument(token, argument));
+      index++;
+    }
+
+    String rendered = legacy ? ChatColor.translateAlternateColorCodes('&', prepared) : prepared;
+    return applyReplacements(rendered, replacements, legacy);
+  }
+
+  private static String applyReplacements(
+      String rendered,
+      List<RenderedArgument> replacements,
+      boolean legacy
+  ) {
+    StringBuilder output = new StringBuilder(rendered.length());
+    int cursor = 0;
+    while (cursor < rendered.length()) {
+      RenderedArgument match = null;
+      for (RenderedArgument replacement : replacements) {
+        if (rendered.startsWith(replacement.token(), cursor)) {
+          match = replacement;
+          break;
         }
-        return builder.build();
-    }
+      }
+      if (match == null) {
+        output.append(rendered.charAt(cursor));
+        cursor++;
+        continue;
+      }
 
-    public LocalizationSnapshot snapshot() {
-        return manager.snapshot();
+      MessageArgument argument = match.argument();
+      String value = String.valueOf(argument.value());
+      if (argument.kind() == MessageArgumentKind.TRUSTED) {
+        output.append(legacy ? ChatColor.translateAlternateColorCodes('&', value) : value);
+      } else {
+        output.append(sanitizeUntrusted(value));
+      }
+      cursor += match.token().length();
     }
+    return output.toString();
+  }
 
-    public DirectorTextResolver directorResolver() {
-        return this::directorText;
-    }
+  private static String sanitizeUntrusted(String value) {
+    String stripped = ChatColor.stripColor(value);
+    return stripped == null ? "" : stripped.replace(String.valueOf(ChatColor.COLOR_CHAR), "");
+  }
 
-    public String directorText(TextKey key, MessageArgs arguments) {
-        MessageKey definition = manager.snapshot().catalog().key(key.id());
-        if (!(definition instanceof TextKey textKey)) {
-            return DirectorTextResolver.ENGLISH.resolve(key, arguments);
-        }
-        ResolvedText resolved = manager.snapshot().resolve(textKey, arguments == null ? MessageArgs.empty() : arguments);
-        return substitute(resolved.template(), resolved.arguments());
-    }
-
-    public String legacy(TextKey key) {
-        return legacy(key, MessageArgs.empty());
-    }
-
-    public String legacy(TextKey key, MessageArgs arguments) {
-        ResolvedText resolved = manager.snapshot().resolve(key, arguments);
-        return ChatColor.translateAlternateColorCodes('&', substitute(resolved.template(), resolved.arguments()));
-    }
-
-    private String substitute(String template, MessageArgs arguments) {
-        StringBuilder rendered = new StringBuilder(template.length() + arguments.size() * 8);
-        for (int index = 0; index < template.length(); index++) {
-            char current = template.charAt(index);
-            if (current == '{' && index + 1 < template.length() && template.charAt(index + 1) == '{') {
-                rendered.append('{');
-                index++;
-                continue;
-            }
-            if (current == '}' && index + 1 < template.length() && template.charAt(index + 1) == '}') {
-                rendered.append('}');
-                index++;
-                continue;
-            }
-            if (current != '{') {
-                rendered.append(current);
-                continue;
-            }
-            int end = template.indexOf('}', index + 1);
-            if (end < 0) {
-                rendered.append(template, index, template.length());
-                break;
-            }
-            String name = template.substring(index + 1, end);
-            MessageArgument argument = arguments.require(name);
-            String value = String.valueOf(argument.value());
-            rendered.append(argument.kind() == MessageArgumentKind.UNTRUSTED ? sanitizeUntrusted(value) : value);
-            index = end;
-        }
-        return rendered.toString();
-    }
-
-    private String sanitizeUntrusted(String value) {
-        return value.replace('§', '&');
-    }
+  private record RenderedArgument(String token, MessageArgument argument) {
+  }
 }

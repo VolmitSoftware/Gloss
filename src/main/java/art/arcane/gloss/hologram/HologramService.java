@@ -3,10 +3,12 @@ package art.arcane.gloss.hologram;
 import art.arcane.gloss.Gloss;
 import art.arcane.gloss.api.Hologram;
 import art.arcane.gloss.api.TemporaryHologram;
+import art.arcane.gloss.doc.DocumentDelta;
+import art.arcane.gloss.doc.DocumentRegistry;
+import art.arcane.gloss.doc.DocumentReviser;
+import art.arcane.gloss.doc.DocumentStore;
+import art.arcane.gloss.doc.GlossDocument;
 import art.arcane.volmlib.util.entity.StackExclusion;
-import art.arcane.volmlib.util.io.FolderWatcher;
-import art.arcane.volmlib.util.io.IO;
-import art.arcane.volmlib.util.json.JSONObject;
 import art.arcane.volmlib.util.scheduling.FoliaScheduler;
 import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
@@ -40,41 +42,51 @@ import java.util.logging.Level;
 
 public final class HologramService {
     private static final String DISPLAY_TAG = "gloss_display";
-    private static final String FILE_SUFFIX = ".json";
     private static final int NO_TASK = -1;
+
+    private static final DocumentReviser<HologramDoc> REVISER = new DocumentReviser<>() {
+        @Override
+        public long revisionOf(HologramDoc value) {
+            return value.revision();
+        }
+
+        @Override
+        public HologramDoc withRevision(HologramDoc value, long revision) {
+            return value.withRevision(revision);
+        }
+    };
 
     private final Gloss plugin;
     private final NamespacedKey markerKey;
+    private final DocumentRegistry<HologramDoc> registry;
+    private final DocumentStore<HologramDoc> store;
     private final Map<String, PersistentHologram> holograms;
     private final List<TemporaryHologramDisplay> temporaries;
     private final Set<UUID> leased;
-    private final Map<String, String> writtenHashes;
     private final ExecutorService fileExecutor;
     private final ChunkPurgeListener chunkListener;
-    private volatile FolderWatcher watcher;
     private int driverTaskId;
     private int temporaryTaskId;
-    private int watcherTaskId;
 
     public HologramService(Gloss plugin) {
         this.plugin = plugin;
         this.markerKey = new NamespacedKey(plugin, "hologram");
+        File folder = new File(plugin.getDataFolder(), HologramDoc.KIND);
+        this.store = new DocumentStore<>(HologramDoc.KIND, folder, REVISER);
+        this.registry = DocumentRegistry.folder(HologramDoc.KIND, folder, HologramDoc::parse,
+            HologramDoc::revision, store::isOwnWrite);
         this.holograms = new ConcurrentHashMap<>();
         this.temporaries = new CopyOnWriteArrayList<>();
         this.leased = ConcurrentHashMap.newKeySet();
-        this.writtenHashes = new ConcurrentHashMap<>();
         this.fileExecutor = Executors.newSingleThreadExecutor(HologramService::createFileThread);
         this.chunkListener = new ChunkPurgeListener();
         this.driverTaskId = NO_TASK;
         this.temporaryTaskId = NO_TASK;
-        this.watcherTaskId = NO_TASK;
     }
 
     public void enable() {
-        File folder = folder();
-        folder.mkdirs();
-        loadAll(folder);
-        watcher = new FolderWatcher(folder);
+        loadAll();
+        plugin.watchdog().register("holograms", this::pollRegistry);
         Bukkit.getPluginManager().registerEvents(chunkListener, plugin);
         sweepLoadedChunks();
         startTasks();
@@ -84,6 +96,7 @@ public final class HologramService {
     }
 
     public void disable() {
+        plugin.watchdog().unregister("holograms");
         stopTasks();
         HandlerList.unregisterAll(chunkListener);
         for (PersistentHologram hologram : holograms.values()) {
@@ -97,9 +110,8 @@ public final class HologramService {
         shutdownFileExecutor();
         temporaries.clear();
         holograms.clear();
-        writtenHashes.clear();
+        store.forgetAll();
         leased.clear();
-        watcher = null;
     }
 
     public void reload() {
@@ -109,11 +121,7 @@ public final class HologramService {
         }
 
         holograms.clear();
-        writtenHashes.clear();
-        File folder = folder();
-        folder.mkdirs();
-        loadAll(folder);
-        watcher = new FolderWatcher(folder);
+        loadAll();
         startTasks();
     }
 
@@ -147,11 +155,11 @@ public final class HologramService {
             removed.despawnAll();
         }
 
-        File file = fileFor(safeId);
-        writtenHashes.remove(file.getAbsolutePath());
         submitFileTask(() -> {
-            if (file.exists() && !file.delete()) {
-                Gloss.warn("Failed to delete hologram file " + file.getName());
+            try {
+                store.delete(safeId);
+            } catch (IOException failure) {
+                Gloss.warn("Failed to delete hologram file " + safeId + ".json: " + failure.getMessage());
             }
         });
     }
@@ -184,6 +192,10 @@ public final class HologramService {
 
     Gloss plugin() {
         return plugin;
+    }
+
+    HologramAnimator animator() {
+        return plugin.animator();
     }
 
     double viewRange() {
@@ -245,16 +257,13 @@ public final class HologramService {
     }
 
     void persist(PersistentHologram hologram) {
-        HologramDescriptor descriptor = hologram.descriptor();
-        String json = descriptor.toJson().toString(4);
-        File file = fileFor(descriptor.id());
-        writtenHashes.put(file.getAbsolutePath(), IO.hash(json + "\n"));
+        HologramDoc doc = hologram.toDoc(hologram.nextRevision());
+        String id = hologram.id();
         submitFileTask(() -> {
             try {
-                folder().mkdirs();
-                IO.writeAll(file, json);
+                store.write(id, doc);
             } catch (IOException failure) {
-                plugin.getLogger().log(Level.WARNING, "Failed to save hologram " + descriptor.id(), failure);
+                plugin.getLogger().log(Level.WARNING, "Failed to save hologram " + id, failure);
             }
         });
     }
@@ -299,7 +308,6 @@ public final class HologramService {
     private void startTasks() {
         driverTaskId = plugin.scheduler().sr(this::driveHolograms, plugin.cfg().holograms().updateIntervalTicks());
         temporaryTaskId = plugin.scheduler().sr(this::driveTemporaries, plugin.cfg().holograms().temporaryUpdateIntervalTicks());
-        watcherTaskId = plugin.scheduler().ar(this::pollWatcher, plugin.cfg().hotload().watchIntervalTicks());
     }
 
     private void stopTasks() {
@@ -310,10 +318,6 @@ public final class HologramService {
         if (temporaryTaskId != NO_TASK) {
             plugin.scheduler().csr(temporaryTaskId);
             temporaryTaskId = NO_TASK;
-        }
-        if (watcherTaskId != NO_TASK) {
-            plugin.scheduler().car(watcherTaskId);
-            watcherTaskId = NO_TASK;
         }
     }
 
@@ -335,81 +339,48 @@ public final class HologramService {
         }
     }
 
-    private void pollWatcher() {
-        FolderWatcher activeWatcher = watcher;
-        if (activeWatcher == null || !activeWatcher.checkModified()) {
+    private void pollRegistry() {
+        DocumentDelta delta = registry.poll();
+        if (delta.isEmpty()) {
             return;
         }
 
-        List<File> touched = new ArrayList<>(activeWatcher.getCreated());
-        touched.addAll(activeWatcher.getChanged());
-        for (File file : touched) {
-            if (!file.isFile() || !file.getName().endsWith(FILE_SUFFIX) || isOwnWrite(file)) {
+        for (String id : delta.loaded()) {
+            GlossDocument<HologramDoc> document = registry.get(id);
+            if (document == null) {
                 continue;
             }
 
-            loadFile(file);
-            Gloss.info("Hotloaded hologram " + file.getName());
+            applyDocument(id, document.value());
+            Gloss.info("Hotloaded hologram " + id + ".json");
         }
 
-        for (File file : activeWatcher.getDeleted()) {
-            if (!file.getName().endsWith(FILE_SUFFIX)) {
-                continue;
-            }
-
-            String id = file.getName().substring(0, file.getName().length() - FILE_SUFFIX.length());
+        for (String id : delta.removed()) {
             PersistentHologram removed = holograms.remove(id);
             if (removed == null) {
                 continue;
             }
 
-            writtenHashes.remove(file.getAbsolutePath());
             removed.despawnAll();
             Gloss.info("Hologram " + id + " removed from disk.");
         }
     }
 
-    private boolean isOwnWrite(File file) {
-        String expected = writtenHashes.get(file.getAbsolutePath());
-        if (expected == null) {
-            return false;
-        }
-
-        try {
-            return expected.equals(IO.hash(IO.readAll(file)));
-        } catch (IOException ignored) {
-            return false;
+    private void loadAll() {
+        registry.reload();
+        for (GlossDocument<HologramDoc> document : registry.snapshot().values()) {
+            applyDocument(document.id(), document.value());
         }
     }
 
-    private void loadAll(File folder) {
-        File[] files = folder.listFiles();
-        if (files == null) {
+    private void applyDocument(String id, HologramDoc doc) {
+        PersistentHologram existing = holograms.get(id);
+        if (existing != null) {
+            existing.apply(doc);
             return;
         }
 
-        for (File file : files) {
-            if (file.isFile() && file.getName().endsWith(FILE_SUFFIX)) {
-                loadFile(file);
-            }
-        }
-    }
-
-    private void loadFile(File file) {
-        try {
-            String content = IO.readAll(file);
-            HologramDescriptor descriptor = HologramDescriptor.fromJson(new JSONObject(content));
-            PersistentHologram existing = holograms.get(descriptor.id());
-            if (existing != null) {
-                existing.apply(descriptor);
-            } else {
-                holograms.put(descriptor.id(), new PersistentHologram(this, descriptor));
-            }
-        } catch (IOException | RuntimeException failure) {
-            Gloss.warn("Failed to load hologram file " + file.getName() + ": "
-                + failure.getClass().getSimpleName()
-                + (failure.getMessage() == null ? "" : " - " + failure.getMessage()));
-        }
+        holograms.put(id, new PersistentHologram(this, id, doc));
     }
 
     private void sweepLoadedChunks() {
@@ -445,14 +416,6 @@ public final class HologramService {
     private boolean isGlossDisplay(TextDisplay display) {
         return display.getScoreboardTags().contains(DISPLAY_TAG)
             || display.getPersistentDataContainer().has(markerKey, PersistentDataType.BOOLEAN);
-    }
-
-    private File folder() {
-        return new File(plugin.getDataFolder(), "holograms");
-    }
-
-    private File fileFor(String id) {
-        return new File(folder(), id + FILE_SUFFIX);
     }
 
     private static Thread createFileThread(Runnable task) {

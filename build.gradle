@@ -5,10 +5,11 @@ import org.gradle.jvm.toolchain.JavaLanguageVersion
 plugins {
     id 'java-library'
     alias(libs.plugins.shadow)
+    alias(libs.plugins.slimjar)
 }
 
 group = 'art.arcane'
-version = '2.0.0-26.2'
+version = '3.0.0-26.2'
 def apiVersion = '26.1'
 def main = 'art.arcane.gloss.Gloss'
 def lib = 'art.arcane.gloss.libs'
@@ -20,6 +21,7 @@ String authTokenProperty = providers.gradleProperty('authToken').orNull
 String jitpackAuthToken = authTokenProperty ?: providers.gradleProperty('jitpackAuthToken').orNull
 
 def shadowJarTask = tasks.named('shadowJar', com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar)
+tasks.named('slimJar').get()
 
 tasks.register('buildPsychoLT', Copy) {
     group = 'development'
@@ -42,6 +44,7 @@ def apiJarTask = tasks.register('apiJar', Jar) {
     archiveClassifier.set('api')
     from(sourceSets.main.output) {
         include 'art/arcane/gloss/api/**'
+        exclude 'art/arcane/gloss/api/internal/**'
     }
 }
 
@@ -53,7 +56,19 @@ shadowJarTask.configure {
     archiveClassifier.set('')
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
     minimize()
+    relocate('io.github.slimjar', "${lib}.slimjar")
+    relocate('com.github.retrooper.packetevents', "${lib}.packetevents.api")
+    relocate('io.github.retrooper.packetevents', "${lib}.packetevents.impl")
     relocate('org.bstats', "${lib}.bstats")
+}
+
+slimJar {
+    relocate('com.github.retrooper.packetevents', "${lib}.packetevents.api")
+    relocate('io.github.retrooper.packetevents', "${lib}.packetevents.impl")
+    relocate('org.bstats', "${lib}.bstats")
+    relocate('org.apache.commons', "${lib}.commons")
+    relocate('net.kyori', "${lib}.kyori")
+    relocate('com.moandjiezana.toml', "${lib}.toml")
 }
 
 tasks.named('processResources').configure {
@@ -115,6 +130,9 @@ tasks.named('check').configure {
 repositories {
     mavenCentral()
     maven {
+        url = uri('https://libraries.minecraft.net/')
+    }
+    maven {
         url = uri('https://repo.papermc.io/repository/maven-public/')
     }
     maven {
@@ -122,6 +140,15 @@ repositories {
     }
     maven {
         url = uri('https://repo.extendedclip.com/content/repositories/placeholderapi/')
+    }
+    maven {
+        url = uri('https://repo.codemc.io/repository/maven-releases/')
+    }
+    maven {
+        url = uri('https://repo.codemc.io/repository/maven-snapshots/')
+    }
+    maven {
+        url = uri('https://repo.aikar.co/content/groups/aikar/')
     }
     maven {
         url = uri('https://jitpack.io')
@@ -132,9 +159,31 @@ repositories {
             }
         }
     }
+    maven {
+        url = uri('https://repo.momirealms.net/releases/')
+    }
+    maven {
+        url = uri('https://repo.oraxen.com/releases')
+    }
+    maven {
+        url = uri('https://repo.nexomc.com/releases/')
+    }
+    maven {
+        url = uri('https://maven.devs.beer/')
+    }
+    maven {
+        url = uri('https://nexus.phoenixdevt.fr/repository/maven-public/')
+    }
+    maven {
+        url = uri('https://repo.auxilor.io/repository/maven-public/')
+    }
+    maven {
+        url = uri('https://mvn.lumine.io/repository/maven-public/')
+    }
 }
 
 dependencies {
+    implementation('de.crazydev22.slimjar.helper:spigot:2.1.9')
     compileOnly('me.clip:placeholderapi:2.11.6') { transitive = false }
     compileOnly('com.github.MilkBowl:VaultAPI:1.7') { transitive = false }
     compileOnly(libs.paper)
@@ -144,10 +193,38 @@ dependencies {
         changing = true
         transitive = false
     }
+
+    compileOnly(libs.craftengine.core) { transitive = false }
+    compileOnly(libs.craftengine.bukkit) { transitive = false }
+    compileOnly(libs.itemsadder) { transitive = false }
+    compileOnly(libs.oraxen) { transitive = false }
+    compileOnly(libs.nexo) { transitive = false }
+    compileOnly(libs.mmoitems) { transitive = false }
+    compileOnly(libs.mythiclib) { transitive = false }
+    compileOnly(libs.score) { transitive = false }
+    compileOnly(libs.eco) { transitive = false }
+    compileOnly(libs.slimefun) { transitive = false }
+    compileOnly(libs.mythic) { transitive = false }
+    compileOnly(libs.headDatabase) { transitive = false }
+
+    slim(libs.packetevents) {
+        exclude(group: 'net.kyori')
+    }
+    slim(libs.adventure.minimessage)
+    slim(libs.adventure.nbt)
+    slim(libs.adventure.legacy)
+    slim(libs.commons.io)
+    slim(libs.commons.imaging)
+    slim(libs.toml4j) {
+        exclude(group: 'com.google.code.gson')
+    }
+
     testImplementation('me.clip:placeholderapi:2.11.6') { transitive = false }
     testImplementation('com.github.MilkBowl:VaultAPI:1.7') { transitive = false }
     testImplementation(libs.paper)
     testImplementation(libs.junitJupiter)
+    testImplementation(libs.junit4)
+    testRuntimeOnly(libs.junitVintage)
     testRuntimeOnly(libs.junitPlatformLauncher)
 }
 

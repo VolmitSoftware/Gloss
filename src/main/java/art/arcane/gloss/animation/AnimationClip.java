@@ -9,22 +9,26 @@ public record AnimationClip(String id, double targetFramerate, AnimationMode mod
     }
 
     public String frameAt(long nowMs) {
-        int count = frames.size();
-        if (count == 0) {
+        if (frames.isEmpty()) {
             return "";
         }
-        if (count == 1) {
-            return frames.get(0);
+
+        return frames.get(frameIndexAt(nowMs));
+    }
+
+    public int frameIndexAt(long nowMs) {
+        int count = frames.size();
+        if (count <= 1) {
+            return 0;
         }
 
         long tick = (long) (nowMs / (1000.0D / targetFramerate));
-        int index = switch (mode) {
+        return switch (mode) {
             case ASCEND -> Math.floorMod(tick, count);
             case DESCEND -> count - 1 - Math.floorMod(tick, count);
             case ASCEND_DESCEND -> pingPong(tick, count);
             case RANDOM -> scrambled(tick, count);
         };
-        return frames.get(index);
     }
 
     private int pingPong(long tick, int count) {

@@ -42,7 +42,7 @@ Java 25 is required. The local `VolmLib` sibling checkout is resolved automatica
 
 ```
 plugins/Gloss/
-├── config.yml
+├── config.toml
 ├── holograms/<id>.json
 ├── boards/<id>.json
 ├── emoji/<id>.json

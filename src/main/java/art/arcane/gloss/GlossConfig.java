@@ -1,9 +1,9 @@
 package art.arcane.gloss;
 
-import org.bukkit.configuration.ConfigurationSection;
-import org.bukkit.configuration.file.FileConfiguration;
+import art.arcane.gloss.config.GlossConfigFile;
 
 import java.util.List;
+import java.util.Objects;
 
 public record GlossConfig(
     Holograms holograms,
@@ -21,8 +21,17 @@ public record GlossConfig(
     Hotload hotload,
     Commands commands,
     boolean splashScreen,
-    boolean metrics
+    boolean metrics,
+    Menus menus,
+    Panels panels,
+    Previews previews,
+    EditorSync editorSync,
+    Debug debug,
+    CustomItems customItems,
+    Integration integration
 ) {
+    private static final GlossConfig DEFAULTS = defaults();
+
     public record Holograms(
         boolean enabled,
         double stackDistance,
@@ -30,7 +39,10 @@ public record GlossConfig(
         double viewRange,
         boolean perViewerPlaceholders,
         int temporaryUpdateIntervalTicks,
-        int textArtMaxWidth
+        int textArtMaxWidth,
+        boolean highFrequencyAnimations,
+        int maxAnimationFps,
+        int animationPacketBudget
     ) {
     }
 
@@ -42,11 +54,7 @@ public record GlossConfig(
 
     public record Tablist(
         boolean enabled,
-        boolean useHeaderFooters,
-        String header,
-        String footer,
-        int updateIntervalTicks,
-        boolean groupListNames
+        int updateIntervalTicks
     ) {
     }
 
@@ -75,17 +83,7 @@ public record GlossConfig(
 
     public record Bubbles(
         boolean enabled,
-        boolean followPlayers,
-        boolean hideOwn,
-        int wordWrapChars,
-        long maxTimeAliveMs,
-        String prefix,
-        double offsetX,
-        double offsetY,
-        double offsetZ,
-        List<String> blacklistWorlds,
-        int lineStaggerTicks,
-        boolean flyAway
+        List<String> blacklistWorlds
     ) {
     }
 
@@ -105,13 +103,16 @@ public record GlossConfig(
 
     public record Drops(
         boolean enabled,
-        String nameFormat
+        String nameFormat,
+        String bundleFormat,
+        int bundleEntryLimit,
+        boolean preserveCustomNames,
+        boolean useItemDisplayNames
     ) {
     }
 
     public record Motd(
-        boolean enabled,
-        List<String> texts
+        boolean enabled
     ) {
     }
 
@@ -130,121 +131,174 @@ public record GlossConfig(
     ) {
     }
 
-    public static GlossConfig load(FileConfiguration source) {
-        ConfigurationSection features = section(source, "features");
-        ConfigurationSection holograms = section(source, "holograms");
-        ConfigurationSection boards = section(source, "boards");
-        ConfigurationSection tablist = section(source, "tablist");
-        ConfigurationSection emoji = section(source, "emoji");
-        ConfigurationSection chat = section(source, "chat");
-        ConfigurationSection text = section(source, "text");
-        ConfigurationSection bubbles = section(source, "chat-bubbles");
-        ConfigurationSection indicators = section(source, "damage-indicators");
-        ConfigurationSection drops = section(source, "drops");
-        ConfigurationSection motd = section(source, "motd");
-        ConfigurationSection groups = section(source, "groups");
-        ConfigurationSection hotload = section(source, "hotload");
-        ConfigurationSection commands = section(source, "commands");
+    public record Menus(
+        boolean enabled,
+        float uiScale
+    ) {
+    }
 
+    public record Panels(
+        boolean enabled
+    ) {
+    }
+
+    public record Previews(
+        boolean enabled,
+        double lookDistance,
+        float scale
+    ) {
+    }
+
+    public record EditorSync(
+        String builderUrl,
+        boolean enabled,
+        String endpoint,
+        String createToken,
+        int sessionMinutes,
+        int pollSeconds,
+        int maxProjectMiB
+    ) {
+    }
+
+    public record Debug(
+        boolean hitbox,
+        boolean position,
+        boolean animator
+    ) {
+    }
+
+    public record CustomItems(
+        boolean enabled,
+        List<String> providers
+    ) {
+    }
+
+    public record Integration(
+        int sampleIntervalTicks
+    ) {
+    }
+
+    public static GlossConfig from(GlossConfigFile file) {
+        GlossConfigFile source = Objects.requireNonNull(file, "file");
         return new GlossConfig(
             new Holograms(
-                features.getBoolean("holograms", true),
-                clamp(holograms.getDouble("stack-distance", 0.26D), 0.05D, 2.0D),
-                clampInt(holograms.getInt("update-interval-ticks", 10), 1, 200),
-                clamp(holograms.getDouble("view-range", 48.0D), 4.0D, 128.0D),
-                holograms.getBoolean("per-viewer-placeholders", true),
-                clampInt(holograms.getInt("temporary-update-interval-ticks", 2), 1, 20),
-                clampInt(holograms.getInt("text-art-max-width", 48), 8, 128)
+                source.features.holograms,
+                source.holograms.stackDistance,
+                source.holograms.updateIntervalTicks,
+                source.holograms.viewRange,
+                source.holograms.perViewerPlaceholders,
+                source.holograms.temporaryUpdateIntervalTicks,
+                source.holograms.textArtMaxWidth,
+                source.holograms.highFrequencyAnimations,
+                source.holograms.maxAnimationFps,
+                source.holograms.animationPacketBudget
             ),
             new Boards(
-                features.getBoolean("boards", true),
-                clampInt(boards.getInt("update-interval-ticks", 20), 1, 200)
+                source.features.boards,
+                source.boards.updateIntervalTicks
             ),
             new Tablist(
-                features.getBoolean("tablist", true),
-                tablist.getBoolean("use-header-footers", true),
-                tablist.getString("header", "&d&lGloss"),
-                tablist.getString("footer", "&7VolmitSoftware.com"),
-                clampInt(tablist.getInt("update-interval-ticks", 40), 1, 400),
-                tablist.getBoolean("group-list-names", true)
+                source.features.tablist,
+                source.tablist.updateIntervalTicks
             ),
             new Emoji(
-                features.getBoolean("emoji", true),
-                emoji.getBoolean("emoji-specific-permissions", false),
-                emoji.getBoolean("tab-complete", true)
+                source.features.emoji,
+                source.emoji.emojiSpecificPermissions,
+                source.emoji.tabComplete
             ),
             new Animations(
-                features.getBoolean("animations", true)
+                source.features.animations
             ),
             new Chat(
-                chat.getBoolean("color", true)
+                source.chat.color
             ),
             new Text(
-                text.getBoolean("placeholders", true),
-                text.getBoolean("functions", true)
+                source.text.placeholders,
+                source.text.functions
             ),
             new Bubbles(
-                features.getBoolean("chat-bubbles", true),
-                bubbles.getBoolean("follow-players", true),
-                bubbles.getBoolean("hide-own-messages", true),
-                clampInt(bubbles.getInt("word-wrap-break-chars", 32), 8, 128),
-                clampLong(bubbles.getLong("max-time-alive", 5000L), 500L, 60000L),
-                bubbles.getString("message.prefix", "&7"),
-                bubbles.getDouble("message.offset.x", 0.0D),
-                bubbles.getDouble("message.offset.y", 1.0D),
-                bubbles.getDouble("message.offset.z", 0.0D),
-                List.copyOf(bubbles.getStringList("blacklist-worlds")),
-                clampInt(bubbles.getInt("line-stagger-ticks", 5), 0, 40),
-                bubbles.getBoolean("fly-away", true)
+                source.features.chatBubbles,
+                List.copyOf(source.chatBubbles.blacklistWorlds)
             ),
             new Indicators(
-                features.getBoolean("damage-indicators", true),
-                clamp(indicators.getDouble("motion.random-throw-force", 0.08D), 0.0D, 2.0D),
-                clamp(indicators.getDouble("motion.initial-up-force", 0.13D), 0.0D, 2.0D),
-                clamp(indicators.getDouble("motion.gravity-factor", 0.0093D), 0.0D, 1.0D),
-                clampInt(indicators.getInt("max-indicators-per-second", 40), 1, 1000),
-                clampLong(indicators.getLong("max-ms-alive", 3000L), 250L, 30000L),
-                indicators.getString("damage-indicator-prefix", "&c&l"),
-                indicators.getString("heal-indicator-prefix", "&a&l"),
-                clampInt(indicators.getInt("decimals", 0), 0, 2),
-                indicators.getBoolean("show-heals", true)
+                source.features.damageIndicators,
+                source.damageIndicators.randomThrowForce,
+                source.damageIndicators.initialUpForce,
+                source.damageIndicators.gravityFactor,
+                source.damageIndicators.maxPerSecond,
+                source.damageIndicators.maxMsAlive,
+                source.damageIndicators.damagePrefix,
+                source.damageIndicators.healPrefix,
+                source.damageIndicators.decimals,
+                source.damageIndicators.showHeals
             ),
             new Drops(
-                features.getBoolean("drops", true),
-                drops.getString("name-format", "&7{count}x {type}")
+                source.features.drops,
+                source.drops.nameFormat,
+                source.drops.bundleFormat,
+                source.drops.bundleEntryLimit,
+                source.drops.preserveCustomNames,
+                source.drops.useItemDisplayNames
             ),
             new Motd(
-                motd.getBoolean("enabled", false),
-                List.copyOf(motd.getStringList("texts"))
+                source.features.motd
             ),
             new Groups(
-                groups.getBoolean("use-vault", true)
+                source.groups.useVault
             ),
             new Hotload(
-                clampInt(hotload.getInt("watch-interval-ticks", 20), 1, 200)
+                source.hotload.watchIntervalTicks
             ),
             new Commands(
-                commands.getBoolean("sounds", true)
+                source.commands.sounds
             ),
-            source.getBoolean("splash-screen", true),
-            source.getBoolean("metrics", true)
+            source.splashScreen,
+            source.metrics,
+            new Menus(
+                source.features.menus,
+                (float) source.menus.uiScale
+            ),
+            new Panels(
+                source.features.panels
+            ),
+            new Previews(
+                source.features.previews,
+                source.preview.lookDistance,
+                (float) source.preview.scale
+            ),
+            new EditorSync(
+                source.editor.builderUrl,
+                source.editor.sync.enabled,
+                source.editor.sync.endpoint,
+                source.editor.sync.createToken,
+                source.editor.sync.sessionMinutes,
+                source.editor.sync.pollSeconds,
+                source.editor.sync.maxProjectMiB
+            ),
+            new Debug(
+                source.debug.hitbox,
+                source.debug.position,
+                source.debug.animator
+            ),
+            new CustomItems(
+                source.items.customItems,
+                List.copyOf(source.items.customItemProviders)
+            ),
+            new Integration(
+                source.integration.sampleIntervalTicks
+            )
         );
     }
 
-    private static ConfigurationSection section(FileConfiguration source, String path) {
-        ConfigurationSection existing = source.getConfigurationSection(path);
-        return existing != null ? existing : source.createSection(path);
+    public static GlossConfig current() {
+        Gloss plugin = Gloss.instance;
+        GlossConfig active = plugin == null ? null : plugin.cfg();
+        return active == null ? DEFAULTS : active;
     }
 
-    private static double clamp(double value, double minimum, double maximum) {
-        return Math.max(minimum, Math.min(maximum, value));
-    }
-
-    private static int clampInt(int value, int minimum, int maximum) {
-        return Math.max(minimum, Math.min(maximum, value));
-    }
-
-    private static long clampLong(long value, long minimum, long maximum) {
-        return Math.max(minimum, Math.min(maximum, value));
+    private static GlossConfig defaults() {
+        GlossConfigFile file = new GlossConfigFile();
+        file.normalize();
+        return from(file);
     }
 }

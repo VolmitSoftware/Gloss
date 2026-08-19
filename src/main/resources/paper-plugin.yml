@@ -4,7 +4,7 @@ main: ${main}
 folia-supported: true
 api-version: ${apiVersion}
 load: STARTUP
-description: Holograms, scoreboards, tablist, emoji chat, chat bubbles and damage indicators.
+description: Holograms, menus, panels, previews, scoreboards, tablist, emoji chat, chat bubbles and damage indicators.
 authors: [ VolmitSoftware ]
 website: VolmitSoftware.com
 dependencies:
@@ -17,6 +17,74 @@ dependencies:
       load: BEFORE
       required: false
       join-classpath: true
+    ProtocolLib:
+      load: BEFORE
+      required: false
+      join-classpath: true
+    ProtocolSupport:
+      load: BEFORE
+      required: false
+      join-classpath: true
+    ViaVersion:
+      load: BEFORE
+      required: false
+      join-classpath: true
+    ViaBackwards:
+      load: BEFORE
+      required: false
+      join-classpath: true
+    ViaRewind:
+      load: BEFORE
+      required: false
+      join-classpath: true
+    Geyser-Spigot:
+      load: BEFORE
+      required: false
+      join-classpath: true
+    CraftEngine:
+      load: BEFORE
+      required: false
+      join-classpath: true
+    ItemsAdder:
+      load: BEFORE
+      required: false
+      join-classpath: true
+    Oraxen:
+      load: BEFORE
+      required: false
+      join-classpath: true
+    Nexo:
+      load: BEFORE
+      required: false
+      join-classpath: true
+    MMOItems:
+      load: BEFORE
+      required: false
+      join-classpath: true
+    ExecutableItems:
+      load: BEFORE
+      required: false
+      join-classpath: true
+    EcoItems:
+      load: BEFORE
+      required: false
+      join-classpath: true
+    Slimefun:
+      load: BEFORE
+      required: false
+      join-classpath: true
+    MythicMobs:
+      load: BEFORE
+      required: false
+      join-classpath: true
+    HeadDatabase:
+      load: BEFORE
+      required: false
+      join-classpath: true
+    WorldGuard:
+      load: BEFORE
+      required: false
+      join-classpath: true
 permissions:
   gloss.*:
     description: Gives access to all Gloss permissions.
@@ -25,13 +93,27 @@ permissions:
       gloss.admin: true
       gloss.holograms: true
       gloss.boards: true
+      gloss.menus: true
+      gloss.panels: true
+      gloss.preview: true
+      gloss.previews: true
+      gloss.items: true
+      gloss.sync: true
+      gloss.import: true
       gloss.emoji.use: true
       gloss.chat.color: true
       gloss.bubbles.send: true
+      gloss.bubbles.style: true
       gloss.indicators.show: true
   gloss.admin:
-    description: Allows reloading Gloss, viewing status and managing groups.
+    description: Allows reloading Gloss, viewing status and restoring shipped defaults.
     default: op
+    children:
+      gloss.emoji.reset: true
+      gloss.animations.reset: true
+      gloss.bubbles.reset: true
+      gloss.tablist.reset: true
+      gloss.motd.reset: true
   gloss.holograms:
     description: Gives access to all Gloss hologram permissions.
     default: op
@@ -69,7 +151,7 @@ permissions:
     description: Allows creating scoreboards.
     default: op
   gloss.boards.edit:
-    description: Allows editing scoreboards, primary boards and board permissions.
+    description: Allows editing scoreboards, primary boards, board permissions and restoring shipped boards.
     default: op
   gloss.boards.delete:
     description: Allows deleting scoreboards.
@@ -80,15 +162,111 @@ permissions:
   gloss.boards.hide:
     description: Allows hiding your scoreboard.
     default: op
+  gloss.menus:
+    description: Gives access to all Gloss hologram-menu permissions.
+    default: op
+    children:
+      gloss.menus.list: true
+      gloss.menus.open: true
+      gloss.menus.close: true
+      gloss.menus.move: true
+      gloss.menus.back: true
+      gloss.menus.create: true
+      gloss.menus.edit: true
+      gloss.menus.builder: true
+  gloss.menus.list:
+    description: Allows listing hologram menus.
+    default: op
+  gloss.menus.open:
+    description: Allows opening hologram menus.
+    default: op
+  gloss.menus.close:
+    description: Allows closing your open menu session.
+    default: op
+  gloss.menus.move:
+    description: Allows moving your open menu session.
+    default: op
+  gloss.menus.back:
+    description: Allows reopening your previous menu session.
+    default: op
+  gloss.menus.create:
+    description: Allows creating a hologram menu and the panel that places it; also requires gloss.panels.
+    default: op
+  gloss.menus.edit:
+    description: Allows editing menu content and opening menus in the web editor.
+    default: op
+  gloss.menus.builder:
+    description: Allows linking the hosted Gloss web editor.
+    default: op
+  gloss.panels:
+    description: Allows managing persistent world panels.
+    default: op
+    children:
+      gloss.panels.editweb: true
+  gloss.panels.editweb:
+    description: Allows opening panel projects in the web editor.
+    default: op
+  gloss.preview:
+    description: Allows seeing container previews and adjusting their scale.
+    default: op
+  gloss.previews:
+    description: Allows inspecting container-preview documents.
+    default: op
+    children:
+      gloss.previews.reset: true
+      gloss.previews.dump: true
+  gloss.previews.reset:
+    description: Allows restoring shipped container-preview documents.
+    default: op
+  gloss.previews.dump:
+    description: Allows dumping compiled container-preview documents.
+    default: op
+  gloss.items:
+    description: Allows inspecting custom item providers.
+    default: op
+    children:
+      gloss.items.export: true
+  gloss.items.export:
+    description: Allows exporting the custom item catalog for the web editor.
+    default: op
+  gloss.sync:
+    description: Allows managing web editor sync sessions.
+    default: op
+  gloss.import:
+    description: Allows previewing legacy hologram migrations.
+    default: op
+    children:
+      gloss.import.apply: true
+  gloss.import.apply:
+    description: Allows applying legacy hologram migrations.
+    default: op
   gloss.emoji.use:
     description: Allows using emoji in chat.
     default: true
+  gloss.emoji.reset:
+    description: Allows restoring shipped emoji defaults.
+    default: op
+  gloss.animations.reset:
+    description: Allows restoring shipped animation defaults.
+    default: op
   gloss.chat.color:
     description: Allows using color codes in chat.
     default: op
   gloss.bubbles.send:
     description: Chat messages from this player display as chat bubbles.
     default: true
+  gloss.bubbles.style:
+    description: Allows choosing a personal chat bubble style.
+    default: op
+  gloss.bubbles.reset:
+    description: Allows restoring shipped bubble style defaults.
+    default: op
+  gloss.tablist.reset:
+    description: Allows restoring the shipped tablist document.
+    default: op
+  gloss.motd.reset:
+    description: Allows restoring the shipped MOTD document.
+    default: op
   gloss.indicators.show:
     description: Shows damage and heal indicators to this player.
     default: true

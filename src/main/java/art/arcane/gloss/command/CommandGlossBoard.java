@@ -16,10 +16,11 @@ import org.bukkit.entity.Player;
 import java.util.ArrayList;
 import java.util.List;
 
-@Director(name = "board", aliases = {"sb", "bd"}, descriptionKey = "command.help.board", description = "Create and manage scoreboards")
+@Director(name = "board", aliases = {"boards", "sb", "bd"}, descriptionKey = "command.help.board", description = "Create and manage scoreboards")
 public class CommandGlossBoard {
     private static final String CLEAR_PERMISSION_TOKEN = "default";
     private static final String DEFAULT_LINE = "&7A fresh Gloss board";
+    private static final String LIST_COMMAND = "/gloss board list";
 
     private final Gloss plugin;
 
@@ -211,22 +212,33 @@ public class CommandGlossBoard {
                 MessageArgument.untrusted("node", node));
     }
 
+    @Director(name = "reset", sync = true, descriptionKey = "command.help.board.reset", description = "Restore shipped scoreboard defaults")
+    public void reset(@Param(name = "sender", contextual = true) CommandSender sender,
+                      @Param(name = "name", defaultValue = "*", descriptionKey = "command.help.arg.reset_name", description = "Name to reset, or * for every shipped default") String name) {
+        if (GlossCommandMessages.denied(sender, "gloss.boards.edit")) {
+            return;
+        }
+        GlossCommandMessages.sendResetResult(sender, "board", name, plugin.boards().resetToDefault(name));
+    }
+
     @Director(name = "list", descriptionKey = "command.help.board.list", description = "List scoreboards")
-    public void list(@Param(name = "sender", contextual = true) CommandSender sender) {
+    public void list(@Param(name = "sender", contextual = true) CommandSender sender,
+                     @Param(name = "page", defaultValue = "1", descriptionKey = "command.help.arg.list_page", description = "One-based list page") int page) {
         List<GlossBoardMeta> boards = plugin.boards().boards();
         if (boards.isEmpty()) {
             GlossCommandMessages.send(sender, GlossMessages.BOARD_LIST_EMPTY);
             return;
         }
 
+        GlossCommandPager.Window window = GlossCommandPager.window(boards.size(), page, GlossCommandPager.TEXT_PAGE_SIZE);
         DirectorMiniMenu.Theme theme = GlossCommandService.menuTheme();
-        String hover = DirectorMiniMenu.escapeText(GlossLocalization.english()
-                .directorText(GlossMessages.BOARD_LIST_HOVER, MessageArgs.empty()));
-        List<String> lines = new ArrayList<>(boards.size() + 2);
-        lines.add(DirectorMiniMenu.banner("/gloss board list", theme));
-        for (GlossBoardMeta meta : boards) {
+        String hover = DirectorMiniMenu.escapeText(GlossLocalization.globalDirectorText(GlossMessages.BOARD_LIST_HOVER, MessageArgs.empty()));
+        List<String> lines = new ArrayList<>();
+        lines.add(DirectorMiniMenu.banner(LIST_COMMAND, theme));
+        for (GlossBoardMeta meta : boards.subList(window.startIndex(), window.endIndex())) {
             lines.add(renderListEntry(meta, theme, hover));
         }
+        GlossCommandPager.appendFooter(lines, window, LIST_COMMAND, theme);
         lines.add(DirectorMiniMenu.bar(theme));
         DirectorMiniMenu.deliver(sender, lines);
     }
@@ -240,7 +252,7 @@ public class CommandGlossBoard {
         }
 
         String permission = meta.permission() == null || meta.permission().isBlank()
-                ? GlossLocalization.english().legacy(GlossMessages.BOARD_PERMISSION_NONE)
+                ? GlossLocalization.globalLegacy(GlossMessages.BOARD_PERMISSION_NONE)
                 : meta.permission();
         GlossCommandMessages.send(sender, GlossMessages.BOARD_INFO_HEADER,
                 MessageArgument.untrusted("id", id),
@@ -288,8 +300,7 @@ public class CommandGlossBoard {
                 .append("</click></hover> <").append(theme.description()).append(">").append(title)
                 .append("</").append(theme.description()).append(">");
         if (meta.primary()) {
-            String marker = DirectorMiniMenu.escapeText(GlossLocalization.english()
-                    .directorText(GlossMessages.BOARD_LIST_PRIMARY, MessageArgs.empty()));
+            String marker = DirectorMiniMenu.escapeText(GlossLocalization.globalDirectorText(GlossMessages.BOARD_LIST_PRIMARY, MessageArgs.empty()));
             entry.append(" <").append(theme.optional()).append(">(").append(marker).append(")</")
                     .append(theme.optional()).append(">");
         }

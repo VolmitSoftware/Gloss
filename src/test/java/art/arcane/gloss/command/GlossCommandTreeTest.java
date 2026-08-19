@@ -14,6 +14,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Set;
 
 class GlossCommandTreeTest {
     private static final List<List<String>> EXPECTED_PATHS = List.of(
@@ -43,14 +44,96 @@ class GlossCommandTreeTest {
             List.of("board", "permission"),
             List.of("board", "list"),
             List.of("board", "info"),
-            List.of("group"),
-            List.of("group", "list"),
-            List.of("group", "info"),
+            List.of("board", "reset"),
             List.of("emoji"),
+            List.of("emoji", "list"),
+            List.of("emoji", "reset"),
             List.of("animations"),
+            List.of("animations", "list"),
+            List.of("animations", "reset"),
+            List.of("bubbles"),
+            List.of("bubbles", "style"),
+            List.of("bubbles", "reset"),
+            List.of("tablist"),
+            List.of("tablist", "reset"),
+            List.of("motd"),
+            List.of("motd", "reset"),
             List.of("status"),
             List.of("reload"),
-            List.of("version")
+            List.of("version"),
+            List.of("menu"),
+            List.of("menu", "list"),
+            List.of("menu", "create"),
+            List.of("menu", "open"),
+            List.of("menu", "back"),
+            List.of("menu", "close"),
+            List.of("menu", "move"),
+            List.of("menu", "builder"),
+            List.of("menu", "edit"),
+            List.of("menu", "addrow"),
+            List.of("menu", "insertrow"),
+            List.of("menu", "setrow"),
+            List.of("menu", "removerow"),
+            List.of("menu", "offsetrow"),
+            List.of("menu", "seticon"),
+            List.of("menu", "style"),
+            List.of("menu", "image"),
+            List.of("menu", "new"),
+            List.of("menu", "copy"),
+            List.of("panel"),
+            List.of("panel", "list"),
+            List.of("panel", "reload"),
+            List.of("panel", "near"),
+            List.of("panel", "info"),
+            List.of("panel", "create"),
+            List.of("panel", "delete"),
+            List.of("panel", "rename"),
+            List.of("panel", "copy"),
+            List.of("panel", "move"),
+            List.of("panel", "here"),
+            List.of("panel", "teleport"),
+            List.of("panel", "rotate"),
+            List.of("panel", "scale"),
+            List.of("panel", "align"),
+            List.of("panel", "menu"),
+            List.of("panel", "addrow"),
+            List.of("panel", "insertrow"),
+            List.of("panel", "setrow"),
+            List.of("panel", "removerow"),
+            List.of("panel", "offsetrow"),
+            List.of("panel", "seticon"),
+            List.of("panel", "style"),
+            List.of("panel", "image"),
+            List.of("panel", "ranges"),
+            List.of("panel", "visibility"),
+            List.of("panel", "permissions"),
+            List.of("panel", "follow"),
+            List.of("panel", "unfollow"),
+            List.of("panel", "edit"),
+            List.of("panel", "web"),
+            List.of("panel", "save"),
+            List.of("panel", "cancel"),
+            List.of("preview"),
+            List.of("preview", "list"),
+            List.of("preview", "reset"),
+            List.of("preview", "dump"),
+            List.of("item"),
+            List.of("item", "status"),
+            List.of("item", "export"),
+            List.of("sync"),
+            List.of("sync", "list"),
+            List.of("sync", "status"),
+            List.of("sync", "revoke"),
+            List.of("sync", "pull"),
+            List.of("import"),
+            List.of("import", "preview"),
+            List.of("import", "apply"),
+            List.of("import", "holoui"),
+            List.of("import", "legacy")
+    );
+    private static final Set<String> GROUP_ROOTS = Set.of(
+            "hologram", "board", "emoji", "animations", "bubbles", "tablist", "motd",
+            "menu", "panel", "preview", "item", "sync", "import"
     );
 
     @Test
@@ -83,8 +166,7 @@ class GlossCommandTreeTest {
             for (String token : path) {
                 cursor = findExactChild(cursor, token);
             }
-            boolean group = path.size() == 1
-                    && (path.get(0).equals("hologram") || path.get(0).equals("board") || path.get(0).equals("group"));
+            boolean group = path.size() == 1 && GROUP_ROOTS.contains(path.get(0));
             Assertions.assertEquals(!group, cursor.isInvocable(), "Wrong invocability for path " + path);
         }
     }
@@ -110,7 +192,7 @@ class GlossCommandTreeTest {
 
             Assertions.assertInstanceOf(TextKey.class, key, key.id());
             TextKey textKey = (TextKey) key;
-            String resolved = GlossLocalization.english().directorText(textKey, MessageArgs.empty());
+            String resolved = GlossLocalization.globalDirectorText(textKey, MessageArgs.empty());
             Assertions.assertEquals(textKey.english(), resolved, key.id());
         }
     }

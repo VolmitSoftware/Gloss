@@ -37,6 +37,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 import java.util.logging.Level;
@@ -59,13 +60,46 @@ public final class GlossCommandService implements CommandExecutor, TabCompleter,
             "gloss.boards.delete",
             "gloss.boards.show",
             "gloss.boards.hide",
-            "gloss.emoji.use"
+            "gloss.emoji.use",
+            "gloss.emoji.reset",
+            "gloss.animations.reset",
+            "gloss.bubbles.reset",
+            "gloss.bubbles.style",
+            "gloss.tablist.reset",
+            "gloss.motd.reset",
+            "gloss.menus",
+            "gloss.menus.list",
+            "gloss.menus.open",
+            "gloss.menus.close",
+            "gloss.menus.move",
+            "gloss.menus.back",
+            "gloss.menus.create",
+            "gloss.menus.edit",
+            "gloss.menus.builder",
+            "gloss.panels",
+            "gloss.panels.editweb",
+            "gloss.previews",
+            "gloss.previews.reset",
+            "gloss.previews.dump",
+            "gloss.items",
+            "gloss.items.export",
+            "gloss.sync",
+            "gloss.import",
+            "gloss.import.apply"
+    );
+    /**
+     * The six ported subtrees keep HoloUi's positional-to-keyed convenience pre-pass. Everything
+     * else on /gloss (hologram, board, emoji, ...) stays strictly keyed per the Director law.
+     */
+    private static final Set<String> SCOPED_POSITIONAL_ROOTS = Set.of(
+            "menu", "menus", "panel", "panels", "preview", "previews", "item", "items", "sync", "import"
     );
     private static final int HELP_PAGE_SIZE = 8;
 
     private final Gloss plugin;
     private final DirectorTheme theme;
     private final AtomicCache<DirectorRuntimeEngine> directorCache = new AtomicCache<>();
+    private volatile CommandGloss root;
 
     public GlossCommandService(Gloss plugin) {
         this.plugin = plugin;
@@ -112,8 +146,11 @@ public final class GlossCommandService implements CommandExecutor, TabCompleter,
 
     public boolean executeCommand(CommandSender sender, String commandName, String label, String[] args) {
         String[] routed = routedArgs(commandName, args, false);
+        if (isScopedPositionalRoot(routed)) {
+            routed = normalizePositionalArgs(routed);
+        }
         if (!hasBaseCommandAccess(sender)) {
-            sender.sendMessage(GlossLocalization.english().legacy(GlossMessages.COMMAND_NO_PERMISSION_USE));
+            sender.sendMessage(GlossLocalization.globalLegacy(GlossMessages.COMMAND_NO_PERMISSION_USE));
             playFailureChime(sender);
             return true;
         }
@@ -125,11 +162,13 @@ public final class GlossCommandService implements CommandExecutor, TabCompleter,
 
         DirectorExecutionResult result = runDirector(sender, label, routed);
         if (result.isSuccess()) {
-            playSuccessChime(sender);
+            if (!defersAutomaticOutcomeSound(routed)) {
+                playSuccessChime(sender);
+            }
             return true;
         }
 
-        sender.sendMessage(GlossLocalization.english().legacy(
+        sender.sendMessage(GlossLocalization.globalLegacy(
                 GlossMessages.COMMAND_USAGE_HELP,
                 GlossLocalization.args(MessageArgument.trusted("command", commandName))
         ));
@@ -141,7 +180,12 @@ public final class GlossCommandService implements CommandExecutor, TabCompleter,
         if (!hasBaseCommandAccess(sender)) {
             return List.of();
         }
-        return runDirectorTab(sender, commandName, routedArgs(commandName, args, true));
+        String[] routed = routedArgs(commandName, args, true);
+        if (!isScopedPositionalRoot(routed)) {
+            return runDirectorTab(sender, commandName, routed);
+        }
+        List<String> suggestions = runDirectorTab(sender, commandName, normalizeTabArgs(routed));
+        return restorePositionalSuggestions(routed, suggestions);
     }
 
     @Override
@@ -214,6 +258,212 @@ public final class GlossCommandService implements CommandExecutor, TabCompleter,
         return normalized.toArray(new String[0]);
     }
 
+    static boolean isScopedPositionalRoot(String[] args) {
+        return args != null && args.length > 0 && args[0] != null
+                && SCOPED_POSITIONAL_ROOTS.contains(args[0].toLowerCase(Locale.ROOT));
+    }
+
+    static String[] normalizePositionalArgs(String[] args) {
+        args = normalizeTrailingText(args);
+
+        if (args.length == 1 && isGroup(args[0], "menu", "menus")) {
+            return new String[]{"menu", "list"};
+        }
+        if (args.length == 1 && isGroup(args[0], "panel", "panels")) {
+            return new String[]{"panel", "list"};
+        }
+        if (args.length == 1 && isGroup(args[0], "preview", "previews")) {
+            return new String[]{"preview", "list"};
+        }
+
+        if (args.length == 3
+                && isGroup(args[0], "menu", "menus")
+                && args[1].equalsIgnoreCase("open")
+                && isBareOptionalValue(args[2])) {
+            return new String[]{args[0], "open", "menu=" + args[2]};
+        }
+        if (args.length == 3
+                && isGroup(args[0], "preview", "previews")
+                && args[1].equalsIgnoreCase("reset")
+                && isBareOptionalValue(args[2])) {
+            return new String[]{args[0], "reset", "name=" + args[2]};
+        }
+        if (args.length == 3
+                && isGroup(args[0], "panel", "panels")
+                && args[1].equalsIgnoreCase("near")
+                && isBareOptionalValue(args[2])) {
+            return new String[]{args[0], "near", "radius=" + args[2]};
+        }
+        if (args.length == 3
+                && isGroup(args[0], "panel", "panels")
+                && args[1].equalsIgnoreCase("list")
+                && isBareOptionalValue(args[2])) {
+            return new String[]{args[0], "list", "page=" + args[2]};
+        }
+        if (args.length == 4
+                && isGroup(args[0], "panel", "panels")
+                && args[1].equalsIgnoreCase("create")
+                && isBareOptionalValue(args[3])) {
+            return new String[]{args[0], "create", args[2], "menu=" + args[3]};
+        }
+
+        return args;
+    }
+
+    private static String[] normalizeTrailingText(String[] args) {
+        if (args.length < 2) {
+            return args;
+        }
+
+        if (isGroup(args[0], "menu", "menus") && args[1].equalsIgnoreCase("create")) {
+            if (args.length == 3) {
+                return new String[]{args[0], args[1], args[2], "text="};
+            }
+            if (args.length > 3) {
+                String joined = String.join(" ", Arrays.copyOfRange(args, 3, args.length));
+                String trailingText = joined.regionMatches(true, 0, "text=", 0, "text=".length())
+                        ? joined
+                        : "text=" + joined;
+                return new String[]{args[0], args[1], args[2], trailingText};
+            }
+            return args;
+        }
+
+        if (!isGroup(args[0], "menu", "menus") && !isGroup(args[0], "panel", "panels")) {
+            return args;
+        }
+
+        TrailingArgument trailing = switch (args[1].toLowerCase(Locale.ROOT)) {
+            case "addrow" -> new TrailingArgument(3, "text");
+            case "insertrow", "setrow" -> new TrailingArgument(4, "text");
+            case "seticon", "style" -> new TrailingArgument(5, "value");
+            case "image" -> new TrailingArgument(3, "path");
+            default -> null;
+        };
+        if (trailing == null || args.length <= trailing.index()) {
+            return args;
+        }
+
+        String prefix = trailing.name() + "=";
+        String joined = String.join(" ", Arrays.copyOfRange(args, trailing.index(), args.length));
+        String trailingArgument = joined.regionMatches(true, 0, prefix, 0, prefix.length())
+                ? joined
+                : prefix + joined;
+        String[] normalized = Arrays.copyOf(args, trailing.index() + 1);
+        normalized[trailing.index()] = trailingArgument;
+        return normalized;
+    }
+
+    static String[] normalizeTabArgs(String[] args) {
+        if (args.length == 3
+                && isGroup(args[0], "menu", "menus")
+                && args[1].equalsIgnoreCase("open")
+                && isBareTabValue(args[2])) {
+            return new String[]{args[0], "open", "menu=" + args[2]};
+        }
+        if (args.length == 3
+                && isGroup(args[0], "preview", "previews")
+                && args[1].equalsIgnoreCase("reset")
+                && isBareTabValue(args[2])) {
+            return new String[]{args[0], "reset", "name=" + args[2]};
+        }
+        if (args.length == 3
+                && isGroup(args[0], "panel", "panels")
+                && args[1].equalsIgnoreCase("near")
+                && isBareTabValue(args[2])) {
+            return new String[]{args[0], "near", "radius=" + args[2]};
+        }
+        if (args.length == 3
+                && isGroup(args[0], "panel", "panels")
+                && args[1].equalsIgnoreCase("list")
+                && isBareTabValue(args[2])) {
+            return new String[]{args[0], "list", "page=" + args[2]};
+        }
+        if (args.length == 4
+                && isGroup(args[0], "panel", "panels")
+                && args[1].equalsIgnoreCase("create")
+                && isBareTabValue(args[3])) {
+            return new String[]{args[0], "create", args[2], "menu=" + args[3]};
+        }
+
+        return args;
+    }
+
+    static boolean defersAutomaticOutcomeSound(String[] normalizedArgs) {
+        return normalizedArgs.length > 1
+                && isGroup(normalizedArgs[0], "menu", "menus")
+                && normalizedArgs[1].equalsIgnoreCase("create");
+    }
+
+    static List<String> restorePositionalSuggestions(String[] args, List<String> suggestions) {
+        String prefix = positionalPrefix(args);
+        if (prefix == null) {
+            return suggestions;
+        }
+
+        return suggestions.stream()
+                .map(suggestion -> suggestion.startsWith(prefix) ? suggestion.substring(prefix.length()) : suggestion)
+                .toList();
+    }
+
+    private static boolean isBareOptionalValue(String token) {
+        if (token == null || token.isEmpty()) {
+            return false;
+        }
+        if (token.indexOf('=') >= 0) {
+            return false;
+        }
+        String lower = token.toLowerCase(Locale.ROOT);
+        return !lower.equals("help")
+                && !lower.equals("?")
+                && !lower.startsWith("help=");
+    }
+
+    private static boolean isBareTabValue(String token) {
+        return token != null && token.indexOf('=') < 0 && (token.isEmpty() || isBareOptionalValue(token));
+    }
+
+    private static String positionalPrefix(String[] args) {
+        if (args.length == 3
+                && isGroup(args[0], "menu", "menus")
+                && args[1].equalsIgnoreCase("open")
+                && isBareTabValue(args[2])) {
+            return "menu=";
+        }
+        if (args.length == 3
+                && isGroup(args[0], "preview", "previews")
+                && args[1].equalsIgnoreCase("reset")
+                && isBareTabValue(args[2])) {
+            return "name=";
+        }
+        if (args.length == 3
+                && isGroup(args[0], "panel", "panels")
+                && args[1].equalsIgnoreCase("near")
+                && isBareTabValue(args[2])) {
+            return "radius=";
+        }
+        if (args.length == 3
+                && isGroup(args[0], "panel", "panels")
+                && args[1].equalsIgnoreCase("list")
+                && isBareTabValue(args[2])) {
+            return "page=";
+        }
+        if (args.length == 4
+                && isGroup(args[0], "panel", "panels")
+                && args[1].equalsIgnoreCase("create")
+                && isBareTabValue(args[3])) {
+            return "menu=";
+        }
+        return null;
+    }
+
+    private static boolean isGroup(String value, String canonical, String alias) {
+        return value.equalsIgnoreCase(canonical) || value.equalsIgnoreCase(alias);
+    }
+
+    private record TrailingArgument(int index, String name) {
+    }
+
     private static String normalizeCommandName(String commandName) {
         if (commandName == null) {
             return null;
@@ -276,14 +526,22 @@ public final class GlossCommandService implements CommandExecutor, TabCompleter,
         return directorCache.aquire(this::buildDirector);
     }
 
+    public void shutdown() {
+        CommandGloss current = root;
+        if (current != null) {
+            current.shutdown();
+        }
+    }
+
     private DirectorRuntimeEngine buildDirector() {
+        root = new CommandGloss(plugin);
         return DirectorEngineFactory.create(
-                new CommandGloss(plugin),
+                root,
                 DirectorEngineOptions.builder()
                         .contexts(buildDirectorContexts())
                         .dispatcher(this::dispatchDirector)
                         .invocationHook(this)
-                        .textResolver(GlossLocalization.english()::directorText)
+                        .textResolver(GlossLocalization.globalDirectorResolver())
                         .build()
         );
     }
@@ -338,7 +596,7 @@ public final class GlossCommandService implements CommandExecutor, TabCompleter,
         }
 
         DirectorMiniMenu.Theme helpTheme = DirectorMiniMenu.Theme.fromDirectorTheme(theme);
-        DirectorMiniMenu.deliver(sender, DirectorMiniMenu.render(page.get(), helpTheme, GlossLocalization.english().directorResolver()));
+        DirectorMiniMenu.deliver(sender, page.get(), helpTheme, GlossLocalization.globalDirectorResolver());
 
         return true;
     }
@@ -362,8 +620,15 @@ public final class GlossCommandService implements CommandExecutor, TabCompleter,
     }
 
     private boolean soundsEnabled() {
-        GlossConfig config = plugin.cfg();
+        return soundsEnabled(plugin.cfg());
+    }
+
+    public static boolean soundsEnabled(GlossConfig config) {
         return config == null || config.commands().sounds();
+    }
+
+    public static boolean commandSoundsEnabled() {
+        return soundsEnabled(GlossConfig.current());
     }
 
     private record BukkitDirectorSender(CommandSender sender) implements DirectorSender {

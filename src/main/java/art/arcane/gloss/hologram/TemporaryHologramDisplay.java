@@ -27,6 +27,7 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
 
     private final HologramService service;
     private final String id;
+    private final String animatorGroup;
     private final long durationMs;
     private final long startedMs;
     private final Object linesLock;
@@ -46,6 +47,7 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
     TemporaryHologramDisplay(HologramService service, String id, Location initial, long durationMs) {
         this.service = service;
         this.id = Objects.requireNonNull(id, "Temporary hologram requires an id.");
+        this.animatorGroup = "temp:" + id + "#" + Integer.toHexString(System.identityHashCode(this));
         this.durationMs = durationMs;
         this.startedMs = M.ms();
         this.linesLock = new Object();
@@ -148,6 +150,7 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
         }
 
         service.removeTemporary(this);
+        service.animator().removeGroup(animatorGroup);
         TextDisplay active = display;
         display = null;
         appliedVisibility.clear();
@@ -165,6 +168,7 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
             return;
         }
         if (!enabled) {
+            service.animator().removeGroup(animatorGroup);
             TextDisplay active = display;
             if (active != null) {
                 display = null;
@@ -190,6 +194,7 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
 
         TextDisplay active = display;
         if (active == null || !active.isValid()) {
+            service.animator().removeGroup(animatorGroup);
             if (active != null) {
                 display = null;
                 service.despawnEntity(active, anchor);
@@ -261,6 +266,18 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
 
     private void applyText(TextDisplay active) {
         List<String> snapshot = lines;
+        World world = position.getWorld();
+        if (world != null) {
+            AnimationTemplate template = service.animator().compileTemplate(snapshot,
+                line -> service.plugin().text().renderStatic(line));
+            if (template != null) {
+                service.animator().publish(animatorGroup, HologramAnimator.SHARED_SUB,
+                    new HologramAnimator.Target(active.getEntityId(), template, captureViewers(world)));
+                return;
+            }
+        }
+
+        service.animator().removeGroup(animatorGroup);
         boolean dirty = textDirty.compareAndSet(true, false);
         if (!dirty && !containsFunctionTokens(snapshot)) {
             return;
@@ -358,6 +375,20 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
                 player.hideEntity(service.plugin(), active);
             }
         });
+    }
+
+    private List<Player> captureViewers(World world) {
+        boolean whitelist = viewerList.isWhitelist();
+        Set<UUID> members = viewerList.members();
+        List<Player> viewers = new ArrayList<>();
+        for (Player online : world.getPlayers()) {
+            boolean member = members.contains(online.getUniqueId());
+            if (whitelist == member) {
+                viewers.add(online);
+            }
+        }
+
+        return List.copyOf(viewers);
     }
 
     private Location safeBind(Supplier<Location> binder) {

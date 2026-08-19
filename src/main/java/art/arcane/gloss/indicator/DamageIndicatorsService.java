@@ -1,5 +1,6 @@
 package art.arcane.gloss.indicator;
 
+import art.arcane.gloss.service.GlossTelemetry;
 import art.arcane.gloss.Gloss;
 import art.arcane.gloss.GlossConfig;
 import art.arcane.gloss.api.TemporaryHologram;
@@ -130,6 +131,7 @@ public final class DamageIndicatorsService implements Listener {
     }
 
     private void spawn(LivingEntity target, double amount, boolean damage) {
+        GlossTelemetry.countIndicatorSpawn();
         GlossConfig.Indicators cfg = plugin.cfg().indicators();
         Location initial = target.getLocation().add(0.0D, damage ? 0.7D : -0.1D, 0.0D);
         String id = (damage ? "dmg-" : "heal-") + target.getUniqueId() + "-" + M.ms() + "-" + sequence.incrementAndGet();

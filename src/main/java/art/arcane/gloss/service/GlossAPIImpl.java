@@ -2,19 +2,60 @@ package art.arcane.gloss.service;
 
 import art.arcane.gloss.Gloss;
 import art.arcane.gloss.api.GlossAPI;
+import art.arcane.gloss.api.HoloMenu;
+import art.arcane.gloss.api.HoloMenuHandle;
 import art.arcane.gloss.api.Hologram;
 import art.arcane.gloss.api.TemporaryHologram;
+import art.arcane.gloss.api.internal.GlossApiServiceImpl;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
+import org.bukkit.plugin.Plugin;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 public final class GlossAPIImpl implements GlossAPI {
     private final Gloss plugin;
 
     public GlossAPIImpl(Gloss plugin) {
         this.plugin = plugin;
+    }
+
+    @Override
+    public HoloMenuHandle open(Plugin owner, Player player, HoloMenu menu) {
+        return menus().open(owner, player, menu);
+    }
+
+    @Override
+    public HoloMenuHandle open(Plugin owner, Player player, String menuId) {
+        return menus().open(owner, player, menuId);
+    }
+
+    @Override
+    public boolean close(Player player) {
+        GlossApiServiceImpl service = plugin.getApiService();
+        return service != null && service.close(player);
+    }
+
+    @Override
+    public boolean isOpen(Player player) {
+        GlossApiServiceImpl service = plugin.getApiService();
+        return service != null && service.isOpen(player);
+    }
+
+    @Override
+    public Set<String> menuIds() {
+        GlossApiServiceImpl service = plugin.getApiService();
+        return service == null ? Set.of() : service.menuIds();
+    }
+
+    private GlossApiServiceImpl menus() {
+        GlossApiServiceImpl service = plugin.getApiService();
+        if (service == null) {
+            throw new IllegalStateException("Gloss menus are not enabled");
+        }
+        return service;
     }
 
     @Override
