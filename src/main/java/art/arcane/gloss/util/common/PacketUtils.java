@@ -13,6 +13,12 @@ import java.util.Collections;
 
 public final class PacketUtils {
 
+  public static void sendOne(Player player, PacketWrapper<?> packet) {
+    if (player == null) return;
+    GlossTelemetry.countPackets(1L);
+    PacketEvents.getAPI().getPlayerManager().sendPacket(player, packet);
+  }
+
   public static void send(Player player, PacketWrapper<?> packet) {
     if (player == null) return;
     send(player, Collections.singletonList(packet));

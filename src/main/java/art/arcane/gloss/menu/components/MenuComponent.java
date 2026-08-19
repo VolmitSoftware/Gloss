@@ -46,16 +46,24 @@ public abstract class MenuComponent<T extends ComponentData> {
     return open;
   }
 
-  public void tick() {
+  /**
+   * Ticks with the eye pose the session read once for this pass, instead of every component
+   * reading it again.
+   *
+   * @param eyeOrigin    the viewer's eye position for this tick, or null when the session holds
+   *                     nothing that reads the eye pose
+   * @param eyeDirection the viewer's look direction for this tick, on the same terms
+   */
+  public void tick(Vector eyeOrigin, Vector eyeDirection) {
     if (!open) return;
     if (currentIcon != null) {
       currentIcon.tick();
       refreshDynamicGeometry();
     }
-    onTick();
+    onTick(eyeOrigin, eyeDirection);
   }
 
-  protected abstract void onTick();
+  protected abstract void onTick(Vector eyeOrigin, Vector eyeDirection);
 
   protected abstract MenuIcon<?> createIcon();
 
@@ -64,6 +72,7 @@ public abstract class MenuComponent<T extends ComponentData> {
   protected abstract void onClose();
 
   public void open() {
+    if (open) return;
     applyTransform();
     this.currentIcon = createIcon();
     this.currentIcon.spawn();

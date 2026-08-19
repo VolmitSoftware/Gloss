@@ -43,6 +43,13 @@ public class CommandGloss {
         this.legacyImport = new CommandGlossImport();
     }
 
+    /** Runs on the tree the director cache kept, never on one a racing builder threw away. */
+    public void enable() {
+        if (panel != null) {
+            panel.enable();
+        }
+    }
+
     public void shutdown() {
         if (panel != null) {
             panel.shutdown();

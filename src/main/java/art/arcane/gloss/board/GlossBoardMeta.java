@@ -1,9 +1,12 @@
 package art.arcane.gloss.board;
 
 import art.arcane.gloss.doc.DocumentEnvelope;
+import art.arcane.gloss.text.TextPipeline;
 
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.UnaryOperator;
 
 public final class GlossBoardMeta {
     public static final String UNRESTRICTED_PERMISSION = "default";
@@ -11,15 +14,18 @@ public final class GlossBoardMeta {
 
     private final String id;
     private final CopyOnWriteArrayList<String> content;
+    private final AtomicLong contentGeneration;
     private volatile String title;
     private volatile boolean primary;
     private volatile String permission;
     private volatile List<String> groups;
     private volatile long revision;
+    private volatile RenderPlan renderPlan;
 
     public GlossBoardMeta(String id) {
         this.id = id;
         this.content = new CopyOnWriteArrayList<>();
+        this.contentGeneration = new AtomicLong();
         this.title = id;
         this.primary = false;
         this.permission = UNRESTRICTED_PERMISSION;
@@ -54,26 +60,26 @@ public final class GlossBoardMeta {
 
     public void setTitle(String title) {
         this.title = title == null ? id : title;
+        contentGeneration.incrementAndGet();
     }
 
     public List<String> lines() {
         return List.copyOf(content);
     }
 
-    List<String> contentView() {
-        return content;
-    }
-
     public void addLine(String line) {
         content.add(line == null ? "" : line);
+        contentGeneration.incrementAndGet();
     }
 
     public void setLine(int index, String line) {
         content.set(index, line == null ? "" : line);
+        contentGeneration.incrementAndGet();
     }
 
     public void removeLine(int index) {
         content.remove(index);
+        contentGeneration.incrementAndGet();
     }
 
     public boolean primary() {
@@ -118,5 +124,106 @@ public final class GlossBoardMeta {
             : revision + 1L;
         revision = next;
         return next;
+    }
+
+    /**
+     * Returns the cached render plan for the current content and emoji generation,
+     * rebuilding it when either changed. Lines without placeholders and functions are
+     * viewer-independent, so their rendered value is computed once and shared.
+     */
+    RenderPlan renderPlan(long emojiGeneration, int maxTitleLength, int maxLines, UnaryOperator<String> staticRender) {
+        RenderPlan current = renderPlan;
+        long generation = contentGeneration.get();
+        if (current != null && current.matches(generation, emojiGeneration)) {
+            return current;
+        }
+        RenderPlan built = RenderPlan.build(generation, emojiGeneration, title, content,
+            maxTitleLength, maxLines, staticRender);
+        renderPlan = built;
+        return built;
+    }
+
+    /**
+     * Immutable per-board render memo. {@code staticTitle}/{@code staticLines} entries are
+     * pre-rendered (already truncated for the title); a {@code null} entry means the value
+     * is viewer-dependent and must be rendered per player from the corresponding raw value.
+     */
+    static final class RenderPlan {
+        private static final int DYNAMIC_FLAGS = TextPipeline.HAS_PLACEHOLDER | TextPipeline.HAS_FUNCTION;
+
+        private final long contentGeneration;
+        private final long emojiGeneration;
+        private final String rawTitle;
+        private final String staticTitle;
+        private final String[] rawLines;
+        private final String[] staticLines;
+
+        private RenderPlan(long contentGeneration, long emojiGeneration, String rawTitle, String staticTitle,
+                           String[] rawLines, String[] staticLines) {
+            this.contentGeneration = contentGeneration;
+            this.emojiGeneration = emojiGeneration;
+            this.rawTitle = rawTitle;
+            this.staticTitle = staticTitle;
+            this.rawLines = rawLines;
+            this.staticLines = staticLines;
+        }
+
+        static RenderPlan build(long contentGeneration, long emojiGeneration, String title, List<String> content,
+                                int maxTitleLength, int maxLines, UnaryOperator<String> staticRender) {
+            String rawTitle = title == null ? "" : title;
+            String staticTitle = null;
+            if ((TextPipeline.classify(rawTitle) & DYNAMIC_FLAGS) == 0) {
+                staticTitle = truncate(renderValue(rawTitle, staticRender), maxTitleLength);
+            }
+
+            Object[] snapshot = content.toArray();
+            int count = Math.min(snapshot.length, maxLines);
+            String[] rawLines = new String[count];
+            String[] staticLines = new String[count];
+            for (int i = 0; i < count; i++) {
+                String raw = (String) snapshot[i];
+                rawLines[i] = raw;
+                staticLines[i] = (TextPipeline.classify(raw) & DYNAMIC_FLAGS) == 0
+                    ? renderValue(raw, staticRender)
+                    : null;
+            }
+            return new RenderPlan(contentGeneration, emojiGeneration, rawTitle, staticTitle, rawLines, staticLines);
+        }
+
+        private static String renderValue(String raw, UnaryOperator<String> staticRender) {
+            if (TextPipeline.classify(raw) == 0) {
+                return raw;
+            }
+            String rendered = staticRender.apply(raw);
+            return rendered == null ? "" : rendered;
+        }
+
+        private static String truncate(String value, int maxLength) {
+            return value.length() > maxLength ? value.substring(0, maxLength) : value;
+        }
+
+        boolean matches(long contentGeneration, long emojiGeneration) {
+            return this.contentGeneration == contentGeneration && this.emojiGeneration == emojiGeneration;
+        }
+
+        String rawTitle() {
+            return rawTitle;
+        }
+
+        String staticTitle() {
+            return staticTitle;
+        }
+
+        int lineCount() {
+            return rawLines.length;
+        }
+
+        String rawLine(int index) {
+            return rawLines[index];
+        }
+
+        String staticLine(int index) {
+            return staticLines[index];
+        }
     }
 }

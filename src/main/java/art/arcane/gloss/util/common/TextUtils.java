@@ -37,9 +37,12 @@ public final class TextUtils {
     return builder.toString();
   }
 
-  private static String translateLegacy(String text) {
+  static String translateLegacy(String text) {
     if (text == null || text.isEmpty()) {
       return "";
+    }
+    if (text.indexOf('&') < 0 && text.indexOf(ChatColor.COLOR_CHAR) < 0) {
+      return text;
     }
     StringBuilder out = new StringBuilder(text.length());
     for (int i = 0; i < text.length(); i++) {

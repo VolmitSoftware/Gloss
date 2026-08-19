@@ -3,6 +3,7 @@ package art.arcane.gloss.hologram;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class AnimatorLoopPolicyTest {
     @Test
@@ -34,9 +35,31 @@ class AnimatorLoopPolicyTest {
     }
 
     @Test
-    void fastPassRecoversByOneFloor() {
-        assertEquals(16L, AnimatorLoopPolicy.nextIntervalMillis(24L, 2.0D, 8L));
-        assertEquals(8L, AnimatorLoopPolicy.nextIntervalMillis(16L, 2.0D, 8L));
+    void fastPassRecoversMultiplicatively() {
+        assertEquals(18L, AnimatorLoopPolicy.nextIntervalMillis(24L, 2.0D, 8L));
+        assertEquals(12L, AnimatorLoopPolicy.nextIntervalMillis(16L, 2.0D, 8L));
+        assertEquals(187L, AnimatorLoopPolicy.nextIntervalMillis(250L, 1.0D, 4L));
+    }
+
+    @Test
+    void recoveryAlwaysMakesProgressAndSettlesOnTheFloor() {
+        assertEquals(8L, AnimatorLoopPolicy.nextIntervalMillis(9L, 1.0D, 8L));
+        assertEquals(4L, AnimatorLoopPolicy.nextIntervalMillis(5L, 1.0D, 4L));
+
+        long interval = 250L;
+        for (int pass = 0; pass < 64; pass++) {
+            long next = AnimatorLoopPolicy.nextIntervalMillis(interval, 1.0D, 4L);
+            assertTrue(next < interval || next == 4L, "recovery must shrink until it reaches the floor");
+            interval = next;
+        }
+        assertEquals(4L, interval);
+    }
+
+    @Test
+    void deadbandHoldsTheIntervalWhenThePassIsMerelyComfortable() {
+        assertEquals(24L, AnimatorLoopPolicy.nextIntervalMillis(24L, 20.0D, 8L));
+        assertEquals(24L, AnimatorLoopPolicy.nextIntervalMillis(24L, 12.0D, 8L));
+        assertEquals(18L, AnimatorLoopPolicy.nextIntervalMillis(24L, 11.9D, 8L));
     }
 
     @Test

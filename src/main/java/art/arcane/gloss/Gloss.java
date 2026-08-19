@@ -313,7 +313,16 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
         }
     }
 
+    /**
+     * Operator-facing reload (/gloss reload). Cycles every service unconditionally: the operator is
+     * asking for everything on disk to be re-read, not just the parts config.toml happens to
+     * mention.
+     */
     public void reloadAll() {
+        applyReloadedConfig(true);
+    }
+
+    private void applyReloadedConfig(boolean cycleEveryService) {
         GlossConfigFile reloaded;
         try {
             reloaded = configLoader.loadForReload();
@@ -325,19 +334,66 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
         GlossConfig previous = config;
         GlossConfig next = GlossConfig.from(reloaded);
         config = next;
-        text.reload();
-        animations.reload();
-        emoji.reload();
-        holograms.reload();
-        boards.reload();
-        groups.reload();
-        tablist.reload();
-        motd.reload();
-        bubbles.reload();
-        indicators.reload();
-        drops.reload();
+        reloadServices(previous, next, cycleEveryService);
         applyMergedConfigHooks(previous, next);
         info("Reloaded in-place from disk.");
+    }
+
+    /**
+     * A service reload re-parses that service's documents and, for holograms, despawns and respawns
+     * every display it owns. On the watchdog path that cost is only owed to services whose own
+     * config section actually moved — editing an unrelated key in config.toml used to respawn every
+     * hologram on the server. The sections are records, so an unchanged section compares equal.
+     * Documents themselves keep hot-reloading through their own watchdog entries either way.
+     */
+    private void reloadServices(GlossConfig previous, GlossConfig next, boolean cycleEveryService) {
+        if (previous == null || cycleEveryService) {
+            text.reload();
+            animations.reload();
+            emoji.reload();
+            holograms.reload();
+            boards.reload();
+            groups.reload();
+            tablist.reload();
+            motd.reload();
+            bubbles.reload();
+            indicators.reload();
+            drops.reload();
+            return;
+        }
+        if (!previous.text().equals(next.text())) {
+            text.reload();
+        }
+        if (!previous.animations().equals(next.animations())) {
+            animations.reload();
+        }
+        if (!previous.emoji().equals(next.emoji())) {
+            emoji.reload();
+        }
+        if (!previous.holograms().equals(next.holograms())) {
+            holograms.reload();
+        }
+        if (!previous.boards().equals(next.boards())) {
+            boards.reload();
+        }
+        if (!previous.groups().equals(next.groups())) {
+            groups.reload();
+        }
+        if (!previous.tablist().equals(next.tablist())) {
+            tablist.reload();
+        }
+        if (!previous.motd().equals(next.motd())) {
+            motd.reload();
+        }
+        if (!previous.bubbles().equals(next.bubbles())) {
+            bubbles.reload();
+        }
+        if (!previous.indicators().equals(next.indicators())) {
+            indicators.reload();
+        }
+        if (!previous.drops().equals(next.drops())) {
+            drops.reload();
+        }
     }
 
     private GlossConfigFile loadBootConfig() {
@@ -383,6 +439,12 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
         configWatcher = null;
     }
 
+    /**
+     * Runs on the watchdog IO thread. The stat and the self-write hash are exactly the work that
+     * belongs there; the reload itself cycles services that spawn entities and send packets, so it
+     * hops to the server context. The self-write guard stays ahead of the hop so Gloss never
+     * reloads its own canonicalising rewrite of config.toml.
+     */
     private void configWatchTick() {
         FileWatcher watcher = configWatcher;
         if (watcher == null || !watcher.checkModified()) {
@@ -392,7 +454,10 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
             return;
         }
         info("config.toml changed on disk; reloading.");
-        reloadAll();
+        if (SchedulerUtils.runGlobal(this, () -> applyReloadedConfig(false))) {
+            return;
+        }
+        warn("config.toml reload could not be scheduled onto the server thread; skipping this pass.");
     }
 
     private void applyMergedConfigHooks(GlossConfig previous, GlossConfig next) {

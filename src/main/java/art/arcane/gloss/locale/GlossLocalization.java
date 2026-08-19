@@ -29,6 +29,7 @@ import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -305,52 +306,65 @@ public final class GlossLocalization {
     return renderTemplate(key.english(), arguments, legacy);
   }
 
+  /**
+   * Splices argument values straight into the output as the template is scanned left to right.
+   * Inserted text is appended, never rescanned, so a value that itself looks like a placeholder is
+   * never reprocessed. Literal segments carry the legacy colour translation; argument values keep
+   * the trusted/untrusted handling.
+   */
   private static String renderTemplate(String template, MessageArgs arguments, boolean legacy) {
-    String prepared = template;
-    List<RenderedArgument> replacements = new ArrayList<>(arguments.size());
-    int index = 0;
-    for (MessageArgument argument : arguments.arguments().values()) {
-      String token = "\uE000" + index + "\uE001";
-      prepared = prepared.replace("{" + argument.name() + "}", token);
-      replacements.add(new RenderedArgument(token, argument));
-      index++;
+    Collection<MessageArgument> values = arguments.arguments().values();
+    if (values.isEmpty()) {
+      return legacy ? ChatColor.translateAlternateColorCodes('&', template) : template;
     }
 
-    String rendered = legacy ? ChatColor.translateAlternateColorCodes('&', prepared) : prepared;
-    return applyReplacements(rendered, replacements, legacy);
-  }
+    List<Placeholder> placeholders = new ArrayList<>(values.size());
+    for (MessageArgument argument : values) {
+      placeholders.add(new Placeholder("{" + argument.name() + "}", argument));
+    }
 
-  private static String applyReplacements(
-      String rendered,
-      List<RenderedArgument> replacements,
-      boolean legacy
-  ) {
-    StringBuilder output = new StringBuilder(rendered.length());
-    int cursor = 0;
-    while (cursor < rendered.length()) {
-      RenderedArgument match = null;
-      for (RenderedArgument replacement : replacements) {
-        if (rendered.startsWith(replacement.token(), cursor)) {
-          match = replacement;
+    StringBuilder output = new StringBuilder(template.length() + 16);
+    int copied = 0;
+    int cursor = template.indexOf('{');
+    while (cursor >= 0) {
+      Placeholder match = null;
+      for (Placeholder placeholder : placeholders) {
+        if (template.startsWith(placeholder.token(), cursor)) {
+          match = placeholder;
           break;
         }
       }
       if (match == null) {
-        output.append(rendered.charAt(cursor));
-        cursor++;
+        cursor = template.indexOf('{', cursor + 1);
         continue;
       }
 
-      MessageArgument argument = match.argument();
-      String value = String.valueOf(argument.value());
-      if (argument.kind() == MessageArgumentKind.TRUSTED) {
-        output.append(legacy ? ChatColor.translateAlternateColorCodes('&', value) : value);
-      } else {
-        output.append(sanitizeUntrusted(value));
-      }
-      cursor += match.token().length();
+      appendLiteral(output, template, copied, cursor, legacy);
+      appendArgument(output, match.argument(), legacy);
+      copied = cursor + match.token().length();
+      cursor = template.indexOf('{', copied);
     }
+
+    appendLiteral(output, template, copied, template.length(), legacy);
     return output.toString();
+  }
+
+  private static void appendLiteral(StringBuilder output, String template, int from, int to, boolean legacy) {
+    if (from >= to) {
+      return;
+    }
+
+    String segment = template.substring(from, to);
+    output.append(legacy ? ChatColor.translateAlternateColorCodes('&', segment) : segment);
+  }
+
+  private static void appendArgument(StringBuilder output, MessageArgument argument, boolean legacy) {
+    String value = String.valueOf(argument.value());
+    if (argument.kind() == MessageArgumentKind.TRUSTED) {
+      output.append(legacy ? ChatColor.translateAlternateColorCodes('&', value) : value);
+      return;
+    }
+    output.append(sanitizeUntrusted(value));
   }
 
   private static String sanitizeUntrusted(String value) {
@@ -358,6 +372,6 @@ public final class GlossLocalization {
     return stripped == null ? "" : stripped.replace(String.valueOf(ChatColor.COLOR_CHAR), "");
   }
 
-  private record RenderedArgument(String token, MessageArgument argument) {
+  private record Placeholder(String token, MessageArgument argument) {
   }
 }

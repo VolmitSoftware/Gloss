@@ -7,6 +7,7 @@ import art.arcane.gloss.preview.doc.CompiledPreviewDocument.CompiledMatch;
 import art.arcane.gloss.preview.doc.CompiledPreviewDocument.CompiledVariant;
 import art.arcane.gloss.preview.doc.CompiledPreviewDocument.Resolved;
 import art.arcane.volmlib.util.io.FolderWatcher;
+import art.arcane.volmlib.util.scheduling.SchedulerUtils;
 import org.bukkit.Material;
 import org.bukkit.entity.ChestBoat;
 import org.bukkit.entity.Entity;
@@ -188,8 +189,34 @@ public final class PreviewDocumentRegistry {
         }
       }
     }
+    boolean entityMatchers = false;
+    for (CompiledPreviewDocument document : ordered) {
+      if (declaresEntityMatchers(document)) {
+        entityMatchers = true;
+        break;
+      }
+    }
     warnedTies.clear();
-    snapshot = new Snapshot(List.copyOf(ordered), blockTypes);
+    snapshot = new Snapshot(List.copyOf(ordered), blockTypes, entityMatchers);
+  }
+
+  private static boolean declaresEntityMatchers(CompiledPreviewDocument document) {
+    if (SPECIAL_ANY_INVENTORY_HOLDER.equals(document.special())) {
+      return true;
+    }
+    if (declaresEntityMatch(document.match())) {
+      return true;
+    }
+    for (CompiledVariant variant : document.variants()) {
+      if (declaresEntityMatch(variant.match())) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private static boolean declaresEntityMatch(CompiledMatch match) {
+    return !match.exactEntities().isEmpty() || !match.entityGlobs().isEmpty();
   }
 
   // ---------------------------------------------------------------------
@@ -291,12 +318,22 @@ public final class PreviewDocumentRegistry {
     applyIfChanged(changed);
   }
 
+  /**
+   * The compile above ran on the watchdog IO thread. Publishing is a volatile snapshot swap and is
+   * safe there; closing previews destroys display entities, so it hops to the server context and
+   * only falls through inline when there is nothing to schedule onto.
+   */
   private void applyIfChanged(boolean changed) {
     if (!changed) {
       return;
     }
     publish();
-    closeOpenPreviews();
+    if (SchedulerUtils.runGlobal(Gloss.instance, PreviewDocumentRegistry::closeOpenPreviews)) {
+      return;
+    }
+    Gloss.log(Level.WARNING,
+        "Preview hot reload could not reach the server thread; open previews keep the old layout"
+            + " until they are reopened.");
   }
 
   /**
@@ -367,6 +404,10 @@ public final class PreviewDocumentRegistry {
   /** Raycast hot path: one volatile read and an {@link EnumSet} ordinal test, no allocation. */
   public boolean isPreviewBlockType(Material material) {
     return material != null && material != Material.AIR && snapshot.blockTypes().contains(material);
+  }
+
+  public boolean hasEntityMatchers() {
+    return snapshot.hasEntityMatchers();
   }
 
   /**
@@ -478,10 +519,10 @@ public final class PreviewDocumentRegistry {
   // Helpers
   // ---------------------------------------------------------------------
 
-  /** The published pair: the resolution order and the materials a raycast may stop on. */
-  private record Snapshot(List<CompiledPreviewDocument> ordered, Set<Material> blockTypes) {
+  /** The published state: the resolution order, the materials a raycast may stop on, and whether any document declares entity matchers. */
+  private record Snapshot(List<CompiledPreviewDocument> ordered, Set<Material> blockTypes, boolean hasEntityMatchers) {
 
-    private static final Snapshot EMPTY = new Snapshot(List.of(), Set.of());
+    private static final Snapshot EMPTY = new Snapshot(List.of(), Set.of(), false);
   }
 
   private static boolean isDocument(File file) {

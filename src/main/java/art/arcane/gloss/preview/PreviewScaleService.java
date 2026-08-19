@@ -8,10 +8,12 @@ import art.arcane.volmlib.util.hud.HudPriority;
 import art.arcane.volmlib.util.hud.HudSegment;
 import art.arcane.volmlib.util.hud.HudSlot;
 import art.arcane.volmlib.util.localization.MessageArgs;
+import art.arcane.volmlib.util.scheduling.SchedulerUtils;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
 import org.bukkit.entity.Player;
+import org.bukkit.event.EventPriority;
 import org.bukkit.event.player.PlayerItemHeldEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerToggleSneakEvent;
@@ -23,6 +25,9 @@ import java.util.Map;
 import java.util.TreeMap;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public final class PreviewScaleService {
 
@@ -38,30 +43,50 @@ public final class PreviewScaleService {
   private static final Map<UUID, Double> factors = new ConcurrentHashMap<>();
   private static final Map<UUID, Long> lastSneakPress = new ConcurrentHashMap<>();
   private static final Map<UUID, Long> adjusting = new ConcurrentHashMap<>();
+  private static final List<Events> listeners = new CopyOnWriteArrayList<>();
+  private static final AtomicBoolean writeQueued = new AtomicBoolean();
+  private static final AtomicInteger revision = new AtomicInteger();
   private static volatile File storeFile;
+  private static volatile Gloss owner;
 
   private PreviewScaleService() {
   }
 
   public static void init(Gloss plugin) {
+    owner = plugin;
     storeFile = new File(plugin.getDataFolder(), "preview-scales.json");
     load();
-    Events.listen(plugin, PlayerToggleSneakEvent.class, PreviewScaleService::onSneak);
-    Events.listen(plugin, PlayerItemHeldEvent.class, PreviewScaleService::onScroll);
-    Events.listen(plugin, PlayerQuitEvent.class, e -> {
+    listeners.add(Events.listen(plugin, PlayerToggleSneakEvent.class, PreviewScaleService::onSneak));
+    listeners.add(Events.listen(plugin, PlayerItemHeldEvent.class, PreviewScaleService::onScroll));
+    listeners.add(Events.listen(plugin, PlayerQuitEvent.class, EventPriority.MONITOR, e -> {
       UUID id = e.getPlayer().getUniqueId();
       lastSneakPress.remove(id);
       if (adjusting.remove(id) != null) {
         persist();
       }
       plugin.getHudBar().clearAll(e.getPlayer());
-    });
+    }));
   }
 
   public static void shutdown() {
-    persist();
+    for (Events listener : listeners) {
+      listener.unregister();
+    }
+    listeners.clear();
+    writeQueued.set(false);
+    write();
     lastSneakPress.clear();
     adjusting.clear();
+    owner = null;
+  }
+
+  /**
+   * Bumped whenever a stored factor changes. Open previews read a viewer's factor twice per tick;
+   * holding the value against this counter turns that into one comparison until someone actually
+   * scrolls.
+   */
+  public static int revision() {
+    return revision.get();
   }
 
   public static float factor(Player player) {
@@ -134,6 +159,7 @@ public final class PreviewScaleService {
     double current = factors.getOrDefault(id, 1.0D);
     double updated = Math.max(MIN_FACTOR, Math.min(MAX_FACTOR, current * Math.pow(STEP, -diff)));
     factors.put(id, updated);
+    revision.incrementAndGet();
     if (updated < HIDE_BELOW) {
       actionBar(player, Gloss.instance.getLocalization().legacy(GlossMessages.PREVIEW_SCALE_HIDDEN));
     } else {
@@ -195,12 +221,38 @@ public final class PreviewScaleService {
         } catch (IllegalArgumentException ignored) {
         }
       });
+      revision.incrementAndGet();
     } catch (Exception ex) {
       Gloss.logExceptionStack(false, ex, "Failed to load preview scales.");
     }
   }
 
-  private static synchronized void persist() {
+  /**
+   * Queues one write off the calling thread. Sneak and quit both request a persist from a gameplay
+   * thread, and the store is one small JSON file rewritten whole, so requests arriving while a
+   * write is already queued collapse into it — the queued write reads the live map, which by then
+   * carries every change that collapsed. {@link #write} is the single writer and is synchronized,
+   * so the last writer to acquire it is the one that leaves its content on disk.
+   */
+  private static void persist() {
+    if (storeFile == null) {
+      return;
+    }
+    if (!writeQueued.compareAndSet(false, true)) {
+      return;
+    }
+    Gloss plugin = owner;
+    if (plugin == null || !SchedulerUtils.runAsync(plugin, PreviewScaleService::flush)) {
+      flush();
+    }
+  }
+
+  private static void flush() {
+    writeQueued.set(false);
+    write();
+  }
+
+  private static synchronized void write() {
     File file = storeFile;
     if (file == null) {
       return;

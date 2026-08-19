@@ -115,7 +115,7 @@ public final class GlossIntegrationService implements IntegrationServiceContract
         ? IntegrationMetricSchema.glossKeys()
         : metricKeys;
     long now = System.currentTimeMillis();
-    Map<String, IntegrationMetricSample> out = new HashMap<>();
+    Map<String, IntegrationMetricSample> out = new HashMap<>(Math.max(16, requested.size() * 2));
 
     for (String key : requested) {
       switch (key) {
@@ -156,7 +156,7 @@ public final class GlossIntegrationService implements IntegrationServiceContract
                 "panels-not-ready", service -> service.size()));
         case IntegrationMetricSchema.GLOSS_BOARDS_ACTIVE ->
             out.put(key, sampleService(key, now, Gloss::boards,
-                "boards-not-ready", service -> service.boards().size()));
+                "boards-not-ready", service -> service.boardCount()));
         case IntegrationMetricSchema.GLOSS_TABLIST_PLAYERS ->
             out.put(key, sampleService(key, now, Gloss::tablist,
                 "tablist-not-ready", service -> service.managedPlayerCount()));

@@ -34,6 +34,7 @@ import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
+import org.bukkit.event.EventPriority;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerTeleportEvent;
 
@@ -58,14 +59,33 @@ public final class CommandGlossPanel {
 
   private final Map<UUID, PanelEditSession> editSessions = new ConcurrentHashMap<>();
 
+  private volatile Events quitListener;
+
+  /**
+   * Listener registration is deliberately not done here. The director engine is built through a
+   * compare-and-set cache, so two callers racing the first command each construct a command tree;
+   * only one wins the cache and the loser is dropped. A listener registered in this constructor
+   * would outlive that dropped tree, feeding quit events into edit sessions nobody can reach. The
+   * enable hook below runs once, on the tree the cache actually kept.
+   */
   public CommandGlossPanel() {
+  }
+
+  public void enable() {
     Gloss plugin = Gloss.instance;
-    if (plugin != null) {
-      Events.listen(plugin, PlayerQuitEvent.class, event -> discardEdit(event.getPlayer()));
+    if (plugin == null || quitListener != null) {
+      return;
     }
+    quitListener = Events.listen(plugin, PlayerQuitEvent.class, EventPriority.MONITOR,
+        event -> discardEdit(event.getPlayer()));
   }
 
   public void shutdown() {
+    Events listener = quitListener;
+    quitListener = null;
+    if (listener != null) {
+      listener.unregister();
+    }
     editSessions.clear();
   }
 

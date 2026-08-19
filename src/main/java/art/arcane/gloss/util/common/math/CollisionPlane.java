@@ -26,19 +26,30 @@ public class CollisionPlane {
     return intersectionDistance(origin, direction).isPresent();
   }
 
+  /**
+   * Ray/plane intersection, in scalars. The arithmetic is written in the same order the vector form
+   * evaluated it in, so the result is bit-identical — only the four scratch vectors are gone. This
+   * runs per clickable component per tick and again on every click.
+   */
   public OptionalDouble intersectionDistance(Vector origin, Vector direction) {
-    Vector offset = center.clone().subtract(origin);
-    double proj = normal.dot(direction);
+    double proj = normal.getX() * direction.getX()
+        + normal.getY() * direction.getY()
+        + normal.getZ() * direction.getZ();
     if (Math.abs(proj) < 1.0E-9D) {
       return OptionalDouble.empty();
     }
-    double distance = normal.dot(offset) / proj;
+    double offsetX = center.getX() - origin.getX();
+    double offsetY = center.getY() - origin.getY();
+    double offsetZ = center.getZ() - origin.getZ();
+    double distance = (normal.getX() * offsetX + normal.getY() * offsetY + normal.getZ() * offsetZ) / proj;
     if (distance < 0.0D) {
       return OptionalDouble.empty();
     }
-    Vector intersect = origin.clone().add(direction.clone().multiply(distance)).subtract(center);
-    float distX = (float) Math.abs(right.dot(intersect));
-    float distY = (float) Math.abs(up.dot(intersect));
+    double intersectX = origin.getX() + direction.getX() * distance - center.getX();
+    double intersectY = origin.getY() + direction.getY() * distance - center.getY();
+    double intersectZ = origin.getZ() + direction.getZ() * distance - center.getZ();
+    float distX = (float) Math.abs(right.getX() * intersectX + right.getY() * intersectY + right.getZ() * intersectZ);
+    float distY = (float) Math.abs(up.getX() * intersectX + up.getY() * intersectY + up.getZ() * intersectZ);
     return distX < width / 2F && distY < height / 2F
         ? OptionalDouble.of(distance)
         : OptionalDouble.empty();

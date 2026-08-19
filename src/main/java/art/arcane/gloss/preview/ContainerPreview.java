@@ -8,9 +8,11 @@ import art.arcane.gloss.preview.doc.PreviewDocumentRegistry;
 import art.arcane.gloss.preview.doc.PreviewStateContext;
 import art.arcane.gloss.service.GlossTelemetry;
 import art.arcane.gloss.util.common.DisplayEntity;
+import art.arcane.gloss.util.common.PacketUtils;
 import art.arcane.volmlib.util.scheduling.FoliaScheduler;
 import art.arcane.volmlib.util.scheduling.SchedulerUtils;
 import com.github.retrooper.packetevents.util.Vector3f;
+import com.github.retrooper.packetevents.wrapper.PacketWrapper;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
@@ -26,6 +28,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public final class ContainerPreview {
 
@@ -78,10 +81,22 @@ public final class ContainerPreview {
   private double scaleTarget = 1.0;
   private double appliedScale = 1.0;
   private int ticks;
-  private volatile boolean refreshScheduled;
+  private final AtomicBoolean refreshScheduled = new AtomicBoolean();
   private volatile boolean accessStateMatches = true;
   private boolean open;
   private boolean visualsShown;
+
+  private int viewerScaleRevision = Integer.MIN_VALUE;
+  private float viewerScale = 1F;
+  private boolean viewerHidden;
+
+  private boolean posePinned;
+  private double poseEyeX;
+  private double poseEyeY;
+  private double poseEyeZ;
+  private float poseYaw;
+  private float posePitch;
+  private double poseScale;
 
   private ContainerPreview(Player player, Block block, Entity entity, Vector targetCenter,
                            List<PreviewElement> elements, boolean showsContents) {
@@ -197,12 +212,14 @@ public final class ContainerPreview {
   }
 
   public void open() {
+    refreshViewerScale();
     recomputeAnchor();
     appliedScale = scaleTarget;
-    if (!PreviewScaleService.isHidden(player)) {
+    if (!viewerHidden) {
       for (Rendered r : rendered) {
         spawn(r);
       }
+      pinPose();
       visualsShown = true;
     }
     open = true;
@@ -218,14 +235,16 @@ public final class ContainerPreview {
     if (checkAccess || refreshContents) {
       scheduleRefresh(checkAccess);
     }
+    refreshViewerScale();
     recomputeAnchor();
-    boolean shouldShow = !PreviewScaleService.isHidden(player);
+    boolean shouldShow = !viewerHidden;
     if (shouldShow != visualsShown) {
       if (shouldShow) {
         appliedScale = scaleTarget;
         for (Rendered r : rendered) {
           spawn(r);
         }
+        pinPose();
       } else {
         despawnVisuals();
       }
@@ -238,12 +257,19 @@ public final class ContainerPreview {
     if (scaleDirty) {
       appliedScale = scaleTarget;
     }
+    boolean poseMoved = poseMoved();
+    List<PacketWrapper<?>> teleports = poseMoved ? new ArrayList<>(rendered.size() * 3) : null;
     for (Rendered r : rendered) {
-      reposition(r);
+      if (teleports != null) {
+        reposition(r, teleports);
+      }
       if (scaleDirty) {
         rescale(r);
       }
       applyDynamic(r);
+    }
+    if (teleports != null && !teleports.isEmpty()) {
+      PacketUtils.send(player, teleports);
     }
     return true;
   }
@@ -271,6 +297,49 @@ public final class ContainerPreview {
       r.item = null;
       r.count = null;
     }
+    posePinned = false;
+  }
+
+  /**
+   * True when anything {@link #at} reads has moved since the layout was last placed.
+   *
+   * <p>Every element position is a pure function of the viewer's eye pose and the applied scale —
+   * {@code recomputeAnchor} derives the anchor, the basis vectors and the facing from the eye
+   * alone, and the target centre is fixed for the life of the preview. A viewer who has not moved
+   * therefore gets byte-identical coordinates, so skipping the whole reposition pass sends nothing
+   * a client would have seen. Comparisons are exact: an ulp of drift is a real move.
+   */
+  private boolean poseMoved() {
+    if (posePinned && eye.getX() == poseEyeX && eye.getY() == poseEyeY && eye.getZ() == poseEyeZ
+        && eye.getYaw() == poseYaw && eye.getPitch() == posePitch && appliedScale == poseScale) {
+      return false;
+    }
+    pinPose();
+    return true;
+  }
+
+  private void pinPose() {
+    posePinned = true;
+    poseEyeX = eye.getX();
+    poseEyeY = eye.getY();
+    poseEyeZ = eye.getZ();
+    poseYaw = eye.getYaw();
+    posePitch = eye.getPitch();
+    poseScale = appliedScale;
+  }
+
+  /**
+   * The viewer's personal scale, re-read only when someone actually adjusted one. The preview loop
+   * asks for it twice a tick and the answer changes only on a scroll gesture.
+   */
+  private void refreshViewerScale() {
+    int revision = PreviewScaleService.revision();
+    if (revision == viewerScaleRevision) {
+      return;
+    }
+    viewerScaleRevision = revision;
+    viewerScale = PreviewScaleService.factor(player);
+    viewerHidden = PreviewScaleService.isHidden(player);
   }
 
   private void seed(Rendered r) {
@@ -322,16 +391,28 @@ public final class ContainerPreview {
     }
   }
 
-  private void reposition(Rendered r) {
+  /**
+   * Collects rather than sends. Every element of a moving preview is teleported in the same tick to
+   * the same single viewer, so the whole layout goes out as one batched send instead of up to three
+   * send calls per element.
+   */
+  private void reposition(Rendered r, List<PacketWrapper<?>> teleports) {
     if (r.background != null && r.backgroundPx != null) {
-      DisplayEntityManager.goTo(r.background, at(r.backgroundPx));
+      collect(teleports, DisplayEntityManager.goToPacket(r.background, at(r.backgroundPx)));
     }
     if (r.item != null && r.itemPx != null) {
-      DisplayEntityManager.goTo(r.item, at(r.itemPx));
+      collect(teleports, DisplayEntityManager.goToPacket(r.item, at(r.itemPx)));
     }
     if (r.count != null && r.countPx != null) {
-      DisplayEntityManager.goTo(r.count, at(r.countPx));
+      collect(teleports, DisplayEntityManager.goToPacket(r.count, at(r.countPx)));
     }
+  }
+
+  private static void collect(List<PacketWrapper<?>> teleports, PacketWrapper<?> teleport) {
+    if (teleport == null) {
+      return;
+    }
+    teleports.add(teleport);
   }
 
   private void applyDynamic(Rendered r) {
@@ -382,11 +463,15 @@ public final class ContainerPreview {
     }
   }
 
+  /**
+   * The in-flight guard is claimed with a compare-and-set: the tick thread arms it while a region
+   * or entity thread is the one that clears it, so a plain write could drop a refresh by landing
+   * between another thread's read and its reset.
+   */
   private void scheduleRefresh(boolean checkAccess) {
-    if (refreshScheduled) {
+    if (!refreshScheduled.compareAndSet(false, true)) {
       return;
     }
-    refreshScheduled = true;
     GlossTelemetry.countPreviewRefresh();
     Runnable read = () -> {
       try {
@@ -394,7 +479,7 @@ public final class ContainerPreview {
           readDynamic(r);
         }
       } finally {
-        refreshScheduled = false;
+        refreshScheduled.set(false);
       }
     };
     ContainerPreviewAccess.ViewerAccess access = checkAccess
@@ -406,17 +491,17 @@ public final class ContainerPreview {
           boolean canOpen = ContainerPreviewAccess.canOpen(player, block, access);
           if (canOpen != showsContents) {
             accessStateMatches = false;
-            refreshScheduled = false;
+            refreshScheduled.set(false);
             return;
           }
         }
         if (!showsContents) {
-          refreshScheduled = false;
+          refreshScheduled.set(false);
           return;
         }
         if (block.getType() == Material.ENDER_CHEST) {
           if (!SchedulerUtils.runEntity(Gloss.instance, player, read)) {
-            refreshScheduled = false;
+            refreshScheduled.set(false);
           }
           return;
         }
@@ -424,7 +509,7 @@ public final class ContainerPreview {
       };
       if (!FoliaScheduler.runRegion(Gloss.instance, block.getLocation(), blockRead)) {
         if (FoliaScheduler.isFolia(Gloss.instance.getServer())) {
-          refreshScheduled = false;
+          refreshScheduled.set(false);
         } else {
           blockRead.run();
         }
@@ -437,18 +522,18 @@ public final class ContainerPreview {
           boolean canOpen = ContainerPreviewAccess.canOpen(player, entity, access);
           if (canOpen != showsContents) {
             accessStateMatches = false;
-            refreshScheduled = false;
+            refreshScheduled.set(false);
             return;
           }
         }
         if (showsContents) {
           read.run();
         } else {
-          refreshScheduled = false;
+          refreshScheduled.set(false);
         }
       };
       if (!SchedulerUtils.runEntity(Gloss.instance, entity, entityRead)) {
-        refreshScheduled = false;
+        refreshScheduled.set(false);
       }
       return;
     }
@@ -457,15 +542,32 @@ public final class ContainerPreview {
 
   private void readDynamic(Rendered r) {
     switch (r.element) {
-      case PreviewElement.Slot slot -> {
-        ItemStack stack = slot.inventory().getItem(slot.slot());
-        r.pendingItem = isEmpty(stack) ? null : stack.clone();
-      }
+      case PreviewElement.Slot slot -> readSlot(r, slot);
       case PreviewElement.Cell cell -> r.pendingColor = cell.color().getAsInt();
       case PreviewElement.Label label -> r.pendingText = safe(label.text().get());
       case PreviewElement.Panel ignored -> {
       }
     }
+  }
+
+  /**
+   * A refresh clones a slot only when its contents actually changed. The comparison is the one
+   * {@code ItemStack.equals} makes — same amount, same everything else — so an unchanged slot keeps
+   * publishing the stack it already published, and {@link #applySlot} still sees an equal value and
+   * sends nothing. The previous pending stack is the reference rather than the applied one because
+   * this runs on the target's region thread while the applied side belongs to the viewer's.
+   */
+  private void readSlot(Rendered r, PreviewElement.Slot slot) {
+    ItemStack stack = slot.inventory().getItem(slot.slot());
+    if (isEmpty(stack)) {
+      r.pendingItem = null;
+      return;
+    }
+    ItemStack previous = r.pendingItem;
+    if (previous != null && previous.getAmount() == stack.getAmount() && previous.isSimilar(stack)) {
+      return;
+    }
+    r.pendingItem = stack.clone();
   }
 
   private UUID spawnBackground(double[] px, int width, int height, int color) {
@@ -599,14 +701,24 @@ public final class ContainerPreview {
     return at(px[0], px[1], px[2]);
   }
 
+  /**
+   * Layout pixel to world position. Written out in components rather than through {@code Vector}
+   * temporaries — the reposition pass runs this three times per element per tick — but the
+   * arithmetic and its evaluation order are the ones the vector form produced, so the coordinates
+   * are bit-identical.
+   */
   private Location at(double pxX, double pxY, double pxZ) {
     double unit = pixel();
-    Location loc = anchor.clone();
-    loc.add(right.clone().multiply(pxX * unit));
-    loc.add(up.clone().multiply(pxY * unit));
+    double acrossX = pxX * unit;
+    double acrossY = pxY * unit;
+    double planeX = anchor.getX() + right.getX() * acrossX + up.getX() * acrossY;
+    double planeY = anchor.getY() + right.getY() * acrossX + up.getY() * acrossY;
+    double planeZ = anchor.getZ() + right.getZ() * acrossX + up.getZ() * acrossY;
     double shrink = depthShrink(pxZ);
-    Vector fromEye = loc.toVector().subtract(eye.toVector()).multiply(shrink);
-    Location projected = eye.clone().add(fromEye);
+    Location projected = eye.clone();
+    projected.setX(eye.getX() + (planeX - eye.getX()) * shrink);
+    projected.setY(eye.getY() + (planeY - eye.getY()) * shrink);
+    projected.setZ(eye.getZ() + (planeZ - eye.getZ()) * shrink);
     projected.setYaw(planeYaw);
     projected.setPitch(planePitch);
     return projected;
@@ -641,7 +753,7 @@ public final class ContainerPreview {
     double anchorDistance = Math.max(MIN_DISTANCE, Math.min(COMFORT_DISTANCE, surfaceDistance - EDGE_MARGIN));
     double distanceFactor = Math.max(MIN_SCALE_FACTOR, Math.min(1.0, anchorDistance / COMFORT_DISTANCE));
 
-    this.scaleTarget = GlossConfig.current().previews().scale() * PreviewScaleService.factor(player) * distanceFactor;
+    this.scaleTarget = GlossConfig.current().previews().scale() * viewerScale * distanceFactor;
     this.right = computedRight;
     this.up = computedUp;
     this.eye = eye;

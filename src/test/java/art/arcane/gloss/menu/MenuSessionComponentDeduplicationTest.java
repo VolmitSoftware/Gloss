@@ -71,7 +71,7 @@ public class MenuSessionComponentDeduplicationTest {
     }
 
     @Override
-    protected void onTick() {
+    protected void onTick(Vector eyeOrigin, Vector eyeDirection) {
     }
 
     @Override

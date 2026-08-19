@@ -39,6 +39,7 @@ class GlossConfigTest {
         assertEquals(5, snapshot.hotload().watchIntervalTicks());
         assertEquals(0.26D, snapshot.holograms().stackDistance());
         assertEquals(2, snapshot.holograms().temporaryUpdateIntervalTicks());
+        assertTrue(snapshot.holograms().interpolatedMotion());
         assertEquals(48, snapshot.holograms().textArtMaxWidth());
         assertTrue(snapshot.holograms().highFrequencyAnimations());
         assertEquals(120, snapshot.holograms().maxAnimationFps());
@@ -78,6 +79,7 @@ class GlossConfigTest {
 
             [holograms]
             temporaryUpdateIntervalTicks = 9999
+            interpolatedMotion = false
             textArtMaxWidth = 1
             maxAnimationFps = 9999
             animationPacketBudget = 1
@@ -100,6 +102,7 @@ class GlossConfigTest {
 
         assertEquals(1, loaded.hotload.watchIntervalTicks);
         assertEquals(20, loaded.holograms.temporaryUpdateIntervalTicks);
+        assertFalse(loaded.holograms.interpolatedMotion);
         assertEquals(8, loaded.holograms.textArtMaxWidth);
         assertEquals(240, loaded.holograms.maxAnimationFps);
         assertEquals(100, loaded.holograms.animationPacketBudget);
@@ -111,6 +114,7 @@ class GlossConfigTest {
         String rewritten = Files.readString(file);
         assertTrue(rewritten.contains("watchIntervalTicks = 1"));
         assertTrue(rewritten.contains("temporaryUpdateIntervalTicks = 20"));
+        assertTrue(rewritten.contains("interpolatedMotion = false"));
         assertTrue(rewritten.contains("textArtMaxWidth = 8"));
         assertTrue(rewritten.contains("maxAnimationFps = 240"));
         assertTrue(rewritten.contains("animationPacketBudget = 100"));

@@ -35,6 +35,13 @@ public final class AnimationTemplate {
     public static AnimationTemplate compile(String raw, Predicate<String> isFunction,
                                             Function<String, AnimationClip> fastClipResolver,
                                             UnaryOperator<String> renderer) {
+        return compile(raw, isFunction, fastClipResolver, renderer, clip -> null);
+    }
+
+    public static AnimationTemplate compile(String raw, Predicate<String> isFunction,
+                                            Function<String, AnimationClip> fastClipResolver,
+                                            UnaryOperator<String> renderer,
+                                            Function<AnimationClip, List<String>> sharedFrames) {
         List<Segment> segments = new ArrayList<>();
         Map<String, List<String>> frameCache = new HashMap<>();
         boolean slotted = false;
@@ -54,8 +61,9 @@ public final class AnimationTemplate {
                     segments.add(new LiteralSegment(renderer.apply(literal)));
                 }
 
-                segments.add(new SlotSegment(clip, frameCache.computeIfAbsent(name,
-                    key -> renderFrames(clip, renderer))));
+                List<String> shared = sharedFrames.apply(clip);
+                segments.add(new SlotSegment(clip, shared != null ? shared
+                    : frameCache.computeIfAbsent(name, key -> renderFrames(clip, renderer))));
                 slotted = true;
                 cursor = close + 1;
                 open = raw.indexOf('|', cursor);

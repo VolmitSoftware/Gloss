@@ -30,6 +30,7 @@ public final class IntegrationBridgeService {
     private Events enableListener;
     private Events disableListener;
     private int taskId;
+    private volatile long sampleClock;
 
     public IntegrationBridgeService(Gloss plugin) {
         this.plugin = plugin;
@@ -42,12 +43,16 @@ public final class IntegrationBridgeService {
         this.functions = new ArrayList<>();
         this.providers = new ArrayList<>();
         this.taskId = NO_TASK;
+        this.sampleClock = System.currentTimeMillis();
     }
 
     public void enable() {
         rediscover();
         enableListener = Events.listen(plugin, PluginEnableEvent.class, event -> rediscover());
         disableListener = Events.listen(plugin, PluginDisableEvent.class, event -> rediscover());
+        if (taskId != NO_TASK) {
+            plugin.scheduler().csr(taskId);
+        }
         taskId = plugin.scheduler().sr(this::sample, plugin.cfg().integration().sampleIntervalTicks());
     }
 
@@ -80,7 +85,9 @@ public final class IntegrationBridgeService {
     }
 
     private void sample() {
-        bridge.sample(System.currentTimeMillis());
+        long now = System.currentTimeMillis();
+        sampleClock = now;
+        bridge.sample(now);
     }
 
     private void rediscover() {
@@ -119,7 +126,9 @@ public final class IntegrationBridgeService {
     private void attach() {
         for (String key : bridge.allKeys()) {
             String name = FUNCTION_PREFIX + key;
-            plugin.text().registerFunction(name, player -> bridge.render(key, System.currentTimeMillis()));
+            // The driver tick clock is precise enough for a 60 s reference window and keeps the
+            // render path free of a syscall per line per viewer.
+            plugin.text().registerFunction(name, player -> bridge.render(key, sampleClock));
             functions.add(name);
         }
         for (String namespace : bridge.namespaces()) {

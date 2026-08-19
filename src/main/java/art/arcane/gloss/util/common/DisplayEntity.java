@@ -454,6 +454,69 @@ public class DisplayEntity {
     return new WrapperPlayServerEntityMetadata(entityId, metadata);
   }
 
+  public WrapperPlayServerEntityMetadata metadataPacket(int... indices) {
+    List<EntityData<?>> metadata = new ArrayList<>(indices.length);
+    for (int index : indices) {
+      EntityData<?> data = entityData(index);
+      if (data != null) {
+        metadata.add(data);
+      }
+    }
+    return new WrapperPlayServerEntityMetadata(id, metadata);
+  }
+
+  public static WrapperPlayServerDestroyEntities destroyAll(int[] entityIds) {
+    return new WrapperPlayServerDestroyEntities(entityIds);
+  }
+
+  private EntityData<?> entityData(int index) {
+    if (index == 0) {
+      return new EntityData<>(0, EntityDataTypes.BYTE, entityFlags);
+    }
+    if (index == 5) {
+      return new EntityData<>(5, EntityDataTypes.BOOLEAN, noGravity);
+    }
+    if (displayKind == DisplayKind.RAW) {
+      return null;
+    }
+    return switch (index) {
+      case 8 -> new EntityData<>(8, EntityDataTypes.INT, interpolationDelay);
+      case 9 -> new EntityData<>(9, EntityDataTypes.INT, interpolationDuration);
+      case 10 -> new EntityData<>(10, EntityDataTypes.INT, teleportDuration);
+      case 11 -> new EntityData<>(11, EntityDataTypes.VECTOR3F, translation);
+      case 12 -> new EntityData<>(12, EntityDataTypes.VECTOR3F, scale);
+      case 13 -> new EntityData<>(13, EntityDataTypes.QUATERNION, leftRotation);
+      case 14 -> new EntityData<>(14, EntityDataTypes.QUATERNION, rightRotation);
+      case 15 -> new EntityData<>(15, EntityDataTypes.BYTE, billboard);
+      case 16 -> new EntityData<>(16, EntityDataTypes.INT, brightness);
+      case 17 -> new EntityData<>(17, EntityDataTypes.FLOAT, viewRange);
+      case 18 -> new EntityData<>(18, EntityDataTypes.FLOAT, shadowRadius);
+      case 19 -> new EntityData<>(19, EntityDataTypes.FLOAT, shadowStrength);
+      case 20 -> new EntityData<>(20, EntityDataTypes.FLOAT, width);
+      case 21 -> new EntityData<>(21, EntityDataTypes.FLOAT, height);
+      case 22 -> new EntityData<>(22, EntityDataTypes.INT, glowColorOverride);
+      case CONTENT_DATA_INDEX -> contentData();
+      case 24 -> displayKind == DisplayKind.TEXT
+          ? new EntityData<>(24, EntityDataTypes.INT, lineWidth)
+          : displayKind == DisplayKind.ITEM
+              ? new EntityData<>(24, EntityDataTypes.BYTE, itemDisplayType)
+              : null;
+      case 25 -> displayKind == DisplayKind.TEXT ? new EntityData<>(25, EntityDataTypes.INT, backgroundColor) : null;
+      case 26 -> displayKind == DisplayKind.TEXT ? new EntityData<>(26, EntityDataTypes.BYTE, textOpacity) : null;
+      case 27 -> displayKind == DisplayKind.TEXT ? new EntityData<>(27, EntityDataTypes.BYTE, textFlags) : null;
+      default -> null;
+    };
+  }
+
+  private EntityData<?> contentData() {
+    return switch (displayKind) {
+      case TEXT -> new EntityData<>(CONTENT_DATA_INDEX, EntityDataTypes.ADV_COMPONENT, text);
+      case ITEM -> new EntityData<>(CONTENT_DATA_INDEX, EntityDataTypes.ITEMSTACK, fromBukkitItemStack(item));
+      case BLOCK -> new EntityData<>(CONTENT_DATA_INDEX, EntityDataTypes.BLOCK_STATE, blockState);
+      case RAW -> null;
+    };
+  }
+
   public static final class Builder {
     private static final AtomicInteger NEXT_ID = new AtomicInteger(Integer.MIN_VALUE);
 

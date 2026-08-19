@@ -140,6 +140,37 @@ class AnimationTemplateTest {
     }
 
     @Test
+    void sharedFramesReplacePerCompileFrameRendering() {
+        AtomicInteger renders = new AtomicInteger();
+        UnaryOperator<String> counting = raw -> {
+            renders.incrementAndGet();
+            return raw;
+        };
+        AnimationTemplate template = AnimationTemplate.compile("x |animation.fast| y",
+            name -> "animation.fast".equals(name), name -> "animation.fast".equals(name) ? FAST : null,
+            counting, clip -> List.of("1", "2", "3", "4"));
+
+        assertEquals("x 1 y", template.compose(0L));
+        assertEquals("x 2 y", template.compose(10L));
+        assertEquals(2, renders.get(), "shared frames must leave only the literals to render");
+    }
+
+    @Test
+    void absentSharedFramesFallBackToPerCompileRendering() {
+        AtomicInteger renders = new AtomicInteger();
+        UnaryOperator<String> counting = raw -> {
+            renders.incrementAndGet();
+            return raw;
+        };
+        AnimationTemplate template = AnimationTemplate.compile("x |animation.fast| y",
+            name -> "animation.fast".equals(name), name -> "animation.fast".equals(name) ? FAST : null,
+            counting, clip -> null);
+
+        assertEquals("x A y", template.compose(0L));
+        assertEquals(6, renders.get(), "without a shared list every frame renders through the pipeline");
+    }
+
+    @Test
     void emptyFrameListComposesToNothing() {
         AnimationClip empty = new AnimationClip("empty", 100.0D, AnimationMode.ASCEND, List.of());
         AnimationTemplate template = compile("x|animation.empty|y",

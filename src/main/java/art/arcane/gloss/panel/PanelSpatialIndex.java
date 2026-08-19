@@ -10,69 +10,66 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
 
+/**
+ * Placement index for persistent panels: identity lookups by id/uuid plus a chunk-bucketed
+ * horizontal range query.
+ *
+ * <p><b>Snapshot publication.</b> Every read answers from one immutable {@link State} behind a
+ * single volatile field — the same shape {@code PreviewDocumentRegistry} uses — so a viewer query
+ * takes no lock at all. The runtime queries this once per viewer per tick, which at a full server
+ * is thousands of reads per second against a structure that changes only when an operator edits a
+ * panel or a follow-panel's target moves; a reader-writer lock there is pure contention for no
+ * benefit. Writers serialize on {@link #writeLock}, rebuild the affected maps, and publish the new
+ * state in one assignment: a failed validation therefore leaves the previous state untouched, and
+ * a reader never observes a half-applied mutation.
+ *
+ * <p>Published maps and buckets are never mutated afterwards. A write copies exactly what it
+ * touches — the board table, and the one world/bucket a placement moves between — and shares every
+ * untouched bucket with the previous state.
+ *
+ * <p>{@link #generation()} increments on every published change so callers can cache a query result
+ * and re-run it only when the index actually moved.
+ */
 public final class PanelSpatialIndex {
   private static final double CHUNK_SIZE = 16.0D;
 
-  private final Map<UUID, PanelDefinition> boardsByUuid;
-  private final Map<String, UUID> uuidsById;
-  private final Map<UUID, Map<ChunkCoordinate, Set<UUID>>> chunksByWorld;
-  private final ReentrantReadWriteLock lock;
+  private final Object writeLock = new Object();
 
-  public PanelSpatialIndex() {
-    boardsByUuid = new HashMap<>();
-    uuidsById = new HashMap<>();
-    chunksByWorld = new HashMap<>();
-    lock = new ReentrantReadWriteLock();
-  }
+  private volatile State state = State.EMPTY;
 
   public int size() {
-    lock.readLock().lock();
-    try {
-      return boardsByUuid.size();
-    } finally {
-      lock.readLock().unlock();
-    }
+    return state.boardsByUuid().size();
+  }
+
+  public boolean isEmpty() {
+    return state.boardsByUuid().isEmpty();
+  }
+
+  /** Increments on every published change; equal generations mean an identical index. */
+  public long generation() {
+    return state.generation();
   }
 
   public Optional<PanelDefinition> get(String id) {
-    String canonicalId = PanelIds.canonicalize(id);
-    lock.readLock().lock();
-    try {
-      UUID boardUuid = uuidsById.get(canonicalId);
-      return boardUuid == null ? Optional.empty() : Optional.ofNullable(boardsByUuid.get(boardUuid));
-    } finally {
-      lock.readLock().unlock();
-    }
+    State current = state;
+    UUID boardUuid = current.uuidsById().get(PanelIds.canonicalize(id));
+    return boardUuid == null ? Optional.empty() : Optional.ofNullable(current.boardsByUuid().get(boardUuid));
   }
 
   public Optional<PanelDefinition> get(UUID boardUuid) {
-    UUID requiredUuid = Objects.requireNonNull(boardUuid, "boardUuid");
-    lock.readLock().lock();
-    try {
-      return Optional.ofNullable(boardsByUuid.get(requiredUuid));
-    } finally {
-      lock.readLock().unlock();
-    }
+    return Optional.ofNullable(state.boardsByUuid().get(Objects.requireNonNull(boardUuid, "boardUuid")));
   }
 
   public List<PanelDefinition> list() {
-    lock.readLock().lock();
-    try {
-      List<PanelDefinition> snapshot = new ArrayList<>(boardsByUuid.values());
-      snapshot.sort((left, right) -> left.id().compareTo(right.id()));
-      return List.copyOf(snapshot);
-    } finally {
-      lock.readLock().unlock();
-    }
+    return state.ordered();
   }
 
   public void replaceAll(Collection<PanelDefinition> boards) {
     Objects.requireNonNull(boards, "boards");
     Map<UUID, PanelDefinition> replacementBoards = new HashMap<>(capacityFor(boards.size()));
     Map<String, UUID> replacementIds = new HashMap<>(capacityFor(boards.size()));
-    Map<UUID, Map<ChunkCoordinate, Set<UUID>>> replacementChunks = new HashMap<>();
+    Map<UUID, Map<Long, Set<UUID>>> replacementChunks = new HashMap<>();
 
     for (PanelDefinition board : boards) {
       PanelDefinition requiredBoard = Objects.requireNonNull(board, "boards must not contain null");
@@ -86,53 +83,58 @@ public final class PanelSpatialIndex {
       addToChunk(replacementChunks, requiredBoard);
     }
 
-    lock.writeLock().lock();
-    try {
-      boardsByUuid.clear();
-      boardsByUuid.putAll(replacementBoards);
-      uuidsById.clear();
-      uuidsById.putAll(replacementIds);
-      chunksByWorld.clear();
-      chunksByWorld.putAll(replacementChunks);
-    } finally {
-      lock.writeLock().unlock();
+    synchronized (writeLock) {
+      state = state.publish(replacementBoards, replacementIds, replacementChunks);
     }
   }
 
   public void upsert(PanelDefinition board) {
     PanelDefinition requiredBoard = Objects.requireNonNull(board, "board");
-    lock.writeLock().lock();
-    try {
-      UUID idOwner = uuidsById.get(requiredBoard.id());
+    synchronized (writeLock) {
+      State current = state;
+      UUID idOwner = current.uuidsById().get(requiredBoard.id());
       if (idOwner != null && !idOwner.equals(requiredBoard.uuid())) {
         throw new IllegalArgumentException("duplicate panel ID: " + requiredBoard.id());
       }
-
-      PanelDefinition previous = boardsByUuid.put(requiredBoard.uuid(), requiredBoard);
-      if (previous != null) {
-        removeFromChunk(previous);
-        uuidsById.remove(previous.id());
+      PanelDefinition previous = current.boardsByUuid().get(requiredBoard.uuid());
+      if (requiredBoard.equals(previous)) {
+        // Re-publishing an identical definition would produce an identical state; skipping keeps
+        // a stationary follow-panel from invalidating every viewer's cached query every tick.
+        return;
       }
-      uuidsById.put(requiredBoard.id(), requiredBoard.uuid());
-      addToChunk(chunksByWorld, requiredBoard);
-    } finally {
-      lock.writeLock().unlock();
+
+      Map<UUID, PanelDefinition> boardsByUuid = new HashMap<>(current.boardsByUuid());
+      boardsByUuid.put(requiredBoard.uuid(), requiredBoard);
+      Map<String, UUID> uuidsById = current.uuidsById();
+      if (previous == null || !previous.id().equals(requiredBoard.id())) {
+        uuidsById = new HashMap<>(uuidsById);
+        if (previous != null) {
+          uuidsById.remove(previous.id());
+        }
+        uuidsById.put(requiredBoard.id(), requiredBoard.uuid());
+      }
+      Map<UUID, Map<Long, Set<UUID>>> chunksByWorld = current.chunksByWorld();
+      if (previous == null || !sameBucket(previous, requiredBoard)) {
+        chunksByWorld = withBoard(withoutBoard(chunksByWorld, previous), requiredBoard);
+      }
+      state = current.publish(boardsByUuid, uuidsById, chunksByWorld);
     }
   }
 
   public boolean remove(UUID boardUuid) {
     UUID requiredUuid = Objects.requireNonNull(boardUuid, "boardUuid");
-    lock.writeLock().lock();
-    try {
-      PanelDefinition removed = boardsByUuid.remove(requiredUuid);
+    synchronized (writeLock) {
+      State current = state;
+      PanelDefinition removed = current.boardsByUuid().get(requiredUuid);
       if (removed == null) {
         return false;
       }
+      Map<UUID, PanelDefinition> boardsByUuid = new HashMap<>(current.boardsByUuid());
+      boardsByUuid.remove(requiredUuid);
+      Map<String, UUID> uuidsById = new HashMap<>(current.uuidsById());
       uuidsById.remove(removed.id());
-      removeFromChunk(removed);
+      state = current.publish(boardsByUuid, uuidsById, withoutBoard(current.chunksByWorld(), removed));
       return true;
-    } finally {
-      lock.writeLock().unlock();
     }
   }
 
@@ -142,31 +144,27 @@ public final class PanelSpatialIndex {
     requireFinite(z, "z");
     requireRadius(radius);
 
-    lock.readLock().lock();
-    try {
-      Map<ChunkCoordinate, Set<UUID>> worldChunks = chunksByWorld.get(requiredWorldUuid);
-      if (worldChunks == null || worldChunks.isEmpty()) {
-        return List.of();
-      }
-
-      int minimumChunkX = chunkCoordinate(x - radius);
-      int maximumChunkX = chunkCoordinate(x + radius);
-      int minimumChunkZ = chunkCoordinate(z - radius);
-      int maximumChunkZ = chunkCoordinate(z + radius);
-      Set<UUID> candidateUuids = collectCandidates(worldChunks, minimumChunkX, maximumChunkX,
-          minimumChunkZ, maximumChunkZ);
-      List<PanelDefinition> matches = new ArrayList<>(candidateUuids.size());
-      for (UUID candidateUuid : candidateUuids) {
-        PanelDefinition board = boardsByUuid.get(candidateUuid);
-        if (board != null && horizontalDistance(board, x, z) <= radius) {
-          matches.add(board);
-        }
-      }
-      matches.sort((left, right) -> compare(left, right, x, z));
-      return List.copyOf(matches);
-    } finally {
-      lock.readLock().unlock();
+    State current = state;
+    Map<Long, Set<UUID>> worldChunks = current.chunksByWorld().get(requiredWorldUuid);
+    if (worldChunks == null || worldChunks.isEmpty()) {
+      return List.of();
     }
+
+    Set<UUID> candidateUuids = collectCandidates(worldChunks,
+        chunkCoordinate(x - radius), chunkCoordinate(x + radius),
+        chunkCoordinate(z - radius), chunkCoordinate(z + radius));
+    if (candidateUuids.isEmpty()) {
+      return List.of();
+    }
+    List<PanelDefinition> matches = new ArrayList<>(candidateUuids.size());
+    for (UUID candidateUuid : candidateUuids) {
+      PanelDefinition board = current.boardsByUuid().get(candidateUuid);
+      if (board != null && horizontalDistance(board, x, z) <= radius) {
+        matches.add(board);
+      }
+    }
+    matches.sort((left, right) -> compare(left, right, x, z));
+    return List.copyOf(matches);
   }
 
   private static int capacityFor(int size) {
@@ -176,17 +174,77 @@ public final class PanelSpatialIndex {
     return (int) Math.min(Integer.MAX_VALUE, (long) Math.ceil(size / 0.75D));
   }
 
-  private static void addToChunk(Map<UUID, Map<ChunkCoordinate, Set<UUID>>> chunks, PanelDefinition board) {
+  /** True when both placements live in the same world chunk, so no bucket has to move. */
+  private static boolean sameBucket(PanelDefinition previous, PanelDefinition board) {
+    PanelTransform previousTransform = previous.transform();
+    PanelTransform boardTransform = board.transform();
+    return previousTransform.worldUuid().equals(boardTransform.worldUuid())
+        && chunkKey(previousTransform.x(), previousTransform.z())
+        == chunkKey(boardTransform.x(), boardTransform.z());
+  }
+
+  private static void addToChunk(Map<UUID, Map<Long, Set<UUID>>> chunks, PanelDefinition board) {
     PanelTransform transform = board.transform();
-    ChunkCoordinate coordinate = ChunkCoordinate.from(transform.x(), transform.z());
     chunks.computeIfAbsent(transform.worldUuid(), ignored -> new HashMap<>())
-        .computeIfAbsent(coordinate, ignored -> new HashSet<>())
+        .computeIfAbsent(chunkKey(transform.x(), transform.z()), ignored -> new HashSet<>())
         .add(board.uuid());
   }
 
-  private static Set<UUID> collectCandidates(Map<ChunkCoordinate, Set<UUID>> worldChunks,
-                                              int minimumChunkX, int maximumChunkX,
-                                              int minimumChunkZ, int maximumChunkZ) {
+  /** Copies the one world map and bucket the placement lands in; every other bucket is shared. */
+  private static Map<UUID, Map<Long, Set<UUID>>> withBoard(Map<UUID, Map<Long, Set<UUID>>> chunks,
+                                                           PanelDefinition board) {
+    PanelTransform transform = board.transform();
+    long key = chunkKey(transform.x(), transform.z());
+    Map<UUID, Map<Long, Set<UUID>>> replacement = new HashMap<>(chunks);
+    Map<Long, Set<UUID>> worldChunks = new HashMap<>(replacement.getOrDefault(transform.worldUuid(), Map.of()));
+    Set<UUID> bucket = new HashSet<>(worldChunks.getOrDefault(key, Set.of()));
+    bucket.add(board.uuid());
+    worldChunks.put(key, bucket);
+    replacement.put(transform.worldUuid(), worldChunks);
+    return replacement;
+  }
+
+  /** The mirror of {@link #withBoard}; a null board (nothing was indexed yet) is a no-op. */
+  private static Map<UUID, Map<Long, Set<UUID>>> withoutBoard(Map<UUID, Map<Long, Set<UUID>>> chunks,
+                                                              PanelDefinition board) {
+    if (board == null) {
+      return chunks;
+    }
+    PanelTransform transform = board.transform();
+    Map<Long, Set<UUID>> worldChunks = chunks.get(transform.worldUuid());
+    if (worldChunks == null) {
+      return chunks;
+    }
+    long key = chunkKey(transform.x(), transform.z());
+    Set<UUID> bucket = worldChunks.get(key);
+    if (bucket == null || !bucket.contains(board.uuid())) {
+      return chunks;
+    }
+    Map<UUID, Map<Long, Set<UUID>>> replacement = new HashMap<>(chunks);
+    Map<Long, Set<UUID>> replacementChunks = new HashMap<>(worldChunks);
+    if (bucket.size() == 1) {
+      replacementChunks.remove(key);
+    } else {
+      Set<UUID> replacementBucket = new HashSet<>(bucket);
+      replacementBucket.remove(board.uuid());
+      replacementChunks.put(key, replacementBucket);
+    }
+    if (replacementChunks.isEmpty()) {
+      replacement.remove(transform.worldUuid());
+    } else {
+      replacement.put(transform.worldUuid(), replacementChunks);
+    }
+    return replacement;
+  }
+
+  /**
+   * Walks the requested chunk window when it is smaller than the world's occupied bucket count,
+   * and the occupied buckets themselves otherwise. Both paths select the same buckets; the choice
+   * only decides which of the two is cheaper for the radius asked for.
+   */
+  private static Set<UUID> collectCandidates(Map<Long, Set<UUID>> worldChunks,
+                                             int minimumChunkX, int maximumChunkX,
+                                             int minimumChunkZ, int maximumChunkZ) {
     long width = (long) maximumChunkX - minimumChunkX + 1L;
     long depth = (long) maximumChunkZ - minimumChunkZ + 1L;
     if (width > worldChunks.size() || depth > worldChunks.size()
@@ -197,7 +255,7 @@ public final class PanelSpatialIndex {
     Set<UUID> candidates = new HashSet<>();
     for (long chunkX = minimumChunkX; chunkX <= maximumChunkX; chunkX++) {
       for (long chunkZ = minimumChunkZ; chunkZ <= maximumChunkZ; chunkZ++) {
-        Set<UUID> bucket = worldChunks.get(new ChunkCoordinate((int) chunkX, (int) chunkZ));
+        Set<UUID> bucket = worldChunks.get(chunkKey((int) chunkX, (int) chunkZ));
         if (bucket != null) {
           candidates.addAll(bucket);
         }
@@ -206,14 +264,16 @@ public final class PanelSpatialIndex {
     return candidates;
   }
 
-  private static Set<UUID> collectExistingBuckets(Map<ChunkCoordinate, Set<UUID>> worldChunks,
-                                                   int minimumChunkX, int maximumChunkX,
-                                                   int minimumChunkZ, int maximumChunkZ) {
+  private static Set<UUID> collectExistingBuckets(Map<Long, Set<UUID>> worldChunks,
+                                                  int minimumChunkX, int maximumChunkX,
+                                                  int minimumChunkZ, int maximumChunkZ) {
     Set<UUID> candidates = new HashSet<>();
-    for (Map.Entry<ChunkCoordinate, Set<UUID>> entry : worldChunks.entrySet()) {
-      ChunkCoordinate coordinate = entry.getKey();
-      if (coordinate.x() >= minimumChunkX && coordinate.x() <= maximumChunkX
-          && coordinate.z() >= minimumChunkZ && coordinate.z() <= maximumChunkZ) {
+    for (Map.Entry<Long, Set<UUID>> entry : worldChunks.entrySet()) {
+      long key = entry.getKey();
+      int chunkX = (int) (key >> 32);
+      int chunkZ = (int) key;
+      if (chunkX >= minimumChunkX && chunkX <= maximumChunkX
+          && chunkZ >= minimumChunkZ && chunkZ <= maximumChunkZ) {
         candidates.addAll(entry.getValue());
       }
     }
@@ -235,6 +295,15 @@ public final class PanelSpatialIndex {
   private static double horizontalDistance(PanelDefinition board, double x, double z) {
     PanelTransform transform = board.transform();
     return Math.hypot(transform.x() - x, transform.z() - z);
+  }
+
+  /** Both chunk coordinates packed into one key, so a bucket lookup allocates nothing. */
+  private static long chunkKey(double x, double z) {
+    return chunkKey(chunkCoordinate(x), chunkCoordinate(z));
+  }
+
+  private static long chunkKey(int chunkX, int chunkZ) {
+    return ((long) chunkX << 32) | (chunkZ & 0xFFFFFFFFL);
   }
 
   private static int chunkCoordinate(double blockCoordinate) {
@@ -259,29 +328,23 @@ public final class PanelSpatialIndex {
     }
   }
 
-  private void removeFromChunk(PanelDefinition board) {
-    PanelTransform transform = board.transform();
-    Map<ChunkCoordinate, Set<UUID>> worldChunks = chunksByWorld.get(transform.worldUuid());
-    if (worldChunks == null) {
-      return;
-    }
-    ChunkCoordinate coordinate = ChunkCoordinate.from(transform.x(), transform.z());
-    Set<UUID> bucket = worldChunks.get(coordinate);
-    if (bucket == null) {
-      return;
-    }
-    bucket.remove(board.uuid());
-    if (bucket.isEmpty()) {
-      worldChunks.remove(coordinate);
-    }
-    if (worldChunks.isEmpty()) {
-      chunksByWorld.remove(transform.worldUuid());
-    }
-  }
+  /**
+   * One published index. Every map inside is effectively immutable: writers copy what they change
+   * and share what they do not, so a state that has been published is never edited again.
+   */
+  private record State(Map<UUID, PanelDefinition> boardsByUuid,
+                       Map<String, UUID> uuidsById,
+                       Map<UUID, Map<Long, Set<UUID>>> chunksByWorld,
+                       List<PanelDefinition> ordered,
+                       long generation) {
 
-  private record ChunkCoordinate(int x, int z) {
-    private static ChunkCoordinate from(double x, double z) {
-      return new ChunkCoordinate(chunkCoordinate(x), chunkCoordinate(z));
+    private static final State EMPTY = new State(Map.of(), Map.of(), Map.of(), List.of(), 0L);
+
+    private State publish(Map<UUID, PanelDefinition> boards, Map<String, UUID> ids,
+                          Map<UUID, Map<Long, Set<UUID>>> chunks) {
+      List<PanelDefinition> sorted = new ArrayList<>(boards.values());
+      sorted.sort((left, right) -> left.id().compareTo(right.id()));
+      return new State(boards, ids, chunks, List.copyOf(sorted), generation + 1L);
     }
   }
 }

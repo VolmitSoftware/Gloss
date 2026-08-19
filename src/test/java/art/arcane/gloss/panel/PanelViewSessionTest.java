@@ -135,7 +135,7 @@ public class PanelViewSessionTest {
     }
 
     @Override
-    protected void onTick() {
+    protected void onTick(Vector eyeOrigin, Vector eyeDirection) {
     }
 
     @Override

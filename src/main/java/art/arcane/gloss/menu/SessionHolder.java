@@ -37,10 +37,64 @@ class SessionHolder {
   private transient ContainerPreview preview;
   private String navigationRoot;
 
+  /** Eye pose the last preview scan ran from, and what it acquired; see {@link #stableAim}. */
+  private double aimX, aimY, aimZ;
+  private float aimYaw, aimPitch;
+  private Object aimTarget;
+
   SessionHolder(Player player, PlayerSnapshotStore<String> openMenus) {
     this.player = player;
     this.playerId = player.getUniqueId();
     this.openMenus = openMenus;
+  }
+
+  Player player() {
+    return player;
+  }
+
+  UUID playerId() {
+    return playerId;
+  }
+
+  /**
+   * Whether this holder is carrying nothing. An idle holder is pruned by the tick sweep instead of
+   * living on for the rest of the player's session.
+   */
+  boolean isIdle() {
+    return session == null && preview == null;
+  }
+
+  boolean isDisposable() {
+    return !player.isOnline() || isIdle();
+  }
+
+  /**
+   * The target the last preview scan acquired, when a preview is open and the viewer's eye has not
+   * moved since — a scan from an identical pose resolves the same ray. Returns null (and forgets
+   * the record) otherwise, which is the signal to scan.
+   */
+  Object stableAim(Location eye) {
+    synchronized (previewLock) {
+      if (preview == null || aimTarget == null) {
+        aimTarget = null;
+        return null;
+      }
+      return eye.getX() == aimX && eye.getY() == aimY && eye.getZ() == aimZ
+          && eye.getYaw() == aimYaw && eye.getPitch() == aimPitch
+          ? aimTarget
+          : null;
+    }
+  }
+
+  void recordAim(Location eye, Object target) {
+    synchronized (previewLock) {
+      aimX = eye.getX();
+      aimY = eye.getY();
+      aimZ = eye.getZ();
+      aimYaw = eye.getYaw();
+      aimPitch = eye.getPitch();
+      aimTarget = target;
+    }
   }
 
   void openSession(MenuDefinitionData data, ApiMenuHandle handle) {
@@ -86,6 +140,11 @@ class SessionHolder {
     }
   }
 
+  /** Package hook for the preview scan: the aim record only survives while a preview is live. */
+  private void forgetAim() {
+    aimTarget = null;
+  }
+
   boolean tick() {
     if (!player.isOnline()) {
       closeSession(false, HoloCloseReason.QUIT);
@@ -93,6 +152,9 @@ class SessionHolder {
       return true;
     }
 
+    if (isIdle()) {
+      return true;
+    }
 
     synchronized (sessionLock) {
       if (session != null) {
@@ -155,6 +217,7 @@ class SessionHolder {
   private void safelyClosePreview() {
     ContainerPreview current = preview;
     preview = null;
+    forgetAim();
     if (current == null) {
       return;
     }

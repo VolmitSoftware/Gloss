@@ -399,6 +399,65 @@ public class PreviewRegistryTest {
     assertEquals("minecart.json", registry.forEntity(unnamed).doc().name());
   }
 
+  @Test
+  public void entityMatcherPresenceFollowsTheLoadedDocuments() throws IOException {
+    PreviewDocumentRegistry registry = new PreviewDocumentRegistry(configDir);
+    assertTrue(registry.hasEntityMatchers());
+
+    assertTrue(document("minecart").delete());
+    registry.reload();
+    assertFalse(registry.hasEntityMatchers());
+
+    write("carts", "{ \"match\": { \"entities\": [\"*_CHEST_BOAT\"], \"priority\": 20 },"
+        + " \"elements\": [ " + CELL + " ] }");
+    registry.reload();
+    assertTrue(registry.hasEntityMatchers());
+  }
+
+  @Test
+  public void theAnyInventoryHolderSpecialAloneCountsAsAnEntityMatcher() throws IOException {
+    PreviewDocumentRegistry registry = new PreviewDocumentRegistry(configDir);
+    for (String name : PreviewDocumentRegistry.SHIPPED) {
+      assertTrue(name, document(name).delete());
+    }
+    write("holders", "{ \"match\": { \"special\": \"anyInventoryHolder\", \"priority\": 10 },"
+        + " \"elements\": [ " + CELL + " ] }");
+    registry.reload();
+
+    assertEquals(Set.of("holders"), registry.names());
+    assertTrue(registry.hasEntityMatchers());
+  }
+
+  @Test
+  public void aVariantLevelEntityMatcherCounts() throws IOException {
+    PreviewDocumentRegistry registry = new PreviewDocumentRegistry(configDir);
+    for (String name : PreviewDocumentRegistry.SHIPPED) {
+      assertTrue(name, document(name).delete());
+    }
+    write("varianted", "{ \"match\": { \"blocks\": [\"CHEST\"], \"priority\": 10 },"
+        + " \"variants\": [ { \"entities\": [\"CHEST_MINECART\"], \"vars\": {} } ],"
+        + " \"elements\": [ " + CELL + " ] }");
+    registry.reload();
+
+    assertEquals(Set.of("varianted"), registry.names());
+    assertTrue(registry.hasEntityMatchers());
+  }
+
+  @Test
+  public void blockOnlyDocumentsLeaveEntityMatchingOff() throws IOException {
+    PreviewDocumentRegistry registry = new PreviewDocumentRegistry(configDir);
+    for (String name : PreviewDocumentRegistry.SHIPPED) {
+      assertTrue(name, document(name).delete());
+    }
+    write("blocks_only", doc("[\"CHEST\"]", 10));
+    registry.reload();
+
+    assertEquals(Set.of("blocks_only"), registry.names());
+    assertFalse(registry.hasEntityMatchers());
+    assertNull(registry.forEntity(storageMinecart()));
+    assertFalse(registry.isPreviewEntity(storageMinecart()));
+  }
+
   // ---------------------------------------------------------------------
   // Equivalence gate: the retired MenuSessionManager.isPreviewBlockType list
   // ---------------------------------------------------------------------

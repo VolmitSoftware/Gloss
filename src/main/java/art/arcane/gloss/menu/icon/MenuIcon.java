@@ -235,6 +235,7 @@ public abstract class MenuIcon<D extends MenuIconData> {
   }
 
   public void spawn() {
+    remove();
     Location spawnLocation = session.getTransform().localPosition(position, new Vector(0F, -localLineHeight(), 0F));
     displayEntities = createDisplayEntities(spawnLocation);
     applyOrientation();
@@ -242,11 +243,12 @@ public abstract class MenuIcon<D extends MenuIconData> {
   }
 
   public void remove() {
-    if (displayEntities == null) {
+    List<UUID> spawned = displayEntities;
+    displayEntities = null;
+    if (spawned == null || spawned.isEmpty()) {
       return;
     }
-    displayEntities.forEach(uuid -> DisplayEntityManager.delete(uuid, session.getPlayer()));
-    displayEntities.clear();
+    DisplayEntityManager.deleteAll(spawned, session.getPlayer());
   }
 
   public void move(Vector offset) {

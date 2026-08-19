@@ -8,9 +8,11 @@ import art.arcane.gloss.config.MenuComponentData;
 import art.arcane.gloss.config.MenuDefinitionData;
 import art.arcane.gloss.menu.action.ActionContext;
 import art.arcane.gloss.menu.action.SessionActionContext;
+import art.arcane.gloss.menu.components.ClickableComponent;
 import art.arcane.gloss.menu.components.MenuComponent;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
+import org.bukkit.util.Vector;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -28,6 +30,7 @@ public class MenuSession {
   private final double maxDistance;
   private final double offsetDistance;
   private final List<MenuComponent<?>> components;
+  private final boolean readsEyePose;
 
   private final Map<String, MenuComponent<?>> componentsById;
 
@@ -64,6 +67,14 @@ public class MenuSession {
     }
     this.components = List.copyOf(new ArrayList<>(uniqueComponents.values()));
     this.componentsById = uniqueComponents;
+    boolean eyeReader = false;
+    for (MenuComponent<?> component : this.components) {
+      if (component instanceof ClickableComponent<?>) {
+        eyeReader = true;
+        break;
+      }
+    }
+    this.readsEyePose = eyeReader;
   }
 
   public String getId() {
@@ -163,9 +174,22 @@ public class MenuSession {
     components.forEach(MenuComponent::applyTransform);
   }
 
+  /**
+   * Drives every component from one eye pose. The pose is read once per session instead of once per
+   * component — and not at all when nothing in the session reads it.
+   */
   public void tick() {
     drainApiUpdates();
-    components.forEach(MenuComponent::tick);
+    Vector eyeOrigin = null;
+    Vector eyeDirection = null;
+    if (readsEyePose) {
+      Location eye = player.getEyeLocation();
+      eyeOrigin = eye.toVector();
+      eyeDirection = eye.getDirection();
+    }
+    for (MenuComponent<?> component : components) {
+      component.tick(eyeOrigin, eyeDirection);
+    }
   }
 
   public void open() {

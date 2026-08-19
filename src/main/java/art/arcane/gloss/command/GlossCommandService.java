@@ -98,8 +98,7 @@ public final class GlossCommandService implements CommandExecutor, TabCompleter,
 
     private final Gloss plugin;
     private final DirectorTheme theme;
-    private final AtomicCache<DirectorRuntimeEngine> directorCache = new AtomicCache<>();
-    private volatile CommandGloss root;
+    private final AtomicCache<Tree> directorCache = new AtomicCache<>();
 
     public GlossCommandService(Gloss plugin) {
         this.plugin = plugin;
@@ -111,7 +110,7 @@ public final class GlossCommandService implements CommandExecutor, TabCompleter,
     }
 
     public void register() {
-        getDirector();
+        tree().root().enable();
         PluginCommand rootCommand;
         try {
             rootCommand = plugin.getCommand(ROOT_COMMAND);
@@ -523,27 +522,40 @@ public final class GlossCommandService implements CommandExecutor, TabCompleter,
     }
 
     private DirectorRuntimeEngine getDirector() {
+        return tree().engine();
+    }
+
+    private Tree tree() {
         return directorCache.aquire(this::buildDirector);
     }
 
     public void shutdown() {
-        CommandGloss current = root;
+        Tree current = directorCache.peek();
         if (current != null) {
-            current.shutdown();
+            current.root().shutdown();
         }
     }
 
-    private DirectorRuntimeEngine buildDirector() {
-        root = new CommandGloss(plugin);
-        return DirectorEngineFactory.create(
-                root,
+    /**
+     * The command tree and its engine are cached as one value. Splitting them let a racing builder
+     * publish its own tree into a field while the cache kept the winner's engine, leaving the two
+     * halves describing different objects — and the loser's tree holding live listeners nothing
+     * could ever shut down.
+     */
+    private Tree buildDirector() {
+        CommandGloss built = new CommandGloss(plugin);
+        return new Tree(built, DirectorEngineFactory.create(
+                built,
                 DirectorEngineOptions.builder()
                         .contexts(buildDirectorContexts())
                         .dispatcher(this::dispatchDirector)
                         .invocationHook(this)
                         .textResolver(GlossLocalization.globalDirectorResolver())
                         .build()
-        );
+        ));
+    }
+
+    private record Tree(CommandGloss root, DirectorRuntimeEngine engine) {
     }
 
     private DirectorContextRegistry buildDirectorContexts() {
@@ -652,6 +664,10 @@ public final class GlossCommandService implements CommandExecutor, TabCompleter,
 
     private static final class AtomicCache<T> {
         private final AtomicReference<T> reference = new AtomicReference<>();
+
+        T peek() {
+            return reference.get();
+        }
 
         T aquire(Supplier<T> supplier) {
             T value = reference.get();

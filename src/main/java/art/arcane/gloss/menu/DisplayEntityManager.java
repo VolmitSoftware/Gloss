@@ -5,9 +5,11 @@ import art.arcane.gloss.service.GlossTelemetry;
 import art.arcane.gloss.util.common.DisplayEntity;
 import art.arcane.gloss.util.common.PacketUtils;
 import com.github.retrooper.packetevents.PacketEvents;
+import com.github.retrooper.packetevents.PacketEventsAPI;
 import com.github.retrooper.packetevents.manager.server.ServerVersion;
 import com.github.retrooper.packetevents.util.Quaternion4f;
 import com.github.retrooper.packetevents.util.Vector3f;
+import com.github.retrooper.packetevents.wrapper.PacketWrapper;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -15,20 +17,46 @@ import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.util.Vector;
 
+import java.util.ArrayList;
+import java.util.IdentityHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 
 public class DisplayEntityManager {
 
+  /**
+   * Metadata index of the display's content slot — text component, item stack or block state
+   * depending on the display kind. Mirrors {@code DisplayEntity.CONTENT_DATA_INDEX};
+   * {@code DisplayEntityMetadataTest} pins the subset packet against the full one.
+   */
+  private static final int CONTENT_INDEX = 23;
+  private static final int TRANSLATION_INDEX = 11;
+  private static final int SCALE_INDEX = 12;
+  private static final int LEFT_ROTATION_INDEX = 13;
+  private static final int TEXT_BACKGROUND_INDEX = 25;
+
+  /**
+   * High half of every manager key. The keys are internal handles only — the uuid a client sees is
+   * the one {@link DisplayEntity} carries — so a counter is used instead of
+   * {@link UUID#randomUUID()} and its {@code SecureRandom} draw.
+   */
+  private static final long KEY_NAMESPACE = 0x676C6F73734D4E55L;
+
   private static final Map<UUID, DisplayEntity> displayEntities = new ConcurrentHashMap<>();
   private static final Map<UUID, Player> playerVisibility = new ConcurrentHashMap<>();
   private static final AtomicBoolean unsupportedVersionWarning = new AtomicBoolean(false);
+  private static final AtomicLong keySequence = new AtomicLong();
+
+  /** Null until PacketEvents is up; the server version cannot change afterwards. */
+  private static volatile Boolean versionSupported;
 
   public static UUID add(DisplayEntity displayEntity) {
-    UUID uuid = UUID.randomUUID();
+    UUID uuid = new UUID(KEY_NAMESPACE, keySequence.incrementAndGet());
     displayEntities.put(uuid, displayEntity);
     return uuid;
   }
@@ -62,7 +90,7 @@ public class DisplayEntityManager {
     Player player = playerVisibility.remove(uuid);
     if (displayEntity == null || player == null)
       return;
-    PacketUtils.send(player, displayEntity.remove());
+    PacketUtils.sendOne(player, displayEntity.remove());
     GlossTelemetry.countSpawnChurn();
   }
 
@@ -89,10 +117,58 @@ public class DisplayEntityManager {
     Player player = playerVisibility.remove(uuid);
     Player target = player == null ? fallbackPlayer : player;
     if (displayEntity != null && target != null) {
-      PacketUtils.send(target, displayEntity.remove());
+      PacketUtils.sendOne(target, displayEntity.remove());
     }
     displayEntities.remove(uuid);
     playerVisibility.remove(uuid);
+  }
+
+  /**
+   * Deletes a whole icon's worth of handles, collapsing the removals into one destroy packet per
+   * receiving player instead of one per entity. Same bookkeeping as
+   * {@link #delete(UUID, Player)}, which it replaces at the icon teardown call sites.
+   */
+  public static void deleteAll(List<UUID> uuids, Player fallbackPlayer) {
+    if (uuids == null || uuids.isEmpty())
+      return;
+
+    boolean unsupported = unsupportedVersion();
+    Map<Player, List<Integer>> byViewer = unsupported ? null : new IdentityHashMap<>(2);
+    for (UUID uuid : uuids) {
+      DisplayEntity displayEntity = displayEntities.remove(uuid);
+      Player player = playerVisibility.remove(uuid);
+      if (unsupported || displayEntity == null)
+        continue;
+      Player target = player == null ? fallbackPlayer : player;
+      if (target == null)
+        continue;
+      byViewer.computeIfAbsent(target, ignored -> new ArrayList<>(uuids.size()))
+          .add(displayEntity.id());
+    }
+
+    if (unsupported)
+      return;
+
+    for (Map.Entry<Player, List<Integer>> entry : byViewer.entrySet()) {
+      List<Integer> ids = entry.getValue();
+      int[] packed = new int[ids.size()];
+      for (int index = 0; index < packed.length; index++) {
+        packed[index] = ids.get(index);
+      }
+      PacketUtils.sendOne(entry.getKey(), DisplayEntity.destroyAll(packed));
+    }
+  }
+
+  /**
+   * Drops a departed player's visibility bookkeeping. Menu teardown normally deletes the handles
+   * first; this is the sweep for anything that outlived its session.
+   */
+  public static void forget(Player player) {
+    if (player == null)
+      return;
+    UUID playerId = player.getUniqueId();
+    playerVisibility.values().removeIf(viewer ->
+        viewer == player || (viewer != null && viewer.getUniqueId().equals(playerId)));
   }
 
   public static Vector location(UUID uuid) {
@@ -104,13 +180,26 @@ public class DisplayEntityManager {
   }
 
   public static void goTo(UUID uuid, Location location) {
-    if (unsupportedVersion())
+    PacketWrapper<?> teleport = goToPacket(uuid, location);
+    if (teleport == null)
       return;
+    PacketUtils.sendOne(playerVisibility.get(uuid), teleport);
+  }
+
+  /**
+   * The teleport {@link #goTo} would have sent, moved into the entity's state but left unsent, or
+   * null when there is nothing to send. Callers that move many displays belonging to one viewer in
+   * the same tick collect these and hand the whole list to
+   * {@link PacketUtils#send(Player, java.util.Collection)} instead of paying a send call per entity.
+   */
+  public static PacketWrapper<?> goToPacket(UUID uuid, Location location) {
+    if (unsupportedVersion())
+      return null;
     DisplayEntity displayEntity = displayEntities.get(uuid);
     Player player = playerVisibility.get(uuid);
     if (displayEntity == null || player == null)
-      return;
-    PacketUtils.send(player, displayEntity.goTo(location));
+      return null;
+    return displayEntity.goTo(location);
   }
 
   public static void move(UUID uuid, Vector offset) {
@@ -120,9 +209,15 @@ public class DisplayEntityManager {
     Player player = playerVisibility.get(uuid);
     if (displayEntity == null || player == null)
       return;
-    PacketUtils.send(player, displayEntity.move(offset));
+    PacketUtils.sendOne(player, displayEntity.move(offset));
   }
 
+  /**
+   * Points a display at the menu's facing. Display entities ignore head-yaw, so no head-look packet
+   * is sent, and the roll goes out as the single left-rotation metadata entry rather than the full
+   * 22-entry block. Nothing is sent at all when the stored orientation already matches — the state
+   * is still written first so a later spawn carries it.
+   */
   public static void orient(UUID uuid, float yaw, float pitch, float roll) {
     if (unsupportedVersion())
       return;
@@ -132,15 +227,30 @@ public class DisplayEntityManager {
       return;
 
     double halfRoll = Math.toRadians(roll) / 2.0D;
+    float rollZ = (float) Math.sin(halfRoll);
+    float rollW = (float) Math.cos(halfRoll);
+    boolean facingUnchanged = displayEntity.yaw() == yaw && displayEntity.pitch() == pitch;
+    boolean rollUnchanged = isRoll(displayEntity.leftRotation(), rollZ, rollW);
     displayEntity.yaw(yaw)
         .pitch(pitch)
-        .leftRotation(new Quaternion4f(0F, 0F, (float) Math.sin(halfRoll), (float) Math.cos(halfRoll)));
+        .leftRotation(new Quaternion4f(0F, 0F, rollZ, rollW));
     if (player == null) {
       return;
     }
-    PacketUtils.send(player, displayEntity.rotate(yaw, pitch));
-    PacketUtils.send(player, displayEntity.headLook());
-    PacketUtils.send(player, displayEntity.dataPacket());
+    if (!facingUnchanged) {
+      PacketUtils.sendOne(player, displayEntity.rotate(yaw, pitch));
+    }
+    if (!rollUnchanged) {
+      PacketUtils.sendOne(player, displayEntity.metadataPacket(LEFT_ROTATION_INDEX));
+    }
+  }
+
+  private static boolean isRoll(Quaternion4f rotation, float rollZ, float rollW) {
+    return rotation != null
+        && rotation.getX() == 0F
+        && rotation.getY() == 0F
+        && rotation.getZ() == rollZ
+        && rotation.getW() == rollW;
   }
 
   public static void changeName(UUID uuid, Component name) {
@@ -152,8 +262,9 @@ public class DisplayEntityManager {
       return;
     if (!displayEntity.isTextDisplay())
       return;
-    displayEntity.text(name == null ? Component.empty() : name);
-    PacketUtils.send(player, displayEntity.dataPacket());
+    Component text = name == null ? Component.empty() : name;
+    displayEntity.text(text);
+    PacketUtils.sendOne(player, DisplayEntity.textUpdate(displayEntity.id(), text));
   }
 
   public static void changeTextBackground(UUID uuid, int backgroundColor) {
@@ -166,7 +277,7 @@ public class DisplayEntityManager {
     if (!displayEntity.isTextDisplay())
       return;
     displayEntity.backgroundColor(backgroundColor);
-    PacketUtils.send(player, displayEntity.dataPacket());
+    PacketUtils.sendOne(player, displayEntity.metadataPacket(TEXT_BACKGROUND_INDEX));
   }
 
   public static void changeScale(UUID uuid, float x, float y, float z) {
@@ -177,7 +288,7 @@ public class DisplayEntityManager {
     if (displayEntity == null || player == null)
       return;
     displayEntity.scale(new Vector3f(x, y, z));
-    PacketUtils.send(player, displayEntity.dataPacket());
+    PacketUtils.sendOne(player, displayEntity.metadataPacket(SCALE_INDEX));
   }
 
   public static void changeTransform(UUID uuid, float x, float y, float z, Vector3f translation) {
@@ -189,7 +300,7 @@ public class DisplayEntityManager {
       return;
     displayEntity.scale(new Vector3f(x, y, z));
     displayEntity.translation(translation == null ? new Vector3f(0, 0, 0) : translation);
-    PacketUtils.send(player, displayEntity.dataPacket());
+    PacketUtils.sendOne(player, displayEntity.metadataPacket(TRANSLATION_INDEX, SCALE_INDEX));
   }
 
   public static void changeItem(UUID uuid, ItemStack itemStack) {
@@ -202,13 +313,22 @@ public class DisplayEntityManager {
     if (!displayEntity.isItemDisplay())
       return;
     displayEntity.item(itemStack == null ? new ItemStack(Material.AIR) : itemStack.clone());
-    PacketUtils.send(player, displayEntity.dataPacket());
+    PacketUtils.sendOne(player, displayEntity.metadataPacket(CONTENT_INDEX));
   }
 
   private static boolean unsupportedVersion() {
-    if (PacketEvents.getAPI() != null
-        && PacketEvents.getAPI().getServerManager().getVersion().isNewerThanOrEquals(ServerVersion.V_1_19_4)) {
-      return false;
+    Boolean resolved = versionSupported;
+    if (resolved != null) {
+      return !resolved;
+    }
+
+    PacketEventsAPI<?> api = PacketEvents.getAPI();
+    if (api != null) {
+      boolean supported = api.getServerManager().getVersion().isNewerThanOrEquals(ServerVersion.V_1_19_4);
+      versionSupported = supported;
+      if (supported) {
+        return false;
+      }
     }
 
     if (unsupportedVersionWarning.compareAndSet(false, true)) {

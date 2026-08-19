@@ -30,6 +30,7 @@ import java.util.UUID;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertSame;
+import static org.junit.Assert.assertTrue;
 
 public class DisplayEntityMetadataTest {
 
@@ -114,6 +115,102 @@ public class DisplayEntityMetadataTest {
     assertEquals(List.of(0, 5, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23),
         values.stream().map(EntityData::getIndex).toList());
     assertEquals(9812, values.getLast().getValue());
+  }
+
+  @Test
+  public void textDisplaySubsetsMatchTheFullDataPacketEntries() {
+    DisplayEntity entity = new DisplayEntity(1, UUID.randomUUID(), entityType())
+        .displayKind(DisplayEntity.DisplayKind.TEXT)
+        .text(Component.text("A"))
+        .lineWidth(150)
+        .backgroundColor(7)
+        .textOpacity((byte) 12)
+        .textFlags((byte) 3)
+        .billboard((byte) 1)
+        .brightness(9)
+        .viewRange(3.5F)
+        .glowColorOverride(4);
+
+    assertSubsetsMatchFull(entity);
+  }
+
+  @Test
+  public void blockDisplaySubsetsMatchTheFullDataPacketEntries() {
+    DisplayEntity entity = new DisplayEntity(2, UUID.randomUUID(), entityType())
+        .displayKind(DisplayEntity.DisplayKind.BLOCK)
+        .blockState(9812);
+
+    assertSubsetsMatchFull(entity);
+  }
+
+  @Test
+  public void rawEntitySubsetsMatchTheFullDataPacketEntries() {
+    DisplayEntity entity = DisplayEntity.Builder.entity(
+        entityType(),
+        new Location(null, 1D, 2D, 3D)
+    );
+
+    assertSubsetsMatchFull(entity);
+  }
+
+  @Test
+  public void itemDisplaySubsetCarriesTheItemDisplayType() {
+    DisplayEntity entity = new DisplayEntity(3, UUID.randomUUID(), entityType())
+        .displayKind(DisplayEntity.DisplayKind.ITEM)
+        .itemDisplayType((byte) 5);
+    WrapperPlayServerEntityMetadata subset = entity.metadataPacket(24);
+    List<EntityData<?>> values = subset.getEntityMetadata();
+
+    assertEquals(1, values.size());
+    assertEquals(24, values.getFirst().getIndex());
+    assertEquals((byte) 5, values.getFirst().getValue());
+  }
+
+  @Test
+  public void aMultiIndexSubsetPreservesRequestOrder() {
+    DisplayEntity entity = new DisplayEntity(4, UUID.randomUUID(), entityType())
+        .displayKind(DisplayEntity.DisplayKind.TEXT)
+        .text(Component.text("A"));
+    WrapperPlayServerEntityMetadata subset = entity.metadataPacket(13, 12, 23);
+
+    assertEquals(List.of(13, 12, 23),
+        subset.getEntityMetadata().stream().map(EntityData::getIndex).toList());
+  }
+
+  @Test
+  public void inapplicableIndicesAreOmittedFromSubsets() {
+    DisplayEntity raw = DisplayEntity.Builder.entity(
+        entityType(),
+        new Location(null, 1D, 2D, 3D)
+    );
+    DisplayEntity block = new DisplayEntity(5, UUID.randomUUID(), entityType())
+        .displayKind(DisplayEntity.DisplayKind.BLOCK)
+        .blockState(11);
+
+    assertTrue(raw.metadataPacket(8, 23, 24).getEntityMetadata().isEmpty());
+    assertEquals(List.of(23),
+        block.metadataPacket(24, 25, 26, 27, 23, 99).getEntityMetadata().stream().map(EntityData::getIndex).toList());
+  }
+
+  @Test
+  public void destroyAllBatchesEveryIdIntoOnePacket() {
+    WrapperPlayServerDestroyEntities packet = DisplayEntity.destroyAll(new int[]{7, 9, 11});
+
+    assertArrayEquals(new int[]{7, 9, 11}, packet.getEntityIds());
+  }
+
+  private static void assertSubsetsMatchFull(DisplayEntity entity) {
+    WrapperPlayServerEntityMetadata full = (WrapperPlayServerEntityMetadata) entity.dataPacket();
+    for (EntityData<?> expected : full.getEntityMetadata()) {
+      WrapperPlayServerEntityMetadata subset = entity.metadataPacket(expected.getIndex());
+      List<EntityData<?>> values = subset.getEntityMetadata();
+
+      assertEquals(1, values.size());
+      EntityData<?> actual = values.getFirst();
+      assertEquals(expected.getIndex(), actual.getIndex());
+      assertSame(expected.getType(), actual.getType());
+      assertEquals(expected.getValue(), actual.getValue());
+    }
   }
 
   private static EntityType entityType() {

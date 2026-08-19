@@ -10,6 +10,7 @@ import art.arcane.gloss.doc.DocumentStore;
 import art.arcane.gloss.doc.GlossDocument;
 import art.arcane.volmlib.util.entity.StackExclusion;
 import art.arcane.volmlib.util.scheduling.FoliaScheduler;
+import art.arcane.volmlib.util.scheduling.SchedulerUtils;
 import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
 import org.bukkit.Location;
@@ -17,10 +18,13 @@ import org.bukkit.NamespacedKey;
 import org.bukkit.World;
 import org.bukkit.entity.Display;
 import org.bukkit.entity.Entity;
+import org.bukkit.entity.Player;
 import org.bukkit.entity.TextDisplay;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
 import org.bukkit.event.HandlerList;
 import org.bukkit.event.Listener;
+import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.world.EntitiesLoadEvent;
 import org.bukkit.persistence.PersistentDataType;
 
@@ -33,11 +37,11 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 import java.util.logging.Level;
 
 public final class HologramService {
@@ -61,12 +65,13 @@ public final class HologramService {
     private final DocumentRegistry<HologramDoc> registry;
     private final DocumentStore<HologramDoc> store;
     private final Map<String, PersistentHologram> holograms;
-    private final List<TemporaryHologramDisplay> temporaries;
-    private final Set<UUID> leased;
+    private final Set<TemporaryHologramDisplay> temporaries;
+    private final Map<UUID, TextDisplay> leased;
     private final ExecutorService fileExecutor;
-    private final ChunkPurgeListener chunkListener;
+    private final HologramListener listener;
     private int driverTaskId;
     private int temporaryTaskId;
+    private volatile HologramTick lastTick;
 
     public HologramService(Gloss plugin) {
         this.plugin = plugin;
@@ -76,10 +81,10 @@ public final class HologramService {
         this.registry = DocumentRegistry.folder(HologramDoc.KIND, folder, HologramDoc::parse,
             HologramDoc::revision, store::isOwnWrite);
         this.holograms = new ConcurrentHashMap<>();
-        this.temporaries = new CopyOnWriteArrayList<>();
-        this.leased = ConcurrentHashMap.newKeySet();
+        this.temporaries = ConcurrentHashMap.newKeySet();
+        this.leased = new ConcurrentHashMap<>();
         this.fileExecutor = Executors.newSingleThreadExecutor(HologramService::createFileThread);
-        this.chunkListener = new ChunkPurgeListener();
+        this.listener = new HologramListener();
         this.driverTaskId = NO_TASK;
         this.temporaryTaskId = NO_TASK;
     }
@@ -87,7 +92,7 @@ public final class HologramService {
     public void enable() {
         loadAll();
         plugin.watchdog().register("holograms", this::pollRegistry);
-        Bukkit.getPluginManager().registerEvents(chunkListener, plugin);
+        Bukkit.getPluginManager().registerEvents(listener, plugin);
         sweepLoadedChunks();
         startTasks();
         if (!holograms.isEmpty()) {
@@ -98,7 +103,7 @@ public final class HologramService {
     public void disable() {
         plugin.watchdog().unregister("holograms");
         stopTasks();
-        HandlerList.unregisterAll(chunkListener);
+        HandlerList.unregisterAll(listener);
         for (PersistentHologram hologram : holograms.values()) {
             hologram.despawnAll();
         }
@@ -206,6 +211,14 @@ public final class HologramService {
         return plugin.cfg().holograms().perViewerPlaceholders();
     }
 
+    boolean interpolatedMotion() {
+        return plugin.cfg().holograms().interpolatedMotion();
+    }
+
+    int temporaryUpdateIntervalTicks() {
+        return plugin.cfg().holograms().temporaryUpdateIntervalTicks();
+    }
+
     boolean isActive(PersistentHologram hologram) {
         return holograms.get(hologram.id()) == hologram;
     }
@@ -223,7 +236,7 @@ public final class HologramService {
         display.addScoreboardTag(DISPLAY_TAG);
         StackExclusion.exclude(display);
         display.getPersistentDataContainer().set(markerKey, PersistentDataType.BOOLEAN, true);
-        leased.add(display.getUniqueId());
+        leased.put(display.getUniqueId(), display);
     }
 
     void despawnEntity(TextDisplay entity, Location anchor) {
@@ -322,20 +335,97 @@ public final class HologramService {
     }
 
     private void driveHolograms() {
-        boolean enabled = plugin.cfg().holograms().enabled();
-        for (PersistentHologram hologram : holograms.values()) {
-            if (enabled) {
-                hologram.update();
-            } else {
+        if (!plugin.cfg().holograms().enabled()) {
+            for (PersistentHologram hologram : holograms.values()) {
                 hologram.despawnAll();
             }
+
+            sweepLeases();
+            return;
         }
+
+        HologramTick tick = new HologramTick();
+        for (PersistentHologram hologram : holograms.values()) {
+            hologram.update(tick);
+        }
+
+        publishTick(tick);
+        sweepLeases();
     }
 
     private void driveTemporaries() {
         boolean enabled = plugin.cfg().holograms().enabled();
+        HologramTick tick = new HologramTick();
         for (TemporaryHologramDisplay temporary : temporaries) {
-            temporary.drive(enabled);
+            temporary.drive(tick, enabled);
+        }
+
+        publishTick(tick);
+    }
+
+    /**
+     * Published only once the pass that filled it has finished. The map is lazily populated during
+     * the pass, so handing it out earlier would let a reader on another region thread walk a map
+     * that is still being written; a volatile write after the last mutation makes the snapshot
+     * safely readable and permanently immutable in practice.
+     */
+    private void publishTick(HologramTick tick) {
+        lastTick = tick;
+    }
+
+    /**
+     * Runs {@code action} for every player the last drive pass saw within {@code rangeSquared} of
+     * {@code anchor}, and reports whether that snapshot existed.
+     *
+     * <p>Callers that spawn a temporary at event rate would otherwise allocate a fresh
+     * {@code world.getPlayers()} list per event purely to answer a proximity question the drive pass
+     * already answered. Positions are at most one drive interval old. A false return means no pass
+     * has captured this world yet and the caller must do its own scan.
+     */
+    public boolean forEachNearbyViewer(Location anchor, double rangeSquared, Consumer<Player> action) {
+        HologramTick tick = lastTick;
+        World world = anchor.getWorld();
+        if (tick == null || world == null) {
+            return false;
+        }
+
+        List<HologramTick.Viewer> viewers = tick.captured(world);
+        if (viewers == null) {
+            return false;
+        }
+
+        double anchorX = anchor.getX();
+        double anchorY = anchor.getY();
+        double anchorZ = anchor.getZ();
+        for (HologramTick.Viewer viewer : viewers) {
+            double dx = viewer.x() - anchorX;
+            double dy = viewer.y() - anchorY;
+            double dz = viewer.z() - anchorZ;
+            if (dx * dx + dy * dy + dz * dz > rangeSquared) {
+                continue;
+            }
+
+            action.accept(viewer.player());
+        }
+
+        return true;
+    }
+
+    private void sweepLeases() {
+        if (leased.isEmpty()) {
+            return;
+        }
+
+        leased.values().removeIf(display -> !display.isValid());
+    }
+
+    void prunePlayer(UUID playerId) {
+        for (TemporaryHologramDisplay temporary : temporaries) {
+            temporary.onPlayerQuit(playerId);
+        }
+
+        for (PersistentHologram hologram : holograms.values()) {
+            hologram.onPlayerQuit(playerId);
         }
     }
 
@@ -345,6 +435,18 @@ public final class HologramService {
             return;
         }
 
+        if (SchedulerUtils.runGlobal(plugin, () -> applyDelta(delta))) {
+            return;
+        }
+
+        Gloss.warn("Hologram hot reload could not reach the server thread; the change was skipped.");
+    }
+
+    /**
+     * Spawns and despawns display entities, so it never runs on the watchdog IO thread. The poll
+     * that produced the delta is pure file work; only this half needs the server context.
+     */
+    private void applyDelta(DocumentDelta delta) {
         for (String id : delta.loaded()) {
             GlossDocument<HologramDoc> document = registry.get(id);
             if (document == null) {
@@ -402,15 +504,19 @@ public final class HologramService {
         }
 
         for (Entity entity : world.getChunkAt(chunkX, chunkZ).getEntities()) {
-            if (!(entity instanceof TextDisplay display)) {
-                continue;
-            }
-            if (!isGlossDisplay(display) || leased.contains(display.getUniqueId())) {
-                continue;
-            }
-
-            display.remove();
+            purgeOrphan(entity);
         }
+    }
+
+    private void purgeOrphan(Entity entity) {
+        if (!(entity instanceof TextDisplay display)) {
+            return;
+        }
+        if (leased.containsKey(display.getUniqueId()) || !isGlossDisplay(display)) {
+            return;
+        }
+
+        display.remove();
     }
 
     private boolean isGlossDisplay(TextDisplay display) {
@@ -436,11 +542,17 @@ public final class HologramService {
         return id;
     }
 
-    private final class ChunkPurgeListener implements Listener {
+    private final class HologramListener implements Listener {
         @EventHandler
         public void onEntitiesLoad(EntitiesLoadEvent event) {
-            Chunk chunk = event.getChunk();
-            scheduleChunkPurge(event.getWorld(), chunk.getX(), chunk.getZ());
+            for (Entity entity : event.getEntities()) {
+                purgeOrphan(entity);
+            }
+        }
+
+        @EventHandler(priority = EventPriority.MONITOR)
+        public void onPlayerQuit(PlayerQuitEvent event) {
+            prunePlayer(event.getPlayer().getUniqueId());
         }
     }
 }

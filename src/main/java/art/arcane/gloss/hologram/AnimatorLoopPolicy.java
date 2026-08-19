@@ -4,6 +4,8 @@ public final class AnimatorLoopPolicy {
     public static final long CEILING_MILLIS = 250L;
     public static final long MIN_FLOOR_MILLIS = 4L;
     public static final double BUDGET_FACTOR = 1.25D;
+    public static final double SHRINK_THRESHOLD = 0.5D;
+    public static final double RECOVERY_FACTOR = 0.75D;
 
     private AnimatorLoopPolicy() {
     }
@@ -17,8 +19,15 @@ public final class AnimatorLoopPolicy {
     public static long nextIntervalMillis(long currentMillis, double passMillis, long floorMillis) {
         long floor = Math.max(MIN_FLOOR_MILLIS, Math.min(CEILING_MILLIS, floorMillis));
         long current = Math.max(floor, Math.min(CEILING_MILLIS, currentMillis));
-        long adjusted = passMillis > current * BUDGET_FACTOR ? current + floor : current - floor;
-        return Math.max(floor, Math.min(CEILING_MILLIS, adjusted));
+        if (passMillis > current * BUDGET_FACTOR) {
+            return Math.min(CEILING_MILLIS, current + floor);
+        }
+        if (current <= floor || passMillis >= current * SHRINK_THRESHOLD) {
+            return current;
+        }
+
+        long recovered = (long) Math.floor(current * RECOVERY_FACTOR);
+        return Math.max(floor, Math.min(current - 1L, recovered));
     }
 
     public static long minSendIntervalMillis(int viewers, int packetBudget) {

@@ -19,6 +19,7 @@ import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemStack;
 
+import java.lang.reflect.Method;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -60,6 +61,9 @@ final class PreviewStateAdapters {
 
   /** Older server APIs have no {@code getRecipesUsed}; the reflective gate keeps them working. */
   private static final boolean RECIPES_USED_AVAILABLE = hasRecipesUsed();
+
+  /** Paper's non-copying {@code Block.getState(boolean)}, or null on a server without it. */
+  private static final Method LIVE_STATE = liveStateMethod();
 
   private PreviewStateAdapters() {
   }
@@ -177,24 +181,47 @@ final class PreviewStateAdapters {
       long gameTime,
       Map<String, Object> out
   ) {
+    BlockState state = state(block);
     out.put("time", (double) gameTime);
     // The universal group is published unconditionally so every cataloged universal name resolves
     // in every context; a target with no material (a bare ender-chest inventory, or statics) gets
     // the empty string rather than a missing variable, which documents branch on as `blockType != ""`.
     out.put("blockType", blockType(block, entity));
-    out.put("customName", customName(block, entity));
+    out.put("customName", customName(state, entity));
     if (inventory != null) {
       sampleInventory(inventory, out);
     }
     switch (category) {
-      case CATEGORY_FURNACE -> sampleFurnace(block, flow, gameTime, out);
-      case CATEGORY_BREWING -> sampleBrewing(block, flow, gameTime, out);
-      case CATEGORY_BEEHIVE -> sampleBeehive(block, out);
+      case CATEGORY_FURNACE -> sampleFurnace(state, flow, gameTime, out);
+      case CATEGORY_BREWING -> sampleBrewing(state, flow, gameTime, out);
+      case CATEGORY_BEEHIVE -> sampleBeehive(state, out);
       case CATEGORY_CAULDRON -> sampleCauldron(block, out);
-      case CATEGORY_JUKEBOX -> sampleJukebox(block, out);
+      case CATEGORY_JUKEBOX -> sampleJukebox(state, out);
       default -> {
       }
     }
+  }
+
+  /**
+   * One block state per sample, shared by every reading below instead of fetched again per group.
+   *
+   * <p>Paper's {@code getState(false)} hands back the live tile entity rather than copying it,
+   * which is what a read-only sample wants; the reflective gate keeps the Spigot compatibility
+   * build (and any server without the overload) on the copying call. The state is read and dropped
+   * inside this pass, never retained.
+   */
+  private static BlockState state(Block block) {
+    if (block == null) {
+      return null;
+    }
+    if (LIVE_STATE != null) {
+      try {
+        return (BlockState) LIVE_STATE.invoke(block, false);
+      } catch (ReflectiveOperationException | RuntimeException unavailable) {
+        return block.getState();
+      }
+    }
+    return block.getState();
   }
 
   private static void sampleInventory(Inventory inventory, Map<String, Object> out) {
@@ -209,8 +236,8 @@ final class PreviewStateAdapters {
     out.put("inventory.occupied", (double) occupied);
   }
 
-  private static void sampleFurnace(Block block, TimeFlowTracker flow, long gameTime, Map<String, Object> out) {
-    if (block == null || !(block.getState() instanceof Furnace furnace)) {
+  private static void sampleFurnace(BlockState state, TimeFlowTracker flow, long gameTime, Map<String, Object> out) {
+    if (!(state instanceof Furnace furnace)) {
       return;
     }
     int cookTime = furnace.getCookTime();
@@ -227,8 +254,8 @@ final class PreviewStateAdapters {
     out.put("surge.gain", flow.surgeSeconds());
   }
 
-  private static void sampleBrewing(Block block, TimeFlowTracker flow, long gameTime, Map<String, Object> out) {
-    if (block == null || !(block.getState() instanceof BrewingStand stand)) {
+  private static void sampleBrewing(BlockState state, TimeFlowTracker flow, long gameTime, Map<String, Object> out) {
+    if (!(state instanceof BrewingStand stand)) {
       return;
     }
     int brewTime = stand.getBrewingTime();
@@ -242,15 +269,14 @@ final class PreviewStateAdapters {
   }
 
   /** Hive readings, including the defaults used when the tile state is missing. */
-  private static void sampleBeehive(Block block, Map<String, Object> out) {
-    if (block == null) {
+  private static void sampleBeehive(BlockState state, Map<String, Object> out) {
+    if (state == null) {
       return;
     }
     int bees = 0;
     int maxBees = DEFAULT_MAX_BEES;
     int honey = 0;
     int maxHoney = DEFAULT_MAX_HONEY;
-    BlockState state = block.getState();
     if (state instanceof Beehive beehive) {
       bees = Math.max(0, beehive.getEntityCount());
       maxBees = Math.max(1, beehive.getMaxEntities());
@@ -289,8 +315,8 @@ final class PreviewStateAdapters {
     out.put("fluid", fluid(type));
   }
 
-  private static void sampleJukebox(Block block, Map<String, Object> out) {
-    if (block == null || !(block.getState() instanceof Jukebox jukebox)) {
+  private static void sampleJukebox(BlockState state, Map<String, Object> out) {
+    if (!(state instanceof Jukebox jukebox)) {
       return;
     }
     boolean hasRecord = jukebox.hasRecord();
@@ -322,9 +348,9 @@ final class PreviewStateAdapters {
    * collapses to empty so documents can branch on {@code customName != ''} and fall back to their
    * themed title.
    */
-  private static String customName(Block block, Entity entity) {
-    if (block != null) {
-      return block.getState() instanceof Nameable nameable ? name(nameable.getCustomName()) : "";
+  private static String customName(BlockState state, Entity entity) {
+    if (state != null) {
+      return state instanceof Nameable nameable ? name(nameable.getCustomName()) : "";
     }
     return entity == null ? "" : name(entity.getCustomName());
   }
@@ -366,6 +392,14 @@ final class PreviewStateAdapters {
       return true;
     } catch (NoSuchMethodException e) {
       return false;
+    }
+  }
+
+  private static Method liveStateMethod() {
+    try {
+      return Block.class.getMethod("getState", boolean.class);
+    } catch (NoSuchMethodException absent) {
+      return null;
     }
   }
 

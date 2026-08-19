@@ -102,6 +102,9 @@ public final class GlossConfigFile {
         @ConfigDoc("Ticks between refreshes of temporary holograms. Clamped to 1..20.")
         public int temporaryUpdateIntervalTicks = 2;
 
+        @ConfigDoc("Uses client-side Display interpolation for moving temporary holograms, falling back to teleports when the server API lacks it.")
+        public boolean interpolatedMotion = true;
+
         @ConfigDoc("Drives fast animated hologram lines from a dedicated async thread instead of the tick updater.")
         public boolean highFrequencyAnimations = true;
 

@@ -65,6 +65,9 @@ public final class PreviewStateContext implements ExprScope {
   private static final String LANG_ARG_PREFIX = "arg";
   private static final long MILLIS_PER_TICK = 50L;
 
+  /** Room for the widest built-in group set (universal + inventory + furnace) without a resize. */
+  private static final int SNAPSHOT_CAPACITY = 24;
+
   /** Evaluation errors carry no source position; see ExprEvaluator's class-level note. */
   private static final int NO_POSITION = -1;
 
@@ -180,9 +183,12 @@ public final class PreviewStateContext implements ExprScope {
     if (cached != null && cached.tick() == tick) {
       return cached.values();
     }
-    Map<String, Object> values = new HashMap<>();
+    Map<String, Object> values = new HashMap<>(SNAPSHOT_CAPACITY);
     PreviewStateAdapters.sample(category, block, entity, inventory, flow, tick, values);
-    mergeProviders(values);
+    List<PreviewStateProvider> providers = PreviewStateProviders.all();
+    if (!providers.isEmpty()) {
+      mergeProviders(providers, values);
+    }
     sampled = new Sampled(tick, values);
     return values;
   }
@@ -191,8 +197,8 @@ public final class PreviewStateContext implements ExprScope {
     return world == null ? System.currentTimeMillis() / MILLIS_PER_TICK : world.getGameTime();
   }
 
-  private void mergeProviders(Map<String, Object> out) {
-    for (PreviewStateProvider provider : PreviewStateProviders.all()) {
+  private void mergeProviders(List<PreviewStateProvider> providers, Map<String, Object> out) {
+    for (PreviewStateProvider provider : providers) {
       String namespace = null;
       Map<String, Object> values;
       try {

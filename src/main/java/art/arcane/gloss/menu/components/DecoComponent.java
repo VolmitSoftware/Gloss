@@ -4,6 +4,7 @@ import art.arcane.gloss.config.MenuComponentData;
 import art.arcane.gloss.config.components.DecoComponentData;
 import art.arcane.gloss.menu.MenuSession;
 import art.arcane.gloss.menu.icon.MenuIcon;
+import org.bukkit.util.Vector;
 
 public class DecoComponent extends MenuComponent<DecoComponentData> {
 
@@ -18,7 +19,7 @@ public class DecoComponent extends MenuComponent<DecoComponentData> {
   protected void onOpen() {
   }
 
-  protected void onTick() {
+  protected void onTick(Vector eyeOrigin, Vector eyeDirection) {
   }
 
   protected void onClose() {

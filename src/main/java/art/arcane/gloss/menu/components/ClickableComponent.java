@@ -23,6 +23,11 @@ public abstract class ClickableComponent<T extends ComponentData> extends MenuCo
   private final HitboxData hitbox;
   private Vector planeOrigin;
 
+  /** The eye position the current tick is being driven from; null outside a tick. */
+  private Vector tickEye;
+  /** The eye vector the plane is already oriented from, by identity. */
+  private Vector orientedFrom;
+
   protected CollisionPlane plane;
 
   protected boolean selected;
@@ -43,7 +48,7 @@ public abstract class ClickableComponent<T extends ComponentData> extends MenuCo
     if (!open || plane == null) {
       return OptionalDouble.empty();
     }
-    currentIcon.orientHitbox(plane, origin);
+    orientTo(origin);
     return plane.intersectionDistance(origin, direction);
   }
 
@@ -58,10 +63,29 @@ public abstract class ClickableComponent<T extends ComponentData> extends MenuCo
   }
 
   @Override
-  protected void onTick() {
-    Location playerPos = session.getPlayer().getEyeLocation().clone();
-    currentIcon.orientHitbox(plane, playerPos.toVector());
-    boolean isLookingAt = plane.isLookingAt(playerPos.toVector(), playerPos.getDirection());
+  public void tick(Vector eyeOrigin, Vector eyeDirection) {
+    this.tickEye = eyeOrigin;
+    try {
+      super.tick(eyeOrigin, eyeDirection);
+    } finally {
+      this.tickEye = null;
+    }
+  }
+
+  @Override
+  protected void onTick(Vector eyeOrigin, Vector eyeDirection) {
+    if (plane == null || currentIcon == null) {
+      return;
+    }
+    Vector origin = eyeOrigin;
+    Vector direction = eyeDirection;
+    if (origin == null || direction == null) {
+      Location eye = session.getPlayer().getEyeLocation();
+      origin = eye.toVector();
+      direction = eye.getDirection();
+    }
+    orientTo(origin);
+    boolean isLookingAt = plane.isLookingAt(origin, direction);
     if (isLookingAt && !selected) {
       this.selected = true;
       currentIcon.move(plane.getNormal().clone().multiply(highlightMod));
@@ -69,6 +93,20 @@ public abstract class ClickableComponent<T extends ComponentData> extends MenuCo
       this.selected = false;
       currentIcon.applyTransform(location);
     }
+  }
+
+  /**
+   * Orients the hitbox from an eye position, skipping the work when the plane is already oriented
+   * from that exact vector. Orienting twice from one eye is a no-op by construction (pinned by
+   * {@code CharacterizationHitboxOrientationTest}), so this only removes redundant work — it is
+   * what collapses the geometry refresh and the tick into a single orientation.
+   */
+  private void orientTo(Vector eye) {
+    if (plane == null || currentIcon == null || eye == null || orientedFrom == eye) {
+      return;
+    }
+    currentIcon.orientHitbox(plane, eye);
+    orientedFrom = eye;
   }
 
   @Override
@@ -112,8 +150,9 @@ public abstract class ClickableComponent<T extends ComponentData> extends MenuCo
       next.resize(hitbox.scaledWidth(scale), hitbox.scaledHeight(scale));
     }
     this.plane = next;
+    this.orientedFrom = null;
     positionPlane();
-    currentIcon.orientHitbox(plane, session.getPlayer().getEyeLocation().toVector());
+    orientTo(tickEye != null ? tickEye : session.getPlayer().getEyeLocation().toVector());
     if (selected)
       currentIcon.move(plane.getNormal().clone().multiply(highlightMod));
   }

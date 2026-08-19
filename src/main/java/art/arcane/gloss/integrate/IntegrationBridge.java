@@ -28,13 +28,19 @@ public final class IntegrationBridge {
     );
     public static final Set<String> CAPABILITIES = Set.of("handshake", "heartbeat", "metrics");
 
+    private static final Publication EMPTY = new Publication(Map.of(), Map.of());
+
     private final String requesterId;
     private final String requesterVersion;
     private final MetricReferences references;
     private final List<Source> sources;
-    private volatile Map<String, Double> samples;
+    private volatile Publication publication;
 
     public record Source(IntegrationServiceContract contract, String pluginId, Set<String> keys) {
+    }
+
+    /** Sampled values plus their display strings, swapped together so a reader never sees a mixed pair. */
+    private record Publication(Map<String, Double> values, Map<String, String> rendered) {
     }
 
     public IntegrationBridge(String requesterId, String requesterVersion, MetricReferences references) {
@@ -42,7 +48,7 @@ public final class IntegrationBridge {
         this.requesterVersion = requesterVersion == null ? "" : requesterVersion;
         this.references = references;
         this.sources = new CopyOnWriteArrayList<>();
-        this.samples = Map.of();
+        this.publication = EMPTY;
     }
 
     public void adopt(Collection<IntegrationServiceContract> contracts) {
@@ -58,13 +64,13 @@ public final class IntegrationBridge {
 
         sources.clear();
         sources.addAll(discovered);
-        samples = filtered(samples, allKeys());
+        publication = publish(filtered(publication.values(), allKeys()));
     }
 
     public void clear() {
         sources.clear();
         references.clear();
-        samples = Map.of();
+        publication = EMPTY;
     }
 
     public Set<String> allKeys() {
@@ -95,11 +101,12 @@ public final class IntegrationBridge {
 
     public String render(String key, long nowMs) {
         references.reference(key, nowMs);
-        return MetricFormat.compact(samples.get(key));
+        String rendered = publication.rendered().get(key);
+        return rendered == null ? "" : rendered;
     }
 
     public Map<String, Object> previewValues(String namespace, long nowMs) {
-        Map<String, Double> published = samples;
+        Map<String, Double> published = publication.values();
         Map<String, Object> out = new HashMap<>();
         String prefix = namespace + ".";
         for (Source source : sources) {
@@ -120,7 +127,7 @@ public final class IntegrationBridge {
     public void sample(long nowMs) {
         Set<String> active = references.active(nowMs);
         if (active.isEmpty()) {
-            samples = Map.of();
+            publication = EMPTY;
             return;
         }
 
@@ -132,11 +139,24 @@ public final class IntegrationBridge {
             }
             collect(source, wanted, next);
         }
-        samples = Map.copyOf(next);
+        publication = publish(next);
     }
 
     public Map<String, Double> published() {
-        return samples;
+        return publication.values();
+    }
+
+    /** Display strings are formatted here, at sample time, so {@link #render} is a map lookup. */
+    private static Publication publish(Map<String, Double> values) {
+        if (values.isEmpty()) {
+            return EMPTY;
+        }
+
+        Map<String, String> rendered = new LinkedHashMap<>();
+        for (Map.Entry<String, Double> entry : values.entrySet()) {
+            rendered.put(entry.getKey(), MetricFormat.compact(entry.getValue()));
+        }
+        return new Publication(Map.copyOf(values), Map.copyOf(rendered));
     }
 
     public static String namespaceOf(String key, String pluginId) {
@@ -240,7 +260,7 @@ public final class IntegrationBridge {
                 kept.put(entry.getKey(), entry.getValue());
             }
         }
-        return Map.copyOf(kept);
+        return kept;
     }
 
     private static String normalize(String value) {

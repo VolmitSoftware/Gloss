@@ -43,6 +43,7 @@ import java.util.Set;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import java.util.function.UnaryOperator;
 import java.util.logging.Level;
 import java.util.stream.Stream;
@@ -53,6 +54,7 @@ public final class ConfigManager {
   private static final String MENU_EXTENSION = ".json";
   private static final long RELOAD_TTL_MILLIS = 2500L;
   private static final String WATCHDOG_ENTRY = "menus";
+  private static final long QUEUED_PUBLICATION_TIMEOUT_SECONDS = 30L;
 
   private final Map<String, MenuDefinitionData> menuRegistry = new ConcurrentHashMap<>();
   private final Map<String, String> menuSourceRegistry = new ConcurrentHashMap<>();
@@ -101,70 +103,104 @@ public final class ConfigManager {
     Gloss.instance.getLocalization().update();
   }
 
+  /**
+   * One {@code checkModified} pass per watched folder, handling changed, created and deleted
+   * together.
+   *
+   * <p>This used to be a fast pass followed by a slow pass over the same two watchers. Both passes
+   * consume the same modification deltas, so whichever ran first ate the change: a creation seen by
+   * the fast pass — which only walks children it already knows and so cannot see a new file at all —
+   * left the slow pass with nothing to register, and the double walk paid two directory listings per
+   * poll for it. A single pass reading all three lists cannot drop anything.
+   *
+   * <p>Runs on the watchdog IO thread: the stats, the reads and the parses happen here, and the
+   * collected applications — which destroy menu sessions, publish definitions and refresh panel
+   * visuals — are handed to the server context as one batch.
+   */
   private void fileTick() {
-    fastFileTick();
-    slowFileTick();
-  }
-
-  private void fastFileTick() {
-    if (menuDefinitionFolder.checkModifiedFast()) {
-      menuDefinitionFolder.getChanged().forEach(f -> {
-        if (isMenuFile(menuDir, f)) {
-          String name = menuId(menuDir, f);
-          String previousRevision = getRevision(name).orElse(null);
-          Optional<MenuDocument> loaded = loadConfig(name, f);
-          loaded.filter(document -> !document.revision().equals(previousRevision)).ifPresent(document -> {
-            Gloss.instance.getSessionManager().destroyAllType(name, p -> {
-              SchedulerUtils.runEntity(Gloss.instance, p, () -> {
-                String notice = Gloss.instance.getLocalization().legacy(
-                    GlossMessages.CONFIG_RELOADED,
-                    MessageArgs.builder().untrusted("name", name).build()
-                );
-                Gloss.instance.getHudBar().publish(p, new HudSegment(RELOAD_PURPOSE, HudPriority.NOTICE, RELOAD_TTL_MILLIS, List.of(HudSlot.CENTER, HudSlot.RIGHT), notice));
-                p.playSound(p.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, .5F, 1);
-              });
-            });
-            publishDefinition(document);
-            refreshBoardMenu(name);
-            Gloss.log(Level.INFO, "Menu config \"%s\" has been changed and re-registered.", name);
-          });
-        }
-      });
-      menuDefinitionFolder.getCreated().forEach(this::registerCreatedMenus);
-      menuDefinitionFolder.getDeleted().forEach(this::unregisterDeletedPath);
+    List<Runnable> applications = new ArrayList<>();
+    collectMenuChanges(applications);
+    collectImageChanges(applications);
+    if (applications.isEmpty()) {
+      return;
     }
-    if (imageFolder.checkModifiedFast()) {
-      if (!imageFolder.getChanged().isEmpty()) {
-        imageFolder.getChanged().forEach(f -> Gloss.log(Level.INFO, "Image asset \"%s\" changed and was hot reloaded.", f.getName()));
-        if (Gloss.instance.getSessionManager() != null) {
-          Gloss.instance.getSessionManager().refreshVisuals();
-        }
-        if (Gloss.instance.getPanelRuntime() != null) {
-          Gloss.instance.getPanelRuntime().refreshVisuals();
-        }
+    boolean scheduled = SchedulerUtils.runGlobal(Gloss.instance, () -> {
+      for (Runnable application : applications) {
+        application.run();
       }
+    });
+    if (!scheduled) {
+      Gloss.log(Level.WARNING,
+          "Menu hot reload could not reach the server thread; %d change(s) were skipped.",
+          applications.size());
     }
   }
 
-  private void slowFileTick() {
-    if (menuDefinitionFolder.checkModified()) {
-      menuDefinitionFolder.getCreated().forEach(this::registerCreatedMenus);
-      menuDefinitionFolder.getDeleted().forEach(this::unregisterDeletedPath);
+  private void collectMenuChanges(List<Runnable> applications) {
+    if (!menuDefinitionFolder.checkModified()) {
+      return;
     }
-    if (imageFolder.checkModified()) {
-      if (!imageFolder.getCreated().isEmpty()) {
-        imageFolder.getCreated().forEach(f -> Gloss.log(Level.INFO, "Image asset \"%s\" was detected and hot loaded.", f.getName()));
+    for (File changed : menuDefinitionFolder.getChanged()) {
+      if (!isMenuFile(menuDir, changed)) {
+        continue;
       }
-      if (!imageFolder.getDeleted().isEmpty()) {
-        imageFolder.getDeleted().forEach(f -> Gloss.log(Level.INFO, "Image asset \"%s\" was removed.", f.getName()));
+      String name = menuId(menuDir, changed);
+      String previousRevision = getRevision(name).orElse(null);
+      loadConfig(name, changed)
+          .filter(document -> !document.revision().equals(previousRevision))
+          .ifPresent(document -> applications.add(() -> applyChangedMenu(name, document)));
+    }
+    for (File created : menuDefinitionFolder.getCreated()) {
+      collectCreatedMenus(created, applications);
+    }
+    for (File deleted : menuDefinitionFolder.getDeleted()) {
+      collectDeletedPath(deleted, applications);
+    }
+  }
+
+  private void collectImageChanges(List<Runnable> applications) {
+    if (!imageFolder.checkModified()) {
+      return;
+    }
+    List<File> changed = List.copyOf(imageFolder.getChanged());
+    List<File> created = List.copyOf(imageFolder.getCreated());
+    List<File> deleted = List.copyOf(imageFolder.getDeleted());
+    if (changed.isEmpty() && created.isEmpty() && deleted.isEmpty()) {
+      return;
+    }
+    applications.add(() -> {
+      for (File file : changed) {
+        Gloss.log(Level.INFO, "Image asset \"%s\" changed and was hot reloaded.", file.getName());
       }
-      if ((!imageFolder.getCreated().isEmpty() || !imageFolder.getDeleted().isEmpty()) && Gloss.instance.getSessionManager() != null) {
+      for (File file : created) {
+        Gloss.log(Level.INFO, "Image asset \"%s\" was detected and hot loaded.", file.getName());
+      }
+      for (File file : deleted) {
+        Gloss.log(Level.INFO, "Image asset \"%s\" was removed.", file.getName());
+      }
+      if (Gloss.instance.getSessionManager() != null) {
         Gloss.instance.getSessionManager().refreshVisuals();
-        if (Gloss.instance.getPanelRuntime() != null) {
-          Gloss.instance.getPanelRuntime().refreshVisuals();
-        }
       }
-    }
+      if (Gloss.instance.getPanelRuntime() != null) {
+        Gloss.instance.getPanelRuntime().refreshVisuals();
+      }
+    });
+  }
+
+  private void applyChangedMenu(String name, MenuDocument document) {
+    Gloss.instance.getSessionManager().destroyAllType(name, p -> {
+      SchedulerUtils.runEntity(Gloss.instance, p, () -> {
+        String notice = Gloss.instance.getLocalization().legacy(
+            GlossMessages.CONFIG_RELOADED,
+            MessageArgs.builder().untrusted("name", name).build()
+        );
+        Gloss.instance.getHudBar().publish(p, new HudSegment(RELOAD_PURPOSE, HudPriority.NOTICE, RELOAD_TTL_MILLIS, List.of(HudSlot.CENTER, HudSlot.RIGHT), notice));
+        p.playSound(p.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, .5F, 1);
+      });
+    });
+    publishDefinition(document);
+    refreshBoardMenu(name);
+    Gloss.log(Level.INFO, "Menu config \"%s\" has been changed and re-registered.", name);
   }
 
   static boolean isMenuFile(File root, File file) {
@@ -241,43 +277,52 @@ public final class ConfigManager {
   }
 
   private void registerMenu(File f) {
-    String name = menuId(menuDir, f);
-    Optional<MenuDocument> loaded = loadConfig(name, f);
-    loaded.filter(document -> !document.revision().equals(getRevision(name).orElse(null))).ifPresent(document -> {
-      publishDefinition(document);
-      refreshBoardMenu(name);
-      Gloss.log(Level.INFO, "New menu config \"%s\" detected and registered.", name);
-    });
+    loadCreatedMenu(f).ifPresent(Runnable::run);
   }
 
-  private void registerCreatedMenus(File path) {
+  private Optional<Runnable> loadCreatedMenu(File f) {
+    String name = menuId(menuDir, f);
+    String previousRevision = getRevision(name).orElse(null);
+    return loadConfig(name, f)
+        .filter(document -> !document.revision().equals(previousRevision))
+        .map(document -> () -> {
+          publishDefinition(document);
+          refreshBoardMenu(name);
+          Gloss.log(Level.INFO, "New menu config \"%s\" detected and registered.", name);
+        });
+  }
+
+  private void collectCreatedMenus(File path, List<Runnable> applications) {
     for (File created : discoverMenuFiles(path)) {
       if (isMenuFile(menuDir, created)) {
-        registerMenu(created);
+        loadCreatedMenu(created).ifPresent(applications::add);
       }
     }
   }
 
-  private void unregisterDeletedPath(File path) {
+  private void collectDeletedPath(File path, List<Runnable> applications) {
     if (isMenuFile(menuDir, path)) {
-      unregisterMenu(path);
+      String name = menuId(menuDir, path);
+      if (menuRegistry.containsKey(name)) {
+        applications.add(() -> unregisterMenu(name));
+      }
     }
-    unregisterMenuPrefix(path);
+    collectDeletedPrefix(path, applications);
   }
 
-  private void unregisterMenu(File f) {
-    String name = menuId(menuDir, f);
-    if (menuRegistry.containsKey(name)) {
-      Gloss.instance.getSessionManager().destroyAllType(name, p -> {
-      });
-      menuRegistry.remove(name);
-      menuSourceRegistry.remove(name);
-      refreshBoardMenu(name);
-      Gloss.log(Level.INFO, "Menu config \"%s\" has been deleted and unregistered.", name);
+  private void unregisterMenu(String name) {
+    if (!menuRegistry.containsKey(name)) {
+      return;
     }
+    Gloss.instance.getSessionManager().destroyAllType(name, p -> {
+    });
+    menuRegistry.remove(name);
+    menuSourceRegistry.remove(name);
+    refreshBoardMenu(name);
+    Gloss.log(Level.INFO, "Menu config \"%s\" has been deleted and unregistered.", name);
   }
 
-  private void unregisterMenuPrefix(File directory) {
+  private void collectDeletedPrefix(File directory, List<Runnable> applications) {
     String prefix;
     try {
       Path relative = menuDir.getCanonicalFile().toPath().relativize(directory.getCanonicalFile().toPath());
@@ -289,16 +334,8 @@ public final class ConfigManager {
       return;
     }
     String nestedPrefix = prefix + "/";
-    List<String> removed = menuRegistry.keySet().stream()
-        .filter(id -> id.startsWith(nestedPrefix))
-        .toList();
-    for (String id : removed) {
-      Gloss.instance.getSessionManager().destroyAllType(id, player -> {
-      });
-      menuRegistry.remove(id);
-      menuSourceRegistry.remove(id);
-      refreshBoardMenu(id);
-      Gloss.log(Level.INFO, "Menu config \"%s\" has been deleted and unregistered.", id);
+    for (String id : menuRegistry.keySet().stream().filter(key -> key.startsWith(nestedPrefix)).toList()) {
+      applications.add(() -> unregisterMenu(id));
     }
   }
 
@@ -450,17 +487,23 @@ public final class ConfigManager {
           new CancellationException("menu mutation service is shut down"));
     }
     Map<String, String> requiredSources = Map.copyOf(sources);
+    List<MenuDocument> documents;
+    try {
+      documents = new ArrayList<>(requiredSources.size());
+      for (Map.Entry<String, String> entry : requiredSources.entrySet()) {
+        documents.add(MenuDocumentParser.parse(entry.getKey(), entry.getValue()));
+      }
+    } catch (RuntimeException failure) {
+      return CompletableFuture.failedFuture(failure);
+    }
+    List<MenuDocument> parsed = List.copyOf(documents);
     CompletableFuture<List<MenuDocument>> publication = new CompletableFuture<>();
     boolean accepted = SchedulerUtils.runGlobal(Gloss.instance, () -> {
       if (publication.isDone()) {
         return;
       }
       try {
-        List<MenuDocument> documents = new ArrayList<>(requiredSources.size());
-        for (Map.Entry<String, String> entry : requiredSources.entrySet()) {
-          documents.add(MenuDocumentParser.parse(entry.getKey(), entry.getValue()));
-        }
-        for (MenuDocument document : documents) {
+        for (MenuDocument document : parsed) {
           publishDefinition(document);
           if (Gloss.instance.getSessionManager() != null) {
             Gloss.instance.getSessionManager().destroyAllType(document.id(), player -> {
@@ -468,7 +511,7 @@ public final class ConfigManager {
           }
           refreshBoardMenu(document.id());
         }
-        publication.complete(List.copyOf(documents));
+        publication.complete(parsed);
       } catch (RuntimeException failure) {
         publication.completeExceptionally(failure);
       }
@@ -477,7 +520,21 @@ public final class ConfigManager {
       publication.completeExceptionally(
           new IllegalStateException("unable to schedule editor sync menu publication"));
     }
-    return publication;
+    return guardQueued(publication);
+  }
+
+  /**
+   * Caps how long a caller waits on a hop that was accepted but never ran.
+   *
+   * <p>The editor-sync apply path holds the global persistence lease across this future. A server
+   * that shuts down between the scheduler accepting the task and running it leaves the future
+   * pending forever, the lease unclosed, and every later menu, panel and watchdog read parked behind
+   * the semaphore. Failing the future instead drives the caller's existing rollback, which closes
+   * the lease. The runnable re-checks {@code isDone()} before it publishes, so a task that arrives
+   * after the timeout is a no-op rather than a late mutation.
+   */
+  private static <T> CompletableFuture<T> guardQueued(CompletableFuture<T> queued) {
+    return queued.orTimeout(QUEUED_PUBLICATION_TIMEOUT_SECONDS, TimeUnit.SECONDS);
   }
 
   public boolean exists(String key) {
@@ -546,11 +603,14 @@ public final class ConfigManager {
             new IllegalStateException("unable to schedule menu publication for " + menuId));
       }
     });
-    return published;
+    return guardQueued(published);
   }
 
   private void publishWrittenDocument(CompletableFuture<MenuDocument> published, MenuDocument document,
                                       String menuId, String expectedRevision, boolean create) {
+    if (published.isDone()) {
+      return;
+    }
     try {
       if (!acceptingMenuMutations) {
         throw new CancellationException("menu mutation service shut down before publication");

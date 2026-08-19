@@ -37,4 +37,27 @@ class TablistTokensTest {
     void nullValuesSubstituteAsEmpty() {
         assertEquals(" - ", TablistService.substituteTokens("$player - $group", null, null));
     }
+
+    @Test
+    void adjacentTokensSubstitute() {
+        assertEquals("SteveadminSteve", TablistService.substituteTokens("$player$group$player", "Steve", "admin"));
+    }
+
+    @Test
+    void aDollarThatStartsNoTokenIsLeftAlone() {
+        assertEquals("cost $5 for Steve", TablistService.substituteTokens("cost $5 for $player", "Steve", "admin"));
+        assertEquals("$", TablistService.substituteTokens("$", "Steve", "admin"));
+        assertEquals("$play", TablistService.substituteTokens("$play", "Steve", "admin"));
+    }
+
+    @Test
+    void substitutedValuesAreNotRescannedForOtherTokens() {
+        assertEquals("$group", TablistService.substituteTokens("$player", "$group", "admin"));
+        assertEquals("$player", TablistService.substituteTokens("$group", "Steve", "$player"));
+    }
+
+    @Test
+    void emptyTemplateStaysEmpty() {
+        assertEquals("", TablistService.substituteTokens("", "Steve", "admin"));
+    }
 }

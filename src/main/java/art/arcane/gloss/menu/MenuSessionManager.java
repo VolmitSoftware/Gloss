@@ -50,12 +50,19 @@ import org.bukkit.util.RayTraceResult;
 import org.bukkit.util.Vector;
 
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
 public final class MenuSessionManager {
 
-  private final Map<Player, SessionHolder> holders = new ConcurrentHashMap<>();
+  /**
+   * Where the Folia obstruction walk starts along the eye ray, matching the first sample the
+   * previous fixed-step loop took.
+   */
+  private static final double OBSTRUCTION_START = 0.1D;
+
+  private final Map<UUID, SessionHolder> holders = new ConcurrentHashMap<>();
 
   private final PlayerSnapshotStore<String> openMenus = new PlayerSnapshotStore<>();
 
@@ -63,6 +70,7 @@ public final class MenuSessionManager {
       ApiClickGuard.DEFAULT_FAULT_LIMIT, ApiClickGuard.DEFAULT_SLOW_MILLIS);
 
   private SchedulerUtils.TaskHandle debugHitbox, debugPos;
+  private final SchedulerUtils.TaskHandle holderTask, previewTask;
 
   public PlayerSnapshotStore<String> getOpenMenus() {
     return openMenus;
@@ -74,40 +82,36 @@ public final class MenuSessionManager {
 
   public MenuSessionManager() {
     applyDebugSettings();
-    SchedulerUtils.scheduleSyncTask(Gloss.instance, 1L, () -> {
+    holderTask = SchedulerUtils.scheduleSyncTask(Gloss.instance, 1L, () -> {
+      if (holders.isEmpty()) {
+        return;
+      }
       long tickStart = System.nanoTime();
-      holders.forEach((player, holder) -> {
+      holders.values().forEach(holder -> {
+        Player player = holder.player();
         Runnable tickTask = () -> {
-          if (!player.isOnline()) {
-            holder.close(HoloCloseReason.QUIT);
-            holders.remove(player, holder);
-            return;
-          }
-
           if (holder.tick()) {
-            holders.remove(player, holder);
+            disposeIfIdle(holder);
           }
         };
 
-        if (!SchedulerUtils.runEntity(Gloss.instance, player, tickTask)) {
-          return;
-        }
+        SchedulerUtils.runEntity(Gloss.instance, player, tickTask);
       });
       GlossTelemetry.addTickNanos(System.nanoTime() - tickStart);
     }, false);
     Events.listen(Gloss.instance, PlayerMoveEvent.class, EventPriority.HIGHEST, e -> {
-      if (e.isCancelled() || e.getTo() == null) return;
-      SessionHolder holder = holders.get(e.getPlayer());
+      if (holders.isEmpty() || e.isCancelled() || e.getTo() == null) return;
+      SessionHolder holder = holders.get(e.getPlayer().getUniqueId());
       if (holder == null) return;
       holder.inspectSession(s -> s == null ? null : handleMovement(s, e.getFrom(), e.getTo()));
     });
     Events.listen(Gloss.instance, PlayerDeathEvent.class, EventPriority.MONITOR, e -> {
-      SessionHolder holder = holders.get(e.getEntity());
+      SessionHolder holder = holders.get(e.getEntity().getUniqueId());
       if (holder == null) return;
       holder.inspectSession(s -> s != null && s.isCloseOnDeath() ? HoloCloseReason.DEATH : null);
     });
     Events.listen(Gloss.instance, PlayerRespawnEvent.class, EventPriority.MONITOR, e -> {
-      SessionHolder holder = holders.get(e.getPlayer());
+      SessionHolder holder = holders.get(e.getPlayer().getUniqueId());
       if (holder == null) return;
       holder.inspectSession(s -> {
         if (s == null) return null;
@@ -121,7 +125,7 @@ public final class MenuSessionManager {
       });
     });
     Events.listen(Gloss.instance, PlayerTeleportEvent.class, EventPriority.MONITOR, e -> {
-      SessionHolder holder = holders.get(e.getPlayer());
+      SessionHolder holder = holders.get(e.getPlayer().getUniqueId());
       if (holder == null || e.getTo() == null) return;
       holder.inspectSession(s -> {
         if (s == null) return null;
@@ -134,13 +138,24 @@ public final class MenuSessionManager {
         return null;
       });
     });
-    Events.listen(Gloss.instance, PlayerQuitEvent.class, e -> {
-      SessionHolder holder = holders.remove(e.getPlayer());
+    Events.listen(Gloss.instance, PlayerQuitEvent.class, EventPriority.MONITOR, e -> {
+      DisplayEntityManager.forget(e.getPlayer());
+      SessionHolder holder = holders.remove(e.getPlayer().getUniqueId());
       if (holder == null) return;
       holder.close(HoloCloseReason.QUIT);
     });
     Events.listen(Gloss.instance, PlayerInteractEvent.class, EventPriority.HIGHEST, this::dispatchClick);
-    listenToInventoryPreview();
+    previewTask = listenToInventoryPreview();
+  }
+
+  /**
+   * Drops a holder that reported itself finished, but only while it is still finished — the map
+   * operation is atomic against the {@code computeIfAbsent} that opens a menu or preview, so a
+   * session opened during the tick cannot be orphaned by the sweep.
+   */
+  private void disposeIfIdle(SessionHolder holder) {
+    holders.computeIfPresent(holder.playerId(),
+        (id, current) -> current == holder && current.isDisposable() ? null : current);
   }
 
   private void dispatchClick(PlayerInteractEvent event) {
@@ -149,9 +164,8 @@ public final class MenuSessionManager {
     if (action != Action.LEFT_CLICK_AIR && action != Action.LEFT_CLICK_BLOCK
         && action != Action.RIGHT_CLICK_AIR && action != Action.RIGHT_CLICK_BLOCK) return;
     if (event.getHand() == EquipmentSlot.OFF_HAND) return;
-    HoloClickTrigger trigger = HoloClickTrigger.fromInteraction(action, event.getPlayer().isSneaking());
 
-    SessionHolder holder = holders.get(event.getPlayer());
+    SessionHolder holder = holders.isEmpty() ? null : holders.get(event.getPlayer().getUniqueId());
     SessionHolder.ClickSnapshot snapshot = holder == null
         ? null
         : holder.snapshotClick(event.getPlayer().getEyeLocation());
@@ -166,6 +180,7 @@ public final class MenuSessionManager {
         : boardTarget == null ? snapshot.distance() : Math.min(snapshot.distance(), boardTarget.distance());
     if (isInteractionObstructed(event.getPlayer(), nearestDistance)) return;
 
+    HoloClickTrigger trigger = HoloClickTrigger.fromInteraction(action, event.getPlayer().isSneaking());
     event.setCancelled(true);
     if (boardTarget != null && (snapshot == null || boardTarget.distance() < snapshot.distance())) {
       try {
@@ -204,32 +219,100 @@ public final class MenuSessionManager {
   }
 
   private boolean isFoliaInteractionObstructed(World world, Location eye, double distance) {
-    Vector direction = eye.getDirection().normalize();
-    Location sample = eye.clone();
-    int previousX = Integer.MIN_VALUE;
-    int previousY = Integer.MIN_VALUE;
-    int previousZ = Integer.MIN_VALUE;
-    for (double traveled = 0.1D; traveled + 1.0E-6D < distance; traveled += 0.1D) {
-      sample.setX(eye.getX() + direction.getX() * traveled);
-      sample.setY(eye.getY() + direction.getY() * traveled);
-      sample.setZ(eye.getZ() + direction.getZ() * traveled);
-      int blockX = sample.getBlockX();
-      int blockY = sample.getBlockY();
-      int blockZ = sample.getBlockZ();
-      if (blockX == previousX && blockY == previousY && blockZ == previousZ) {
-        continue;
+    return isVoxelObstructed(world, eye, distance, FoliaScheduler::isOwnedByCurrentRegion);
+  }
+
+  /**
+   * Folia's stand-in for {@code rayTraceBlocks}, which may only touch blocks the calling region
+   * owns. Walks the exact voxels the eye ray crosses (DDA) instead of sampling every 0.1 blocks,
+   * resolves region ownership once per chunk column rather than once per sample, and — the fix —
+   * treats a voxel the current region does not own as <b>passable</b>.
+   *
+   * <p>Treating foreign voxels as obstructing is what made a menu straddling a region boundary
+   * silently unclickable: the ray left the clicker's region before reaching the button, so every
+   * click was swallowed. Occlusion by blocks in a foreign region is therefore best-effort on Folia;
+   * the Paper path still does a real ray trace and is unchanged.
+   */
+  static boolean isVoxelObstructed(World world, Location eye, double distance, RegionOwnership ownership) {
+    if (distance <= OBSTRUCTION_START) {
+      return false;
+    }
+    Vector direction = eye.getDirection();
+    double length = direction.length();
+    if (length < 1.0E-9D) {
+      return false;
+    }
+    double dirX = direction.getX() / length;
+    double dirY = direction.getY() / length;
+    double dirZ = direction.getZ() / length;
+    double startX = eye.getX() + dirX * OBSTRUCTION_START;
+    double startY = eye.getY() + dirY * OBSTRUCTION_START;
+    double startZ = eye.getZ() + dirZ * OBSTRUCTION_START;
+    double reach = distance - OBSTRUCTION_START;
+
+    int x = (int) Math.floor(startX);
+    int y = (int) Math.floor(startY);
+    int z = (int) Math.floor(startZ);
+    int stepX = dirX > 0.0D ? 1 : dirX < 0.0D ? -1 : 0;
+    int stepY = dirY > 0.0D ? 1 : dirY < 0.0D ? -1 : 0;
+    int stepZ = dirZ > 0.0D ? 1 : dirZ < 0.0D ? -1 : 0;
+    double deltaX = stepX == 0 ? Double.POSITIVE_INFINITY : Math.abs(1.0D / dirX);
+    double deltaY = stepY == 0 ? Double.POSITIVE_INFINITY : Math.abs(1.0D / dirY);
+    double deltaZ = stepZ == 0 ? Double.POSITIVE_INFINITY : Math.abs(1.0D / dirZ);
+    double nextX = boundary(startX, x, stepX, dirX);
+    double nextY = boundary(startY, y, stepY, dirY);
+    double nextZ = boundary(startZ, z, stepZ, dirZ);
+
+    int minHeight = world.getMinHeight();
+    int maxHeight = world.getMaxHeight();
+    int columnX = Integer.MIN_VALUE;
+    int columnZ = Integer.MIN_VALUE;
+    boolean columnOwned = false;
+
+    while (true) {
+      if (y >= minHeight && y < maxHeight) {
+        int chunkX = x >> 4;
+        int chunkZ = z >> 4;
+        if (chunkX != columnX || chunkZ != columnZ) {
+          columnX = chunkX;
+          columnZ = chunkZ;
+          columnOwned = ownership.owns(world, chunkX, chunkZ);
+        }
+        if (columnOwned && !world.getBlockAt(x, y, z).isPassable()) {
+          return true;
+        }
       }
-      previousX = blockX;
-      previousY = blockY;
-      previousZ = blockZ;
-      if (!FoliaScheduler.isOwnedByCurrentRegion(sample)) {
-        return true;
+
+      double traveled;
+      if (nextX <= nextY && nextX <= nextZ) {
+        traveled = nextX;
+        x += stepX;
+        nextX += deltaX;
+      } else if (nextY <= nextZ) {
+        traveled = nextY;
+        y += stepY;
+        nextY += deltaY;
+      } else {
+        traveled = nextZ;
+        z += stepZ;
+        nextZ += deltaZ;
       }
-      if (!world.getBlockAt(blockX, blockY, blockZ).isPassable()) {
-        return true;
+      if (traveled + 1.0E-6D >= reach) {
+        return false;
       }
     }
-    return false;
+  }
+
+  private static double boundary(double start, int voxel, int step, double direction) {
+    if (step == 0) {
+      return Double.POSITIVE_INFINITY;
+    }
+    return (step > 0 ? voxel + 1 - start : start - voxel) / Math.abs(direction);
+  }
+
+  /** Whether the calling thread's region owns a chunk column; a seam so the walk is testable. */
+  interface RegionOwnership {
+    boolean owns(World world, int chunkX, int chunkZ);
   }
 
   private void dispatchPersonalClick(Player player, SessionHolder.ClickSnapshot snapshot,
@@ -270,7 +353,7 @@ public final class MenuSessionManager {
   }
 
   public NavigationResult navigateSession(Player player, NavigationRequest request) {
-    SessionHolder holder = holders.get(player);
+    SessionHolder holder = holders.get(player.getUniqueId());
     if (request.mode() == NavigationMode.CLOSE) {
       return holder != null && holder.closeSession(false, HoloCloseReason.CLOSED_BY_COMMAND)
           ? NavigationResult.APPLIED
@@ -309,7 +392,7 @@ public final class MenuSessionManager {
       return NavigationResult.DENIED;
     }
 
-    SessionHolder activeHolder = holder == null ? holders.computeIfAbsent(player, this::newHolder) : holder;
+    SessionHolder activeHolder = holder == null ? holder(player) : holder;
     return activeHolder.navigateSession(menu, request);
   }
 
@@ -325,31 +408,31 @@ public final class MenuSessionManager {
       return false;
     }
 
-    holders.computeIfAbsent(p, this::newHolder).openSession(menu, handle);
+    holder(p).openSession(menu, handle);
     return true;
   }
 
   public boolean hasMenuSession(Player p) {
-    SessionHolder holder = holders.get(p);
+    SessionHolder holder = holders.get(p.getUniqueId());
     return holder != null && holder.hasSession();
   }
 
   public boolean moveSession(Player p) {
-    SessionHolder holder = holders.get(p);
+    SessionHolder holder = holders.get(p.getUniqueId());
     return holder != null && holder.moveSession(p.getLocation());
   }
 
   public boolean destroySessionFor(Player p, ApiMenuHandle handle, HoloCloseReason reason) {
-    SessionHolder holder = holders.get(p);
+    SessionHolder holder = holders.get(p.getUniqueId());
     return holder != null && holder.closeSessionOf(handle, reason);
   }
 
   public void addPreviewSession(Player p, ContainerPreview session) {
-    holders.computeIfAbsent(p, this::newHolder).openPreview(session);
+    holder(p).openPreview(session);
   }
 
   public boolean hasPreviewSession(Player p) {
-    SessionHolder holder = holders.get(p);
+    SessionHolder holder = holders.get(p.getUniqueId());
     return holder != null && holder.hasPreview();
   }
 
@@ -358,23 +441,34 @@ public final class MenuSessionManager {
   }
 
   public boolean destroySession(Player p, boolean history, HoloCloseReason reason) {
-    SessionHolder holder = holders.get(p);
+    SessionHolder holder = holders.get(p.getUniqueId());
     if (holder == null) return false;
     return holder.closeSession(history, reason);
   }
 
   public void destroyAll() {
+    cancel(holderTask);
+    cancel(previewTask);
+    cancel(debugHitbox);
+    cancel(debugPos);
     holders.values().forEach(holder -> holder.close(HoloCloseReason.GLOSS_SHUTDOWN));
     holders.clear();
     openMenus.clear();
   }
 
-  private SessionHolder newHolder(Player player) {
-    return new SessionHolder(player, openMenus);
+  private static void cancel(SchedulerUtils.TaskHandle handle) {
+    if (handle != null && !handle.isCancelled()) {
+      handle.cancel();
+    }
+  }
+
+  private SessionHolder holder(Player player) {
+    return holders.computeIfAbsent(player.getUniqueId(), id -> new SessionHolder(player, openMenus));
   }
 
   public void destroyAllType(String id, Consumer<Player> consumer) {
-    holders.forEach((player, holder) -> {
+    holders.values().forEach(holder -> {
+      Player player = holder.player();
       Runnable destroyTask = () -> {
         boolean closed = holder.inspectSession(session ->
             session != null && session.getId().equals(id) ? HoloCloseReason.DEFINITION_RELOADED : null);
@@ -388,16 +482,16 @@ public final class MenuSessionManager {
   }
 
   public void refreshVisuals() {
-    holders.forEach((player, holder) -> {
+    holders.values().forEach(holder -> {
       Runnable refreshTask = holder::refreshVisuals;
-      SchedulerUtils.runEntity(Gloss.instance, player, refreshTask);
+      SchedulerUtils.runEntity(Gloss.instance, holder.player(), refreshTask);
     });
   }
 
   public void closeAllPreviews() {
-    holders.forEach((player, holder) -> {
+    holders.values().forEach(holder -> {
       Runnable closeTask = holder::closePreview;
-      SchedulerUtils.runEntity(Gloss.instance, player, closeTask);
+      SchedulerUtils.runEntity(Gloss.instance, holder.player(), closeTask);
     });
   }
 
@@ -436,7 +530,8 @@ public final class MenuSessionManager {
 
   public void controlHitboxDebug(boolean hitbox) {
     if (hitbox && (debugHitbox == null || debugHitbox.isCancelled())) {
-      debugHitbox = SchedulerUtils.scheduleSyncTask(Gloss.instance, 2L, () -> holders.forEach((player, holder) -> {
+      debugHitbox = SchedulerUtils.scheduleSyncTask(Gloss.instance, 2L, () -> holders.values().forEach(holder -> {
+        Player player = holder.player();
         Runnable debugTask = () -> holder.onSession(session -> {
           if (session == null) return;
           session.getComponents().forEach(c -> {
@@ -454,7 +549,8 @@ public final class MenuSessionManager {
   //TODO Fix anchor particle
   public void controlPositionDebug(boolean positionDebug) {
     if (positionDebug && (debugPos == null || debugPos.isCancelled())) {
-      debugPos = SchedulerUtils.scheduleSyncTask(Gloss.instance, 2L, () -> holders.forEach((player, holder) -> {
+      debugPos = SchedulerUtils.scheduleSyncTask(Gloss.instance, 2L, () -> holders.values().forEach(holder -> {
+        Player player = holder.player();
         Runnable debugTask = () -> {
           World world = player.getWorld();
           holder.onSession(s -> {
@@ -470,48 +566,75 @@ public final class MenuSessionManager {
       debugPos.cancel();
   }
 
-  private void listenToInventoryPreview() {
-    SchedulerUtils.scheduleSyncTask(Gloss.instance, 1L, () -> Bukkit.getOnlinePlayers().forEach(player -> {
-      Runnable previewTask = () -> managePreviewEvents(player);
-      if (!SchedulerUtils.runEntity(Gloss.instance, player, previewTask)) {
-        SessionHolder holder = holders.get(player);
-        if (holder != null) {
-          holder.closePreview();
-        }
+  private SchedulerUtils.TaskHandle listenToInventoryPreview() {
+    return SchedulerUtils.scheduleSyncTask(Gloss.instance, 1L, () -> {
+      if (!ContainerPreviewAccess.isEnabled()) {
+        return;
       }
-    }), false);
+      Bukkit.getOnlinePlayers().forEach(player -> {
+        Runnable previewTask = () -> managePreviewEvents(player);
+        if (!SchedulerUtils.runEntity(Gloss.instance, player, previewTask)) {
+          SessionHolder holder = holders.get(player.getUniqueId());
+          if (holder != null) {
+            holder.closePreview();
+          }
+        }
+      });
+    }, false);
   }
 
   private void managePreviewEvents(Player p) {
     try {
-      PreviewTarget target = getLookedAtPreviewTarget(p);
-      SessionHolder holder = holders.get(p);
+      SessionHolder holder = holders.get(p.getUniqueId());
+      Location eye = p.getEyeLocation();
+      if (holder != null && holder.stableAim(eye) instanceof PreviewTarget held && stillEligible(held)) {
+        return;
+      }
+
+      PreviewTarget target = getLookedAtPreviewTarget(p, eye);
       if (target == null) {
         if (holder != null) {
+          holder.recordAim(eye, null);
           holder.closePreview();
         }
         return;
       }
 
       if (holder == null) {
-        holder = holders.computeIfAbsent(p, this::newHolder);
+        holder = holder(p);
       }
+      holder.recordAim(eye, target);
 
       SessionHolder finalHolder = holder;
       holder.onPreview(preview -> {
         if (preview == null) {
-          createNewPreviewSession(target, p);
+          createNewPreviewSession(target, p, eye);
           return;
         }
 
         if (!target.matches(preview)) {
           finalHolder.closePreview();
-          createNewPreviewSession(target, p);
+          createNewPreviewSession(target, p, eye);
         }
       });
     } catch (Exception ex) {
       Gloss.logExceptionStack(false, ex, "Failed to manage inventory preview for %s.", p.getName());
     }
+  }
+
+  /**
+   * Whether a target the previous scan acquired is still one a scan could acquire. Together with an
+   * unmoved eye this is what lets a tick skip the two ray traces: the ray is identical and its
+   * winner still qualifies. A container that is broken, or a cart that dies, fails here and the
+   * scan runs, so the preview still closes on the tick the target goes away.
+   */
+  private boolean stillEligible(PreviewTarget target) {
+    if (target.block() != null) {
+      Material type = target.block().getType();
+      return type != Material.AIR && isPreviewBlockType(type);
+    }
+    Entity entity = target.entity();
+    return entity != null && entity.isValid() && isPreviewEntity(entity);
   }
 
   /**
@@ -538,32 +661,60 @@ public final class MenuSessionManager {
     return targetBlock != null && targetBlock.getType() != Material.AIR ? targetBlock : null;
   }
 
+  /**
+   * What the player is looking at, if anything a preview document claims.
+   *
+   * <p><b>This is deliberately permission-blind.</b> A viewer without {@code gloss.preview} still
+   * acquires the target; the permission decides only whether the card built downstream is the
+   * locked padlock one. Never add a permission prefilter here —
+   * {@code CharacterizationPreviewRaycastTest} fails if anyone does.
+   *
+   * <p>Both traces are held to the smallest span that can still change the answer: the entity trace
+   * is capped where a block hit would beat it anyway (the {@code +0.01} squared tie-break, in
+   * linear form), and skipped outright when no document declares an entity matcher — the filter
+   * would have rejected everything.
+   */
   private PreviewTarget getLookedAtPreviewTarget(Player player) {
+    return getLookedAtPreviewTarget(player, null);
+  }
+
+  private PreviewTarget getLookedAtPreviewTarget(Player player, Location knownEye) {
     if (!ContainerPreviewAccess.isEnabled()) {
       return null;
     }
-    Location eyeLocation = player.getEyeLocation();
+    Location eyeLocation = knownEye == null ? player.getEyeLocation() : knownEye;
     World world = eyeLocation.getWorld();
     if (world == null) {
       return null;
     }
+    double lookDistance = GlossConfig.current().previews().lookDistance();
     Vector direction = eyeLocation.getDirection();
     RayTraceResult blockResult = world.rayTraceBlocks(
         eyeLocation,
         direction,
-        GlossConfig.current().previews().lookDistance(),
+        lookDistance,
         FluidCollisionMode.NEVER,
         true
     );
-    PreviewTarget blockTarget = null;
     Block targetBlock = blockResult == null ? null : blockResult.getHitBlock();
-    if (targetBlock != null && targetBlock.getType() != Material.AIR && isPreviewBlockType(targetBlock.getType())) {
-      blockTarget = PreviewTarget.block(targetBlock);
+    boolean occluding = targetBlock != null && targetBlock.getType() != Material.AIR;
+    PreviewTarget blockTarget = occluding && isPreviewBlockType(targetBlock.getType())
+        ? PreviewTarget.block(targetBlock)
+        : null;
+
+    PreviewDocumentRegistry registry = previewRegistry();
+    if (registry == null || !registry.hasEntityMatchers()) {
+      return blockTarget;
     }
+
+    double blockDistance = occluding ? hitDistanceSquared(eyeLocation, blockResult) : Double.MAX_VALUE;
+    double entityReach = blockDistance == Double.MAX_VALUE
+        ? lookDistance
+        : Math.min(lookDistance, Math.sqrt(blockDistance + 0.01D));
     RayTraceResult entityResult = world.rayTraceEntities(
         eyeLocation,
         direction,
-        GlossConfig.current().previews().lookDistance(),
+        entityReach,
         0.35D,
         this::isPreviewEntity
     );
@@ -571,26 +722,25 @@ public final class MenuSessionManager {
     if (targetEntity == null) {
       return blockTarget;
     }
-    double blockDistance = hitDistanceSquared(eyeLocation, blockResult);
-    double entityDistance = hitDistanceSquared(eyeLocation, entityResult);
-    if (targetBlock != null && targetBlock.getType() != Material.AIR && blockDistance + 0.01D < entityDistance) {
+    if (occluding && blockDistance + 0.01D < hitDistanceSquared(eyeLocation, entityResult)) {
       return blockTarget;
     }
     return PreviewTarget.entity(targetEntity);
   }
 
-  private void createNewPreviewSession(PreviewTarget target, Player p) {
+  private void createNewPreviewSession(PreviewTarget target, Player p, Location scanEye) {
     ContainerPreviewAccess.ViewerAccess access = ContainerPreviewAccess.capture(p);
     if (target.block() != null) {
-      createNewBlockPreviewSession(target.block(), p, access);
+      createNewBlockPreviewSession(target.block(), p, access, scanEye);
       return;
     }
     if (target.entity() != null) {
-      createNewEntityPreviewSession(target.entity(), p, access);
+      createNewEntityPreviewSession(target.entity(), p, access, scanEye);
     }
   }
 
-  private void createNewBlockPreviewSession(Block b, Player p, ContainerPreviewAccess.ViewerAccess access) {
+  private void createNewBlockPreviewSession(Block b, Player p, ContainerPreviewAccess.ViewerAccess access,
+                                            Location scanEye) {
     Runnable createTask = () -> {
       if (b.getType() == Material.AIR) {
         return;
@@ -598,17 +748,17 @@ public final class MenuSessionManager {
       boolean canOpen = ContainerPreviewAccess.canOpen(p, b, access);
       if (!canOpen) {
         ContainerPreview lockedSession = ContainerPreview.locked(b, p);
-        openPreviewIfCurrent(PreviewTarget.block(b), p, lockedSession);
+        openPreviewIfCurrent(PreviewTarget.block(b), p, lockedSession, scanEye);
         return;
       }
       if (isEnderChestDocument(b)) {
         Vector center = b.getLocation().toVector().add(new Vector(0.5D, 0.5D, 0.5D));
         Runnable buildTask = () -> {
           ContainerPreview newSession = ContainerPreview.forEnderChest(b, p, center);
-          openPreviewIfCurrent(PreviewTarget.block(b), p, newSession);
+          openPreviewIfCurrent(PreviewTarget.block(b), p, newSession, scanEye);
         };
         if (!SchedulerUtils.runEntity(Gloss.instance, p, buildTask)) {
-          SessionHolder holder = holders.get(p);
+          SessionHolder holder = holders.get(p.getUniqueId());
           if (holder != null) {
             holder.closePreview();
           }
@@ -617,7 +767,7 @@ public final class MenuSessionManager {
       }
       Runnable buildTask = () -> {
         ContainerPreview newSession = ContainerPreview.forBlock(b, p);
-        openPreviewIfCurrent(PreviewTarget.block(b), p, newSession);
+        openPreviewIfCurrent(PreviewTarget.block(b), p, newSession, scanEye);
       };
       buildTask.run();
     };
@@ -628,7 +778,8 @@ public final class MenuSessionManager {
     }
   }
 
-  private void createNewEntityPreviewSession(Entity entity, Player p, ContainerPreviewAccess.ViewerAccess access) {
+  private void createNewEntityPreviewSession(Entity entity, Player p, ContainerPreviewAccess.ViewerAccess access,
+                                             Location scanEye) {
     Runnable createTask = () -> {
       if (!entity.isValid() || !isPreviewEntity(entity)) {
         return;
@@ -636,23 +787,23 @@ public final class MenuSessionManager {
       ContainerPreview newSession = ContainerPreviewAccess.canOpen(p, entity, access)
           ? ContainerPreview.forEntity(entity, p)
           : ContainerPreview.locked(entity, p);
-      openPreviewIfCurrent(PreviewTarget.entity(entity), p, newSession);
+      openPreviewIfCurrent(PreviewTarget.entity(entity), p, newSession, scanEye);
     };
 
     if (!SchedulerUtils.runEntity(Gloss.instance, entity, createTask)) {
-      SessionHolder holder = holders.get(p);
+      SessionHolder holder = holders.get(p.getUniqueId());
       if (holder != null) {
         holder.closePreview();
       }
     }
   }
 
-  private void openPreviewIfCurrent(PreviewTarget target, Player p, ContainerPreview newSession) {
+  private void openPreviewIfCurrent(PreviewTarget target, Player p, ContainerPreview newSession, Location scanEye) {
     if (newSession == null) {
       return;
     }
     Runnable openTask = () -> {
-      if (!newSession.canView() || !isStillLookingAt(p, target)) {
+      if (!newSession.canView() || !isStillLookingAt(p, target, scanEye)) {
         newSession.close();
         return;
       }
@@ -663,9 +814,20 @@ public final class MenuSessionManager {
     }
   }
 
-  private boolean isStillLookingAt(Player player, PreviewTarget target) {
-    PreviewTarget current = getLookedAtPreviewTarget(player);
-    return target.matches(current);
+  /**
+   * Re-checks that the player has not looked away between acquiring the target and building the
+   * card. An eye pose identical to the scan's answers that without a second pair of ray traces; on
+   * Folia the build may have hopped regions and genuinely deferred, so the traces are redone.
+   */
+  private boolean isStillLookingAt(Player player, PreviewTarget target, Location scanEye) {
+    if (scanEye != null && !FoliaScheduler.isFolia(Gloss.instance)) {
+      Location eye = player.getEyeLocation();
+      if (eye.getX() == scanEye.getX() && eye.getY() == scanEye.getY() && eye.getZ() == scanEye.getZ()
+          && eye.getYaw() == scanEye.getYaw() && eye.getPitch() == scanEye.getPitch()) {
+        return true;
+      }
+    }
+    return target.matches(getLookedAtPreviewTarget(player));
   }
 
   private double hitDistanceSquared(Location eyeLocation, RayTraceResult rayTraceResult) {
@@ -703,7 +865,7 @@ public final class MenuSessionManager {
     return plugin == null ? null : plugin.getPreviewRegistry();
   }
 
-  private record PreviewTarget(Block block, Entity entity) {
+  record PreviewTarget(Block block, Entity entity) {
 
     private static PreviewTarget block(Block block) {
       return new PreviewTarget(block, null);

@@ -103,6 +103,15 @@ final class PreviewFakeSupport {
       return false;
     }
 
+    /**
+     * Metaless similarity by material, which is what a real stack with no meta answers. The
+     * inherited implementation delegates to a craft-side stack that a headless fake never has.
+     */
+    @Override
+    public boolean isSimilar(ItemStack stack) {
+      return stack != null && stack.getType() == type;
+    }
+
     @Override
     public ItemStack clone() {
       return new FakeStack(type, amount);

@@ -3,6 +3,7 @@ package art.arcane.gloss.hologram;
 import art.arcane.gloss.Gloss;
 import art.arcane.gloss.api.HologramViewers;
 import art.arcane.gloss.api.TemporaryHologram;
+import art.arcane.gloss.text.TextPipeline;
 import art.arcane.volmlib.util.math.M;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
@@ -24,6 +25,13 @@ import java.util.logging.Level;
 
 final class TemporaryHologramDisplay implements TemporaryHologram {
     private static final double POSITION_EPSILON_SQUARED = 1.0E-6D;
+    private static final int NO_TELEPORT_DURATION = -1;
+
+    private record LineSet(List<String> lines, int flags) {
+        static LineSet of(List<String> lines) {
+            return new LineSet(lines, HologramMath.classify(lines));
+        }
+    }
 
     private final HologramService service;
     private final String id;
@@ -37,12 +45,13 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
     private final AtomicBoolean textDirty;
     private final AtomicBoolean visibilityReset;
     private final ViewerList viewerList;
-    private volatile List<String> lines;
+    private volatile LineSet lineSet;
     private volatile Location position;
     private volatile Location appliedPosition;
     private volatile Supplier<Location> binder;
     private volatile TextDisplay display;
     private volatile String rendered;
+    private volatile int appliedTeleportTicks;
 
     TemporaryHologramDisplay(HologramService service, String id, Location initial, long durationMs) {
         this.service = service;
@@ -51,13 +60,14 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
         this.durationMs = durationMs;
         this.startedMs = M.ms();
         this.linesLock = new Object();
-        this.lines = List.of();
+        this.lineSet = new LineSet(List.of(), 0);
         this.appliedVisibility = new ConcurrentHashMap<>();
         this.destroyed = new AtomicBoolean();
         this.spawning = new AtomicBoolean();
         this.textDirty = new AtomicBoolean(true);
         this.visibilityReset = new AtomicBoolean();
         this.viewerList = new ViewerList();
+        this.appliedTeleportTicks = NO_TELEPORT_DURATION;
         this.position = Objects.requireNonNull(initial, "Temporary hologram requires a location.").clone();
     }
 
@@ -78,16 +88,16 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
 
     @Override
     public List<String> lines() {
-        return lines;
+        return lineSet.lines();
     }
 
     @Override
     public void addLine(String line) {
         Objects.requireNonNull(line, "Hologram line may not be null.");
         synchronized (linesLock) {
-            List<String> next = new ArrayList<>(lines);
+            List<String> next = new ArrayList<>(lineSet.lines());
             next.add(line);
-            lines = List.copyOf(next);
+            lineSet = LineSet.of(List.copyOf(next));
         }
 
         textDirty.set(true);
@@ -104,9 +114,9 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
     @Override
     public void setLines(List<String> lines) {
         Objects.requireNonNull(lines, "Hologram lines may not be null.");
-        List<String> next = List.copyOf(lines);
+        LineSet next = LineSet.of(List.copyOf(lines));
         synchronized (linesLock) {
-            this.lines = next;
+            this.lineSet = next;
         }
 
         textDirty.set(true);
@@ -122,7 +132,7 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
     @Override
     public void clearLines() {
         synchronized (linesLock) {
-            lines = List.of();
+            lineSet = new LineSet(List.of(), 0);
         }
 
         textDirty.set(true);
@@ -160,6 +170,10 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
     }
 
     void drive(boolean enabled) {
+        drive(new HologramTick(), enabled);
+    }
+
+    void drive(HologramTick tick, boolean enabled) {
         if (destroyed.get()) {
             return;
         }
@@ -205,8 +219,12 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
         }
 
         moveIfNeeded(active, anchor);
-        applyText(active);
+        applyText(active, tick, world);
         applyVisibility(active);
+    }
+
+    void onPlayerQuit(UUID playerId) {
+        appliedVisibility.remove(playerId);
     }
 
     private void spawn(World world, Location anchor) {
@@ -217,8 +235,11 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
             return;
         }
 
-        String next = service.renderStaticLines(lines);
+        textDirty.set(false);
+        LineSet snapshot = lineSet;
+        String next = service.renderStaticLines(snapshot.lines());
         boolean whitelist = viewerList.isWhitelist();
+        int teleportTicks = desiredTeleportTicks();
         boolean scheduled = service.plugin().scheduler().runAt(anchor, () -> {
             try {
                 if (destroyed.get()) {
@@ -231,6 +252,9 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
                     if (whitelist) {
                         DisplayVisibility.setVisibleByDefault(spawned, false);
                     }
+                    if (teleportTicks > 0) {
+                        DisplayMotion.applyTeleportDuration(spawned, teleportTicks);
+                    }
                 };
                 TextDisplay spawned = world.spawn(anchor, TextDisplay.class, configurer);
                 if (destroyed.get()) {
@@ -239,7 +263,8 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
                 }
 
                 rendered = next;
-                appliedPosition = anchor.clone();
+                appliedPosition = anchor;
+                appliedTeleportTicks = teleportTicks;
                 appliedVisibility.clear();
                 display = spawned;
                 applyVisibility(spawned);
@@ -256,34 +281,49 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
 
     private void moveIfNeeded(TextDisplay active, Location anchor) {
         Location applied = appliedPosition;
-        if (applied != null && applied.getWorld() == anchor.getWorld() && applied.distanceSquared(anchor) < POSITION_EPSILON_SQUARED) {
+        boolean sameWorld = applied != null && applied.getWorld() == anchor.getWorld();
+        if (sameWorld && applied.distanceSquared(anchor) < POSITION_EPSILON_SQUARED) {
             return;
         }
 
-        appliedPosition = anchor.clone();
+        int teleportTicks = desiredTeleportTicks();
+        if (appliedTeleportTicks != teleportTicks) {
+            appliedTeleportTicks = teleportTicks;
+            service.plugin().scheduler().runEntity(active,
+                () -> DisplayMotion.applyTeleportDuration(active, teleportTicks));
+        }
+
+        appliedPosition = anchor;
         service.plugin().scheduler().teleport(active, anchor.clone());
     }
 
-    private void applyText(TextDisplay active) {
-        List<String> snapshot = lines;
-        World world = position.getWorld();
-        if (world != null) {
-            AnimationTemplate template = service.animator().compileTemplate(snapshot,
+    private int desiredTeleportTicks() {
+        if (!DisplayMotion.canInterpolate() || !service.interpolatedMotion()) {
+            return 0;
+        }
+
+        return DisplayMotion.clampDuration(service.temporaryUpdateIntervalTicks());
+    }
+
+    private void applyText(TextDisplay active, HologramTick tick, World world) {
+        LineSet snapshot = lineSet;
+        if ((snapshot.flags() & TextPipeline.HAS_FUNCTION) != 0) {
+            AnimationTemplate template = service.animator().compileTemplate(snapshot.lines(),
                 line -> service.plugin().text().renderStatic(line));
             if (template != null) {
                 service.animator().publish(animatorGroup, HologramAnimator.SHARED_SUB,
-                    new HologramAnimator.Target(active.getEntityId(), template, captureViewers(world)));
+                    new HologramAnimator.Target(active.getEntityId(), template, captureViewers(tick, world)));
                 return;
             }
         }
 
         service.animator().removeGroup(animatorGroup);
         boolean dirty = textDirty.compareAndSet(true, false);
-        if (!dirty && !containsFunctionTokens(snapshot)) {
+        if (!dirty && !hasRegisteredFunction(snapshot)) {
             return;
         }
 
-        String next = service.renderStaticLines(snapshot);
+        String next = service.renderStaticLines(snapshot.lines());
         if (next.equals(rendered)) {
             return;
         }
@@ -296,6 +336,21 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
         });
     }
 
+    private boolean hasRegisteredFunction(LineSet snapshot) {
+        if ((snapshot.flags() & TextPipeline.HAS_FUNCTION) == 0) {
+            return false;
+        }
+
+        TextPipeline text = service.plugin().text();
+        for (String line : snapshot.lines()) {
+            if (HologramMath.containsRegisteredFunction(line, text::hasFunction)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private void applyVisibility(TextDisplay active) {
         boolean whitelist = viewerList.isWhitelist();
         Set<UUID> members = viewerList.members();
@@ -305,15 +360,20 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
             reconcileVisibility(active, whitelist, members);
             return;
         }
-        if (whitelist && DisplayVisibility.canHideByDefault()) {
-            reconcileWhitelist(active, members);
+        if (whitelist) {
+            if (DisplayVisibility.canHideByDefault()) {
+                reconcileWhitelist(active, members);
+                return;
+            }
+
+            reconcileVisibility(active, true, members);
             return;
         }
-        if (!whitelist && members.isEmpty() && appliedVisibility.isEmpty()) {
+        if (members.isEmpty() && appliedVisibility.isEmpty()) {
             return;
         }
 
-        reconcileVisibility(active, whitelist, members);
+        reconcileBlacklist(active, members);
     }
 
     private void reconcileWhitelist(TextDisplay active, Set<UUID> members) {
@@ -348,6 +408,38 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
         }
     }
 
+    private void reconcileBlacklist(TextDisplay active, Set<UUID> members) {
+        for (UUID member : members) {
+            if (Boolean.FALSE.equals(appliedVisibility.get(member))) {
+                continue;
+            }
+
+            Player viewer = Bukkit.getPlayer(member);
+            if (viewer == null) {
+                continue;
+            }
+
+            appliedVisibility.put(member, false);
+            dispatchVisibility(active, viewer, false);
+        }
+
+        for (Map.Entry<UUID, Boolean> entry : appliedVisibility.entrySet()) {
+            if (members.contains(entry.getKey())) {
+                continue;
+            }
+
+            appliedVisibility.remove(entry.getKey());
+            if (entry.getValue()) {
+                continue;
+            }
+
+            Player watcher = Bukkit.getPlayer(entry.getKey());
+            if (watcher != null) {
+                dispatchVisibility(active, watcher, true);
+            }
+        }
+    }
+
     private void reconcileVisibility(TextDisplay active, boolean whitelist, Set<UUID> members) {
         for (Player online : Bukkit.getOnlinePlayers()) {
             UUID viewerId = online.getUniqueId();
@@ -360,8 +452,6 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
             appliedVisibility.put(viewerId, visible);
             dispatchVisibility(active, online, visible);
         }
-
-        appliedVisibility.keySet().removeIf(viewerId -> Bukkit.getPlayer(viewerId) == null);
     }
 
     private void dispatchVisibility(TextDisplay active, Player player, boolean visible) {
@@ -377,14 +467,14 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
         });
     }
 
-    private List<Player> captureViewers(World world) {
+    private List<Player> captureViewers(HologramTick tick, World world) {
         boolean whitelist = viewerList.isWhitelist();
         Set<UUID> members = viewerList.members();
-        List<Player> viewers = new ArrayList<>();
-        for (Player online : world.getPlayers()) {
-            boolean member = members.contains(online.getUniqueId());
-            if (whitelist == member) {
-                viewers.add(online);
+        List<HologramTick.Viewer> candidates = tick.viewers(world);
+        List<Player> viewers = new ArrayList<>(candidates.size());
+        for (HologramTick.Viewer candidate : candidates) {
+            if (whitelist == members.contains(candidate.id())) {
+                viewers.add(candidate.player());
             }
         }
 
@@ -402,38 +492,30 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
 
     private boolean replaceLine(int index, String line) {
         synchronized (linesLock) {
-            if (index < 0 || index >= lines.size()) {
+            List<String> current = lineSet.lines();
+            if (index < 0 || index >= current.size()) {
                 return false;
             }
 
-            List<String> next = new ArrayList<>(lines);
+            List<String> next = new ArrayList<>(current);
             next.set(index, line);
-            lines = List.copyOf(next);
+            lineSet = LineSet.of(List.copyOf(next));
             return true;
         }
     }
 
     private boolean dropLine(int index) {
         synchronized (linesLock) {
-            if (index < 0 || index >= lines.size()) {
+            List<String> current = lineSet.lines();
+            if (index < 0 || index >= current.size()) {
                 return false;
             }
 
-            List<String> next = new ArrayList<>(lines);
+            List<String> next = new ArrayList<>(current);
             next.remove(index);
-            lines = List.copyOf(next);
+            lineSet = LineSet.of(List.copyOf(next));
             return true;
         }
-    }
-
-    private static boolean containsFunctionTokens(List<String> snapshot) {
-        for (String line : snapshot) {
-            if (line.indexOf('|') >= 0) {
-                return true;
-            }
-        }
-
-        return false;
     }
 
     private final class ViewerList implements HologramViewers {

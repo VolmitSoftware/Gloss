@@ -79,6 +79,14 @@ class TextPipelineFunctionTest {
     }
 
     @Test
+    void authoredExpressionsRunBeforeColorsAndPlaceholders() {
+        TextPipeline pipeline = new TextPipeline(null);
+        assertEquals("3", pipeline.renderStatic("{{ 1 + 2 }}"));
+        assertEquals("§x§f§f§0§0§a§aPulse", pipeline.renderStatic("{{ hex(#FF00AA) }}Pulse"));
+        assertEquals("%player_name%", pipeline.renderStatic("{{ papi('player_name') }}"));
+    }
+
+    @Test
     void nullInputRendersEmpty() {
         TextPipeline pipeline = new TextPipeline(null);
         assertEquals("", pipeline.renderStatic(null));

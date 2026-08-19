@@ -6,25 +6,28 @@ import art.arcane.gloss.exceptions.MenuIconException;
 import art.arcane.gloss.menu.DisplayEntityManager;
 import art.arcane.gloss.menu.MenuSession;
 import art.arcane.gloss.text.TextPipeline;
-import art.arcane.gloss.util.common.DisplayEntity;
 import art.arcane.gloss.util.common.TextUtils;
 import art.arcane.gloss.util.common.math.CollisionPlane;
 import art.arcane.volmlib.util.bukkit.Placeholders;
-import com.google.common.collect.Lists;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
 import org.bukkit.util.Vector;
 
-import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 public class TextMenuIcon extends MenuIcon<TextIconData> {
 
   private final List<Component> components;
   private final int refreshInterval;
+  /**
+   * The post-pipeline string each line was last parsed from. MiniMessage parsing is deterministic,
+   * so an unchanged string re-parses to an equal Component — comparing the strings first lets a
+   * refresh whose placeholders did not move skip the parse entirely.
+   */
+  private List<String> parsedFrom;
   private String sourceText;
   private boolean dynamicSource;
   private boolean refreshFailureLogged;
@@ -34,21 +37,16 @@ public class TextMenuIcon extends MenuIcon<TextIconData> {
     super(session, loc, data);
     sourceText = data.text();
     dynamicSource = containsPlaceholderToken(sourceText);
-    components = render(session, sourceText);
+    parsedFrom = new ArrayList<>();
+    components = new ArrayList<>();
+    components.addAll(render(sourceText));
     refreshInterval = data.resolvedRefreshTicks();
     refreshCountdown = refreshInterval;
   }
 
-  public static List<Component> render(MenuSession session, String text) {
-    Player player = session.getPlayer();
-    return Arrays.stream((text == null ? "" : text).split("\n"))
-        .map(s -> TextUtils.parse(TextPipeline.menuText(player, Placeholders.setPlaceholders(player, s))))
-        .collect(Collectors.toList());
-  }
-
   @Override
   protected List<UUID> createDisplayEntities(Location loc) {
-    List<UUID> uuids = Lists.newArrayList();
+    List<UUID> uuids = new ArrayList<>(components.size());
     Location lineLocation = session.getTransform().localPosition(
         loc,
         new Vector(0F, ((components.size() - 1) / 2F * localLineHeight()) - localLineHeight(), 0F)
@@ -106,7 +104,7 @@ public class TextMenuIcon extends MenuIcon<TextIconData> {
     if (displayEntities == null || displayEntities.size() != components.size())
       return false;
 
-    List<Component> replacement = render(session, text);
+    List<Component> replacement = render(text);
     if (replacement.equals(components)) {
       return true;
     }
@@ -128,6 +126,29 @@ public class TextMenuIcon extends MenuIcon<TextIconData> {
 
     markGeometryChanged();
     return true;
+  }
+
+  /**
+   * Renders one component per line, reusing the previous line's component whenever the text that
+   * produced it is unchanged. Updates the parse cache as a side effect.
+   */
+  private List<Component> render(String text) {
+    Player player = session.getPlayer();
+    String[] lines = (text == null ? "" : text).split("\n");
+    List<Component> rendered = new ArrayList<>(lines.length);
+    List<String> sources = new ArrayList<>(lines.length);
+    int cached = Math.min(parsedFrom.size(), components.size());
+    for (int index = 0; index < lines.length; index++) {
+      String piped = TextPipeline.menuText(player, Placeholders.setPlaceholders(player, lines[index]));
+      sources.add(piped);
+      if (index < cached && piped.equals(parsedFrom.get(index))) {
+        rendered.add(components.get(index));
+      } else {
+        rendered.add(TextUtils.parse(piped));
+      }
+    }
+    parsedFrom = sources;
+    return rendered;
   }
 
   private static boolean containsPlaceholderToken(String text) {

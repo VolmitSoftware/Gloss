@@ -204,6 +204,42 @@ class IntegrationBridgeTest {
     }
 
     @Test
+    void displayStringsAreFormattedAtSampleTimeAndReusedUntilTheNextSample() {
+        FakeContract adapt = new FakeContract("adapt", true, "adapt.player-sessions");
+        adapt.values.put("adapt.player-sessions", 1500.0D);
+        IntegrationBridge bridge = bridge();
+        bridge.adopt(List.of(adapt));
+
+        bridge.render("adapt.player-sessions", 0L);
+        bridge.sample(1L);
+        assertEquals("1.5K", bridge.render("adapt.player-sessions", 1L));
+
+        adapt.values.put("adapt.player-sessions", 2500.0D);
+        assertEquals("1.5K", bridge.render("adapt.player-sessions", 1L));
+
+        bridge.sample(2L);
+        assertEquals("2.5K", bridge.render("adapt.player-sessions", 2L));
+    }
+
+    @Test
+    void rediscoveryKeepsDisplayStringsForRetainedKeys() {
+        FakeContract adapt = new FakeContract("adapt", true, "adapt.player-sessions");
+        FakeContract iris = new FakeContract("iris", true, "iris.generation-time");
+        adapt.values.put("adapt.player-sessions", 7.0D);
+        iris.values.put("iris.generation-time", 42.0D);
+        IntegrationBridge bridge = bridge();
+        bridge.adopt(List.of(adapt, iris));
+        bridge.render("adapt.player-sessions", 0L);
+        bridge.render("iris.generation-time", 0L);
+        bridge.sample(1L);
+
+        bridge.adopt(List.of(adapt));
+
+        assertEquals("7", bridge.render("adapt.player-sessions", 1L));
+        assertEquals("", bridge.render("iris.generation-time", 1L));
+    }
+
+    @Test
     void aThrowingContractIsSkippedWithoutTakingTheBridgeDown() {
         IntegrationBridge bridge = bridge();
         bridge.adopt(List.of(new IntegrationServiceContract() {

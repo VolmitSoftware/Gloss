@@ -12,6 +12,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
+import org.bukkit.event.EventPriority;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.util.Vector;
 
@@ -36,6 +37,17 @@ import java.util.concurrent.atomic.AtomicInteger;
 public final class PanelRuntimeManager implements PanelServiceListener {
   private static final long SHUTDOWN_TIMEOUT_SECONDS = 10L;
 
+  private static final double CHUNK_SIZE = 16.0D;
+
+  /**
+   * Horizontal padding added to a cached candidate query, in blocks: the longest distance between
+   * two points of one chunk. A viewer reuses its candidate list for as long as it stays in the
+   * chunk it queried from, so the query has to cover every position that chunk contains — with the
+   * padding the cached list is always a superset of the true in-range set, and the authoritative
+   * per-panel range test below still decides membership.
+   */
+  private static final double CHUNK_QUERY_PADDING = CHUNK_SIZE * Math.sqrt(2.0D);
+
   private final Gloss plugin;
   private final PanelService boards;
   private final PanelSpatialIndex effectiveIndex = new PanelSpatialIndex();
@@ -47,14 +59,17 @@ public final class PanelRuntimeManager implements PanelServiceListener {
   private final Map<UUID, PanelFollowPose> followPoses = new ConcurrentHashMap<>();
   private final AtomicInteger visibleBoards = new AtomicInteger();
   private final SchedulerUtils.TaskHandle tickTask;
+  private final Events quitListener;
 
   private volatile boolean running = true;
+  private volatile boolean hasPlayerFollowers;
 
   public PanelRuntimeManager(Gloss plugin, PanelService boards) {
     this.plugin = plugin;
     this.boards = boards;
     replaceDefinitions(boards.subscribeAndSnapshot(this));
-    Events.listen(plugin, PlayerQuitEvent.class, event -> closeViewer(event.getPlayer()));
+    this.quitListener = Events.listen(plugin, PlayerQuitEvent.class, EventPriority.MONITOR,
+        event -> closeViewer(event.getPlayer()));
     this.tickTask = SchedulerUtils.scheduleSyncTask(plugin, 1L, this::scheduleTick, false);
   }
 
@@ -127,6 +142,7 @@ public final class PanelRuntimeManager implements PanelServiceListener {
     running = false;
     boards.removeListener(this);
     tickTask.cancel();
+    quitListener.unregister();
     closeViewersForShutdown();
     viewers.clear();
     previews.clear();
@@ -134,6 +150,7 @@ public final class PanelRuntimeManager implements PanelServiceListener {
     samplingTargets.clear();
     followPoses.clear();
     definitions.clear();
+    hasPlayerFollowers = false;
     effectiveIndex.replaceAll(List.of());
     visibleBoards.set(0);
   }
@@ -156,6 +173,7 @@ public final class PanelRuntimeManager implements PanelServiceListener {
       removeUnusedFollowPose(board.follow().targetPlayerUuid());
     }
     previews.entrySet().removeIf(entry -> entry.getValue().definition().uuid().equals(board.uuid()));
+    refreshFollowerFlag();
   }
 
   @Override
@@ -167,7 +185,15 @@ public final class PanelRuntimeManager implements PanelServiceListener {
     if (!running) {
       return;
     }
-    sampleFollowTargets();
+    try {
+      sampleFollowTargets();
+    } catch (RuntimeException failure) {
+      // Sampling is best-effort bookkeeping; a throw here must not take the viewer loop with it.
+      Gloss.logExceptionStack(false, failure, "Failed to sample persistent panel follow targets.");
+    }
+    if (idle()) {
+      return;
+    }
     for (Player player : Bukkit.getOnlinePlayers()) {
       UUID playerId = player.getUniqueId();
       if (!tickingViewers.add(playerId)) {
@@ -194,7 +220,19 @@ public final class PanelRuntimeManager implements PanelServiceListener {
     }
   }
 
+  /**
+   * True when no viewer can have anything to do this tick: nothing placed, nothing being previewed
+   * in the editor, and no viewer state holding open views that would need closing. A server with no
+   * panels at all therefore pays nothing per player per tick.
+   */
+  private boolean idle() {
+    return effectiveIndex.isEmpty() && previews.isEmpty() && viewers.isEmpty();
+  }
+
   private void sampleFollowTargets() {
+    if (!hasPlayerFollowers) {
+      return;
+    }
     Map<UUID, List<PanelDefinition>> byTarget = new HashMap<>();
     for (PanelDefinition board : definitions.values()) {
       if (board.follow().mode() != PanelFollowMode.PLAYER) {
@@ -259,6 +297,7 @@ public final class PanelRuntimeManager implements PanelServiceListener {
         effectiveIndex.upsert(board.withTransform(PanelFollowTransform.resolve(board, pose)));
       }
     }
+    refreshFollowerFlag();
   }
 
   private void replaceDefinitions(List<PanelDefinition> loadedBoards) {
@@ -279,6 +318,18 @@ public final class PanelRuntimeManager implements PanelServiceListener {
     }
     effectiveIndex.replaceAll(effectiveBoards);
     followPoses.keySet().removeIf(targetId -> !activeFollowTargets.contains(targetId));
+    refreshFollowerFlag();
+  }
+
+  /** Recomputed from the definition table, which is small and only changes on an operator edit. */
+  private void refreshFollowerFlag() {
+    for (PanelDefinition board : definitions.values()) {
+      if (board.follow().mode() == PanelFollowMode.PLAYER) {
+        hasPlayerFollowers = true;
+        return;
+      }
+    }
+    hasPlayerFollowers = false;
   }
 
   private void removeUnusedFollowPose(UUID targetId) {
@@ -356,7 +407,16 @@ public final class PanelRuntimeManager implements PanelServiceListener {
     private final Map<UUID, PanelViewSession> views = new HashMap<>();
     private final Map<UUID, Long> unavailable = new HashMap<>();
     private final Set<UUID> dismissed = new HashSet<>();
+
+    private List<PanelDefinition> cachedCandidates = List.of();
+    private UUID cachedWorld;
+    private long cachedGeneration = -1L;
+    private double cachedRange = -1.0D;
+    private int cachedChunkX;
+    private int cachedChunkZ;
     private boolean closed;
+
+    private volatile boolean anyViews;
 
     private ViewerState(Player player) {
       this.player = player;
@@ -374,11 +434,12 @@ public final class PanelRuntimeManager implements PanelServiceListener {
         return;
       }
 
-      double queryRange = boards.maximumViewRange();
-      List<PanelDefinition> candidates = queryRange <= 0.0D
-          ? List.of()
-          : effectiveIndex.query(world.getUID(), location.getX(), location.getZ(), queryRange);
+      List<PanelDefinition> candidates = candidates(world, location);
       PanelPreview preview = previews.get(player.getUniqueId());
+      if (candidates.isEmpty() && preview == null && views.isEmpty()
+          && dismissed.isEmpty() && unavailable.isEmpty()) {
+        return;
+      }
       Map<UUID, PanelDefinition> effectiveCandidates = new LinkedHashMap<>(candidates.size() + 1);
       for (PanelDefinition candidate : candidates) {
         effectiveCandidates.put(candidate.uuid(), candidate);
@@ -438,11 +499,13 @@ public final class PanelRuntimeManager implements PanelServiceListener {
             continue;
           }
           views.put(definition.uuid(), view);
+          anyViews = true;
           visibleBoards.incrementAndGet();
         } else {
           NavigationResult updateResult = view.update(definition, effective.transform());
           if (updateResult != NavigationResult.APPLIED) {
             views.remove(definition.uuid(), view);
+            anyViews = !views.isEmpty();
             visibleBoards.decrementAndGet();
             if (updateResult == NavigationResult.NOT_FOUND) {
               unavailable.put(definition.uuid(), definition.revision());
@@ -462,11 +525,49 @@ public final class PanelRuntimeManager implements PanelServiceListener {
           visibleBoards.decrementAndGet();
         }
       }
+      anyViews = !views.isEmpty();
       dismissed.removeIf(boardId -> !inRange.contains(boardId));
       unavailable.keySet().removeIf(boardId -> !inRange.contains(boardId));
     }
 
-    private synchronized PanelClickTarget findClickTarget() {
+    /**
+     * The panels this viewer could possibly see, reused for as long as it stays in the chunk it
+     * queried from and the index has not changed. The query is a candidate prefilter — the caller
+     * still range-tests every entry against that panel's own view range — so a padded, slightly
+     * over-broad list produces exactly the same membership.
+     */
+    private List<PanelDefinition> candidates(World world, Location location) {
+      double queryRange = boards.maximumViewRange();
+      if (queryRange <= 0.0D) {
+        cachedCandidates = List.of();
+        cachedGeneration = -1L;
+        return List.of();
+      }
+      int chunkX = (int) Math.floor(location.getX() / CHUNK_SIZE);
+      int chunkZ = (int) Math.floor(location.getZ() / CHUNK_SIZE);
+      long generation = effectiveIndex.generation();
+      if (generation == cachedGeneration && queryRange == cachedRange && chunkX == cachedChunkX
+          && chunkZ == cachedChunkZ && world.getUID().equals(cachedWorld)) {
+        return cachedCandidates;
+      }
+      cachedCandidates = effectiveIndex.query(world.getUID(), location.getX(), location.getZ(),
+          queryRange + CHUNK_QUERY_PADDING);
+      cachedWorld = world.getUID();
+      cachedGeneration = generation;
+      cachedRange = queryRange;
+      cachedChunkX = chunkX;
+      cachedChunkZ = chunkZ;
+      return cachedCandidates;
+    }
+
+    private PanelClickTarget findClickTarget() {
+      return anyViews ? nearestClickTarget() : null;
+    }
+
+    private synchronized PanelClickTarget nearestClickTarget() {
+      if (views.isEmpty()) {
+        return null;
+      }
       Location eye = player.getEyeLocation();
       Vector origin = eye.toVector();
       Vector direction = eye.getDirection();
@@ -568,6 +669,7 @@ public final class PanelRuntimeManager implements PanelServiceListener {
         view.close();
       }
       views.clear();
+      anyViews = false;
       if (count > 0) {
         visibleBoards.addAndGet(-count);
       }
@@ -576,6 +678,7 @@ public final class PanelRuntimeManager implements PanelServiceListener {
     private void closeView(UUID boardId) {
       PanelViewSession view = views.remove(boardId);
       if (view != null) {
+        anyViews = !views.isEmpty();
         view.close();
         visibleBoards.decrementAndGet();
       }

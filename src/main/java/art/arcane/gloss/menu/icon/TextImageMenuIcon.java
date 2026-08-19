@@ -10,8 +10,6 @@ import art.arcane.gloss.util.common.TextUtils;
 import art.arcane.gloss.util.common.math.CollisionPlane;
 import com.google.common.collect.Lists;
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.TextComponent;
-import net.kyori.adventure.text.format.TextDecoration;
 import org.apache.commons.imaging.ImageFormat;
 import org.apache.commons.imaging.ImageFormats;
 import org.apache.commons.lang3.tuple.Pair;
@@ -74,22 +72,7 @@ public class TextImageMenuIcon extends MenuIcon<TextImageIconData> {
     String path = data.requirePath();
     try {
       Pair<ImageFormat, BufferedImage> imageData = Gloss.instance.getConfigManager().getImage(path);
-      BufferedImage image = imageData.getRight();
-      ImageFormat format = imageData.getLeft();
-      List<Component> lines = Lists.newArrayList();
-      for (int y = 0; y < image.getHeight(); y++) {
-        TextComponent.Builder component = Component.text();
-        for (int x = 0; x < image.getWidth(); x++) {
-          int colour = image.getRGB(x, y);
-          if (format != ImageFormats.JPEG && ((colour >> 24) & 0x0000FF) < 255)
-            component.append(Component.text(" ").decorate(TextDecoration.BOLD)).append(Component.text(" "));
-          else
-            component.append(TextUtils.textColor("█", colour & 0x00FFFFFF));
-        }
-
-        lines.add(component.build());
-      }
-      return lines;
+      return TextImageRasterCache.lines(imageData.getRight(), imageData.getLeft() == ImageFormats.JPEG);
     } catch (IOException | RuntimeException e) {
       MenuIconException ex = new MenuIconException("Failed to load relative image \"%s\"!", path);
       ex.initCause(e);

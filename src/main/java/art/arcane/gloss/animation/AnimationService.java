@@ -5,6 +5,7 @@ import art.arcane.gloss.doc.DocumentRegistry;
 import art.arcane.gloss.doc.GlossDocument;
 import art.arcane.gloss.doc.ShippedDefaults;
 import art.arcane.gloss.doc.ShippedDocumentCatalog;
+import art.arcane.gloss.text.TextPipeline;
 import art.arcane.volmlib.util.math.M;
 
 import java.io.File;
@@ -22,6 +23,7 @@ public final class AnimationService {
     private final ShippedDefaults defaults;
     private final DocumentRegistry<AnimationDoc> registry;
     private final List<String> registeredFunctions;
+    private final AnimationFrameCache frameCache;
     private volatile List<AnimationClip> clips;
     private volatile Map<String, AnimationClip> clipsById;
 
@@ -31,6 +33,7 @@ public final class AnimationService {
         this.defaults = new ShippedDefaults(AnimationDoc.KIND, folder, ShippedDocumentCatalog.ANIMATIONS.names());
         this.registry = DocumentRegistry.folder(AnimationDoc.KIND, folder, AnimationDoc::parse, AnimationDoc::revision);
         this.registeredFunctions = new ArrayList<>();
+        this.frameCache = new AnimationFrameCache(raw -> plugin.text().renderStatic(raw));
         this.clips = List.of();
         this.clipsById = Map.of();
     }
@@ -48,6 +51,7 @@ public final class AnimationService {
     public void disable() {
         plugin.watchdog().unregister("animations");
         unregisterFunctions();
+        frameCache.clear();
         clips = List.of();
         clipsById = Map.of();
     }
@@ -70,6 +74,10 @@ public final class AnimationService {
         return id == null ? null : clipsById.get(id);
     }
 
+    public List<String> staticFrames(AnimationClip clip) {
+        return frameCache.staticFrames(clip, TextPipeline.emojiGeneration());
+    }
+
     public List<String> resetToDefault(String nameOrStar) {
         return defaults.resetToDefault(nameOrStar);
     }
@@ -84,6 +92,7 @@ public final class AnimationService {
 
     private synchronized void rebuild() {
         unregisterFunctions();
+        frameCache.clear();
         List<AnimationClip> loaded = new ArrayList<>(registry.snapshot().size());
         for (GlossDocument<AnimationDoc> document : registry.snapshot().values()) {
             AnimationDoc doc = document.value();

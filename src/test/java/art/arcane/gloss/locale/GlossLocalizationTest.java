@@ -177,6 +177,48 @@ public class GlossLocalizationTest {
   }
 
   @Test
+  public void zeroArgumentRenderingTranslatesTheTemplateOnlyForLegacy() {
+    String english = GlossMessages.SYNC_CAPABILITY_WARNING.english();
+
+    assertEquals(english, localization.text(GlossMessages.SYNC_CAPABILITY_WARNING));
+    assertEquals(
+        ChatColor.translateAlternateColorCodes('&', english),
+        localization.legacy(GlossMessages.SYNC_CAPABILITY_WARNING)
+    );
+  }
+
+  @Test
+  public void legacyRenderingTranslatesTemplateColorsAroundSplicedArguments() {
+    assertEquals(
+        ChatColor.translateAlternateColorCodes('&', "&7Page &f2&7/&f3 &8- &7showing &f13&7-&f24 &7of &f25"),
+        localization.legacy(
+            GlossMessages.LIST_PAGE,
+            MessageArgs.builder()
+                .trusted("page", 2)
+                .trusted("pages", 3)
+                .trusted("from", 13)
+                .trusted("to", 24)
+                .trusted("total", 25)
+                .build()
+        )
+    );
+  }
+
+  @Test
+  public void argumentValuesThatLookLikePlaceholdersAreNotReprocessed() {
+    String rendered = localization.text(
+        GlossMessages.PREVIEW_FUEL_LEVEL,
+        MessageArgs.builder()
+            .untrusted("fuel", "{maximum}")
+            .untrusted("maximum", "9")
+            .build()
+    );
+
+    assertTrue(rendered.contains("{maximum}"));
+    assertTrue(rendered.contains("9"));
+  }
+
+  @Test
   public void listPagerMessagesDeclareEveryRuntimePlaceholder() {
     assertEquals(Set.of("page", "pages", "from", "to", "total"), GlossMessages.LIST_PAGE.placeholders());
     assertEquals(Set.of("command"), GlossMessages.LIST_NEXT.placeholders());

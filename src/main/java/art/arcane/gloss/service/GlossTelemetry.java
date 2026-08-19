@@ -2,19 +2,21 @@ package art.arcane.gloss.service;
 
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.LongAdder;
 
 public final class GlossTelemetry {
   private static final long RATE_WINDOW_MS = 1000L;
-  private static final AtomicLong PACKETS = new AtomicLong();
-  private static final AtomicLong SPAWN_CHURN = new AtomicLong();
-  private static final AtomicLong PREVIEW_REFRESHES = new AtomicLong();
-  private static final AtomicLong TICK_NANOS = new AtomicLong();
+  private static final LongAdder PACKETS = new LongAdder();
+  private static final LongAdder SPAWN_CHURN = new LongAdder();
+  private static final LongAdder PREVIEW_REFRESHES = new LongAdder();
+  private static final LongAdder TICK_NANOS = new LongAdder();
   private static final AtomicLong BUBBLES = new AtomicLong();
   private static final AtomicLong INDICATORS = new AtomicLong();
   private static final AtomicLong EMOJI_REPLACEMENTS = new AtomicLong();
   private static final AtomicInteger MENUS_OPEN = new AtomicInteger();
   private static final AtomicInteger PREVIEWS_OPEN = new AtomicInteger();
   private static final Object RATE_LOCK = new Object();
+  private static volatile long windowDeadlineMs;
   private static long windowStartMs;
   private static long windowPackets;
   private static long windowSpawnChurn;
@@ -36,21 +38,21 @@ public final class GlossTelemetry {
 
   public static void countPackets(long packets) {
     if (packets > 0L) {
-      PACKETS.addAndGet(packets);
+      PACKETS.add(packets);
     }
   }
 
   public static void countSpawnChurn() {
-    SPAWN_CHURN.incrementAndGet();
+    SPAWN_CHURN.increment();
   }
 
   public static void countPreviewRefresh() {
-    PREVIEW_REFRESHES.incrementAndGet();
+    PREVIEW_REFRESHES.increment();
   }
 
   public static void addTickNanos(long nanos) {
     if (nanos > 0L) {
-      TICK_NANOS.addAndGet(nanos);
+      TICK_NANOS.add(nanos);
     }
   }
 
@@ -127,13 +129,14 @@ public final class GlossTelemetry {
 
   public static void clear() {
     synchronized (RATE_LOCK) {
-      PACKETS.set(0L);
-      SPAWN_CHURN.set(0L);
-      PREVIEW_REFRESHES.set(0L);
-      TICK_NANOS.set(0L);
+      PACKETS.reset();
+      SPAWN_CHURN.reset();
+      PREVIEW_REFRESHES.reset();
+      TICK_NANOS.reset();
       BUBBLES.set(0L);
       INDICATORS.set(0L);
       EMOJI_REPLACEMENTS.set(0L);
+      windowDeadlineMs = 0L;
       windowStartMs = 0L;
       windowPackets = 0L;
       windowSpawnChurn = 0L;
@@ -155,13 +158,18 @@ public final class GlossTelemetry {
   }
 
   private static void refreshRates(long now) {
+    long deadline = windowDeadlineMs;
+    if (deadline != 0L && now < deadline) {
+      return;
+    }
     synchronized (RATE_LOCK) {
       if (windowStartMs == 0L) {
         windowStartMs = now;
-        windowPackets = PACKETS.get();
-        windowSpawnChurn = SPAWN_CHURN.get();
-        windowPreviewRefreshes = PREVIEW_REFRESHES.get();
-        windowTickNanos = TICK_NANOS.get();
+        windowDeadlineMs = now + RATE_WINDOW_MS;
+        windowPackets = PACKETS.sum();
+        windowSpawnChurn = SPAWN_CHURN.sum();
+        windowPreviewRefreshes = PREVIEW_REFRESHES.sum();
+        windowTickNanos = TICK_NANOS.sum();
         windowBubbles = BUBBLES.get();
         windowIndicators = INDICATORS.get();
         windowEmojiReplacements = EMOJI_REPLACEMENTS.get();
@@ -173,10 +181,10 @@ public final class GlossTelemetry {
         return;
       }
 
-      long packets = PACKETS.get();
-      long spawnChurn = SPAWN_CHURN.get();
-      long previewRefreshes = PREVIEW_REFRESHES.get();
-      long tickNanos = TICK_NANOS.get();
+      long packets = PACKETS.sum();
+      long spawnChurn = SPAWN_CHURN.sum();
+      long previewRefreshes = PREVIEW_REFRESHES.sum();
+      long tickNanos = TICK_NANOS.sum();
       long bubbles = BUBBLES.get();
       long indicators = INDICATORS.get();
       long emojiReplacements = EMOJI_REPLACEMENTS.get();
@@ -191,6 +199,7 @@ public final class GlossTelemetry {
       emojiReplacementsPerSecond = (emojiReplacements - windowEmojiReplacements) / seconds;
 
       windowStartMs = now;
+      windowDeadlineMs = now + RATE_WINDOW_MS;
       windowPackets = packets;
       windowSpawnChurn = spawnChurn;
       windowPreviewRefreshes = previewRefreshes;

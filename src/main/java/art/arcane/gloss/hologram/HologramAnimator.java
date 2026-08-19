@@ -46,6 +46,7 @@ public final class HologramAnimator {
     private final Supplier<GlossConfig> config;
     private final Predicate<String> isFunction;
     private final Function<String, AnimationClip> clipResolver;
+    private final Function<AnimationClip, List<String>> sharedFrames;
     private final AnimationTextSender sender;
     private final Map<TargetKey, Target> targets;
     private final Map<TargetKey, SendState> states;
@@ -56,16 +57,24 @@ public final class HologramAnimator {
 
     public HologramAnimator(Gloss plugin) {
         this(plugin::cfg,
-            name -> plugin.text().isFunction(name),
+            name -> plugin.text().hasFunction(name),
             name -> resolveClip(plugin, name),
+            clip -> plugin.animations().staticFrames(clip),
             HologramAnimator::sendPacket);
     }
 
     HologramAnimator(Supplier<GlossConfig> config, Predicate<String> isFunction,
                      Function<String, AnimationClip> clipResolver, AnimationTextSender sender) {
+        this(config, isFunction, clipResolver, clip -> null, sender);
+    }
+
+    HologramAnimator(Supplier<GlossConfig> config, Predicate<String> isFunction,
+                     Function<String, AnimationClip> clipResolver,
+                     Function<AnimationClip, List<String>> sharedFrames, AnimationTextSender sender) {
         this.config = config;
         this.isFunction = isFunction;
         this.clipResolver = clipResolver;
+        this.sharedFrames = sharedFrames;
         this.sender = sender;
         this.targets = new ConcurrentHashMap<>();
         this.states = new ConcurrentHashMap<>();
@@ -116,7 +125,7 @@ public final class HologramAnimator {
         }
 
         AnimationTemplate template = AnimationTemplate.compile(String.join("\n", rawLines),
-            isFunction, this::fastClip, renderer);
+            isFunction, this::fastClip, renderer, sharedFrames);
         return template.hasSlots() ? template : null;
     }
 

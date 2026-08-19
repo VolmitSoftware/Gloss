@@ -5,6 +5,7 @@ import art.arcane.gloss.doc.DocumentRegistry;
 import art.arcane.gloss.doc.GlossDocument;
 import art.arcane.gloss.doc.ShippedDefaults;
 import art.arcane.gloss.doc.ShippedDocumentCatalog;
+import art.arcane.gloss.text.TextPipeline;
 import org.bukkit.Bukkit;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -15,16 +16,20 @@ import org.bukkit.event.server.ServerListPingEvent;
 import java.io.File;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.atomic.AtomicLong;
 
 public final class MotdService {
     private final Gloss plugin;
     private final ShippedDefaults defaults;
     private final DocumentRegistry<MotdDoc> registry;
+    private final AtomicLong docGeneration;
     private PingListener listener;
     private volatile boolean failureLogged;
+    private volatile MotdMemo memo;
 
     public MotdService(Gloss plugin) {
         this.plugin = plugin;
+        this.docGeneration = new AtomicLong();
         this.defaults = new ShippedDefaults(MotdDoc.KIND, plugin.getDataFolder(),
             ShippedDocumentCatalog.MOTD.names());
         this.registry = DocumentRegistry.singleFile(MotdDoc.KIND,
@@ -34,7 +39,8 @@ public final class MotdService {
     public void enable() {
         defaults.extractMissing();
         registry.reload();
-        plugin.watchdog().register(MotdDoc.KIND, registry::poll);
+        docGeneration.incrementAndGet();
+        plugin.watchdog().register(MotdDoc.KIND, this::pollRegistry);
         if (!plugin.cfg().motd().enabled()) {
             return;
         }
@@ -68,11 +74,21 @@ public final class MotdService {
         return document == null ? MotdDoc.DEFAULTS : document.value();
     }
 
+    private void pollRegistry() {
+        if (registry.poll().isEmpty()) {
+            return;
+        }
+        docGeneration.incrementAndGet();
+    }
+
     private void handlePing(ServerListPingEvent event) {
-        List<MotdDoc.MotdEntry> entries = doc().entries();
-        MotdDoc.MotdEntry pick = entries.get(ThreadLocalRandom.current().nextInt(entries.size()));
         try {
-            event.setMotd(plugin.text().renderStatic(pick.joined()));
+            MotdMemo current = memo();
+            int index = ThreadLocalRandom.current().nextInt(current.entries().size());
+            String cached = current.rendered()[index];
+            event.setMotd(cached == null
+                ? plugin.text().renderStatic(current.entries().get(index).joined())
+                : cached);
         } catch (Throwable failure) {
             if (!failureLogged) {
                 failureLogged = true;
@@ -80,6 +96,36 @@ public final class MotdService {
                     + (failure.getMessage() == null ? "" : ": " + failure.getMessage()));
             }
         }
+    }
+
+    /**
+     * Entries are rendered once per document revision and emoji table. An entry carrying a text
+     * function ({@code |name|}) is left out of the memo and re-rendered on every ping, so a
+     * time-varying function still produces fresh output.
+     */
+    private MotdMemo memo() {
+        long generation = docGeneration.get();
+        long emojiGeneration = TextPipeline.emojiGeneration();
+        MotdMemo current = memo;
+        if (current != null && current.docGeneration() == generation && current.emojiGeneration() == emojiGeneration) {
+            return current;
+        }
+
+        List<MotdDoc.MotdEntry> entries = doc().entries();
+        String[] rendered = new String[entries.size()];
+        for (int index = 0; index < rendered.length; index++) {
+            String joined = entries.get(index).joined();
+            if ((TextPipeline.classify(joined) & TextPipeline.HAS_FUNCTION) == 0) {
+                rendered[index] = plugin.text().renderStatic(joined);
+            }
+        }
+        MotdMemo built = new MotdMemo(generation, emojiGeneration, entries, rendered);
+        memo = built;
+        return built;
+    }
+
+    private record MotdMemo(long docGeneration, long emojiGeneration, List<MotdDoc.MotdEntry> entries,
+                            String[] rendered) {
     }
 
     private final class PingListener implements Listener {

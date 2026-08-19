@@ -2,6 +2,7 @@ package art.arcane.gloss.expr;
 
 import java.util.List;
 import java.util.Locale;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
@@ -22,6 +23,8 @@ public final class ExprFunctions {
 
   /** Legacy colour/format codes: {@code &} followed by a colour digit, a format letter, or reset. */
   private static final Pattern LEGACY_CODE = Pattern.compile("&[0-9A-Fa-fK-Ok-oRr]");
+  private static final Pattern SECTION_CODE = Pattern.compile("§[0-9A-Fa-fK-Ok-oRr]");
+  private static final Pattern NUMBER = Pattern.compile("[-+]?(?:\\d+(?:\\.\\d*)?|\\.\\d+)");
 
   private ExprFunctions() {
   }
@@ -44,6 +47,10 @@ public final class ExprFunctions {
       case "alpha" -> alpha(name, args);
       case "mix" -> mix(name, args);
       case "palette" -> palette(name, args);
+      case "select" -> select(name, args);
+      case "number" -> number(name, args);
+      case "bar" -> bar(name, args);
+      case "hex" -> hex(name, args);
       case "str" -> str(name, args);
       case "fixed" -> fixed(name, args);
       case "plain" -> plain(name, args);
@@ -179,6 +186,60 @@ public final class ExprFunctions {
       throw new ExprException(name + " list entries must be numbers", NO_POSITION);
     }
     return d;
+  }
+
+  private static Object select(String name, List<Object> args) {
+    requireCount(name, args, 2);
+    Object listArg = args.get(0);
+    if (!(listArg instanceof List<?> list)) {
+      throw new ExprException(name + " argument 1 must be a list", NO_POSITION);
+    }
+    if (list.isEmpty()) {
+      throw new ExprException(name + " list must not be empty", NO_POSITION);
+    }
+    int index = (int) Math.floor(numArg(name, args, 1));
+    return list.get(Math.floorMod(index, list.size()));
+  }
+
+  private static double number(String name, List<Object> args) {
+    requireCount(name, args, 1);
+    Object value = args.get(0);
+    if (value instanceof Double number) {
+      return number;
+    }
+    if (!(value instanceof String text)) {
+      throw new ExprException(name + " argument 1 must be a number or string", NO_POSITION);
+    }
+    String plain = SECTION_CODE.matcher(LEGACY_CODE.matcher(text).replaceAll("")).replaceAll("").replace(",", "");
+    Matcher matcher = NUMBER.matcher(plain);
+    if (!matcher.find()) {
+      throw new ExprException(name + " could not find a number", NO_POSITION);
+    }
+    return Double.parseDouble(matcher.group());
+  }
+
+  private static String bar(String name, List<Object> args) {
+    requireCount(name, args, 5);
+    double value = numArg(name, args, 0);
+    double maximum = numArg(name, args, 1);
+    double widthValue = numArg(name, args, 2);
+    if (maximum <= 0.0D) {
+      throw new ExprException(name + " argument 2 must be greater than zero", NO_POSITION);
+    }
+    if (widthValue != Math.rint(widthValue) || widthValue < 1 || widthValue > 64) {
+      throw new ExprException(name + " argument 3 must be a whole number in [1, 64]", NO_POSITION);
+    }
+    int width = (int) widthValue;
+    String filled = strArg(name, args, 3);
+    String empty = strArg(name, args, 4);
+    int count = (int) Math.round(Math.min(1.0D, Math.max(0.0D, value / maximum)) * width);
+    return filled.repeat(count) + empty.repeat(width - count);
+  }
+
+  private static String hex(String name, List<Object> args) {
+    requireCount(name, args, 1);
+    long color = (long) numArg(name, args, 0);
+    return String.format(Locale.ROOT, "[%06X]", color & 0xFFFFFFL);
   }
 
   private static String str(String name, List<Object> args) {

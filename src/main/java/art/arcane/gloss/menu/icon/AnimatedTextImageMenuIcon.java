@@ -10,8 +10,6 @@ import art.arcane.gloss.util.common.TextUtils;
 import art.arcane.gloss.util.common.math.CollisionPlane;
 import com.google.common.collect.Lists;
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.TextComponent;
-import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Location;
 import org.bukkit.util.Vector;
 
@@ -84,30 +82,18 @@ public class AnimatedTextImageMenuIcon extends MenuIcon<AnimatedImageData> {
           .max()
           .orElse(0);
       images.forEach(i -> {
-        List<Component> lines = Lists.newArrayList();
-        for (int y = 0; y < i.getHeight(); y++) {
-          TextComponent.Builder component = Component.text();
-          for (int x = 0; x < i.getWidth(); x++) {
-            int colour = i.getRGB(x, y);
-            if (((colour >> 24) & 0x0000FF) < 255)
-              component.append(Component.text(" ").decorate(TextDecoration.BOLD))
-                  .append(Component.text(" "));
-            else
-              component.append(TextUtils.textColor("█", colour & 0x00FFFFFF));
-          }
-          lines.add(component.build());
+        List<Component> raster = TextImageRasterCache.lines(i, false);
+        int padding = height - i.getHeight();
+        if (padding <= 0) {
+          frameComponents.add(raster);
+          return;
         }
 
-        TextComponent.Builder empty = Component.text();
-        for (int x = 0; x < i.getWidth(); x++) {
-          empty.append(Component.text(" ")
-                  .decorate(TextDecoration.BOLD))
-              .append(Component.text(" "));
+        List<Component> lines = Lists.newArrayList(raster);
+        Component empty = TextImageRasterCache.blankRow(i.getWidth());
+        for (int y = 0; y < padding; y++) {
+          lines.add(empty);
         }
-        for (int y = 0; y < height - i.getHeight(); y++) {
-          lines.add(empty.build());
-        }
-
         frameComponents.add(lines);
       });
     } catch (IOException | RuntimeException e) {

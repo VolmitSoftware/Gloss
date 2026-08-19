@@ -6,22 +6,36 @@ import art.arcane.volmlib.util.bukkit.Placeholders;
 import net.md_5.bungee.api.ChatColor;
 import org.bukkit.entity.Player;
 
+import java.util.Collection;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.UnaryOperator;
 
 public final class TextPipeline implements TextRenderer {
+    public static final int HAS_FUNCTION = 1;
+    public static final int HAS_PLACEHOLDER = 1 << 1;
+    public static final int HAS_EMOJI_CANDIDATE = 1 << 2;
+    public static final int HAS_COLOR = 1 << 3;
+
     private static final int HEX_CACHE_LIMIT = 4096;
+    private static final int ALL_FLAGS = HAS_FUNCTION | HAS_PLACEHOLDER | HAS_EMOJI_CANDIDATE | HAS_COLOR;
+
+    private static final AtomicLong EMOJI_GENERATION = new AtomicLong();
+
+    private static volatile long[] emojiTriggerAscii = new long[2];
+    private static volatile char[] emojiTriggerExtended = new char[0];
 
     private final Gloss plugin;
     private final Map<String, Function<Player, String>> functions;
     private final Set<String> failedFunctions;
     private final Map<String, String> hexCache;
+    private final TextExpressionRenderer expressions;
     private volatile UnaryOperator<String> emojiFilter;
     private volatile BiFunction<Player, String, String> chatEmojiFilter;
 
@@ -30,6 +44,7 @@ public final class TextPipeline implements TextRenderer {
         this.functions = new ConcurrentHashMap<>();
         this.failedFunctions = ConcurrentHashMap.newKeySet();
         this.hexCache = new ConcurrentHashMap<>();
+        this.expressions = new TextExpressionRenderer(plugin);
     }
 
     public void enable() {
@@ -40,6 +55,7 @@ public final class TextPipeline implements TextRenderer {
         failedFunctions.clear();
         emojiFilter = null;
         chatEmojiFilter = null;
+        expressions.clear();
     }
 
     public void reload() {
@@ -55,6 +71,9 @@ public final class TextPipeline implements TextRenderer {
         String out = raw;
         if (functionsEnabled() && out.indexOf('|') >= 0) {
             out = applyFunctions(viewer, out);
+        }
+        if (functionsEnabled() && out.indexOf("{{") >= 0) {
+            out = expressions.render(viewer, out);
         }
         if (viewer != null && placeholdersEnabled() && out.indexOf('%') >= 0) {
             out = Placeholders.setPlaceholders(viewer, out);
@@ -105,6 +124,84 @@ public final class TextPipeline implements TextRenderer {
         return plugin == null ? null : plugin.text();
     }
 
+    public static int classify(String raw) {
+        if (raw == null || raw.isEmpty()) {
+            return 0;
+        }
+
+        long[] triggerAscii = emojiTriggerAscii;
+        char[] triggerExtended = emojiTriggerExtended;
+        int flags = 0;
+        int colons = 0;
+        int length = raw.length();
+        for (int i = 0; i < length; i++) {
+            char value = raw.charAt(i);
+            if (value == '|') {
+                flags |= HAS_FUNCTION;
+            } else if (value == '{' && i + 1 < length && raw.charAt(i + 1) == '{') {
+                flags |= HAS_FUNCTION;
+            } else if (value == '%') {
+                flags |= HAS_PLACEHOLDER;
+            } else if (value == '&' || value == '§' || value == '[') {
+                flags |= HAS_COLOR;
+            } else if (value == ':') {
+                colons++;
+                if (colons >= 2) {
+                    flags |= HAS_EMOJI_CANDIDATE;
+                }
+            }
+            if ((flags & HAS_EMOJI_CANDIDATE) == 0 && isEmojiTrigger(value, triggerAscii, triggerExtended)) {
+                flags |= HAS_EMOJI_CANDIDATE;
+            }
+            if (flags == ALL_FLAGS) {
+                return flags;
+            }
+        }
+        return flags;
+    }
+
+    public static void publishEmojiTriggers(Collection<String> triggers) {
+        long[] ascii = new long[2];
+        StringBuilder extended = new StringBuilder();
+        if (triggers != null) {
+            for (String trigger : triggers) {
+                if (trigger == null || trigger.isEmpty()) {
+                    continue;
+                }
+                char first = trigger.charAt(0);
+                if (first < 128) {
+                    ascii[first >>> 6] |= 1L << (first & 63);
+                } else if (extended.indexOf(String.valueOf(first)) < 0) {
+                    extended.append(first);
+                }
+            }
+        }
+        emojiTriggerAscii = ascii;
+        emojiTriggerExtended = extended.toString().toCharArray();
+        EMOJI_GENERATION.incrementAndGet();
+    }
+
+    /**
+     * Monotonic generation for the published emoji state. Bumped on every emoji registry
+     * rebuild (and on emoji disable), so render memos keyed on it invalidate when either
+     * the trigger set or the replacement table changes.
+     */
+    public static long emojiGeneration() {
+        return EMOJI_GENERATION.get();
+    }
+
+    private static boolean isEmojiTrigger(char value, long[] ascii, char[] extended) {
+        if (value < 128) {
+            return (ascii[value >>> 6] & (1L << (value & 63))) != 0L;
+        }
+        for (char candidate : extended) {
+            if (candidate == value) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     @Override
     public String chat(Player sender, String message) {
         Player activeSender = Objects.requireNonNull(sender);
@@ -134,7 +231,7 @@ public final class TextPipeline implements TextRenderer {
         failedFunctions.remove(name);
     }
 
-    public boolean isFunction(String name) {
+    public boolean hasFunction(String name) {
         return name != null && functions.containsKey(name);
     }
 

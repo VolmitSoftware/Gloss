@@ -8,6 +8,7 @@ import art.arcane.gloss.doc.DocumentStore;
 import art.arcane.gloss.doc.GlossDocument;
 import art.arcane.gloss.doc.ShippedDefaults;
 import art.arcane.gloss.doc.ShippedDocumentCatalog;
+import art.arcane.gloss.text.TextPipeline;
 import art.arcane.volmlib.util.board.Board;
 import art.arcane.volmlib.util.board.BoardManager;
 import art.arcane.volmlib.util.board.BoardProvider;
@@ -16,6 +17,7 @@ import art.arcane.volmlib.util.board.ScoreDirection;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
 import org.bukkit.event.HandlerList;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerChangedWorldEvent;
@@ -34,6 +36,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Predicate;
+import java.util.function.UnaryOperator;
 import java.util.logging.Level;
 
 public final class BoardService implements Listener {
@@ -59,11 +62,14 @@ public final class BoardService implements Listener {
     private final Map<String, GlossBoardMeta> metas;
     private final Map<UUID, String> selections;
     private final Set<UUID> sticky;
+    private final UnaryOperator<String> staticRender;
     private volatile BoardManager<Board> manager;
     private volatile int managerIntervalTicks;
+    private volatile List<GlossBoardMeta> boardSnapshot;
 
     public BoardService(Gloss plugin) {
         this.plugin = plugin;
+        this.staticRender = raw -> plugin.text().renderStatic(raw);
         File folder = new File(plugin.getDataFolder(), BoardDoc.KIND);
         this.store = new DocumentStore<>(BoardDoc.KIND, folder, REVISER);
         this.defaults = new ShippedDefaults(BoardDoc.KIND, folder, ShippedDocumentCatalog.BOARDS.names());
@@ -122,6 +128,7 @@ public final class BoardService implements Listener {
         selections.clear();
         sticky.clear();
         metas.clear();
+        boardSnapshot = null;
         store.forgetAll();
     }
 
@@ -162,6 +169,7 @@ public final class BoardService implements Listener {
         if (removed == null) {
             return false;
         }
+        boardSnapshot = null;
         try {
             store.delete(boardId);
         } catch (IOException failure) {
@@ -176,10 +184,21 @@ public final class BoardService implements Listener {
         return true;
     }
 
+    /** Id-sorted snapshot of the loaded boards, rebuilt only when the board set changes. */
     public List<GlossBoardMeta> boards() {
+        List<GlossBoardMeta> snapshot = boardSnapshot;
+        if (snapshot != null) {
+            return snapshot;
+        }
         List<GlossBoardMeta> list = new ArrayList<>(metas.values());
         list.sort(Comparator.comparing(GlossBoardMeta::id));
-        return list;
+        List<GlossBoardMeta> published = List.copyOf(list);
+        boardSnapshot = published;
+        return published;
+    }
+
+    public int boardCount() {
+        return metas.size();
     }
 
     public void saveBoard(GlossBoardMeta meta) {
@@ -187,6 +206,7 @@ public final class BoardService implements Listener {
             return;
         }
         metas.put(meta.id(), meta);
+        boardSnapshot = null;
         BoardDoc doc = meta.toDoc(meta.nextRevision());
         plugin.scheduler().a(() -> writeBoard(meta.id(), doc), 0);
     }
@@ -235,7 +255,7 @@ public final class BoardService implements Listener {
         selectAutomatically(player);
     }
 
-    @EventHandler
+    @EventHandler(priority = EventPriority.MONITOR)
     public void on(PlayerQuitEvent event) {
         UUID uuid = event.getPlayer().getUniqueId();
         selections.remove(uuid);
@@ -310,6 +330,7 @@ public final class BoardService implements Listener {
             metas.put(document.id(), GlossBoardMeta.fromDoc(document.id(), document.value()));
         }
         metas.keySet().retainAll(present);
+        boardSnapshot = null;
     }
 
     private void writeBoard(String id, BoardDoc doc) {
@@ -339,6 +360,7 @@ public final class BoardService implements Listener {
             dirty = metas.remove(id) != null || dirty;
         }
         if (dirty) {
+            boardSnapshot = null;
             reselectAll();
         }
     }
@@ -354,7 +376,12 @@ public final class BoardService implements Listener {
             if (meta == null) {
                 return "";
             }
-            String rendered = plugin.text().render(player, meta.title());
+            GlossBoardMeta.RenderPlan plan = plan(meta);
+            String cached = plan.staticTitle();
+            if (cached != null) {
+                return cached;
+            }
+            String rendered = plugin.text().render(player, plan.rawTitle());
             if (rendered == null) {
                 return "";
             }
@@ -367,16 +394,23 @@ public final class BoardService implements Listener {
             if (meta == null) {
                 return List.of();
             }
-            List<String> raw = meta.contentView();
-            List<String> rendered = new ArrayList<>(Math.min(raw.size(), MAX_LINES));
-            for (String line : raw) {
-                if (rendered.size() >= MAX_LINES) {
-                    break;
+            GlossBoardMeta.RenderPlan plan = plan(meta);
+            int count = plan.lineCount();
+            List<String> rendered = new ArrayList<>(count);
+            for (int index = 0; index < count; index++) {
+                String cached = plan.staticLine(index);
+                if (cached != null) {
+                    rendered.add(cached);
+                    continue;
                 }
-                String value = plugin.text().render(player, line);
+                String value = plugin.text().render(player, plan.rawLine(index));
                 rendered.add(value == null ? "" : value);
             }
             return rendered;
+        }
+
+        private GlossBoardMeta.RenderPlan plan(GlossBoardMeta meta) {
+            return meta.renderPlan(TextPipeline.emojiGeneration(), MAX_TITLE_LENGTH, MAX_LINES, staticRender);
         }
     }
 }

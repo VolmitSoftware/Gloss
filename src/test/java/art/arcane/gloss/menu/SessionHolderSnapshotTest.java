@@ -374,7 +374,7 @@ public class SessionHolderSnapshotTest {
     }
 
     @Override
-    protected void onTick() {
+    protected void onTick(Vector eyeOrigin, Vector eyeDirection) {
     }
 
     @Override

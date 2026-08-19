@@ -6,13 +6,16 @@ import art.arcane.gloss.doc.DocumentRegistry;
 import art.arcane.gloss.doc.GlossDocument;
 import art.arcane.gloss.doc.ShippedDefaults;
 import art.arcane.gloss.doc.ShippedDocumentCatalog;
+import art.arcane.gloss.text.TextPipeline;
 import org.bukkit.entity.Player;
 
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 public final class EmojiService {
     private static final String PERMISSION_PREFIX = "gloss.emoji.";
@@ -23,6 +26,7 @@ public final class EmojiService {
     private final DocumentRegistry<EmojiDoc> registry;
     private volatile List<EmojiEntry> entries;
     private volatile EmojiReplacer replacer;
+    private volatile Map<String, String> permissionNodes;
 
     public EmojiService(Gloss plugin) {
         this.plugin = plugin;
@@ -31,6 +35,7 @@ public final class EmojiService {
         this.registry = DocumentRegistry.folder(EmojiDoc.KIND, folder, EmojiDoc::parse, EmojiDoc::revision);
         this.entries = List.of();
         this.replacer = new EmojiReplacer(List.of());
+        this.permissionNodes = Map.of();
     }
 
     public void enable() {
@@ -51,6 +56,8 @@ public final class EmojiService {
         plugin.text().setEmojiFilter(null);
         entries = List.of();
         replacer = new EmojiReplacer(List.of());
+        permissionNodes = Map.of();
+        TextPipeline.publishEmojiTriggers(List.of());
     }
 
     public void reload() {
@@ -75,11 +82,13 @@ public final class EmojiService {
             return counted(message, replacer.apply(message));
         }
 
-        return counted(message, replacer.apply(message, id -> sender.hasPermission(PERMISSION_PREFIX + id)));
+        Map<String, String> nodes = permissionNodes;
+        return counted(message, replacer.apply(message,
+            id -> sender.hasPermission(nodes.getOrDefault(id, PERMISSION_PREFIX + id))));
     }
 
     private static String counted(String input, String output) {
-        if (output != null && !output.equals(input)) {
+        if (output != null && output != input && !output.equals(input)) {
             GlossTelemetry.countEmojiReplacement();
         }
         return output;
@@ -121,5 +130,16 @@ public final class EmojiService {
         loaded.sort(Comparator.comparing(EmojiEntry::id));
         entries = List.copyOf(loaded);
         replacer = new EmojiReplacer(entries);
+
+        Map<String, String> nodes = new HashMap<>(loaded.size() * 2);
+        List<String> triggers = new ArrayList<>();
+        for (EmojiEntry entry : entries) {
+            nodes.put(entry.id(), PERMISSION_PREFIX + entry.id());
+            if (entry.enabled() && entry.hasTrigger()) {
+                triggers.add(entry.trigger());
+            }
+        }
+        permissionNodes = Map.copyOf(nodes);
+        TextPipeline.publishEmojiTriggers(triggers);
     }
 }

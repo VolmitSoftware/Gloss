@@ -2,12 +2,16 @@ package art.arcane.gloss.bubble;
 
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
 
 public final class BubbleStyles {
     public static final String DEFAULT_STYLE_ID = "default";
     public static final String STYLE_PERMISSION_PREFIX = "gloss.bubbles.style.";
+
+    private static final int PATTERN_CACHE_LIMIT = 256;
+    private static final Map<String, Pattern> PATTERN_CACHE = new ConcurrentHashMap<>();
 
     private BubbleStyles() {
     }
@@ -60,6 +64,27 @@ public final class BubbleStyles {
     }
 
     public static boolean globMatches(String pattern, String value) {
+        return compileGlob(pattern).matcher(value).matches();
+    }
+
+    public static void clearPatternCache() {
+        PATTERN_CACHE.clear();
+    }
+
+    private static Pattern compileGlob(String pattern) {
+        Pattern cached = PATTERN_CACHE.get(pattern);
+        if (cached != null) {
+            return cached;
+        }
+        Pattern compiled = Pattern.compile(globRegex(pattern));
+        if (PATTERN_CACHE.size() < PATTERN_CACHE_LIMIT) {
+            Pattern raced = PATTERN_CACHE.putIfAbsent(pattern, compiled);
+            return raced == null ? compiled : raced;
+        }
+        return compiled;
+    }
+
+    private static String globRegex(String pattern) {
         StringBuilder regex = new StringBuilder(pattern.length() + 8);
         StringBuilder literal = new StringBuilder();
         for (int i = 0; i < pattern.length(); i++) {
@@ -77,6 +102,6 @@ public final class BubbleStyles {
         if (literal.length() > 0) {
             regex.append(Pattern.quote(literal.toString()));
         }
-        return value.matches(regex.toString());
+        return regex.toString();
     }
 }

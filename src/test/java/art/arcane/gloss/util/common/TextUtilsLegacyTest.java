@@ -6,6 +6,7 @@ import net.kyori.adventure.text.format.TextColor;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 
 class TextUtilsLegacyTest {
     @Test
@@ -32,5 +33,25 @@ class TextUtilsLegacyTest {
     @Test
     void emojiCharactersPassThroughUnchanged() {
         assertEquals("Shop ☺", TextUtils.content(TextUtils.parse("Shop ☺")));
+    }
+
+    @Test
+    void textWithoutLegacyMarkersReturnsTheSameInstance() {
+        String plain = "Shop <bold>menu</bold> [ff8800] % | :smile:";
+
+        assertSame(plain, TextUtils.translateLegacy(plain));
+    }
+
+    @Test
+    void nullAndEmptyTranslateToEmpty() {
+        assertEquals("", TextUtils.translateLegacy(null));
+        assertEquals("", TextUtils.translateLegacy(""));
+    }
+
+    @Test
+    void markedTextStillTranslates() {
+        assertEquals("<red>Danger", TextUtils.translateLegacy("&cDanger"));
+        assertEquals("<#ff8800>Warm", TextUtils.translateLegacy("§x§f§f§8§8§0§0Warm"));
+        assertEquals("&z stays", TextUtils.translateLegacy("&z stays"));
     }
 }
