@@ -169,7 +169,7 @@ public final class LegacyGlossDataImporter {
         boolean primary = legacy.has("primary") && legacy.get("primary").getAsBoolean();
         String permission = optString(legacy, "permission", "");
         return new BoardDoc(BoardDoc.CURRENT_SCHEMA_VERSION, DocumentEnvelope.INITIAL_REVISION,
-            title, stringList(legacy.getAsJsonArray("content")), primary, permission, List.of());
+            title, stringList(legacy.getAsJsonArray("content")), primary, false, permission, List.of());
     }
 
     private static EmojiDoc convertEmoji(JsonObject legacy) {
@@ -258,7 +258,7 @@ public final class LegacyGlossDataImporter {
             List<String> groups = new ArrayList<>(board.groups());
             groups.add(group);
             BoardDoc updated = new BoardDoc(board.schemaVersion(), board.revision() + 1L, board.title(),
-                board.lines(), board.primary(), board.permission(), groups);
+                board.lines(), board.primary(), board.hideNumbers(), board.permission(), groups);
             writeDocument(boardFile.toPath(), updated);
             return true;
         } catch (IOException | RuntimeException failure) {

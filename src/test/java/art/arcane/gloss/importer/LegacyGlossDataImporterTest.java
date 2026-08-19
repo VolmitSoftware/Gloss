@@ -108,7 +108,7 @@ class LegacyGlossDataImporterTest {
 
         assertEquals(LegacyGlossDataImporter.Status.MIGRATED, status(result, "boards/main.json"));
         BoardDoc expected = new BoardDoc(BoardDoc.CURRENT_SCHEMA_VERSION, DocumentEnvelope.INITIAL_REVISION,
-            "&6Main", List.of("&fLine one", "&7Line two"), true, "vip.board", List.of());
+            "&6Main", List.of("&fLine one", "&7Line two"), true, false, "vip.board", List.of());
         assertEquals(document(expected), read("boards/main.json"));
         assertEquals(LEGACY_BOARD, backedUp(result, "boards/main.json"));
     }

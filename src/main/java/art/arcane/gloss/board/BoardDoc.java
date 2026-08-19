@@ -8,7 +8,7 @@ import java.util.List;
 import java.util.Locale;
 
 public record BoardDoc(int schemaVersion, long revision, String title, List<String> lines, boolean primary,
-                       String permission, List<String> groups) {
+                       boolean hideNumbers, String permission, List<String> groups) {
     public static final String KIND = "boards";
     public static final int CURRENT_SCHEMA_VERSION = 1;
 
@@ -22,7 +22,7 @@ public record BoardDoc(int schemaVersion, long revision, String title, List<Stri
     }
 
     public BoardDoc withRevision(long revision) {
-        return new BoardDoc(schemaVersion, revision, title, lines, primary, permission, groups);
+        return new BoardDoc(schemaVersion, revision, title, lines, primary, hideNumbers, permission, groups);
     }
 
     public static BoardDoc parse(String fileName, String raw) {

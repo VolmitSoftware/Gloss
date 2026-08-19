@@ -17,6 +17,7 @@ class GlossBoardMetaDocTest {
         meta.addLine("&7Line one");
         meta.addLine("&7Line two");
         meta.setPrimary(true);
+        meta.setHideNumbers(true);
         meta.setPermission("vip");
         meta.setGroups(List.of("admins", "mods"));
 
@@ -27,6 +28,7 @@ class GlossBoardMetaDocTest {
         assertEquals("&d&lArena", restored.title());
         assertEquals(List.of("&7Line one", "&7Line two"), restored.lines());
         assertTrue(restored.primary());
+        assertTrue(restored.hideNumbers());
         assertEquals("vip", restored.permission());
         assertEquals(List.of("admins", "mods"), restored.groups());
         assertEquals(7L, restored.revision());
@@ -34,7 +36,7 @@ class GlossBoardMetaDocTest {
 
     @Test
     void fromDocWithBlankTitleFallsBackToTheId() {
-        BoardDoc doc = new BoardDoc(1, 1L, "", List.of(), false, null, null);
+        BoardDoc doc = new BoardDoc(1, 1L, "", List.of(), false, false, null, null);
 
         GlossBoardMeta meta = GlossBoardMeta.fromDoc("bare", doc);
 
@@ -42,6 +44,7 @@ class GlossBoardMetaDocTest {
         assertEquals("bare", meta.title());
         assertEquals(List.of(), meta.lines());
         assertFalse(meta.primary());
+        assertFalse(meta.hideNumbers());
         assertEquals(GlossBoardMeta.UNRESTRICTED_PERMISSION, meta.permission());
         assertEquals(List.of(), meta.groups());
         assertFalse(meta.permissionGated());

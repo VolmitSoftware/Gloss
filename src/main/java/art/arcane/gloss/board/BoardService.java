@@ -409,6 +409,12 @@ public final class BoardService implements Listener {
             return rendered;
         }
 
+        @Override
+        public boolean hideScores(Player player) {
+            GlossBoardMeta meta = selectedMeta(player);
+            return meta != null && meta.hideNumbers();
+        }
+
         private GlossBoardMeta.RenderPlan plan(GlossBoardMeta meta) {
             return meta.renderPlan(TextPipeline.emojiGeneration(), MAX_TITLE_LENGTH, MAX_LINES, staticRender);
         }

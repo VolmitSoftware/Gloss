@@ -15,17 +15,20 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.DoubleSupplier;
 
 public final class TextExpressionRenderer {
     private static final int CACHE_LIMIT = 4096;
     private static final int SOURCE_LIMIT = 1024;
 
     private final Gloss plugin;
+    private final DoubleSupplier serverTps;
     private final Map<String, Expr> cache;
     private final Set<String> failed;
 
-    public TextExpressionRenderer(Gloss plugin) {
+    TextExpressionRenderer(Gloss plugin, DoubleSupplier serverTps) {
         this.plugin = plugin;
+        this.serverTps = serverTps;
         this.cache = new ConcurrentHashMap<>();
         this.failed = ConcurrentHashMap.newKeySet();
     }
@@ -111,6 +114,7 @@ public final class TextExpressionRenderer {
                 case "time.ticks" -> nowMs / 50.0D;
                 case "server.online" -> (double) Bukkit.getOnlinePlayers().size();
                 case "server.maxPlayers" -> (double) Bukkit.getMaxPlayers();
+                case "server.tps" -> serverTps.getAsDouble();
                 case "player.name" -> viewer == null ? null : viewer.getName();
                 case "player.ping" -> viewer == null ? null : (double) viewer.getPing();
                 case "player.health" -> viewer == null ? null : viewer.getHealth();
@@ -130,29 +134,67 @@ public final class TextExpressionRenderer {
         }
 
         private Object papi(List<Object> args, boolean numeric) {
-            if (args.size() != 1 || !(args.get(0) instanceof String name)) {
-                throw new IllegalArgumentException((numeric ? "papiNumber" : "papi") + " expects one string");
+            if ((args.size() != 1 && args.size() != 2) || !(args.get(0) instanceof String name)) {
+                throw new IllegalArgumentException((numeric ? "papiNumber" : "papi")
+                    + " expects a key and optional fallback");
             }
+            Object fallback = args.size() == 2 ? args.get(1) : null;
+            validateFallback(numeric, fallback);
             String token = name.startsWith("%") && name.endsWith("%") ? name : "%" + name + "%";
             if (viewer == null) {
+                if (fallback != null) {
+                    return fallback;
+                }
                 if (numeric) {
                     throw new IllegalStateException("papiNumber requires a player-backed surface");
                 }
                 return token;
             }
             String value = Placeholders.setPlaceholders(viewer, token);
-            return numeric ? ExprFunctions.call("number", List.of(value)) : value;
+            if (value.equals(token) && fallback != null) {
+                return fallback;
+            }
+            if (!numeric) {
+                return value;
+            }
+            try {
+                return ExprFunctions.call("number", List.of(value));
+            } catch (RuntimeException failure) {
+                if (fallback != null) {
+                    return fallback;
+                }
+                throw failure;
+            }
         }
 
         private Object metricCall(List<Object> args) {
-            if (args.size() != 1 || !(args.get(0) instanceof String key)) {
-                throw new IllegalArgumentException("metric expects one string");
+            if ((args.size() != 1 && args.size() != 2) || !(args.get(0) instanceof String key)) {
+                throw new IllegalArgumentException("metric expects a key and optional numeric fallback");
+            }
+            Object fallback = args.size() == 2 ? args.get(1) : null;
+            if (fallback != null && !(fallback instanceof Number)) {
+                throw new IllegalArgumentException("metric fallback must be a number");
             }
             Double value = metric(key);
             if (value == null) {
+                if (fallback != null) {
+                    return ((Number) fallback).doubleValue();
+                }
                 throw new IllegalArgumentException("unknown metric: " + key);
             }
             return value;
+        }
+
+        private void validateFallback(boolean numeric, Object fallback) {
+            if (fallback == null) {
+                return;
+            }
+            if (numeric && !(fallback instanceof Number)) {
+                throw new IllegalArgumentException("papiNumber fallback must be a number");
+            }
+            if (!numeric && !(fallback instanceof String)) {
+                throw new IllegalArgumentException("papi fallback must be a string");
+            }
         }
 
         private Double metric(String key) {

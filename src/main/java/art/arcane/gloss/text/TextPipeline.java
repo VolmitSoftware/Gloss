@@ -35,6 +35,7 @@ public final class TextPipeline implements TextRenderer {
     private final Map<String, Function<Player, String>> functions;
     private final Set<String> failedFunctions;
     private final Map<String, String> hexCache;
+    private final ServerTickSampler serverTicks;
     private final TextExpressionRenderer expressions;
     private volatile UnaryOperator<String> emojiFilter;
     private volatile BiFunction<Player, String, String> chatEmojiFilter;
@@ -44,10 +45,12 @@ public final class TextPipeline implements TextRenderer {
         this.functions = new ConcurrentHashMap<>();
         this.failedFunctions = ConcurrentHashMap.newKeySet();
         this.hexCache = new ConcurrentHashMap<>();
-        this.expressions = new TextExpressionRenderer(plugin);
+        this.serverTicks = new ServerTickSampler(plugin);
+        this.expressions = new TextExpressionRenderer(plugin, serverTicks::tps);
     }
 
     public void enable() {
+        serverTicks.enable();
     }
 
     public void disable() {
@@ -55,6 +58,7 @@ public final class TextPipeline implements TextRenderer {
         failedFunctions.clear();
         emojiFilter = null;
         chatEmojiFilter = null;
+        serverTicks.disable();
         expressions.clear();
     }
 

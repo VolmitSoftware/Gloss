@@ -22,6 +22,7 @@ class BoardDocTest {
               "title": "&6Board",
               "lines": ["a", "b"],
               "primary": true,
+              "hideNumbers": true,
               "permission": "staff",
               "groups": ["vip"]
             }
@@ -34,13 +35,15 @@ class BoardDocTest {
         assertEquals("&6Board", doc.title());
         assertEquals(List.of("a", "b"), doc.lines());
         assertTrue(doc.primary());
+        assertTrue(doc.hideNumbers());
         assertEquals("staff", doc.permission());
         assertEquals(List.of("vip"), doc.groups());
     }
 
     @Test
     void gsonRoundTripPreservesAllFields() {
-        BoardDoc original = new BoardDoc(1, 12L, "&d&lArena", List.of("one", "two"), false, "vip", List.of("mods"));
+        BoardDoc original = new BoardDoc(1, 12L, "&d&lArena", List.of("one", "two"), false, true,
+            "vip", List.of("mods"));
 
         BoardDoc decoded = BoardDoc.parse("arena.json", BukkitJson.GSON.toJson(original));
 
@@ -60,15 +63,16 @@ class BoardDocTest {
     @Test
     void wrongSchemaVersionIsRejected() {
         assertThrows(IllegalArgumentException.class,
-            () -> new BoardDoc(2, 1L, "t", List.of(), false, "default", List.of()));
+            () -> new BoardDoc(2, 1L, "t", List.of(), false, false, "default", List.of()));
     }
 
     @Test
     void revisionBoundsAreEnforced() {
         assertThrows(IllegalArgumentException.class,
-            () -> new BoardDoc(1, 0L, "t", List.of(), false, "default", List.of()));
+            () -> new BoardDoc(1, 0L, "t", List.of(), false, false, "default", List.of()));
         assertThrows(IllegalArgumentException.class,
-            () -> new BoardDoc(1, DocumentEnvelope.MAX_SAFE_REVISION + 1L, "t", List.of(), false, "default", List.of()));
+            () -> new BoardDoc(1, DocumentEnvelope.MAX_SAFE_REVISION + 1L, "t", List.of(), false, false,
+                "default", List.of()));
     }
 
     @Test
@@ -78,13 +82,14 @@ class BoardDocTest {
         assertEquals("", doc.title());
         assertEquals(List.of(), doc.lines());
         assertFalse(doc.primary());
+        assertFalse(doc.hideNumbers());
         assertEquals(GlossBoardMeta.UNRESTRICTED_PERMISSION, doc.permission());
         assertEquals(List.of(), doc.groups());
     }
 
     @Test
     void groupsAreNormalizedLowercaseTrimmedAndDeduplicated() {
-        BoardDoc doc = new BoardDoc(1, 1L, "t", List.of(), false, "default",
+        BoardDoc doc = new BoardDoc(1, 1L, "t", List.of(), false, false, "default",
             Arrays.asList(" VIP ", "vip", "", null, "Mods"));
 
         assertEquals(List.of("vip", "mods"), doc.groups());
@@ -92,13 +97,13 @@ class BoardDocTest {
 
     @Test
     void permissionNormalizesLikeTheMeta() {
-        assertEquals("default", new BoardDoc(1, 1L, "t", List.of(), false, "  ", List.of()).permission());
-        assertEquals("vip", new BoardDoc(1, 1L, "t", List.of(), false, " VIP ", List.of()).permission());
+        assertEquals("default", new BoardDoc(1, 1L, "t", List.of(), false, false, "  ", List.of()).permission());
+        assertEquals("vip", new BoardDoc(1, 1L, "t", List.of(), false, false, " VIP ", List.of()).permission());
     }
 
     @Test
     void withRevisionOnlyChangesTheRevision() {
-        BoardDoc doc = new BoardDoc(1, 1L, "t", List.of("x"), true, "vip", List.of("mods"));
+        BoardDoc doc = new BoardDoc(1, 1L, "t", List.of("x"), true, true, "vip", List.of("mods"));
 
         BoardDoc bumped = doc.withRevision(2L);
 
@@ -106,6 +111,7 @@ class BoardDocTest {
         assertEquals(doc.title(), bumped.title());
         assertEquals(doc.lines(), bumped.lines());
         assertEquals(doc.primary(), bumped.primary());
+        assertEquals(doc.hideNumbers(), bumped.hideNumbers());
         assertEquals(doc.permission(), bumped.permission());
         assertEquals(doc.groups(), bumped.groups());
     }

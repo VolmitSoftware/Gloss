@@ -17,6 +17,7 @@ public final class GlossBoardMeta {
     private final AtomicLong contentGeneration;
     private volatile String title;
     private volatile boolean primary;
+    private volatile boolean hideNumbers;
     private volatile String permission;
     private volatile List<String> groups;
     private volatile long revision;
@@ -28,6 +29,7 @@ public final class GlossBoardMeta {
         this.contentGeneration = new AtomicLong();
         this.title = id;
         this.primary = false;
+        this.hideNumbers = false;
         this.permission = UNRESTRICTED_PERMISSION;
         this.groups = List.of();
         this.revision = 0L;
@@ -40,6 +42,7 @@ public final class GlossBoardMeta {
             meta.addLine(line);
         }
         meta.setPrimary(doc.primary());
+        meta.setHideNumbers(doc.hideNumbers());
         meta.setPermission(doc.permission());
         meta.setGroups(doc.groups());
         meta.revision = doc.revision();
@@ -47,7 +50,8 @@ public final class GlossBoardMeta {
     }
 
     public BoardDoc toDoc(long revision) {
-        return new BoardDoc(BoardDoc.CURRENT_SCHEMA_VERSION, revision, title, lines(), primary, permission, groups);
+        return new BoardDoc(BoardDoc.CURRENT_SCHEMA_VERSION, revision, title, lines(), primary, hideNumbers,
+            permission, groups);
     }
 
     public String id() {
@@ -88,6 +92,14 @@ public final class GlossBoardMeta {
 
     public void setPrimary(boolean primary) {
         this.primary = primary;
+    }
+
+    public boolean hideNumbers() {
+        return hideNumbers;
+    }
+
+    public void setHideNumbers(boolean hideNumbers) {
+        this.hideNumbers = hideNumbers;
     }
 
     public String permission() {
