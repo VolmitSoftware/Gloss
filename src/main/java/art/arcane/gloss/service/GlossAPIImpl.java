@@ -8,6 +8,7 @@ import art.arcane.gloss.api.Hologram;
 import art.arcane.gloss.api.TemporaryHologram;
 import art.arcane.gloss.api.internal.GlossApiServiceImpl;
 import org.bukkit.Location;
+import org.bukkit.entity.Item;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 
@@ -96,6 +97,16 @@ public final class GlossAPIImpl implements GlossAPI {
     @Override
     public String filter(Player player, String raw) {
         return plugin.text().render(player, raw);
+    }
+
+    @Override
+    public void refreshDropName(Item item) {
+        plugin.drops().refresh(item);
+    }
+
+    @Override
+    public void refreshDropName(Item item, String bundleFormat, int bundleEntryLimit) {
+        plugin.drops().refresh(item, bundleFormat, bundleEntryLimit);
     }
 
     @Override

@@ -1,6 +1,7 @@
 package art.arcane.gloss.api;
 
 import org.bukkit.Location;
+import org.bukkit.entity.Item;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 
@@ -38,6 +39,10 @@ public interface GlossAPI {
     double stackSpread();
 
     String filter(Player player, String raw);
+
+    void refreshDropName(Item item);
+
+    void refreshDropName(Item item, String bundleFormat, int bundleEntryLimit);
 
     Optional<String> boardFor(Player player);
 

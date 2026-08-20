@@ -4,6 +4,7 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.TextComponent;
 import net.kyori.adventure.text.format.TextColor;
 import net.kyori.adventure.text.minimessage.MiniMessage;
+import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.bukkit.ChatColor;
 
 import java.util.Collections;
@@ -12,9 +13,22 @@ import java.util.Map;
 
 public final class TextUtils {
   private static final Map<Character, String> LEGACY_TAGS = legacyTags();
+  private static final LegacyComponentSerializer LEGACY = LegacyComponentSerializer.builder()
+      .character(LegacyComponentSerializer.SECTION_CHAR)
+      .hexColors()
+      .useUnusualXRepeatedCharacterHexFormat()
+      .build();
 
   public static Component parse(String text) {
     return MiniMessage.miniMessage().deserialize(translateLegacy(text));
+  }
+
+  /**
+   * Section codes only. Used for text that carries player typed content, where a MiniMessage pass
+   * would turn whatever the player wrote between angle brackets into markup.
+   */
+  public static Component parseLegacy(String text) {
+    return LEGACY.deserialize(text == null ? "" : text);
   }
 
   public static Component textColor(String text, String hexColor) {

@@ -10,7 +10,7 @@ import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.UnaryOperator;
 
-public final class AnimationTemplate {
+public final class AnimationTemplate implements TextFrameSource {
     public sealed interface Segment permits LiteralSegment, SlotSegment {
     }
 
@@ -93,6 +93,7 @@ public final class AnimationTemplate {
         return segments;
     }
 
+    @Override
     public String compose(long nowMs) {
         if (segments.size() == 1 && segments.getFirst() instanceof LiteralSegment only) {
             return only.text();

@@ -9,37 +9,67 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.UUID;
+import java.util.function.LongFunction;
 import java.util.function.Supplier;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ChatBubblesShimmerRuntimeTest {
+    private static final long BORN_AT_MS = 1000L;
+    private static final long LIFETIME_MS = 5000L;
+
+    private static ChatBubblesService.BubbleRecord record(CapturingTemporaryHologram hologram,
+                                                          BubbleStyleDoc.Shimmer shimmer) {
+        return new ChatBubblesService.BubbleRecord(hologram, null, new Vector(),
+            BubbleMotionPlan.compile(BubbleStyleDoc.DEFAULTS.motion()), BubbleShimmerPlan.compile(shimmer),
+            false, BORN_AT_MS, LIFETIME_MS, BORN_AT_MS + LIFETIME_MS, 1, 0.5D, "&7", "message", 32,
+            List.of("§7abcdefgh"));
+    }
+
     @Test
-    void servicePublishesSpawnAndFlyAwayFramesToTheLiveTemporaryHologram() {
+    void bubbleFramesWaitThenRunBothBoundedSweeps() {
+        ChatBubblesService.BubbleRecord record = record(new CapturingTemporaryHologram(),
+            BubbleStyleDoc.DEFAULTS.shimmer());
+
+        assertEquals(List.of("§7abcdefgh"), record.frameAt(BORN_AT_MS));
+        assertEquals(List.of("§7abcdefgh"), record.frameAt(BORN_AT_MS + 399L));
+        assertTrue(record.frameAt(BORN_AT_MS + 400L).getFirst()
+            .startsWith("§7§x§f§f§f§f§f§fa§7§x§f§f§f§f§f§fb"));
+        assertEquals(List.of("§7abcdefgh"), record.frameAt(BORN_AT_MS + 2000L));
+        assertTrue(record.frameAt(BORN_AT_MS + 4300L).getFirst()
+            .startsWith("§7§x§f§f§f§f§f§fa§7§x§f§f§f§f§f§fb"));
+    }
+
+    @Test
+    void framesAreMemoizedPerBandStepSoTheAnimatorLoopDoesNotRebuildEveryPass() {
+        ChatBubblesService.BubbleRecord record = record(new CapturingTemporaryHologram(),
+            BubbleStyleDoc.DEFAULTS.shimmer());
+
+        List<String> first = record.frameAt(BORN_AT_MS + 400L);
+        assertSame(first, record.frameAt(BORN_AT_MS + 408L));
+        assertNotEquals(first, record.frameAt(BORN_AT_MS + 500L));
+    }
+
+    @Test
+    void serviceHandsTheHologramAFrameBinderInsteadOfPushingTextOnTheTickPath() {
         CapturingTemporaryHologram hologram = new CapturingTemporaryHologram();
-        BubbleStyleDoc.Shimmer shimmer = new BubbleStyleDoc.Shimmer(
-            true, true, "#ffffff", 1, 1000L, 0L, 1000L);
-        ChatBubblesService.BubbleRecord record = new ChatBubblesService.BubbleRecord(
-            hologram, null, new Vector(), BubbleMotionPlan.compile(BubbleStyleDoc.DEFAULTS.motion()),
-            BubbleShimmerPlan.compile(shimmer), false, 1000L, 5000L, 6000L, 1, 0.5D,
-            "&7", "message", 32, List.of("§7Gloss"));
+        ChatBubblesService.BubbleRecord record = record(hologram, BubbleStyleDoc.DEFAULTS.shimmer());
 
-        ChatBubblesService.applyBubbleText(record, 1000L);
-        List<String> spawn = hologram.lines();
-        ChatBubblesService.applyBubbleText(record, 3500L);
-        List<String> idle = hologram.lines();
-        ChatBubblesService.applyBubbleText(record, 5500L);
-        List<String> departure = hologram.lines();
+        ChatBubblesService.publishInitialText(record, BORN_AT_MS);
 
-        assertNotEquals(List.of("§7Gloss"), spawn);
-        assertEquals(List.of("§7Gloss"), idle);
-        assertNotEquals(idle, departure);
-        assertEquals(3, hologram.publishCount);
+        assertEquals(1, hologram.publishCount, "spawn publishes the delayed base frame exactly once");
+        assertEquals(List.of("§7abcdefgh"), hologram.lines);
+        assertNotNull(hologram.frames, "the shimmer must be driven by the bound frame source");
+        assertEquals(record.frameAt(BORN_AT_MS + 500L), hologram.frames.apply(BORN_AT_MS + 500L));
     }
 
     private static final class CapturingTemporaryHologram implements TemporaryHologram {
         private List<String> lines = List.of();
+        private LongFunction<List<String>> frames;
         private int publishCount;
 
         @Override
@@ -80,6 +110,11 @@ class ChatBubblesShimmerRuntimeTest {
         public void setRenderedLines(List<String> lines) {
             this.lines = List.copyOf(lines);
             publishCount++;
+        }
+
+        @Override
+        public void bindRenderedFrames(LongFunction<List<String>> frames) {
+            this.frames = frames;
         }
 
         @Override

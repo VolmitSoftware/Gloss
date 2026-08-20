@@ -55,6 +55,54 @@ class BubbleLegacyDefaultUpgradeTest {
         assertEquals(edited, Files.readString(file.toPath(), StandardCharsets.UTF_8));
     }
 
+    @Test
+    void upgradesTheUntouchedFastSchemaTwoDefault() throws IOException {
+        String current = shippedDefault();
+        String previous = current.replace("\"spawnDelayMs\": 400", "\"spawnDelayMs\": 0");
+        File file = new File(folder, "default.json");
+        Files.writeString(file.toPath(), previous, StandardCharsets.UTF_8);
+
+        assertTrue(ChatBubblesService.upgradeLegacyDefault(defaults()));
+        assertEquals(current, Files.readString(file.toPath(), StandardCharsets.UTF_8));
+    }
+
+    @Test
+    void upgradesTheUntouchedTwoToneSchemaTwoDefault() throws IOException {
+        String current = shippedDefault();
+        String previous = current
+            .replace("\"flyAway\": true", "\"flyAway\": false")
+            .replace("\"durationMs\": 700", "\"durationMs\": 4233")
+            .replace("\"spawnDelayMs\": 400", "\"spawnDelayMs\": 0")
+            .replace(
+            "    \"color\": \"#ffffff\",\n",
+            "    \"color\": \"#ffffff\",\n    \"edgeColor\": \"#aaaaaa\",\n");
+        File file = new File(folder, "default.json");
+        Files.writeString(file.toPath(), previous, StandardCharsets.UTF_8);
+
+        assertTrue(ChatBubblesService.upgradeLegacyDefault(defaults()));
+        assertEquals(current, Files.readString(file.toPath(), StandardCharsets.UTF_8));
+    }
+
+    @Test
+    void upgradesTheUntouchedLegacyCycleSchemaTwoDefault() throws IOException {
+        String current = shippedDefault();
+        String previous = current
+            .replace("\"flyAway\": true", "\"flyAway\": false")
+            .replace("\"durationMs\": 700", "\"durationMs\": 4233")
+            .replace("\"spawnDelayMs\": 400", "\"spawnDelayMs\": 0");
+        File file = new File(folder, "default.json");
+        Files.writeString(file.toPath(), previous, StandardCharsets.UTF_8);
+
+        assertTrue(ChatBubblesService.upgradeLegacyDefault(defaults()));
+        assertEquals(current, Files.readString(file.toPath(), StandardCharsets.UTF_8));
+    }
+
+    private String shippedDefault() throws IOException {
+        return Files.readString(
+            new File("src/main/resources/defaults/bubbles/default.json").toPath(),
+            StandardCharsets.UTF_8);
+    }
+
     private ShippedDefaults defaults() {
         return new ShippedDefaults(BubbleStyleDoc.KIND, folder, List.of("default"));
     }

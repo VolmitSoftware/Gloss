@@ -57,15 +57,15 @@ final class CharacterizationHarness implements AutoCloseable {
     record DelayedTask(Runnable task, long delayTicks) {
     }
 
-    record Sent(List<Player> viewers, int entityId, String text) {
+    record Sent(List<Player> viewers, int entityId, String text, TextCodec codec) {
     }
 
     static final class RecordingSender implements AnimationTextSender {
         final List<Sent> sent = new CopyOnWriteArrayList<>();
 
         @Override
-        public void send(List<Player> viewers, int entityId, String legacyText) {
-            sent.add(new Sent(List.copyOf(viewers), entityId, legacyText));
+        public void send(List<Player> viewers, int entityId, String legacyText, TextCodec codec) {
+            sent.add(new Sent(List.copyOf(viewers), entityId, legacyText, codec));
         }
     }
 

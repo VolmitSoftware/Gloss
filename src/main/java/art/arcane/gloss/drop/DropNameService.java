@@ -89,6 +89,24 @@ public final class DropNameService implements Listener {
         return tracker.size();
     }
 
+    public void refresh(Item item) {
+        if (!listening || item == null) {
+            return;
+        }
+
+        plugin.scheduler().runEntity(item, () -> refreshOnOwner(item));
+    }
+
+    public void refresh(Item item, String bundleFormat, int bundleEntryLimit) {
+        if (!listening || item == null || bundleFormat == null) {
+            return;
+        }
+
+        int safeEntryLimit = Math.max(1, Math.min(bundleEntryLimit, 10));
+        plugin.scheduler().runEntity(item,
+            () -> refreshOnOwner(item, bundleFormat, safeEntryLimit));
+    }
+
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onItemSpawn(ItemSpawnEvent event) {
         Item item = event.getEntity();
@@ -124,16 +142,25 @@ public final class DropNameService implements Listener {
 
     private void applyName(Item item, ItemStack stack, int count) {
         GlossConfig.Drops drops = plugin.cfg().drops();
+        applyName(item, stack, count, drops.bundleFormat(), drops.bundleEntryLimit());
+    }
+
+    private void applyName(Item item, ItemStack stack, int count, String bundleFormat,
+                           int bundleEntryLimit) {
+        GlossConfig.Drops drops = plugin.cfg().drops();
         boolean glossOwned = item.getPersistentDataContainer().has(nameKey, PersistentDataType.BOOLEAN);
         if (DropNameFormatter.preservesExistingName(drops.preserveCustomNames(), item.getCustomName() != null, glossOwned)) {
             return;
         }
 
-        String raw = bundleLabel(drops, stack);
+        String raw = bundleLabel(bundleFormat, bundleEntryLimit, stack);
         if (raw.isEmpty()) {
             raw = DropNameFormatter.format(drops.nameFormat(), count, typeLabel(drops, stack));
         }
-        item.setCustomName(renderName(raw));
+        String rendered = renderName(raw);
+        if (!rendered.equals(item.getCustomName())) {
+            item.setCustomName(rendered);
+        }
         if (!item.isCustomNameVisible()) {
             item.setCustomNameVisible(true);
         }
@@ -179,29 +206,36 @@ public final class DropNameService implements Listener {
         return DropNameFormatter.typeLabel(true, displayName, materialName);
     }
 
-    private static String bundleLabel(GlossConfig.Drops drops, ItemStack stack) {
-        if (stack.getType() != Material.BUNDLE || !(stack.getItemMeta() instanceof BundleMeta meta)) {
+    private static String bundleLabel(String format, int entryLimit, ItemStack stack) {
+        List<DropNameFormatter.BundleContent> contents = bundleContents(stack);
+        if (contents.isEmpty()) {
             return "";
+        }
+
+        return DropNameFormatter.formatBundle(
+            format,
+            contents,
+            entryLimit,
+            DropNameService::renderMore);
+    }
+
+    private static List<DropNameFormatter.BundleContent> bundleContents(ItemStack stack) {
+        if (stack.getType() != Material.BUNDLE || !(stack.getItemMeta() instanceof BundleMeta meta)) {
+            return List.of();
         }
 
         List<ItemStack> items = meta.getItems();
         if (items == null || items.isEmpty()) {
-            return "";
+            return List.of();
         }
 
         List<DropNameFormatter.BundleContent> contents = new ArrayList<>(items.size());
         for (ItemStack carried : items) {
-            if (carried == null) {
-                continue;
+            if (carried != null) {
+                contents.add(new DropNameFormatter.BundleContent(prettyName(carried.getType()), carried.getAmount()));
             }
-            contents.add(new DropNameFormatter.BundleContent(prettyName(carried.getType()), carried.getAmount()));
         }
-
-        return DropNameFormatter.formatBundle(
-            drops.bundleFormat(),
-            contents,
-            drops.bundleEntryLimit(),
-            DropNameService::renderMore);
+        return contents;
     }
 
     private static String prettyName(Material material) {
@@ -215,6 +249,24 @@ public final class DropNameService implements Listener {
 
     private void prunePass() {
         tracker.prune(PRUNE_BUDGET);
+    }
+
+    private void refreshOnOwner(Item item) {
+        if (!listening || !item.isValid()) {
+            return;
+        }
+
+        ItemStack stack = item.getItemStack();
+        applyName(item, stack, stack.getAmount());
+    }
+
+    private void refreshOnOwner(Item item, String bundleFormat, int bundleEntryLimit) {
+        if (!listening || !item.isValid()) {
+            return;
+        }
+
+        ItemStack stack = item.getItemStack();
+        applyName(item, stack, stack.getAmount(), bundleFormat, bundleEntryLimit);
     }
 
     private static boolean stillPresent(UUID entityId) {

@@ -22,15 +22,15 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class HologramAnimatorTest {
-    private record Sent(List<Player> viewers, int entityId, String text) {
+    private record Sent(List<Player> viewers, int entityId, String text, TextCodec codec) {
     }
 
     private static final class RecordingSender implements AnimationTextSender {
         private final List<Sent> sent = new ArrayList<>();
 
         @Override
-        public void send(List<Player> viewers, int entityId, String legacyText) {
-            sent.add(new Sent(List.copyOf(viewers), entityId, legacyText));
+        public void send(List<Player> viewers, int entityId, String legacyText, TextCodec codec) {
+            sent.add(new Sent(List.copyOf(viewers), entityId, legacyText, codec));
         }
     }
 

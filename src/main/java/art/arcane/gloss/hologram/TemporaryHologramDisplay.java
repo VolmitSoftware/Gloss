@@ -24,6 +24,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
+import java.util.function.LongFunction;
 import java.util.function.Supplier;
 import java.util.logging.Level;
 
@@ -59,6 +60,7 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
     private volatile Location appliedPosition;
     private volatile Supplier<Location> binder;
     private volatile Supplier<HologramPresentation> presentationBinder;
+    private volatile FrameComposer frameComposer;
     private volatile TextDisplay display;
     private volatile String rendered;
     private volatile HologramPresentation appliedPresentation;
@@ -160,6 +162,11 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
         }
 
         textDirty.set(true);
+    }
+
+    @Override
+    public void bindRenderedFrames(LongFunction<List<String>> frames) {
+        this.frameComposer = frames == null ? null : new FrameComposer(frames);
     }
 
     @Override
@@ -290,6 +297,7 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
                     spawned.setText(next);
                     if (snapshot.rendered()) {
                         spawned.setLineWidth(RENDERED_LINE_WIDTH);
+                        spawned.setAlignment(TextDisplay.TextAlignment.LEFT);
                     }
                     applyPresentationNow(spawned, presentation, teleportTicks, false);
                     if (whitelist) {
@@ -383,6 +391,12 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
     }
 
     private void applyText(TextDisplay active, HologramTick tick, World world) {
+        FrameComposer frames = frameComposer;
+        if (frames != null) {
+            applyFrames(active, tick, world, frames);
+            return;
+        }
+
         LineSet snapshot = lineSet;
         if ((snapshot.flags() & TextPipeline.HAS_FUNCTION) != 0) {
             AnimationTemplate template = service.animator().compileTemplate(snapshot.lines(),
@@ -401,6 +415,34 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
         }
 
         String next = renderLines(snapshot);
+        if (next.equals(rendered)) {
+            return;
+        }
+
+        rendered = next;
+        service.plugin().scheduler().runEntity(active, () -> {
+            if (active.isValid()) {
+                active.setText(next);
+            }
+        });
+    }
+
+    /**
+     * A bound frame source owns the text. It rides the animator's async packet loop so a sub tick
+     * effect keeps its own rate instead of being quantized to the temporary driver's tick interval;
+     * with high frequency animations switched off it falls back to one composed frame per drive.
+     */
+    private void applyFrames(TextDisplay active, HologramTick tick, World world, FrameComposer frames) {
+        if (service.highFrequencyAnimations()) {
+            service.animator().publish(animatorGroup, HologramAnimator.SHARED_SUB,
+                new HologramAnimator.Target(active.getEntityId(), frames, captureViewers(tick, world),
+                    TextCodec.LEGACY));
+            return;
+        }
+
+        service.animator().removeGroup(animatorGroup);
+        textDirty.set(false);
+        String next = frames.compose(M.ms());
         if (next.equals(rendered)) {
             return;
         }
@@ -608,6 +650,34 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
             List<String> copied = List.copyOf(next);
             lineSet = lineSet.rendered() ? LineSet.rendered(copied) : LineSet.of(copied);
             return true;
+        }
+    }
+
+    /**
+     * Joins the bound frame's lines once per band step rather than once per animator pass. The
+     * binder memoizes on its own effect clock and hands back the same list until the effect moves,
+     * so identity is enough to skip the join.
+     */
+    private static final class FrameComposer implements TextFrameSource {
+        private final LongFunction<List<String>> frames;
+        private volatile List<String> lastLines;
+        private volatile String lastText;
+
+        private FrameComposer(LongFunction<List<String>> frames) {
+            this.frames = frames;
+        }
+
+        @Override
+        public String compose(long nowMs) {
+            List<String> lines = frames.apply(nowMs);
+            if (lines == lastLines) {
+                return lastText;
+            }
+
+            String text = String.join("\n", lines);
+            lastLines = lines;
+            lastText = text;
+            return text;
         }
     }
 

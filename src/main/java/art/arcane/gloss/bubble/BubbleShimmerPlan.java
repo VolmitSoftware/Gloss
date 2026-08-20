@@ -6,6 +6,11 @@ import java.util.List;
 import java.util.Map;
 
 final class BubbleShimmerPlan {
+    static final long DEFAULT_DURATION_MS = 700L;
+    static final long DEFAULT_SPAWN_DELAY_MS = 400L;
+    static final long DEFAULT_FLY_AWAY_LEAD_MS = 700L;
+    static final long NO_BAND = Long.MIN_VALUE;
+
     private final boolean spawn;
     private final boolean flyAway;
     private final String color;
@@ -15,13 +20,13 @@ final class BubbleShimmerPlan {
     private final long flyAwayLeadMs;
 
     private BubbleShimmerPlan(BubbleStyleDoc.Shimmer shimmer) {
-        this.spawn = shimmer.spawn();
-        this.flyAway = shimmer.flyAway();
-        this.color = rgbCode(shimmer.color());
-        this.width = shimmer.width();
-        this.durationMs = shimmer.durationMs();
-        this.spawnDelayMs = shimmer.spawnDelayMs();
-        this.flyAwayLeadMs = shimmer.flyAwayLeadMs();
+        spawn = shimmer.spawn();
+        flyAway = shimmer.flyAway();
+        color = rgbCode(shimmer.color());
+        width = shimmer.width();
+        durationMs = shimmer.durationMs();
+        spawnDelayMs = shimmer.spawnDelayMs();
+        flyAwayLeadMs = shimmer.flyAwayLeadMs();
     }
 
     static BubbleShimmerPlan compile(BubbleStyleDoc.Shimmer shimmer) {
@@ -29,84 +34,114 @@ final class BubbleShimmerPlan {
     }
 
     List<String> render(List<String> lines, long ageMs, long lifetimeMs) {
-        double progress = progress(ageMs, lifetimeMs);
-        if (progress < 0.0D) {
+        return renderAt(lines, bandIndex(ageMs, lifetimeMs, visibleCount(lines)));
+    }
+
+    List<String> renderAt(List<String> lines, long bandIndex) {
+        if (bandIndex == NO_BAND) {
             return lines;
         }
         List<String> rendered = new ArrayList<>(lines.size());
+        boolean touched = false;
+        int visibleIndex = 0;
         for (String line : lines) {
-            rendered.add(renderLine(line, progress));
+            LineRender next = renderLine(line, bandIndex, visibleIndex);
+            touched |= next.text() != line;
+            rendered.add(next.text());
+            visibleIndex = next.nextVisibleIndex();
         }
-        return List.copyOf(rendered);
+        return touched ? List.copyOf(rendered) : lines;
     }
 
-    double progress(long ageMs, long lifetimeMs) {
+    long bandIndex(long ageMs, long lifetimeMs, int visibleGlyphs) {
+        if (visibleGlyphs <= 0) {
+            return NO_BAND;
+        }
+        double progress = progress(ageMs, lifetimeMs);
+        if (progress < 0.0D) {
+            return NO_BAND;
+        }
+        return Math.round(progress * (visibleGlyphs - 1L));
+    }
+
+    int visibleCount(List<String> lines) {
+        int count = 0;
+        for (String line : lines) {
+            int cursor = 0;
+            while (cursor < line.length()) {
+                int formatLength = formatLength(line, cursor);
+                if (formatLength > 0) {
+                    cursor += formatLength;
+                    continue;
+                }
+                cursor += Character.charCount(line.codePointAt(cursor));
+                count++;
+            }
+        }
+        return count;
+    }
+
+    private double progress(long ageMs, long lifetimeMs) {
         if (flyAway) {
-            long flyAwayStartMs = Math.max(0L, lifetimeMs - flyAwayLeadMs);
-            double departure = phaseProgress(ageMs, flyAwayStartMs);
+            long departureStartMs = Math.max(0L, lifetimeMs - flyAwayLeadMs);
+            double departure = progressAt(ageMs, departureStartMs);
             if (departure >= 0.0D) {
                 return departure;
             }
         }
-        return spawn ? phaseProgress(ageMs, spawnDelayMs) : -1.0D;
+        if (spawn) {
+            return progressAt(ageMs, spawnDelayMs);
+        }
+        return -1.0D;
     }
 
-    private double phaseProgress(long ageMs, long startMs) {
-        long elapsedMs = ageMs - startMs;
+    private double progressAt(long ageMs, long startsAtMs) {
+        long elapsedMs = ageMs - startsAtMs;
         if (elapsedMs < 0L || elapsedMs > durationMs) {
             return -1.0D;
         }
-        return Math.max(0.0D, Math.min(1.0D, (double) elapsedMs / durationMs));
+        return elapsedMs / (double) durationMs;
     }
 
-    private String renderLine(String line, double progress) {
-        int visibleCount = visibleCount(line);
-        if (visibleCount == 0) {
-            return line;
-        }
-        double center = progress * (visibleCount - 1);
-        int first = (int) Math.round(center - ((width - 1) / 2.0D));
-        int last = first + width - 1;
-        StringBuilder rendered = new StringBuilder(line.length() + width * 24);
+    private boolean lit(long bandIndex, long at) {
+        long distance = bandIndex - at;
+        int before = (width - 1) / 2;
+        int after = width - before - 1;
+        return distance >= -after && distance <= before;
+    }
+
+    private LineRender renderLine(String line, long bandIndex, int firstVisibleIndex) {
+        StringBuilder rendered = null;
         FormatState formatting = new FormatState();
-        int visibleIndex = 0;
+        int visibleIndex = firstVisibleIndex;
         int cursor = 0;
         while (cursor < line.length()) {
             int formatLength = formatLength(line, cursor);
             if (formatLength > 0) {
                 String raw = line.substring(cursor, cursor + formatLength);
                 formatting.apply(raw);
-                rendered.append(raw);
+                if (rendered != null) {
+                    rendered.append(raw);
+                }
                 cursor += formatLength;
                 continue;
             }
             int codePoint = line.codePointAt(cursor);
-            String glyph = new String(Character.toChars(codePoint));
-            if (visibleIndex >= first && visibleIndex <= last) {
-                rendered.append(color).append(glyph).append(formatting.codes());
-            } else {
-                rendered.append(glyph);
+            int glyphLength = Character.charCount(codePoint);
+            if (lit(bandIndex, visibleIndex)) {
+                if (rendered == null) {
+                    rendered = new StringBuilder(line.length() + 64).append(line, 0, cursor);
+                }
+                rendered.append(color)
+                    .append(line, cursor, cursor + glyphLength)
+                    .append(formatting.codes());
+            } else if (rendered != null) {
+                rendered.append(line, cursor, cursor + glyphLength);
             }
             visibleIndex++;
-            cursor += Character.charCount(codePoint);
+            cursor += glyphLength;
         }
-        return rendered.toString();
-    }
-
-    private static int visibleCount(String line) {
-        int count = 0;
-        int cursor = 0;
-        while (cursor < line.length()) {
-            int formatLength = formatLength(line, cursor);
-            if (formatLength > 0) {
-                cursor += formatLength;
-                continue;
-            }
-            int codePoint = line.codePointAt(cursor);
-            count++;
-            cursor += Character.charCount(codePoint);
-        }
-        return count;
+        return new LineRender(rendered == null ? line : rendered.toString(), visibleIndex);
     }
 
     private static int formatLength(String input, int index) {
@@ -144,12 +179,15 @@ final class BubbleShimmerPlan {
         return normalized >= '0' && normalized <= '9' || normalized >= 'a' && normalized <= 'f';
     }
 
-    private static String rgbCode(String color) {
+    private static String rgbCode(String value) {
         StringBuilder code = new StringBuilder(14).append('§').append('x');
-        for (int index = 1; index < color.length(); index++) {
-            code.append('§').append(color.charAt(index));
+        for (int index = 1; index < value.length(); index++) {
+            code.append('§').append(value.charAt(index));
         }
         return code.toString();
+    }
+
+    private record LineRender(String text, int nextVisibleIndex) {
     }
 
     private static final class FormatState {

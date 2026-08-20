@@ -58,6 +58,118 @@ public final class ChatBubblesService implements Listener {
         + "  \"followPlayer\": true,\n"
         + "  \"hideOwn\": true\n"
         + "}\n").getBytes(StandardCharsets.UTF_8);
+    private static final byte[] PREVIOUS_SCHEMA_TWO_DEFAULT = ("{\n"
+        + "  \"schemaVersion\": 2,\n"
+        + "  \"revision\": 1,\n"
+        + "  \"prefix\": \"&7\",\n"
+        + "  \"offset\": [0.0, 1.0, 0.0],\n"
+        + "  \"wordWrapChars\": 32,\n"
+        + "  \"maxAliveMs\": 5000,\n"
+        + "  \"followPlayer\": true,\n"
+        + "  \"hideOwn\": true,\n"
+        + "  \"motion\": {\n"
+        + "    \"translation\": {\n"
+        + "      \"x\": \"0\",\n"
+        + "      \"y\": \"10 * pow(clamp((ageMs - lifetimeMs + 2000) / 2000, 0, 1), 16)\",\n"
+        + "      \"z\": \"0\"\n"
+        + "    },\n"
+        + "    \"scale\": {\n"
+        + "      \"x\": \"1\",\n"
+        + "      \"y\": \"1\",\n"
+        + "      \"z\": \"1\"\n"
+        + "    },\n"
+        + "    \"rotation\": {\n"
+        + "      \"x\": \"0\",\n"
+        + "      \"y\": \"0\",\n"
+        + "      \"z\": \"0\"\n"
+        + "    },\n"
+        + "    \"opacity\": \"1\"\n"
+        + "  },\n"
+        + "  \"shimmer\": {\n"
+        + "    \"spawn\": true,\n"
+        + "    \"flyAway\": true,\n"
+        + "    \"color\": \"#ffffff\",\n"
+        + "    \"width\": 3,\n"
+        + "    \"durationMs\": 700,\n"
+        + "    \"spawnDelayMs\": 0,\n"
+        + "    \"flyAwayLeadMs\": 700\n"
+        + "  }\n"
+        + "}\n").getBytes(StandardCharsets.UTF_8);
+    private static final byte[] PREVIOUS_TWO_TONE_DEFAULT = ("{\n"
+        + "  \"schemaVersion\": 2,\n"
+        + "  \"revision\": 1,\n"
+        + "  \"prefix\": \"&7\",\n"
+        + "  \"offset\": [0.0, 1.0, 0.0],\n"
+        + "  \"wordWrapChars\": 32,\n"
+        + "  \"maxAliveMs\": 5000,\n"
+        + "  \"followPlayer\": true,\n"
+        + "  \"hideOwn\": true,\n"
+        + "  \"motion\": {\n"
+        + "    \"translation\": {\n"
+        + "      \"x\": \"0\",\n"
+        + "      \"y\": \"10 * pow(clamp((ageMs - lifetimeMs + 2000) / 2000, 0, 1), 16)\",\n"
+        + "      \"z\": \"0\"\n"
+        + "    },\n"
+        + "    \"scale\": {\n"
+        + "      \"x\": \"1\",\n"
+        + "      \"y\": \"1\",\n"
+        + "      \"z\": \"1\"\n"
+        + "    },\n"
+        + "    \"rotation\": {\n"
+        + "      \"x\": \"0\",\n"
+        + "      \"y\": \"0\",\n"
+        + "      \"z\": \"0\"\n"
+        + "    },\n"
+        + "    \"opacity\": \"1\"\n"
+        + "  },\n"
+        + "  \"shimmer\": {\n"
+        + "    \"spawn\": true,\n"
+        + "    \"flyAway\": false,\n"
+        + "    \"color\": \"#ffffff\",\n"
+        + "    \"edgeColor\": \"#aaaaaa\",\n"
+        + "    \"width\": 3,\n"
+        + "    \"durationMs\": 4233,\n"
+        + "    \"spawnDelayMs\": 0,\n"
+        + "    \"flyAwayLeadMs\": 700\n"
+        + "  }\n"
+        + "}\n").getBytes(StandardCharsets.UTF_8);
+    private static final byte[] PREVIOUS_LEGACY_CYCLE_DEFAULT = ("{\n"
+        + "  \"schemaVersion\": 2,\n"
+        + "  \"revision\": 1,\n"
+        + "  \"prefix\": \"&7\",\n"
+        + "  \"offset\": [0.0, 1.0, 0.0],\n"
+        + "  \"wordWrapChars\": 32,\n"
+        + "  \"maxAliveMs\": 5000,\n"
+        + "  \"followPlayer\": true,\n"
+        + "  \"hideOwn\": true,\n"
+        + "  \"motion\": {\n"
+        + "    \"translation\": {\n"
+        + "      \"x\": \"0\",\n"
+        + "      \"y\": \"10 * pow(clamp((ageMs - lifetimeMs + 2000) / 2000, 0, 1), 16)\",\n"
+        + "      \"z\": \"0\"\n"
+        + "    },\n"
+        + "    \"scale\": {\n"
+        + "      \"x\": \"1\",\n"
+        + "      \"y\": \"1\",\n"
+        + "      \"z\": \"1\"\n"
+        + "    },\n"
+        + "    \"rotation\": {\n"
+        + "      \"x\": \"0\",\n"
+        + "      \"y\": \"0\",\n"
+        + "      \"z\": \"0\"\n"
+        + "    },\n"
+        + "    \"opacity\": \"1\"\n"
+        + "  },\n"
+        + "  \"shimmer\": {\n"
+        + "    \"spawn\": true,\n"
+        + "    \"flyAway\": false,\n"
+        + "    \"color\": \"#ffffff\",\n"
+        + "    \"width\": 3,\n"
+        + "    \"durationMs\": 4233,\n"
+        + "    \"spawnDelayMs\": 0,\n"
+        + "    \"flyAwayLeadMs\": 700\n"
+        + "  }\n"
+        + "}\n").getBytes(StandardCharsets.UTF_8);
 
     private final Gloss plugin;
     private final ShippedDefaults defaults;
@@ -104,7 +216,10 @@ public final class ChatBubblesService implements Listener {
     }
 
     static boolean upgradeLegacyDefault(ShippedDefaults defaults) {
-        return defaults.replaceIfExact("default", LEGACY_DEFAULT);
+        return defaults.replaceIfExact("default", LEGACY_DEFAULT)
+            || defaults.replaceIfExact("default", PREVIOUS_SCHEMA_TWO_DEFAULT)
+            || defaults.replaceIfExact("default", PREVIOUS_TWO_TONE_DEFAULT)
+            || defaults.replaceIfExact("default", PREVIOUS_LEGACY_CYCLE_DEFAULT);
     }
 
     public void disable() {
@@ -138,7 +253,7 @@ public final class ChatBubblesService implements Listener {
     private void extractDefaults() {
         defaults.extractMissing();
         if (upgradeLegacyDefault(defaults)) {
-            Gloss.info("Upgraded the untouched bubble default to schema version 2.");
+            Gloss.info("Upgraded the untouched bubble default to the current shipped style.");
         }
     }
 
@@ -285,7 +400,7 @@ public final class ChatBubblesService implements Listener {
         BubbleRecord record = new BubbleRecord(hologram, captured, offset, resolved.motion(), resolved.shimmer(),
             style.followPlayer(), startedAtMs, style.maxAliveMs(), startedAtMs + style.maxAliveMs(), lines.size(),
             seed(sender.getUniqueId(), startedAtMs, sequence), style.prefix(), message, style.wordWrapChars(), lines);
-        applyBubbleText(record, startedAtMs);
+        publishInitialText(record, startedAtMs);
         SenderState state = bubbles.compute(sender.getUniqueId(), (uuid, existing) -> {
             SenderState target = existing == null ? new SenderState() : existing;
             target.lastEye = eyePoint;
@@ -360,10 +475,8 @@ public final class ChatBubblesService implements Listener {
         if (state.followCount.get() > 0) {
             state.lastEye = EyePoint.of(sender.getEyeLocation());
         }
-        long nowMs = M.ms();
         for (BubbleRecord record : state.live) {
             refreshText(sender, record);
-            applyBubbleText(record, nowMs);
         }
     }
 
@@ -376,18 +489,14 @@ public final class ChatBubblesService implements Listener {
         if (lines.isEmpty() || lines.equals(record.renderedLines)) {
             return;
         }
-        record.renderedLines = lines;
+        record.renderedLines = List.copyOf(lines);
         record.lineCount = lines.size();
+        record.hologram.setRenderedLines(record.frameAt(M.ms()));
     }
 
-    static void applyBubbleText(BubbleRecord record, long nowMs) {
-        long ageMs = Math.max(0L, Math.min(record.durationMs, nowMs - record.startedAtMs));
-        List<String> displayed = record.shimmer.render(record.renderedLines, ageMs, record.durationMs);
-        if (displayed.equals(record.appliedLines)) {
-            return;
-        }
-        record.appliedLines = displayed;
-        record.hologram.setRenderedLines(displayed);
+    static void publishInitialText(BubbleRecord record, long nowMs) {
+        record.hologram.setRenderedLines(record.frameAt(nowMs));
+        record.hologram.bindRenderedFrames(record::frameAt);
     }
 
     private void sweepExpired(UUID senderId, SenderState state, long now) {
@@ -550,7 +659,9 @@ public final class ChatBubblesService implements Listener {
         volatile int lineIndex;
         volatile int lineCount;
         volatile List<String> renderedLines;
-        volatile List<String> appliedLines;
+        volatile List<String> shimmerBase;
+        volatile int shimmerVisibleCount;
+        volatile ShimmerFrame shimmerFrame;
         volatile BubbleFrame lastFrame;
 
         BubbleRecord(TemporaryHologram hologram, Location captured, Vector offset, BubbleMotionPlan motion,
@@ -573,8 +684,30 @@ public final class ChatBubblesService implements Listener {
             this.wrapChars = wrapChars;
             this.dynamicPrefix = TextPipeline.viewerDependent(prefix);
             this.renderedLines = List.copyOf(renderedLines);
-            this.appliedLines = List.of();
+            this.shimmerBase = this.renderedLines;
+            this.shimmerVisibleCount = shimmer.visibleCount(this.renderedLines);
         }
+
+        List<String> frameAt(long nowMs) {
+            long ageMs = Math.max(0L, Math.min(durationMs, nowMs - startedAtMs));
+            List<String> base = renderedLines;
+            if (shimmerBase != base) {
+                shimmerBase = base;
+                shimmerVisibleCount = shimmer.visibleCount(base);
+            }
+            long bandIndex = shimmer.bandIndex(ageMs, durationMs, shimmerVisibleCount);
+            ShimmerFrame cached = shimmerFrame;
+            if (cached != null && cached.bandIndex() == bandIndex && cached.base() == base) {
+                return cached.lines();
+            }
+
+            List<String> composed = shimmer.renderAt(base, bandIndex);
+            shimmerFrame = new ShimmerFrame(bandIndex, base, composed);
+            return composed;
+        }
+    }
+
+    record ShimmerFrame(long bandIndex, List<String> base, List<String> lines) {
     }
 
     private record StyleSnapshot(Map<String, BubbleStyleDoc> documents, Map<String, ResolvedStyle> resolved) {

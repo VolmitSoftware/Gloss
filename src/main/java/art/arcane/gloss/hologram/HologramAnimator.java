@@ -31,7 +31,10 @@ public final class HologramAnimator {
     private static final long REPORT_INTERVAL_MILLIS = 10_000L;
     private static final long STOP_JOIN_MILLIS = 1000L;
 
-    public record Target(int entityId, AnimationTemplate template, List<Player> viewers) {
+    public record Target(int entityId, TextFrameSource frames, List<Player> viewers, TextCodec codec) {
+        public Target(int entityId, TextFrameSource frames, List<Player> viewers) {
+            this(entityId, frames, viewers, TextCodec.AUTHORED);
+        }
     }
 
     private record TargetKey(String group, String sub) {
@@ -180,9 +183,9 @@ public final class HologramAnimator {
                 continue;
             }
 
-            String text = target.template().compose(nowMs);
+            String text = target.frames().compose(nowMs);
             if (!text.equals(state.lastText)) {
-                sender.send(online, target.entityId(), text);
+                sender.send(online, target.entityId(), text, target.codec());
                 state.lastText = text;
                 state.lastViewers = viewerIds(online);
                 state.lastSentMs = nowMs;
@@ -195,7 +198,7 @@ public final class HologramAnimator {
                 continue;
             }
 
-            sender.send(fresh, target.entityId(), text);
+            sender.send(fresh, target.entityId(), text, target.codec());
             state.lastViewers = viewerIds(online);
             state.lastSentMs = nowMs;
             sends++;
@@ -296,8 +299,9 @@ public final class HologramAnimator {
         return plugin.animations().clip(name.substring(FUNCTION_PREFIX.length()));
     }
 
-    private static void sendPacket(List<Player> viewers, int entityId, String legacyText) {
-        List<PacketWrapper<?>> packets = List.of(DisplayEntity.textUpdate(entityId, TextUtils.parse(legacyText)));
+    private static void sendPacket(List<Player> viewers, int entityId, String legacyText, TextCodec codec) {
+        List<PacketWrapper<?>> packets = List.of(DisplayEntity.textUpdate(entityId,
+            codec == TextCodec.LEGACY ? TextUtils.parseLegacy(legacyText) : TextUtils.parse(legacyText)));
         PacketUtils.send(viewers, packets);
     }
 

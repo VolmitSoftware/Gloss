@@ -20,7 +20,9 @@ public record BubbleStyleDoc(int schemaVersion, long revision, String prefix, Ve
     private static final Axis ONE = new Axis("1", "1", "1");
     private static final Axis DEFAULT_TRANSLATION = new Axis("0", DEFAULT_TRANSLATION_Y, "0");
     private static final Motion DEFAULT_MOTION = new Motion(DEFAULT_TRANSLATION, ONE, ZERO, "1");
-    private static final Shimmer DEFAULT_SHIMMER = new Shimmer(true, true, "#ffffff", 3, 700L, 0L, 700L);
+    private static final Shimmer DEFAULT_SHIMMER = new Shimmer(true, true, Shimmer.DEFAULT_COLOR,
+        3, BubbleShimmerPlan.DEFAULT_DURATION_MS, BubbleShimmerPlan.DEFAULT_SPAWN_DELAY_MS,
+        BubbleShimmerPlan.DEFAULT_FLY_AWAY_LEAD_MS);
 
     public static final BubbleStyleDoc DEFAULTS = new BubbleStyleDoc(CURRENT_SCHEMA_VERSION,
         DocumentEnvelope.INITIAL_REVISION, "&7", new Vector(0.0D, 1.0D, 0.0D), 32, 5000L,
@@ -63,6 +65,8 @@ public record BubbleStyleDoc(int schemaVersion, long revision, String prefix, Ve
 
     public record Shimmer(Boolean spawn, Boolean flyAway, String color, Integer width, Long durationMs,
                           Long spawnDelayMs, Long flyAwayLeadMs) {
+        public static final String DEFAULT_COLOR = "#ffffff";
+
         public static final int MIN_WIDTH = 1;
         public static final int MAX_WIDTH = 16;
         public static final long MIN_DURATION_MS = 100L;
@@ -72,14 +76,22 @@ public record BubbleStyleDoc(int schemaVersion, long revision, String prefix, Ve
         public Shimmer {
             spawn = spawn == null ? true : spawn;
             flyAway = flyAway == null ? true : flyAway;
-            color = color == null ? "#ffffff" : color.trim().toLowerCase(Locale.ROOT);
-            if (!isRgbColor(color)) {
-                throw new IllegalArgumentException("Bubble shimmer color must be #RRGGBB.");
-            }
+            color = normalizeColor(color, DEFAULT_COLOR, "color");
             width = clampInt(width == null ? 3 : width, MIN_WIDTH, MAX_WIDTH);
-            durationMs = clampLong(durationMs == null ? 700L : durationMs, MIN_DURATION_MS, MAX_DURATION_MS);
-            spawnDelayMs = clampLong(spawnDelayMs == null ? 0L : spawnDelayMs, 0L, MAX_OFFSET_MS);
-            flyAwayLeadMs = clampLong(flyAwayLeadMs == null ? 700L : flyAwayLeadMs, 0L, MAX_OFFSET_MS);
+            durationMs = clampLong(durationMs == null ? BubbleShimmerPlan.DEFAULT_DURATION_MS : durationMs,
+                MIN_DURATION_MS, MAX_DURATION_MS);
+            spawnDelayMs = clampLong(spawnDelayMs == null
+                ? BubbleShimmerPlan.DEFAULT_SPAWN_DELAY_MS : spawnDelayMs, 0L, MAX_OFFSET_MS);
+            flyAwayLeadMs = clampLong(flyAwayLeadMs == null
+                ? BubbleShimmerPlan.DEFAULT_FLY_AWAY_LEAD_MS : flyAwayLeadMs, 0L, MAX_OFFSET_MS);
+        }
+
+        private static String normalizeColor(String value, String fallback, String key) {
+            String normalized = value == null ? fallback : value.trim().toLowerCase(Locale.ROOT);
+            if (!isRgbColor(normalized)) {
+                throw new IllegalArgumentException("Bubble shimmer " + key + " must be #RRGGBB.");
+            }
+            return normalized;
         }
 
         private static boolean isRgbColor(String value) {

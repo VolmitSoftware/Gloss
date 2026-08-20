@@ -219,6 +219,10 @@ public final class HologramService {
         return plugin.cfg().holograms().temporaryUpdateIntervalTicks();
     }
 
+    boolean highFrequencyAnimations() {
+        return plugin.cfg().holograms().highFrequencyAnimations();
+    }
+
     boolean isActive(PersistentHologram hologram) {
         return holograms.get(hologram.id()) == hologram;
     }

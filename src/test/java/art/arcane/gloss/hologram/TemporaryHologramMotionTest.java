@@ -104,6 +104,7 @@ class TemporaryHologramMotionTest {
         DisplayHandle display = harness.onlySpawned(world);
         assertEquals("&1literal\n§bblue", display.lastText());
         assertTrue(display.callLog.contains("setLineWidth"));
+        assertTrue(display.callLog.contains("setAlignment"));
         assertEquals(1, world.spawned.size());
     }
 

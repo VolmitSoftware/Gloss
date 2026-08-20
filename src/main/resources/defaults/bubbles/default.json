@@ -31,7 +31,7 @@
     "color": "#ffffff",
     "width": 3,
     "durationMs": 700,
-    "spawnDelayMs": 0,
+    "spawnDelayMs": 400,
     "flyAwayLeadMs": 700
   }
 }
