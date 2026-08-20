@@ -5,6 +5,7 @@ import art.arcane.gloss.config.MenuComponentData;
 import art.arcane.gloss.config.components.ComponentData;
 import art.arcane.gloss.config.components.HitboxAnchor;
 import art.arcane.gloss.config.components.HitboxData;
+import art.arcane.gloss.config.components.HoverEasing;
 import art.arcane.gloss.menu.MenuSession;
 import art.arcane.gloss.menu.MenuTransform;
 import art.arcane.gloss.util.common.ParticleUtils;
@@ -21,7 +22,10 @@ public abstract class ClickableComponent<T extends ComponentData> extends MenuCo
 
   private final float highlightMod;
   private final HitboxData hitbox;
+  private final int hoverDurationTicks;
+  private final HoverEasing hoverEasing;
   private Vector planeOrigin;
+  private double hoverProgress;
 
   /** The eye position the current tick is being driven from; null outside a tick. */
   private Vector tickEye;
@@ -32,10 +36,13 @@ public abstract class ClickableComponent<T extends ComponentData> extends MenuCo
 
   protected boolean selected;
 
-  public ClickableComponent(MenuSession session, MenuComponentData data, float highlightMod, HitboxData hitbox) {
+  public ClickableComponent(MenuSession session, MenuComponentData data, float highlightMod,
+                            HitboxData hitbox, int hoverDurationTicks, HoverEasing hoverEasing) {
     super(session, data);
     this.highlightMod = highlightMod;
     this.hitbox = hitbox;
+    this.hoverDurationTicks = hoverDurationTicks;
+    this.hoverEasing = hoverEasing;
   }
 
   public boolean isSelected() {
@@ -85,14 +92,9 @@ public abstract class ClickableComponent<T extends ComponentData> extends MenuCo
       direction = eye.getDirection();
     }
     orientTo(origin);
-    boolean isLookingAt = plane.isLookingAt(origin, direction);
-    if (isLookingAt && !selected) {
-      this.selected = true;
-      currentIcon.move(plane.getNormal().clone().multiply(highlightMod));
-    } else if (!isLookingAt && selected) {
-      this.selected = false;
-      currentIcon.applyTransform(location);
-    }
+    this.selected = plane.isLookingAt(origin, direction);
+    advanceHover();
+    applyHoverVisual();
   }
 
   /**
@@ -112,6 +114,7 @@ public abstract class ClickableComponent<T extends ComponentData> extends MenuCo
   @Override
   public void onClose() {
     this.selected = false;
+    this.hoverProgress = 0D;
   }
 
   @Override
@@ -153,8 +156,38 @@ public abstract class ClickableComponent<T extends ComponentData> extends MenuCo
     this.orientedFrom = null;
     positionPlane();
     orientTo(tickEye != null ? tickEye : session.getPlayer().getEyeLocation().toVector());
-    if (selected)
-      currentIcon.move(plane.getNormal().clone().multiply(highlightMod));
+    applyHoverVisual();
+  }
+
+  private void advanceHover() {
+    hoverProgress = nextHoverProgress(selected, hoverProgress, hoverDurationTicks);
+  }
+
+  private void applyHoverVisual() {
+    if (currentIcon == null || plane == null) {
+      return;
+    }
+    double distance = hoverDistance(
+        highlightMod,
+        session.getTransform().scale(),
+        hoverProgress,
+        hoverEasing
+    );
+    Vector offset = plane.getNormal().clone().multiply(distance);
+    currentIcon.applyVisualOffset(location, offset);
+  }
+
+  static double nextHoverProgress(boolean selected, double progress, int durationTicks) {
+    if (durationTicks == 0) {
+      return selected ? 1D : 0D;
+    }
+    double step = 1D / durationTicks;
+    return selected ? Math.min(1D, progress + step) : Math.max(0D, progress - step);
+  }
+
+  static double hoverDistance(float highlightModifier, float uiScale, double progress,
+                              HoverEasing easing) {
+    return highlightModifier * uiScale * easing.apply(progress);
   }
 
   private void positionPlane() {

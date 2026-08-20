@@ -1,5 +1,7 @@
 package art.arcane.gloss.animation;
 
+import art.arcane.gloss.text.TextPipeline;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -58,11 +60,6 @@ public final class AnimationFrameCache {
     }
 
     private static boolean viewerDependent(String frame) {
-        if (frame.indexOf('%') >= 0) {
-            return true;
-        }
-
-        int open = frame.indexOf('|');
-        return open >= 0 && frame.indexOf('|', open + 1) >= 0;
+        return TextPipeline.viewerDependent(frame);
     }
 }

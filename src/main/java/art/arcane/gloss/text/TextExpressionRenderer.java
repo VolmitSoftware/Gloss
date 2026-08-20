@@ -20,6 +20,12 @@ import java.util.function.DoubleSupplier;
 import java.util.function.IntSupplier;
 
 public final class TextExpressionRenderer {
+    public static final Set<String> STANDARD_VARIABLES = Set.of(
+        "time.ms", "time.seconds", "time.ticks",
+        "server.online", "server.maxPlayers", "server.tps",
+        "player.name", "player.ping", "player.health", "player.level");
+    public static final Set<String> STANDARD_FUNCTIONS = Set.of("papi", "papiNumber", "metric");
+
     private static final int CACHE_LIMIT = 4096;
     private static final int SOURCE_LIMIT = 1024;
 
@@ -52,7 +58,7 @@ public final class TextExpressionRenderer {
                 break;
             }
             String source = input.substring(open + 2, close).trim();
-            String resolved = resolve(viewer, source);
+            String resolved = resolve(scope(viewer), source);
             if (resolved != null) {
                 if (output == null) {
                     output = new StringBuilder(input.length() + 16);
@@ -75,13 +81,17 @@ public final class TextExpressionRenderer {
         failed.clear();
     }
 
-    private String resolve(Player viewer, String source) {
+    ExprScope scope(Player viewer) {
+        return new Scope(viewer, System.currentTimeMillis());
+    }
+
+    private String resolve(ExprScope scope, String source) {
         if (source.isEmpty() || source.length() > SOURCE_LIMIT) {
             return null;
         }
         try {
             Expr expression = cached(source);
-            return ExprEvaluator.string(expression, new Scope(viewer, System.currentTimeMillis()));
+            return ExprEvaluator.string(expression, scope);
         } catch (RuntimeException failure) {
             if (failed.add(source)) {
                 Gloss.warn("Text expression {{ " + source + " }} failed: " + failure.getMessage());

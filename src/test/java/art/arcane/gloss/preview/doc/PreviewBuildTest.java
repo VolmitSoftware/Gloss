@@ -78,7 +78,7 @@ public class PreviewBuildTest {
         }
         """);
 
-    List<PreviewElement> elements = doc.build(PreviewStateContext.forInventory(inventory, Map.of()));
+    List<PreviewElement> elements = doc.build(PreviewStateContext.forInventory(inventory, null, Map.of()));
 
     assertEquals(8, elements.size());
     assertPanel(elements.get(0), 0, 8, 0, 170, 54, 0xCC336699);
@@ -185,7 +185,7 @@ public class PreviewBuildTest {
         """);
     Inventory inventory = PreviewFakes.inventory(1).build();
 
-    List<PreviewElement> elements = doc.build(PreviewStateContext.forInventory(inventory, Map.of()));
+    List<PreviewElement> elements = doc.build(PreviewStateContext.forInventory(inventory, null, Map.of()));
 
     assertEquals(0xF21B1B22, panel(elements.get(0)).color());
     assertEquals(0xF21B1B22, cell(elements.get(1)).color().getAsInt());
@@ -212,7 +212,7 @@ public class PreviewBuildTest {
         }
         """);
 
-    List<PreviewElement> elements = doc.build(PreviewStateContext.forInventory(PreviewFakes.inventory(5).build(), Map.of()));
+    List<PreviewElement> elements = doc.build(PreviewStateContext.forInventory(PreviewFakes.inventory(5).build(), null, Map.of()));
 
     assertEquals(5, elements.size());
     for (int index = 0; index < 5; index++) {
@@ -239,7 +239,7 @@ public class PreviewBuildTest {
         }
         """);
 
-    List<PreviewElement> elements = doc.build(PreviewStateContext.forInventory(inventory, Map.of()));
+    List<PreviewElement> elements = doc.build(PreviewStateContext.forInventory(inventory, null, Map.of()));
 
     assertEquals(3, elements.size());
     assertEquals(0xFF000000, cell(elements.get(0)).color().getAsInt());
@@ -257,7 +257,7 @@ public class PreviewBuildTest {
         }
         """);
 
-    assertTrue(doc.build(PreviewStateContext.forInventory(PreviewFakes.inventory(3).build(), Map.of())).isEmpty());
+    assertTrue(doc.build(PreviewStateContext.forInventory(PreviewFakes.inventory(3).build(), null, Map.of())).isEmpty());
   }
 
   /**
@@ -270,7 +270,7 @@ public class PreviewBuildTest {
     Inventory inventory = PreviewFakes.inventory(1024).build();
     CompiledPreviewDocument doc = parse("flood.json", floodDocument(5, false));
 
-    assertEquals(4096, doc.build(PreviewStateContext.forInventory(inventory, Map.of())).size());
+    assertEquals(4096, doc.build(PreviewStateContext.forInventory(inventory, null, Map.of())).size());
   }
 
   /** The repeat that straddles the cap is truncated to what is left rather than skipped whole. */
@@ -280,7 +280,7 @@ public class PreviewBuildTest {
     // One plain label, then four repeats of 1024: 1 + 1024 + 1024 + 1024 leaves 1023 for the last.
     CompiledPreviewDocument doc = parse("straddle.json", floodDocument(4, true));
 
-    List<PreviewElement> elements = doc.build(PreviewStateContext.forInventory(inventory, Map.of()));
+    List<PreviewElement> elements = doc.build(PreviewStateContext.forInventory(inventory, null, Map.of()));
 
     assertEquals(4096, elements.size());
     assertTrue(elements.get(0) instanceof PreviewElement.Label);
@@ -376,7 +376,7 @@ public class PreviewBuildTest {
         }
         """);
 
-    List<PreviewElement> elements = doc.build(PreviewStateContext.forInventory(PreviewFakes.inventory(1).build(), Map.of()));
+    List<PreviewElement> elements = doc.build(PreviewStateContext.forInventory(PreviewFakes.inventory(1).build(), null, Map.of()));
 
     assertEquals(1, elements.size());
     assertEquals(0x00000000, cell(elements.get(0)).color().getAsInt());
@@ -395,7 +395,7 @@ public class PreviewBuildTest {
     List<String> errors = new ArrayList<>();
 
     List<PreviewElement> elements = doc.build(
-        PreviewStateContext.forInventory(PreviewFakes.inventory(1).build(), Map.of()), errors::add);
+        PreviewStateContext.forInventory(PreviewFakes.inventory(1).build(), null, Map.of()), errors::add);
     int color = cell(elements.get(0)).color().getAsInt();
 
     assertEquals(0x00000000, color);
@@ -435,7 +435,7 @@ public class PreviewBuildTest {
         }
         """);
 
-    List<PreviewElement> elements = doc.build(PreviewStateContext.forInventory(PreviewFakes.inventory(1).build(), Map.of()));
+    List<PreviewElement> elements = doc.build(PreviewStateContext.forInventory(PreviewFakes.inventory(1).build(), null, Map.of()));
 
     assertEquals(1, elements.size());
     assertEquals("kept", TextUtils.content(label(elements.get(0)).text().get()));
@@ -449,7 +449,7 @@ public class PreviewBuildTest {
         }
         """);
 
-    List<PreviewElement> elements = doc.build(PreviewStateContext.forInventory(PreviewFakes.inventory(1).build(), Map.of()));
+    List<PreviewElement> elements = doc.build(PreviewStateContext.forInventory(PreviewFakes.inventory(1).build(), null, Map.of()));
 
     assertEquals(1, elements.size());
     assertEquals(Component.empty(), label(elements.get(0)).text().get());
@@ -467,7 +467,7 @@ public class PreviewBuildTest {
         }
         """);
 
-    List<PreviewElement> elements = doc.build(PreviewStateContext.forInventory(PreviewFakes.inventory(1).build(), Map.of()));
+    List<PreviewElement> elements = doc.build(PreviewStateContext.forInventory(PreviewFakes.inventory(1).build(), null, Map.of()));
 
     assertEquals(1, elements.size());
     assertEquals("kept", TextUtils.content(label(elements.get(0)).text().get()));
@@ -484,7 +484,7 @@ public class PreviewBuildTest {
         }
         """);
 
-    List<PreviewElement> elements = doc.build(PreviewStateContext.forInventory(PreviewFakes.inventory(1).build(), Map.of()));
+    List<PreviewElement> elements = doc.build(PreviewStateContext.forInventory(PreviewFakes.inventory(1).build(), null, Map.of()));
 
     assertEquals(1, elements.size());
     assertEquals("kept", TextUtils.content(label(elements.get(0)).text().get()));
@@ -506,7 +506,7 @@ public class PreviewBuildTest {
         { "elements": [ { "type": "label", "text": "'items ' + count(0)" } ] }
         """);
 
-    List<PreviewElement> elements = doc.build(PreviewStateContext.forInventory(inventory, Map.of()));
+    List<PreviewElement> elements = doc.build(PreviewStateContext.forInventory(inventory, null, Map.of()));
     assertEquals("items 0", TextUtils.content(label(elements.get(0)).text().get()));
 
     fake.item(0, PreviewFakes.stack(Material.STONE, 5));
@@ -521,7 +521,7 @@ public class PreviewBuildTest {
         { "elements": [ { "type": "cell", "x": "count(0) * 10", "size": 18, "color": "#FF000000" } ] }
         """);
 
-    List<PreviewElement> elements = doc.build(PreviewStateContext.forInventory(inventory, Map.of()));
+    List<PreviewElement> elements = doc.build(PreviewStateContext.forInventory(inventory, null, Map.of()));
     fake.item(0, PreviewFakes.stack(Material.STONE, 3));
 
     assertEquals(0, elements.get(0).x());
@@ -553,7 +553,7 @@ public class PreviewBuildTest {
         """);
 
     List<PreviewElement> elements = doc.build(
-        PreviewStateContext.forInventory(PreviewFakes.inventory(3).build(), Map.of()));
+        PreviewStateContext.forInventory(PreviewFakes.inventory(3).build(), null, Map.of()));
     Supplier<Component> text = label(elements.get(0)).text();
 
     assertNotSame(text.get(), text.get());

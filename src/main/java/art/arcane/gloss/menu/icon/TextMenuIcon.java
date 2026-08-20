@@ -8,7 +8,6 @@ import art.arcane.gloss.menu.MenuSession;
 import art.arcane.gloss.text.TextPipeline;
 import art.arcane.gloss.util.common.TextUtils;
 import art.arcane.gloss.util.common.math.CollisionPlane;
-import art.arcane.volmlib.util.bukkit.Placeholders;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
@@ -36,7 +35,7 @@ public class TextMenuIcon extends MenuIcon<TextIconData> {
   public TextMenuIcon(MenuSession session, Location loc, TextIconData data) throws MenuIconException {
     super(session, loc, data);
     sourceText = data.text();
-    dynamicSource = containsPlaceholderToken(sourceText);
+    dynamicSource = TextPipeline.viewerDependent(sourceText);
     parsedFrom = new ArrayList<>();
     components = new ArrayList<>();
     components.addAll(render(sourceText));
@@ -100,7 +99,7 @@ public class TextMenuIcon extends MenuIcon<TextIconData> {
 
   public boolean updateText(String text) {
     sourceText = text;
-    dynamicSource = containsPlaceholderToken(sourceText);
+    dynamicSource = TextPipeline.viewerDependent(sourceText);
     if (displayEntities == null || displayEntities.size() != components.size())
       return false;
 
@@ -139,7 +138,7 @@ public class TextMenuIcon extends MenuIcon<TextIconData> {
     List<String> sources = new ArrayList<>(lines.length);
     int cached = Math.min(parsedFrom.size(), components.size());
     for (int index = 0; index < lines.length; index++) {
-      String piped = TextPipeline.menuText(player, Placeholders.setPlaceholders(player, lines[index]));
+      String piped = TextPipeline.menuText(player, lines[index]);
       sources.add(piped);
       if (index < cached && piped.equals(parsedFrom.get(index))) {
         rendered.add(components.get(index));
@@ -151,11 +150,4 @@ public class TextMenuIcon extends MenuIcon<TextIconData> {
     return rendered;
   }
 
-  private static boolean containsPlaceholderToken(String text) {
-    if (text == null) {
-      return false;
-    }
-    int opening = text.indexOf('%');
-    return opening >= 0 && text.indexOf('%', opening + 1) > opening + 1;
-  }
 }

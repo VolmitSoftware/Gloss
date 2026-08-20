@@ -8,7 +8,7 @@ import art.arcane.gloss.menu.action.ActionContext;
 import art.arcane.gloss.menu.action.ActionOutcome;
 import art.arcane.gloss.menu.action.MenuAction;
 import art.arcane.gloss.menu.icon.MenuIcon;
-import art.arcane.volmlib.util.bukkit.Placeholders;
+import art.arcane.gloss.text.TextPipeline;
 import com.google.common.collect.Lists;
 
 import java.util.List;
@@ -22,7 +22,11 @@ public class ToggleComponent extends ClickableComponent<ToggleComponentData> {
   private boolean state;
 
   public ToggleComponent(MenuSession session, MenuComponentData data) {
-    super(session, data, ((ToggleComponentData) data.data()).highlightMod(), null);
+    super(session, data,
+        ((ToggleComponentData) data.data()).highlightMod(),
+        ((ToggleComponentData) data.data()).hitbox(),
+        ((ToggleComponentData) data.data()).resolvedHoverDurationTicks(),
+        ((ToggleComponentData) data.data()).resolvedHoverEasing());
     this.condition = this.data.condition();
     this.expected = this.data.expectedValue();
     this.trueIcon = MenuIcon.createIcon(session, location, this.data.trueIcon(), this);
@@ -59,11 +63,17 @@ public class ToggleComponent extends ClickableComponent<ToggleComponentData> {
   @Override
   public void applyTransform() {
     super.applyTransform();
-    falseIcon.applyTransform(location);
-    trueIcon.applyTransform(location);
+    if (falseIcon != currentIcon) {
+      falseIcon.applyTransform(location);
+    }
+    if (trueIcon != currentIcon) {
+      trueIcon.applyTransform(location);
+    }
   }
 
   private boolean isValid() {
-    return Placeholders.setPlaceholders(session.getPlayer(), condition).equalsIgnoreCase(expected);
+    String renderedCondition = TextPipeline.menuText(session.getPlayer(), condition);
+    String renderedExpected = expected == null ? null : TextPipeline.menuText(session.getPlayer(), expected);
+    return renderedCondition.equalsIgnoreCase(renderedExpected);
   }
 }

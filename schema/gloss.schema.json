@@ -511,7 +511,7 @@
       ]
     },
     "hitbox": {
-      "title": "Button Hitbox",
+      "title": "Clickable Hitbox",
       "description": "Optional click-plane dimensions, anchor and displacement in blocks before uiScale is applied.",
       "type": "object",
       "minProperties": 1,
@@ -539,7 +539,7 @@
           "$ref": "#/$defs/vector3"
         },
         "anchor": {
-          "description": "Whether offset is relative to the button or the menu centre. Menu anchoring detaches button and plane movement.",
+          "description": "Whether offset is relative to the clickable component or the menu centre. Menu anchoring detaches icon and plane movement.",
           "type": "string",
           "enum": [
             "button",
@@ -559,8 +559,19 @@
       ],
       "properties": {
         "highlightModifier": {
-          "description": "Defines by how much a highlighted button moves towards the player.",
+          "description": "Menu-local travel toward the viewer at uiScale 1.",
           "type": "number"
+        },
+        "hoverDurationTicks": {
+          "description": "Ticks used to enter and leave the hovered pose. Defaults to 4; zero is instant.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 40
+        },
+        "hoverEasing": {
+          "description": "Easing curve used for hover entry and exit. Defaults to ease_out_cubic.",
+          "type": "string",
+          "enum": ["linear", "ease_out_cubic", "ease_in_out_cubic", "back_out"]
         },
         "actions": {
           "description": "Defines what happens upon a interaction.",
@@ -607,8 +618,19 @@
       ],
       "properties": {
         "highlightModifier": {
-          "description": "Defines by how much a highlighted button moves towards the player.",
+          "description": "Menu-local travel toward the viewer at uiScale 1.",
           "type": "number"
+        },
+        "hoverDurationTicks": {
+          "description": "Ticks used to enter and leave the hovered pose. Defaults to 4; zero is instant.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 40
+        },
+        "hoverEasing": {
+          "description": "Easing curve used for hover entry and exit. Defaults to ease_out_cubic.",
+          "type": "string",
+          "enum": ["linear", "ease_out_cubic", "ease_in_out_cubic", "back_out"]
         },
         "condition": {
           "description": "Defines what placeholder value is used to determine the toggles initial state.",
@@ -639,6 +661,10 @@
         "falseIcon": {
           "description": "Defines the visual part of the component while the toggle is in the false state.",
           "$ref": "#/$defs/icon"
+        },
+        "hitbox": {
+          "description": "Optional stable click plane shared by both toggle icon states.",
+          "$ref": "#/$defs/hitbox"
         }
       }
     },

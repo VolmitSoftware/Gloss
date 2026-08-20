@@ -150,7 +150,7 @@ class HologramRenderCacheTest {
         PersistentHologram hologram = hologram("h-anim-range", List.of(CharacterizationHarness.FAST_CLIP_LINE));
         hologram.update();
         hologram.update();
-        assertEquals(1, harness.animator.targetCount());
+        assertEquals(2, harness.animator.targetCount());
 
         harness.moveTo(alice, world, 500.0D, 64.0D, 500.0D);
         harness.moveTo(bob, world, 500.0D, 64.0D, 500.0D);

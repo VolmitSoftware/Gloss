@@ -2,6 +2,7 @@ package art.arcane.gloss.text;
 
 import art.arcane.gloss.Gloss;
 import art.arcane.gloss.GlossConfig;
+import art.arcane.gloss.expr.ExprScope;
 import art.arcane.volmlib.util.bukkit.Placeholders;
 import net.md_5.bungee.api.ChatColor;
 import org.bukkit.entity.Player;
@@ -38,7 +39,7 @@ public final class TextPipeline implements TextRenderer {
     private final ServerTickSampler serverTicks;
     private final TextExpressionRenderer expressions;
     private volatile UnaryOperator<String> emojiFilter;
-    private volatile BiFunction<Player, String, String> chatEmojiFilter;
+    private volatile BiFunction<Player, String, String> viewerEmojiFilter;
 
     public TextPipeline(Gloss plugin) {
         this.plugin = plugin;
@@ -57,7 +58,7 @@ public final class TextPipeline implements TextRenderer {
         functions.clear();
         failedFunctions.clear();
         emojiFilter = null;
-        chatEmojiFilter = null;
+        viewerEmojiFilter = null;
         serverTicks.disable();
         expressions.clear();
     }
@@ -82,10 +83,7 @@ public final class TextPipeline implements TextRenderer {
         if (viewer != null && placeholdersEnabled() && out.indexOf('%') >= 0) {
             out = Placeholders.setPlaceholders(viewer, out);
         }
-        UnaryOperator<String> emoji = emojiFilter;
-        if (emoji != null) {
-            out = emoji.apply(out);
-        }
+        out = applyEmoji(viewer, out);
         return applyColors(out);
     }
 
@@ -95,17 +93,14 @@ public final class TextPipeline implements TextRenderer {
     }
 
     public String renderMenuText(Player viewer, String raw) {
-        if (raw == null || raw.isEmpty()) {
-            return "";
-        }
-        return applyColors(applyEmoji(viewer, raw));
+        return render(viewer, raw);
     }
 
     public String applyEmoji(Player viewer, String raw) {
         if (raw == null || raw.isEmpty()) {
             return "";
         }
-        BiFunction<Player, String, String> viewerEmoji = chatEmojiFilter;
+        BiFunction<Player, String, String> viewerEmoji = viewerEmojiFilter;
         if (viewer != null && viewerEmoji != null) {
             return viewerEmoji.apply(viewer, raw);
         }
@@ -116,6 +111,26 @@ public final class TextPipeline implements TextRenderer {
     public static String menuText(Player viewer, String raw) {
         TextPipeline pipeline = active();
         return pipeline == null ? raw : pipeline.renderMenuText(viewer, raw);
+    }
+
+    public ExprScope expressionScope(Player viewer) {
+        return expressions.scope(viewer);
+    }
+
+    public static boolean viewerDependent(String raw) {
+        if (raw == null || raw.isEmpty()) {
+            return false;
+        }
+        int expression = raw.indexOf("{{");
+        if (expression >= 0 && raw.indexOf("}}", expression + 2) >= 0) {
+            return true;
+        }
+        return containsPair(raw, '%') || containsPair(raw, '|');
+    }
+
+    private static boolean containsPair(String raw, char marker) {
+        int open = raw.indexOf(marker);
+        return open >= 0 && raw.indexOf(marker, open + 1) > open + 1;
     }
 
     public static String emojiText(String raw) {
@@ -215,7 +230,7 @@ public final class TextPipeline implements TextRenderer {
 
         GlossConfig config = plugin.cfg();
         String out = message;
-        BiFunction<Player, String, String> emoji = chatEmojiFilter;
+        BiFunction<Player, String, String> emoji = viewerEmojiFilter;
         if (emoji != null && config.emoji().enabled() && activeSender.hasPermission("gloss.emoji.use")) {
             out = emoji.apply(activeSender, out);
         }
@@ -253,8 +268,8 @@ public final class TextPipeline implements TextRenderer {
         emojiFilter = filter;
     }
 
-    public void setChatEmojiFilter(BiFunction<Player, String, String> filter) {
-        chatEmojiFilter = filter;
+    public void setViewerEmojiFilter(BiFunction<Player, String, String> filter) {
+        viewerEmojiFilter = filter;
     }
 
     private boolean functionsEnabled() {

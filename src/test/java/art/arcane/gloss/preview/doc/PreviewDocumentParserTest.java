@@ -274,6 +274,21 @@ public class PreviewDocumentParserTest {
   }
 
   @Test
+  public void standardTextVariablesAndPapiFunctionsAreAccepted() {
+    CompiledPreviewDocument doc = parse("standard-text.json", """
+        {
+          "elements": [
+            { "type": "label", "text": "player.name + ' ' + str(server.online) + ' ' + papi('vault_prefix', 'Member')" },
+            { "type": "cell", "size": 4, "color": 1, "x": "time.seconds + player.ping + papiNumber('player_level', 0) + metric('react.tps', server.tps)" }
+          ]
+        }
+        """);
+
+    assertFalse(doc.elements().get(0).text().isConstant());
+    assertFalse(doc.elements().get(1).x().isConstant());
+  }
+
+  @Test
   public void declaredVarsAreAcceptedAndUndeclaredVarsAreRejected() {
     CompiledPreviewDocument doc = parse("vars.json", """
         {

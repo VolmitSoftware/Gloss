@@ -19,8 +19,25 @@ public record ToggleComponentData(
     List<MenuActionData> trueActions,
     List<MenuActionData> falseActions,
     MenuIconData trueIcon,
-    MenuIconData falseIcon
+    MenuIconData falseIcon,
+    HitboxData hitbox,
+    Integer hoverDurationTicks,
+    HoverEasing hoverEasing
 ) implements ComponentData {
+
+  public ToggleComponentData {
+    ButtonComponentData.validateHover(highlightMod, hoverDurationTicks);
+  }
+
+  public int resolvedHoverDurationTicks() {
+    return hoverDurationTicks == null
+        ? ButtonComponentData.DEFAULT_HOVER_DURATION_TICKS
+        : hoverDurationTicks;
+  }
+
+  public HoverEasing resolvedHoverEasing() {
+    return HoverEasing.resolve(hoverEasing);
+  }
 
   public MenuComponentType getType() {
     return MenuComponentType.TOGGLE;

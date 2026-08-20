@@ -8,6 +8,7 @@ import art.arcane.gloss.expr.ExprFunctions;
 import art.arcane.gloss.expr.ExprScope;
 import art.arcane.gloss.locale.GlossLocalization;
 import art.arcane.gloss.locale.GlossMessages;
+import art.arcane.gloss.text.TextPipeline;
 import art.arcane.volmlib.util.localization.MessageArgs;
 import art.arcane.volmlib.util.localization.MessageKey;
 import art.arcane.volmlib.util.localization.TextKey;
@@ -35,8 +36,10 @@ import java.util.logging.Level;
  * <ol>
  *   <li>{@code vars.<name>} reads the injected variables map. Variables are reachable only under
  *       that prefix, so a document variable can never shadow (or be shadowed by) an adapter name.</li>
- *   <li>everything else reads the cached adapter snapshot, which already contains the provider
- *       namespaces merged under {@code <namespace>.<key>}.</li>
+ *   <li>adapter and provider names read the cached target snapshot.</li>
+ *   <li>remaining names fall through to Gloss's standard time, server, player, PAPI and metric
+ *       scope. Player values are absent only when this context was intentionally built without a
+ *       viewer.</li>
  * </ol>
  * Unknown names return null; {@code ExprEvaluator} turns that into an error naming the variable.
  *
@@ -79,7 +82,8 @@ public final class PreviewStateContext implements ExprScope {
    * Exposed for {@code VariableCatalogSyncTest}, which pins the shipped variable catalog's
    * {@code functions} section against this set.
    */
-  static final Set<String> CONTEXT_FUNCTIONS = Set.of("lang", "count", "occupied", "item");
+  static final Set<String> CONTEXT_FUNCTIONS = Set.of(
+      "lang", "count", "occupied", "item", "papi", "papiNumber", "metric");
 
   private final Block block;
   private final Entity entity;
@@ -89,6 +93,7 @@ public final class PreviewStateContext implements ExprScope {
   private final String category;
   private final TimeFlowTracker flow;
   private final World world;
+  private final ExprScope standardScope;
 
   /** The one field carrying both halves of a sample; see the publication contract in the javadoc. */
   private volatile Sampled sampled;
@@ -111,6 +116,9 @@ public final class PreviewStateContext implements ExprScope {
         ? new TimeFlowTracker(PreviewStateAdapters.countsDown(category))
         : null;
     this.world = block != null ? block.getWorld() : entity != null ? entity.getWorld() : null;
+    Gloss active = Gloss.instance;
+    TextPipeline text = active == null ? null : active.text();
+    this.standardScope = text == null ? null : text.expressionScope(player);
   }
 
   public static PreviewStateContext forBlock(Block block, Player player, Map<String, Object> vars) {
@@ -126,14 +134,19 @@ public final class PreviewStateContext implements ExprScope {
   }
 
   /** Inventory-only target, e.g. a viewer's ender chest. */
-  public static PreviewStateContext forInventory(Inventory inventory, Map<String, Object> vars) {
+  public static PreviewStateContext forInventory(Inventory inventory, Player player, Map<String, Object> vars) {
     Objects.requireNonNull(inventory, "inventory");
-    return new PreviewStateContext(null, null, null, inventory, PreviewStateAdapters.CATEGORY_INVENTORY, vars);
+    return new PreviewStateContext(null, null, player, inventory, PreviewStateAdapters.CATEGORY_INVENTORY, vars);
   }
 
-  /** Target-less context for locked previews and document validation: only {@code vars} and {@code time}. */
+  /** Target-less viewerless context for document validation and console diagnostics. */
   public static PreviewStateContext statics(Map<String, Object> vars) {
     return new PreviewStateContext(null, null, null, null, PreviewStateAdapters.CATEGORY_STATIC, vars);
+  }
+
+  public static PreviewStateContext forViewer(Player player, Map<String, Object> vars) {
+    Objects.requireNonNull(player, "player");
+    return new PreviewStateContext(null, null, player, null, PreviewStateAdapters.CATEGORY_STATIC, vars);
   }
 
   /** The previewed inventory, or null when the target has none; Slot elements require non-null. */
@@ -155,7 +168,11 @@ public final class PreviewStateContext implements ExprScope {
     if (dottedName.startsWith(VARS_PREFIX)) {
       return vars.get(dottedName.substring(VARS_PREFIX.length()));
     }
-    return snapshot().get(dottedName);
+    Object value = snapshot().get(dottedName);
+    if (value != null || standardScope == null) {
+      return value;
+    }
+    return standardScope.variable(dottedName);
   }
 
   @Override
@@ -165,7 +182,7 @@ public final class PreviewStateContext implements ExprScope {
       case "count" -> count(args);
       case "occupied" -> occupied(args);
       case "item" -> item(args);
-      default -> ExprFunctions.call(name, args);
+      default -> standardScope == null ? ExprFunctions.call(name, args) : standardScope.call(name, args);
     };
   }
 

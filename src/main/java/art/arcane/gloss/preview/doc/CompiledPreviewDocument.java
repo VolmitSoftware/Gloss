@@ -403,7 +403,7 @@ public final class CompiledPreviewDocument {
       return Component.empty();
     }
     try {
-      return TextUtils.parse(string(card.title(), context));
+      return TextUtils.parse(TextPipeline.emojiText(string(card.title(), context)));
     } catch (RuntimeException failure) {
       reportError(sink, "card title: " + failure.getMessage());
       return Component.empty();

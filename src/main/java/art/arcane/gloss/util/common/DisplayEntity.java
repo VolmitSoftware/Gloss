@@ -14,7 +14,9 @@ import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEn
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityMetadata;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityTeleport;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerSpawnEntity;
+import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerTeams;
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.block.data.BlockData;
@@ -33,6 +35,17 @@ import static io.github.retrooper.packetevents.util.SpigotConversionUtil.fromBuk
 
 public class DisplayEntity {
   private static final int CONTENT_DATA_INDEX = 23;
+  private static final String COLLISION_TEAM_PREFIX = "gls_nc_";
+  private static final WrapperPlayServerTeams.ScoreBoardTeamInfo COLLISIONLESS_TEAM =
+      new WrapperPlayServerTeams.ScoreBoardTeamInfo(
+          Component.empty(),
+          Component.empty(),
+          Component.empty(),
+          WrapperPlayServerTeams.NameTagVisibility.NEVER,
+          WrapperPlayServerTeams.CollisionRule.NEVER,
+          NamedTextColor.WHITE,
+          WrapperPlayServerTeams.OptionData.NONE
+      );
 
   private final int id;
   private final UUID uuid;
@@ -361,6 +374,9 @@ public class DisplayEntity {
 
   public List<PacketWrapper<?>> spawn() {
     List<PacketWrapper<?>> packets = new ArrayList<>();
+    if (isRawEntity()) {
+      packets.add(collisionTeamCreate());
+    }
     packets.add(new WrapperPlayServerSpawnEntity(id, Optional.of(uuid), entityType,
         location, pitch, yaw, headYaw, 0, Optional.empty()));
     packets.add(dataPacket());
@@ -393,6 +409,19 @@ public class DisplayEntity {
 
   public PacketWrapper<?> headLook() {
     return new WrapperPlayServerEntityHeadLook(id, headYaw);
+  }
+
+  public boolean isRawEntity() {
+    return displayKind == DisplayKind.RAW;
+  }
+
+  public WrapperPlayServerTeams collisionTeamRemove() {
+    return new WrapperPlayServerTeams(
+        collisionTeamName(),
+        WrapperPlayServerTeams.TeamMode.REMOVE,
+        (WrapperPlayServerTeams.ScoreBoardTeamInfo) null,
+        List.of()
+    );
   }
 
   public boolean isTextDisplay() {
@@ -515,6 +544,19 @@ public class DisplayEntity {
       case BLOCK -> new EntityData<>(CONTENT_DATA_INDEX, EntityDataTypes.BLOCK_STATE, blockState);
       case RAW -> null;
     };
+  }
+
+  private WrapperPlayServerTeams collisionTeamCreate() {
+    return new WrapperPlayServerTeams(
+        collisionTeamName(),
+        WrapperPlayServerTeams.TeamMode.CREATE,
+        COLLISIONLESS_TEAM,
+        uuid.toString()
+    );
+  }
+
+  private String collisionTeamName() {
+    return COLLISION_TEAM_PREFIX + Integer.toUnsignedString(id, 36);
   }
 
   public static final class Builder {

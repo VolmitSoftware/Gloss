@@ -10,11 +10,15 @@ import com.github.retrooper.packetevents.manager.server.ServerManager;
 import com.github.retrooper.packetevents.manager.server.ServerVersion;
 import com.github.retrooper.packetevents.netty.NettyManager;
 import com.github.retrooper.packetevents.protocol.entity.data.EntityData;
+import com.github.retrooper.packetevents.protocol.entity.type.EntityType;
 import com.github.retrooper.packetevents.util.Quaternion4f;
 import com.github.retrooper.packetevents.util.Vector3f;
 import com.github.retrooper.packetevents.wrapper.PacketWrapper;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerDestroyEntities;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityMetadata;
+import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityHeadLook;
+import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityTeleport;
+import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerTeams;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
@@ -23,6 +27,7 @@ import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+import java.lang.reflect.Proxy;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -165,6 +170,31 @@ public class DisplayEntityManagerPacketShapeTest {
   }
 
   @Test
+  public void orientingALivingIconUpdatesItsBodyPitchAndHeadYaw() {
+    Player viewer = viewer();
+    DisplayEntity entity = DisplayEntity.Builder.entity(
+        entityType(),
+        new Location(null, 0D, 64D, 0D)
+    );
+    UUID key = DisplayEntityManager.add(entity);
+    DisplayEntityManager.spawn(key, viewer);
+    SENT.clear();
+
+    DisplayEntityManager.orient(key, 75F, -20F, 30F);
+
+    assertEquals(2, SENT.size());
+    WrapperPlayServerEntityTeleport body = (WrapperPlayServerEntityTeleport) SENT.getFirst();
+    WrapperPlayServerEntityHeadLook head = (WrapperPlayServerEntityHeadLook) SENT.getLast();
+    assertEquals(75F, body.getYaw(), 0F);
+    assertEquals(-20F, body.getPitch(), 0F);
+    assertEquals(75F, head.getHeadYaw(), 0F);
+
+    DisplayEntityManager.orient(key, 75F, -20F, 30F);
+    assertEquals(2, SENT.size());
+    DisplayEntityManager.delete(key, viewer);
+  }
+
+  @Test
   public void changingANameSendsOnlyTheContentEntry() {
     Player viewer = viewer();
     UUID key = DisplayEntityManager.add(textDisplay());
@@ -205,6 +235,28 @@ public class DisplayEntityManagerPacketShapeTest {
   }
 
   @Test
+  public void deletingALivingIconAlsoRemovesItsCollisionTeam() {
+    Player viewer = viewer();
+    DisplayEntity entity = DisplayEntity.Builder.entity(
+        entityType(),
+        new Location(null, 0D, 64D, 0D)
+    );
+    UUID key = DisplayEntityManager.add(entity);
+    DisplayEntityManager.spawn(key, viewer);
+    assertTrue(DisplayEntityManager.isVisibleRawEntity(viewer, entity.id()));
+    SENT.clear();
+
+    DisplayEntityManager.deleteAll(List.of(key), viewer);
+
+    assertEquals(2, SENT.size());
+    assertArrayEquals(new int[]{entity.id()},
+        ((WrapperPlayServerDestroyEntities) SENT.getFirst()).getEntityIds());
+    assertEquals(WrapperPlayServerTeams.TeamMode.REMOVE,
+        ((WrapperPlayServerTeams) SENT.getLast()).getTeamMode());
+    assertTrue(!DisplayEntityManager.isVisibleRawEntity(viewer, entity.id()));
+  }
+
+  @Test
   public void forgettingAPlayerDropsItsVisibilityBookkeeping() {
     Player viewer = viewer();
     UUID key = DisplayEntityManager.add(textDisplay());
@@ -230,6 +282,19 @@ public class DisplayEntityManagerPacketShapeTest {
 
   private static DisplayEntity textDisplay() {
     return DisplayEntity.Builder.textDisplay(Component.text("x"), new Location(null, 0D, 64D, 0D));
+  }
+
+  private static EntityType entityType() {
+    return (EntityType) Proxy.newProxyInstance(
+        EntityType.class.getClassLoader(),
+        new Class<?>[]{EntityType.class},
+        (proxy, method, args) -> switch (method.getName()) {
+          case "hashCode" -> System.identityHashCode(proxy);
+          case "equals" -> proxy == args[0];
+          case "toString" -> "EntityType[test]";
+          default -> throw new UnsupportedOperationException(method.getName());
+        }
+    );
   }
 
   private static Player viewer() {

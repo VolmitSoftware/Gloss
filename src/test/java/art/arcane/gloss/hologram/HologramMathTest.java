@@ -13,7 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class HologramMathTest {
     private static boolean placeholderRouted(List<String> lines) {
-        return (HologramMath.classify(lines) & TextPipeline.HAS_PLACEHOLDER) != 0;
+        return TextPipeline.viewerDependent(String.join("\n", lines));
     }
 
     @Test
@@ -27,7 +27,9 @@ class HologramMathTest {
     @Test
     void classifyDetectsPlaceholderLines() {
         assertTrue(placeholderRouted(List.of("&7Hello", "%player_name%")));
-        assertTrue(placeholderRouted(List.of("100% pure")));
+        assertTrue(placeholderRouted(List.of("Hello {{ player.name }}")));
+        assertTrue(placeholderRouted(List.of("|animation.rainbow|")));
+        assertFalse(placeholderRouted(List.of("100% pure")));
     }
 
     @Test

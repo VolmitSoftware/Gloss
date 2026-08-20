@@ -13,7 +13,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class BubbleStyleResolutionTest {
     private static BubbleStyleDoc style(BubbleStyleDoc.Select select) {
-        return new BubbleStyleDoc(1, 1L, "&7", null, 32, 5, 5000L, true, true, true, select);
+        return new BubbleStyleDoc(2, 1L, "&7", null, 32, 5000L, true, true,
+            BubbleStyleDoc.DEFAULTS.motion(), BubbleStyleDoc.DEFAULTS.shimmer(), select);
     }
 
     private static BubbleStyleDoc.Select select(List<String> worlds, List<String> groups, int priority) {

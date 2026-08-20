@@ -20,7 +20,7 @@ import java.util.logging.Level;
 public final class AnimationService {
     private static final String FUNCTION_PREFIX = "animation.";
     private static final String RAINBOW_NAME = "rainbow";
-    private static final String LEGACY_RAINBOW_DEFAULT = """
+    private static final String LEGACY_NAMED_RAINBOW_DEFAULT = """
         {
           "schemaVersion": 1,
           "revision": 1,
@@ -31,6 +31,20 @@ public final class AnimationService {
             "&6Gloss",
             "&aGloss",
             "&bGloss"
+          ]
+        }
+        """;
+    private static final String LEGACY_STEPPED_RAINBOW_DEFAULT = """
+        {
+          "schemaVersion": 1,
+          "revision": 1,
+          "mode": "ascend",
+          "frameIntervalMs": 500,
+          "frames": [
+            "&c",
+            "&6",
+            "&a",
+            "&b"
           ]
         }
         """;
@@ -62,7 +76,7 @@ public final class AnimationService {
         defaults.extractMissing();
         if (upgradeLegacyRainbowDefault(defaults)) {
             Gloss.log(Level.INFO,
-                "animations/rainbow.json: upgraded the unchanged legacy shipped default.");
+                "animations/rainbow.json: upgraded the unchanged prior shipped default to the smooth RGB gradient.");
         }
         registry.reload();
         rebuild();
@@ -104,7 +118,14 @@ public final class AnimationService {
     }
 
     static boolean upgradeLegacyRainbowDefault(ShippedDefaults defaults) {
-        return defaults.replaceIfExact(RAINBOW_NAME, LEGACY_RAINBOW_DEFAULT.getBytes(StandardCharsets.UTF_8));
+        if (defaults.replaceIfExact(
+            RAINBOW_NAME,
+            LEGACY_NAMED_RAINBOW_DEFAULT.getBytes(StandardCharsets.UTF_8))) {
+            return true;
+        }
+        return defaults.replaceIfExact(
+            RAINBOW_NAME,
+            LEGACY_STEPPED_RAINBOW_DEFAULT.getBytes(StandardCharsets.UTF_8));
     }
 
     private void pollRegistry() {

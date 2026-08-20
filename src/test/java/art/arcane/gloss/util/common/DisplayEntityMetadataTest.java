@@ -16,6 +16,7 @@ import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEn
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityMetadata;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityTeleport;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerSpawnEntity;
+import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerTeams;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Location;
 import org.bukkit.util.Vector;
@@ -65,8 +66,13 @@ public class DisplayEntityMetadataTest {
         new Location(null, 1D, 2D, 3D, 35F, -10F)
     );
     List<PacketWrapper<?>> packets = entity.spawn();
-    WrapperPlayServerSpawnEntity spawn = (WrapperPlayServerSpawnEntity) packets.getFirst();
+    WrapperPlayServerTeams team = (WrapperPlayServerTeams) packets.getFirst();
+    WrapperPlayServerSpawnEntity spawn = (WrapperPlayServerSpawnEntity) packets.get(1);
 
+    assertEquals(WrapperPlayServerTeams.TeamMode.CREATE, team.getTeamMode());
+    assertEquals(WrapperPlayServerTeams.CollisionRule.NEVER,
+        team.getTeamInfo().orElseThrow().getCollisionRule());
+    assertEquals(List.of(entity.uuid().toString()), team.getPlayers());
     assertEquals(35F, spawn.getYaw(), 0F);
     assertEquals(35F, spawn.getHeadYaw(), 0F);
     assertEquals(-10F, spawn.getPitch(), 0F);
@@ -83,6 +89,7 @@ public class DisplayEntityMetadataTest {
     WrapperPlayServerEntityTeleport rotated = (WrapperPlayServerEntityTeleport) entity.rotate(70F, 15F);
     WrapperPlayServerEntityHeadLook headLook = (WrapperPlayServerEntityHeadLook) entity.headLook();
     WrapperPlayServerDestroyEntities removed = (WrapperPlayServerDestroyEntities) entity.remove();
+    WrapperPlayServerTeams teamRemoved = entity.collisionTeamRemove();
 
     assertEquals(3D, moved.getPosition().getX(), 0D);
     assertEquals(1D, moved.getPosition().getY(), 0D);
@@ -91,6 +98,7 @@ public class DisplayEntityMetadataTest {
     assertEquals(15F, rotated.getPitch(), 0F);
     assertEquals(70F, headLook.getHeadYaw(), 0F);
     assertArrayEquals(new int[]{entity.id()}, removed.getEntityIds());
+    assertEquals(WrapperPlayServerTeams.TeamMode.REMOVE, teamRemoved.getTeamMode());
   }
 
   @Test

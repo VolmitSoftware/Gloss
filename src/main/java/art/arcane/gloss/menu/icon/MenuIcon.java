@@ -258,14 +258,22 @@ public abstract class MenuIcon<D extends MenuIconData> {
   }
 
   public void applyTransform(Location loc) {
-    teleport(session.getTransform().orient(loc));
+    applyVisualOffset(loc, new Vector());
+  }
+
+  public void applyVisualOffset(Location loc, Vector worldOffset) {
+    Location target = session.getTransform().orient(loc);
+    target.add(worldOffset);
+    teleport(target);
     applyOrientation();
   }
 
   public void teleport(Location loc) {
     Location target = loc.clone();
     Vector offset = target.toVector().subtract(position.toVector());
-    move(offset);
+    if (offset.lengthSquared() > 1.0E-12D) {
+      move(offset);
+    }
     this.position.setYaw(target.getYaw());
     this.position.setPitch(target.getPitch());
   }

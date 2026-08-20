@@ -46,13 +46,13 @@ public final class EmojiService {
         registry.reload();
         rebuild();
         plugin.text().setEmojiFilter(this::apply);
-        plugin.text().setChatEmojiFilter(this::applyFor);
+        plugin.text().setViewerEmojiFilter(this::applyFor);
         plugin.watchdog().register("emoji", this::pollRegistry);
     }
 
     public void disable() {
         plugin.watchdog().unregister("emoji");
-        plugin.text().setChatEmojiFilter(null);
+        plugin.text().setViewerEmojiFilter(null);
         plugin.text().setEmojiFilter(null);
         entries = List.of();
         replacer = new EmojiReplacer(List.of());

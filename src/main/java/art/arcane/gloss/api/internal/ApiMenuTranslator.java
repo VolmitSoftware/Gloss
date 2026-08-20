@@ -76,7 +76,7 @@ public final class ApiMenuTranslator {
     return switch (component) {
       case HoloComponent.Decoration decoration -> new DecoComponentData(iconData(decoration.icon()));
       case HoloComponent.Button button ->
-          new ButtonComponentData(button.highlightModifier(), List.of(), iconData(button.icon()), null);
+          new ButtonComponentData(button.highlightModifier(), List.of(), iconData(button.icon()), null, null, null);
     };
   }
 }

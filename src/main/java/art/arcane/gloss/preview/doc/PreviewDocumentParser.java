@@ -13,6 +13,7 @@ import art.arcane.gloss.preview.doc.CompiledPreviewDocument.CompiledVariant;
 import art.arcane.gloss.preview.doc.CompiledPreviewDocument.ElementTemplate;
 import art.arcane.gloss.preview.doc.CompiledPreviewDocument.ElementType;
 import art.arcane.gloss.preview.doc.CompiledPreviewDocument.RepeatTemplate;
+import art.arcane.gloss.text.TextExpressionRenderer;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonElement;
@@ -91,6 +92,7 @@ public final class PreviewDocumentParser {
     for (Set<String> names : PreviewStateAdapters.catalog().values()) {
       flat.addAll(names);
     }
+    flat.addAll(TextExpressionRenderer.STANDARD_VARIABLES);
     this.flatCatalog = flat;
   }
 

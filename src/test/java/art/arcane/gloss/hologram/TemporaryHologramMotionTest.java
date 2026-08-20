@@ -1,5 +1,6 @@
 package art.arcane.gloss.hologram;
 
+import art.arcane.gloss.api.HologramPresentation;
 import art.arcane.gloss.hologram.CharacterizationHarness.DisplayHandle;
 import art.arcane.gloss.hologram.CharacterizationHarness.WorldState;
 import org.junit.jupiter.api.AfterEach;
@@ -9,6 +10,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -91,5 +93,38 @@ class TemporaryHologramMotionTest {
 
         assertEquals(callsAfterSpawn, display.callLog.size(), "an unmoved hologram must not re-arm motion");
         assertTrue(display.teleports.isEmpty());
+    }
+
+    @Test
+    void renderedLinesBypassTextProcessingAndRemainOneDisplay() {
+        TemporaryHologramDisplay temporary = temporary("t-rendered");
+        temporary.setRenderedLines(List.of("&1literal", "§bblue"));
+        temporary.drive(true);
+
+        DisplayHandle display = harness.onlySpawned(world);
+        assertEquals("&1literal\n§bblue", display.lastText());
+        assertTrue(display.callLog.contains("setLineWidth"));
+        assertEquals(1, world.spawned.size());
+    }
+
+    @Test
+    void presentationBindingUpdatesOnlyWhenItsNormalizedValueChanges() {
+        AtomicReference<HologramPresentation> presentation = new AtomicReference<>(
+            new HologramPresentation(2.0D, 0.5D, 1.0D, 0.0D, 90.0D, 450.0D, 0.5D));
+        TemporaryHologramDisplay temporary = temporary("t-presentation");
+        temporary.bindPresentation(presentation::get);
+        temporary.drive(true);
+
+        DisplayHandle display = harness.onlySpawned(world);
+        assertTrue(display.callLog.contains("setTransformation"));
+        assertTrue(display.callLog.contains("setTextOpacity"));
+        int callsAfterSpawn = display.callLog.size();
+
+        temporary.drive(true);
+        assertEquals(callsAfterSpawn, display.callLog.size());
+
+        presentation.set(new HologramPresentation(0.5D, 0.5D, 0.5D, 30.0D, 60.0D, 90.0D, 0.25D));
+        temporary.drive(true);
+        assertTrue(display.callLog.size() > callsAfterSpawn);
     }
 }

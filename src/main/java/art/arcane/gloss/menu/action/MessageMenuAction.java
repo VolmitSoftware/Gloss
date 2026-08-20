@@ -1,8 +1,8 @@
 package art.arcane.gloss.menu.action;
 
 import art.arcane.gloss.config.action.MessageActionData;
+import art.arcane.gloss.text.TextPipeline;
 import art.arcane.gloss.util.common.TextUtils;
-import art.arcane.volmlib.util.bukkit.Placeholders;
 import net.kyori.adventure.audience.Audience;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
@@ -30,7 +30,7 @@ public final class MessageMenuAction extends MenuAction<MessageActionData> {
   public ActionOutcome execute(ActionContext context) {
     Player player = context.player();
     String personalized = data.message().replace("%player%", player.getName());
-    String resolved = Placeholders.setPlaceholders(player, personalized);
+    String resolved = TextPipeline.menuText(player, personalized);
     deliver(player, sanitizeInteractions(TextUtils.parse(resolved)));
     return ActionOutcome.CONTINUE;
   }

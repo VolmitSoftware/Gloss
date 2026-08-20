@@ -15,7 +15,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class AnimationLegacyDefaultUpgradeTest {
-    private static final String LEGACY_DEFAULT = """
+    private static final String LEGACY_NAMED_DEFAULT = """
         {
           "schemaVersion": 1,
           "revision": 1,
@@ -29,28 +29,48 @@ class AnimationLegacyDefaultUpgradeTest {
           ]
         }
         """;
+    private static final String LEGACY_STEPPED_DEFAULT = """
+        {
+          "schemaVersion": 1,
+          "revision": 1,
+          "mode": "ascend",
+          "frameIntervalMs": 500,
+          "frames": [
+            "&c",
+            "&6",
+            "&a",
+            "&b"
+          ]
+        }
+        """;
 
     @TempDir
     File folder;
 
     @Test
-    void upgradesOnlyTheExactLegacyShippedRainbow() throws IOException {
+    void upgradesTheExactLegacyNamedShippedRainbow() throws IOException {
         File file = new File(folder, "rainbow.json");
-        Files.writeString(file.toPath(), LEGACY_DEFAULT, StandardCharsets.UTF_8);
+        Files.writeString(file.toPath(), LEGACY_NAMED_DEFAULT, StandardCharsets.UTF_8);
 
         assertTrue(AnimationService.upgradeLegacyRainbowDefault(defaults()));
 
-        String upgraded = Files.readString(file.toPath(), StandardCharsets.UTF_8);
-        AnimationDoc doc = AnimationDoc.parse(file.getName(), upgraded);
-        assertEquals(List.of("&c", "&6", "&a", "&b"), doc.frames());
-        assertEquals("&c&lONLINE", doc.frames().getFirst() + "&lONLINE");
-        assertFalse((doc.frames().getFirst() + "&lONLINE").contains("GlossONLINE"));
+        assertSmoothRainbow(file);
+    }
+
+    @Test
+    void upgradesTheExactLegacySteppedShippedRainbow() throws IOException {
+        File file = new File(folder, "rainbow.json");
+        Files.writeString(file.toPath(), LEGACY_STEPPED_DEFAULT, StandardCharsets.UTF_8);
+
+        assertTrue(AnimationService.upgradeLegacyRainbowDefault(defaults()));
+
+        assertSmoothRainbow(file);
     }
 
     @Test
     void preservesAnyUserEditedRainbow() throws IOException {
         File file = new File(folder, "rainbow.json");
-        String edited = LEGACY_DEFAULT.replace("&bGloss", "&bCustom");
+        String edited = LEGACY_NAMED_DEFAULT.replace("&bGloss", "&bCustom");
         Files.writeString(file.toPath(), edited, StandardCharsets.UTF_8);
 
         assertFalse(AnimationService.upgradeLegacyRainbowDefault(defaults()));
@@ -60,11 +80,34 @@ class AnimationLegacyDefaultUpgradeTest {
     @Test
     void preservesFormattingVariantsOfTheLegacyRainbow() throws IOException {
         File file = new File(folder, "rainbow.json");
-        String reformatted = LEGACY_DEFAULT.replace("  \"revision\"", "    \"revision\"");
+        String reformatted = LEGACY_NAMED_DEFAULT.replace("  \"revision\"", "    \"revision\"");
         Files.writeString(file.toPath(), reformatted, StandardCharsets.UTF_8);
 
         assertFalse(AnimationService.upgradeLegacyRainbowDefault(defaults()));
         assertEquals(reformatted, Files.readString(file.toPath(), StandardCharsets.UTF_8));
+    }
+
+    private void assertSmoothRainbow(File file) throws IOException {
+        String upgraded = Files.readString(file.toPath(), StandardCharsets.UTF_8);
+        AnimationDoc doc = AnimationDoc.parse(file.getName(), upgraded);
+        assertEquals(50, doc.frameIntervalMs());
+        assertEquals(60, doc.frames().size());
+        assertEquals("[FF0000]", doc.frames().getFirst());
+        assertEquals("[FF0019]", doc.frames().getLast());
+        assertEquals(60, doc.frames().stream().distinct().count());
+        for (int index = 0; index < doc.frames().size(); index++) {
+            int current = frameColor(doc.frames().get(index));
+            int next = frameColor(doc.frames().get((index + 1) % doc.frames().size()));
+            for (int shift : List.of(16, 8, 0)) {
+                int delta = Math.abs(((current >> shift) & 0xFF) - ((next >> shift) & 0xFF));
+                assertTrue(delta <= 26);
+            }
+        }
+        assertFalse((doc.frames().getFirst() + "&lONLINE").contains("GlossONLINE"));
+    }
+
+    private int frameColor(String frame) {
+        return Integer.parseInt(frame.substring(1, 7), 16);
     }
 
     private ShippedDefaults defaults() {

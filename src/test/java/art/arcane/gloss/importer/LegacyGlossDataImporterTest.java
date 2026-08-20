@@ -281,8 +281,7 @@ class LegacyGlossDataImporterTest {
         assertEquals(1.5D, bubbles.offset().getY());
         assertEquals(40, bubbles.wordWrapChars());
         assertEquals(7000L, bubbles.maxAliveMs());
-        assertEquals(3, bubbles.lineStaggerTicks());
-        assertFalse(bubbles.flyAway());
+        assertEquals("0", bubbles.motion().translation().y());
         assertFalse(bubbles.followPlayer());
         assertFalse(bubbles.hideOwn());
         assertEquals(2L, bubbles.revision());
@@ -300,7 +299,8 @@ class LegacyGlossDataImporterTest {
     @Test
     void customizedBubbleStyleBlocksConfigYmlBubbleContent() throws IOException {
         write("bubbles/default.json", document(new BubbleStyleDoc(BubbleStyleDoc.CURRENT_SCHEMA_VERSION, 5L,
-            "&d", new Vector(0.0D, 2.0D, 0.0D), 48, 2, 9000L, false, true, false, null)));
+            "&d", new Vector(0.0D, 2.0D, 0.0D), 48, 9000L, true, false,
+            BubbleStyleDoc.DEFAULTS.motion(), BubbleStyleDoc.DEFAULTS.shimmer(), null)));
         write("config.yml", """
             chat-bubbles:
               message:

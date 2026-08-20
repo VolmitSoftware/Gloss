@@ -188,6 +188,7 @@ public class CommandGlossPreview {
       if (block != null && document.matchesBlock(block.getType())) {
         return PreviewStateContext.forBlock(block, player, document.varsForBlock(block.getType()));
       }
+      return PreviewStateContext.forViewer(player, document.varsForBlock(null));
     }
     return PreviewStateContext.statics(document.varsForBlock(null));
   }

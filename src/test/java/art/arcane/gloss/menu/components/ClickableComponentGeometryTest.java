@@ -2,6 +2,7 @@ package art.arcane.gloss.menu.components;
 
 import art.arcane.gloss.config.components.HitboxAnchor;
 import art.arcane.gloss.config.components.HitboxData;
+import art.arcane.gloss.config.components.HoverEasing;
 import art.arcane.gloss.menu.MenuTransform;
 import org.bukkit.Location;
 import org.bukkit.util.Vector;
@@ -67,6 +68,28 @@ public class ClickableComponentGeometryTest {
 
     assertEquals(new Vector(10, 20, 30), first);
     assertEquals(first, moved);
+  }
+
+  @Test
+  public void hoverProgressEntersAndLeavesOverTheAuthoredDuration() {
+    double progress = 0D;
+    for (int tick = 0; tick < 4; tick++) {
+      progress = ClickableComponent.nextHoverProgress(true, progress, 4);
+    }
+    assertEquals(1D, progress, 0D);
+
+    progress = ClickableComponent.nextHoverProgress(false, progress, 4);
+    assertEquals(0.75D, progress, 0D);
+  }
+
+  @Test
+  public void hoverDistanceAppliesUiScaleExactlyOnce() {
+    assertEquals(0.1D, ClickableComponent.hoverDistance(
+        0.05F,
+        2F,
+        1D,
+        HoverEasing.LINEAR
+    ), 1.0E-7D);
   }
 
   private static MenuTransform transform(float scale, float yaw) {

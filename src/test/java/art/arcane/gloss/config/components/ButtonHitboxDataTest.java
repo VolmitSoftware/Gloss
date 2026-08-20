@@ -5,6 +5,8 @@ import com.google.gson.JsonObject;
 import org.bukkit.util.Vector;
 import org.junit.Test;
 
+import java.util.List;
+
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
@@ -63,5 +65,47 @@ public class ButtonHitboxDataTest {
     assertTrue(!hitbox.hasCustomSize());
     assertEquals(new Vector(0.5, 0, 0), hitbox.offset());
     assertEquals(HitboxAnchor.BUTTON, hitbox.anchorOrDefault());
+  }
+
+  @Test
+  public void toggleUsesTheSameStableHitboxAndHoverContract() {
+    ComponentData decoded = BukkitJson.GSON.fromJson(
+        "{\"type\":\"toggle\",\"highlightModifier\":0.2,\"hoverDurationTicks\":8,"
+            + "\"hoverEasing\":\"back_out\",\"condition\":\"yes\",\"expectedValue\":\"yes\","
+            + "\"trueActions\":[],\"falseActions\":[],"
+            + "\"trueIcon\":{\"type\":\"text\",\"text\":\"On\"},"
+            + "\"falseIcon\":{\"type\":\"text\",\"text\":\"Off\"},"
+            + "\"hitbox\":{\"width\":1.5,\"height\":0.5}}",
+        ComponentData.class);
+    ToggleComponentData toggle = (ToggleComponentData) decoded;
+
+    assertEquals(1.5F, toggle.hitbox().width(), 0F);
+    assertEquals(0.5F, toggle.hitbox().height(), 0F);
+    assertEquals(8, toggle.resolvedHoverDurationTicks());
+    assertEquals(HoverEasing.BACK_OUT, toggle.resolvedHoverEasing());
+  }
+
+  @Test
+  public void omittedHoverAnimationUsesRuntimeDefaults() {
+    ComponentData decoded = BukkitJson.GSON.fromJson(
+        "{\"type\":\"button\",\"highlightModifier\":0.05,\"actions\":[],"
+            + "\"icon\":{\"type\":\"text\",\"text\":\"Play\"}}",
+        ComponentData.class);
+    ButtonComponentData button = (ButtonComponentData) decoded;
+
+    assertEquals(4, button.resolvedHoverDurationTicks());
+    assertEquals(HoverEasing.EASE_OUT_CUBIC, button.resolvedHoverEasing());
+  }
+
+  @Test
+  public void invalidHoverDurationIsRejected() {
+    assertThrows(IllegalArgumentException.class, () -> new ButtonComponentData(
+        0.05F,
+        List.of(),
+        null,
+        null,
+        41,
+        HoverEasing.LINEAR
+    ));
   }
 }

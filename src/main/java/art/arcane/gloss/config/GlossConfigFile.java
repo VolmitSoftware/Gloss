@@ -96,7 +96,7 @@ public final class GlossConfigFile {
         @ConfigDoc("Distance in blocks at which holograms become visible. Clamped to 4..128.")
         public double viewRange = 48.0D;
 
-        @ConfigDoc("Resolves placeholders per viewing player instead of once globally.")
+        @ConfigDoc("Renders complete placeholder, function and expression tokens per viewing player instead of once globally.")
         public boolean perViewerPlaceholders = true;
 
         @ConfigDoc("Ticks between refreshes of temporary holograms. Clamped to 1..20.")

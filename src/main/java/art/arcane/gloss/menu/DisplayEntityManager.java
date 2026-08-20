@@ -49,6 +49,7 @@ public class DisplayEntityManager {
 
   private static final Map<UUID, DisplayEntity> displayEntities = new ConcurrentHashMap<>();
   private static final Map<UUID, Player> playerVisibility = new ConcurrentHashMap<>();
+  private static final Map<Integer, UUID> rawEntityIds = new ConcurrentHashMap<>();
   private static final AtomicBoolean unsupportedVersionWarning = new AtomicBoolean(false);
   private static final AtomicLong keySequence = new AtomicLong();
 
@@ -58,6 +59,9 @@ public class DisplayEntityManager {
   public static UUID add(DisplayEntity displayEntity) {
     UUID uuid = new UUID(KEY_NAMESPACE, keySequence.incrementAndGet());
     displayEntities.put(uuid, displayEntity);
+    if (displayEntity.isRawEntity()) {
+      rawEntityIds.put(displayEntity.id(), uuid);
+    }
     return uuid;
   }
 
@@ -90,7 +94,7 @@ public class DisplayEntityManager {
     Player player = playerVisibility.remove(uuid);
     if (displayEntity == null || player == null)
       return;
-    PacketUtils.sendOne(player, displayEntity.remove());
+    PacketUtils.send(player, removalPackets(displayEntity));
     GlossTelemetry.countSpawnChurn();
   }
 
@@ -99,7 +103,7 @@ public class DisplayEntityManager {
       return;
 
     despawn(uuid);
-    displayEntities.remove(uuid);
+    forgetEntity(displayEntities.remove(uuid));
     playerVisibility.remove(uuid);
   }
 
@@ -108,7 +112,7 @@ public class DisplayEntityManager {
       return;
 
     if (unsupportedVersion()) {
-      displayEntities.remove(uuid);
+      forgetEntity(displayEntities.remove(uuid));
       playerVisibility.remove(uuid);
       return;
     }
@@ -117,9 +121,9 @@ public class DisplayEntityManager {
     Player player = playerVisibility.remove(uuid);
     Player target = player == null ? fallbackPlayer : player;
     if (displayEntity != null && target != null) {
-      PacketUtils.sendOne(target, displayEntity.remove());
+      PacketUtils.send(target, removalPackets(displayEntity));
     }
-    displayEntities.remove(uuid);
+    forgetEntity(displayEntities.remove(uuid));
     playerVisibility.remove(uuid);
   }
 
@@ -133,9 +137,10 @@ public class DisplayEntityManager {
       return;
 
     boolean unsupported = unsupportedVersion();
-    Map<Player, List<Integer>> byViewer = unsupported ? null : new IdentityHashMap<>(2);
+    Map<Player, List<DisplayEntity>> byViewer = unsupported ? null : new IdentityHashMap<>(2);
     for (UUID uuid : uuids) {
       DisplayEntity displayEntity = displayEntities.remove(uuid);
+      forgetEntity(displayEntity);
       Player player = playerVisibility.remove(uuid);
       if (unsupported || displayEntity == null)
         continue;
@@ -143,19 +148,26 @@ public class DisplayEntityManager {
       if (target == null)
         continue;
       byViewer.computeIfAbsent(target, ignored -> new ArrayList<>(uuids.size()))
-          .add(displayEntity.id());
+          .add(displayEntity);
     }
 
     if (unsupported)
       return;
 
-    for (Map.Entry<Player, List<Integer>> entry : byViewer.entrySet()) {
-      List<Integer> ids = entry.getValue();
-      int[] packed = new int[ids.size()];
+    for (Map.Entry<Player, List<DisplayEntity>> entry : byViewer.entrySet()) {
+      List<DisplayEntity> entities = entry.getValue();
+      int[] packed = new int[entities.size()];
       for (int index = 0; index < packed.length; index++) {
-        packed[index] = ids.get(index);
+        packed[index] = entities.get(index).id();
       }
-      PacketUtils.sendOne(entry.getKey(), DisplayEntity.destroyAll(packed));
+      List<PacketWrapper<?>> packets = new ArrayList<>(entities.size() + 1);
+      packets.add(DisplayEntity.destroyAll(packed));
+      for (DisplayEntity displayEntity : entities) {
+        if (displayEntity.isRawEntity()) {
+          packets.add(displayEntity.collisionTeamRemove());
+        }
+      }
+      PacketUtils.send(entry.getKey(), packets);
     }
   }
 
@@ -169,6 +181,21 @@ public class DisplayEntityManager {
     UUID playerId = player.getUniqueId();
     playerVisibility.values().removeIf(viewer ->
         viewer == player || (viewer != null && viewer.getUniqueId().equals(playerId)));
+  }
+
+  public static boolean isVisibleRawEntity(Player player, int entityId) {
+    if (player == null) {
+      return false;
+    }
+    UUID handle = rawEntityIds.get(entityId);
+    Player viewer = handle == null ? null : playerVisibility.get(handle);
+    return viewer != null && viewer.getUniqueId().equals(player.getUniqueId());
+  }
+
+  private static void forgetEntity(DisplayEntity displayEntity) {
+    if (displayEntity != null && displayEntity.isRawEntity()) {
+      rawEntityIds.remove(displayEntity.id());
+    }
   }
 
   public static Vector location(UUID uuid) {
@@ -213,10 +240,9 @@ public class DisplayEntityManager {
   }
 
   /**
-   * Points a display at the menu's facing. Display entities ignore head-yaw, so no head-look packet
-   * is sent, and the roll goes out as the single left-rotation metadata entry rather than the full
-   * 22-entry block. Nothing is sent at all when the stored orientation already matches — the state
-   * is still written first so a later spawn carries it.
+   * Points an icon at the menu's facing. Living icons receive body and head rotation packets;
+   * display entities receive roll as one left-rotation metadata entry. Nothing is sent when the
+   * stored orientation already matches, but the state is written before spawn in both cases.
    */
   public static void orient(UUID uuid, float yaw, float pitch, float roll) {
     if (unsupportedVersion())
@@ -226,10 +252,25 @@ public class DisplayEntityManager {
     if (displayEntity == null)
       return;
 
+    boolean facingUnchanged = displayEntity.yaw() == yaw && displayEntity.pitch() == pitch;
+    if (displayEntity.isRawEntity()) {
+      boolean headUnchanged = displayEntity.headYaw() == yaw;
+      displayEntity.yaw(yaw).pitch(pitch).headYaw(yaw);
+      if (player == null) {
+        return;
+      }
+      if (!facingUnchanged) {
+        PacketUtils.sendOne(player, displayEntity.rotate(yaw, pitch));
+      }
+      if (!headUnchanged) {
+        PacketUtils.sendOne(player, displayEntity.headLook());
+      }
+      return;
+    }
+
     double halfRoll = Math.toRadians(roll) / 2.0D;
     float rollZ = (float) Math.sin(halfRoll);
     float rollW = (float) Math.cos(halfRoll);
-    boolean facingUnchanged = displayEntity.yaw() == yaw && displayEntity.pitch() == pitch;
     boolean rollUnchanged = isRoll(displayEntity.leftRotation(), rollZ, rollW);
     displayEntity.yaw(yaw)
         .pitch(pitch)
@@ -251,6 +292,13 @@ public class DisplayEntityManager {
         && rotation.getY() == 0F
         && rotation.getZ() == rollZ
         && rotation.getW() == rollW;
+  }
+
+  private static List<PacketWrapper<?>> removalPackets(DisplayEntity displayEntity) {
+    if (!displayEntity.isRawEntity()) {
+      return List.of(displayEntity.remove());
+    }
+    return List.of(displayEntity.remove(), displayEntity.collisionTeamRemove());
   }
 
   public static void changeName(UUID uuid, Component name) {

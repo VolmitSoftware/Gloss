@@ -28,6 +28,14 @@ import art.arcane.volmlib.util.bukkit.papi.PlayerSnapshotStore;
 import art.arcane.volmlib.util.localization.MessageArgs;
 import art.arcane.volmlib.util.scheduling.FoliaScheduler;
 import art.arcane.volmlib.util.scheduling.SchedulerUtils;
+import com.github.retrooper.packetevents.PacketEvents;
+import com.github.retrooper.packetevents.event.PacketListenerAbstract;
+import com.github.retrooper.packetevents.event.PacketListenerCommon;
+import com.github.retrooper.packetevents.event.PacketListenerPriority;
+import com.github.retrooper.packetevents.event.PacketReceiveEvent;
+import com.github.retrooper.packetevents.protocol.packettype.PacketType;
+import com.github.retrooper.packetevents.protocol.player.InteractionHand;
+import com.github.retrooper.packetevents.wrapper.play.client.WrapperPlayClientInteractEntity;
 import org.bukkit.Bukkit;
 import org.bukkit.Color;
 import org.bukkit.FluidCollisionMode;
@@ -71,6 +79,7 @@ public final class MenuSessionManager {
 
   private SchedulerUtils.TaskHandle debugHitbox, debugPos;
   private final SchedulerUtils.TaskHandle holderTask, previewTask;
+  private final PacketListenerCommon entityInteractionListener;
 
   public PlayerSnapshotStore<String> getOpenMenus() {
     return openMenus;
@@ -145,6 +154,17 @@ public final class MenuSessionManager {
       holder.close(HoloCloseReason.QUIT);
     });
     Events.listen(Gloss.instance, PlayerInteractEvent.class, EventPriority.HIGHEST, this::dispatchClick);
+    entityInteractionListener = PacketEvents.getAPI() == null
+        || PacketEvents.getAPI().getEventManager() == null
+        ? null
+        : PacketEvents.getAPI().getEventManager().registerListener(
+            new PacketListenerAbstract(PacketListenerPriority.HIGHEST) {
+              @Override
+              public void onPacketReceive(PacketReceiveEvent event) {
+                dispatchRawEntityClick(event);
+              }
+            }
+        );
     previewTask = listenToInventoryPreview();
   }
 
@@ -165,34 +185,72 @@ public final class MenuSessionManager {
         && action != Action.RIGHT_CLICK_AIR && action != Action.RIGHT_CLICK_BLOCK) return;
     if (event.getHand() == EquipmentSlot.OFF_HAND) return;
 
-    SessionHolder holder = holders.isEmpty() ? null : holders.get(event.getPlayer().getUniqueId());
+    HoloClickTrigger trigger = HoloClickTrigger.fromInteraction(action, event.getPlayer().isSneaking());
+    if (dispatchClick(event.getPlayer(), trigger)) {
+      event.setCancelled(true);
+    }
+  }
+
+  private void dispatchRawEntityClick(PacketReceiveEvent event) {
+    if (event.getPacketType() != PacketType.Play.Client.INTERACT_ENTITY) {
+      return;
+    }
+    Player player = event.getPlayer();
+    if (player == null) {
+      return;
+    }
+    WrapperPlayClientInteractEntity packet = new WrapperPlayClientInteractEntity(event);
+    if (packet.getHand() == InteractionHand.OFF_HAND
+        || !DisplayEntityManager.isVisibleRawEntity(player, packet.getEntityId())) {
+      return;
+    }
+
+    event.setCancelled(true);
+    boolean sneaking = packet.isSneaking().orElse(player.isSneaking());
+    HoloClickTrigger trigger = rawEntityTrigger(packet.getAction(), sneaking);
+    SchedulerUtils.runEntity(Gloss.instance, player, () -> {
+      if (player.isOnline()) {
+        dispatchClick(player, trigger);
+      }
+    });
+  }
+
+  static HoloClickTrigger rawEntityTrigger(WrapperPlayClientInteractEntity.InteractAction action,
+                                           boolean sneaking) {
+    if (action == WrapperPlayClientInteractEntity.InteractAction.ATTACK) {
+      return sneaking ? HoloClickTrigger.SHIFT_LEFT_CLICK : HoloClickTrigger.LEFT_CLICK;
+    }
+    return sneaking ? HoloClickTrigger.SHIFT_RIGHT_CLICK : HoloClickTrigger.RIGHT_CLICK;
+  }
+
+  private boolean dispatchClick(Player player, HoloClickTrigger trigger) {
+    SessionHolder holder = holders.isEmpty() ? null : holders.get(player.getUniqueId());
     SessionHolder.ClickSnapshot snapshot = holder == null
         ? null
-        : holder.snapshotClick(event.getPlayer().getEyeLocation());
+        : holder.snapshotClick(player.getEyeLocation());
     PanelRuntimeManager boardRuntime = Gloss.instance.getPanelRuntime();
     PanelClickTarget boardTarget = boardRuntime == null
         ? null
-        : boardRuntime.findClickTarget(event.getPlayer());
-    if (snapshot == null && boardTarget == null) return;
+        : boardRuntime.findClickTarget(player);
+    if (snapshot == null && boardTarget == null) return false;
 
     double nearestDistance = snapshot == null
         ? boardTarget.distance()
         : boardTarget == null ? snapshot.distance() : Math.min(snapshot.distance(), boardTarget.distance());
-    if (isInteractionObstructed(event.getPlayer(), nearestDistance)) return;
+    if (isInteractionObstructed(player, nearestDistance)) return false;
 
-    HoloClickTrigger trigger = HoloClickTrigger.fromInteraction(action, event.getPlayer().isSneaking());
-    event.setCancelled(true);
     if (boardTarget != null && (snapshot == null || boardTarget.distance() < snapshot.distance())) {
       try {
         boardTarget.dispatch(trigger);
       } catch (Exception ex) {
         Gloss.logExceptionStack(false, ex, "Board component %s of board %s threw while handling a click from %s.",
-            boardTarget.component().getId(), boardTarget.view().definition().id(), event.getPlayer().getName());
+            boardTarget.component().getId(), boardTarget.view().definition().id(), player.getName());
       }
-      return;
+      return true;
     }
 
-    dispatchPersonalClick(event.getPlayer(), snapshot, trigger);
+    dispatchPersonalClick(player, snapshot, trigger);
+    return true;
   }
 
   private boolean isInteractionObstructed(Player player, double distance) {
@@ -447,6 +505,11 @@ public final class MenuSessionManager {
   }
 
   public void destroyAll() {
+    if (PacketEvents.getAPI() != null
+        && PacketEvents.getAPI().getEventManager() != null
+        && entityInteractionListener != null) {
+      PacketEvents.getAPI().getEventManager().unregisterListener(entityInteractionListener);
+    }
     cancel(holderTask);
     cancel(previewTask);
     cancel(debugHitbox);

@@ -294,7 +294,7 @@ public class PreviewStateContextTest {
   @Test
   public void inventoryContextExposesSizeAndOccupiedWithoutABlock() {
     Inventory chest = PreviewFakes.inventory(9).item(8, PreviewFakes.stack(Material.STONE, 1)).build();
-    PreviewStateContext context = PreviewStateContext.forInventory(chest, Map.of());
+    PreviewStateContext context = PreviewStateContext.forInventory(chest, null, Map.of());
 
     assertEquals("inventory", context.category());
     assertEquals(9.0D, number(context, "inventory.size"), EPSILON);
@@ -558,7 +558,7 @@ public class PreviewStateContextTest {
     assertEquals("", PreviewStateContext.forBlock(
         PreviewFakes.cauldron(Material.CAULDRON).build(), null, Map.of()).variable("customName"));
     assertEquals("", PreviewStateContext.statics(Map.of()).variable("customName"));
-    assertEquals("", PreviewStateContext.forInventory(PreviewFakes.inventory(9).build(), Map.of()).variable("customName"));
+    assertEquals("", PreviewStateContext.forInventory(PreviewFakes.inventory(9).build(), null, Map.of()).variable("customName"));
   }
 
   @Test

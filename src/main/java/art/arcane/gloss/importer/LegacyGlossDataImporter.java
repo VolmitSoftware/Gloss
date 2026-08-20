@@ -393,15 +393,19 @@ public final class LegacyGlossDataImporter {
                 yaml.getDouble("chat-bubbles.message.offset.x", base.offset().getX()),
                 yaml.getDouble("chat-bubbles.message.offset.y", base.offset().getY()),
                 yaml.getDouble("chat-bubbles.message.offset.z", base.offset().getZ()));
+            BubbleStyleDoc.Motion motion = yaml.getBoolean("chat-bubbles.fly-away", true)
+                ? base.motion()
+                : new BubbleStyleDoc.Motion(new BubbleStyleDoc.Axis("0", "0", "0"),
+                    new BubbleStyleDoc.Axis("1", "1", "1"), new BubbleStyleDoc.Axis("0", "0", "0"), "1");
             BubbleStyleDoc updated = new BubbleStyleDoc(base.schemaVersion(), base.revision() + 1L,
                 yaml.getString("chat-bubbles.message.prefix", base.prefix()),
                 offset,
                 yaml.getInt("chat-bubbles.word-wrap-break-chars", base.wordWrapChars()),
-                yaml.getInt("chat-bubbles.line-stagger-ticks", base.lineStaggerTicks()),
                 yaml.getLong("chat-bubbles.max-time-alive", base.maxAliveMs()),
-                yaml.getBoolean("chat-bubbles.fly-away", base.flyAway()),
                 yaml.getBoolean("chat-bubbles.follow-players", base.followPlayer()),
                 yaml.getBoolean("chat-bubbles.hide-own-messages", base.hideOwn()),
+                motion,
+                base.shimmer(),
                 base.select());
             writeDocument(styleFile.toPath(), updated);
             entries.add(Entry.of("config", LEGACY_CONFIG_FILE_NAME + ":chat-bubbles", Status.OVERLAID));

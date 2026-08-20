@@ -40,6 +40,8 @@ public final class ExprFunctions {
       case "round" -> (double) Math.round(oneNumArg(name, args));
       case "abs" -> Math.abs(oneNumArg(name, args));
       case "mod" -> mod(name, args);
+      case "pow" -> pow(name, args);
+      case "smoothstep" -> smoothstep(name, args);
       case "sin" -> Math.sin(oneNumArg(name, args));
       case "cos" -> Math.cos(oneNumArg(name, args));
       case "rgb" -> rgb(name, args);
@@ -56,6 +58,15 @@ public final class ExprFunctions {
       case "plain" -> plain(name, args);
       case "readable" -> readable(name, args);
       default -> null;
+    };
+  }
+
+  public static boolean isSupported(String name) {
+    return switch (name) {
+      case "clamp", "lerp", "min", "max", "floor", "ceil", "round", "abs", "mod", "pow",
+          "smoothstep", "sin", "cos", "rgb", "argb", "alpha", "mix", "palette", "select",
+          "number", "bar", "hex", "str", "fixed", "plain", "readable" -> true;
+      default -> false;
     };
   }
 
@@ -104,6 +115,27 @@ public final class ExprFunctions {
       throw new ExprException("division by zero", NO_POSITION);
     }
     return a - Math.floor(a / b) * b;
+  }
+
+  private static double pow(String name, List<Object> args) {
+    requireCount(name, args, 2);
+    double value = Math.pow(numArg(name, args, 0), numArg(name, args, 1));
+    if (!Double.isFinite(value)) {
+      throw new ExprException(name + " result must be finite", NO_POSITION);
+    }
+    return value;
+  }
+
+  private static double smoothstep(String name, List<Object> args) {
+    requireCount(name, args, 3);
+    double edge0 = numArg(name, args, 0);
+    double edge1 = numArg(name, args, 1);
+    if (edge0 == edge1) {
+      throw new ExprException(name + " edges must differ", NO_POSITION);
+    }
+    double value = numArg(name, args, 2);
+    double t = Math.min(1.0D, Math.max(0.0D, (value - edge0) / (edge1 - edge0)));
+    return t * t * (3.0D - 2.0D * t);
   }
 
   // ---------------------------------------------------------------------

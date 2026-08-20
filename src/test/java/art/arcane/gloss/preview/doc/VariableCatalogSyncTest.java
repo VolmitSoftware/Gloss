@@ -1,5 +1,6 @@
 package art.arcane.gloss.preview.doc;
 
+import art.arcane.gloss.text.TextExpressionRenderer;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import org.junit.Test;
@@ -50,6 +51,12 @@ public class VariableCatalogSyncTest {
   }
 
   @Test
+  public void standardVariableNamesExactlyMatchTheTextExpressionScope() {
+    assertEquals(TextExpressionRenderer.STANDARD_VARIABLES,
+        root().getAsJsonObject("standardVariables").keySet());
+  }
+
+  @Test
   public void everyVariableDeclaresAKnownTypeAndANonBlankDescription() {
     JsonObject categories = categories();
     for (String category : categories.keySet()) {
@@ -62,6 +69,10 @@ public class VariableCatalogSyncTest {
         assertTrue(path + ".description", variable.has("description"));
         assertFalse(path + " description", variable.get("description").getAsString().isBlank());
       }
+    }
+    JsonObject standard = root().getAsJsonObject("standardVariables");
+    for (String name : standard.keySet()) {
+      assertVariable(name, standard.getAsJsonObject(name));
     }
   }
 
@@ -85,6 +96,14 @@ public class VariableCatalogSyncTest {
       assertTrue(name + ".description", function.has("description"));
       assertFalse(name + " description", function.get("description").getAsString().isBlank());
     }
+  }
+
+  private static void assertVariable(String path, JsonObject variable) {
+    assertTrue(path + ".type", variable.has("type"));
+    assertTrue(path + " type=" + variable.get("type").getAsString(),
+        KNOWN_TYPES.contains(variable.get("type").getAsString()));
+    assertTrue(path + ".description", variable.has("description"));
+    assertFalse(path + " description", variable.get("description").getAsString().isBlank());
   }
 
   private static JsonObject categories() {

@@ -46,6 +46,8 @@ class AnimationFrameCacheTest {
             "placeholder frames must stay on the per-viewer render path");
         assertNull(frameCache.staticFrames(clip("fn", List.of("|rainbow|")), 0L),
             "function frames must stay on the per-viewer render path");
+        assertNull(frameCache.staticFrames(clip("expression", List.of("{{ player.name }}")), 0L),
+            "inline player expressions must stay on the per-viewer render path");
         assertEquals(0, renders.get(), "viewer-dependent clips must never be pre-rendered");
     }
 

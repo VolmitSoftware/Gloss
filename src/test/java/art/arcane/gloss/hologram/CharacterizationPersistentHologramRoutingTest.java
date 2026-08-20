@@ -75,6 +75,15 @@ class CharacterizationPersistentHologramRoutingTest {
     }
 
     @Test
+    void literalPercentAndPipeCharactersKeepSharedRouting() {
+        PersistentHologram hologram = hologram("h-literal-markers", List.of("100% ready", "A | B"));
+        hologram.update();
+
+        assertEquals("100% ready\nA | B", harness.onlySpawned(world).lastText());
+        assertEquals(1, harness.liveSpawned(world).size());
+    }
+
+    @Test
     void placeholderLinesRouteToPrivatePerViewerDisplays() {
         harness.registerFunction("who", player -> player == null ? "console" : player.getName());
         PersistentHologram hologram = hologram("h-viewer", List.of("%score% |who|"));
@@ -100,6 +109,20 @@ class CharacterizationPersistentHologramRoutingTest {
             assertTrue(display.lastText().contains(owner.name),
                 "the display shown to a viewer must carry that viewer's rendering");
         }
+    }
+
+    @Test
+    void inlinePlayerExpressionsRouteToPrivatePerViewerDisplays() {
+        PersistentHologram hologram = hologram("h-expression", List.of("Hello {{ player.name }}"));
+        hologram.update();
+
+        List<DisplayHandle> live = harness.liveSpawned(world);
+        assertEquals(2, live.size());
+        Set<String> texts = new HashSet<>();
+        for (DisplayHandle display : live) {
+            texts.add(display.lastText());
+        }
+        assertEquals(Set.of("Hello Alice", "Hello Bob"), texts);
     }
 
     @Test
@@ -160,23 +183,22 @@ class CharacterizationPersistentHologramRoutingTest {
     }
 
     @Test
-    void sharedAnimationLinePublishesAndRetractsWithTheLineSet() {
+    void animationLinePublishesOnePrivateTargetPerViewerAndRetractsWithTheLineSet() {
         PersistentHologram hologram = hologram("h-anim", List.of(CharacterizationHarness.FAST_CLIP_LINE));
         hologram.update();
-        DisplayHandle display = harness.onlySpawned(world);
 
         hologram.update();
-        assertEquals(1, harness.animator.targetCount(), "animated shared lines must publish one target");
-        assertEquals(1, harness.animator.pass(0L));
-        CharacterizationHarness.Sent sent = harness.sender.sent.get(0);
-        assertEquals(display.entityId, sent.entityId());
-        assertEquals(Set.of(alice.proxy, bob.proxy), Set.copyOf(sent.viewers()),
-            "shared animation must capture every in-range viewer");
+        assertEquals(2, harness.animator.targetCount(), "viewer-capable animation lines publish one target per viewer");
+        assertEquals(2, harness.animator.pass(0L));
+        for (CharacterizationHarness.Sent sent : harness.sender.sent) {
+            assertEquals(1, sent.viewers().size());
+        }
 
         hologram.setLines(List.of("plain"));
         hologram.update();
         assertEquals(0, harness.animator.targetCount(), "dropping the animated line must retract the target");
-        assertEquals("plain", display.lastText(), "the tick path must take back over after retraction");
+        assertEquals("plain", harness.onlySpawned(world).lastText(),
+            "the shared tick path must take back over after retraction");
     }
 
     @Test

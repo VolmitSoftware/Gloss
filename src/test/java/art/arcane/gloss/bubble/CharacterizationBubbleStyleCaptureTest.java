@@ -24,7 +24,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class CharacterizationBubbleStyleCaptureTest {
     private static BubbleStyleDoc style(BubbleStyleDoc.Select select) {
         return new BubbleStyleDoc(BubbleStyleDoc.CURRENT_SCHEMA_VERSION, DocumentEnvelope.INITIAL_REVISION,
-            "&7", new Vector(0.0D, 1.0D, 0.0D), 32, 5, 5000L, true, true, true, select);
+            "&7", new Vector(0.0D, 1.0D, 0.0D), 32, 5000L, true, true,
+            BubbleStyleDoc.DEFAULTS.motion(), BubbleStyleDoc.DEFAULTS.shimmer(), select);
     }
 
     // --- the DEFAULTS style is the terminal fallback of every spawn ---
@@ -35,9 +36,8 @@ class CharacterizationBubbleStyleCaptureTest {
         assertEquals("&7", defaults.prefix());
         assertEquals(new Vector(0.0D, 1.0D, 0.0D), defaults.offset());
         assertEquals(32, defaults.wordWrapChars());
-        assertEquals(5, defaults.lineStaggerTicks());
         assertEquals(5000L, defaults.maxAliveMs());
-        assertTrue(defaults.flyAway());
+        assertEquals(BubbleStyleDoc.DEFAULT_TRANSLATION_Y, defaults.motion().translation().y());
         assertTrue(defaults.followPlayer());
         assertTrue(defaults.hideOwn());
         assertNull(defaults.select());
@@ -54,15 +54,13 @@ class CharacterizationBubbleStyleCaptureTest {
     @Test
     void captureClampsTheLifecycleBounds() {
         BubbleStyleDoc doc = new BubbleStyleDoc(BubbleStyleDoc.CURRENT_SCHEMA_VERSION,
-            DocumentEnvelope.INITIAL_REVISION, "&7", null, 1, 999, 1L, false, false, false, null);
+            DocumentEnvelope.INITIAL_REVISION, "&7", null, 1, 1L, false, false, null, null, null);
         assertEquals(8, doc.wordWrapChars());
-        assertEquals(40, doc.lineStaggerTicks());
         assertEquals(500L, doc.maxAliveMs());
 
         BubbleStyleDoc high = new BubbleStyleDoc(BubbleStyleDoc.CURRENT_SCHEMA_VERSION,
-            DocumentEnvelope.INITIAL_REVISION, "&7", null, 9999, -3, 999_999_999L, false, false, false, null);
+            DocumentEnvelope.INITIAL_REVISION, "&7", null, 9999, 999_999_999L, false, false, null, null, null);
         assertEquals(128, high.wordWrapChars());
-        assertEquals(0, high.lineStaggerTicks());
         assertEquals(60000L, high.maxAliveMs());
     }
 
@@ -70,7 +68,7 @@ class CharacterizationBubbleStyleCaptureTest {
     void captureDefensivelyClonesTheOffsetVector() {
         Vector offset = new Vector(0.5D, 2.0D, -0.5D);
         BubbleStyleDoc doc = new BubbleStyleDoc(BubbleStyleDoc.CURRENT_SCHEMA_VERSION,
-            DocumentEnvelope.INITIAL_REVISION, "&7", offset, 32, 5, 5000L, true, true, true, null);
+            DocumentEnvelope.INITIAL_REVISION, "&7", offset, 32, 5000L, true, true, null, null, null);
         offset.setY(99.0D);
         assertEquals(new Vector(0.5D, 2.0D, -0.5D), doc.offset());
     }
@@ -78,7 +76,7 @@ class CharacterizationBubbleStyleCaptureTest {
     @Test
     void captureFillsNullPrefixAndOffsetWithTheLegacyDefaults() {
         BubbleStyleDoc doc = new BubbleStyleDoc(BubbleStyleDoc.CURRENT_SCHEMA_VERSION,
-            DocumentEnvelope.INITIAL_REVISION, null, null, 32, 5, 5000L, true, true, true, null);
+            DocumentEnvelope.INITIAL_REVISION, null, null, 32, 5000L, true, true, null, null, null);
         assertEquals("&7", doc.prefix());
         assertEquals(new Vector(0.0D, 1.0D, 0.0D), doc.offset());
     }

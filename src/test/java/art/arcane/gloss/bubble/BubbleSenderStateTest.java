@@ -2,6 +2,7 @@ package art.arcane.gloss.bubble;
 
 import art.arcane.gloss.bubble.ChatBubblesService.BubbleRecord;
 import art.arcane.gloss.bubble.ChatBubblesService.SenderState;
+import org.bukkit.util.Vector;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -11,7 +12,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class BubbleSenderStateTest {
     private static BubbleRecord record(boolean followPlayer, long expiresAtMs) {
-        return new BubbleRecord(null, null, false, followPlayer, expiresAtMs);
+        return record(followPlayer, expiresAtMs, 1);
+    }
+
+    private static BubbleRecord record(boolean followPlayer, long expiresAtMs, int lineCount) {
+        return new BubbleRecord(null, null, new Vector(), BubbleMotionPlan.compile(BubbleStyleDoc.DEFAULTS.motion()),
+            BubbleShimmerPlan.compile(BubbleStyleDoc.DEFAULTS.shimmer()), followPlayer, 0L, 5000L, expiresAtMs,
+            lineCount, 0.5D, "&7", "message", 32,
+            List.of("message"));
     }
 
     private static int indexOfViaScan(SenderState state, BubbleRecord record) {
@@ -118,5 +126,20 @@ class BubbleSenderStateTest {
 
         assertTrue(state.live.isEmpty());
         assertEquals(0, state.followCount.get());
+    }
+
+    @Test
+    void stackedLineCountIncludesEveryLineInThisAndNewerMessageBlocks() {
+        SenderState state = new SenderState();
+        BubbleRecord oldest = record(false, 0L, 3);
+        BubbleRecord middle = record(false, 0L, 2);
+        BubbleRecord newest = record(false, 0L, 1);
+        state.add(oldest);
+        state.add(middle);
+        state.add(newest);
+
+        assertEquals(6, state.stackedLineCount(oldest));
+        assertEquals(3, state.stackedLineCount(middle));
+        assertEquals(1, state.stackedLineCount(newest));
     }
 }

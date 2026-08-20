@@ -4,6 +4,7 @@ import art.arcane.gloss.api.HoloClickTrigger;
 import art.arcane.gloss.config.MenuComponentData;
 import art.arcane.gloss.config.MenuDefinitionData;
 import art.arcane.gloss.config.components.ComponentData;
+import art.arcane.gloss.config.components.HoverEasing;
 import art.arcane.gloss.config.icon.IconBillboard;
 import art.arcane.gloss.enums.MenuComponentType;
 import art.arcane.gloss.exceptions.MenuIconException;
@@ -171,7 +172,7 @@ public class CharacterizationHitboxOrientationTest {
 
   private static final class ProbeClickable extends ClickableComponent<ProbeClickableData> {
     private ProbeClickable(MenuSession session, MenuComponentData data) {
-      super(session, data, 0.05F, null);
+      super(session, data, 0.05F, null, 4, HoverEasing.EASE_OUT_CUBIC);
     }
 
     @Override

@@ -24,9 +24,7 @@ import java.util.logging.Level;
 
 final class PersistentHologram implements Hologram {
     private static final double POSITION_EPSILON_SQUARED = 1.0E-6D;
-    private static final int VIEWER_DEPENDENT_FLAGS = TextPipeline.HAS_FUNCTION | TextPipeline.HAS_PLACEHOLDER;
-
-    private record LineSet(List<String> lines, int flags, long generation) {
+    private record LineSet(List<String> lines, int flags, boolean viewerDependent, long generation) {
     }
 
     private record SharedText(long generation, long emojiGeneration, String text) {
@@ -61,7 +59,7 @@ final class PersistentHologram implements Hologram {
         this.id = id;
         this.animatorGroup = "holo:" + id;
         this.linesLock = new Object();
-        this.lineSet = new LineSet(List.of(), 0, 0L);
+        this.lineSet = new LineSet(List.of(), 0, false, 0L);
         this.viewerDisplays = new ConcurrentHashMap<>();
         this.viewerRendered = new ConcurrentHashMap<>();
         this.viewerSpawning = ConcurrentHashMap.newKeySet();
@@ -79,7 +77,7 @@ final class PersistentHologram implements Hologram {
         this.id = id;
         this.animatorGroup = "holo:" + id;
         this.linesLock = new Object();
-        this.lineSet = new LineSet(List.of(), 0, 0L);
+        this.lineSet = new LineSet(List.of(), 0, false, 0L);
         this.viewerDisplays = new ConcurrentHashMap<>();
         this.viewerRendered = new ConcurrentHashMap<>();
         this.viewerSpawning = ConcurrentHashMap.newKeySet();
@@ -193,7 +191,14 @@ final class PersistentHologram implements Hologram {
 
     private void publishLines(List<String> next) {
         lineGenerations++;
-        lineSet = new LineSet(next, HologramMath.classify(next), lineGenerations);
+        boolean viewerDependent = false;
+        for (String line : next) {
+            if (TextPipeline.viewerDependent(line)) {
+                viewerDependent = true;
+                break;
+            }
+        }
+        lineSet = new LineSet(next, HologramMath.classify(next), viewerDependent, lineGenerations);
     }
 
     private boolean replaceLine(int index, String line) {
@@ -239,7 +244,7 @@ final class PersistentHologram implements Hologram {
         Location anchor = new Location(world, x, y, z);
         reconcilePosition(world, anchor);
         List<HologramTick.Viewer> viewers = tick.viewers(world);
-        if ((snapshot.flags() & TextPipeline.HAS_PLACEHOLDER) != 0 && service.perViewerPlaceholders()) {
+        if (snapshot.viewerDependent() && service.perViewerPlaceholders()) {
             despawnShared();
             updatePerViewer(world, anchor, snapshot, viewers);
         } else {
@@ -568,7 +573,7 @@ final class PersistentHologram implements Hologram {
         TextPipeline text = service.plugin().text();
         for (int index = 0; index < values.size(); index++) {
             String line = values.get(index);
-            if ((TextPipeline.classify(line) & VIEWER_DEPENDENT_FLAGS) != 0) {
+            if (TextPipeline.viewerDependent(line)) {
                 continue;
             }
 

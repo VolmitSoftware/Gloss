@@ -176,7 +176,7 @@ public class GoldenEquivalenceTest {
   private static List<PreviewElement> enderChest(CompiledPreviewDocument doc) {
     assertEquals("enderChest", doc.special());
     Inventory inventory = GoldenFakes.enderChestInventory();
-    return doc.build(PreviewStateContext.forInventory(inventory, doc.varsForBlock(Material.ENDER_CHEST)));
+    return doc.build(PreviewStateContext.forInventory(inventory, null, doc.varsForBlock(Material.ENDER_CHEST)));
   }
 
   private static List<PreviewElement> locked(CompiledPreviewDocument doc) {

@@ -140,7 +140,7 @@ public final class ContainerPreview {
       return null;
     }
     List<PreviewElement> elements = resolved.doc().build(
-        PreviewStateContext.forInventory(player.getEnderChest(), resolved.vars()));
+        PreviewStateContext.forInventory(player.getEnderChest(), player, resolved.vars()));
     if (elements.isEmpty()) {
       return null;
     }
@@ -165,7 +165,7 @@ public final class ContainerPreview {
   }
 
   public static ContainerPreview locked(Block block, Player player) {
-    List<PreviewElement> elements = lockedElements();
+    List<PreviewElement> elements = lockedElements(player);
     if (elements.isEmpty()) {
       return null;
     }
@@ -174,7 +174,7 @@ public final class ContainerPreview {
   }
 
   public static ContainerPreview locked(Entity entity, Player player) {
-    List<PreviewElement> elements = lockedElements();
+    List<PreviewElement> elements = lockedElements(player);
     if (elements.isEmpty()) {
       return null;
     }
@@ -182,13 +182,12 @@ public final class ContainerPreview {
     return new ContainerPreview(player, null, entity, center, elements, false);
   }
 
-  /** Target-less: the locked document only ever draws its own constants, so the scope is statics. */
-  private static List<PreviewElement> lockedElements() {
+  private static List<PreviewElement> lockedElements(Player player) {
     PreviewDocumentRegistry registry = registry();
     CompiledPreviewDocument.Resolved resolved = registry == null
         ? null
         : registry.special(PreviewDocumentRegistry.SPECIAL_LOCKED);
-    return resolved == null ? List.of() : resolved.doc().build(PreviewStateContext.statics(resolved.vars()));
+    return resolved == null ? List.of() : resolved.doc().build(PreviewStateContext.forViewer(player, resolved.vars()));
   }
 
   /** Null before the plugin has enabled, which is the one window a preview can be requested in. */

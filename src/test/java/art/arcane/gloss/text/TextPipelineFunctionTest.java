@@ -87,6 +87,15 @@ class TextPipelineFunctionTest {
     }
 
     @Test
+    void emojiReplacementTextIsNotReinterpretedAsAuthoredCode() {
+        TextPipeline pipeline = new TextPipeline(null);
+        pipeline.setEmojiFilter(raw -> raw.replace(":literal:", "{{ 1 + 2 }} |function| %player_name%"));
+        pipeline.registerFunction("function", player -> "executed");
+
+        assertEquals("{{ 1 + 2 }} |function| %player_name%", pipeline.renderStatic(":literal:"));
+    }
+
+    @Test
     void nullInputRendersEmpty() {
         TextPipeline pipeline = new TextPipeline(null);
         assertEquals("", pipeline.renderStatic(null));
