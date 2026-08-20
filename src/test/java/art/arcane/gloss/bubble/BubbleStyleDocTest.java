@@ -132,7 +132,7 @@ class BubbleStyleDocTest {
         BubbleStyleDoc doc = new BubbleStyleDoc(2, 1L, null, null, 1000, 10L, true, true, null, null, null);
 
         assertEquals("&7", doc.prefix());
-        assertEquals(new Vector(0.0D, 1.0D, 0.0D), doc.offset());
+        assertEquals(new Vector(0.0D, 0.3D, 0.0D), doc.offset());
         assertEquals(128, doc.wordWrapChars());
         assertEquals(500L, doc.maxAliveMs());
     }

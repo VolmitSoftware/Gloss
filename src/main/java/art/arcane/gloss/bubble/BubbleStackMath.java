@@ -1,8 +1,6 @@
 package art.arcane.gloss.bubble;
 
 public final class BubbleStackMath {
-    private static final double BASE_LIFT = 0.86D;
-
     private BubbleStackMath() {
     }
 
@@ -11,6 +9,6 @@ public final class BubbleStackMath {
     }
 
     public static double offsetY(double spread, int stackedLineCount) {
-        return BASE_LIFT + stackOffset(spread, stackedLineCount);
+        return stackOffset(spread, stackedLineCount);
     }
 }

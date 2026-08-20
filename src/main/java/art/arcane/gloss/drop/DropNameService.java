@@ -150,7 +150,8 @@ public final class DropNameService implements Listener {
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onItemSpawn(ItemSpawnEvent event) {
-        refreshOnOwner(event.getEntity());
+        Item item = event.getEntity();
+        plugin.scheduler().runEntity(item, () -> refreshOnOwner(item), 1);
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)

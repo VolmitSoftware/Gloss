@@ -233,10 +233,10 @@ public final class GlossConfigFile {
         public Filters filters = new Filters();
 
         public static final class Limits {
-            @ConfigDoc("Ticks between airborne motion updates. Client interpolation smooths the gaps. Clamped to 1..20.")
+            @ConfigDoc("Ticks between airborne carrier-position and motion updates. Client interpolation smooths the gaps. Clamped to 1..20.")
             public int updateIntervalTicks = 2;
 
-            @ConfigDoc("Ticks between cheap movement checks after an item has settled. Clamped to 2..200.")
+            @ConfigDoc("Ticks between cheap carrier-position and stack checks after an item has settled. Clamped to 2..200.")
             public int settledPollIntervalTicks = 20;
 
             @ConfigDoc("Maximum ItemDisplay models used to suggest stack size. Clamped to 1..5.")

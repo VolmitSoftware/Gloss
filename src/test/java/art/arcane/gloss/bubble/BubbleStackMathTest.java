@@ -20,8 +20,8 @@ class BubbleStackMathTest {
     }
 
     @Test
-    void offsetYCombinesBaseLiftAndMultilineStackHeight() {
-        assertEquals(0.86D + 1.04D, BubbleStackMath.offsetY(0.26D, 4), 1.0E-12D);
-        assertEquals(0.86D, BubbleStackMath.offsetY(0.26D, 0), 1.0E-12D);
+    void offsetYUsesOnlyMultilineStackHeight() {
+        assertEquals(1.04D, BubbleStackMath.offsetY(0.26D, 4), 1.0E-12D);
+        assertEquals(0.0D, BubbleStackMath.offsetY(0.26D, 0), 1.0E-12D);
     }
 }

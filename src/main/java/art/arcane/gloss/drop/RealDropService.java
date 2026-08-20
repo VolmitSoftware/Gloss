@@ -47,7 +47,6 @@ final class RealDropService {
     private volatile Set<String> materialBlacklist = Set.of();
     private volatile boolean running;
     private volatile long generation;
-    private volatile boolean visibilityWarningLogged;
 
     RealDropService(Gloss plugin) {
         this.plugin = plugin;
@@ -132,16 +131,12 @@ final class RealDropService {
             }
             return;
         }
-        if (!DisplayVisibility.canHideByDefault()) {
-            if (!visibilityWarningLogged) {
-                visibilityWarningLogged = true;
-                Gloss.log(java.util.logging.Level.WARNING,
-                    "Real drops require Entity#setVisibleByDefault on this server; keeping vanilla item rendering.");
-            }
-            healOwned(item);
-            return;
-        }
         if (existing != null && existing.generation == generation && !existing.closed) {
+            if (!presentationOwned(existing)) {
+                moveCarrier(existing, plugin.cfg().realDrops().limits().updateIntervalTicks());
+                plugin.scheduler().runEntity(item, () -> presentOwned(item, requestedLabel), 1);
+                return;
+            }
             refreshOwned(existing, label);
             return;
         }
@@ -216,12 +211,13 @@ final class RealDropService {
         display.setViewRange(HologramMath.viewRangeMultiplier(config.limits().viewRange()));
         display.setInterpolationDelay(0);
         display.setInterpolationDuration(config.limits().updateIntervalTicks());
+        display.setItemDisplayTransform(ItemDisplay.ItemDisplayTransform.FIXED);
         display.getPersistentDataContainer().set(ownerKey, PersistentDataType.STRING,
             state.item.getUniqueId().toString());
         setDisplayStack(display, stack);
-        if (!state.item.addPassenger(display)) {
+        if (index > 0 && !carrier(state).addPassenger(display)) {
             display.remove();
-            throw new IllegalStateException("ItemDisplay refused the dropped item as its vehicle");
+            throw new IllegalStateException("ItemDisplay carrier refused an additional dropped-item model");
         }
         applyVisualTransformation(display, state, index, state.rotation, config);
         return display;
@@ -248,9 +244,9 @@ final class RealDropService {
             new Quaternionf()));
         display.getPersistentDataContainer().set(ownerKey, PersistentDataType.STRING,
             state.item.getUniqueId().toString());
-        if (!state.item.addPassenger(display)) {
+        if (!carrier(state).addPassenger(display)) {
             display.remove();
-            throw new IllegalStateException("TextDisplay refused the dropped item as its vehicle");
+            throw new IllegalStateException("ItemDisplay carrier refused the dropped-item label");
         }
         return display;
     }
@@ -367,14 +363,25 @@ final class RealDropService {
         }
 
         GlossConfig.RealDrops config = plugin.cfg().realDrops();
+        boolean onGround = state.item.isOnGround();
+        int nextDelay = onGround
+            ? config.limits().settledPollIntervalTicks()
+            : config.limits().updateIntervalTicks();
+        if (!presentationOwned(state)) {
+            moveCarrier(state, nextDelay);
+            state.onGround = onGround;
+            state.lastVelocityY = state.item.getVelocity().getY();
+            scheduleTick(state, nextDelay);
+            return;
+        }
         if (!moveReservation(state, chunkKey(state.item.getLocation()), config.limits().maxVisualsPerChunk())) {
             state.closed = true;
             teardownOwned(state);
             return;
         }
         refreshVisuals(state, config);
+        moveCarrier(state, nextDelay);
 
-        boolean onGround = state.item.isOnGround();
         Vector velocity = state.item.getVelocity();
         double velocityY = velocity.getY();
         boolean bounced = !onGround && state.lastVelocityY < -0.02D && velocityY > 0.02D;
@@ -395,9 +402,7 @@ final class RealDropService {
         }
         state.onGround = onGround;
         state.lastVelocityY = velocityY;
-        scheduleTick(state, onGround
-            ? config.limits().settledPollIntervalTicks()
-            : config.limits().updateIntervalTicks());
+        scheduleTick(state, nextDelay);
     }
 
     private void failState(State state, RuntimeException failure) {
@@ -479,12 +484,10 @@ final class RealDropService {
         boolean current = states.remove(state.item.getUniqueId(), state);
         state.closed = true;
         for (ItemDisplay display : state.visuals) {
-            state.item.removePassenger(display);
             removeEntity(display);
         }
         state.visuals.clear();
         if (state.label != null) {
-            state.item.removePassenger(state.label);
             removeEntity(state.label);
             state.label = null;
         }
@@ -579,6 +582,39 @@ final class RealDropService {
         ItemStack shown = stack.clone();
         shown.setAmount(1);
         display.setItemStack(shown);
+    }
+
+    private boolean presentationOwned(State state) {
+        ItemDisplay carrier = carrierOrNull(state);
+        return carrier != null && plugin.scheduler().isOwnedByCurrentRegion(carrier);
+    }
+
+    private void moveCarrier(State state, int interpolationTicks) {
+        ItemDisplay carrier = carrierOrNull(state);
+        if (carrier == null) {
+            return;
+        }
+        Location destination = state.item.getLocation().clone();
+        int duration = Math.max(0, Math.min(interpolationTicks, 59));
+        plugin.scheduler().runEntity(carrier, () -> {
+            if (!carrier.isValid()) {
+                return;
+            }
+            carrier.setTeleportDuration(duration);
+            plugin.scheduler().teleport(carrier, destination);
+        });
+    }
+
+    private static ItemDisplay carrier(State state) {
+        ItemDisplay carrier = carrierOrNull(state);
+        if (carrier == null) {
+            throw new IllegalStateException("Real-drop presentation has no ItemDisplay carrier");
+        }
+        return carrier;
+    }
+
+    private static ItemDisplay carrierOrNull(State state) {
+        return state.visuals.isEmpty() ? null : state.visuals.get(0);
     }
 
     private boolean moveReservation(State state, ChunkKey next, int maximum) {

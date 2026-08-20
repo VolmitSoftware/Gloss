@@ -34,7 +34,7 @@ class CharacterizationBubbleStyleCaptureTest {
     void defaultsStyleCarriesTheExactLegacySpawnParameters() {
         BubbleStyleDoc defaults = BubbleStyleDoc.DEFAULTS;
         assertEquals("&7", defaults.prefix());
-        assertEquals(new Vector(0.0D, 1.0D, 0.0D), defaults.offset());
+        assertEquals(new Vector(0.0D, 0.3D, 0.0D), defaults.offset());
         assertEquals(32, defaults.wordWrapChars());
         assertEquals(5000L, defaults.maxAliveMs());
         assertEquals(BubbleStyleDoc.DEFAULT_TRANSLATION_Y, defaults.motion().translation().y());
@@ -78,7 +78,7 @@ class CharacterizationBubbleStyleCaptureTest {
         BubbleStyleDoc doc = new BubbleStyleDoc(BubbleStyleDoc.CURRENT_SCHEMA_VERSION,
             DocumentEnvelope.INITIAL_REVISION, null, null, 32, 5000L, true, true, null, null, null);
         assertEquals("&7", doc.prefix());
-        assertEquals(new Vector(0.0D, 1.0D, 0.0D), doc.offset());
+        assertEquals(new Vector(0.0D, 0.3D, 0.0D), doc.offset());
     }
 
     @Test

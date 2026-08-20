@@ -95,6 +95,10 @@ public final class ChatBubblesService implements Listener {
         + "    \"flyAwayLeadMs\": 700\n"
         + "  }\n"
         + "}\n").getBytes(StandardCharsets.UTF_8);
+    private static final byte[] PREVIOUS_HEIGHT_DEFAULT = new String(
+        PREVIOUS_SCHEMA_TWO_DEFAULT, StandardCharsets.UTF_8)
+        .replace("\"spawnDelayMs\": 0", "\"spawnDelayMs\": 400")
+        .getBytes(StandardCharsets.UTF_8);
     private static final byte[] PREVIOUS_TWO_TONE_DEFAULT = ("{\n"
         + "  \"schemaVersion\": 2,\n"
         + "  \"revision\": 1,\n"
@@ -218,6 +222,7 @@ public final class ChatBubblesService implements Listener {
     static boolean upgradeLegacyDefault(ShippedDefaults defaults) {
         return defaults.replaceIfExact("default", LEGACY_DEFAULT)
             || defaults.replaceIfExact("default", PREVIOUS_SCHEMA_TWO_DEFAULT)
+            || defaults.replaceIfExact("default", PREVIOUS_HEIGHT_DEFAULT)
             || defaults.replaceIfExact("default", PREVIOUS_TWO_TONE_DEFAULT)
             || defaults.replaceIfExact("default", PREVIOUS_LEGACY_CYCLE_DEFAULT);
     }

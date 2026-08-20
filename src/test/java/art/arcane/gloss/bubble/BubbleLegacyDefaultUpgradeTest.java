@@ -58,7 +58,8 @@ class BubbleLegacyDefaultUpgradeTest {
     @Test
     void upgradesTheUntouchedFastSchemaTwoDefault() throws IOException {
         String current = shippedDefault();
-        String previous = current.replace("\"spawnDelayMs\": 400", "\"spawnDelayMs\": 0");
+        String previous = previousHeight(current)
+            .replace("\"spawnDelayMs\": 400", "\"spawnDelayMs\": 0");
         File file = new File(folder, "default.json");
         Files.writeString(file.toPath(), previous, StandardCharsets.UTF_8);
 
@@ -69,7 +70,7 @@ class BubbleLegacyDefaultUpgradeTest {
     @Test
     void upgradesTheUntouchedTwoToneSchemaTwoDefault() throws IOException {
         String current = shippedDefault();
-        String previous = current
+        String previous = previousHeight(current)
             .replace("\"flyAway\": true", "\"flyAway\": false")
             .replace("\"durationMs\": 700", "\"durationMs\": 4233")
             .replace("\"spawnDelayMs\": 400", "\"spawnDelayMs\": 0")
@@ -86,12 +87,22 @@ class BubbleLegacyDefaultUpgradeTest {
     @Test
     void upgradesTheUntouchedLegacyCycleSchemaTwoDefault() throws IOException {
         String current = shippedDefault();
-        String previous = current
+        String previous = previousHeight(current)
             .replace("\"flyAway\": true", "\"flyAway\": false")
             .replace("\"durationMs\": 700", "\"durationMs\": 4233")
             .replace("\"spawnDelayMs\": 400", "\"spawnDelayMs\": 0");
         File file = new File(folder, "default.json");
         Files.writeString(file.toPath(), previous, StandardCharsets.UTF_8);
+
+        assertTrue(ChatBubblesService.upgradeLegacyDefault(defaults()));
+        assertEquals(current, Files.readString(file.toPath(), StandardCharsets.UTF_8));
+    }
+
+    @Test
+    void upgradesTheUntouchedPreviousHeightDefault() throws IOException {
+        String current = shippedDefault();
+        File file = new File(folder, "default.json");
+        Files.writeString(file.toPath(), previousHeight(current), StandardCharsets.UTF_8);
 
         assertTrue(ChatBubblesService.upgradeLegacyDefault(defaults()));
         assertEquals(current, Files.readString(file.toPath(), StandardCharsets.UTF_8));
@@ -105,5 +116,9 @@ class BubbleLegacyDefaultUpgradeTest {
 
     private ShippedDefaults defaults() {
         return new ShippedDefaults(BubbleStyleDoc.KIND, folder, List.of("default"));
+    }
+
+    private static String previousHeight(String current) {
+        return current.replace("\"offset\": [0.0, 0.3, 0.0]", "\"offset\": [0.0, 1.0, 0.0]");
     }
 }
