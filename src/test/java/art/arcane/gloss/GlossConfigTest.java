@@ -28,6 +28,8 @@ class GlossConfigTest {
         GlossConfigFile defaults = new GlossConfigFile();
         defaults.normalize();
         String toml = TomlCodec.toToml(defaults, "gloss", ConfigExposePolicy.ALL);
+        assertTrue(toml.contains("realDrops = true"));
+        assertFalse(toml.contains("[realDrops"));
         GlossConfigFile parsed = TomlCodec.fromToml(toml, GlossConfigFile.class);
         parsed.normalize();
 
@@ -74,6 +76,7 @@ class GlossConfigTest {
         assertEquals(3, snapshot.realDrops().limits().maxVisualsPerStack());
         assertEquals(128, snapshot.realDrops().limits().maxVisualsPerChunk());
         assertTrue(snapshot.realDrops().motion().tumble());
+        assertEquals(1.35F, snapshot.realDrops().motion().speedMultiplier());
         assertEquals("NATURAL", snapshot.realDrops().landing().mode());
         assertTrue(snapshot.realDrops().labels().enabled());
         assertEquals(List.of("BEDROCK", "BARRIER"), snapshot.realDrops().filters().materialBlacklist());
@@ -106,35 +109,6 @@ class GlossConfigTest {
             [menus]
             uiScale = 0.01
 
-            [realDrops.limits]
-            updateIntervalTicks = 0
-            settledPollIntervalTicks = 999
-            maxVisualsPerStack = 99
-            maxVisualsPerChunk = 1
-            viewRange = 999.0
-            spread = -2.0
-
-            [realDrops.motion]
-            degreesPerSecondX = -9999.0
-            degreesPerSecondY = 9999.0
-            degreesPerSecondZ = 9999.0
-            variance = 8.0
-
-            [realDrops.landing]
-            mode = "sideways"
-            tiltDegrees = 99.0
-            transitionTicks = 99
-
-            [realDrops.labels]
-            yOffset = -1.0
-            scale = 99.0
-            viewRange = 1.0
-            billboard = "diagonal"
-            backgroundRed = -1
-            backgroundGreen = 999
-            backgroundBlue = 999
-            backgroundAlpha = -1
-
             [items]
             customItemProviders = [" Oraxen ", "", "oraxen", "Nexo"]
             """);
@@ -151,27 +125,6 @@ class GlossConfigTest {
         assertEquals(5, loaded.editor.sync.sessionMinutes);
         assertEquals(4.0D, loaded.preview.scale);
         assertEquals(0.25D, loaded.menus.uiScale);
-        assertEquals(1, loaded.realDrops.limits.updateIntervalTicks);
-        assertEquals(200, loaded.realDrops.limits.settledPollIntervalTicks);
-        assertEquals(5, loaded.realDrops.limits.maxVisualsPerStack);
-        assertEquals(8, loaded.realDrops.limits.maxVisualsPerChunk);
-        assertEquals(128.0D, loaded.realDrops.limits.viewRange);
-        assertEquals(0.0D, loaded.realDrops.limits.spread);
-        assertEquals(-1440.0D, loaded.realDrops.motion.degreesPerSecondX);
-        assertEquals(1440.0D, loaded.realDrops.motion.degreesPerSecondY);
-        assertEquals(1440.0D, loaded.realDrops.motion.degreesPerSecondZ);
-        assertEquals(1.0D, loaded.realDrops.motion.variance);
-        assertEquals("NATURAL", loaded.realDrops.landing.mode);
-        assertEquals(45.0D, loaded.realDrops.landing.tiltDegrees);
-        assertEquals(20, loaded.realDrops.landing.transitionTicks);
-        assertEquals(0.0D, loaded.realDrops.labels.yOffset);
-        assertEquals(4.0D, loaded.realDrops.labels.scale);
-        assertEquals(4.0D, loaded.realDrops.labels.viewRange);
-        assertEquals("CENTER", loaded.realDrops.labels.billboard);
-        assertEquals(0, loaded.realDrops.labels.backgroundRed);
-        assertEquals(255, loaded.realDrops.labels.backgroundGreen);
-        assertEquals(255, loaded.realDrops.labels.backgroundBlue);
-        assertEquals(0, loaded.realDrops.labels.backgroundAlpha);
         assertEquals(List.of("oraxen", "nexo"), loaded.items.customItemProviders);
 
         String rewritten = Files.readString(file);
@@ -184,9 +137,6 @@ class GlossConfigTest {
         assertTrue(rewritten.contains("sessionMinutes = 5"));
         assertTrue(rewritten.contains("scale = 4.0"));
         assertTrue(rewritten.contains("uiScale = 0.25"));
-        assertTrue(rewritten.contains("maxVisualsPerChunk = 8"));
-        assertTrue(rewritten.contains("degreesPerSecondX = -1440.0"));
-        assertTrue(rewritten.contains("billboard = \"CENTER\""));
         assertTrue(rewritten.contains("customItemProviders = [\"oraxen\", \"nexo\"]"));
     }
 

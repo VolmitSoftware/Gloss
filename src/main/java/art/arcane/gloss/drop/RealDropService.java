@@ -31,11 +31,13 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Supplier;
 
 final class RealDropService {
     private static final float DEG_TO_RAD = (float) (Math.PI / 180.0D);
 
     private final Gloss plugin;
+    private final Supplier<GlossConfig.RealDrops> configSupplier;
     private final NamespacedKey markerKey;
     private final NamespacedKey ownerKey;
     private final NamespacedKey restoreNameKey;
@@ -48,8 +50,9 @@ final class RealDropService {
     private volatile boolean running;
     private volatile long generation;
 
-    RealDropService(Gloss plugin) {
+    RealDropService(Gloss plugin, Supplier<GlossConfig.RealDrops> configSupplier) {
         this.plugin = plugin;
+        this.configSupplier = configSupplier;
         this.markerKey = new NamespacedKey(plugin, "real_drop");
         this.ownerKey = new NamespacedKey(plugin, "real_drop_owner");
         this.restoreNameKey = new NamespacedKey(plugin, "real_drop_name_visible");
@@ -61,7 +64,7 @@ final class RealDropService {
     void enable() {
         generation++;
         running = true;
-        GlossConfig.RealDrops.Filters filters = plugin.cfg().realDrops().filters();
+        GlossConfig.RealDrops.Filters filters = config().filters();
         disabledWorlds = normalized(filters.disabledWorlds(), false);
         materialBlacklist = normalized(filters.materialBlacklist(), true);
     }
@@ -122,7 +125,7 @@ final class RealDropService {
             healOwned(item);
         }
         Label label = effectiveLabel(item, requestedLabel);
-        if (!running || !plugin.cfg().realDrops().enabled() || !eligible(item)) {
+        if (!running || !config().enabled() || !eligible(item)) {
             if (existing != null) {
                 existing.closed = true;
                 teardownOwned(existing);
@@ -133,7 +136,7 @@ final class RealDropService {
         }
         if (existing != null && existing.generation == generation && !existing.closed) {
             if (!presentationOwned(existing)) {
-                moveCarrier(existing, plugin.cfg().realDrops().limits().updateIntervalTicks());
+                moveCarrier(existing, config().limits().updateIntervalTicks());
                 plugin.scheduler().runEntity(item, () -> presentOwned(item, requestedLabel), 1);
                 return;
             }
@@ -151,7 +154,7 @@ final class RealDropService {
         if (!item.isValid() || item.isDead()) {
             return;
         }
-        GlossConfig.RealDrops config = plugin.cfg().realDrops();
+        GlossConfig.RealDrops config = config();
         ItemStack stack = item.getItemStack();
         int visualCount = desiredVisualCount(stack, config);
         boolean createLabel = config.labels().enabled() && !label.lines().isEmpty();
@@ -257,7 +260,7 @@ final class RealDropService {
             return;
         }
         try {
-            GlossConfig.RealDrops config = plugin.cfg().realDrops();
+            GlossConfig.RealDrops config = config();
             refreshVisuals(state, config);
             refreshLabel(state, label, config);
         } catch (RuntimeException failure) {
@@ -351,7 +354,7 @@ final class RealDropService {
         if (state.closed || state.generation != generation || states.get(state.item.getUniqueId()) != state) {
             return;
         }
-        if (!running || !plugin.cfg().realDrops().enabled() || !state.item.isValid() || state.item.isDead()) {
+        if (!running || !config().enabled() || !state.item.isValid() || state.item.isDead()) {
             state.closed = true;
             teardownOwned(state);
             return;
@@ -362,7 +365,7 @@ final class RealDropService {
             return;
         }
 
-        GlossConfig.RealDrops config = plugin.cfg().realDrops();
+        GlossConfig.RealDrops config = config();
         boolean onGround = state.item.isOnGround();
         int nextDelay = onGround
             ? config.limits().settledPollIntervalTicks()
@@ -413,7 +416,7 @@ final class RealDropService {
     }
 
     private void applyPose(State state, Quaternionf rotation, int interpolationTicks) {
-        GlossConfig.RealDrops config = plugin.cfg().realDrops();
+        GlossConfig.RealDrops config = config();
         for (int index = 0; index < state.visuals.size(); index++) {
             ItemDisplay display = state.visuals.get(index);
             if (!display.isValid()) {
@@ -558,7 +561,11 @@ final class RealDropService {
         if (material == Material.AIR || materialBlacklist.contains(material.name())) {
             return false;
         }
-        return !plugin.cfg().realDrops().filters().onlyPlayerDrops() || item.getThrower() != null;
+        return !config().filters().onlyPlayerDrops() || item.getThrower() != null;
+    }
+
+    private GlossConfig.RealDrops config() {
+        return configSupplier.get();
     }
 
     private Label effectiveLabel(Item item, Label requested) {

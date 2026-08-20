@@ -1,7 +1,6 @@
 package art.arcane.gloss.drop;
 
 import art.arcane.gloss.GlossConfig;
-import art.arcane.gloss.config.GlossConfigFile;
 import org.junit.jupiter.api.Test;
 
 import java.util.UUID;
@@ -12,9 +11,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class RealDropModelTest {
     private static GlossConfig.RealDrops defaults() {
-        GlossConfigFile file = new GlossConfigFile();
-        file.normalize();
-        return GlossConfig.from(file).realDrops();
+        return RealDropSettingsDoc.DEFAULTS.toConfig(true);
     }
 
     @Test
@@ -49,6 +46,30 @@ class RealDropModelTest {
         assertTrue(Float.isFinite(first.x()));
         assertTrue(Float.isFinite(first.y()));
         assertTrue(Float.isFinite(first.z()));
+    }
+
+    @Test
+    void tumbleSpeedMultiplierScalesEveryAxis() {
+        UUID itemId = UUID.fromString("32f44d5c-a2dc-4f92-9000-8f8449c856fa");
+        GlossConfig.RealDrops.Motion base = new GlossConfig.RealDrops.Motion(
+            true, 1.0F, 160.0F, 120.0F, 100.0F, 0.2F, true);
+        GlossConfig.RealDrops.Motion faster = new GlossConfig.RealDrops.Motion(
+            true, 1.5F, 160.0F, 120.0F, 100.0F, 0.2F, true);
+
+        RealDropModel.Angles baseSpin = RealDropModel.spin(itemId, 0, base);
+        RealDropModel.Angles fasterSpin = RealDropModel.spin(itemId, 0, faster);
+
+        assertEquals(baseSpin.x() * 1.5F, fasterSpin.x(), 0.0001F);
+        assertEquals(baseSpin.y() * 1.5F, fasterSpin.y(), 0.0001F);
+        assertEquals(baseSpin.z() * 1.5F, fasterSpin.z(), 0.0001F);
+    }
+
+    @Test
+    void shippedMotionIsFasterAndDropLabelsSeeThroughCaveBlocks() {
+        GlossConfig.RealDrops drops = defaults();
+
+        assertEquals(1.35F, drops.motion().speedMultiplier());
+        assertTrue(drops.labels().seeThrough());
     }
 
     @Test

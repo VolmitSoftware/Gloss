@@ -87,9 +87,10 @@ final class RealDropModel {
     static Angles spin(UUID itemId, int bounceRevision, GlossConfig.RealDrops.Motion motion) {
         long seed = mix(itemId.getMostSignificantBits() ^ itemId.getLeastSignificantBits()
             ^ ((long) bounceRevision * 0x9E3779B97F4A7C15L));
-        float x = varied(motion.degreesPerSecondX(), motion.variance(), seed);
-        float y = varied(motion.degreesPerSecondY(), motion.variance(), mix(seed));
-        float z = varied(motion.degreesPerSecondZ(), motion.variance(), mix(mix(seed)));
+        float multiplier = motion.speedMultiplier();
+        float x = varied(motion.degreesPerSecondX(), motion.variance(), seed) * multiplier;
+        float y = varied(motion.degreesPerSecondY(), motion.variance(), mix(seed)) * multiplier;
+        float z = varied(motion.degreesPerSecondZ(), motion.variance(), mix(mix(seed))) * multiplier;
         return new Angles(x, y, z);
     }
 

@@ -2,11 +2,17 @@ package art.arcane.gloss.drop;
 
 import art.arcane.gloss.Gloss;
 import art.arcane.gloss.GlossConfig;
+import art.arcane.gloss.doc.DocumentDelta;
+import art.arcane.gloss.doc.DocumentRegistry;
+import art.arcane.gloss.doc.GlossDocument;
+import art.arcane.gloss.doc.ShippedDefaults;
+import art.arcane.gloss.doc.ShippedDocumentCatalog;
 import art.arcane.gloss.locale.GlossLocalization;
 import art.arcane.gloss.locale.GlossMessages;
 import art.arcane.gloss.text.TextPipeline;
 import art.arcane.volmlib.util.format.Form;
 import art.arcane.volmlib.util.localization.MessageArgument;
+import art.arcane.volmlib.util.scheduling.SchedulerUtils;
 import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
 import org.bukkit.Location;
@@ -31,6 +37,7 @@ import org.bukkit.inventory.meta.BundleMeta;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataType;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -48,19 +55,31 @@ public final class DropNameService implements Listener {
     private final NamespacedKey nameKey;
     private final NamespacedKey renderedNameKey;
     private final DropNameTracker tracker;
+    private final ShippedDefaults realDropDefaults;
+    private final DocumentRegistry<RealDropSettingsDoc> realDropSettings;
     private final RealDropService realDrops;
     private final Map<String, String> renderedNames;
     private volatile long renderedGeneration = -1L;
     private int pruneTaskId = -1;
     private boolean listening;
+    private volatile RealDropSettingsDoc realDropDoc;
+    private volatile GlossConfig.RealDrops activeRealDropConfig;
 
     public DropNameService(Gloss plugin) {
         this.plugin = plugin;
         this.nameKey = new NamespacedKey(plugin, "drop_name");
         this.renderedNameKey = new NamespacedKey(plugin, "drop_name_value");
         this.tracker = new DropNameTracker(DropNameService::stillPresent);
-        this.realDrops = new RealDropService(plugin);
+        this.realDropDefaults = new ShippedDefaults(RealDropSettingsDoc.KIND,
+            new File(plugin.getDataFolder(), RealDropSettingsDoc.KIND),
+            ShippedDocumentCatalog.REAL_DROPS.names());
+        this.realDropSettings = DocumentRegistry.folder(RealDropSettingsDoc.KIND,
+            new File(plugin.getDataFolder(), RealDropSettingsDoc.KIND),
+            RealDropSettingsDoc::parse, RealDropSettingsDoc::revision);
+        this.realDrops = new RealDropService(plugin, this::realDropConfig);
         this.renderedNames = new ConcurrentHashMap<>();
+        this.realDropDoc = RealDropSettingsDoc.DEFAULTS;
+        this.activeRealDropConfig = RealDropSettingsDoc.DEFAULTS.toConfig(false);
     }
 
     public void enable() {
@@ -68,6 +87,8 @@ public final class DropNameService implements Listener {
             return;
         }
 
+        loadRealDropSettings();
+        plugin.watchdog().register(RealDropSettingsDoc.KIND, this::pollRealDropSettings);
         realDrops.enable();
         Bukkit.getPluginManager().registerEvents(this, plugin);
         listening = true;
@@ -78,6 +99,7 @@ public final class DropNameService implements Listener {
     }
 
     public void disable() {
+        plugin.watchdog().unregister(RealDropSettingsDoc.KIND);
         if (pruneTaskId != -1) {
             plugin.scheduler().csr(pruneTaskId);
             pruneTaskId = -1;
@@ -102,6 +124,7 @@ public final class DropNameService implements Listener {
         }
         tracker.clear();
         renderedNames.clear();
+        loadRealDropSettings();
         realDrops.disable();
         realDrops.enable();
         if (plugin.cfg().drops().enabled()) {
@@ -336,6 +359,48 @@ public final class DropNameService implements Listener {
                 plugin.scheduler().runAt(anchor, () -> rehydrateChunk(world, chunkX, chunkZ), 1);
             }
         }
+    }
+
+    private GlossConfig.RealDrops realDropConfig() {
+        return activeRealDropConfig;
+    }
+
+    private void loadRealDropSettings() {
+        if (plugin.cfg().realDrops().enabled()) {
+            realDropDefaults.extractMissing();
+        }
+        realDropSettings.reload();
+        GlossDocument<RealDropSettingsDoc> document =
+            realDropSettings.get(RealDropSettingsDoc.DEFAULT_ID);
+        realDropDoc = document == null ? RealDropSettingsDoc.DEFAULTS : document.value();
+        refreshRealDropConfig();
+    }
+
+    private void pollRealDropSettings() {
+        DocumentDelta delta = realDropSettings.poll();
+        if (delta.isEmpty()) {
+            return;
+        }
+        GlossDocument<RealDropSettingsDoc> document =
+            realDropSettings.get(RealDropSettingsDoc.DEFAULT_ID);
+        realDropDoc = document == null ? RealDropSettingsDoc.DEFAULTS : document.value();
+        refreshRealDropConfig();
+        if (!SchedulerUtils.runGlobal(plugin, this::reloadPresentations)) {
+            Gloss.warn("Could not apply hot-reloaded real-drop settings on the server thread.");
+        }
+    }
+
+    private void refreshRealDropConfig() {
+        activeRealDropConfig = realDropDoc.toConfig(plugin.cfg().realDrops().enabled());
+    }
+
+    private void reloadPresentations() {
+        if (!listening) {
+            return;
+        }
+        realDrops.disable();
+        realDrops.enable();
+        rehydrateLoadedChunks();
     }
 
     private void rehydrateChunk(World world, int chunkX, int chunkZ) {

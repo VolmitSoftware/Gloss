@@ -47,6 +47,7 @@ final class PersistentHologram implements Hologram {
     private volatile double x;
     private volatile double y;
     private volatile double z;
+    private volatile boolean seeThrough;
     private volatile long revision;
     private volatile Location appliedAnchor;
     private volatile TextDisplay sharedDisplay;
@@ -70,6 +71,7 @@ final class PersistentHologram implements Hologram {
         this.x = location.getX();
         this.y = location.getY();
         this.z = location.getZ();
+        this.seeThrough = true;
     }
 
     PersistentHologram(HologramService service, String id, HologramDoc doc) {
@@ -170,15 +172,20 @@ final class PersistentHologram implements Hologram {
         x = anchor.position().getX();
         y = anchor.position().getY();
         z = anchor.position().getZ();
+        boolean visibilityChanged = seeThrough != doc.seeThrough();
+        seeThrough = doc.seeThrough();
         revision = doc.revision();
         synchronized (linesLock) {
             publishLines(doc.lines());
+        }
+        if (visibilityChanged) {
+            applySeeThrough();
         }
     }
 
     HologramDoc toDoc(long revision) {
         return new HologramDoc(HologramDoc.CURRENT_SCHEMA_VERSION, revision,
-            new HologramDoc.Anchor(worldName, new Vector(x, y, z)), lineSet.lines());
+            new HologramDoc.Anchor(worldName, new Vector(x, y, z)), lineSet.lines(), seeThrough);
     }
 
     long nextRevision() {
@@ -382,7 +389,7 @@ final class PersistentHologram implements Hologram {
                 }
 
                 Consumer<TextDisplay> configurer = spawned -> {
-                    service.configureDisplay(spawned);
+                    service.configureDisplay(spawned, seeThrough);
                     spawned.setText(rendered);
                 };
                 TextDisplay spawned = world.spawn(anchor, TextDisplay.class, configurer);
@@ -467,7 +474,7 @@ final class PersistentHologram implements Hologram {
                 }
 
                 Consumer<TextDisplay> configurer = spawned -> {
-                    service.configureDisplay(spawned);
+                    service.configureDisplay(spawned, seeThrough);
                     DisplayVisibility.setVisibleByDefault(spawned, false);
                 };
                 TextDisplay spawned = world.spawn(anchor, TextDisplay.class, configurer);
@@ -594,6 +601,24 @@ final class PersistentHologram implements Hologram {
         sharedDisplay = null;
         sharedRendered = null;
         service.despawnEntity(display, location());
+    }
+
+    private void applySeeThrough() {
+        TextDisplay shared = sharedDisplay;
+        if (shared != null) {
+            service.plugin().scheduler().runEntity(shared, () -> {
+                if (shared.isValid()) {
+                    shared.setSeeThrough(seeThrough);
+                }
+            });
+        }
+        for (TextDisplay display : viewerDisplays.values()) {
+            service.plugin().scheduler().runEntity(display, () -> {
+                if (display.isValid()) {
+                    display.setSeeThrough(seeThrough);
+                }
+            });
+        }
     }
 
     private void despawnViewers() {

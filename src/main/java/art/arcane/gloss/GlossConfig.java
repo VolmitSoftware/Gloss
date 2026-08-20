@@ -1,6 +1,7 @@
 package art.arcane.gloss;
 
 import art.arcane.gloss.config.GlossConfigFile;
+import art.arcane.gloss.drop.RealDropSettingsDoc;
 
 import java.util.List;
 import java.util.Objects;
@@ -141,6 +142,7 @@ public record GlossConfig(
 
         public record Motion(
             boolean tumble,
+            float speedMultiplier,
             float degreesPerSecondX,
             float degreesPerSecondY,
             float degreesPerSecondZ,
@@ -310,55 +312,7 @@ public record GlossConfig(
                 source.drops.preserveCustomNames,
                 source.drops.useItemDisplayNames
             ),
-            new RealDrops(
-                source.features.realDrops,
-                new RealDrops.Limits(
-                    source.realDrops.limits.updateIntervalTicks,
-                    source.realDrops.limits.settledPollIntervalTicks,
-                    source.realDrops.limits.maxVisualsPerStack,
-                    source.realDrops.limits.maxVisualsPerChunk,
-                    (float) source.realDrops.limits.viewRange,
-                    (float) source.realDrops.limits.spread
-                ),
-                new RealDrops.Scale(
-                    (float) source.realDrops.scale.defaultScale,
-                    (float) source.realDrops.scale.flatItems,
-                    (float) source.realDrops.scale.thinBlocks
-                ),
-                new RealDrops.Motion(
-                    source.realDrops.motion.tumble,
-                    (float) source.realDrops.motion.degreesPerSecondX,
-                    (float) source.realDrops.motion.degreesPerSecondY,
-                    (float) source.realDrops.motion.degreesPerSecondZ,
-                    (float) source.realDrops.motion.variance,
-                    source.realDrops.motion.changeOnBounce
-                ),
-                new RealDrops.Landing(
-                    source.realDrops.landing.mode,
-                    (float) source.realDrops.landing.tiltDegrees,
-                    source.realDrops.landing.randomYaw,
-                    source.realDrops.landing.transitionTicks
-                ),
-                new RealDrops.Labels(
-                    source.realDrops.labels.enabled,
-                    (float) source.realDrops.labels.yOffset,
-                    (float) source.realDrops.labels.scale,
-                    (float) source.realDrops.labels.viewRange,
-                    source.realDrops.labels.billboard,
-                    source.realDrops.labels.seeThrough,
-                    source.realDrops.labels.shadow,
-                    source.realDrops.labels.background,
-                    source.realDrops.labels.backgroundRed,
-                    source.realDrops.labels.backgroundGreen,
-                    source.realDrops.labels.backgroundBlue,
-                    source.realDrops.labels.backgroundAlpha
-                ),
-                new RealDrops.Filters(
-                    List.copyOf(source.realDrops.filters.disabledWorlds),
-                    List.copyOf(source.realDrops.filters.materialBlacklist),
-                    source.realDrops.filters.onlyPlayerDrops
-                )
-            ),
+            RealDropSettingsDoc.DEFAULTS.toConfig(source.features.realDrops),
             new Motd(
                 source.features.motd
             ),

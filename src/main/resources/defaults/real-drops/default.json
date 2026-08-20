@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "revision": 1,
+  "limits": {
+    "updateIntervalTicks": 2,
+    "settledPollIntervalTicks": 20,
+    "maxVisualsPerStack": 3,
+    "maxVisualsPerChunk": 128,
+    "viewRange": 32.0,
+    "spread": 0.18
+  },
+  "scale": {
+    "defaultScale": 0.4,
+    "flatItems": 0.65,
+    "thinBlocks": 0.45
+  },
+  "motion": {
+    "tumble": true,
+    "speedMultiplier": 1.35,
+    "degreesPerSecondX": 160.0,
+    "degreesPerSecondY": 120.0,
+    "degreesPerSecondZ": 100.0,
+    "variance": 0.2,
+    "changeOnBounce": true
+  },
+  "landing": {
+    "mode": "NATURAL",
+    "tiltDegrees": 10.0,
+    "randomYaw": true,
+    "transitionTicks": 4
+  },
+  "labels": {
+    "enabled": true,
+    "yOffset": 0.55,
+    "scale": 0.85,
+    "viewRange": 32.0,
+    "billboard": "CENTER",
+    "seeThrough": true,
+    "shadow": true,
+    "background": true,
+    "backgroundRed": 0,
+    "backgroundGreen": 0,
+    "backgroundBlue": 0,
+    "backgroundAlpha": 80
+  },
+  "filters": {
+    "disabledWorlds": [],
+    "materialBlacklist": [
+      "BEDROCK",
+      "BARRIER"
+    ],
+    "onlyPlayerDrops": false
+  }
+}

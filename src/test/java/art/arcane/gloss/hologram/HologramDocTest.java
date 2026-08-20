@@ -34,23 +34,25 @@ class HologramDocTest {
         assertEquals("world_nether", doc.anchor().world());
         assertEquals(new Vector(12.5D, 64.0D, -7.25D), doc.anchor().position());
         assertEquals(List.of("&dWelcome", "&7Line two"), doc.lines());
+        assertTrue(doc.seeThrough());
     }
 
     @Test
     void gsonRoundTripPreservesAllFields() {
         HologramDoc original = new HologramDoc(1, 3L,
             new HologramDoc.Anchor("world", new Vector(0.0D, -32.5D, 1000000.125D)),
-            List.of("plain", "", "&x&f&f&0&0&f&fhex"));
+            List.of("plain", "", "&x&f&f&0&0&f&fhex"), false);
 
         HologramDoc decoded = HologramDoc.parse("arena.json", BukkitJson.GSON.toJson(original));
 
         assertEquals(original, decoded);
+        assertFalse(decoded.seeThrough());
     }
 
     @Test
     void serializedAnchorPositionIsAnArrayTriple() {
         HologramDoc doc = new HologramDoc(1, 1L,
-            new HologramDoc.Anchor("world", new Vector(1.0D, 2.0D, 3.0D)), List.of("x"));
+            new HologramDoc.Anchor("world", new Vector(1.0D, 2.0D, 3.0D)), List.of("x"), true);
 
         String json = BukkitJson.GSON.toJson(doc);
 
@@ -69,7 +71,7 @@ class HologramDocTest {
 
     @Test
     void missingAnchorIsRejected() {
-        assertThrows(NullPointerException.class, () -> new HologramDoc(1, 1L, null, List.of("x")));
+        assertThrows(NullPointerException.class, () -> new HologramDoc(1, 1L, null, List.of("x"), true));
         assertThrows(RuntimeException.class,
             () -> HologramDoc.parse("bare.json", "{\"schemaVersion\":1,\"revision\":1,\"lines\":[]}"));
     }
@@ -94,15 +96,15 @@ class HologramDocTest {
     @Test
     void revisionBoundsAreEnforced() {
         HologramDoc.Anchor anchor = new HologramDoc.Anchor("world", new Vector(0, 0, 0));
-        assertThrows(IllegalArgumentException.class, () -> new HologramDoc(1, 0L, anchor, List.of()));
+        assertThrows(IllegalArgumentException.class, () -> new HologramDoc(1, 0L, anchor, List.of(), true));
         assertThrows(IllegalArgumentException.class,
-            () -> new HologramDoc(1, DocumentEnvelope.MAX_SAFE_REVISION + 1L, anchor, List.of()));
+            () -> new HologramDoc(1, DocumentEnvelope.MAX_SAFE_REVISION + 1L, anchor, List.of(), true));
     }
 
     @Test
     void linesAreImmutableCopies() {
         HologramDoc doc = new HologramDoc(1, 1L,
-            new HologramDoc.Anchor("world", new Vector(0, 0, 0)), List.of("one"));
+            new HologramDoc.Anchor("world", new Vector(0, 0, 0)), List.of("one"), true);
 
         assertThrows(UnsupportedOperationException.class, () -> doc.lines().add("two"));
     }
@@ -110,13 +112,14 @@ class HologramDocTest {
     @Test
     void withRevisionOnlyChangesTheRevision() {
         HologramDoc doc = new HologramDoc(1, 1L,
-            new HologramDoc.Anchor("world", new Vector(1, 2, 3)), List.of("x"));
+            new HologramDoc.Anchor("world", new Vector(1, 2, 3)), List.of("x"), false);
 
         HologramDoc bumped = doc.withRevision(2L);
 
         assertEquals(2L, bumped.revision());
         assertEquals(doc.anchor(), bumped.anchor());
         assertEquals(doc.lines(), bumped.lines());
+        assertEquals(doc.seeThrough(), bumped.seeThrough());
     }
 
     @Test

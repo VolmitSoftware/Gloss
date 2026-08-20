@@ -232,10 +232,14 @@ public final class HologramService {
     }
 
     void configureDisplay(TextDisplay display) {
+        configureDisplay(display, false);
+    }
+
+    void configureDisplay(TextDisplay display, boolean seeThrough) {
         display.setPersistent(false);
         display.setBillboard(Display.Billboard.CENTER);
         display.setViewRange(HologramMath.viewRangeMultiplier(plugin.cfg().holograms().viewRange()));
-        display.setSeeThrough(false);
+        display.setSeeThrough(seeThrough);
         display.setShadowed(false);
         display.addScoreboardTag(DISPLAY_TAG);
         StackExclusion.exclude(display);

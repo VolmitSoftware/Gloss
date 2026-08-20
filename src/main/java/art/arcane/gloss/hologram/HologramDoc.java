@@ -8,7 +8,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
-public record HologramDoc(int schemaVersion, long revision, Anchor anchor, List<String> lines) {
+public record HologramDoc(int schemaVersion, long revision, Anchor anchor, List<String> lines,
+                          Boolean seeThrough) {
     public static final String KIND = "holograms";
     public static final int CURRENT_SCHEMA_VERSION = 1;
 
@@ -31,10 +32,11 @@ public record HologramDoc(int schemaVersion, long revision, Anchor anchor, List<
         DocumentEnvelope.requireRevision(KIND, revision);
         anchor = Objects.requireNonNull(anchor, "hologram requires an anchor");
         lines = copyLines(lines);
+        seeThrough = seeThrough == null || seeThrough;
     }
 
     public HologramDoc withRevision(long revision) {
-        return new HologramDoc(schemaVersion, revision, anchor, lines);
+        return new HologramDoc(schemaVersion, revision, anchor, lines, seeThrough);
     }
 
     public static HologramDoc parse(String fileName, String raw) {
