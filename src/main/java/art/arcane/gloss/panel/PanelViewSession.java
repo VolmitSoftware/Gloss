@@ -9,6 +9,7 @@ import art.arcane.gloss.locale.GlossMessages;
 import art.arcane.gloss.menu.MenuSession;
 import art.arcane.gloss.menu.MenuSessionOptions;
 import art.arcane.gloss.menu.MenuTransform;
+import art.arcane.gloss.menu.action.MenuNavigationHistory;
 import art.arcane.gloss.menu.action.MenuNavigator;
 import art.arcane.gloss.menu.action.NavigationRequest;
 import art.arcane.gloss.menu.action.NavigationResult;
@@ -16,8 +17,6 @@ import art.arcane.gloss.menu.components.ClickableComponent;
 import art.arcane.volmlib.util.localization.MessageArgs;
 import org.bukkit.entity.Player;
 
-import java.util.ArrayDeque;
-import java.util.Deque;
 import java.util.Objects;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -26,7 +25,7 @@ public final class PanelViewSession implements MenuNavigator {
   private final Player viewer;
   private final Function<String, MenuDefinitionData> menuLookup;
   private final Consumer<PanelViewSession> closeRequester;
-  private final Deque<String> history = new ArrayDeque<>();
+  private final MenuNavigationHistory navigation = new MenuNavigationHistory();
 
   private PanelDefinition definition;
   private PanelTransform effectiveTransform;
@@ -39,7 +38,7 @@ public final class PanelViewSession implements MenuNavigator {
         Objects.requireNonNull(options, "options").definition(),
         options.effectiveTransform(),
         options.viewer(),
-        menuId -> options.menus().get(menuId).orElse(null),
+        menuId -> options.menus().definition(menuId).orElse(null),
         options.closeRequester()
     );
   }
@@ -76,7 +75,7 @@ public final class PanelViewSession implements MenuNavigator {
     } finally {
       session = null;
       currentMenuId = null;
-      history.clear();
+      navigation.clear();
     }
   }
 
@@ -103,7 +102,7 @@ public final class PanelViewSession implements MenuNavigator {
         effectiveTransform = previousTransform;
         close();
       } else {
-        history.clear();
+        navigation.clear();
       }
       return result;
     }
@@ -148,7 +147,7 @@ public final class PanelViewSession implements MenuNavigator {
     if (closed || definition.rootMenuId().equals(currentMenuId)) {
       return false;
     }
-    history.clear();
+    navigation.clear();
     return openMenu(definition.rootMenuId(), NavigationMode.HOME, false, true) == NavigationResult.APPLIED;
   }
 
@@ -172,12 +171,8 @@ public final class PanelViewSession implements MenuNavigator {
       return NavigationResult.APPLIED;
     }
 
-    String target = switch (requiredRequest.mode()) {
-      case PUSH, REPLACE -> requiredRequest.target();
-      case BACK -> history.peekFirst();
-      case HOME -> definition.rootMenuId();
-      case CLOSE -> null;
-    };
+    String target = navigation.resolveTarget(
+        requiredRequest.mode(), requiredRequest.target(), definition.rootMenuId());
     if (target == null) {
       return NavigationResult.NO_HISTORY;
     }
@@ -232,7 +227,7 @@ public final class PanelViewSession implements MenuNavigator {
       return NavigationResult.DENIED;
     }
 
-    updateHistory(mode);
+    navigation.commit(mode, currentMenuId);
     session = replacement;
     currentMenuId = menu.getId();
     if (previous != null) {
@@ -243,16 +238,6 @@ public final class PanelViewSession implements MenuNavigator {
 
   private boolean isAtRoot(String menuId) {
     return definition.rootMenuId().equals(menuId);
-  }
-
-  private void updateHistory(NavigationMode mode) {
-    if (mode == NavigationMode.PUSH && currentMenuId != null) {
-      history.addFirst(currentMenuId);
-    } else if (mode == NavigationMode.BACK) {
-      history.pollFirst();
-    } else if (mode == NavigationMode.HOME) {
-      history.clear();
-    }
   }
 
   private void applyTransform() {

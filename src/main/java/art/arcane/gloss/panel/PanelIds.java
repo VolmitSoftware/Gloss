@@ -1,17 +1,18 @@
 package art.arcane.gloss.panel;
 
+import art.arcane.gloss.doc.DocumentIds;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.regex.Pattern;
 
 public final class PanelIds {
-  public static final int MAX_ID_LENGTH = 255;
-  public static final int MAX_SEGMENT_LENGTH = 64;
-  public static final int MAX_MENU_ID_LENGTH = 255;
+  public static final int MAX_ID_LENGTH = DocumentIds.MAX_ID_LENGTH;
+  public static final int MAX_SEGMENT_LENGTH = DocumentIds.MAX_SEGMENT_LENGTH;
+  public static final int MAX_MENU_ID_LENGTH = DocumentIds.MAX_ID_LENGTH;
 
   private static final Pattern SEGMENT = Pattern.compile("[a-z0-9][a-z0-9._-]*");
-  private static final Pattern MENU_SEGMENT = Pattern.compile("[A-Za-z0-9][A-Za-z0-9._-]*");
 
   private PanelIds() {
   }
@@ -47,27 +48,6 @@ public final class PanelIds {
   }
 
   public static String requireMenuReference(String value) {
-    if (value == null) {
-      throw new IllegalArgumentException("root menu id must not be null");
-    }
-
-    String normalized = value.strip();
-    if (normalized.isEmpty()) {
-      throw new IllegalArgumentException("root menu id must not be blank");
-    }
-    if (normalized.length() > MAX_MENU_ID_LENGTH) {
-      throw new IllegalArgumentException("root menu id must be at most " + MAX_MENU_ID_LENGTH + " characters");
-    }
-
-    String[] segments = normalized.split("/", -1);
-    for (String segment : segments) {
-      if (segment.isEmpty() || segment.equals(".") || segment.equals("..")) {
-        throw new IllegalArgumentException("root menu id contains an invalid path segment: " + value);
-      }
-      if (segment.length() > MAX_SEGMENT_LENGTH || !MENU_SEGMENT.matcher(segment).matches()) {
-        throw new IllegalArgumentException("root menu id segment must match [A-Za-z0-9][A-Za-z0-9._-]*: " + segment);
-      }
-    }
-    return normalized;
+    return DocumentIds.require("root menu id", value);
   }
 }

@@ -1,5 +1,7 @@
 package art.arcane.gloss.config.menu;
 
+import art.arcane.gloss.doc.AtomicFiles;
+import art.arcane.gloss.doc.DocumentRevisionConflictException;
 import art.arcane.volmlib.util.bukkit.json.BukkitJson;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -7,8 +9,6 @@ import com.google.gson.JsonParser;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
@@ -16,13 +16,13 @@ import java.nio.file.LinkOption;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
-import java.nio.file.StandardOpenOption;
 import java.util.Arrays;
 import java.util.Objects;
 import java.util.function.UnaryOperator;
 
 final class MenuDocumentRepository {
   private static final String JSON_EXTENSION = ".json";
+  private static final String NOUN = "menu";
 
   private final Path directory;
 
@@ -100,7 +100,7 @@ final class MenuDocumentRepository {
         throw new FileAlreadyExistsException(targetMenuId);
       }
       publishNewFile(temporary, target);
-      forceDirectory(target.getParent());
+      AtomicFiles.forceDirectory(target.getParent());
     } finally {
       Files.deleteIfExists(temporary);
     }
@@ -128,7 +128,7 @@ final class MenuDocumentRepository {
         throw new FileAlreadyExistsException(menuId);
       }
       publishNewFile(temporary, target);
-      forceDirectory(target.getParent());
+      AtomicFiles.forceDirectory(target.getParent());
     } finally {
       Files.deleteIfExists(temporary);
     }
@@ -143,10 +143,10 @@ final class MenuDocumentRepository {
       String latestRevision = MenuDocument.revisionOf(new String(latestBytes, StandardCharsets.UTF_8));
       requireRevision(menuId, expectedRevision, latestRevision);
       if (!Arrays.equals(originalBytes, latestBytes)) {
-        throw new MenuRevisionConflictException(menuId, expectedRevision, latestRevision);
+        throw new DocumentRevisionConflictException(NOUN, menuId, expectedRevision, latestRevision);
       }
       Files.move(temporary, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
-      forceDirectory(target.getParent());
+      AtomicFiles.forceDirectory(target.getParent());
     } finally {
       Files.deleteIfExists(temporary);
     }
@@ -157,25 +157,8 @@ final class MenuDocumentRepository {
     if (parent == null) {
       throw new IOException("menu file has no parent directory: " + target);
     }
-    Path temporary = Files.createTempFile(parent, "." + target.getFileName() + ".", ".tmp");
-    boolean success = false;
-    try {
-      byte[] encoded = source.getBytes(StandardCharsets.UTF_8);
-      try (FileChannel channel = FileChannel.open(temporary, StandardOpenOption.WRITE,
-          StandardOpenOption.TRUNCATE_EXISTING)) {
-        ByteBuffer buffer = ByteBuffer.wrap(encoded);
-        while (buffer.hasRemaining()) {
-          channel.write(buffer);
-        }
-        channel.force(true);
-      }
-      success = true;
-      return temporary;
-    } finally {
-      if (!success) {
-        Files.deleteIfExists(temporary);
-      }
-    }
+    return AtomicFiles.writeDurableTemporary(parent, "." + target.getFileName() + ".",
+        source.getBytes(StandardCharsets.UTF_8));
   }
 
   private MenuDocument readPersisted(String menuId, Path target, String writtenRevision) throws IOException {
@@ -183,7 +166,7 @@ final class MenuDocumentRepository {
     String persistedSource = new String(persistedBytes, StandardCharsets.UTF_8);
     String persistedRevision = MenuDocument.revisionOf(persistedSource);
     if (!persistedRevision.equals(writtenRevision)) {
-      throw new MenuRevisionConflictException(menuId, writtenRevision, persistedRevision);
+      throw new DocumentRevisionConflictException(NOUN, menuId, writtenRevision, persistedRevision);
     }
     return MenuDocumentParser.parse(menuId, persistedSource);
   }
@@ -201,8 +184,16 @@ final class MenuDocumentRepository {
     requireRevision(menuId, expectedRevision, MenuDocument.revisionOf(actualSource));
   }
 
+  /**
+   * A read never creates a directory. An absent {@code menus/} is the same answer as an absent menu
+   * — {@code NoSuchFileException}, which the mutation service classifies as an operator mistake
+   * rather than a storage fault — so asking for a menu that was never authored does not leave an
+   * empty folder behind.
+   */
   private byte[] readRegularFile(Path path) throws IOException {
-    ensureDirectory();
+    if (!Files.exists(directory, LinkOption.NOFOLLOW_LINKS)) {
+      throw new NoSuchFileException(path.toString());
+    }
     validateAncestors(path);
     if (!Files.exists(path, LinkOption.NOFOLLOW_LINKS)) {
       throw new NoSuchFileException(path.toString());
@@ -214,55 +205,11 @@ final class MenuDocumentRepository {
   }
 
   private void prepareParent(Path target) throws IOException {
-    ensureDirectory();
-    Path parent = target.getParent();
-    if (parent == null) {
-      throw new IOException("menu file has no parent directory: " + target);
-    }
-    Path current = directory;
-    for (Path segment : directory.relativize(parent)) {
-      current = current.resolve(segment);
-      if (Files.exists(current, LinkOption.NOFOLLOW_LINKS)) {
-        if (Files.isSymbolicLink(current) || !Files.isDirectory(current, LinkOption.NOFOLLOW_LINKS)) {
-          throw new IOException("menu path contains a non-directory or symbolic link: " + current);
-        }
-      } else {
-        Files.createDirectory(current);
-        forceDirectory(current.getParent());
-      }
-    }
-    if (Files.isSymbolicLink(target)) {
-      throw new IOException("menu file must not be a symbolic link: " + target);
-    }
+    AtomicFiles.prepareParent(directory, target, NOUN);
   }
 
   private void validateAncestors(Path target) throws IOException {
-    Path parent = target.getParent();
-    if (parent == null || !parent.startsWith(directory)) {
-      throw new IOException("menu path escapes the menu directory: " + target);
-    }
-    Path current = directory;
-    for (Path segment : directory.relativize(parent)) {
-      current = current.resolve(segment);
-      if (Files.isSymbolicLink(current) || !Files.isDirectory(current, LinkOption.NOFOLLOW_LINKS)) {
-        throw new IOException("menu path contains a non-directory or symbolic link: " + current);
-      }
-    }
-  }
-
-  private void ensureDirectory() throws IOException {
-    Path parent = directory.getParent();
-    if (parent != null) {
-      Files.createDirectories(parent);
-    }
-    if (Files.exists(directory, LinkOption.NOFOLLOW_LINKS)) {
-      if (Files.isSymbolicLink(directory) || !Files.isDirectory(directory, LinkOption.NOFOLLOW_LINKS)) {
-        throw new IOException("menu storage path must be a real directory: " + directory);
-      }
-      return;
-    }
-    Files.createDirectory(directory);
-    forceDirectory(directory.getParent());
+    AtomicFiles.validateAncestors(directory, target, NOUN);
   }
 
   private Path path(String id) {
@@ -275,17 +222,7 @@ final class MenuDocumentRepository {
 
   private static void requireRevision(String menuId, String expectedRevision, String actualRevision) {
     if (!expectedRevision.equals(actualRevision)) {
-      throw new MenuRevisionConflictException(menuId, expectedRevision, actualRevision);
-    }
-  }
-
-  private static void forceDirectory(Path path) throws IOException {
-    if (path == null) {
-      return;
-    }
-    try (FileChannel channel = FileChannel.open(path, StandardOpenOption.READ)) {
-      channel.force(true);
-    } catch (UnsupportedOperationException ignored) {
+      throw new DocumentRevisionConflictException(NOUN, menuId, expectedRevision, actualRevision);
     }
   }
 }

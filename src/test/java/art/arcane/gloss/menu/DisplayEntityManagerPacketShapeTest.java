@@ -1,6 +1,7 @@
 package art.arcane.gloss.menu;
 
 import art.arcane.gloss.util.common.DisplayEntity;
+import art.arcane.gloss.util.common.DisplayEntity.MetadataIndex;
 import com.github.retrooper.packetevents.PacketEvents;
 import com.github.retrooper.packetevents.PacketEventsAPI;
 import com.github.retrooper.packetevents.injector.ChannelInjector;
@@ -80,7 +81,7 @@ public class DisplayEntityManagerPacketShapeTest {
     DisplayEntity entity = textDisplay();
     entity.scale(new Vector3f(2F, 3F, 4F));
 
-    EntityData<?> only = single(entity.metadataPacket(SCALE));
+    EntityData<?> only = single(entity.metadataPacket(MetadataIndex.SCALE));
 
     assertEquals(SCALE, only.getIndex());
     assertEquals(new Vector3f(2F, 3F, 4F), only.getValue());
@@ -92,7 +93,8 @@ public class DisplayEntityManagerPacketShapeTest {
     entity.scale(new Vector3f(1F, 1F, 1F));
     entity.translation(new Vector3f(0.5F, -0.25F, 0F));
 
-    List<EntityData<?>> values = entity.metadataPacket(TRANSLATION, SCALE).getEntityMetadata();
+    List<EntityData<?>> values = entity.metadataPacket(MetadataIndex.TRANSLATION, MetadataIndex.SCALE)
+        .getEntityMetadata();
 
     assertEquals(List.of(TRANSLATION, SCALE), values.stream().map(EntityData::getIndex).toList());
     assertEquals(new Vector3f(0.5F, -0.25F, 0F), values.get(0).getValue());
@@ -103,7 +105,10 @@ public class DisplayEntityManagerPacketShapeTest {
     DisplayEntity entity = textDisplay();
     entity.backgroundColor(0x40112233);
 
-    assertEquals(0x40112233, single(entity.metadataPacket(TEXT_BACKGROUND)).getValue());
+    EntityData<?> only = single(entity.metadataPacket(MetadataIndex.TEXT_BACKGROUND));
+
+    assertEquals(TEXT_BACKGROUND, only.getIndex());
+    assertEquals(0x40112233, only.getValue());
   }
 
   @Test
@@ -111,7 +116,7 @@ public class DisplayEntityManagerPacketShapeTest {
     DisplayEntity entity = textDisplay();
     entity.text(Component.text("gloss"));
 
-    assertEquals(Component.text("gloss"), single(entity.metadataPacket(CONTENT)).getValue());
+    assertEquals(Component.text("gloss"), single(entity.metadataPacket(MetadataIndex.CONTENT)).getValue());
   }
 
   @Test
@@ -120,7 +125,7 @@ public class DisplayEntityManagerPacketShapeTest {
     Quaternion4f roll = new Quaternion4f(0F, 0F, 0.25F, 0.75F);
     entity.leftRotation(roll);
 
-    assertEquals(roll, single(entity.metadataPacket(LEFT_ROTATION)).getValue());
+    assertEquals(roll, single(entity.metadataPacket(MetadataIndex.LEFT_ROTATION)).getValue());
   }
 
   // ---------------------------------------------------------------------

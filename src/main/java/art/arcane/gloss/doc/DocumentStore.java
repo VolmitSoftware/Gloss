@@ -6,8 +6,6 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
@@ -35,18 +33,9 @@ public final class DocumentStore<T> {
     public void write(String id, T value) throws IOException {
         Objects.requireNonNull(value, "value");
         File file = fileFor(id);
-        if (!folder.isDirectory()) {
-            folder.mkdirs();
-        }
         byte[] encoded = (BukkitJson.GSON.toJson(value) + System.lineSeparator()).getBytes(StandardCharsets.UTF_8);
         writtenHashes.put(file.getAbsolutePath(), DocumentHashes.sha256(encoded));
-        Path temporary = Files.createTempFile(folder.toPath(), "." + file.getName() + ".", ".tmp");
-        try {
-            Files.write(temporary, encoded);
-            Files.move(temporary, file.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
-        } finally {
-            Files.deleteIfExists(temporary);
-        }
+        AtomicFiles.replace(file.toPath(), encoded);
     }
 
     public boolean delete(String id) throws IOException {
@@ -75,7 +64,7 @@ public final class DocumentStore<T> {
         Objects.requireNonNull(update, "update");
         long actual = reviser.revisionOf(current);
         if (actual != expectedRevision) {
-            throw new DocumentRevisionConflictException(id, expectedRevision, actual);
+            throw new DocumentRevisionConflictException(kind, id, expectedRevision, actual);
         }
         if (actual >= DocumentEnvelope.MAX_SAFE_REVISION) {
             throw new IllegalStateException(kind + " revision overflow: " + id);

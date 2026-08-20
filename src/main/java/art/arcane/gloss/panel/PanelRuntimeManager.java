@@ -487,7 +487,7 @@ public final class PanelRuntimeManager implements PanelServiceListener {
               definition,
               effective.transform(),
               player,
-              plugin.getConfigManager(),
+              plugin.getMenuCatalog(),
               this::dismiss
           ));
           NavigationResult openResult = view.open();
@@ -626,7 +626,7 @@ public final class PanelRuntimeManager implements PanelServiceListener {
       unavailable.clear();
       for (PanelViewSession view : List.copyOf(views.values())) {
         if (view.currentMenuId() != null && view.currentMenuId().equals(menuId)) {
-          boolean refreshed = plugin.getConfigManager().exists(view.currentMenuId())
+          boolean refreshed = plugin.getMenuCatalog().exists(view.currentMenuId())
               ? view.reloadCurrent()
               : view.returnHome();
           if (!refreshed) {

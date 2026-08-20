@@ -3,7 +3,7 @@ package art.arcane.gloss.importer;
 import art.arcane.gloss.Gloss;
 import art.arcane.gloss.panel.PanelDefinition;
 import art.arcane.gloss.panel.PanelService;
-import art.arcane.gloss.config.ConfigManager;
+import art.arcane.gloss.config.menu.MenuCatalog;
 import art.arcane.volmlib.util.scheduling.SchedulerUtils;
 import org.bukkit.World;
 
@@ -30,7 +30,7 @@ public final class LegacyHologramImportService {
   private static final long SHUTDOWN_TIMEOUT_SECONDS = 30L;
 
   private final Gloss plugin;
-  private final ConfigManager configManager;
+  private final MenuCatalog menuCatalog;
   private final Path pluginsDirectory;
   private final ExecutorService scannerExecutor;
   private final LegacyHologramScanner scanner;
@@ -40,10 +40,10 @@ public final class LegacyHologramImportService {
   private final AtomicBoolean busy;
   private final Set<CompletableFuture<?>> activeOperations;
 
-  public LegacyHologramImportService(Gloss plugin, ConfigManager configManager,
+  public LegacyHologramImportService(Gloss plugin, MenuCatalog menuCatalog,
                                      File pluginDataDirectory) {
     this.plugin = Objects.requireNonNull(plugin, "plugin");
-    this.configManager = Objects.requireNonNull(configManager, "configManager");
+    this.menuCatalog = Objects.requireNonNull(menuCatalog, "menuCatalog");
     File dataDirectory = Objects.requireNonNull(pluginDataDirectory, "pluginDataDirectory");
     File parent = Objects.requireNonNull(dataDirectory.getAbsoluteFile().getParentFile(),
         "plugin data directory must have a parent");
@@ -175,8 +175,8 @@ public final class LegacyHologramImportService {
 
   private ExistingSnapshot snapshotExisting() {
     Map<String, String> menuSources = new HashMap<>();
-    for (String menuId : configManager.keys()) {
-      configManager.getSource(menuId).ifPresent(source -> menuSources.put(menuId, source));
+    for (String menuId : menuCatalog.keys()) {
+      menuCatalog.source(menuId).ifPresent(source -> menuSources.put(menuId, source));
     }
     PanelService boardService = requireBoardService();
     Set<String> boardIds = new HashSet<>();
@@ -224,7 +224,7 @@ public final class LegacyHologramImportService {
           return CompletableFuture.failedFuture(new CancellationException(
               "legacy hologram import service is shutting down"));
         }
-        return configManager.createMenu(candidate.menuId(), candidate.menuSource())
+        return menuCatalog.create(candidate.menuId(), candidate.menuSource())
             .thenApply(document -> null);
       }
 

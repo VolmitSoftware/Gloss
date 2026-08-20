@@ -5,6 +5,7 @@ import art.arcane.gloss.api.HoloCloseReason;
 import art.arcane.gloss.api.internal.ApiMenuHandle;
 import art.arcane.gloss.config.MenuDefinitionData;
 import art.arcane.gloss.enums.NavigationMode;
+import art.arcane.gloss.menu.action.MenuNavigationHistory;
 import art.arcane.gloss.menu.action.NavigationRequest;
 import art.arcane.gloss.menu.action.NavigationResult;
 import art.arcane.gloss.menu.components.ClickableComponent;
@@ -16,8 +17,6 @@ import org.bukkit.Location;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.ArrayDeque;
-import java.util.Deque;
 import java.util.List;
 import java.util.Objects;
 import java.util.OptionalDouble;
@@ -32,7 +31,7 @@ class SessionHolder {
   private final Player player;
   private final UUID playerId;
   private final PlayerSnapshotStore<String> openMenus;
-  private final Deque<String> navigationHistory = new ArrayDeque<>();
+  private final MenuNavigationHistory navigation = new MenuNavigationHistory();
   private transient volatile MenuSession session;
   private transient ContainerPreview preview;
   private String navigationRoot;
@@ -288,7 +287,7 @@ class SessionHolder {
 
   String lastSessionId() {
     synchronized (sessionLock) {
-      return navigationHistory.peekFirst();
+      return navigation.last();
     }
   }
 
@@ -365,10 +364,11 @@ class SessionHolder {
     synchronized (sessionLock) {
       if (session == null) return null;
       if (history) {
+        String closingMenuId = session.getId();
         if (navigationRoot == null) {
-          navigationRoot = session.getId();
+          navigationRoot = closingMenuId;
         }
-        navigationHistory.addFirst(session.getId());
+        navigation.record(closingMenuId);
       } else {
         clearNavigation();
       }
@@ -378,29 +378,13 @@ class SessionHolder {
 
   private void commitNavigation(NavigationMode mode, String targetId, String previousMenuId) {
     if (previousMenuId == null) {
-      if (mode == NavigationMode.PUSH) {
-        navigationHistory.clear();
+      if (mode == NavigationMode.PUSH || (mode == NavigationMode.REPLACE && navigationRoot == null)) {
         navigationRoot = targetId;
-      } else if (mode == NavigationMode.REPLACE && navigationRoot == null) {
-        navigationRoot = targetId;
-      } else if (mode == NavigationMode.BACK) {
-        navigationHistory.pollFirst();
-      } else if (mode == NavigationMode.HOME) {
-        navigationHistory.clear();
       }
-      return;
-    }
-
-    if (navigationRoot == null) {
+    } else if (navigationRoot == null) {
       navigationRoot = previousMenuId;
     }
-    if (mode == NavigationMode.PUSH) {
-      navigationHistory.addFirst(previousMenuId);
-    } else if (mode == NavigationMode.BACK) {
-      navigationHistory.pollFirst();
-    } else if (mode == NavigationMode.HOME) {
-      navigationHistory.clear();
-    }
+    navigation.commit(mode, previousMenuId);
   }
 
   private Detached detachCurrentSession() {
@@ -417,16 +401,11 @@ class SessionHolder {
     if (data == null) {
       return false;
     }
-    return switch (mode) {
-      case PUSH, REPLACE -> true;
-      case BACK -> Objects.equals(navigationHistory.peekFirst(), data.getId());
-      case HOME -> Objects.equals(navigationRoot, data.getId());
-      case CLOSE -> false;
-    };
+    return Objects.equals(navigation.resolveTarget(mode, data.getId(), navigationRoot), data.getId());
   }
 
   private void clearNavigation() {
-    navigationHistory.clear();
+    navigation.clear();
     navigationRoot = null;
   }
 

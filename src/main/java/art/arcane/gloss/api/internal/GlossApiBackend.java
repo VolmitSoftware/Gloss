@@ -65,12 +65,12 @@ final class GlossApiBackend implements ApiBackend {
 
   @Override
   public MenuDefinitionData definition(String menuId) {
-    return plugin.getConfigManager().get(menuId).orElse(null);
+    return plugin.getMenuCatalog().definition(menuId).orElse(null);
   }
 
   @Override
   public Set<String> menuIds() {
-    return Set.copyOf(plugin.getConfigManager().keys());
+    return Set.copyOf(plugin.getMenuCatalog().keys());
   }
 
   @Override

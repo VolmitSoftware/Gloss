@@ -1,5 +1,8 @@
 package art.arcane.gloss.config.menu;
 
+import art.arcane.gloss.doc.DocumentRevisionConflictException;
+import art.arcane.gloss.doc.ExecutorStorageTaskRunner;
+import art.arcane.gloss.doc.StorageTaskRunner;
 import art.arcane.gloss.persistence.GlossPersistenceCoordinator;
 import com.google.gson.JsonParser;
 import org.junit.Rule;
@@ -50,7 +53,7 @@ public class MenuMutationServiceTest {
     assertEquals(1, runner.size());
     runner.runNext();
     assertTrue(assertThrows(CompletionException.class, second::join)
-        .getCause() instanceof MenuRevisionConflictException);
+        .getCause() instanceof DocumentRevisionConflictException);
   }
 
   @Test
@@ -114,7 +117,7 @@ public class MenuMutationServiceTest {
     logger.setLevel(Level.OFF);
     MenuMutationService service = new MenuMutationService(new MenuMutationService.Dependencies(
         new MenuDocumentRepository(pluginData),
-        new MenuExecutorTaskRunner(MenuMutationServiceTest.class.getClassLoader()),
+        new ExecutorStorageTaskRunner(MenuMutationServiceTest.class.getClassLoader(), "Gloss-Menu-Storage"),
         logger, new GlossPersistenceCoordinator()));
     CountDownLatch mutationStarted = new CountDownLatch(1);
     CountDownLatch allowMutation = new CountDownLatch(1);
@@ -153,7 +156,7 @@ public class MenuMutationServiceTest {
     assertEquals("Finished", text(Files.readString(menu)));
   }
 
-  private static MenuMutationService service(File pluginData, MenuTaskRunner runner) {
+  private static MenuMutationService service(File pluginData, StorageTaskRunner runner) {
     Logger logger = Logger.getLogger(MenuMutationServiceTest.class.getName());
     logger.setLevel(Level.OFF);
     return new MenuMutationService(new MenuMutationService.Dependencies(
@@ -185,11 +188,11 @@ public class MenuMutationServiceTest {
         .getAsJsonObject("icon").get("text").getAsString();
   }
 
-  private static final class ManualTaskRunner implements MenuTaskRunner {
+  private static final class ManualTaskRunner implements StorageTaskRunner {
     private final ArrayDeque<ManualTask> tasks = new ArrayDeque<>();
 
     @Override
-    public MenuTaskHandle submit(Runnable task) {
+    public StorageTaskHandle submit(Runnable task) {
       ManualTask scheduled = new ManualTask(task);
       tasks.addLast(scheduled);
       return scheduled::cancel;

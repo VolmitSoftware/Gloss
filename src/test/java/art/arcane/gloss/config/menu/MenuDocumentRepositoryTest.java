@@ -1,5 +1,6 @@
 package art.arcane.gloss.config.menu;
 
+import art.arcane.gloss.doc.DocumentRevisionConflictException;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParseException;
 import com.google.gson.JsonParser;
@@ -13,6 +14,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.util.stream.Stream;
 
@@ -54,7 +56,7 @@ public class MenuDocumentRepositoryTest {
     Files.writeString(menu, source("External"), StandardCharsets.UTF_8);
     boolean[] invoked = {false};
 
-    MenuRevisionConflictException conflict = assertThrows(MenuRevisionConflictException.class,
+    DocumentRevisionConflictException conflict = assertThrows(DocumentRevisionConflictException.class,
         () -> repository.mutate("shop", stale, document -> {
           invoked[0] = true;
           return document;
@@ -72,7 +74,7 @@ public class MenuDocumentRepositoryTest {
     MenuDocumentRepository repository = new MenuDocumentRepository(pluginData);
     String original = Files.readString(menu);
 
-    assertThrows(MenuRevisionConflictException.class, () -> repository.mutate(
+    assertThrows(DocumentRevisionConflictException.class, () -> repository.mutate(
         "shop", MenuDocument.revisionOf(original), document -> {
           replace(menu, source("External"));
           return MenuRowMutations.setTextRow(document, 1, "Command");
@@ -132,6 +134,33 @@ public class MenuDocumentRepositoryTest {
           return document;
         }));
     assertEquals(original, Files.readString(menu));
+  }
+
+  @Test
+  public void menuStorageIsCreatedByTheFirstWriteAndNotByTheRepository() throws IOException {
+    File pluginData = temp.newFolder("lazy");
+    Path menus = pluginData.toPath().resolve("menus");
+
+    MenuDocumentRepository repository = new MenuDocumentRepository(pluginData);
+    assertFalse("constructing the repository must not create menus/", Files.exists(menus));
+
+    repository.create("spawn/welcome", source("Welcome"));
+
+    assertTrue(Files.isRegularFile(menus.resolve("spawn/welcome.json")));
+  }
+
+  @Test
+  public void readingAnUnknownMenuNeverCreatesMenuStorage() throws IOException {
+    File pluginData = temp.newFolder("reads");
+    Path menus = pluginData.toPath().resolve("menus");
+    MenuDocumentRepository repository = new MenuDocumentRepository(pluginData);
+
+    assertThrows(NoSuchFileException.class,
+        () -> repository.mutate("missing", MenuDocument.revisionOf("{}"), document -> document));
+    assertThrows(NoSuchFileException.class,
+        () -> repository.copy("missing", MenuDocument.revisionOf("{}"), "copied"));
+
+    assertFalse("a read must not create menus/", Files.exists(menus));
   }
 
   private static Path writeMenu(File pluginData, String id, String source) throws IOException {

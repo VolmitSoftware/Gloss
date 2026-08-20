@@ -1,6 +1,9 @@
 package art.arcane.gloss.panel;
 
 import art.arcane.gloss.Gloss;
+import art.arcane.gloss.doc.DocumentRevisionConflictException;
+import art.arcane.gloss.doc.ExecutorStorageTaskRunner;
+import art.arcane.gloss.doc.StorageTaskRunner;
 import art.arcane.gloss.persistence.GlossPersistenceCoordinator;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -25,7 +28,7 @@ import java.util.logging.Logger;
 public final class PanelService {
   private static final long SHUTDOWN_TIMEOUT_SECONDS = 30L;
   private final PanelStore store;
-  private final PanelTaskRunner taskRunner;
+  private final StorageTaskRunner taskRunner;
   private final Logger logger;
   private final PanelSpatialIndex spatialIndex;
   private final CopyOnWriteArrayList<PanelServiceListener> listeners;
@@ -38,7 +41,7 @@ public final class PanelService {
 
   private Lifecycle lifecycle;
   private PendingOperation<?> activeOperation;
-  private PanelTaskRunner.PanelTaskHandle activeTask;
+  private StorageTaskRunner.StorageTaskHandle activeTask;
   private volatile double maximumViewRange;
 
   public PanelService(JavaPlugin plugin) {
@@ -415,7 +418,7 @@ public final class PanelService {
   }
 
   private void dispatch(PendingOperation<?> operation) {
-    PanelTaskRunner.PanelTaskHandle task;
+    StorageTaskRunner.StorageTaskHandle task;
     try {
       task = taskRunner.submit(() -> execute(operation));
     } catch (RuntimeException failure) {
@@ -502,7 +505,7 @@ public final class PanelService {
   }
 
   private void logFailure(String operation, Exception failure) {
-    if (failure instanceof PanelRevisionConflictException
+    if (failure instanceof DocumentRevisionConflictException
         || failure instanceof NoSuchElementException
         || failure instanceof FileAlreadyExistsException
         || failure instanceof IllegalArgumentException) {
@@ -538,7 +541,8 @@ public final class PanelService {
 
   private static Dependencies dependencies(JavaPlugin plugin) {
     JavaPlugin requiredPlugin = Objects.requireNonNull(plugin, "plugin");
-    PanelTaskRunner taskRunner = new PanelExecutorTaskRunner(requiredPlugin.getClass().getClassLoader());
+    StorageTaskRunner taskRunner = new ExecutorStorageTaskRunner(requiredPlugin.getClass().getClassLoader(),
+        "Gloss-Panel-Storage");
     GlossPersistenceCoordinator coordinator = requiredPlugin instanceof Gloss holoUi
         ? holoUi.getPersistenceCoordinator()
         : new GlossPersistenceCoordinator();
@@ -547,7 +551,7 @@ public final class PanelService {
         });
   }
 
-  record Dependencies(PanelStore store, PanelTaskRunner taskRunner, Logger logger,
+  record Dependencies(PanelStore store, StorageTaskRunner taskRunner, Logger logger,
                       GlossPersistenceCoordinator persistenceCoordinator,
                       Runnable beforeIndexPublication) {
     Dependencies {

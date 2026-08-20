@@ -329,17 +329,17 @@ public final class PanelCreationService {
 
     @Override
     public boolean exists(String id) {
-      return plugin.getConfigManager().exists(id);
+      return plugin.getMenuCatalog().exists(id);
     }
 
     @Override
     public MenuDocument publish(String id, String source) throws IOException {
-      return plugin.getConfigManager().publishExternalCreate(id, source);
+      return plugin.getMenuCatalog().publishExternalCreate(id, source);
     }
 
     @Override
     public MenuDocument recover(MenuDocument created) throws IOException {
-      return plugin.getConfigManager().recoverExternalCreate(created);
+      return plugin.getMenuCatalog().recoverExternalCreate(created);
     }
   }
 

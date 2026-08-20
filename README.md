@@ -42,14 +42,30 @@ Java 25 is required. The local `VolmLib` sibling checkout is resolved automatica
 
 ## Data layout
 
+Gloss never creates a folder it has nothing to put in. Only `config.toml` and the shipped defaults
+of enabled features exist after a first boot; every other folder appears the moment something is
+written into it, and stays gone otherwise.
+
 ```
 plugins/Gloss/
-├── config.toml
-├── holograms/<id>.json
-├── boards/<id>.json
-├── emoji/<id>.json
-├── animations/<id>.json
-└── groups/<name>.yml
+├── config.toml                      always
+├── language.yml                     always
+├── tablist.json                     shipped default, while tablist is enabled
+├── motd.json                        shipped default, while motd is enabled (off by default)
+├── boards/<id>.json                 shipped default, while boards are enabled
+├── emoji/<id>.json                  shipped defaults, while emoji is enabled
+├── animations/<id>.json             shipped default, while animations are enabled
+├── bubbles/<id>.json                shipped default, while chat bubbles are enabled
+├── previews/<name>.json             shipped defaults, while container previews are enabled
+├── holograms/<id>.json              on the first hologram
+├── menus/<path>.json                on the first menu
+├── images/<path>                    when an operator drops an image in
+├── panels/<path>.json               on the first panel
+├── editor-sync-transactions/        during an editor sync publication
+├── editor-sync-backups/<id>/        on the first completed editor sync publication
+└── import-backups/<timestamp>/      on a legacy data import that has something to migrate
 ```
 
-All data files hotload — edit them on disk and the change applies in game without a reload.
+All data files hotload — edit them on disk and the change applies in game without a reload. Deleting
+a folder is safe: Gloss reads what is there and recreates only what it writes. `panels/` is the one
+exception to hotloading and reloads through `/gloss panel reload`.

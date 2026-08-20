@@ -1,5 +1,6 @@
 package art.arcane.gloss.util.common;
 
+import art.arcane.gloss.util.common.DisplayEntity.MetadataIndex;
 import com.github.retrooper.packetevents.PacketEvents;
 import com.github.retrooper.packetevents.PacketEventsAPI;
 import com.github.retrooper.packetevents.injector.ChannelInjector;
@@ -25,6 +26,7 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 
 import java.lang.reflect.Proxy;
+import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 
@@ -43,6 +45,35 @@ public class DisplayEntityMetadataTest {
   @AfterClass
   public static void clearPacketEventsApi() {
     PacketEvents.setAPI(null);
+  }
+
+  @Test
+  public void everyMetadataIndexIsPinnedToItsProtocolSlot() {
+    assertEquals(0, MetadataIndex.ENTITY_FLAGS.index());
+    assertEquals(5, MetadataIndex.NO_GRAVITY.index());
+    assertEquals(8, MetadataIndex.INTERPOLATION_DELAY.index());
+    assertEquals(9, MetadataIndex.INTERPOLATION_DURATION.index());
+    assertEquals(10, MetadataIndex.TELEPORT_DURATION.index());
+    assertEquals(11, MetadataIndex.TRANSLATION.index());
+    assertEquals(12, MetadataIndex.SCALE.index());
+    assertEquals(13, MetadataIndex.LEFT_ROTATION.index());
+    assertEquals(14, MetadataIndex.RIGHT_ROTATION.index());
+    assertEquals(15, MetadataIndex.BILLBOARD.index());
+    assertEquals(16, MetadataIndex.BRIGHTNESS.index());
+    assertEquals(17, MetadataIndex.VIEW_RANGE.index());
+    assertEquals(18, MetadataIndex.SHADOW_RADIUS.index());
+    assertEquals(19, MetadataIndex.SHADOW_STRENGTH.index());
+    assertEquals(20, MetadataIndex.WIDTH.index());
+    assertEquals(21, MetadataIndex.HEIGHT.index());
+    assertEquals(22, MetadataIndex.GLOW_COLOR_OVERRIDE.index());
+    assertEquals(23, MetadataIndex.CONTENT.index());
+    assertEquals(24, MetadataIndex.CONTENT_STYLE.index());
+    assertEquals(25, MetadataIndex.TEXT_BACKGROUND.index());
+    assertEquals(26, MetadataIndex.TEXT_OPACITY.index());
+    assertEquals(27, MetadataIndex.TEXT_FLAGS.index());
+    assertEquals("the table is declared in ascending wire order with no repeats",
+        List.of(0, 5, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27),
+        Arrays.stream(MetadataIndex.values()).map(MetadataIndex::index).toList());
   }
 
   @Test
@@ -166,7 +197,7 @@ public class DisplayEntityMetadataTest {
     DisplayEntity entity = new DisplayEntity(3, UUID.randomUUID(), entityType())
         .displayKind(DisplayEntity.DisplayKind.ITEM)
         .itemDisplayType((byte) 5);
-    WrapperPlayServerEntityMetadata subset = entity.metadataPacket(24);
+    WrapperPlayServerEntityMetadata subset = entity.metadataPacket(MetadataIndex.CONTENT_STYLE);
     List<EntityData<?>> values = subset.getEntityMetadata();
 
     assertEquals(1, values.size());
@@ -179,7 +210,8 @@ public class DisplayEntityMetadataTest {
     DisplayEntity entity = new DisplayEntity(4, UUID.randomUUID(), entityType())
         .displayKind(DisplayEntity.DisplayKind.TEXT)
         .text(Component.text("A"));
-    WrapperPlayServerEntityMetadata subset = entity.metadataPacket(13, 12, 23);
+    WrapperPlayServerEntityMetadata subset = entity.metadataPacket(
+        MetadataIndex.LEFT_ROTATION, MetadataIndex.SCALE, MetadataIndex.CONTENT);
 
     assertEquals(List.of(13, 12, 23),
         subset.getEntityMetadata().stream().map(EntityData::getIndex).toList());
@@ -195,9 +227,12 @@ public class DisplayEntityMetadataTest {
         .displayKind(DisplayEntity.DisplayKind.BLOCK)
         .blockState(11);
 
-    assertTrue(raw.metadataPacket(8, 23, 24).getEntityMetadata().isEmpty());
+    assertTrue(raw.metadataPacket(MetadataIndex.INTERPOLATION_DELAY, MetadataIndex.CONTENT,
+        MetadataIndex.CONTENT_STYLE).getEntityMetadata().isEmpty());
     assertEquals(List.of(23),
-        block.metadataPacket(24, 25, 26, 27, 23, 99).getEntityMetadata().stream().map(EntityData::getIndex).toList());
+        block.metadataPacket(MetadataIndex.CONTENT_STYLE, MetadataIndex.TEXT_BACKGROUND,
+                MetadataIndex.TEXT_OPACITY, MetadataIndex.TEXT_FLAGS, MetadataIndex.CONTENT)
+            .getEntityMetadata().stream().map(EntityData::getIndex).toList());
   }
 
   @Test
@@ -207,10 +242,19 @@ public class DisplayEntityMetadataTest {
     assertArrayEquals(new int[]{7, 9, 11}, packet.getEntityIds());
   }
 
+  private static MetadataIndex indexOf(int wireIndex) {
+    for (MetadataIndex index : MetadataIndex.values()) {
+      if (index.index() == wireIndex) {
+        return index;
+      }
+    }
+    throw new AssertionError("no metadata index is declared for wire slot " + wireIndex);
+  }
+
   private static void assertSubsetsMatchFull(DisplayEntity entity) {
     WrapperPlayServerEntityMetadata full = (WrapperPlayServerEntityMetadata) entity.dataPacket();
     for (EntityData<?> expected : full.getEntityMetadata()) {
-      WrapperPlayServerEntityMetadata subset = entity.metadataPacket(expected.getIndex());
+      WrapperPlayServerEntityMetadata subset = entity.metadataPacket(indexOf(expected.getIndex()));
       List<EntityData<?>> values = subset.getEntityMetadata();
 
       assertEquals(1, values.size());

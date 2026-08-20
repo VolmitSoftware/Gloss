@@ -101,8 +101,14 @@ public final class TablistService implements Listener {
         return new ListNameChoice(TablistDoc.FALLBACK_FORMAT, primaryGroup == null ? "" : primaryGroup);
     }
 
+    /**
+     * The shipped {@code tablist.json} is written only while the feature is on; with tablist off
+     * {@link #doc()} runs on {@link TablistDoc#DEFAULTS} and nothing is materialised.
+     */
     public void enable() {
-        defaults.extractMissing();
+        if (plugin.cfg().tablist().enabled()) {
+            defaults.extractMissing();
+        }
         registry.reload();
         docGeneration.incrementAndGet();
         Bukkit.getPluginManager().registerEvents(this, plugin);
@@ -121,6 +127,9 @@ public final class TablistService implements Listener {
 
     public void reload() {
         stopDriver();
+        if (plugin.cfg().tablist().enabled()) {
+            defaults.extractMissing();
+        }
         registry.reload();
         docGeneration.incrementAndGet();
         if (!plugin.cfg().tablist().enabled()) {

@@ -105,8 +105,15 @@ public final class BoardService implements Listener {
         return !meta.permissionGated() || permissionTest.test(meta.permissionNode());
     }
 
+    /**
+     * The shipped boards are extracted only while the sidebar is on, so a server that leaves the
+     * feature off never grows a {@code boards/} folder. Everything else still runs, so turning the
+     * feature on through {@link #reload()} picks the boards up without a restart.
+     */
     public void enable() {
-        defaults.extractMissing();
+        if (plugin.cfg().boards().enabled()) {
+            defaults.extractMissing();
+        }
         loadAllBoards();
         Bukkit.getPluginManager().registerEvents(this, plugin);
         if (plugin.cfg().boards().enabled()) {
@@ -132,8 +139,11 @@ public final class BoardService implements Listener {
     }
 
     public void reload() {
-        loadAllBoards();
         boolean enabled = plugin.cfg().boards().enabled();
+        if (enabled) {
+            defaults.extractMissing();
+        }
+        loadAllBoards();
         BoardManager<Board> activeManager = manager;
         if (enabled && activeManager == null) {
             createManager();

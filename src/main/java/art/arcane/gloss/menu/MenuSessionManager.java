@@ -14,6 +14,7 @@ import art.arcane.gloss.panel.PanelRuntimeManager;
 import art.arcane.gloss.config.MenuDefinitionData;
 import art.arcane.gloss.enums.NavigationMode;
 import art.arcane.gloss.locale.GlossMessages;
+import art.arcane.gloss.menu.action.MenuNavigationHistory;
 import art.arcane.gloss.menu.action.NavigationRequest;
 import art.arcane.gloss.menu.action.NavigationResult;
 import art.arcane.gloss.menu.components.ClickableComponent;
@@ -421,17 +422,17 @@ public final class MenuSessionManager {
       return NavigationResult.DENIED;
     }
 
-    String target = switch (request.mode()) {
-      case PUSH, REPLACE -> request.target();
-      case BACK -> holder == null ? null : holder.lastSessionId();
-      case HOME -> holder == null ? null : holder.rootSessionId();
-      case CLOSE -> null;
-    };
+    String target = MenuNavigationHistory.resolveTarget(
+        request.mode(),
+        request.target(),
+        holder == null ? null : holder.lastSessionId(),
+        holder == null ? null : holder.rootSessionId()
+    );
     if (target == null) {
       return NavigationResult.NO_HISTORY;
     }
 
-    MenuDefinitionData menu = Gloss.instance.getConfigManager().get(target).orElse(null);
+    MenuDefinitionData menu = Gloss.instance.getMenuCatalog().definition(target).orElse(null);
     if (menu == null) {
       player.sendMessage(Gloss.instance.getLocalization().legacy(
           GlossMessages.MENU_UNAVAILABLE,

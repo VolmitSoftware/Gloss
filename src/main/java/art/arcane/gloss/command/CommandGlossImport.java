@@ -284,7 +284,7 @@ public final class CommandGlossImport {
   }
 
   private static LegacyHologramImportService importer() {
-    return Gloss.instance.getConfigManager().getLegacyImporter();
+    return Gloss.instance.getMenuCatalog().legacyImporter();
   }
 
   private static boolean checkPermission(CommandSender sender, String permission) {

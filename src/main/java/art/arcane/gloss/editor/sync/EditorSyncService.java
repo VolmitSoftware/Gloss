@@ -595,7 +595,7 @@ public final class EditorSyncService {
     }
 
     CompletableFuture<List<MenuDocument>> menuPublication =
-        plugin.getConfigManager().publishEditorSyncProject(menus);
+        plugin.getMenuCatalog().publishEditorSyncProject(menus);
     trackSchedulerPublication(menuPublication);
     CompletableFuture<PanelDefinition> published = menuPublication.thenApply(documents -> {
           if (appliedBoard == null) {
@@ -680,7 +680,7 @@ public final class EditorSyncService {
     }
     Map<String, String> baseMenus = menuSources(baseSession.baseProject());
     CompletableFuture<List<MenuDocument>> menuPublication =
-        plugin.getConfigManager().publishEditorSyncProject(baseMenus);
+        plugin.getMenuCatalog().publishEditorSyncProject(baseMenus);
     trackRollbackPublication(menuPublication);
     CompletableFuture<PanelDefinition> republished = menuPublication.thenApply(documents -> {
           if (previousBoard == null || appliedBoard == null) {
@@ -841,7 +841,7 @@ public final class EditorSyncService {
       EditorSyncStoredSession session, JsonObject scopeProject, int maximumBytes) {
     Map<String, String> menus = new LinkedHashMap<>();
     for (String id : menuSources(scopeProject).keySet()) {
-      String source = plugin.getConfigManager().getSource(id)
+      String source = plugin.getMenuCatalog().source(id)
           .orElseThrow(() -> new IllegalStateException("scoped sync menu is no longer loaded: " + id));
       menus.put(id, source);
     }

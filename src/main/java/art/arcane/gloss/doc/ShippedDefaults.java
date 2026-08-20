@@ -82,10 +82,11 @@ public final class ShippedDefaults {
             : nameOrStar;
     }
 
+    /**
+     * The folder is created by the first document that is actually written into it, so a feature
+     * whose defaults are all present — or that ships none at all — never materialises an empty one.
+     */
     private List<String> extract(String wanted, boolean overwrite) {
-        if (!folder.isDirectory() && !folder.mkdirs()) {
-            Gloss.log(Level.WARNING, "%s: unable to create folder at %s", kind, folder.getAbsolutePath());
-        }
         List<String> written = new ArrayList<>();
         for (String name : names) {
             if (!ALL.equals(wanted) && !name.equals(wanted)) {
@@ -100,7 +101,9 @@ public final class ShippedDefaults {
                     Gloss.log(Level.WARNING, "%s/%s%s: missing from the jar, not extracted.", kind, name, EXTENSION);
                     continue;
                 }
-                Files.write(file.toPath(), stream.readAllBytes());
+                byte[] content = stream.readAllBytes();
+                AtomicFiles.createParentDirectories(file.toPath());
+                Files.write(file.toPath(), content);
                 written.add(name);
             } catch (IOException failure) {
                 Gloss.log(Level.WARNING, "%s/%s%s: %s", kind, name, EXTENSION,
@@ -126,9 +129,8 @@ public final class ShippedDefaults {
     }
 
     private boolean replaceAtomically(Path file, byte[] expected, byte[] content) throws IOException {
-        Path temporary = Files.createTempFile(file.getParent(), "." + file.getFileName(), ".tmp");
+        Path temporary = AtomicFiles.writeTemporary(file.getParent(), "." + file.getFileName(), content);
         try {
-            Files.write(temporary, content);
             if (!matchesExact(file, expected)) {
                 return false;
             }

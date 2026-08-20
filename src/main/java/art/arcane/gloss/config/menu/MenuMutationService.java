@@ -1,6 +1,9 @@
 package art.arcane.gloss.config.menu;
 
 import art.arcane.gloss.Gloss;
+import art.arcane.gloss.doc.DocumentRevisionConflictException;
+import art.arcane.gloss.doc.ExecutorStorageTaskRunner;
+import art.arcane.gloss.doc.StorageTaskRunner;
 import art.arcane.gloss.persistence.GlossPersistenceCoordinator;
 import com.google.gson.JsonObject;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -22,7 +25,7 @@ public final class MenuMutationService {
   private static final long SHUTDOWN_TIMEOUT_SECONDS = 30L;
 
   private final MenuDocumentRepository repository;
-  private final MenuTaskRunner taskRunner;
+  private final StorageTaskRunner taskRunner;
   private final Logger logger;
   private final GlossPersistenceCoordinator persistenceCoordinator;
   private final Object lifecycleLock;
@@ -30,7 +33,7 @@ public final class MenuMutationService {
 
   private boolean running;
   private PendingOperation activeOperation;
-  private MenuTaskRunner.MenuTaskHandle activeTask;
+  private StorageTaskRunner.StorageTaskHandle activeTask;
 
   public MenuMutationService(JavaPlugin plugin, File pluginDataDirectory) {
     this(dependencies(plugin, pluginDataDirectory));
@@ -144,7 +147,7 @@ public final class MenuMutationService {
   }
 
   private void dispatch(PendingOperation operation) {
-    MenuTaskRunner.MenuTaskHandle task;
+    StorageTaskRunner.StorageTaskHandle task;
     try {
       task = taskRunner.submit(() -> execute(operation));
     } catch (RuntimeException failure) {
@@ -201,7 +204,7 @@ public final class MenuMutationService {
     if (operation.future().isDone()) {
       return;
     }
-    if (!(failure instanceof MenuRevisionConflictException)
+    if (!(failure instanceof DocumentRevisionConflictException)
         && !(failure instanceof FileAlreadyExistsException)
         && !(failure instanceof NoSuchFileException)
         && !(failure instanceof IllegalArgumentException)) {
@@ -232,7 +235,8 @@ public final class MenuMutationService {
   private static Dependencies dependencies(JavaPlugin plugin, File pluginDataDirectory) {
     JavaPlugin requiredPlugin = Objects.requireNonNull(plugin, "plugin");
     File requiredDirectory = Objects.requireNonNull(pluginDataDirectory, "pluginDataDirectory");
-    MenuTaskRunner runner = new MenuExecutorTaskRunner(requiredPlugin.getClass().getClassLoader());
+    StorageTaskRunner runner = new ExecutorStorageTaskRunner(requiredPlugin.getClass().getClassLoader(),
+        "Gloss-Menu-Storage");
     GlossPersistenceCoordinator coordinator = requiredPlugin instanceof Gloss holoUi
         ? holoUi.getPersistenceCoordinator()
         : new GlossPersistenceCoordinator();
@@ -240,7 +244,7 @@ public final class MenuMutationService {
         requiredPlugin.getLogger(), coordinator);
   }
 
-  record Dependencies(MenuDocumentRepository repository, MenuTaskRunner taskRunner, Logger logger,
+  record Dependencies(MenuDocumentRepository repository, StorageTaskRunner taskRunner, Logger logger,
                       GlossPersistenceCoordinator persistenceCoordinator) {
     Dependencies {
       repository = Objects.requireNonNull(repository, "repository");

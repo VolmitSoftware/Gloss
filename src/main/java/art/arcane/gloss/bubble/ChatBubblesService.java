@@ -82,16 +82,21 @@ public final class ChatBubblesService implements Listener {
         this.stateFile = new File(plugin.getDataFolder(), STATE_FILE_NAME);
     }
 
+    /**
+     * The shipped styles are extracted only while bubbles are on, so a server that leaves the
+     * feature off never grows a {@code bubbles/} folder. Everything else still runs, so turning the
+     * feature on through {@link #reload()} picks the styles up without a restart.
+     */
     public void enable() {
-        defaults.extractMissing();
-        if (upgradeLegacyDefault(defaults)) {
-            Gloss.info("Upgraded the untouched bubble default to schema version 2.");
+        boolean enabled = plugin.cfg().bubbles().enabled();
+        if (enabled) {
+            extractDefaults();
         }
         registry.reload();
         loadPlayerStyles();
         plugin.watchdog().register(BubbleStyleDoc.KIND, registry::poll);
         plugin.getServer().getPluginManager().registerEvents(this, plugin);
-        if (!plugin.cfg().bubbles().enabled()) {
+        if (!enabled) {
             return;
         }
         registerHook();
@@ -112,9 +117,13 @@ public final class ChatBubblesService implements Listener {
     }
 
     public void reload() {
+        boolean enabled = plugin.cfg().bubbles().enabled();
+        if (enabled) {
+            extractDefaults();
+        }
         registry.reload();
         BubbleStyles.clearPatternCache();
-        if (!plugin.cfg().bubbles().enabled()) {
+        if (!enabled) {
             stopDriver();
             destroyAll();
             return;
@@ -124,6 +133,13 @@ public final class ChatBubblesService implements Listener {
         }
         stopDriver();
         startDriver();
+    }
+
+    private void extractDefaults() {
+        defaults.extractMissing();
+        if (upgradeLegacyDefault(defaults)) {
+            Gloss.info("Upgraded the untouched bubble default to schema version 2.");
+        }
     }
 
     public int activeCount() {

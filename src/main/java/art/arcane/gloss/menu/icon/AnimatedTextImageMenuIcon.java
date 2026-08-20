@@ -69,7 +69,7 @@ public class AnimatedTextImageMenuIcon extends MenuIcon<AnimatedImageData> {
   private List<BufferedImage> getImages() throws IOException, MenuIconException {
     List<BufferedImage> images = Lists.newArrayList();
     for (String s : data.requireSource())
-      images.add(Gloss.instance.getConfigManager().getImage(s).getRight());
+      images.add(Gloss.instance.getImageAssets().get(s).getRight());
     return images;
   }
 

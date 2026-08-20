@@ -4,9 +4,11 @@ import art.arcane.gloss.config.MenuComponentData;
 import art.arcane.gloss.config.MenuDefinitionData;
 import art.arcane.gloss.config.components.ComponentData;
 import art.arcane.gloss.enums.MenuComponentType;
+import art.arcane.gloss.enums.NavigationMode;
 import art.arcane.gloss.menu.MenuSession;
 import art.arcane.gloss.menu.components.MenuComponent;
 import art.arcane.gloss.menu.icon.MenuIcon;
+import art.arcane.gloss.menu.action.NavigationRequest;
 import art.arcane.gloss.menu.action.NavigationResult;
 import org.bukkit.NamespacedKey;
 import org.bukkit.Server;
@@ -21,6 +23,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Proxy;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Logger;
@@ -85,6 +88,179 @@ public class PanelViewSessionTest {
     assertEquals(1, rootCloseCalls.get());
     assertEquals(1, brokenCloseCalls.get());
     assertFalse(originalSession.getComponents().isEmpty());
+  }
+
+  @Test
+  public void pushingBuildsAStackAndBackUnwindsItUntilNothingIsLeft() {
+    PanelViewSession view = view(new AtomicInteger());
+
+    assertEquals(NavigationResult.APPLIED, view.open());
+    assertEquals("root", view.currentMenuId());
+
+    assertEquals(NavigationResult.APPLIED, view.navigate(push("alpha")));
+    assertEquals(NavigationResult.APPLIED, view.navigate(push("beta")));
+    assertEquals("beta", view.currentMenuId());
+
+    assertEquals(NavigationResult.APPLIED, view.navigate(request(NavigationMode.BACK)));
+    assertEquals("alpha", view.currentMenuId());
+    assertEquals(NavigationResult.APPLIED, view.navigate(request(NavigationMode.BACK)));
+    assertEquals("root", view.currentMenuId());
+
+    assertEquals("an exhausted history must report no history, not close the view",
+        NavigationResult.NO_HISTORY, view.navigate(request(NavigationMode.BACK)));
+    assertEquals("root", view.currentMenuId());
+    assertFalse(view.closed());
+  }
+
+  @Test
+  public void replaceSwapsTheMenuWithoutTouchingTheHistory() {
+    PanelViewSession view = view(new AtomicInteger());
+    view.open();
+    view.navigate(push("alpha"));
+
+    assertEquals(NavigationResult.APPLIED, view.navigate(new NavigationRequest(NavigationMode.REPLACE, "beta")));
+    assertEquals("beta", view.currentMenuId());
+
+    assertEquals(NavigationResult.APPLIED, view.navigate(request(NavigationMode.BACK)));
+    assertEquals("a replace must not have recorded a history entry", "root", view.currentMenuId());
+    assertEquals(NavigationResult.NO_HISTORY, view.navigate(request(NavigationMode.BACK)));
+  }
+
+  @Test
+  public void homeReturnsToTheRootMenuAndDropsTheWholeHistory() {
+    PanelViewSession view = view(new AtomicInteger());
+    view.open();
+    view.navigate(push("alpha"));
+    view.navigate(push("beta"));
+
+    assertEquals(NavigationResult.APPLIED, view.navigate(request(NavigationMode.HOME)));
+    assertEquals("root", view.currentMenuId());
+    assertEquals(NavigationResult.NO_HISTORY, view.navigate(request(NavigationMode.BACK)));
+  }
+
+  @Test
+  public void homeIsAlwaysAvailableEvenStandingOnTheRoot() {
+    PanelViewSession view = view(new AtomicInteger());
+    view.open();
+
+    assertEquals(NavigationResult.APPLIED, view.navigate(request(NavigationMode.HOME)));
+    assertEquals("root", view.currentMenuId());
+  }
+
+  @Test
+  public void pushingTheSameMenuTwiceRecordsBothEntries() {
+    PanelViewSession view = view(new AtomicInteger());
+    view.open();
+    view.navigate(push("alpha"));
+
+    assertEquals(NavigationResult.APPLIED, view.navigate(push("alpha")));
+
+    assertEquals(NavigationResult.APPLIED, view.navigate(request(NavigationMode.BACK)));
+    assertEquals("a repeat push is recorded, not collapsed", "alpha", view.currentMenuId());
+    assertEquals(NavigationResult.APPLIED, view.navigate(request(NavigationMode.BACK)));
+    assertEquals("root", view.currentMenuId());
+  }
+
+  @Test
+  public void closeAsksTheOwnerToTearTheViewDownAndLeavesTheMenuStanding() {
+    AtomicInteger closeRequests = new AtomicInteger();
+    PanelViewSession view = view(closeRequests);
+    view.open();
+    view.navigate(push("alpha"));
+
+    assertEquals(NavigationResult.APPLIED, view.navigate(request(NavigationMode.CLOSE)));
+
+    assertEquals(1, closeRequests.get());
+    assertEquals("the view itself is torn down by its owner, not by the navigation",
+        "alpha", view.currentMenuId());
+    assertFalse(view.closed());
+  }
+
+  @Test
+  public void returnHomeIsRefusedOnTheRootAndClearsTheHistoryElsewhere() {
+    PanelViewSession view = view(new AtomicInteger());
+    view.open();
+
+    assertFalse("returning home from the root is a no-op", view.returnHome());
+
+    view.navigate(push("alpha"));
+    assertTrue(view.returnHome());
+    assertEquals("root", view.currentMenuId());
+    assertEquals(NavigationResult.NO_HISTORY, view.navigate(request(NavigationMode.BACK)));
+  }
+
+  @Test
+  public void reloadingTheCurrentMenuKeepsTheHistory() {
+    PanelViewSession view = view(new AtomicInteger());
+    view.open();
+    view.navigate(push("alpha"));
+
+    assertTrue(view.reloadCurrent());
+    assertEquals("alpha", view.currentMenuId());
+
+    assertEquals(NavigationResult.APPLIED, view.navigate(request(NavigationMode.BACK)));
+    assertEquals("root", view.currentMenuId());
+  }
+
+  @Test
+  public void adoptingANewRootMenuDropsTheHistoryBuiltUnderTheOldOne() {
+    PanelDefinition initial = PanelDefinition.create("board", "root", transform(1D));
+    PanelViewSession view = view(initial, new AtomicInteger());
+    view.open();
+    view.navigate(push("alpha"));
+
+    PanelDefinition replacement = initial.withRootMenu("beta");
+    assertEquals(NavigationResult.APPLIED, view.update(replacement, replacement.transform()));
+    assertEquals("beta", view.currentMenuId());
+
+    assertEquals(NavigationResult.NO_HISTORY, view.navigate(request(NavigationMode.BACK)));
+  }
+
+  @Test
+  public void closingTheViewForgetsTheHistoryAndDeniesFurtherNavigation() {
+    PanelViewSession view = view(new AtomicInteger());
+    view.open();
+    view.navigate(push("alpha"));
+
+    view.close();
+
+    assertTrue(view.closed());
+    assertNull(view.currentMenuId());
+    assertEquals(NavigationResult.DENIED, view.navigate(request(NavigationMode.BACK)));
+  }
+
+  private static NavigationRequest push(String target) {
+    return new NavigationRequest(NavigationMode.PUSH, target);
+  }
+
+  private static NavigationRequest request(NavigationMode mode) {
+    return new NavigationRequest(mode, null);
+  }
+
+  private static PanelViewSession view(AtomicInteger closeRequests) {
+    return view(PanelDefinition.create("board", "root", transform(1D)), closeRequests);
+  }
+
+  private static PanelViewSession view(PanelDefinition definition, AtomicInteger closeRequests) {
+    Map<String, MenuDefinitionData> menus = Map.of(
+        "root", menu("root"),
+        "alpha", menu("alpha"),
+        "beta", menu("beta")
+    );
+    return new PanelViewSession(
+        definition,
+        definition.transform(),
+        player(),
+        menus::get,
+        ignored -> closeRequests.incrementAndGet()
+    );
+  }
+
+  private static MenuDefinitionData menu(String id) {
+    MenuDefinitionData menu = new MenuDefinitionData(
+        new Vector(), false, false, 8D, false, false, List.<MenuComponentData>of());
+    menu.setId(id);
+    return menu;
   }
 
   private static PanelTransform transform(double x) {

@@ -126,8 +126,8 @@ class DocumentStoreTest {
             () -> store.mutate("alpha", current, 2L, value -> value));
 
         assertEquals("alpha", failure.id());
-        assertEquals(2L, failure.expectedRevision());
-        assertEquals(3L, failure.actualRevision());
+        assertEquals("2", failure.expectedRevision());
+        assertEquals("3", failure.actualRevision());
         assertFalse(new File(folder, "alpha.json").exists());
     }
 

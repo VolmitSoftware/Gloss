@@ -1,5 +1,6 @@
 package art.arcane.gloss.editor.sync;
 
+import art.arcane.gloss.doc.AtomicFiles;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonArray;
@@ -8,15 +9,12 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermission;
 import java.nio.file.StandardCopyOption;
-import java.nio.file.StandardOpenOption;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
@@ -209,16 +207,8 @@ final class EditorSyncSessionStore implements EditorSyncSessionPersistence {
       throw new IOException("editor sync session store has no parent directory");
     }
     validatePath();
-    Path temporary = Files.createTempFile(parent, ".editor-sync-sessions.", ".tmp");
+    Path temporary = AtomicFiles.writeDurableTemporary(parent, ".editor-sync-sessions.", bytes);
     try {
-      try (FileChannel channel = FileChannel.open(temporary, StandardOpenOption.WRITE,
-          StandardOpenOption.TRUNCATE_EXISTING)) {
-        ByteBuffer buffer = ByteBuffer.wrap(bytes);
-        while (buffer.hasRemaining()) {
-          channel.write(buffer);
-        }
-        channel.force(true);
-      }
       restrictPermissions(temporary);
       Files.move(temporary, file, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
       try {
@@ -236,17 +226,12 @@ final class EditorSyncSessionStore implements EditorSyncSessionPersistence {
   }
 
   private void forceFile(Path target) throws IOException {
-    try (FileChannel channel = FileChannel.open(target, StandardOpenOption.READ)) {
-      channel.force(true);
-    }
+    AtomicFiles.forceFile(target);
   }
 
   private void forceDirectory(Path target) throws IOException {
     directoryForceProbe.beforeForce(target);
-    try (FileChannel channel = FileChannel.open(target, StandardOpenOption.READ)) {
-      channel.force(true);
-    } catch (UnsupportedOperationException ignored) {
-    }
+    AtomicFiles.forceDirectory(target);
   }
 
   private void forceDirectoryAfterReplace(Path target) throws IOException {

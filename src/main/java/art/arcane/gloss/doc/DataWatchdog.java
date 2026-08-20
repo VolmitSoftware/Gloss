@@ -18,8 +18,8 @@ import java.util.logging.Level;
  * second is a main-thread stall that scales with the number of documents on disk.
  *
  * <p>A registered poll body may therefore touch nothing but files and its own state. Passes whose
- * apply phase talks to Bukkit hop it themselves — {@code HologramService}, {@code ConfigManager},
- * {@code PreviewDocumentRegistry} and the {@code config} entry all schedule their apply onto the
+ * apply phase talks to Bukkit hop it themselves — {@code HologramService}, {@code MenuCatalog},
+ * {@code ImageAssets}, {@code PreviewDocumentRegistry} and the {@code config} entry all schedule their apply onto the
  * global (or owning region) context and keep only the stat/read/parse off-thread. Cadence is
  * unchanged: the scheduler still ticks at the configured interval, and a pass that outruns the
  * interval simply skips the tick it would have overlapped rather than queueing a backlog.

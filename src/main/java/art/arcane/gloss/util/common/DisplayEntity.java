@@ -24,6 +24,7 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.util.Vector;
 
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -34,7 +35,9 @@ import static io.github.retrooper.packetevents.util.SpigotConversionUtil.fromBuk
 import static io.github.retrooper.packetevents.util.SpigotConversionUtil.fromBukkitItemStack;
 
 public class DisplayEntity {
-  private static final int CONTENT_DATA_INDEX = 23;
+  private static final MetadataIndex[] ALL_METADATA_INDICES = MetadataIndex.values();
+  private static final EnumSet<MetadataIndex> RAW_ENTITY_METADATA_INDICES =
+      EnumSet.of(MetadataIndex.ENTITY_FLAGS, MetadataIndex.NO_GRAVITY);
   private static final String COLLISION_TEAM_PREFIX = "gls_nc_";
   private static final WrapperPlayServerTeams.ScoreBoardTeamInfo COLLISIONLESS_TEAM =
       new WrapperPlayServerTeams.ScoreBoardTeamInfo(
@@ -437,55 +440,18 @@ public class DisplayEntity {
   }
 
   public PacketWrapper<?> dataPacket() {
-    List<EntityData<?>> metadata = new ArrayList<>();
-    metadata.add(new EntityData<>(0, EntityDataTypes.BYTE, entityFlags));
-    metadata.add(new EntityData<>(5, EntityDataTypes.BOOLEAN, noGravity));
-
-    if (displayKind == DisplayKind.RAW) {
-      return new WrapperPlayServerEntityMetadata(id, metadata);
-    }
-
-    metadata.add(new EntityData<>(8, EntityDataTypes.INT, interpolationDelay));
-    metadata.add(new EntityData<>(9, EntityDataTypes.INT, interpolationDuration));
-    metadata.add(new EntityData<>(10, EntityDataTypes.INT, teleportDuration));
-    metadata.add(new EntityData<>(11, EntityDataTypes.VECTOR3F, translation));
-    metadata.add(new EntityData<>(12, EntityDataTypes.VECTOR3F, scale));
-    metadata.add(new EntityData<>(13, EntityDataTypes.QUATERNION, leftRotation));
-    metadata.add(new EntityData<>(14, EntityDataTypes.QUATERNION, rightRotation));
-    metadata.add(new EntityData<>(15, EntityDataTypes.BYTE, billboard));
-    metadata.add(new EntityData<>(16, EntityDataTypes.INT, brightness));
-    metadata.add(new EntityData<>(17, EntityDataTypes.FLOAT, viewRange));
-    metadata.add(new EntityData<>(18, EntityDataTypes.FLOAT, shadowRadius));
-    metadata.add(new EntityData<>(19, EntityDataTypes.FLOAT, shadowStrength));
-    metadata.add(new EntityData<>(20, EntityDataTypes.FLOAT, width));
-    metadata.add(new EntityData<>(21, EntityDataTypes.FLOAT, height));
-    metadata.add(new EntityData<>(22, EntityDataTypes.INT, glowColorOverride));
-
-    if (displayKind == DisplayKind.TEXT) {
-      metadata.add(new EntityData<>(CONTENT_DATA_INDEX, EntityDataTypes.ADV_COMPONENT, text));
-      metadata.add(new EntityData<>(24, EntityDataTypes.INT, lineWidth));
-      metadata.add(new EntityData<>(25, EntityDataTypes.INT, backgroundColor));
-      metadata.add(new EntityData<>(26, EntityDataTypes.BYTE, textOpacity));
-      metadata.add(new EntityData<>(27, EntityDataTypes.BYTE, textFlags));
-    } else if (displayKind == DisplayKind.ITEM) {
-      metadata.add(new EntityData<>(CONTENT_DATA_INDEX, EntityDataTypes.ITEMSTACK, fromBukkitItemStack(item)));
-      metadata.add(new EntityData<>(24, EntityDataTypes.BYTE, itemDisplayType));
-    } else if (displayKind == DisplayKind.BLOCK) {
-      metadata.add(new EntityData<>(CONTENT_DATA_INDEX, EntityDataTypes.BLOCK_STATE, blockState));
-    }
-
-    return new WrapperPlayServerEntityMetadata(id, metadata);
+    return metadataPacket(ALL_METADATA_INDICES);
   }
 
   public static WrapperPlayServerEntityMetadata textUpdate(int entityId, Component text) {
     List<EntityData<?>> metadata = new ArrayList<>(1);
-    metadata.add(new EntityData<>(CONTENT_DATA_INDEX, EntityDataTypes.ADV_COMPONENT, text));
+    metadata.add(new EntityData<>(MetadataIndex.CONTENT.index(), EntityDataTypes.ADV_COMPONENT, text));
     return new WrapperPlayServerEntityMetadata(entityId, metadata);
   }
 
-  public WrapperPlayServerEntityMetadata metadataPacket(int... indices) {
+  public WrapperPlayServerEntityMetadata metadataPacket(MetadataIndex... indices) {
     List<EntityData<?>> metadata = new ArrayList<>(indices.length);
-    for (int index : indices) {
+    for (MetadataIndex index : indices) {
       EntityData<?> data = entityData(index);
       if (data != null) {
         metadata.add(data);
@@ -498,50 +464,52 @@ public class DisplayEntity {
     return new WrapperPlayServerDestroyEntities(entityIds);
   }
 
-  private EntityData<?> entityData(int index) {
-    if (index == 0) {
-      return new EntityData<>(0, EntityDataTypes.BYTE, entityFlags);
-    }
-    if (index == 5) {
-      return new EntityData<>(5, EntityDataTypes.BOOLEAN, noGravity);
-    }
-    if (displayKind == DisplayKind.RAW) {
+  private EntityData<?> entityData(MetadataIndex index) {
+    if (displayKind == DisplayKind.RAW && !RAW_ENTITY_METADATA_INDICES.contains(index)) {
       return null;
     }
+    int wireIndex = index.index();
     return switch (index) {
-      case 8 -> new EntityData<>(8, EntityDataTypes.INT, interpolationDelay);
-      case 9 -> new EntityData<>(9, EntityDataTypes.INT, interpolationDuration);
-      case 10 -> new EntityData<>(10, EntityDataTypes.INT, teleportDuration);
-      case 11 -> new EntityData<>(11, EntityDataTypes.VECTOR3F, translation);
-      case 12 -> new EntityData<>(12, EntityDataTypes.VECTOR3F, scale);
-      case 13 -> new EntityData<>(13, EntityDataTypes.QUATERNION, leftRotation);
-      case 14 -> new EntityData<>(14, EntityDataTypes.QUATERNION, rightRotation);
-      case 15 -> new EntityData<>(15, EntityDataTypes.BYTE, billboard);
-      case 16 -> new EntityData<>(16, EntityDataTypes.INT, brightness);
-      case 17 -> new EntityData<>(17, EntityDataTypes.FLOAT, viewRange);
-      case 18 -> new EntityData<>(18, EntityDataTypes.FLOAT, shadowRadius);
-      case 19 -> new EntityData<>(19, EntityDataTypes.FLOAT, shadowStrength);
-      case 20 -> new EntityData<>(20, EntityDataTypes.FLOAT, width);
-      case 21 -> new EntityData<>(21, EntityDataTypes.FLOAT, height);
-      case 22 -> new EntityData<>(22, EntityDataTypes.INT, glowColorOverride);
-      case CONTENT_DATA_INDEX -> contentData();
-      case 24 -> displayKind == DisplayKind.TEXT
-          ? new EntityData<>(24, EntityDataTypes.INT, lineWidth)
-          : displayKind == DisplayKind.ITEM
-              ? new EntityData<>(24, EntityDataTypes.BYTE, itemDisplayType)
-              : null;
-      case 25 -> displayKind == DisplayKind.TEXT ? new EntityData<>(25, EntityDataTypes.INT, backgroundColor) : null;
-      case 26 -> displayKind == DisplayKind.TEXT ? new EntityData<>(26, EntityDataTypes.BYTE, textOpacity) : null;
-      case 27 -> displayKind == DisplayKind.TEXT ? new EntityData<>(27, EntityDataTypes.BYTE, textFlags) : null;
-      default -> null;
+      case ENTITY_FLAGS -> new EntityData<>(wireIndex, EntityDataTypes.BYTE, entityFlags);
+      case NO_GRAVITY -> new EntityData<>(wireIndex, EntityDataTypes.BOOLEAN, noGravity);
+      case INTERPOLATION_DELAY -> new EntityData<>(wireIndex, EntityDataTypes.INT, interpolationDelay);
+      case INTERPOLATION_DURATION -> new EntityData<>(wireIndex, EntityDataTypes.INT, interpolationDuration);
+      case TELEPORT_DURATION -> new EntityData<>(wireIndex, EntityDataTypes.INT, teleportDuration);
+      case TRANSLATION -> new EntityData<>(wireIndex, EntityDataTypes.VECTOR3F, translation);
+      case SCALE -> new EntityData<>(wireIndex, EntityDataTypes.VECTOR3F, scale);
+      case LEFT_ROTATION -> new EntityData<>(wireIndex, EntityDataTypes.QUATERNION, leftRotation);
+      case RIGHT_ROTATION -> new EntityData<>(wireIndex, EntityDataTypes.QUATERNION, rightRotation);
+      case BILLBOARD -> new EntityData<>(wireIndex, EntityDataTypes.BYTE, billboard);
+      case BRIGHTNESS -> new EntityData<>(wireIndex, EntityDataTypes.INT, brightness);
+      case VIEW_RANGE -> new EntityData<>(wireIndex, EntityDataTypes.FLOAT, viewRange);
+      case SHADOW_RADIUS -> new EntityData<>(wireIndex, EntityDataTypes.FLOAT, shadowRadius);
+      case SHADOW_STRENGTH -> new EntityData<>(wireIndex, EntityDataTypes.FLOAT, shadowStrength);
+      case WIDTH -> new EntityData<>(wireIndex, EntityDataTypes.FLOAT, width);
+      case HEIGHT -> new EntityData<>(wireIndex, EntityDataTypes.FLOAT, height);
+      case GLOW_COLOR_OVERRIDE -> new EntityData<>(wireIndex, EntityDataTypes.INT, glowColorOverride);
+      case CONTENT -> contentData(wireIndex);
+      case CONTENT_STYLE -> switch (displayKind) {
+        case TEXT -> new EntityData<>(wireIndex, EntityDataTypes.INT, lineWidth);
+        case ITEM -> new EntityData<>(wireIndex, EntityDataTypes.BYTE, itemDisplayType);
+        case BLOCK, RAW -> null;
+      };
+      case TEXT_BACKGROUND -> displayKind == DisplayKind.TEXT
+          ? new EntityData<>(wireIndex, EntityDataTypes.INT, backgroundColor)
+          : null;
+      case TEXT_OPACITY -> displayKind == DisplayKind.TEXT
+          ? new EntityData<>(wireIndex, EntityDataTypes.BYTE, textOpacity)
+          : null;
+      case TEXT_FLAGS -> displayKind == DisplayKind.TEXT
+          ? new EntityData<>(wireIndex, EntityDataTypes.BYTE, textFlags)
+          : null;
     };
   }
 
-  private EntityData<?> contentData() {
+  private EntityData<?> contentData(int wireIndex) {
     return switch (displayKind) {
-      case TEXT -> new EntityData<>(CONTENT_DATA_INDEX, EntityDataTypes.ADV_COMPONENT, text);
-      case ITEM -> new EntityData<>(CONTENT_DATA_INDEX, EntityDataTypes.ITEMSTACK, fromBukkitItemStack(item));
-      case BLOCK -> new EntityData<>(CONTENT_DATA_INDEX, EntityDataTypes.BLOCK_STATE, blockState);
+      case TEXT -> new EntityData<>(wireIndex, EntityDataTypes.ADV_COMPONENT, text);
+      case ITEM -> new EntityData<>(wireIndex, EntityDataTypes.ITEMSTACK, fromBukkitItemStack(item));
+      case BLOCK -> new EntityData<>(wireIndex, EntityDataTypes.BLOCK_STATE, blockState);
       case RAW -> null;
     };
   }
@@ -726,5 +694,45 @@ public class DisplayEntity {
     TEXT,
     ITEM,
     BLOCK
+  }
+
+  /**
+   * Entity metadata slots in wire order. {@code CONTENT} and {@code CONTENT_STYLE} mean different
+   * things per display kind — text component, item stack or block state, then line width or item
+   * display type. These numbers are the client's protocol contract: never renumber them.
+   */
+  public enum MetadataIndex {
+    ENTITY_FLAGS(0),
+    NO_GRAVITY(5),
+    INTERPOLATION_DELAY(8),
+    INTERPOLATION_DURATION(9),
+    TELEPORT_DURATION(10),
+    TRANSLATION(11),
+    SCALE(12),
+    LEFT_ROTATION(13),
+    RIGHT_ROTATION(14),
+    BILLBOARD(15),
+    BRIGHTNESS(16),
+    VIEW_RANGE(17),
+    SHADOW_RADIUS(18),
+    SHADOW_STRENGTH(19),
+    WIDTH(20),
+    HEIGHT(21),
+    GLOW_COLOR_OVERRIDE(22),
+    CONTENT(23),
+    CONTENT_STYLE(24),
+    TEXT_BACKGROUND(25),
+    TEXT_OPACITY(26),
+    TEXT_FLAGS(27);
+
+    private final int index;
+
+    MetadataIndex(int index) {
+      this.index = index;
+    }
+
+    public int index() {
+      return index;
+    }
   }
 }

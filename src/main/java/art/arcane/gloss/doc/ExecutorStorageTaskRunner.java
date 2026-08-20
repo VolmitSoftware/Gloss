@@ -1,4 +1,4 @@
-package art.arcane.gloss.config.menu;
+package art.arcane.gloss.doc;
 
 import java.util.Objects;
 import java.util.concurrent.ExecutorService;
@@ -7,14 +7,19 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
-final class MenuExecutorTaskRunner implements MenuTaskRunner {
+/**
+ * One daemon thread per storage service, named {@code <prefix>-<n>} so a thread dump attributes a
+ * stalled write to the store that issued it.
+ */
+public final class ExecutorStorageTaskRunner implements StorageTaskRunner {
   private final ExecutorService executor;
 
-  MenuExecutorTaskRunner(ClassLoader contextClassLoader) {
+  public ExecutorStorageTaskRunner(ClassLoader contextClassLoader, String threadNamePrefix) {
     ClassLoader requiredClassLoader = Objects.requireNonNull(contextClassLoader, "contextClassLoader");
+    String requiredPrefix = Objects.requireNonNull(threadNamePrefix, "threadNamePrefix");
     AtomicInteger sequence = new AtomicInteger();
     this.executor = Executors.newSingleThreadExecutor(task -> {
-      Thread thread = new Thread(task, "Gloss-Menu-Storage-" + sequence.incrementAndGet());
+      Thread thread = new Thread(task, requiredPrefix + "-" + sequence.incrementAndGet());
       thread.setDaemon(true);
       thread.setContextClassLoader(requiredClassLoader);
       return thread;
@@ -22,7 +27,7 @@ final class MenuExecutorTaskRunner implements MenuTaskRunner {
   }
 
   @Override
-  public MenuTaskHandle submit(Runnable task) {
+  public StorageTaskHandle submit(Runnable task) {
     Future<?> future = executor.submit(Objects.requireNonNull(task, "task"));
     return () -> future.cancel(false);
   }

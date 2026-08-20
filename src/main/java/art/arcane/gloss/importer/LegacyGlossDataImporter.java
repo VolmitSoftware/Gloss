@@ -6,6 +6,7 @@ import art.arcane.gloss.board.BoardDoc;
 import art.arcane.gloss.bubble.BubbleStyleDoc;
 import art.arcane.gloss.config.GlossConfigFile;
 import art.arcane.gloss.config.GlossConfigLoader;
+import art.arcane.gloss.doc.AtomicFiles;
 import art.arcane.gloss.doc.DocumentEnvelope;
 import art.arcane.gloss.emoji.EmojiDoc;
 import art.arcane.gloss.hologram.HologramDoc;
@@ -40,6 +41,7 @@ import java.util.Objects;
 import java.util.function.Function;
 import java.util.function.UnaryOperator;
 import java.util.logging.Level;
+import java.util.stream.Stream;
 
 /**
  * In-place migration of pre-merger Gloss v1-shape data inside the CURRENT data folder to the v2
@@ -237,6 +239,7 @@ public final class LegacyGlossDataImporter {
                 Path target = backupDirectory().resolve("groups");
                 Files.move(groupsDir.toPath(), target);
             } catch (IOException failure) {
+                discardEmptyBackupDirectory();
                 entries.add(new Entry("groups", "groups/", Status.ERROR, detail(failure)));
             }
         }
@@ -473,7 +476,13 @@ public final class LegacyGlossDataImporter {
     private void backup(String kind, File file) throws IOException {
         Path target = backupDirectory().resolve(kind).resolve(file.getName());
         Files.createDirectories(target.getParent());
-        Files.copy(file.toPath(), target, StandardCopyOption.REPLACE_EXISTING);
+        try {
+            Files.copy(file.toPath(), target, StandardCopyOption.REPLACE_EXISTING);
+        } catch (IOException failure) {
+            discardEmptyDirectory(target.getParent());
+            discardEmptyBackupDirectory();
+            throw failure;
+        }
     }
 
     private Path backupDirectory() throws IOException {
@@ -486,19 +495,55 @@ public final class LegacyGlossDataImporter {
         return backupRoot;
     }
 
-    private static void writeDocument(Path file, Object document) throws IOException {
-        Path parent = file.getParent();
-        if (parent != null) {
-            Files.createDirectories(parent);
+    /**
+     * Removes the timestamp folder — and {@code import-backups/} above it — when the write that
+     * created it failed and left nothing inside. A failed backup must not be reported as one either,
+     * so the memoized root is dropped along with the directory.
+     */
+    private void discardEmptyBackupDirectory() {
+        Path root = backupRoot;
+        if (root == null) {
+            return;
         }
-        byte[] encoded = (BukkitJson.GSON.toJson(document) + System.lineSeparator()).getBytes(StandardCharsets.UTF_8);
-        Path temporary = Files.createTempFile(parent, "." + file.getFileName() + ".", ".tmp");
         try {
-            Files.write(temporary, encoded);
-            Files.move(temporary, file, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
-        } finally {
-            Files.deleteIfExists(temporary);
+            if (!isEmptyDirectory(root)) {
+                return;
+            }
+            Files.delete(root);
+            backupRoot = null;
+            Path parent = root.getParent();
+            if (parent != null && isEmptyDirectory(parent)) {
+                Files.delete(parent);
+            }
+        } catch (IOException failure) {
+            Gloss.logExceptionStack(false, failure,
+                "Unable to remove the empty import backup directory %s.", root);
         }
+    }
+
+    private static void discardEmptyDirectory(Path directory) {
+        try {
+            if (directory != null && isEmptyDirectory(directory)) {
+                Files.delete(directory);
+            }
+        } catch (IOException failure) {
+            Gloss.logExceptionStack(false, failure,
+                "Unable to remove the empty import backup directory %s.", directory);
+        }
+    }
+
+    private static boolean isEmptyDirectory(Path directory) throws IOException {
+        if (!Files.isDirectory(directory)) {
+            return false;
+        }
+        try (Stream<Path> children = Files.list(directory)) {
+            return children.findAny().isEmpty();
+        }
+    }
+
+    private static void writeDocument(Path file, Object document) throws IOException {
+        AtomicFiles.replace(file,
+            (BukkitJson.GSON.toJson(document) + System.lineSeparator()).getBytes(StandardCharsets.UTF_8));
     }
 
     private static byte[] readResource(String path) throws IOException {

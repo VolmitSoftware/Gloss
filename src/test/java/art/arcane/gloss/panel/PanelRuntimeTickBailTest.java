@@ -1,8 +1,9 @@
 package art.arcane.gloss.panel;
 
 import art.arcane.gloss.Gloss;
-import art.arcane.gloss.config.ConfigManager;
+import art.arcane.gloss.config.menu.MenuCatalog;
 import art.arcane.gloss.menu.CharacterizationSupport;
+import art.arcane.gloss.doc.StorageTaskRunner;
 import art.arcane.gloss.persistence.GlossPersistenceCoordinator;
 import org.bukkit.Location;
 import org.bukkit.NamespacedKey;
@@ -44,7 +45,7 @@ public class PanelRuntimeTickBailTest {
   private final World world = world();
   private Object previousServer;
   private Gloss previousInstance;
-  private ConfigManager configManager;
+  private MenuCatalog menuCatalog;
   private QueuedRunner runner;
   private PanelService service;
   private PanelRuntimeManager runtime;
@@ -67,8 +68,8 @@ public class PanelRuntimeTickBailTest {
           "components": []
         }
         """, StandardCharsets.UTF_8);
-    configManager = new ConfigManager(configDir);
-    CharacterizationSupport.setField(gloss, "configManager", configManager);
+    menuCatalog = new MenuCatalog(configDir);
+    CharacterizationSupport.setField(gloss, "menuCatalog", menuCatalog);
 
     runner = new QueuedRunner();
     service = new PanelService(new PanelService.Dependencies(
@@ -85,8 +86,8 @@ public class PanelRuntimeTickBailTest {
     if (runtime != null) {
       runtime.shutdown();
     }
-    if (configManager != null) {
-      configManager.shutdown();
+    if (menuCatalog != null) {
+      menuCatalog.shutdown();
     }
     CharacterizationSupport.restoreGloss(previousInstance);
     CharacterizationSupport.restoreServer((org.bukkit.Server) previousServer);
@@ -235,11 +236,11 @@ public class PanelRuntimeTickBailTest {
   }
 
   /** Runs submitted service tasks on demand, on the test thread. */
-  private static final class QueuedRunner implements PanelTaskRunner {
+  private static final class QueuedRunner implements StorageTaskRunner {
     private final ArrayDeque<Runnable> tasks = new ArrayDeque<>();
 
     @Override
-    public PanelTaskHandle submit(Runnable task) {
+    public StorageTaskHandle submit(Runnable task) {
       tasks.addLast(task);
       return () -> tasks.remove(task);
     }

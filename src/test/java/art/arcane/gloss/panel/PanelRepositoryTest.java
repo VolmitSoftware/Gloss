@@ -1,5 +1,6 @@
 package art.arcane.gloss.panel;
 
+import art.arcane.gloss.doc.DocumentRevisionConflictException;
 import art.arcane.gloss.persistence.GlossProjectTransaction;
 import org.junit.Assume;
 import org.junit.Rule;
@@ -9,6 +10,7 @@ import org.junit.rules.TemporaryFolder;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.AccessDeniedException;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -96,12 +98,10 @@ public class PanelRepositoryTest {
     Path outside = temp.newFolder("symlink-outside").toPath();
     PanelRepository repository = new PanelRepository(pluginData);
     repository.load();
-    Path link = repository.directory().resolve("linked");
-    try {
-      Files.createSymbolicLink(link, outside);
-    } catch (IOException | UnsupportedOperationException failure) {
-      Assume.assumeNoException(failure);
-    }
+    // load() deliberately does not create panels/ - the first write does - so the storage root has
+    // to be materialized here or the link cannot be made and the test silently skips.
+    Files.createDirectories(repository.directory());
+    link(repository.directory().resolve("linked"), outside);
 
     assertThrows(IOException.class, () -> repository.create(board("linked/escape", "example:world")));
     assertFalse(outside.resolve("escape.json").toFile().exists());
@@ -119,11 +119,7 @@ public class PanelRepositoryTest {
     Files.writeString(outsideFile, "outside", StandardCharsets.UTF_8);
     Files.delete(linkedDirectory.resolve("escape.json"));
     Files.delete(linkedDirectory);
-    try {
-      Files.createSymbolicLink(linkedDirectory, outside);
-    } catch (IOException | UnsupportedOperationException failure) {
-      Assume.assumeNoException(failure);
-    }
+    link(linkedDirectory, outside);
 
     assertThrows(IOException.class, () -> repository.delete(created.id(), created.revision()));
     assertEquals("outside", Files.readString(outsideFile, StandardCharsets.UTF_8));
@@ -199,14 +195,14 @@ public class PanelRepositoryTest {
     }
 
     AtomicBoolean invoked = new AtomicBoolean(false);
-    PanelRevisionConflictException conflict = assertThrows(PanelRevisionConflictException.class,
+    DocumentRevisionConflictException conflict = assertThrows(DocumentRevisionConflictException.class,
         () -> repository.update(created.id(), created.revision(), board -> {
           invoked.set(true);
           return board.withRootMenu("Other");
         }));
     assertFalse(invoked.get());
-    assertEquals(created.revision(), conflict.expectedRevision());
-    assertEquals(updated.revision(), conflict.actualRevision());
+    assertEquals(Long.toString(created.revision()), conflict.expectedRevision());
+    assertEquals(Long.toString(updated.revision()), conflict.actualRevision());
     assertEquals(updated, repository.get(created.id()).orElseThrow());
 
     PanelRepository reopened = new PanelRepository(pluginData);
@@ -238,6 +234,7 @@ public class PanelRepositoryTest {
     File pluginData = temp.newFolder("missing-world");
     PanelRepository repository = new PanelRepository(pluginData);
     repository.load();
+    Files.createDirectories(repository.directory());
     Files.writeString(repository.directory().resolve("missing-uuid.json"), missingWorldJson(
         "missing-uuid", "00000000-0000-0000-0000-000000000301", "\"worldKey\": \"example:not_loaded\""),
         StandardCharsets.UTF_8);
@@ -264,7 +261,7 @@ public class PanelRepositoryTest {
     PanelDefinition first = repository.create(board("a/first", "example:world"));
     PanelDefinition second = repository.create(board("b/second", "example:world"));
 
-    assertThrows(PanelRevisionConflictException.class,
+    assertThrows(DocumentRevisionConflictException.class,
         () -> repository.delete(first.id(), first.revision() + 1L));
     assertTrue(repository.get(first.id()).isPresent());
     assertEquals(first, repository.delete(first.id(), first.revision()));
@@ -310,7 +307,7 @@ public class PanelRepositoryTest {
     PanelDefinition source = repository.create(board("source", "example:world"));
     PanelDefinition occupied = repository.create(board("occupied", "example:world"));
 
-    assertThrows(PanelRevisionConflictException.class,
+    assertThrows(DocumentRevisionConflictException.class,
         () -> repository.rename(source.id(), "renamed", source.revision() + 1L));
     assertThrows(FileAlreadyExistsException.class,
         () -> repository.rename(source.id(), occupied.id(), source.revision()));
@@ -357,6 +354,20 @@ public class PanelRepositoryTest {
           }
         }
         """.formatted(id, uuid, worldIdentity);
+  }
+
+  /**
+   * Only a filesystem that cannot make links at all is a reason to skip. A blanket
+   * {@code IOException} catch here hid a missing parent directory and skipped this test on every
+   * platform for as long as it existed.
+   */
+  private static void link(Path link, Path target) throws IOException {
+    assertTrue(Files.isDirectory(link.getParent()));
+    try {
+      Files.createSymbolicLink(link, target);
+    } catch (UnsupportedOperationException | AccessDeniedException unsupported) {
+      Assume.assumeNoException(unsupported);
+    }
   }
 
   private static PanelDefinition board(String id, String worldKey) {

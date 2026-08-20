@@ -1,5 +1,7 @@
 package art.arcane.gloss.panel;
 
+import art.arcane.gloss.doc.AtomicFiles;
+import art.arcane.gloss.doc.DocumentRevisionConflictException;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonElement;
@@ -7,15 +9,12 @@ import com.google.gson.JsonParser;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
-import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -34,6 +33,7 @@ public final class PanelRepository implements PanelStore {
   public static final String DIRECTORY_NAME = "panels";
 
   private static final String JSON_EXTENSION = ".json";
+  private static final String NOUN = "panel";
   private static final Gson GSON = new GsonBuilder()
       .serializeNulls()
       .disableHtmlEscaping()
@@ -57,10 +57,13 @@ public final class PanelRepository implements PanelStore {
     return directory;
   }
 
+  /**
+   * Reads whatever {@code panels/} holds. A missing folder loads nothing rather than creating one:
+   * the folder is made by the first panel that is written, so a server that never authors a panel
+   * never grows the directory.
+   */
   @Override
   public synchronized PanelLoadResult load() throws IOException {
-    ensureStorageDirectory();
-
     Map<String, PanelDefinition> previous = new HashMap<>(boards);
     Map<String, PanelDefinition> loadedBoards = new HashMap<>();
     Map<UUID, String> loadedUuids = new HashMap<>();
@@ -168,7 +171,7 @@ public final class PanelRepository implements PanelStore {
       throw new NoSuchElementException("unknown panel: " + canonicalId);
     }
     if (current.revision() != expectedRevision) {
-      throw new PanelRevisionConflictException(canonicalId, expectedRevision, current.revision());
+      throw new DocumentRevisionConflictException(NOUN, canonicalId, expectedRevision, current.revision());
     }
     if (current.revision() == PanelDefinition.MAX_SAFE_REVISION) {
       throw new IllegalStateException("panel revision overflow: " + canonicalId);
@@ -196,7 +199,7 @@ public final class PanelRepository implements PanelStore {
       throw new NoSuchElementException("unknown panel: " + canonicalId);
     }
     if (current.revision() != expectedRevision) {
-      throw new PanelRevisionConflictException(canonicalId, expectedRevision, current.revision());
+      throw new DocumentRevisionConflictException(NOUN, canonicalId, expectedRevision, current.revision());
     }
     if (canonicalId.equals(canonicalNewId)) {
       throw new IllegalArgumentException("new panel id must differ from the current id");
@@ -226,14 +229,14 @@ public final class PanelRepository implements PanelStore {
     try {
       Files.delete(source);
       sourceDeleted = true;
-      forceDirectory(source.getParent());
+      AtomicFiles.forceDirectory(source.getParent());
     } catch (IOException failure) {
       try {
         if (sourceDeleted) {
           writeAtomic(source, current, false);
         }
         Files.deleteIfExists(target);
-        forceDirectory(target.getParent());
+        AtomicFiles.forceDirectory(target.getParent());
       } catch (IOException rollbackFailure) {
         failure.addSuppressed(rollbackFailure);
       }
@@ -253,7 +256,7 @@ public final class PanelRepository implements PanelStore {
       throw new NoSuchElementException("unknown panel: " + canonicalId);
     }
     if (current.revision() != expectedRevision) {
-      throw new PanelRevisionConflictException(canonicalId, expectedRevision, current.revision());
+      throw new DocumentRevisionConflictException(NOUN, canonicalId, expectedRevision, current.revision());
     }
 
     Path target = pathForCanonical(canonicalId);
@@ -262,7 +265,7 @@ public final class PanelRepository implements PanelStore {
       throw new IOException("refusing to delete symbolic-link panel file: " + target);
     }
     Files.deleteIfExists(target);
-    forceDirectory(target.getParent());
+    AtomicFiles.forceDirectory(target.getParent());
     boards.remove(canonicalId);
     return current;
   }
@@ -315,7 +318,7 @@ public final class PanelRepository implements PanelStore {
     PanelDefinition current = boards.get(requiredExpected.id());
     if (!requiredExpected.equals(current)) {
       long actualRevision = current == null ? 0L : current.revision();
-      throw new PanelRevisionConflictException(requiredExpected.id(),
+      throw new DocumentRevisionConflictException(NOUN, requiredExpected.id(),
           requiredExpected.revision(), actualRevision);
     }
     validateUpdateIdentity(current, new PanelDefinition(
@@ -358,6 +361,10 @@ public final class PanelRepository implements PanelStore {
   }
 
   private List<Path> boardFiles() throws IOException {
+    if (!Files.exists(directory, LinkOption.NOFOLLOW_LINKS)) {
+      return List.of();
+    }
+    AtomicFiles.requireRealDirectory(directory, NOUN);
     try (Stream<Path> paths = Files.walk(directory)) {
       return paths
           .filter(path -> !Files.isDirectory(path, LinkOption.NOFOLLOW_LINKS))
@@ -435,61 +442,12 @@ public final class PanelRepository implements PanelStore {
     return target;
   }
 
-  private void ensureStorageDirectory() throws IOException {
-    Path parent = directory.getParent();
-    if (parent != null) {
-      Files.createDirectories(parent);
-    }
-    if (Files.exists(directory, LinkOption.NOFOLLOW_LINKS)) {
-      if (Files.isSymbolicLink(directory) || !Files.isDirectory(directory, LinkOption.NOFOLLOW_LINKS)) {
-        throw new IOException("panel storage path must be a real directory: " + directory);
-      }
-      return;
-    }
-    Files.createDirectory(directory);
-    forceDirectory(directory.getParent());
-  }
-
   private void prepareTarget(Path target) throws IOException {
-    ensureStorageDirectory();
-    Path parent = target.getParent();
-    if (parent == null) {
-      throw new IOException("panel file has no parent directory: " + target);
-    }
-
-    Path current = directory;
-    for (Path segment : directory.relativize(parent)) {
-      current = current.resolve(segment);
-      if (Files.exists(current, LinkOption.NOFOLLOW_LINKS)) {
-        if (Files.isSymbolicLink(current) || !Files.isDirectory(current, LinkOption.NOFOLLOW_LINKS)) {
-          throw new IOException("panel path contains a non-directory or symbolic link: " + current);
-        }
-      } else {
-        Files.createDirectory(current);
-        forceDirectory(current.getParent());
-      }
-    }
-
-    if (Files.isSymbolicLink(target)) {
-      throw new IOException("panel file must not be a symbolic link: " + target);
-    }
+    AtomicFiles.prepareParent(directory, target, NOUN);
   }
 
   private void validateAncestors(Path target) throws IOException {
-    Path parent = target.getParent();
-    if (parent == null || !parent.startsWith(directory)) {
-      throw new IOException("panel path escapes the panel directory: " + target);
-    }
-    Path current = directory;
-    if (Files.isSymbolicLink(current) || !Files.isDirectory(current, LinkOption.NOFOLLOW_LINKS)) {
-      throw new IOException("panel storage path must be a real directory: " + current);
-    }
-    for (Path segment : directory.relativize(parent)) {
-      current = current.resolve(segment);
-      if (Files.isSymbolicLink(current) || !Files.isDirectory(current, LinkOption.NOFOLLOW_LINKS)) {
-        throw new IOException("panel path contains a non-directory or symbolic link: " + current);
-      }
-    }
+    AtomicFiles.validateAncestors(directory, target, NOUN);
   }
 
   private void writeAtomic(Path target, PanelDefinition definition, boolean replaceExisting) throws IOException {
@@ -497,36 +455,17 @@ public final class PanelRepository implements PanelStore {
     if (parent == null) {
       throw new IOException("panel file has no parent directory: " + target);
     }
-    Path temporary = Files.createTempFile(parent, "." + target.getFileName() + ".", ".tmp");
+    byte[] encoded = (GSON.toJson(definition) + System.lineSeparator()).getBytes(StandardCharsets.UTF_8);
+    Path temporary = AtomicFiles.writeDurableTemporary(parent, "." + target.getFileName() + ".", encoded);
     try {
-      byte[] encoded = (GSON.toJson(definition) + System.lineSeparator()).getBytes(StandardCharsets.UTF_8);
-      try (FileChannel channel = FileChannel.open(temporary, StandardOpenOption.WRITE,
-          StandardOpenOption.TRUNCATE_EXISTING)) {
-        ByteBuffer buffer = ByteBuffer.wrap(encoded);
-        while (buffer.hasRemaining()) {
-          channel.write(buffer);
-        }
-        channel.force(true);
-      }
-
       if (replaceExisting) {
         Files.move(temporary, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
       } else {
         Files.move(temporary, target, StandardCopyOption.ATOMIC_MOVE);
       }
-      forceDirectory(parent);
+      AtomicFiles.forceDirectory(parent);
     } finally {
       Files.deleteIfExists(temporary);
-    }
-  }
-
-  private void forceDirectory(Path path) throws IOException {
-    if (path == null) {
-      return;
-    }
-    try (FileChannel channel = FileChannel.open(path, StandardOpenOption.READ)) {
-      channel.force(true);
-    } catch (UnsupportedOperationException ignored) {
     }
   }
 

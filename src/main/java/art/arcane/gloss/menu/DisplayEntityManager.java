@@ -3,6 +3,7 @@ package art.arcane.gloss.menu;
 import art.arcane.gloss.Gloss;
 import art.arcane.gloss.service.GlossTelemetry;
 import art.arcane.gloss.util.common.DisplayEntity;
+import art.arcane.gloss.util.common.DisplayEntity.MetadataIndex;
 import art.arcane.gloss.util.common.PacketUtils;
 import com.github.retrooper.packetevents.PacketEvents;
 import com.github.retrooper.packetevents.PacketEventsAPI;
@@ -28,17 +29,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 
 public class DisplayEntityManager {
-
-  /**
-   * Metadata index of the display's content slot — text component, item stack or block state
-   * depending on the display kind. Mirrors {@code DisplayEntity.CONTENT_DATA_INDEX};
-   * {@code DisplayEntityMetadataTest} pins the subset packet against the full one.
-   */
-  private static final int CONTENT_INDEX = 23;
-  private static final int TRANSLATION_INDEX = 11;
-  private static final int SCALE_INDEX = 12;
-  private static final int LEFT_ROTATION_INDEX = 13;
-  private static final int TEXT_BACKGROUND_INDEX = 25;
 
   /**
    * High half of every manager key. The keys are internal handles only — the uuid a client sees is
@@ -282,7 +272,7 @@ public class DisplayEntityManager {
       PacketUtils.sendOne(player, displayEntity.rotate(yaw, pitch));
     }
     if (!rollUnchanged) {
-      PacketUtils.sendOne(player, displayEntity.metadataPacket(LEFT_ROTATION_INDEX));
+      PacketUtils.sendOne(player, displayEntity.metadataPacket(MetadataIndex.LEFT_ROTATION));
     }
   }
 
@@ -325,7 +315,7 @@ public class DisplayEntityManager {
     if (!displayEntity.isTextDisplay())
       return;
     displayEntity.backgroundColor(backgroundColor);
-    PacketUtils.sendOne(player, displayEntity.metadataPacket(TEXT_BACKGROUND_INDEX));
+    PacketUtils.sendOne(player, displayEntity.metadataPacket(MetadataIndex.TEXT_BACKGROUND));
   }
 
   public static void changeScale(UUID uuid, float x, float y, float z) {
@@ -336,7 +326,7 @@ public class DisplayEntityManager {
     if (displayEntity == null || player == null)
       return;
     displayEntity.scale(new Vector3f(x, y, z));
-    PacketUtils.sendOne(player, displayEntity.metadataPacket(SCALE_INDEX));
+    PacketUtils.sendOne(player, displayEntity.metadataPacket(MetadataIndex.SCALE));
   }
 
   public static void changeTransform(UUID uuid, float x, float y, float z, Vector3f translation) {
@@ -348,7 +338,7 @@ public class DisplayEntityManager {
       return;
     displayEntity.scale(new Vector3f(x, y, z));
     displayEntity.translation(translation == null ? new Vector3f(0, 0, 0) : translation);
-    PacketUtils.sendOne(player, displayEntity.metadataPacket(TRANSLATION_INDEX, SCALE_INDEX));
+    PacketUtils.sendOne(player, displayEntity.metadataPacket(MetadataIndex.TRANSLATION, MetadataIndex.SCALE));
   }
 
   public static void changeItem(UUID uuid, ItemStack itemStack) {
@@ -361,7 +351,7 @@ public class DisplayEntityManager {
     if (!displayEntity.isItemDisplay())
       return;
     displayEntity.item(itemStack == null ? new ItemStack(Material.AIR) : itemStack.clone());
-    PacketUtils.sendOne(player, displayEntity.metadataPacket(CONTENT_INDEX));
+    PacketUtils.sendOne(player, displayEntity.metadataPacket(MetadataIndex.CONTENT));
   }
 
   private static boolean unsupportedVersion() {

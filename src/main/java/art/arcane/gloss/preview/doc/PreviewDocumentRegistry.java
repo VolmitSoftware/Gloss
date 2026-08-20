@@ -1,6 +1,7 @@
 package art.arcane.gloss.preview.doc;
 
 import art.arcane.gloss.Gloss;
+import art.arcane.gloss.doc.AtomicFiles;
 import art.arcane.gloss.doc.DataWatchdog;
 import art.arcane.gloss.menu.MenuSessionManager;
 import art.arcane.gloss.preview.doc.CompiledPreviewDocument.CompiledMatch;
@@ -97,15 +98,13 @@ public final class PreviewDocumentRegistry {
   private FolderWatcher watcher;
 
   /**
-   * Creates {@code previews/}, extracts any shipped document missing from it, and compiles every
-   * {@code *.json} it finds. Pure file work — no scheduler, no Bukkit state — so the registry is
-   * constructible headlessly; {@link #startWatching()} arms the hot reload separately.
+   * Extracts any shipped document missing from {@code previews/} and compiles every {@code *.json}
+   * it finds. The folder itself is created by the first extracted document, never up front. Pure
+   * file work — no scheduler, no Bukkit state — so the registry is constructible headlessly;
+   * {@link #startWatching()} arms the hot reload separately.
    */
   public PreviewDocumentRegistry(File configDir) {
     this.folder = new File(configDir, FOLDER_NAME);
-    if (!folder.exists()) {
-      folder.mkdirs();
-    }
     extract(ALL, false);
     reload();
   }
@@ -253,7 +252,9 @@ public final class PreviewDocumentRegistry {
           Gloss.log(Level.WARNING, "previews/%s%s: missing from the jar, not extracted.", name, EXTENSION);
           continue;
         }
-        Files.write(file.toPath(), stream.readAllBytes());
+        byte[] content = stream.readAllBytes();
+        AtomicFiles.createParentDirectories(file.toPath());
+        Files.write(file.toPath(), content);
         written.add(name);
       } catch (IOException failure) {
         Gloss.log(Level.WARNING, "previews/%s%s: %s", name, EXTENSION, detail(name, failure));

@@ -57,7 +57,7 @@ public final class EditorSyncSnapshotBuilder implements EditorSyncSnapshotSource
 
   public EditorSyncProject menu(String menuId, int maximumBytes) {
     String id = MenuIds.require(menuId);
-    String source = plugin.getConfigManager().getSource(id)
+    String source = plugin.getMenuCatalog().source(id)
         .orElseThrow(() -> new IllegalArgumentException("unknown menu: " + id));
     TreeMap<String, String> menus = new TreeMap<>();
     menus.put(id, source);
@@ -138,7 +138,7 @@ public final class EditorSyncSnapshotBuilder implements EditorSyncSnapshotSource
       if (visited.size() > MAX_MENU_COUNT) {
         throw new IllegalArgumentException("board menu graph exceeds " + MAX_MENU_COUNT + " menus");
       }
-      String source = plugin.getConfigManager().getSource(id).orElse(null);
+      String source = plugin.getMenuCatalog().source(id).orElse(null);
       if (source == null) {
         warnings.add("Referenced menu is not loaded: " + id);
         continue;

@@ -60,7 +60,7 @@ public class CommandGlossMenu {
       return;
     }
 
-    List<String> menus = new ArrayList<>(plugin.getConfigManager().keys());
+    List<String> menus = new ArrayList<>(plugin.getMenuCatalog().keys());
     if (menus.isEmpty()) {
       sender.sendMessage(plugin.getLocalization().legacy(GlossMessages.NO_MENUS));
       return;
@@ -260,7 +260,7 @@ public class CommandGlossMenu {
       return;
     }
 
-    MenuDefinitionData menu = plugin.getConfigManager().get(menuName).orElse(null);
+    MenuDefinitionData menu = plugin.getMenuCatalog().definition(menuName).orElse(null);
     if (menu == null) {
       sender.sendMessage(plugin.getLocalization().legacy(
           GlossMessages.MENU_UNAVAILABLE,
@@ -268,7 +268,7 @@ public class CommandGlossMenu {
       ));
       return;
     }
-    String source = plugin.getConfigManager().getSource(menu.getId()).orElse(null);
+    String source = plugin.getMenuCatalog().source(menu.getId()).orElse(null);
     if (source == null) {
       sendEditorFailure(sender, menu.getId());
       return;
@@ -430,7 +430,7 @@ public class CommandGlossMenu {
     if (!MenuRowCommandSupport.checkPermission(sender, EDIT_PERMISSION)) {
       return;
     }
-    Gloss.instance.getConfigManager().createMenu(menuId, art.arcane.gloss.config.menu.MenuBaselines.blankHologramSource())
+    Gloss.instance.getMenuCatalog().create(menuId, art.arcane.gloss.config.menu.MenuBaselines.blankHologramSource())
         .whenComplete((document, failure) -> {
           if (failure != null) {
             MenuRowCommandSupport.reportFailure(sender, menuId, failure);
@@ -456,7 +456,7 @@ public class CommandGlossMenu {
     if (!MenuRowCommandSupport.checkPermission(sender, EDIT_PERMISSION)) {
       return;
     }
-    Gloss.instance.getConfigManager().copyMenu(menuId, newMenuId)
+    Gloss.instance.getMenuCatalog().copy(menuId, newMenuId)
         .whenComplete((document, failure) -> {
           if (failure != null) {
             MenuRowCommandSupport.reportFailure(sender, newMenuId, failure);
@@ -592,7 +592,7 @@ public class CommandGlossMenu {
   }
 
   private boolean openMenu(Player player, CommandSender feedback, String menuName, boolean includeRootPermission) {
-    MenuDefinitionData ui = plugin.getConfigManager().get(menuName).orElse(null);
+    MenuDefinitionData ui = plugin.getMenuCatalog().definition(menuName).orElse(null);
     if (ui == null) {
       feedback.sendMessage(plugin.getLocalization().legacy(
           GlossMessages.MENU_UNAVAILABLE,
@@ -706,11 +706,11 @@ public class CommandGlossMenu {
     @Override
     public KList<String> getPossibilities() {
       KList<String> out = new KList<>();
-      if (Gloss.instance == null || Gloss.instance.getConfigManager() == null) {
+      if (Gloss.instance == null || Gloss.instance.getMenuCatalog() == null) {
         return out;
       }
 
-      out.addAll(Gloss.instance.getConfigManager().keys());
+      out.addAll(Gloss.instance.getMenuCatalog().keys());
       out.removeDuplicates();
       return out;
     }

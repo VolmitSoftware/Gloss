@@ -156,6 +156,74 @@ public class SessionHolderSnapshotTest {
   }
 
   @Test
+  public void pushingTheSameMenuTwiceRecordsBothEntries() {
+    SessionHolder holder = holder(new PlayerSnapshotStore<>());
+    holder.openSession(menu("root"), null);
+    holder.navigateSession(menu("alpha"), new NavigationRequest(NavigationMode.PUSH, "alpha"));
+
+    assertEquals(NavigationResult.APPLIED, holder.navigateSession(
+        menu("alpha"), new NavigationRequest(NavigationMode.PUSH, "alpha")));
+
+    assertEquals("a repeat push is recorded, not collapsed", "alpha", holder.lastSessionId());
+    assertEquals(NavigationResult.APPLIED, holder.navigateSession(
+        menu("alpha"), new NavigationRequest(NavigationMode.BACK, null)));
+    assertEquals("root", holder.lastSessionId());
+  }
+
+  @Test
+  public void openingAFreshSessionResetsTheRootAndDropsTheHistory() {
+    SessionHolder holder = holder(new PlayerSnapshotStore<>());
+    holder.openSession(menu("root"), null);
+    holder.navigateSession(menu("alpha"), new NavigationRequest(NavigationMode.PUSH, "alpha"));
+    assertTrue(holder.closeSession(true, HoloCloseReason.CLOSED_BY_COMMAND));
+    assertEquals("alpha", holder.lastSessionId());
+    assertEquals("root", holder.rootSessionId());
+
+    holder.openSession(menu("gamma"), null);
+
+    assertNull("a fresh open starts a new stack", holder.lastSessionId());
+    assertEquals("gamma", holder.rootSessionId());
+  }
+
+  @Test
+  public void replacingWithNothingOpenAdoptsTheTargetAsTheRoot() {
+    SessionHolder holder = holder(new PlayerSnapshotStore<>());
+
+    assertEquals(NavigationResult.APPLIED, holder.navigateSession(
+        menu("alpha"), new NavigationRequest(NavigationMode.REPLACE, "alpha")));
+
+    assertEquals("alpha", holder.rootSessionId());
+    assertNull(holder.lastSessionId());
+  }
+
+  @Test
+  public void backAndHomeRejectAMenuThatIsNotTheRecordedTarget() {
+    SessionHolder holder = holder(new PlayerSnapshotStore<>());
+    holder.openSession(menu("root"), null);
+    holder.navigateSession(menu("alpha"), new NavigationRequest(NavigationMode.PUSH, "alpha"));
+
+    assertEquals(NavigationResult.NO_HISTORY, holder.navigateSession(
+        menu("beta"), new NavigationRequest(NavigationMode.BACK, null)));
+    assertEquals(NavigationResult.NO_HISTORY, holder.navigateSession(
+        menu("beta"), new NavigationRequest(NavigationMode.HOME, null)));
+
+    assertEquals("a rejected navigation must not disturb the stack", "root", holder.lastSessionId());
+    assertEquals("root", holder.rootSessionId());
+  }
+
+  @Test
+  public void closingWithoutHistoryForgetsTheRootAsWell() {
+    SessionHolder holder = holder(new PlayerSnapshotStore<>());
+    holder.openSession(menu("root"), null);
+    holder.navigateSession(menu("alpha"), new NavigationRequest(NavigationMode.PUSH, "alpha"));
+
+    assertTrue(holder.closeSession(false, HoloCloseReason.CLOSED_BY_COMMAND));
+
+    assertNull(holder.lastSessionId());
+    assertNull(holder.rootSessionId());
+  }
+
+  @Test
   public void closingTheSessionClearsTheStore() {
     PlayerSnapshotStore<String> openMenus = new PlayerSnapshotStore<>();
     SessionHolder holder = holder(openMenus);

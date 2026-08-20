@@ -36,12 +36,19 @@ public final class MotdService {
             new File(plugin.getDataFolder(), MotdDoc.KIND + ".json"), MotdDoc::parse, MotdDoc::revision);
     }
 
+    /**
+     * MOTD ships off, so the shipped {@code motd.json} is only written once the feature is turned
+     * on. Until then {@link #doc()} falls back to {@link MotdDoc#DEFAULTS} and nothing lands on disk.
+     */
     public void enable() {
-        defaults.extractMissing();
+        boolean enabled = plugin.cfg().motd().enabled();
+        if (enabled) {
+            defaults.extractMissing();
+        }
         registry.reload();
         docGeneration.incrementAndGet();
         plugin.watchdog().register(MotdDoc.KIND, this::pollRegistry);
-        if (!plugin.cfg().motd().enabled()) {
+        if (!enabled) {
             return;
         }
 

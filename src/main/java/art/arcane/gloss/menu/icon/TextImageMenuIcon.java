@@ -71,7 +71,7 @@ public class TextImageMenuIcon extends MenuIcon<TextImageIconData> {
   private List<Component> createComponents() throws MenuIconException {
     String path = data.requirePath();
     try {
-      Pair<ImageFormat, BufferedImage> imageData = Gloss.instance.getConfigManager().getImage(path);
+      Pair<ImageFormat, BufferedImage> imageData = Gloss.instance.getImageAssets().get(path);
       return TextImageRasterCache.lines(imageData.getRight(), imageData.getLeft() == ImageFormats.JPEG);
     } catch (IOException | RuntimeException e) {
       MenuIconException ex = new MenuIconException("Failed to load relative image \"%s\"!", path);

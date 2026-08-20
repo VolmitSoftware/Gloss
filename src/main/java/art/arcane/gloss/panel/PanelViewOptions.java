@@ -1,13 +1,13 @@
 package art.arcane.gloss.panel;
 
-import art.arcane.gloss.config.ConfigManager;
+import art.arcane.gloss.config.menu.MenuCatalog;
 import org.bukkit.entity.Player;
 
 import java.util.Objects;
 import java.util.function.Consumer;
 
 public record PanelViewOptions(PanelDefinition definition, PanelTransform effectiveTransform,
-                               Player viewer, ConfigManager menus,
+                               Player viewer, MenuCatalog menus,
                                Consumer<PanelViewSession> closeRequester) {
   public PanelViewOptions {
     definition = Objects.requireNonNull(definition, "definition");

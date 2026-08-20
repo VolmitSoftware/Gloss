@@ -1,5 +1,7 @@
 package art.arcane.gloss.persistence;
 
+import art.arcane.gloss.doc.AtomicFiles;
+import art.arcane.gloss.doc.DocumentHashes;
 import art.arcane.gloss.panel.PanelDefinition;
 import art.arcane.gloss.panel.PanelRepository;
 import com.google.gson.Gson;
@@ -18,12 +20,9 @@ import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -66,8 +65,17 @@ public final class GlossProjectTransaction {
     this.uncertainCommits = new HashSet<>();
   }
 
+  /**
+   * Resolves whatever the previous run left behind. Neither root is created here: a server that has
+   * never run an editor sync has nothing to recover, and creating the pair on every boot left two
+   * permanently empty folders in the data directory. {@link #apply} still creates them, because it
+   * is about to write into them.
+   */
   public void recover() throws IOException {
-    ensureRootDirectories();
+    if (!Files.exists(transactionsDirectory, LinkOption.NOFOLLOW_LINKS)
+        && !Files.exists(backupsDirectory, LinkOption.NOFOLLOW_LINKS)) {
+      return;
+    }
     List<Path> transactions = childDirectories(transactionsDirectory);
     for (Path transaction : transactions) {
       if (!Files.exists(transaction.resolve("journal.json"), LinkOption.NOFOLLOW_LINKS)) {
@@ -99,11 +107,12 @@ public final class GlossProjectTransaction {
     Path transaction = transactionsDirectory.resolve(id).normalize();
     createChildDirectory(transactionsDirectory, transaction);
     Path stage = transaction.resolve("stage");
+    // Created by the first replacement that overwrites an existing file. A publication that is all
+    // new files backs nothing up, and would otherwise archive an empty backup/ forever.
     Path backup = transaction.resolve("backup");
     List<Entry> entries = new ArrayList<>(replacements.size());
     try {
       createChildDirectory(transaction, stage);
-      createChildDirectory(transaction, backup);
       for (Map.Entry<Path, byte[]> replacement : replacements.entrySet()) {
         Path target = replacement.getKey();
         validateTarget(target);
@@ -115,13 +124,14 @@ public final class GlossProjectTransaction {
         String originalHash = null;
         if (existed) {
           byte[] original = readRegularFile(target);
-          originalHash = sha256(original);
+          originalHash = DocumentHashes.sha256(original);
+          ensureChildDirectory(transaction, backup);
           Path backupFile = backup.resolve(relative).normalize();
           safePrepareParent(backup, backupFile);
           writeNewFile(backupFile, original);
         }
         entries.add(new Entry(relativePath(relative), existed, originalHash,
-            sha256(replacement.getValue())));
+            DocumentHashes.sha256(replacement.getValue())));
       }
     } catch (IOException | RuntimeException failure) {
       try {
@@ -257,7 +267,7 @@ public final class GlossProjectTransaction {
         Path stagedFile = stage.resolve(entry.relativePath()).normalize();
         requireChild(stage, stagedFile);
         if (Files.exists(stagedFile, LinkOption.NOFOLLOW_LINKS)) {
-          if (!sha256(readRegularFile(stagedFile)).equals(entry.stagedHash())) {
+          if (!DocumentHashes.sha256(readRegularFile(stagedFile)).equals(entry.stagedHash())) {
             throw new IOException("editor sync staged-file hash mismatch: " + entry.relativePath());
           }
         } else if (journal.state().equals("prepared")) {
@@ -268,14 +278,14 @@ public final class GlossProjectTransaction {
           Path backupFile = backup.resolve(entry.relativePath()).normalize();
           requireChild(backup, backupFile);
           byte[] original = readRegularFile(backupFile);
-          if (!sha256(original).equals(entry.originalHash())) {
+          if (!DocumentHashes.sha256(original).equals(entry.originalHash())) {
             throw new IOException("editor sync backup hash mismatch: " + entry.relativePath());
           }
           if (!Files.exists(target, LinkOption.NOFOLLOW_LINKS)) {
             throw new IOException("editor sync target disappeared during recovery: "
                 + entry.relativePath());
           }
-          String targetHash = sha256(readRegularFile(target));
+          String targetHash = DocumentHashes.sha256(readRegularFile(target));
           if (targetHash.equals(entry.originalHash())) {
             continue;
           }
@@ -287,7 +297,7 @@ public final class GlossProjectTransaction {
         } else {
           validateTarget(target);
           if (Files.exists(target, LinkOption.NOFOLLOW_LINKS)) {
-            String targetHash = sha256(readRegularFile(target));
+            String targetHash = DocumentHashes.sha256(readRegularFile(target));
             if (!targetHash.equals(entry.stagedHash())) {
               throw new IOException("new editor sync target changed independently during recovery: "
                   + entry.relativePath());
@@ -309,6 +319,8 @@ public final class GlossProjectTransaction {
   }
 
   private void archive(Path transaction, String id) throws IOException {
+    pruneEmptyDirectories(transaction);
+    ensureChildDirectory(dataDirectory, backupsDirectory);
     Path destination = backupsDirectory.resolve(id).normalize();
     requireChild(backupsDirectory, destination);
     if (Files.exists(destination, LinkOption.NOFOLLOW_LINKS)) {
@@ -497,6 +509,9 @@ public final class GlossProjectTransaction {
   }
 
   private List<Path> childDirectories(Path root) throws IOException {
+    if (!Files.exists(root, LinkOption.NOFOLLOW_LINKS)) {
+      return List.of();
+    }
     requireDirectory(root);
     try (Stream<Path> stream = Files.list(root)) {
       List<Path> children = stream.sorted(Comparator.comparing(Path::toString)).toList();
@@ -556,16 +571,9 @@ public final class GlossProjectTransaction {
     }
     Path trustedRoot = target.startsWith(dataDirectory) ? dataDirectory : transactionsDirectory;
     safePrepareParent(trustedRoot, target);
-    Path temporary = Files.createTempFile(parent, ".gloss-sync-", ".tmp");
+    Path temporary = AtomicFiles.writeDurableTemporary(parent, ".gloss-sync-", content);
     boolean moved = false;
     try {
-      if (Files.isSymbolicLink(temporary)) {
-        throw new IOException("temporary replacement path is a symbolic link");
-      }
-      try (FileChannel channel = FileChannel.open(temporary, StandardOpenOption.WRITE,
-          StandardOpenOption.TRUNCATE_EXISTING)) {
-        write(channel, content);
-      }
       Files.move(temporary, target, StandardCopyOption.ATOMIC_MOVE,
           StandardCopyOption.REPLACE_EXISTING);
       moved = true;
@@ -609,19 +617,14 @@ public final class GlossProjectTransaction {
       return;
     }
     directoryForceProbe.beforeForce(directory);
-    try (FileChannel channel = FileChannel.open(directory, StandardOpenOption.READ)) {
-      channel.force(true);
-    } catch (UnsupportedOperationException ignored) {
-    }
+    AtomicFiles.forceDirectory(directory);
   }
 
   private void forceFile(Path file) throws IOException {
     if (Files.isSymbolicLink(file) || !Files.isRegularFile(file, LinkOption.NOFOLLOW_LINKS)) {
       throw new IOException("expected a real file while publishing: " + file);
     }
-    try (FileChannel channel = FileChannel.open(file, StandardOpenOption.READ)) {
-      channel.force(true);
-    }
+    AtomicFiles.forceFile(file);
   }
 
   private void requireDirectory(Path directory) throws IOException {
@@ -674,6 +677,33 @@ public final class GlossProjectTransaction {
     return target;
   }
 
+  /**
+   * Drops every empty directory below {@code root} before it is archived.
+   *
+   * <p>A commit publishes by moving each staged file out of {@code stage/} one at a time, which
+   * takes the files but leaves the directory skeleton that held them. Archiving that put an empty
+   * {@code stage/}, and every subdirectory of it, in the data folder for as long as the backup was
+   * kept. Only directories that are actually empty go: a rolled-back transaction still has its
+   * staged files and its {@code backup/} copies, and those are untouched.
+   */
+  private void pruneEmptyDirectories(Path root) throws IOException {
+    try (Stream<Path> paths = Files.walk(root)) {
+      List<Path> ordered = paths.sorted(Comparator.reverseOrder()).toList();
+      for (Path path : ordered) {
+        if (path.equals(root) || Files.isSymbolicLink(path)
+            || !Files.isDirectory(path, LinkOption.NOFOLLOW_LINKS)) {
+          continue;
+        }
+        try (Stream<Path> children = Files.list(path)) {
+          if (children.findAny().isPresent()) {
+            continue;
+          }
+        }
+        Files.delete(path);
+      }
+    }
+  }
+
   private void deleteTree(Path root) throws IOException {
     requireChild(backupsDirectory, root);
     try (Stream<Path> paths = Files.walk(root)) {
@@ -684,14 +714,6 @@ public final class GlossProjectTransaction {
         }
         Files.delete(path);
       }
-    }
-  }
-
-  private static String sha256(byte[] content) {
-    try {
-      return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(content));
-    } catch (NoSuchAlgorithmException failure) {
-      throw new IllegalStateException("SHA-256 is unavailable", failure);
     }
   }
 

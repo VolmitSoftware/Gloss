@@ -7,7 +7,7 @@ import art.arcane.gloss.board.BoardService;
 import art.arcane.gloss.bubble.ChatBubblesService;
 import art.arcane.gloss.chat.ChatService;
 import art.arcane.gloss.command.GlossCommandService;
-import art.arcane.gloss.config.ConfigManager;
+import art.arcane.gloss.config.menu.MenuCatalog;
 import art.arcane.gloss.config.GlossConfigFile;
 import art.arcane.gloss.config.GlossConfigLoader;
 import art.arcane.gloss.doc.DataWatchdog;
@@ -17,6 +17,7 @@ import art.arcane.gloss.emoji.EmojiService;
 import art.arcane.gloss.group.GroupService;
 import art.arcane.gloss.hologram.HologramAnimator;
 import art.arcane.gloss.hologram.HologramService;
+import art.arcane.gloss.image.ImageAssets;
 import art.arcane.gloss.importer.HoloUiDataImporter;
 import art.arcane.gloss.importer.LegacyGlossDataImporter;
 import art.arcane.gloss.indicator.DamageIndicatorsService;
@@ -76,6 +77,7 @@ import java.util.logging.Logger;
 public final class Gloss extends JavaPlugin implements ReloadAware {
     private static final int BSTATS_PLUGIN_ID = 33525;
     private static final String PLACEHOLDER_API_PLUGIN = "PlaceholderAPI";
+    private static final String LOCALE_WATCHDOG_ENTRY = "locale";
 
     public static Gloss instance;
 
@@ -107,7 +109,8 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
     private GlossLocalization localization;
     private GlossPersistenceCoordinator persistenceCoordinator;
     private GlossProjectTransaction projectTransaction;
-    private ConfigManager configManager;
+    private MenuCatalog menuCatalog;
+    private ImageAssets imageAssets;
     private PanelService panelService;
     private PanelRuntimeManager panelRuntime;
     private PreviewDocumentRegistry previewRegistry;
@@ -238,11 +241,11 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
             } catch (Exception failure) {
                 throw new IllegalStateException("Unable to recover Gloss editor sync persistence", failure);
             }
-            configManager = new ConfigManager(getDataFolder());
+            menuCatalog = new MenuCatalog(getDataFolder());
+            imageAssets = new ImageAssets(getDataFolder());
             panelService = new PanelService(this);
             enableService("panels", this::startPanelService, panelService::shutdown);
-            previewRegistry = new PreviewDocumentRegistry(getDataFolder());
-            enableService("previews", this::startPreviewWatching, previewRegistry::stopWatching);
+            startPreviewRegistry();
             itemProviders = new ItemProviderRegistry(this);
             enableService("item-providers", itemProviders::activateAll, itemProviders::shutdown);
             containerProtection = new ContainerProtectionService(this);
@@ -260,7 +263,9 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
             enableService("editor-sync", this::startEditorSync, editorSyncService::shutdown);
             enableService("panel-creation-intake", () -> {
             }, panelCreation::stopAccepting);
-            enableService("config-watchers", configManager::startWatching, configManager::shutdown);
+            enableService("menu-catalog", menuCatalog::startWatching, menuCatalog::shutdown);
+            enableService("image-assets", imageAssets::startWatching, imageAssets::stopWatching);
+            enableService("locale-watcher", this::startLocaleWatcher, this::stopLocaleWatcher);
             enableService("preview-scale", this::startPreviewScale, PreviewScaleService::shutdown);
             getServer().getMessenger().registerOutgoingPluginChannel(this, "BungeeCord");
             enableService("bungee-channel", () -> {
@@ -407,7 +412,7 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
     /**
      * The data importers run in exactly this slot: after config.toml is loaded (so the HoloUi
      * settings overlay lands in the in-memory boot config before {@link GlossConfig#from}
-     * snapshots it) and before the DataWatchdog and every service constructs — ConfigManager
+     * snapshots it) and before the DataWatchdog and every service constructs — MenuCatalog
      * scans menus/ in its constructor and PanelService/registries scan on start, so imported and
      * migrated files must already be in place. Importer failures never abort enable.
      */
@@ -437,6 +442,18 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
         watchdog.stop();
         watchdog.unregister("config");
         configWatcher = null;
+    }
+
+    /**
+     * The language file rides the watchdog as its own entry. It used to be a tail call on the menu
+     * pass, which meant a menu folder that failed to poll took the locale reload down with it.
+     */
+    private void startLocaleWatcher() {
+        watchdog.register(LOCALE_WATCHDOG_ENTRY, localization::update);
+    }
+
+    private void stopLocaleWatcher() {
+        watchdog.unregister(LOCALE_WATCHDOG_ENTRY);
     }
 
     /**
@@ -576,8 +593,12 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
         return projectTransaction;
     }
 
-    public ConfigManager getConfigManager() {
-        return configManager;
+    public MenuCatalog getMenuCatalog() {
+        return menuCatalog;
+    }
+
+    public ImageAssets getImageAssets() {
+        return imageAssets;
     }
 
     public PanelService getPanelService() {
@@ -588,6 +609,7 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
         return panelRuntime;
     }
 
+    /** Null before enable finishes, and for the whole run when {@code previews.enabled} is false. */
     public PreviewDocumentRegistry getPreviewRegistry() {
         return previewRegistry;
     }
@@ -655,11 +677,17 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
         panelService.start();
     }
 
-    private void startPreviewWatching() {
+    /**
+     * Constructing the registry extracts thirteen shipped documents into {@code previews/}. With
+     * previews off there is nothing to serve them to, so the registry is never built and the folder
+     * is never created; every caller of {@link #getPreviewRegistry()} already reads it as nullable.
+     */
+    private void startPreviewRegistry() {
         if (!config.previews().enabled()) {
             return;
         }
-        previewRegistry.startWatching();
+        previewRegistry = new PreviewDocumentRegistry(getDataFolder());
+        enableService("previews", previewRegistry::startWatching, previewRegistry::stopWatching);
     }
 
     private void startPreviewScale() {

@@ -56,7 +56,7 @@ public class CommandGlossPreview {
     }
 
     PreviewDocumentRegistry registry = Gloss.instance.getPreviewRegistry();
-    List<String> names = new ArrayList<>(registry.names());
+    List<String> names = registry == null ? new ArrayList<>() : new ArrayList<>(registry.names());
     names.sort(String::compareTo);
 
     DirectorMiniMenu.Theme theme = GlossCommandService.menuTheme();
@@ -123,7 +123,8 @@ public class CommandGlossPreview {
           GlossMessages.PREVIEWS_RESET_STARTED,
           MessageArgs.builder().untrusted("name", target).build()
       ));
-      List<String> affected = Gloss.instance.getPreviewRegistry().resetToDefault(target);
+      PreviewDocumentRegistry registry = Gloss.instance.getPreviewRegistry();
+      List<String> affected = registry == null ? List.of() : registry.resetToDefault(target);
       if (affected.isEmpty()) {
         sendOnSender(sender, Gloss.instance.getLocalization().legacy(
             GlossMessages.PREVIEWS_RESET_NONE,
@@ -166,7 +167,10 @@ public class CommandGlossPreview {
 
   private void executeDump(CommandSender sender, String docName) {
     // Same trailing-".json" tolerance reset() gets for free through resetToDefault -> extract.
-    CompiledPreviewDocument document = Gloss.instance.getPreviewRegistry().get(PreviewDocumentRegistry.normalize(docName));
+    PreviewDocumentRegistry registry = Gloss.instance.getPreviewRegistry();
+    CompiledPreviewDocument document = registry == null
+        ? null
+        : registry.get(PreviewDocumentRegistry.normalize(docName));
     if (document == null) {
       sender.sendMessage(Gloss.instance.getLocalization().legacy(
           GlossMessages.PREVIEWS_DUMP_UNKNOWN,

@@ -1,5 +1,8 @@
 package art.arcane.gloss.panel;
 
+import art.arcane.gloss.doc.DocumentRevisionConflictException;
+import art.arcane.gloss.doc.ExecutorStorageTaskRunner;
+import art.arcane.gloss.doc.StorageTaskRunner;
 import art.arcane.gloss.persistence.GlossPersistenceCoordinator;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -189,7 +192,7 @@ public class PanelServiceTest {
         created.revision() + 1L, board -> board.withRootMenu("Other"));
     revisionRunner.runNext();
     CompletionException revisionFailure = assertThrows(CompletionException.class, staleUpdate::join);
-    assertTrue(revisionFailure.getCause() instanceof PanelRevisionConflictException);
+    assertTrue(revisionFailure.getCause() instanceof DocumentRevisionConflictException);
     assertEquals(created, revisionService.get(created.id()).orElseThrow());
     assertTrue(revisionListener.updated.isEmpty());
   }
@@ -401,7 +404,7 @@ public class PanelServiceTest {
     }
   }
 
-  private static PanelService service(PanelStore store, PanelTaskRunner taskRunner) {
+  private static PanelService service(PanelStore store, StorageTaskRunner taskRunner) {
     Logger logger = Logger.getLogger(PanelServiceTest.class.getName() + "." + UUID.randomUUID());
     logger.setLevel(Level.OFF);
     return new PanelService(new PanelService.Dependencies(
@@ -414,11 +417,11 @@ public class PanelServiceTest {
         PanelTransform.at("example:world", WORLD_UUID, x, 64.0D, z, 0.0D));
   }
 
-  private static final class ManualTaskRunner implements PanelTaskRunner {
+  private static final class ManualTaskRunner implements StorageTaskRunner {
     private final ArrayDeque<ManualTask> tasks = new ArrayDeque<>();
 
     @Override
-    public PanelTaskHandle submit(Runnable task) {
+    public StorageTaskHandle submit(Runnable task) {
       ManualTask scheduled = new ManualTask(task);
       tasks.addLast(scheduled);
       return scheduled::cancel;
@@ -440,16 +443,16 @@ public class PanelServiceTest {
     }
   }
 
-  private static final class DispatchRaceTaskRunner implements PanelTaskRunner {
-    private final PanelExecutorTaskRunner delegate = new PanelExecutorTaskRunner(
-        PanelServiceTest.class.getClassLoader());
+  private static final class DispatchRaceTaskRunner implements StorageTaskRunner {
+    private final ExecutorStorageTaskRunner delegate = new ExecutorStorageTaskRunner(
+        PanelServiceTest.class.getClassLoader(), "Gloss-Panel-Storage");
     private final AtomicInteger submissions = new AtomicInteger();
     private final CountDownLatch allowSubmissionReturn = new CountDownLatch(1);
     private final AtomicBoolean submitInterrupted = new AtomicBoolean();
 
     @Override
-    public PanelTaskHandle submit(Runnable task) {
-      PanelTaskHandle handle = delegate.submit(task);
+    public StorageTaskHandle submit(Runnable task) {
+      StorageTaskHandle handle = delegate.submit(task);
       if (submissions.incrementAndGet() != 2) {
         return handle;
       }

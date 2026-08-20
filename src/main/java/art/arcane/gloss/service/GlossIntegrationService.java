@@ -1,7 +1,7 @@
 package art.arcane.gloss.service;
 
 import art.arcane.gloss.Gloss;
-import art.arcane.gloss.config.ConfigManager;
+import art.arcane.gloss.config.menu.MenuCatalog;
 import art.arcane.gloss.menu.DisplayEntityManager;
 import art.arcane.gloss.menu.MenuSessionManager;
 import art.arcane.volmlib.integration.IntegrationHandshakeRequest;
@@ -131,8 +131,8 @@ public final class GlossIntegrationService implements IntegrationServiceContract
         case IntegrationMetricSchema.GLOSS_DISPLAY_ENTITIES_VISIBLE ->
             out.put(key, available(key, DisplayEntityManager.visibleCount(), now));
         case IntegrationMetricSchema.GLOSS_MENU_DEFINITIONS ->
-            out.put(key, sampleService(key, now, Gloss::getConfigManager,
-                "config-manager-not-ready", (ConfigManager manager) -> manager.keys().size()));
+            out.put(key, sampleService(key, now, Gloss::getMenuCatalog,
+                "menu-catalog-not-ready", (MenuCatalog catalog) -> catalog.keys().size()));
         case IntegrationMetricSchema.GLOSS_PACKETS_PER_SECOND ->
             out.put(key, available(key, GlossTelemetry.packetsPerSecond(now), now));
         case IntegrationMetricSchema.GLOSS_SPAWNS_PER_SECOND ->

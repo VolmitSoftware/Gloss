@@ -2,7 +2,7 @@ package art.arcane.gloss.command;
 
 import art.arcane.gloss.Gloss;
 import art.arcane.gloss.config.menu.MenuIds;
-import art.arcane.gloss.config.menu.MenuRevisionConflictException;
+import art.arcane.gloss.doc.DocumentRevisionConflictException;
 import art.arcane.gloss.locale.GlossLocalization;
 import art.arcane.gloss.locale.GlossMessages;
 import art.arcane.volmlib.util.collection.KList;
@@ -41,7 +41,7 @@ final class MenuRowCommandSupport {
     if (!checkPermission(sender, permission)) {
       return;
     }
-    Gloss.instance.getConfigManager().mutateMenu(menuId, mutation)
+    Gloss.instance.getMenuCatalog().mutate(menuId, mutation)
         .whenComplete((document, failure) -> {
           if (failure != null) {
             reportFailure(sender, menuId, failure);
@@ -91,7 +91,7 @@ final class MenuRowCommandSupport {
 
   private static void requireImageFile(String path) {
     try {
-      Gloss.instance.getConfigManager().getImage(path);
+      Gloss.instance.getImageAssets().get(path);
     } catch (IOException | RuntimeException failure) {
       throw new IllegalArgumentException(
           "image must be a readable file inside plugins/Gloss/images: " + String.valueOf(path), failure);
@@ -109,10 +109,10 @@ final class MenuRowCommandSupport {
 
   static void reportFailure(CommandSender sender, String menuId, Throwable failure) {
     Throwable cause = PanelCommandSupport.rootCause(failure);
-    if (cause instanceof MenuRevisionConflictException conflict) {
+    if (cause instanceof DocumentRevisionConflictException conflict) {
       sendLater(sender, GlossMessages.MENU_CONTENT_REVISION_CONFLICT,
           MessageArgs.builder()
-              .untrusted("menu", conflict.menuId())
+              .untrusted("menu", conflict.id())
               .untrusted("expected", shortRevision(conflict.expectedRevision()))
               .untrusted("actual", shortRevision(conflict.actualRevision()))
               .build());

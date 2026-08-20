@@ -8,7 +8,7 @@ import art.arcane.gloss.panel.PanelFollowPose;
 import art.arcane.gloss.panel.PanelFollowRotation;
 import art.arcane.gloss.panel.PanelFollowTransform;
 import art.arcane.gloss.panel.PanelIds;
-import art.arcane.gloss.panel.PanelRevisionConflictException;
+import art.arcane.gloss.doc.DocumentRevisionConflictException;
 import art.arcane.gloss.panel.PanelRuntimeManager;
 import art.arcane.gloss.panel.PanelService;
 import art.arcane.gloss.panel.PanelTransform;
@@ -801,7 +801,7 @@ public final class CommandGlossPanel {
     if (board == null) {
       return;
     }
-    String source = plugin().getConfigManager().getSource(board.rootMenuId()).orElse(null);
+    String source = plugin().getMenuCatalog().source(board.rootMenuId()).orElse(null);
     if (source == null) {
       send(sender, GlossMessages.PANELS_MENU_UNAVAILABLE,
           MessageArgs.builder().untrusted("menu", board.rootMenuId()).build());
@@ -1262,7 +1262,7 @@ public final class CommandGlossPanel {
   }
 
   private String resolveMenu(CommandSender sender, String menuId) {
-    MenuDefinitionData menu = plugin().getConfigManager().get(menuId).orElse(null);
+    MenuDefinitionData menu = plugin().getMenuCatalog().definition(menuId).orElse(null);
     if (menu == null) {
       send(sender, GlossMessages.PANELS_MENU_UNAVAILABLE,
           MessageArgs.builder().untrusted("menu", menuId).build());
@@ -1305,10 +1305,10 @@ public final class CommandGlossPanel {
 
   private void reportFailure(CommandSender sender, String id, Throwable failure) {
     Throwable cause = PanelCommandSupport.rootCause(failure);
-    if (cause instanceof PanelRevisionConflictException conflict) {
+    if (cause instanceof DocumentRevisionConflictException conflict) {
       sendLater(sender, GlossMessages.PANELS_REVISION_CONFLICT,
           MessageArgs.builder()
-              .untrusted("board", conflict.boardId())
+              .untrusted("board", conflict.id())
               .untrusted("expected", conflict.expectedRevision())
               .untrusted("actual", conflict.actualRevision())
               .build());

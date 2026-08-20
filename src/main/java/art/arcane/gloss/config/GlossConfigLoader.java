@@ -1,6 +1,7 @@
 package art.arcane.gloss.config;
 
 import art.arcane.gloss.Gloss;
+import art.arcane.gloss.doc.DocumentHashes;
 import art.arcane.volmlib.util.config.ConfigExposePolicy;
 import art.arcane.volmlib.util.config.ConfigFileSupport;
 import art.arcane.volmlib.util.config.ConfigIo;
@@ -10,9 +11,6 @@ import art.arcane.volmlib.util.io.IO;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.util.HexFormat;
 import java.util.Objects;
 
 public final class GlossConfigLoader {
@@ -90,10 +88,8 @@ public final class GlossConfigLoader {
 
     public String hashCurrentFile() {
         try {
-            byte[] content = Files.readAllBytes(file.toPath());
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            return HexFormat.of().formatHex(digest.digest(content));
-        } catch (IOException | NoSuchAlgorithmException failure) {
+            return DocumentHashes.sha256(Files.readAllBytes(file.toPath()));
+        } catch (IOException failure) {
             return "";
         }
     }
