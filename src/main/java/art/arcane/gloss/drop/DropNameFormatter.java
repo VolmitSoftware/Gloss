@@ -5,6 +5,7 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.function.IntFunction;
 
 public final class DropNameFormatter {
@@ -21,6 +22,10 @@ public final class DropNameFormatter {
 
     public static boolean preservesExistingName(boolean preserveCustomNames, boolean hasCustomName, boolean glossOwned) {
         return preserveCustomNames && hasCustomName && !glossOwned;
+    }
+
+    public static boolean ownsExistingName(boolean marked, String lastRendered, String currentName) {
+        return marked && (lastRendered == null || Objects.equals(lastRendered, currentName));
     }
 
     public static String typeLabel(boolean useItemDisplayNames, String displayName, String materialName) {
@@ -60,6 +65,35 @@ public final class DropNameFormatter {
         return template
             .replace("{total}", Integer.toString(total))
             .replace("{contents}", rendered.toString());
+    }
+
+    public static List<String> formatBundleLines(String headerTemplate, String entryTemplate,
+                                                  String moreTemplate, List<BundleContent> contents,
+                                                  int entryLimit) {
+        List<BundleContent> aggregated = aggregate(contents);
+        if (aggregated.isEmpty()) {
+            return List.of();
+        }
+
+        int total = 0;
+        for (BundleContent content : aggregated) {
+            total += content.amount();
+        }
+
+        int shown = Math.min(Math.max(1, entryLimit), aggregated.size());
+        List<String> lines = new ArrayList<>(shown + 2);
+        lines.add(headerTemplate.replace("{total}", Integer.toString(total)));
+        for (int index = 0; index < shown; index++) {
+            BundleContent content = aggregated.get(index);
+            lines.add(entryTemplate
+                .replace("{count}", Integer.toString(content.amount()))
+                .replace("{type}", content.type()));
+        }
+        int remaining = aggregated.size() - shown;
+        if (remaining > 0) {
+            lines.add(moreTemplate.replace("{remaining}", Integer.toString(remaining)));
+        }
+        return List.copyOf(lines);
     }
 
     public static List<BundleContent> aggregate(List<BundleContent> contents) {

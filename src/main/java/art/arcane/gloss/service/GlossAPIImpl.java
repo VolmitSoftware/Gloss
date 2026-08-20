@@ -105,8 +105,15 @@ public final class GlossAPIImpl implements GlossAPI {
     }
 
     @Override
-    public void refreshDropName(Item item, String bundleFormat, int bundleEntryLimit) {
-        plugin.drops().refresh(item, bundleFormat, bundleEntryLimit);
+    public void refreshDropName(Item item, String bundleHeaderFormat, String bundleEntryFormat,
+                                String bundleMoreFormat, int bundleEntryLimit) {
+        plugin.drops().refresh(
+            item, bundleHeaderFormat, bundleEntryFormat, bundleMoreFormat, bundleEntryLimit);
+    }
+
+    @Override
+    public void removeDropPresentation(Item item) {
+        plugin.drops().remove(item);
     }
 
     @Override

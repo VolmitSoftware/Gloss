@@ -122,6 +122,33 @@ class DropNameFormatterTest {
     }
 
     @Test
+    void formatBundleLinesBuildsOneExplicitDisplayLinePerEntry() {
+        assertEquals(List.of(
+                "&eBundle &8(&e12 items&8)",
+                "&7- &f5x stone",
+                "&7- &f4x dirt",
+                "&8+2 more"
+            ),
+            DropNameFormatter.formatBundleLines(
+                GlossConfigFile.BUNDLE_HEADER_FORMAT_DEFAULT,
+                GlossConfigFile.BUNDLE_ENTRY_FORMAT_DEFAULT,
+                GlossConfigFile.BUNDLE_MORE_FORMAT_DEFAULT,
+                List.of(
+                    content("stone", 5),
+                    content("dirt", 4),
+                    content("oak log", 2),
+                    content("sand", 1)
+                ),
+                2));
+    }
+
+    @Test
+    void formatBundleLinesReturnsEmptyForAnEmptyBundle() {
+        assertTrue(DropNameFormatter.formatBundleLines("{total}", "{count} {type}",
+            "{remaining}", List.of(), 3).isEmpty());
+    }
+
+    @Test
     void shippedBundleFormatDeclaresBothTokensAndTheDefaultLimitIsThree() {
         assertTrue(GlossConfigFile.BUNDLE_FORMAT_DEFAULT.contains("{total}"));
         assertTrue(GlossConfigFile.BUNDLE_FORMAT_DEFAULT.contains("{contents}"));
@@ -136,6 +163,14 @@ class DropNameFormatterTest {
         assertFalse(DropNameFormatter.preservesExistingName(true, false, false));
         assertFalse(DropNameFormatter.preservesExistingName(false, true, false));
         assertFalse(DropNameFormatter.preservesExistingName(false, true, true));
+    }
+
+    @Test
+    void ownershipRelinquishesWhenAnotherPluginReplacesTheRenderedName() {
+        assertFalse(DropNameFormatter.ownsExistingName(false, null, "foreign"));
+        assertTrue(DropNameFormatter.ownsExistingName(true, null, "legacy gloss name"));
+        assertTrue(DropNameFormatter.ownsExistingName(true, "gloss name", "gloss name"));
+        assertFalse(DropNameFormatter.ownsExistingName(true, "gloss name", "foreign name"));
     }
 
     @Test

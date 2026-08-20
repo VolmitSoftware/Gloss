@@ -396,7 +396,7 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
         if (!previous.indicators().equals(next.indicators())) {
             indicators.reload();
         }
-        if (!previous.drops().equals(next.drops())) {
+        if (!previous.drops().equals(next.drops()) || !previous.realDrops().equals(next.realDrops())) {
             drops.reload();
         }
     }

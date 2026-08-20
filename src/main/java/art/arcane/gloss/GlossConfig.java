@@ -16,6 +16,7 @@ public record GlossConfig(
     Bubbles bubbles,
     Indicators indicators,
     Drops drops,
+    RealDrops realDrops,
     Motd motd,
     Groups groups,
     Hotload hotload,
@@ -107,9 +108,72 @@ public record GlossConfig(
         String nameFormat,
         String bundleFormat,
         int bundleEntryLimit,
+        boolean bundleVerticalLabels,
+        String bundleHeaderFormat,
+        String bundleEntryFormat,
+        String bundleMoreFormat,
         boolean preserveCustomNames,
         boolean useItemDisplayNames
     ) {
+    }
+
+    public record RealDrops(
+        boolean enabled,
+        Limits limits,
+        Scale scale,
+        Motion motion,
+        Landing landing,
+        Labels labels,
+        Filters filters
+    ) {
+        public record Limits(
+            int updateIntervalTicks,
+            int settledPollIntervalTicks,
+            int maxVisualsPerStack,
+            int maxVisualsPerChunk,
+            float viewRange,
+            float spread
+        ) {
+        }
+
+        public record Scale(float defaultScale, float flatItems, float thinBlocks) {
+        }
+
+        public record Motion(
+            boolean tumble,
+            float degreesPerSecondX,
+            float degreesPerSecondY,
+            float degreesPerSecondZ,
+            float variance,
+            boolean changeOnBounce
+        ) {
+        }
+
+        public record Landing(String mode, float tiltDegrees, boolean randomYaw, int transitionTicks) {
+        }
+
+        public record Labels(
+            boolean enabled,
+            float yOffset,
+            float scale,
+            float viewRange,
+            String billboard,
+            boolean seeThrough,
+            boolean shadow,
+            boolean background,
+            int backgroundRed,
+            int backgroundGreen,
+            int backgroundBlue,
+            int backgroundAlpha
+        ) {
+        }
+
+        public record Filters(
+            List<String> disabledWorlds,
+            List<String> materialBlacklist,
+            boolean onlyPlayerDrops
+        ) {
+        }
     }
 
     public record Motd(
@@ -239,8 +303,61 @@ public record GlossConfig(
                 source.drops.nameFormat,
                 source.drops.bundleFormat,
                 source.drops.bundleEntryLimit,
+                source.drops.bundleVerticalLabels,
+                source.drops.bundleHeaderFormat,
+                source.drops.bundleEntryFormat,
+                source.drops.bundleMoreFormat,
                 source.drops.preserveCustomNames,
                 source.drops.useItemDisplayNames
+            ),
+            new RealDrops(
+                source.features.realDrops,
+                new RealDrops.Limits(
+                    source.realDrops.limits.updateIntervalTicks,
+                    source.realDrops.limits.settledPollIntervalTicks,
+                    source.realDrops.limits.maxVisualsPerStack,
+                    source.realDrops.limits.maxVisualsPerChunk,
+                    (float) source.realDrops.limits.viewRange,
+                    (float) source.realDrops.limits.spread
+                ),
+                new RealDrops.Scale(
+                    (float) source.realDrops.scale.defaultScale,
+                    (float) source.realDrops.scale.flatItems,
+                    (float) source.realDrops.scale.thinBlocks
+                ),
+                new RealDrops.Motion(
+                    source.realDrops.motion.tumble,
+                    (float) source.realDrops.motion.degreesPerSecondX,
+                    (float) source.realDrops.motion.degreesPerSecondY,
+                    (float) source.realDrops.motion.degreesPerSecondZ,
+                    (float) source.realDrops.motion.variance,
+                    source.realDrops.motion.changeOnBounce
+                ),
+                new RealDrops.Landing(
+                    source.realDrops.landing.mode,
+                    (float) source.realDrops.landing.tiltDegrees,
+                    source.realDrops.landing.randomYaw,
+                    source.realDrops.landing.transitionTicks
+                ),
+                new RealDrops.Labels(
+                    source.realDrops.labels.enabled,
+                    (float) source.realDrops.labels.yOffset,
+                    (float) source.realDrops.labels.scale,
+                    (float) source.realDrops.labels.viewRange,
+                    source.realDrops.labels.billboard,
+                    source.realDrops.labels.seeThrough,
+                    source.realDrops.labels.shadow,
+                    source.realDrops.labels.background,
+                    source.realDrops.labels.backgroundRed,
+                    source.realDrops.labels.backgroundGreen,
+                    source.realDrops.labels.backgroundBlue,
+                    source.realDrops.labels.backgroundAlpha
+                ),
+                new RealDrops.Filters(
+                    List.copyOf(source.realDrops.filters.disabledWorlds),
+                    List.copyOf(source.realDrops.filters.materialBlacklist),
+                    source.realDrops.filters.onlyPlayerDrops
+                )
             ),
             new Motd(
                 source.features.motd
