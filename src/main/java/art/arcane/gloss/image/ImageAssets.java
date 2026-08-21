@@ -2,7 +2,8 @@ package art.arcane.gloss.image;
 
 import art.arcane.gloss.Gloss;
 import art.arcane.gloss.persistence.GlossPersistenceCoordinator;
-import art.arcane.volmlib.util.io.FolderWatcher;
+import art.arcane.volmlib.util.collection.KList;
+import art.arcane.volmlib.util.io.ReactiveFolder;
 import art.arcane.volmlib.util.scheduling.SchedulerUtils;
 import org.apache.commons.imaging.ImageFormat;
 import org.apache.commons.imaging.Imaging;
@@ -13,7 +14,9 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.logging.Level;
 
 /**
@@ -21,9 +24,8 @@ import java.util.logging.Level;
  * repaints what is on screen when one of them changes.
  *
  * <p>These are bytes an operator drops in, not documents — there is no id, no envelope and no
- * revision to compare, and a poll that read every image to decide whether it changed would decode
- * the whole folder four times a second. So this stays a plain folder watch that reports files, and
- * the {@code .json} document spine is left to the collections that are documents. It is still one
+ * revision to compare. The reactive folder hashes bytes on a rolling budget without decoding the
+ * images, while the {@code .json} document spine remains reserved for actual documents. It is one
  * entry on the single {@code DataWatchdog} pass like every other collection.
  *
  * <p>The folder is never created here. A server whose operator drops in no image never grows it.
@@ -32,20 +34,34 @@ public final class ImageAssets {
   public static final String KIND = "images";
 
   private final File imageDir;
-  private final FolderWatcher watcher;
+  private volatile ReactiveFolder watcher;
 
   public ImageAssets(File configDir) {
     this.imageDir = new File(configDir, KIND);
-    this.watcher = new FolderWatcher(imageDir);
   }
 
-  public void startWatching() {
+  public synchronized void startWatching() {
+    if (watcher != null) {
+      return;
+    }
+    watcher = new ReactiveFolder(
+        imageDir,
+        this::applyChanges,
+        new KList<>(""),
+        new KList<>(),
+        new KList<>()
+    );
     Gloss.instance.watchdog().register(KIND, this::watchTick);
   }
 
-  public void stopWatching() {
+  public synchronized void stopWatching() {
     if (Gloss.instance != null && Gloss.instance.watchdog() != null) {
       Gloss.instance.watchdog().unregister(KIND);
+    }
+    ReactiveFolder previous = watcher;
+    watcher = null;
+    if (previous != null) {
+      previous.clear();
     }
   }
 
@@ -87,12 +103,17 @@ public final class ImageAssets {
   }
 
   private void pollImages() {
-    if (!watcher.checkModified()) {
+    ReactiveFolder current = watcher;
+    if (current == null) {
       return;
     }
-    List<File> changed = List.copyOf(watcher.getChanged());
-    List<File> created = List.copyOf(watcher.getCreated());
-    List<File> deleted = List.copyOf(watcher.getDeleted());
+    current.check();
+  }
+
+  private void applyChanges(KList<File> createdFiles, KList<File> changedFiles, KList<File> deletedFiles) {
+    List<File> changed = withoutTemporaryArtifacts(changedFiles);
+    List<File> created = withoutTemporaryArtifacts(createdFiles);
+    List<File> deleted = withoutTemporaryArtifacts(deletedFiles);
     if (changed.isEmpty() && created.isEmpty() && deleted.isEmpty()) {
       return;
     }
@@ -114,9 +135,35 @@ public final class ImageAssets {
       }
     });
     if (!scheduled) {
-      Gloss.log(Level.WARNING,
-          "Image hot reload could not reach the server thread; %d change(s) were skipped.",
-          changed.size() + created.size() + deleted.size());
+      throw new IllegalStateException("Image hot reload could not reach the server thread; "
+          + (changed.size() + created.size() + deleted.size()) + " change(s) remain queued");
     }
+  }
+
+  private List<File> withoutTemporaryArtifacts(List<File> files) {
+    List<File> filtered = new ArrayList<>(files.size());
+    for (File file : files) {
+      if (file == null || isTemporaryArtifact(file)) {
+        continue;
+      }
+      filtered.add(file);
+    }
+    return List.copyOf(filtered);
+  }
+
+  private boolean isTemporaryArtifact(File file) {
+    String name = file.getName().toLowerCase(Locale.ROOT);
+    return name.startsWith(".")
+        || name.startsWith("~")
+        || name.startsWith("#")
+        || name.endsWith("~")
+        || name.endsWith(".tmp")
+        || name.endsWith(".temp")
+        || name.endsWith(".part")
+        || name.endsWith(".swp")
+        || name.endsWith(".swx")
+        || name.endsWith(".bak")
+        || name.contains(".tmp.")
+        || name.contains(".temp.");
   }
 }

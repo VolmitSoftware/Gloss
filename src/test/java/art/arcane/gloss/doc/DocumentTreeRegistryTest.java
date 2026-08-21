@@ -7,9 +7,13 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -35,11 +39,12 @@ class DocumentTreeRegistryTest {
     @TempDir
     File root;
 
+    private final AtomicLong clock = new AtomicLong();
     private long stamp = System.currentTimeMillis();
 
     private DocumentRegistry<String> registry() {
         return DocumentRegistry.folderTree("menus", root, PARSER,
-            value -> DocumentRegistry.UNVERSIONED);
+            value -> DocumentRegistry.UNVERSIONED, clock::get);
     }
 
     @Test
@@ -83,6 +88,8 @@ class DocumentTreeRegistryTest {
         DocumentDelta delta = registry.poll();
 
         assertEquals(List.of("archive/old", "quests"), sorted(delta.loaded()));
+        assertEquals("three", registry.get(delta, "archive/old").value());
+        assertTrue(registry.acknowledge(delta));
         assertEquals("three", registry.get("archive/old").value());
     }
 
@@ -99,6 +106,8 @@ class DocumentTreeRegistryTest {
         DocumentDelta delta = registry.poll();
 
         assertEquals(List.of("archive/old", "shop"), sorted(delta.loaded()));
+        assertEquals("two edited", registry.get(delta, "archive/old").value());
+        assertTrue(registry.acknowledge(delta));
         assertEquals("two edited", registry.get("archive/old").value());
     }
 
@@ -110,9 +119,13 @@ class DocumentTreeRegistryTest {
 
         assertTrue(new File(root, "archive/old.json").delete());
 
+        assertTrue(registry.poll().isEmpty());
+        clock.addAndGet(TimeUnit.SECONDS.toNanos(3L));
         DocumentDelta delta = registry.poll();
 
         assertEquals(List.of("archive/old"), delta.removed());
+        assertEquals("two", registry.get("archive/old").value());
+        assertTrue(registry.acknowledge(delta));
         assertNull(registry.get("archive/old"));
     }
 
@@ -126,9 +139,12 @@ class DocumentTreeRegistryTest {
 
         deleteTree(new File(root, "archive"));
 
+        assertTrue(registry.poll().isEmpty());
+        clock.addAndGet(TimeUnit.SECONDS.toNanos(3L));
         DocumentDelta delta = registry.poll();
 
         assertEquals(List.of("archive/deep/older", "archive/old"), sorted(delta.removed()));
+        assertTrue(registry.acknowledge(delta));
         assertEquals(Set.of("shop"), registry.ids());
     }
 
@@ -201,8 +217,8 @@ class DocumentTreeRegistryTest {
     }
 
     private static void deleteTree(File directory) throws IOException {
-        try (var paths = Files.walk(directory.toPath())) {
-            for (java.nio.file.Path path : paths.sorted(Comparator.reverseOrder()).toList()) {
+        try (Stream<Path> paths = Files.walk(directory.toPath())) {
+            for (Path path : paths.sorted(Comparator.reverseOrder()).toList()) {
                 Files.delete(path);
             }
         }

@@ -206,6 +206,24 @@ class GlossConfigTest {
     }
 
     @Test
+    void automaticReloadParsesTheCapturedBytesWithoutRereadingDisk(@TempDir Path tempDir) throws IOException {
+        GlossConfigLoader loader = new GlossConfigLoader(tempDir.toFile());
+        loader.loadForBoot();
+        Path file = tempDir.resolve(GlossConfigLoader.FILE_NAME);
+        String capturedContent = Files.readString(file).replace("splashScreen = true", "splashScreen = false");
+        Files.writeString(file, capturedContent);
+        GlossConfigLoader.ReloadSnapshot snapshot = loader.captureReloadSnapshot();
+
+        Files.writeString(file, capturedContent.replace("metrics = true", "metrics = false"));
+        GlossConfigFile reloaded = loader.loadForReload(snapshot);
+
+        assertFalse(reloaded.splashScreen);
+        assertTrue(reloaded.metrics);
+        assertFalse(loader.isSelfWrite());
+        assertTrue(Files.readString(file).contains("metrics = false"));
+    }
+
+    @Test
     void syncEndpointSanitizerFallsBackOnUnsafeValues() {
         assertEquals("https://relay.example.net/custom/v2",
             GlossConfigFile.sanitizeSyncEndpoint("HTTPS://relay.example.net/custom/v2/"));

@@ -170,9 +170,11 @@ final class RealDropService {
         boolean restoreName = item.isCustomNameVisible();
         State state = new State(item, generation, chunkKey, reserved, restoreVisibility, restoreName);
         state.modelKind = RealDropModel.modelKind(stack.getType());
-        state.rotation.set(baseRotation(state.modelKind));
+        state.rotation.set(RealDropModel.baseRotation(state.modelKind));
         state.spin = RealDropModel.spin(item.getUniqueId(), 0, config.motion());
         state.lastVelocityY = item.getVelocity().getY();
+        state.lastItemX = item.getLocation().getX();
+        state.lastItemZ = item.getLocation().getZ();
         state.onGround = item.isOnGround();
         states.put(item.getUniqueId(), state);
 
@@ -367,14 +369,34 @@ final class RealDropService {
 
         GlossConfig.RealDrops config = config();
         boolean onGround = state.item.isOnGround();
-        int nextDelay = onGround
-            ? config.limits().settledPollIntervalTicks()
-            : config.limits().updateIntervalTicks();
+        Location itemLocation = state.item.getLocation();
+        double deltaX = itemLocation.getX() - state.lastItemX;
+        double deltaZ = itemLocation.getZ() - state.lastItemZ;
+        Vector velocity = state.item.getVelocity();
+        double horizontalVelocitySquared = velocity.getX() * velocity.getX() + velocity.getZ() * velocity.getZ();
+        boolean naturalBlock = onGround && state.modelKind == RealDropModel.ModelKind.BLOCK
+            && "NATURAL".equals(config.landing().mode());
+        RealDropModel.BlockRoll blockRoll = null;
+        if (naturalBlock) {
+            float scale = RealDropModel.scale(state.modelKind, config.scale());
+            double groundDeltaX = state.onGround ? deltaX : 0.0D;
+            double groundDeltaZ = state.onGround ? deltaZ : 0.0D;
+            blockRoll = RealDropModel.groundedBlockRotation(
+                state.rotation, groundDeltaX, groundDeltaZ, Math.sqrt(horizontalVelocitySquared), scale);
+            state.rotation.set(blockRoll.rotation());
+        }
+        RealDropModel.LandingMotion landingMotion = RealDropModel.landingMotion(
+            onGround, state.onGround, horizontalVelocitySquared,
+            blockRoll == null || blockRoll.aligned(), state.groundedStableTicks, config);
+        state.groundedStableTicks = landingMotion.stableTicks();
+        RealDropModel.TickTiming timing = landingMotion.timing();
         if (!presentationOwned(state)) {
-            moveCarrier(state, nextDelay);
+            moveCarrier(state, timing.interpolationTicks());
             state.onGround = onGround;
-            state.lastVelocityY = state.item.getVelocity().getY();
-            scheduleTick(state, nextDelay);
+            state.lastVelocityY = velocity.getY();
+            state.lastItemX = itemLocation.getX();
+            state.lastItemZ = itemLocation.getZ();
+            scheduleTick(state, timing.pollDelayTicks());
             return;
         }
         if (!moveReservation(state, chunkKey(state.item.getLocation()), config.limits().maxVisualsPerChunk())) {
@@ -383,9 +405,8 @@ final class RealDropService {
             return;
         }
         refreshVisuals(state, config);
-        moveCarrier(state, nextDelay);
+        moveCarrier(state, timing.interpolationTicks());
 
-        Vector velocity = state.item.getVelocity();
         double velocityY = velocity.getY();
         boolean bounced = !onGround && state.lastVelocityY < -0.02D && velocityY > 0.02D;
         if (bounced && config.motion().changeOnBounce()) {
@@ -399,13 +420,17 @@ final class RealDropService {
                 state.spin.y() * seconds * DEG_TO_RAD,
                 state.spin.z() * seconds * DEG_TO_RAD);
             applyPose(state, state.rotation, config.limits().updateIntervalTicks());
+        } else if (naturalBlock) {
+            applyPose(state, state.rotation, config.limits().updateIntervalTicks());
         } else if (onGround && !state.onGround) {
             state.rotation.set(landingRotation(state, config));
             applyPose(state, state.rotation, config.landing().transitionTicks());
         }
         state.onGround = onGround;
         state.lastVelocityY = velocityY;
-        scheduleTick(state, nextDelay);
+        state.lastItemX = itemLocation.getX();
+        state.lastItemZ = itemLocation.getZ();
+        scheduleTick(state, timing.pollDelayTicks());
     }
 
     private void failState(State state, RuntimeException failure) {
@@ -422,42 +447,42 @@ final class RealDropService {
             if (!display.isValid()) {
                 continue;
             }
-            display.setInterpolationDuration(Math.max(0, interpolationTicks));
-            applyVisualTransformation(display, state, index, rotation, config);
+            Transformation transformation = visualTransformation(state, index, rotation, config);
+            applyInterpolatedTransformation(display, transformation, interpolationTicks);
         }
     }
 
     private void applyVisualTransformation(ItemDisplay display, State state, int index,
                                            Quaternionf rotation, GlossConfig.RealDrops config) {
+        display.setTransformation(visualTransformation(state, index, rotation, config));
+    }
+
+    private Transformation visualTransformation(State state, int index, Quaternionf rotation,
+                                                GlossConfig.RealDrops config) {
         RealDropModel.Offset offset = RealDropModel.offset(index, config.limits().spread());
         float scale = RealDropModel.scale(state.modelKind, config.scale());
-        Quaternionf indexedRotation = new Quaternionf(rotation);
-        if (index > 0) {
-            indexedRotation.rotateY(index * 0.41F);
-        }
-        display.setTransformation(new Transformation(
-            new Vector3f(offset.x(), offset.y() + RealDropModel.yOffset(state.item.getItemStack().getType()), offset.z()),
+        Quaternionf indexedRotation = RealDropModel.indexedRotation(rotation, index);
+        return new Transformation(
+            new Vector3f(offset.x(), offset.y() + RealDropModel.yOffset(
+                state.item.getItemStack().getType(), state.modelKind, scale, indexedRotation,
+                state.item.isOnGround()), offset.z()),
             indexedRotation,
             new Vector3f(scale, scale, scale),
-            new Quaternionf()));
+            new Quaternionf());
     }
 
     private Quaternionf landingRotation(State state, GlossConfig.RealDrops config) {
-        RealDropModel.Angles angles = RealDropModel.landing(state.item.getUniqueId(), state.modelKind, config.landing());
-        return quaternion(angles);
+        return RealDropModel.landingRotation(state.item.getUniqueId(), state.modelKind, config.landing());
     }
 
-    private static Quaternionf baseRotation(RealDropModel.ModelKind kind) {
-        return kind == RealDropModel.ModelKind.FLAT
-            ? new Quaternionf().rotateX(90.0F * DEG_TO_RAD)
-            : new Quaternionf();
-    }
-
-    private static Quaternionf quaternion(RealDropModel.Angles angles) {
-        return new Quaternionf().rotateXYZ(
-            angles.x() * DEG_TO_RAD,
-            angles.y() * DEG_TO_RAD,
-            angles.z() * DEG_TO_RAD);
+    static void applyInterpolatedTransformation(ItemDisplay display, Transformation transformation,
+                                                int interpolationTicks) {
+        int duration = Math.max(0, interpolationTicks);
+        display.setInterpolationDuration(duration);
+        if (duration > 0) {
+            display.setInterpolationDelay(-1);
+        }
+        display.setTransformation(transformation);
     }
 
     private void scheduleTick(State state, int delayTicks) {
@@ -727,6 +752,9 @@ final class RealDropService {
         private int reserved;
         private int stackHash;
         private int bounceRevision;
+        private int groundedStableTicks;
+        private double lastItemX;
+        private double lastItemZ;
         private double lastVelocityY;
         private boolean restoreNameVisible;
         private boolean onGround;

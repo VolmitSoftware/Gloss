@@ -102,6 +102,7 @@ public final class HologramService {
 
     public void disable() {
         plugin.watchdog().unregister("holograms");
+        registry.close();
         stopTasks();
         HandlerList.unregisterAll(listener);
         for (PersistentHologram hologram : holograms.values()) {
@@ -443,11 +444,12 @@ public final class HologramService {
             return;
         }
 
-        if (SchedulerUtils.runGlobal(plugin, () -> applyDelta(delta))) {
+        if (registry.dispatch(delta, task -> SchedulerUtils.runGlobal(plugin, task),
+            () -> applyDelta(delta))) {
             return;
         }
 
-        Gloss.warn("Hologram hot reload could not reach the server thread; the change was skipped.");
+        Gloss.warn("Hologram hot reload could not reach the server thread; the change will be retried.");
     }
 
     /**
@@ -456,7 +458,7 @@ public final class HologramService {
      */
     private void applyDelta(DocumentDelta delta) {
         for (String id : delta.loaded()) {
-            GlossDocument<HologramDoc> document = registry.get(id);
+            GlossDocument<HologramDoc> document = registry.get(delta, id);
             if (document == null) {
                 continue;
             }

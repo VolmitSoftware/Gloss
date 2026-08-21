@@ -1,15 +1,22 @@
 package art.arcane.gloss.drop;
 
 import art.arcane.gloss.GlossConfig;
+import org.bukkit.Material;
 import org.junit.jupiter.api.Test;
+import org.joml.Quaternionf;
+import org.joml.Vector3f;
 
+import java.util.List;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class RealDropModelTest {
+    private static final float EPSILON = 0.0001F;
+
     private static GlossConfig.RealDrops defaults() {
         return RealDropSettingsDoc.DEFAULTS.toConfig(true);
     }
@@ -30,7 +37,22 @@ class RealDropModelTest {
         GlossConfig.RealDrops.Scale scale = defaults().scale();
         assertEquals(RealDropModel.ModelKind.BLOCK, RealDropModel.modelKind("STONE", true));
         assertEquals(RealDropModel.ModelKind.THIN, RealDropModel.modelKind("OAK_SLAB", true));
+        assertEquals(RealDropModel.ModelKind.THIN, RealDropModel.modelKind("WHITE_CARPET", true));
+        assertEquals(RealDropModel.ModelKind.THIN,
+            RealDropModel.modelKind("LIGHT_WEIGHTED_PRESSURE_PLATE", true));
+        assertEquals(RealDropModel.ModelKind.THIN, RealDropModel.modelKind("SNOW", true));
+        assertEquals(RealDropModel.ModelKind.BLOCK, RealDropModel.modelKind("POWDER_SNOW", true));
+        assertEquals(RealDropModel.ModelKind.FLAT, RealDropModel.modelKind("OAK_DOOR", true));
+        assertEquals(RealDropModel.ModelKind.FLAT, RealDropModel.modelKind("RAIL", true));
+        assertEquals(RealDropModel.ModelKind.FLAT, RealDropModel.modelKind("OAK_SIGN", true));
+        assertEquals(RealDropModel.ModelKind.FLAT, RealDropModel.modelKind("TORCH", true));
+        assertEquals(RealDropModel.ModelKind.FLAT, RealDropModel.modelKind("DANDELION", true));
+        assertEquals(RealDropModel.ModelKind.FLAT, RealDropModel.modelKind("IRON_BARS", true));
+        assertEquals(RealDropModel.ModelKind.FLAT, RealDropModel.modelKind("HOPPER", true));
+        assertEquals(RealDropModel.ModelKind.BLOCK, RealDropModel.modelKind("OAK_STAIRS", true));
         assertEquals(RealDropModel.ModelKind.FLAT, RealDropModel.modelKind("DIAMOND_SWORD", false));
+        assertEquals(RealDropModel.ModelKind.FLAT, RealDropModel.modelKind("TRIDENT", false));
+        assertEquals(RealDropModel.ModelKind.FLAT, RealDropModel.modelKind("SHIELD", false));
         assertEquals(scale.defaultScale(), RealDropModel.scale(RealDropModel.ModelKind.BLOCK, scale));
         assertEquals(scale.thinBlocks(), RealDropModel.scale(RealDropModel.ModelKind.THIN, scale));
         assertEquals(scale.flatItems(), RealDropModel.scale(RealDropModel.ModelKind.FLAT, scale));
@@ -73,13 +95,161 @@ class RealDropModelTest {
     }
 
     @Test
-    void flatItemsLandFlatAndBlocksUseTheConfiguredNaturalTilt() {
+    void flatItemsAndThinBlocksSettleFlushWhileBlocksUseNaturalTilt() {
         UUID itemId = UUID.fromString("530f06c0-439c-4d79-b9ba-6efdaae8aaec");
         GlossConfig.RealDrops.Landing landing = defaults().landing();
         assertEquals(90.0F, RealDropModel.landing(itemId, RealDropModel.ModelKind.FLAT, landing).x());
+        RealDropModel.Angles thin = RealDropModel.landing(itemId, RealDropModel.ModelKind.THIN, landing);
+        assertEquals(0.0F, thin.x());
+        assertEquals(0.0F, thin.z());
         RealDropModel.Angles block = RealDropModel.landing(itemId, RealDropModel.ModelKind.BLOCK, landing);
         assertTrue(Math.abs(block.x()) <= landing.tiltDegrees());
         assertTrue(Math.abs(block.z()) <= landing.tiltDegrees());
+    }
+
+    @Test
+    void ordinaryCubeModelsRestTheirBottomOnTheCarrierSurface() {
+        GlossConfig.RealDrops.Scale scale = defaults().scale();
+        Quaternionf rotation = new Quaternionf();
+
+        assertEquals(scale.defaultScale() * 0.5F,
+            RealDropModel.yOffset(Material.STONE, RealDropModel.ModelKind.BLOCK,
+                scale.defaultScale(), rotation, true));
+        assertEquals(0.0F,
+            RealDropModel.yOffset(Material.DIAMOND_SWORD, RealDropModel.ModelKind.FLAT,
+                scale.flatItems(), rotation, true));
+    }
+
+    @Test
+    void allSixAlignedBlockFacesStayFlushAndAboveTheSurface() {
+        GlossConfig.RealDrops drops = defaults();
+
+        for (int face = 0; face < 6; face++) {
+            Quaternionf rotation = RealDropModel.faceAlignedRotation(RealDropModel.blockFaceRotation(face));
+            Vector3f faceNormal = switch (face) {
+                case 0 -> new Vector3f(0.0F, -1.0F, 0.0F);
+                case 1 -> new Vector3f(0.0F, 1.0F, 0.0F);
+                case 2 -> new Vector3f(-1.0F, 0.0F, 0.0F);
+                case 3 -> new Vector3f(1.0F, 0.0F, 0.0F);
+                case 4 -> new Vector3f(0.0F, 0.0F, -1.0F);
+                case 5 -> new Vector3f(0.0F, 0.0F, 1.0F);
+                default -> throw new IllegalStateException("Unexpected face " + face);
+            };
+            rotation.transform(faceNormal);
+            assertEquals(0.0F, faceNormal.x(), EPSILON);
+            assertEquals(-1.0F, faceNormal.y(), EPSILON);
+            assertEquals(0.0F, faceNormal.z(), EPSILON);
+            float support = RealDropModel.verticalHalfExtent(drops.scale().defaultScale(), rotation);
+            assertEquals(support, RealDropModel.yOffset(Material.STONE, RealDropModel.ModelKind.BLOCK,
+                drops.scale().defaultScale(), rotation, true), EPSILON);
+        }
+    }
+
+    @Test
+    void eachBlockFaceRotationPlacesItsSelectedFaceAgainstTheSurface() {
+        List<Vector3f> normals = List.of(
+            new Vector3f(0.0F, -1.0F, 0.0F),
+            new Vector3f(0.0F, 1.0F, 0.0F),
+            new Vector3f(-1.0F, 0.0F, 0.0F),
+            new Vector3f(1.0F, 0.0F, 0.0F),
+            new Vector3f(0.0F, 0.0F, -1.0F),
+            new Vector3f(0.0F, 0.0F, 1.0F));
+
+        for (int face = 0; face < normals.size(); face++) {
+            Vector3f transformed = RealDropModel.blockFaceRotation(face)
+                .transform(new Vector3f(normals.get(face)));
+            assertEquals(0.0F, transformed.x(), EPSILON);
+            assertEquals(-1.0F, transformed.y(), EPSILON);
+            assertEquals(0.0F, transformed.z(), EPSILON);
+        }
+    }
+
+    @Test
+    void groundTravelRollsAcrossFacesAndMomentumSelectsTheSettledFace() {
+        float scale = defaults().scale().defaultScale();
+        Quaternionf forward = RealDropModel.rollRotation(new Quaternionf(), scale, 0.0D, scale);
+        Quaternionf backward = RealDropModel.rollRotation(new Quaternionf(), -scale, 0.0D, scale);
+        Quaternionf forwardTwice = RealDropModel.rollRotation(forward, scale, 0.0D, scale);
+        Quaternionf right = RealDropModel.rollRotation(new Quaternionf(), 0.0D, scale, scale);
+        Quaternionf left = RealDropModel.rollRotation(new Quaternionf(), 0.0D, -scale, scale);
+
+        assertEquals(0, RealDropModel.nearestDownFace(new Quaternionf()));
+        assertEquals(3, RealDropModel.nearestDownFace(forward));
+        assertEquals(2, RealDropModel.nearestDownFace(backward));
+        assertEquals(1, RealDropModel.nearestDownFace(forwardTwice));
+        assertEquals(5, RealDropModel.nearestDownFace(right));
+        assertEquals(4, RealDropModel.nearestDownFace(left));
+    }
+
+    @Test
+    void gravityContinuouslyFinishesTheMomentumDrivenRollWithoutALateCorrection() {
+        float scale = defaults().scale().defaultScale();
+        RealDropModel.BlockRoll roll = RealDropModel.groundedBlockRotation(
+            new Quaternionf(), scale * 0.75D, 0.0D, 0.05D, scale);
+        int momentumFace = RealDropModel.nearestDownFace(roll.rotation());
+        float previousExtent = RealDropModel.verticalHalfExtent(scale, roll.rotation());
+
+        for (int sample = 0; sample < 24 && !roll.aligned(); sample++) {
+            roll = RealDropModel.groundedBlockRotation(roll.rotation(), 0.0D, 0.0D, 0.0D, scale);
+            float extent = RealDropModel.verticalHalfExtent(scale, roll.rotation());
+            assertTrue(extent <= previousExtent + EPSILON);
+            previousExtent = extent;
+        }
+
+        assertTrue(roll.aligned());
+        assertEquals(momentumFace, RealDropModel.nearestDownFace(roll.rotation()));
+        assertEquals(scale * 0.5F, RealDropModel.verticalHalfExtent(scale, roll.rotation()), EPSILON);
+    }
+
+    @Test
+    void flatLandingAndEveryStackYawKeepTheModelNormalVertical() {
+        GlossConfig.RealDrops.Landing landing = defaults().landing();
+        List<UUID> itemIds = List.of(
+            UUID.fromString("530f06c0-439c-4d79-b9ba-6efdaae8aaec"),
+            UUID.fromString("09065aeb-8c10-47f2-9871-be4c0bf60db4"),
+            UUID.fromString("ac92e158-2772-4c3b-8913-0271b1c7f762"));
+
+        for (UUID itemId : itemIds) {
+            Quaternionf landingRotation = RealDropModel.landingRotation(
+                itemId, RealDropModel.ModelKind.FLAT, landing);
+            for (int index = 0; index < 5; index++) {
+                Quaternionf indexed = RealDropModel.indexedRotation(landingRotation, index);
+                Vector3f normal = indexed.transform(new Vector3f(0.0F, 0.0F, 1.0F));
+                assertEquals(0.0F, normal.x(), EPSILON);
+                assertEquals(1.0F, Math.abs(normal.y()), EPSILON);
+                assertEquals(0.0F, normal.z(), EPSILON);
+            }
+        }
+    }
+
+    @Test
+    void groundedCarrierTracksTheFinalSlideBeforeSwitchingToSettledPolling() {
+        GlossConfig.RealDrops drops = defaults();
+
+        RealDropModel.LandingMotion airborne = RealDropModel.landingMotion(false, false, 0.0D, true, 0, drops);
+        assertEquals(drops.limits().updateIntervalTicks(), airborne.timing().pollDelayTicks());
+        assertEquals(drops.limits().updateIntervalTicks(), airborne.timing().interpolationTicks());
+
+        RealDropModel.LandingMotion contact = RealDropModel.landingMotion(true, false, 0.0D, true, 0, drops);
+        assertFalse(contact.settled());
+        assertEquals(drops.limits().updateIntervalTicks(), contact.timing().pollDelayTicks());
+
+        RealDropModel.LandingMotion sliding = RealDropModel.landingMotion(true, true, 0.01D, true, 0, drops);
+        assertEquals(0, sliding.stableTicks());
+        assertEquals(drops.limits().updateIntervalTicks(), sliding.timing().pollDelayTicks());
+
+        RealDropModel.LandingMotion unaligned = RealDropModel.landingMotion(true, true, 0.0D, false, 0, drops);
+        assertEquals(0, unaligned.stableTicks());
+        assertEquals(drops.limits().updateIntervalTicks(), unaligned.timing().pollDelayTicks());
+
+        RealDropModel.LandingMotion stabilizing = RealDropModel.landingMotion(true, true, 0.0D, true, 0, drops);
+        assertEquals(drops.limits().updateIntervalTicks(), stabilizing.timing().pollDelayTicks());
+
+        RealDropModel.LandingMotion settled = RealDropModel.landingMotion(
+            true, true, 0.0D, true, stabilizing.stableTicks(), drops);
+        assertTrue(settled.settled());
+        assertEquals(drops.limits().settledPollIntervalTicks(), settled.timing().pollDelayTicks());
+        assertEquals(drops.landing().transitionTicks(), settled.timing().interpolationTicks());
     }
 
     @Test

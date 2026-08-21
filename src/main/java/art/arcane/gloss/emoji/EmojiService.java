@@ -2,6 +2,7 @@ package art.arcane.gloss.emoji;
 
 import art.arcane.gloss.service.GlossTelemetry;
 import art.arcane.gloss.Gloss;
+import art.arcane.gloss.doc.DocumentDelta;
 import art.arcane.gloss.doc.DocumentRegistry;
 import art.arcane.gloss.doc.GlossDocument;
 import art.arcane.gloss.doc.ShippedDefaults;
@@ -44,7 +45,7 @@ public final class EmojiService {
         }
         defaults.extractMissing();
         registry.reload();
-        rebuild();
+        rebuild(registry.snapshot());
         plugin.text().setEmojiFilter(this::apply);
         plugin.text().setViewerEmojiFilter(this::applyFor);
         plugin.watchdog().register("emoji", this::pollRegistry);
@@ -52,6 +53,7 @@ public final class EmojiService {
 
     public void disable() {
         plugin.watchdog().unregister("emoji");
+        registry.close();
         plugin.text().setViewerEmojiFilter(null);
         plugin.text().setEmojiFilter(null);
         entries = List.of();
@@ -113,16 +115,16 @@ public final class EmojiService {
     }
 
     private void pollRegistry() {
-        if (registry.poll().isEmpty()) {
+        DocumentDelta delta = registry.poll();
+        if (delta.isEmpty()) {
             return;
         }
-
-        rebuild();
+        registry.apply(delta, () -> rebuild(registry.snapshot(delta)));
     }
 
-    private void rebuild() {
-        List<EmojiEntry> loaded = new ArrayList<>(registry.snapshot().size());
-        for (GlossDocument<EmojiDoc> document : registry.snapshot().values()) {
+    private void rebuild(Map<String, GlossDocument<EmojiDoc>> documents) {
+        List<EmojiEntry> loaded = new ArrayList<>(documents.size());
+        for (GlossDocument<EmojiDoc> document : documents.values()) {
             EmojiDoc doc = document.value();
             loaded.add(new EmojiEntry(document.id(), doc.trigger(), UnicodeText.parse(doc.emoji()), doc.enabled()));
         }

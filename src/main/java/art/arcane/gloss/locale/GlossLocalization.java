@@ -1,6 +1,7 @@
 package art.arcane.gloss.locale;
 
 import art.arcane.gloss.Gloss;
+import art.arcane.gloss.doc.DocumentHashes;
 import art.arcane.volmlib.util.director.DirectorTextResolver;
 import art.arcane.volmlib.util.io.FileWatcher;
 import art.arcane.volmlib.util.localization.LocaleOverlay;
@@ -24,19 +25,23 @@ import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
 
 import java.io.File;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-public final class GlossLocalization {
+public final class GlossLocalization implements AutoCloseable {
   private static final long MAX_LANGUAGE_BYTES = 2L * 1024L * 1024L;
   private static final int MAX_REPORTED_ISSUES = 12;
   private static final MessageCatalog CATALOG = GlossMessages.catalog();
@@ -46,8 +51,10 @@ public final class GlossLocalization {
   private final File languageFile;
   private final Logger logger;
   private final LocalizationManager manager;
-  private final FileWatcher watcher;
+  private volatile FileWatcher watcher;
   private volatile String activeLocale;
+  private volatile String observedHash;
+  private volatile LanguageSnapshot pendingAutomaticSnapshot;
 
   public GlossLocalization(File dataFolder, Logger logger) {
     this.languageFile = new File(dataFolder, "language.yml");
@@ -72,9 +79,42 @@ public final class GlossLocalization {
   }
 
   public void update() {
-    if (watcher.checkModified()) {
-      reload();
+    FileWatcher current = watcher;
+    if (current == null) {
+      return;
     }
+    current.checkModified();
+    LanguageSnapshot snapshot;
+    try {
+      snapshot = captureSnapshot();
+    } catch (IOException failure) {
+      throw new IllegalStateException("Could not capture a stable language.yml snapshot", failure);
+    }
+    if (snapshot == null) {
+      pendingAutomaticSnapshot = null;
+      return;
+    }
+    if (Objects.equals(snapshot.sha256(), observedHash)) {
+      pendingAutomaticSnapshot = null;
+      return;
+    }
+    LanguageSnapshot pending = pendingAutomaticSnapshot;
+    if (pending == null || !pending.sha256().equals(snapshot.sha256())) {
+      pendingAutomaticSnapshot = snapshot;
+      return;
+    }
+    pendingAutomaticSnapshot = null;
+    reload(snapshot);
+  }
+
+  @Override
+  public synchronized void close() {
+    FileWatcher previous = watcher;
+    watcher = null;
+    if (previous != null) {
+      previous.close();
+    }
+    pendingAutomaticSnapshot = null;
   }
 
   public synchronized boolean reload() {
@@ -82,7 +122,23 @@ public final class GlossLocalization {
       ensureDefaultFile();
     }
 
-    LocalizationReloadResult result = manager.reload(this::loadCandidate);
+    LanguageSnapshot snapshot;
+    try {
+      snapshot = captureSnapshot();
+    } catch (IOException failure) {
+      logger.log(Level.SEVERE, "Language reload failed", failure);
+      return false;
+    }
+    if (snapshot == null) {
+      logger.severe("Language reload failed: source is not a regular file: " + languageFile.getPath());
+      return false;
+    }
+    return reload(snapshot);
+  }
+
+  private synchronized boolean reload(LanguageSnapshot snapshot) {
+    LocalizationReloadResult result = manager.reload(() -> loadCandidate(snapshot.rawContent()));
+    observedHash = snapshot.sha256();
     if (!result.applied()) {
       reportRejectedReload(result);
       return false;
@@ -92,6 +148,44 @@ public final class GlossLocalization {
         ? CATALOG.englishLocale()
         : result.current().overlays().get(0).locale();
     return true;
+  }
+
+  private LanguageSnapshot captureSnapshot() throws IOException {
+    if (!languageFile.isFile()) {
+      return null;
+    }
+    BasicFileAttributes before = Files.readAttributes(
+        languageFile.toPath(), BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
+    if (!before.isRegularFile()) {
+      return null;
+    }
+    if (before.size() > MAX_LANGUAGE_BYTES) {
+      throw new IOException("Language source is too large: " + languageFile.getPath());
+    }
+    byte[] content;
+    try (InputStream input = Files.newInputStream(languageFile.toPath())) {
+      content = input.readNBytes((int) MAX_LANGUAGE_BYTES + 1);
+    }
+    if (content.length > MAX_LANGUAGE_BYTES) {
+      throw new IOException("Language source is too large: " + languageFile.getPath());
+    }
+    BasicFileAttributes after = Files.readAttributes(
+        languageFile.toPath(), BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
+    if (!sameSnapshot(before, after) || content.length != after.size()) {
+      throw new IOException("Language source changed while it was being captured: " + languageFile.getPath());
+    }
+    return new LanguageSnapshot(
+        new String(content, StandardCharsets.UTF_8),
+        DocumentHashes.sha256(content)
+    );
+  }
+
+  private boolean sameSnapshot(BasicFileAttributes before, BasicFileAttributes after) {
+    return before.isRegularFile()
+        && after.isRegularFile()
+        && before.size() == after.size()
+        && before.lastModifiedTime().equals(after.lastModifiedTime())
+        && Objects.equals(before.fileKey(), after.fileKey());
   }
 
   public String text(TextKey key) {
@@ -169,17 +263,10 @@ public final class GlossLocalization {
     return GlossLocalization::globalDirectorText;
   }
 
-  private LocalizationCandidate loadCandidate() throws Exception {
-    if (!languageFile.isFile()) {
-      throw new IllegalArgumentException("Language source is not a regular file: " + languageFile.getPath());
-    }
-    if (languageFile.length() > MAX_LANGUAGE_BYTES) {
-      throw new IllegalArgumentException("Language source is too large: " + languageFile.getPath());
-    }
-
+  private LocalizationCandidate loadCandidate(String rawContent) throws Exception {
     YamlConfiguration yaml = new YamlConfiguration();
     yaml.options().pathSeparator(YAML_PATH_SEPARATOR);
-    yaml.load(languageFile);
+    yaml.loadFromString(rawContent);
     String locale = yaml.getString("locale", CATALOG.englishLocale());
     if (locale == null || locale.isBlank()) {
       locale = CATALOG.englishLocale();
@@ -373,5 +460,8 @@ public final class GlossLocalization {
   }
 
   private record Placeholder(String token, MessageArgument argument) {
+  }
+
+  private record LanguageSnapshot(String rawContent, String sha256) {
   }
 }

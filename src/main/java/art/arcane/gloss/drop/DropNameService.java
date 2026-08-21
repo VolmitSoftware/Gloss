@@ -100,6 +100,7 @@ public final class DropNameService implements Listener {
 
     public void disable() {
         plugin.watchdog().unregister(RealDropSettingsDoc.KIND);
+        realDropSettings.close();
         if (pruneTaskId != -1) {
             plugin.scheduler().csr(pruneTaskId);
             pruneTaskId = -1;
@@ -382,11 +383,26 @@ public final class DropNameService implements Listener {
             return;
         }
         GlossDocument<RealDropSettingsDoc> document =
-            realDropSettings.get(RealDropSettingsDoc.DEFAULT_ID);
-        realDropDoc = document == null ? RealDropSettingsDoc.DEFAULTS : document.value();
+            realDropSettings.get(delta, RealDropSettingsDoc.DEFAULT_ID);
+        RealDropSettingsDoc updated = document == null ? RealDropSettingsDoc.DEFAULTS : document.value();
+        if (!realDropSettings.dispatch(delta, task -> SchedulerUtils.runGlobal(plugin, task),
+            () -> applyRealDropSettings(updated))) {
+            Gloss.warn("Could not apply hot-reloaded real-drop settings on the server thread;"
+                + " the change will be retried.");
+        }
+    }
+
+    private void applyRealDropSettings(RealDropSettingsDoc updated) {
+        RealDropSettingsDoc previousDoc = realDropDoc;
+        GlossConfig.RealDrops previousConfig = activeRealDropConfig;
+        realDropDoc = updated;
         refreshRealDropConfig();
-        if (!SchedulerUtils.runGlobal(plugin, this::reloadPresentations)) {
-            Gloss.warn("Could not apply hot-reloaded real-drop settings on the server thread.");
+        try {
+            reloadPresentations();
+        } catch (RuntimeException | Error failure) {
+            realDropDoc = previousDoc;
+            activeRealDropConfig = previousConfig;
+            throw failure;
         }
     }
 

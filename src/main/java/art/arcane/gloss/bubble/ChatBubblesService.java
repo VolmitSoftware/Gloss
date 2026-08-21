@@ -5,6 +5,7 @@ import art.arcane.gloss.api.HologramPresentation;
 import art.arcane.gloss.api.TemporaryHologram;
 import art.arcane.gloss.bubble.BubbleMotionPlan.BubbleMotionContext;
 import art.arcane.gloss.bubble.BubbleMotionPlan.BubbleMotionSample;
+import art.arcane.gloss.doc.DocumentDelta;
 import art.arcane.gloss.doc.DocumentRegistry;
 import art.arcane.gloss.doc.GlossDocument;
 import art.arcane.gloss.doc.ShippedDefaults;
@@ -210,7 +211,7 @@ public final class ChatBubblesService implements Listener {
         }
         registry.reload();
         loadPlayerStyles();
-        plugin.watchdog().register(BubbleStyleDoc.KIND, registry::poll);
+        plugin.watchdog().register(BubbleStyleDoc.KIND, this::pollRegistry);
         plugin.getServer().getPluginManager().registerEvents(this, plugin);
         if (!enabled) {
             return;
@@ -227,8 +228,16 @@ public final class ChatBubblesService implements Listener {
             || defaults.replaceIfExact("default", PREVIOUS_LEGACY_CYCLE_DEFAULT);
     }
 
+    private void pollRegistry() {
+        DocumentDelta delta = registry.poll();
+        if (!delta.isEmpty()) {
+            registry.acknowledge(delta);
+        }
+    }
+
     public void disable() {
         plugin.watchdog().unregister(BubbleStyleDoc.KIND);
+        registry.close();
         stopDriver();
         HandlerList.unregisterAll(this);
         destroyAll();

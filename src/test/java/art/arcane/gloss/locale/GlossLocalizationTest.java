@@ -9,6 +9,7 @@ import art.arcane.volmlib.util.localization.MessageKey;
 import art.arcane.volmlib.util.localization.VolmitLocales;
 import org.bukkit.ChatColor;
 import org.bukkit.configuration.file.YamlConfiguration;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -17,6 +18,7 @@ import org.junit.rules.TemporaryFolder;
 import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.FileTime;
 import java.util.Set;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -37,6 +39,11 @@ public class GlossLocalizationTest {
     Logger logger = Logger.getAnonymousLogger();
     logger.setUseParentHandlers(false);
     localization = new GlossLocalization(temporaryFolder.newFolder(), logger);
+  }
+
+  @After
+  public void tearDown() {
+    localization.close();
   }
 
   @Test
@@ -137,6 +144,35 @@ public class GlossLocalizationTest {
 
     assertFalse(localization.reload());
     assertEquals("Taille 125%", localization.text(GlossMessages.PREVIEW_SCALE_SIZE, arguments));
+  }
+
+  @Test
+  public void automaticReloadQueuesStableExactContentAndDoesNotRecreateDeletion() throws Exception {
+    YamlConfiguration yaml = loadLanguageFile();
+    yaml.set("messages." + GlossMessages.MENU_UNAVAILABLE.id(), "Alpha {menu}");
+    yaml.save(localization.languageFile());
+    MessageArgs arguments = MessageArgs.builder().untrusted("menu", "market").build();
+
+    localization.update();
+    assertFalse("Alpha market".equals(localization.text(GlossMessages.MENU_UNAVAILABLE, arguments)));
+    localization.update();
+    assertEquals("Alpha market", localization.text(GlossMessages.MENU_UNAVAILABLE, arguments));
+
+    FileTime appliedTime = Files.getLastModifiedTime(localization.languageFile().toPath());
+    yaml.set("messages." + GlossMessages.MENU_UNAVAILABLE.id(), "Bravo {menu}");
+    yaml.save(localization.languageFile());
+    Files.setLastModifiedTime(localization.languageFile().toPath(), appliedTime);
+
+    localization.update();
+    assertEquals("Alpha market", localization.text(GlossMessages.MENU_UNAVAILABLE, arguments));
+    localization.update();
+    assertEquals("Bravo market", localization.text(GlossMessages.MENU_UNAVAILABLE, arguments));
+
+    Files.delete(localization.languageFile().toPath());
+    localization.update();
+    localization.update();
+    assertFalse(localization.languageFile().exists());
+    assertEquals("Bravo market", localization.text(GlossMessages.MENU_UNAVAILABLE, arguments));
   }
 
   @Test

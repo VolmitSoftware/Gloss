@@ -8,6 +8,7 @@ import art.arcane.gloss.doc.ShippedDefaults;
 import art.arcane.gloss.doc.ShippedDocumentCatalog;
 import art.arcane.gloss.text.TextPipeline;
 import art.arcane.volmlib.util.scheduling.FoliaScheduler;
+import art.arcane.volmlib.util.scheduling.SchedulerUtils;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -39,6 +40,7 @@ public final class TablistService implements Listener {
     private final Map<UUID, HeaderFooter> appliedHeaderFooters;
     private final Map<UUID, ListNameSource> listNameSources;
     private final AtomicLong docGeneration;
+    private volatile TablistDoc activeDoc;
     private volatile int driverTaskId;
     private volatile HeaderFooterMemo headerFooterMemo;
 
@@ -53,6 +55,7 @@ public final class TablistService implements Listener {
         this.appliedHeaderFooters = new ConcurrentHashMap<>();
         this.listNameSources = new ConcurrentHashMap<>();
         this.docGeneration = new AtomicLong();
+        this.activeDoc = TablistDoc.DEFAULTS;
         this.driverTaskId = -1;
     }
 
@@ -110,6 +113,7 @@ public final class TablistService implements Listener {
             defaults.extractMissing();
         }
         registry.reload();
+        activeDoc = committedDoc();
         docGeneration.incrementAndGet();
         Bukkit.getPluginManager().registerEvents(this, plugin);
         plugin.watchdog().register(TablistDoc.KIND, this::pollRegistry);
@@ -118,6 +122,7 @@ public final class TablistService implements Listener {
 
     public void disable() {
         plugin.watchdog().unregister(TablistDoc.KIND);
+        registry.close();
         HandlerList.unregisterAll(this);
         stopDriver();
         overrides.clear();
@@ -131,6 +136,7 @@ public final class TablistService implements Listener {
             defaults.extractMissing();
         }
         registry.reload();
+        activeDoc = committedDoc();
         docGeneration.incrementAndGet();
         if (!plugin.cfg().tablist().enabled()) {
             resetAppliedHeaderFooters();
@@ -187,6 +193,10 @@ public final class TablistService implements Listener {
     }
 
     private TablistDoc doc() {
+        return activeDoc;
+    }
+
+    private TablistDoc committedDoc() {
         GlossDocument<TablistDoc> document = registry.get(TablistDoc.KIND);
         return document == null ? TablistDoc.DEFAULTS : document.value();
     }
@@ -196,19 +206,28 @@ public final class TablistService implements Listener {
         if (delta.isEmpty()) {
             return;
         }
-        docGeneration.incrementAndGet();
-        TablistDoc doc = doc();
-        if (doc.useHeaderFooter()) {
+        if (!registry.dispatch(delta, task -> SchedulerUtils.runGlobal(plugin, task),
+            () -> applyDelta(delta))) {
+            Gloss.warn("Tablist hot reload could not reach the server thread; the change will be retried.");
+        }
+    }
+
+    private void applyDelta(DocumentDelta delta) {
+        GlossDocument<TablistDoc> document = registry.get(delta, TablistDoc.KIND);
+        TablistDoc updated = document == null ? TablistDoc.DEFAULTS : document.value();
+        if (updated.useHeaderFooter()) {
             appliedHeaderFooters.clear();
         } else {
             resetAppliedHeaderFooters();
         }
-        if (doc.groupListNames()) {
+        if (updated.groupListNames()) {
             appliedListNames.clear();
             listNameSources.clear();
         } else {
             resetAppliedListNames();
         }
+        activeDoc = updated;
+        docGeneration.incrementAndGet();
     }
 
     private void startDriver() {

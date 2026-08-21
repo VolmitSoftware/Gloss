@@ -1,6 +1,7 @@
 package art.arcane.gloss.doc;
 
 import art.arcane.gloss.Gloss;
+import art.arcane.volmlib.util.scheduling.SchedulerUtils;
 
 import java.util.List;
 import java.util.Objects;
@@ -9,28 +10,31 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.logging.Level;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.LongSupplier;
 
 /**
  * Hot-reload driver. Every registered pass runs on one dedicated IO thread, never on the server
- * thread: a poll is a directory walk plus a read and a parse, and eleven of them fired four times a
- * second is a main-thread stall that scales with the number of documents on disk.
+ * thread: a poll is a directory walk plus a read and a parse, and doing that on the main thread
+ * stalls the server in proportion to the number of documents on disk.
  *
  * <p>A registered poll body may therefore touch nothing but files and its own state. Passes whose
  * apply phase talks to Bukkit hop it themselves — {@code HologramService}, {@code MenuCatalog},
  * {@code ImageAssets}, {@code PreviewDocumentRegistry} and the {@code config} entry all schedule their apply onto the
- * global (or owning region) context and keep only the stat/read/parse off-thread. Cadence is
- * unchanged: the scheduler still ticks at the configured interval, and a pass that outruns the
- * interval simply skips the tick it would have overlapped rather than queueing a backlog.
+ * global (or owning region) context and keep only the stat/read/parse off-thread. The scheduler may
+ * request work at the configured interval, but automatic batches start only after a three-second
+ * cooldown from the preceding batch. Requests arriving during a scan or its queued apply phase
+ * collapse into one trailing pass that reads the latest state.
  */
 public final class DataWatchdog {
     private static final int NO_TASK = -1;
     private static final long SHUTDOWN_WAIT_MS = 2000L;
+    private static final long AUTOMATIC_BATCH_COOLDOWN_NANOS = TimeUnit.SECONDS.toNanos(3L);
 
     private final Gloss plugin;
     private final List<Entry> entries;
-    private final AtomicBoolean passInFlight;
+    private final HotloadBatchGate batchGate;
+    private final AtomicLong lifecycleGeneration;
     private volatile ExecutorService io;
     private int taskId;
 
@@ -38,9 +42,14 @@ public final class DataWatchdog {
     }
 
     public DataWatchdog(Gloss plugin) {
+        this(plugin, System::nanoTime);
+    }
+
+    DataWatchdog(Gloss plugin, LongSupplier clock) {
         this.plugin = plugin;
         this.entries = new CopyOnWriteArrayList<>();
-        this.passInFlight = new AtomicBoolean();
+        this.batchGate = new HotloadBatchGate(AUTOMATIC_BATCH_COOLDOWN_NANOS, clock);
+        this.lifecycleGeneration = new AtomicLong();
         this.taskId = NO_TASK;
     }
 
@@ -59,6 +68,8 @@ public final class DataWatchdog {
         if (taskId != NO_TASK) {
             return;
         }
+        batchGate.cancel();
+        lifecycleGeneration.incrementAndGet();
         io = Executors.newSingleThreadExecutor(runnable -> {
             Thread thread = new Thread(runnable, "Gloss-Watchdog-IO");
             thread.setDaemon(true);
@@ -73,6 +84,8 @@ public final class DataWatchdog {
         }
         plugin.scheduler().car(taskId);
         taskId = NO_TASK;
+        lifecycleGeneration.incrementAndGet();
+        batchGate.cancel();
         ExecutorService current = io;
         io = null;
         if (current == null) {
@@ -87,50 +100,81 @@ public final class DataWatchdog {
             current.shutdownNow();
             Thread.currentThread().interrupt();
         }
-        // A pass discarded by shutdownNow never reaches its finally, and a stuck flag would leave
-        // the watchdog permanently silent after the next start().
-        passInFlight.set(false);
     }
 
     public void restart(int intervalTicks) {
         stop();
+        batchGate.deferFromNow();
         start(intervalTicks);
     }
 
+    public void deferAutomaticPass() {
+        batchGate.deferFromNow();
+    }
+
     private void pump() {
+        batchGate.request();
+        dispatchQueuedPass();
+    }
+
+    private void dispatchQueuedPass() {
         ExecutorService current = io;
-        if (current == null) {
+        if (current == null || !batchGate.tryStart()) {
             return;
         }
-        if (!passInFlight.compareAndSet(false, true)) {
-            return;
-        }
+        long generation = lifecycleGeneration.get();
         try {
-            current.execute(this::runPass);
+            current.execute(() -> runPass(generation));
         } catch (RejectedExecutionException rejected) {
-            passInFlight.set(false);
+            if (generation == lifecycleGeneration.get()) {
+                batchGate.retry();
+            }
         }
     }
 
-    private void runPass() {
+    private void runPass(long generation) {
         try {
-            tick();
+            tick(generation);
         } finally {
-            passInFlight.set(false);
+            completeAfterApplyBatch(generation);
         }
+    }
+
+    private void completeAfterApplyBatch(long generation) {
+        if (generation != lifecycleGeneration.get()) {
+            return;
+        }
+        if (plugin != null && SchedulerUtils.runGlobal(plugin, () -> completePass(generation))) {
+            return;
+        }
+        completePass(generation);
+    }
+
+    private void completePass(long generation) {
+        if (generation != lifecycleGeneration.get()) {
+            return;
+        }
+        batchGate.complete();
+        dispatchQueuedPass();
     }
 
     @SuppressWarnings("removal")
     void tick() {
+        tick(lifecycleGeneration.get());
+    }
+
+    @SuppressWarnings("removal")
+    private void tick(long generation) {
         for (Entry entry : entries) {
+            if (generation != lifecycleGeneration.get()) {
+                return;
+            }
             try {
                 entry.poll().run();
             } catch (ThreadDeath fatal) {
                 throw fatal;
             } catch (Throwable failure) {
-                String message = failure.getMessage();
-                Gloss.log(Level.WARNING, "%s: hot reload pass failed: %s", entry.name(),
-                    message == null || message.isEmpty() ? failure.getClass().getSimpleName() : message);
+                Gloss.logExceptionStack(false, failure, "%s: hot reload pass failed.", entry.name());
             }
         }
     }

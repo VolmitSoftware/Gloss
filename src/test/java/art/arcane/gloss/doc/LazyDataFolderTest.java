@@ -120,7 +120,9 @@ class LazyDataFolderTest {
         assertTrue(folder.mkdirs());
         Files.writeString(new File(folder, "spawn.json").toPath(), "lines", StandardCharsets.UTF_8);
 
-        assertEquals(List.of("spawn"), registry.poll().loaded());
+        DocumentDelta delta = registry.poll();
+        assertEquals(List.of("spawn"), delta.loaded());
+        assertTrue(registry.acknowledge(delta));
         assertEquals("lines", registry.get("spawn").value());
     }
 

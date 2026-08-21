@@ -3,11 +3,13 @@ package art.arcane.gloss.preview.doc;
 import art.arcane.gloss.Gloss;
 import art.arcane.gloss.doc.AtomicFiles;
 import art.arcane.gloss.doc.DataWatchdog;
+import art.arcane.gloss.doc.DocumentDelta;
+import art.arcane.gloss.doc.DocumentRegistry;
+import art.arcane.gloss.doc.GlossDocument;
 import art.arcane.gloss.menu.MenuSessionManager;
 import art.arcane.gloss.preview.doc.CompiledPreviewDocument.CompiledMatch;
 import art.arcane.gloss.preview.doc.CompiledPreviewDocument.CompiledVariant;
 import art.arcane.gloss.preview.doc.CompiledPreviewDocument.Resolved;
-import art.arcane.volmlib.util.io.FolderWatcher;
 import art.arcane.volmlib.util.scheduling.SchedulerUtils;
 import org.bukkit.Material;
 import org.bukkit.entity.ChestBoat;
@@ -19,14 +21,11 @@ import org.bukkit.inventory.InventoryHolder;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.EnumSet;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -91,11 +90,11 @@ public final class PreviewDocumentRegistry {
   private static final int GRADE_EXACT = 3;
 
   private final File folder;
-  private final Map<String, CompiledPreviewDocument> documents = new ConcurrentHashMap<>();
+  private final DocumentRegistry<CompiledPreviewDocument> registry;
   private final Set<String> warnedTies = ConcurrentHashMap.newKeySet();
 
   private volatile Snapshot snapshot = Snapshot.EMPTY;
-  private FolderWatcher watcher;
+  private boolean watching;
 
   /**
    * Extracts any shipped document missing from {@code previews/} and compiles every {@code *.json}
@@ -105,6 +104,12 @@ public final class PreviewDocumentRegistry {
    */
   public PreviewDocumentRegistry(File configDir) {
     this.folder = new File(configDir, FOLDER_NAME);
+    this.registry = DocumentRegistry.folder(
+        FOLDER_NAME,
+        folder,
+        PreviewDocumentParser::parse,
+        ignored -> DocumentRegistry.UNVERSIONED
+    );
     extract(ALL, false);
     reload();
   }
@@ -118,54 +123,8 @@ public final class PreviewDocumentRegistry {
    * gone are dropped; documents whose file no longer compiles keep the version already loaded.
    */
   public void reload() {
-    File[] files = folder.listFiles();
-    Set<String> present = new HashSet<>();
-    if (files != null) {
-      for (File file : files) {
-        if (!isDocument(file)) {
-          continue;
-        }
-        present.add(baseName(file));
-        load(file);
-      }
-    }
-    documents.keySet().retainAll(present);
-    publish();
-  }
-
-  /**
-   * True when the file recompiled; false leaves whatever was already loaded under that name.
-   *
-   * <p>Catches {@link Throwable} rather than {@link RuntimeException}: a pathological document
-   * (e.g. thousands of nested parens) can blow the parser's call stack before {@code ExprParser}'s
-   * own depth guard has a chance to run on an unrelated document, and a {@link StackOverflowError}
-   * is an {@link Error}, not a {@code RuntimeException}. One broken document must never abort
-   * plugin enable ({@link #reload()} runs through this at boot) or kill the hot-reload task
-   * ({@link #startWatching()} runs through this on every change). {@link ThreadDeath} is rethrown
-   * because it means the JVM is asking this thread to stop, not that the document is broken.
-   */
-  @SuppressWarnings("removal") // ThreadDeath is deprecated for removal; still the correct rethrow while it exists.
-  private boolean load(File file) {
-    String name = baseName(file);
-    try {
-      String json = Files.readString(file.toPath(), StandardCharsets.UTF_8);
-      documents.put(name, PreviewDocumentParser.parse(name + EXTENSION, json));
-      return true;
-    } catch (ThreadDeath fatal) {
-      throw fatal;
-    } catch (Throwable failure) {
-      Gloss.log(Level.WARNING, "previews/%s%s: %s", name, EXTENSION, detail(name, failure));
-      return false;
-    }
-  }
-
-  private boolean unload(File file) {
-    String name = baseName(file);
-    if (documents.remove(name) == null) {
-      return false;
-    }
-    Gloss.log(Level.INFO, "Preview document \"%s\" was removed.", name);
-    return true;
+    registry.reload();
+    publish(buildSnapshot(registry.snapshot()));
   }
 
   /**
@@ -173,8 +132,11 @@ public final class PreviewDocumentRegistry {
    * as one snapshot. Walking every material once per load is the price of an allocation-free
    * {@link #isPreviewBlockType}; it happens on boot and on edit, never per raycast.
    */
-  private void publish() {
-    List<CompiledPreviewDocument> ordered = new ArrayList<>(documents.values());
+  private Snapshot buildSnapshot(Map<String, GlossDocument<CompiledPreviewDocument>> documents) {
+    List<CompiledPreviewDocument> ordered = new ArrayList<>();
+    for (GlossDocument<CompiledPreviewDocument> document : documents.values()) {
+      ordered.add(document.value());
+    }
     ordered.sort(Comparator.comparing(CompiledPreviewDocument::name));
     EnumSet<Material> blockTypes = EnumSet.noneOf(Material.class);
     for (Material material : Material.values()) {
@@ -195,8 +157,12 @@ public final class PreviewDocumentRegistry {
         break;
       }
     }
+    return new Snapshot(List.copyOf(ordered), blockTypes, entityMatchers);
+  }
+
+  private void publish(Snapshot replacement) {
     warnedTies.clear();
-    snapshot = new Snapshot(List.copyOf(ordered), blockTypes, entityMatchers);
+    snapshot = replacement;
   }
 
   private static boolean declaresEntityMatchers(CompiledPreviewDocument document) {
@@ -271,25 +237,22 @@ public final class PreviewDocumentRegistry {
    * Arms the folder watcher as one {@link DataWatchdog} entry handling edits, creations, and
    * deletions together in a single pass.
    *
-   * <p>One entry rather than a fast/slow pair. {@code FileWatcher.checkModified} consumes the
-   * modification-time and size delta of every child it walks, so two passes sharing one watcher
-   * race: whichever fires first eats the change, and an edit consumed by a handler that only reads
-   * {@code getCreated()}/{@code getDeleted()} is never recompiled. One pass reading all three lists
-   * cannot drop anything. {@code checkModifiedFast} is likewise unusable alone here, because it only
-   * walks children the watcher already knows and so never notices a new file. Thirteen documents
-   * make the extra directory listing cheap. The watchdog isolates a throwing entry itself, so a
-   * broken document or a watcher-internal failure cannot kill hot reload.
+   * <p>The shared document registry owns native events, content reconciliation, deletion grace,
+   * parse-failure retention, and watcher closure. The watchdog isolates a throwing entry itself,
+   * so a broken document or a watcher-internal failure cannot kill hot reload.
    */
   public void startWatching() {
-    if (watcher != null) {
+    if (watching) {
       return;
     }
-    watcher = new FolderWatcher(folder);
+    reload();
+    watching = true;
     Gloss.instance.watchdog().register(WATCHDOG_ENTRY, this::watchTick);
   }
 
   public void stopWatching() {
-    watcher = null;
+    watching = false;
+    registry.close();
     Gloss plugin = Gloss.instance;
     if (plugin != null && plugin.watchdog() != null) {
       plugin.watchdog().unregister(WATCHDOG_ENTRY);
@@ -297,44 +260,30 @@ public final class PreviewDocumentRegistry {
   }
 
   private void watchTick() {
-    if (!watcher.checkModified()) {
+    DocumentDelta delta = registry.poll();
+    if (delta.isEmpty()) {
       return;
     }
-    boolean changed = false;
-    for (File file : watcher.getChanged()) {
-      if (isDocument(file) && load(file)) {
-        Gloss.log(Level.INFO, "Preview document \"%s\" changed and was recompiled.", baseName(file));
-        changed = true;
-      }
+    boolean scheduled = registry.prepareDispatch(delta,
+        task -> SchedulerUtils.runGlobal(Gloss.instance, task), () -> {
+          Snapshot replacement = buildSnapshot(registry.snapshot(delta));
+          return () -> applyHotload(delta, replacement);
+        });
+    if (!scheduled) {
+      Gloss.log(Level.WARNING,
+          "Preview hot reload could not reach the server thread; the change will be retried.");
     }
-    for (File file : watcher.getCreated()) {
-      if (isDocument(file) && load(file)) {
-        Gloss.log(Level.INFO, "Preview document \"%s\" was detected and compiled.", baseName(file));
-        changed = true;
-      }
-    }
-    for (File file : watcher.getDeleted()) {
-      changed |= isDocument(file) && unload(file);
-    }
-    applyIfChanged(changed);
   }
 
-  /**
-   * The compile above ran on the watchdog IO thread. Publishing is a volatile snapshot swap and is
-   * safe there; closing previews destroys display entities, so it hops to the server context and
-   * only falls through inline when there is nothing to schedule onto.
-   */
-  private void applyIfChanged(boolean changed) {
-    if (!changed) {
-      return;
+  private void applyHotload(DocumentDelta delta, Snapshot replacement) {
+    closeOpenPreviews();
+    publish(replacement);
+    for (String id : delta.loaded()) {
+      Gloss.log(Level.INFO, "Preview document \"%s\" was hot loaded.", id);
     }
-    publish();
-    if (SchedulerUtils.runGlobal(Gloss.instance, PreviewDocumentRegistry::closeOpenPreviews)) {
-      return;
+    for (String id : delta.removed()) {
+      Gloss.log(Level.INFO, "Preview document \"%s\" was removed.", id);
     }
-    Gloss.log(Level.WARNING,
-        "Preview hot reload could not reach the server thread; open previews keep the old layout"
-            + " until they are reopened.");
   }
 
   /**
@@ -423,12 +372,13 @@ public final class PreviewDocumentRegistry {
 
   /** The base names of every loaded document, i.e. the file names without {@code .json}. */
   public Set<String> names() {
-    return Set.copyOf(documents.keySet());
+    return registry.ids();
   }
 
   /** The compiled document loaded under this name, or null when none is loaded; see {@link #names()}. */
   public CompiledPreviewDocument get(String name) {
-    return name == null ? null : documents.get(name);
+    GlossDocument<CompiledPreviewDocument> document = name == null ? null : registry.get(name);
+    return document == null ? null : document.value();
   }
 
   /**
@@ -524,15 +474,6 @@ public final class PreviewDocumentRegistry {
   private record Snapshot(List<CompiledPreviewDocument> ordered, Set<Material> blockTypes, boolean hasEntityMatchers) {
 
     private static final Snapshot EMPTY = new Snapshot(List.of(), Set.of(), false);
-  }
-
-  private static boolean isDocument(File file) {
-    return file != null && !file.isDirectory() && file.getName().toLowerCase(Locale.ROOT).endsWith(EXTENSION);
-  }
-
-  private static String baseName(File file) {
-    String name = file.getName();
-    return name.substring(0, name.length() - EXTENSION.length());
   }
 
   /**

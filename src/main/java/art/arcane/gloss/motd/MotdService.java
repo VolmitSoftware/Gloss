@@ -1,6 +1,7 @@
 package art.arcane.gloss.motd;
 
 import art.arcane.gloss.Gloss;
+import art.arcane.gloss.doc.DocumentDelta;
 import art.arcane.gloss.doc.DocumentRegistry;
 import art.arcane.gloss.doc.GlossDocument;
 import art.arcane.gloss.doc.ShippedDefaults;
@@ -58,6 +59,7 @@ public final class MotdService {
 
     public void disable() {
         plugin.watchdog().unregister(MotdDoc.KIND);
+        registry.close();
         if (listener == null) {
             return;
         }
@@ -82,7 +84,8 @@ public final class MotdService {
     }
 
     private void pollRegistry() {
-        if (registry.poll().isEmpty()) {
+        DocumentDelta delta = registry.poll();
+        if (delta.isEmpty() || !registry.acknowledge(delta)) {
             return;
         }
         docGeneration.incrementAndGet();

@@ -1,6 +1,7 @@
 package art.arcane.gloss.animation;
 
 import art.arcane.gloss.Gloss;
+import art.arcane.gloss.doc.DocumentDelta;
 import art.arcane.gloss.doc.DocumentRegistry;
 import art.arcane.gloss.doc.GlossDocument;
 import art.arcane.gloss.doc.ShippedDefaults;
@@ -79,12 +80,13 @@ public final class AnimationService {
                 "animations/rainbow.json: upgraded the unchanged prior shipped default to the smooth RGB gradient.");
         }
         registry.reload();
-        rebuild();
+        rebuild(registry.snapshot());
         plugin.watchdog().register("animations", this::pollRegistry);
     }
 
     public void disable() {
         plugin.watchdog().unregister("animations");
+        registry.close();
         unregisterFunctions();
         frameCache.clear();
         clips = List.of();
@@ -129,18 +131,18 @@ public final class AnimationService {
     }
 
     private void pollRegistry() {
-        if (registry.poll().isEmpty()) {
+        DocumentDelta delta = registry.poll();
+        if (delta.isEmpty()) {
             return;
         }
-
-        rebuild();
+        registry.apply(delta, () -> rebuild(registry.snapshot(delta)));
     }
 
-    private synchronized void rebuild() {
+    private synchronized void rebuild(Map<String, GlossDocument<AnimationDoc>> documents) {
         unregisterFunctions();
         frameCache.clear();
-        List<AnimationClip> loaded = new ArrayList<>(registry.snapshot().size());
-        for (GlossDocument<AnimationDoc> document : registry.snapshot().values()) {
+        List<AnimationClip> loaded = new ArrayList<>(documents.size());
+        for (GlossDocument<AnimationDoc> document : documents.values()) {
             AnimationDoc doc = document.value();
             loaded.add(new AnimationClip(document.id(), 1000.0D / doc.frameIntervalMs(), doc.toMode(), doc.frames()));
         }

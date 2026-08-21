@@ -90,6 +90,7 @@ public final class MenuCatalog {
     if (Gloss.instance != null && Gloss.instance.watchdog() != null) {
       Gloss.instance.watchdog().unregister(KIND);
     }
+    registry.close();
     legacyImporter.shutdown();
     menuMutations.shutdown();
   }
@@ -288,17 +289,18 @@ public final class MenuCatalog {
     if (delta.isEmpty()) {
       return;
     }
-    boolean scheduled = SchedulerUtils.runGlobal(Gloss.instance, () -> applyDelta(delta, known));
+    boolean scheduled = registry.dispatch(delta,
+        task -> SchedulerUtils.runGlobal(Gloss.instance, task), () -> applyDelta(delta, known));
     if (!scheduled) {
       Gloss.log(Level.WARNING,
-          "Menu hot reload could not reach the server thread; %d change(s) were skipped.",
+          "Menu hot reload could not reach the server thread; %d change(s) will be retried.",
           delta.loaded().size() + delta.removed().size());
     }
   }
 
   private void applyDelta(DocumentDelta delta, Set<String> known) {
     for (String id : delta.loaded()) {
-      GlossDocument<MenuDefinitionData> document = registry.get(id);
+      GlossDocument<MenuDefinitionData> document = registry.get(delta, id);
       if (document == null) {
         continue;
       }

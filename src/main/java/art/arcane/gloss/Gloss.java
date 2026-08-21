@@ -68,9 +68,11 @@ import org.bukkit.plugin.java.JavaPlugin;
 
 import javax.imageio.ImageIO;
 import java.io.IOException;
+import java.nio.file.NoSuchFileException;
 import java.util.ArrayDeque;
 import java.util.Collection;
 import java.util.Deque;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -82,10 +84,12 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
     public static Gloss instance;
 
     private final Deque<Runnable> teardowns = new ArrayDeque<>();
+    private final AtomicLong configReloadGeneration = new AtomicLong();
 
     private SchedulerRuntime scheduler;
     private GlossConfigLoader configLoader;
     private FileWatcher configWatcher;
+    private volatile GlossConfigLoader.ReloadSnapshot pendingConfigSnapshot;
     private DataWatchdog watchdog;
     private volatile GlossConfig config;
     private TextPipeline text;
@@ -324,13 +328,31 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
      * mention.
      */
     public void reloadAll() {
-        applyReloadedConfig(true);
+        configReloadGeneration.incrementAndGet();
+        pendingConfigSnapshot = null;
+        try {
+            applyReloadedConfig(true);
+        } finally {
+            DataWatchdog current = watchdog;
+            if (current != null) {
+                current.deferAutomaticPass();
+            }
+        }
     }
 
     private void applyReloadedConfig(boolean cycleEveryService) {
+        applyReloadedConfig(cycleEveryService, null);
+    }
+
+    private void applyReloadedConfig(
+        boolean cycleEveryService,
+        GlossConfigLoader.ReloadSnapshot reloadSnapshot
+    ) {
         GlossConfigFile reloaded;
         try {
-            reloaded = configLoader.loadForReload();
+            reloaded = reloadSnapshot == null
+                ? configLoader.loadForReload()
+                : configLoader.loadForReload(reloadSnapshot);
         } catch (IOException failure) {
             logExceptionStack(false, failure,
                 "config.toml is invalid; keeping the last good configuration.");
@@ -433,7 +455,11 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
     }
 
     private void startDataWatchdog() {
+        FileWatcher previous = configWatcher;
         configWatcher = new FileWatcher(configLoader.file());
+        if (previous != null) {
+            previous.close();
+        }
         watchdog.register("config", this::configWatchTick);
         watchdog.start(config.hotload().watchIntervalTicks());
     }
@@ -441,7 +467,11 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
     private void stopDataWatchdog() {
         watchdog.stop();
         watchdog.unregister("config");
+        FileWatcher previous = configWatcher;
         configWatcher = null;
+        if (previous != null) {
+            previous.close();
+        }
     }
 
     /**
@@ -454,26 +484,56 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
 
     private void stopLocaleWatcher() {
         watchdog.unregister(LOCALE_WATCHDOG_ENTRY);
+        if (localization != null) {
+            localization.close();
+        }
     }
 
     /**
-     * Runs on the watchdog IO thread. The stat and the self-write hash are exactly the work that
-     * belongs there; the reload itself cycles services that spawn entities and send packets, so it
-     * hops to the server context. The self-write guard stays ahead of the hop so Gloss never
-     * reloads its own canonicalising rewrite of config.toml.
+     * Runs on the watchdog IO thread. Snapshot capture and self-write comparison happen here; the
+     * reload itself cycles services that spawn entities and send packets, so it hops to the server
+     * context. Two consecutive passes must see the same bytes before an automatic apply starts.
      */
     private void configWatchTick() {
+        long reloadGeneration = configReloadGeneration.get();
         FileWatcher watcher = configWatcher;
-        if (watcher == null || !watcher.checkModified()) {
+        if (watcher == null) {
             return;
         }
-        if (configLoader.isSelfWrite()) {
+        boolean watcherChanged = watcher.checkModified();
+        GlossConfigLoader.ReloadSnapshot snapshot;
+        try {
+            snapshot = configLoader.captureReloadSnapshot();
+        } catch (NoSuchFileException missing) {
+            pendingConfigSnapshot = null;
+            return;
+        } catch (IOException failure) {
+            throw new IllegalStateException("Could not capture a stable config.toml snapshot", failure);
+        }
+        boolean selfWrite = configLoader.isSelfWrite(snapshot);
+        if (!watcherChanged && selfWrite) {
+            pendingConfigSnapshot = null;
             return;
         }
+        if (selfWrite) {
+            pendingConfigSnapshot = null;
+            return;
+        }
+        GlossConfigLoader.ReloadSnapshot pending = pendingConfigSnapshot;
+        if (pending == null || !pending.sha256().equals(snapshot.sha256())) {
+            pendingConfigSnapshot = snapshot;
+            return;
+        }
+        pendingConfigSnapshot = null;
         info("config.toml changed on disk; reloading.");
-        if (SchedulerUtils.runGlobal(this, () -> applyReloadedConfig(false))) {
+        if (SchedulerUtils.runGlobal(this, () -> {
+            if (reloadGeneration == configReloadGeneration.get()) {
+                applyReloadedConfig(false, snapshot);
+            }
+        })) {
             return;
         }
+        pendingConfigSnapshot = snapshot;
         warn("config.toml reload could not be scheduled onto the server thread; skipping this pass.");
     }
 
@@ -791,6 +851,10 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
     }
 
     private void shutdownServices() {
+        DataWatchdog currentWatchdog = watchdog;
+        if (currentWatchdog != null) {
+            currentWatchdog.stop();
+        }
         if (metrics != null) {
             metrics.shutdown();
             metrics = null;

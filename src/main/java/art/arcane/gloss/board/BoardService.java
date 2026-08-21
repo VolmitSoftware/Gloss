@@ -8,6 +8,7 @@ import art.arcane.gloss.doc.DocumentStore;
 import art.arcane.gloss.doc.GlossDocument;
 import art.arcane.gloss.doc.ShippedDefaults;
 import art.arcane.gloss.doc.ShippedDocumentCatalog;
+import art.arcane.volmlib.util.scheduling.SchedulerUtils;
 import art.arcane.gloss.text.TextPipeline;
 import art.arcane.volmlib.util.board.Board;
 import art.arcane.volmlib.util.board.BoardManager;
@@ -126,6 +127,7 @@ public final class BoardService implements Listener {
     public void disable() {
         HandlerList.unregisterAll(this);
         plugin.watchdog().unregister("boards");
+        registry.close();
         BoardManager<Board> activeManager = manager;
         manager = null;
         if (activeManager != null) {
@@ -355,9 +357,16 @@ public final class BoardService implements Listener {
         if (delta.isEmpty()) {
             return;
         }
+        if (!registry.dispatch(delta, task -> SchedulerUtils.runGlobal(plugin, task),
+            () -> applyRegistryDelta(delta))) {
+            Gloss.warn("Board hot reload could not reach the server thread; the change will be retried.");
+        }
+    }
+
+    private void applyRegistryDelta(DocumentDelta delta) {
         boolean dirty = false;
         for (String id : delta.loaded()) {
-            GlossDocument<BoardDoc> document = registry.get(id);
+            GlossDocument<BoardDoc> document = registry.get(delta, id);
             if (document == null) {
                 continue;
             }
