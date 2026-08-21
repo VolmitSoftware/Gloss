@@ -105,7 +105,8 @@ follow. These are genuine physics changes, not illusions:
   the item is airborne, on top of vanilla gravity. At exactly `0` the entity's gravity flag is
   cleared and the item hangs in place; the flag is restored when the presentation ends. Because the
   correction lands once per update rather than once per tick, the effective acceleration is an
-  approximation, and it gets coarser as `limits.updateIntervalTicks` rises.
+  approximation, and it gets coarser as `limits.updateIntervalTicks` rises. At exactly `0`, Gloss
+  also clears existing vertical velocity and restores the entity's original gravity flag later.
 - `bounce` — vanilla items do not bounce at all. Gloss detects the landing tick (the item is on the
   ground now, was not last update, and was approaching faster than 0.08 blocks per tick) and
   rewrites the vertical velocity to `-approachSpeed * bounce`. The item really leaves the ground.
@@ -123,7 +124,7 @@ Physics only applies to items that currently have a Gloss presentation. A drop e
 `filters`, or one that lost its slot to `limits.maxVisualsPerChunk`, falls exactly as vanilla does.
 
 **The `script` block moves the picture only.** `offset`, `rotation`, `scale`, `glow` and `visible`
-drive the `ItemDisplay` entities that stand in for the item. The item entity itself does not move,
+drive the `ItemDisplay` or `BlockDisplay` entities that stand in for the item. The item entity itself does not move,
 so:
 
 - A scripted bob or a large `offset` visually separates the model from the thing a player walks over
@@ -148,8 +149,8 @@ The `script` block cannot do it and should not be presented as if it can.
    operator finds out immediately rather than when they flip the switch.
 2. If `script.enabled` is false, nothing else happens. The presentation is what it was before the
    block existed.
-3. If it is true, the compiled plan is evaluated once **per display, per update**. A stack with
-   three models evaluates the whole script three times per update, with `index` running 0, 1, 2.
+3. If it is true, a plan that does not reference `index` is evaluated once per stack and
+   shared by its displays. Per-model plans evaluate with `index` running from 0 to `count - 1`.
 4. Within one evaluation: `vars` are evaluated first in declaration order, then `offset`, `rotation`,
    `scale`, `glow`, `visible`.
 5. The results compose onto what the document already computed. They never replace it:
@@ -163,7 +164,8 @@ example `"lit": "materialMatches('*_TORCH') ? 1 : 0"` then `lit > 0` later.
 
 Environment probing (`height`, `blockLight`, `skyLight`) costs block lookups, so it is only
 performed when at least one expression in the document actually references one of those three names.
-A document that never mentions them pays nothing.
+A document that never mentions them pays nothing. Static settled plans also stop reevaluating until
+the animation changes; plans referencing time, motion, or environment inputs retain sparse updates.
 
 ---
 
@@ -180,6 +182,9 @@ All variables are read-only. Numbers are doubles; there are no integers in the l
 | `amount` | number | Items in the stack. |
 | `onGround` | boolean | The item entity reports standing on a block. |
 | `settled` | boolean | The item has come to rest and landing detection has finished; it is now polled at the slow interval. |
+| `phase` | string | Current unified animation phase: `AIRBORNE`, `REBOUNDING`, `ROLLING`, `SETTLING`, `SETTLED`, or `SUBMERGED`. |
+| `stateTime` | number | Seconds spent in the current animation phase. Resets when `phase` changes. |
+| `impactSpeed` | number | Downward approach speed captured at the latest impact. |
 | `inWater` | boolean | `Item.isInWater()`. |
 | `inLava` | boolean | The block at the item's position is lava. |
 | `bounces` | number | Landings counted for this item so far, whether or not `motion.changeOnBounce` is on. |
@@ -187,13 +192,13 @@ All variables are read-only. Numbers are doubles; there are no integers in the l
 | `velocityY` | number | Velocity along Y, blocks per tick. Negative when falling. |
 | `velocityZ` | number | Velocity along Z, blocks per tick. |
 | `speed` | number | Magnitude of that velocity vector. |
-| `height` | number | Blocks between the item and the top of the first solid block below it, probed up to 32 blocks down. 0 when resting, and 0 when nothing was found within the probe. Only computed if referenced. |
+| `height` | number | Blocks between the item and the collision-shape surface below it, probed up to 32 blocks down. Slabs, stairs, snow and other partial blocks use their real collision boxes. Only computed if referenced. |
 | `blockLight` | number | Block light level at the item's position, 0 to 15. Only computed if referenced. |
 | `skyLight` | number | Sky light level at the item's position, 0 to 15. Only computed if referenced. |
 | `random` | number | A value in `[0, 1)` derived from the item's UUID. Fixed for the lifetime of the item, so a value built on it never flickers. |
 | `material` | string | The item's material name, upper case, no namespace, e.g. `"REDSTONE_TORCH"`. |
 | `isBlock` | boolean | This item resolved to the full-block scale family (`scale.defaultScale`). |
-| `isFlat` | boolean | This item resolved to the flat-sprite scale family (`scale.flatItems`): every non-block item, plus flat-model blocks such as torches, rails, signs and doors. |
+| `isFlat` | boolean | This item resolved to the non-block ItemDisplay scale family (`scale.flatItems`). Placeable materials use BlockDisplay regardless of their inventory icon. |
 | `isThin` | boolean | This item resolved to the thin scale family (`scale.thinBlocks`): slabs, carpets, pressure plates and snow. |
 | `pi` | number | 3.14159... |
 
@@ -370,11 +375,11 @@ floating. The two halves are independent: `physics` lifts the item, `script` ani
   "script": {
     "enabled": true,
     "vars": {
-      "phase": "t * 2 + index * 1.2 + random * 6.283",
-      "bob": "inWater ? sin(phase) * 0.09 : 0"
+      "wavePhase": "t * 2 + index * 1.2 + random * 6.283",
+      "bob": "inWater ? sin(wavePhase) * 0.09 : 0"
     },
     "offset":   { "y": "bob" },
-    "rotation": { "z": "inWater ? sin(phase) * 6 : 0", "y": "inWater ? t * 20 : 0" }
+    "rotation": { "z": "inWater ? sin(wavePhase) * 6 : 0", "y": "inWater ? t * 20 : 0" }
   }
 }
 ```
