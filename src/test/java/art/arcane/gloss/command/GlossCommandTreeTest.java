@@ -201,7 +201,7 @@ class GlossCommandTreeTest {
     }
 
     @Test
-    void rootAndSubmenuHelpStayWithinNineteenLines() {
+    void rootAndSubmenuHelpUseCurrentEntryBudget() {
         DirectorRuntimeEngine engine = DirectorEngineFactory.create(new CommandGloss(null));
         DirectorMiniMenu.DirectorHelpPage root = DirectorMiniMenu.resolveHelp(
                 engine, List.of()).orElseThrow();
@@ -211,8 +211,8 @@ class GlossCommandTreeTest {
         Assertions.assertEquals(16, root.entries().size());
         Assertions.assertEquals(18, DirectorMiniMenu.render(
                 root, GlossCommandService.menuTheme(), GlossLocalization.globalDirectorResolver()).size());
-        Assertions.assertEquals(16, submenu.entries().size());
-        Assertions.assertEquals(DirectorMiniMenu.MENU_LINE_COUNT, DirectorMiniMenu.render(
+        Assertions.assertEquals(DirectorMiniMenu.MAX_ENTRIES_PER_PAGE, submenu.entries().size());
+        Assertions.assertEquals(DirectorMiniMenu.MAX_ENTRIES_PER_PAGE + 3, DirectorMiniMenu.render(
                 submenu, GlossCommandService.menuTheme(), GlossLocalization.globalDirectorResolver()).size());
     }
 

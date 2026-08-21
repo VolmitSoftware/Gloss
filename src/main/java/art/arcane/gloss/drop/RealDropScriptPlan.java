@@ -28,9 +28,14 @@ final class RealDropScriptPlan {
     static final double MAX_SCALE_FACTOR = 16.0D;
 
     static final Set<String> ENVIRONMENT_VARIABLES = Set.of("height", "blockLight", "skyLight");
+    static final Set<String> PER_MODEL_VARIABLES = Set.of("index");
+    static final Set<String> CONTINUOUS_VARIABLES = Set.of(
+        "t", "age", "stateTime", "velocityX", "velocityY", "velocityZ", "speed",
+        "height", "blockLight", "skyLight");
     static final Set<String> VARIABLES = Set.of(
         "t", "age", "index", "count", "amount",
-        "onGround", "settled", "inWater", "inLava", "bounces",
+        "onGround", "settled", "phase", "stateTime", "impactSpeed",
+        "inWater", "inLava", "bounces",
         "velocityX", "velocityY", "velocityZ", "speed",
         "height", "blockLight", "skyLight",
         "random", "material", "isBlock", "isFlat", "isThin", "pi");
@@ -53,6 +58,8 @@ final class RealDropScriptPlan {
     private final Expr glow;
     private final Expr visible;
     private final boolean environmentRequired;
+    private final boolean perModelRequired;
+    private final boolean continuousUpdatesRequired;
     private final AtomicBoolean runtimeFailureWarned;
 
     private RealDropScriptPlan(GlossConfig.RealDrops.Script script) {
@@ -79,6 +86,8 @@ final class RealDropScriptPlan {
         glow = script.glow().isBlank() ? null : compile("script.glow", script.glow(), declared, referenced);
         visible = compile("script.visible", script.visible(), declared, referenced);
         environmentRequired = !Collections.disjoint(referenced, ENVIRONMENT_VARIABLES);
+        perModelRequired = !Collections.disjoint(referenced, PER_MODEL_VARIABLES);
+        continuousUpdatesRequired = !Collections.disjoint(referenced, CONTINUOUS_VARIABLES);
         runtimeFailureWarned = new AtomicBoolean();
         validateSamples();
     }
@@ -93,6 +102,14 @@ final class RealDropScriptPlan {
 
     boolean environmentRequired() {
         return environmentRequired;
+    }
+
+    boolean perModelRequired() {
+        return perModelRequired;
+    }
+
+    boolean continuousUpdatesRequired() {
+        return continuousUpdatesRequired;
     }
 
     RealDropScriptSample sample(RealDropScriptContext context) {
@@ -168,13 +185,17 @@ final class RealDropScriptPlan {
     }
 
     private void validateSamples() {
-        validateSample(new RealDropScriptContext(0.0D, 0, 0, 1, 1, false, false, false, false, 0,
+        validateSample(new RealDropScriptContext(0.0D, 0, 0, 1, 1, false, false,
+            "AIRBORNE", 0.0D, 0.0D, false, false, 0,
             0.0D, -0.4D, 0.0D, 4.0D, 15, 15, 0.25D, "STONE", RealDropModel.ModelKind.BLOCK));
-        validateSample(new RealDropScriptContext(1.5D, 30, 1, 3, 32, true, false, false, false, 2,
+        validateSample(new RealDropScriptContext(1.5D, 30, 1, 3, 32, true, false,
+            "ROLLING", 0.2D, 0.7D, false, false, 2,
             0.12D, 0.0D, -0.08D, 0.0D, 7, 0, 0.75D, "TORCH", RealDropModel.ModelKind.FLAT));
-        validateSample(new RealDropScriptContext(9.0D, 180, 2, 3, 64, true, true, true, false, 3,
+        validateSample(new RealDropScriptContext(9.0D, 180, 2, 3, 64, true, true,
+            "SETTLED", 4.0D, 0.4D, true, false, 3,
             0.0D, 0.0D, 0.0D, 0.5D, 0, 4, 0.5D, "OAK_SLAB", RealDropModel.ModelKind.THIN));
-        validateSample(new RealDropScriptContext(45.0D, 900, 0, 2, 8, false, false, false, true, 11,
+        validateSample(new RealDropScriptContext(45.0D, 900, 0, 2, 8, false, false,
+            "SUBMERGED", 2.0D, 0.9D, false, true, 11,
             -0.3D, 0.6D, 0.3D, 12.0D, 15, 15, 0.99D, "DIAMOND", RealDropModel.ModelKind.FLAT));
     }
 
@@ -404,6 +425,9 @@ final class RealDropScriptPlan {
         int amount,
         boolean onGround,
         boolean settled,
+        String phase,
+        double stateTime,
+        double impactSpeed,
         boolean inWater,
         boolean inLava,
         int bounces,
@@ -482,6 +506,9 @@ final class RealDropScriptPlan {
                 case "amount" -> (double) context.amount();
                 case "onGround" -> context.onGround();
                 case "settled" -> context.settled();
+                case "phase" -> context.phase();
+                case "stateTime" -> context.stateTime();
+                case "impactSpeed" -> context.impactSpeed();
                 case "inWater" -> context.inWater();
                 case "inLava" -> context.inLava();
                 case "bounces" -> (double) context.bounces();

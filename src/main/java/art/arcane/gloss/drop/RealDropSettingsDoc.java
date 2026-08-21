@@ -21,7 +21,8 @@ public record RealDropSettingsDoc(
     Labels labels,
     Filters filters,
     Physics physics,
-    Script script
+    Script script,
+    Animation animation
 ) {
     public static final String KIND = "real-drops";
     public static final String DEFAULT_ID = "default";
@@ -37,6 +38,7 @@ public record RealDropSettingsDoc(
         null,
         null,
         null,
+        null,
         null);
 
     public RealDropSettingsDoc {
@@ -44,13 +46,15 @@ public record RealDropSettingsDoc(
         DocumentEnvelope.requireRevision(KIND, revision);
         limits = limits == null ? new Limits(null, null, null, null, null, null) : limits;
         scale = scale == null ? new Scale(null, null, null) : scale;
-        motion = motion == null ? new Motion(null, null, null, null, null, null, null) : motion;
-        landing = landing == null ? new Landing(null, null, null, null) : landing;
+        motion = motion == null ? new Motion(
+            null, null, null, null, null, null, null, null, null, null) : motion;
+        landing = landing == null ? new Landing(null, null, null, null, null, null, null, null) : landing;
         labels = labels == null ? new Labels(null, null, null, null, null, null, null, null,
             null, null, null, null) : labels;
         filters = filters == null ? new Filters(null, null, null) : filters;
         physics = physics == null ? new Physics(null, null, null, null, null) : physics;
         script = script == null ? new Script(null, null, null, null, null, null, null) : script;
+        animation = animation == null ? new Animation(null, null, null) : animation;
     }
 
     public static RealDropSettingsDoc parse(String fileName, String raw) {
@@ -78,12 +82,19 @@ public record RealDropSettingsDoc(
                 motion.degreesPerSecondY().floatValue(),
                 motion.degreesPerSecondZ().floatValue(),
                 motion.variance().floatValue(),
-                motion.changeOnBounce()),
+                motion.changeOnBounce(),
+                motion.velocityInfluence().floatValue(),
+                motion.submergedSpinMultiplier().floatValue(),
+                motion.groundRollMultiplier().floatValue()),
             new GlossConfig.RealDrops.Landing(
                 landing.mode(),
                 landing.tiltDegrees().floatValue(),
                 landing.randomYaw(),
-                landing.transitionTicks()),
+                landing.transitionTicks(),
+                landing.faceAttraction().floatValue(),
+                landing.movingFaceAttraction().floatValue(),
+                landing.alignmentDegrees().floatValue(),
+                landing.settleDelayTicks()),
             new GlossConfig.RealDrops.Labels(
                 labels.enabled(),
                 labels.yOffset().floatValue(),
@@ -107,7 +118,8 @@ public record RealDropSettingsDoc(
                 physics.bounce().floatValue(),
                 physics.waterBuoyancy().floatValue(),
                 physics.waterDrag().floatValue()),
-            script.toConfig());
+            script.toConfig(),
+            animation.toConfig());
     }
 
     public record Limits(
@@ -143,7 +155,10 @@ public record RealDropSettingsDoc(
         Double degreesPerSecondY,
         Double degreesPerSecondZ,
         Double variance,
-        Boolean changeOnBounce
+        Boolean changeOnBounce,
+        Double velocityInfluence,
+        Double submergedSpinMultiplier,
+        Double groundRollMultiplier
     ) {
         public Motion {
             tumble = tumble == null || tumble;
@@ -153,15 +168,31 @@ public record RealDropSettingsDoc(
             degreesPerSecondZ = clamp(degreesPerSecondZ, -1440.0D, 1440.0D, 100.0D);
             variance = clamp(variance, 0.0D, 1.0D, 0.2D);
             changeOnBounce = changeOnBounce == null || changeOnBounce;
+            velocityInfluence = clamp(velocityInfluence, 0.0D, 4.0D, 0.35D);
+            submergedSpinMultiplier = clamp(submergedSpinMultiplier, 0.0D, 1.0D, 0.35D);
+            groundRollMultiplier = clamp(groundRollMultiplier, 0.0D, 4.0D, 1.0D);
         }
     }
 
-    public record Landing(String mode, Double tiltDegrees, Boolean randomYaw, Integer transitionTicks) {
+    public record Landing(
+        String mode,
+        Double tiltDegrees,
+        Boolean randomYaw,
+        Integer transitionTicks,
+        Double faceAttraction,
+        Double movingFaceAttraction,
+        Double alignmentDegrees,
+        Integer settleDelayTicks
+    ) {
         public Landing {
             mode = choice(mode, "NATURAL", "FLAT", "UPRIGHT");
             tiltDegrees = clamp(tiltDegrees, 0.0D, 45.0D, 10.0D);
             randomYaw = randomYaw == null || randomYaw;
             transitionTicks = clamp(transitionTicks, 0, 20, 4);
+            faceAttraction = clamp(faceAttraction, 0.0D, 1.0D, 0.55D);
+            movingFaceAttraction = clamp(movingFaceAttraction, 0.0D, 1.0D, 0.15D);
+            alignmentDegrees = clamp(alignmentDegrees, 0.05D, 10.0D, 0.5D);
+            settleDelayTicks = clamp(settleDelayTicks, 0, 100, 4);
         }
     }
 
@@ -309,6 +340,188 @@ public record RealDropSettingsDoc(
         }
     }
 
+    public record MaterialProperties(Double glow, Double lightLevel) {
+        public MaterialProperties {
+            glow = clamp(glow, 0.0D, 4294967295.0D, 0.0D);
+            lightLevel = clamp(lightLevel, 0.0D, 15.0D, 0.0D);
+        }
+
+        GlossConfig.RealDrops.MaterialProperties toConfig() {
+            return new GlossConfig.RealDrops.MaterialProperties(glow, lightLevel);
+        }
+    }
+
+    public record AnimationKeyframe(
+        Double tick,
+        Double value,
+        String materialMap,
+        String easing
+    ) {
+        public AnimationKeyframe {
+            tick = clamp(tick, 0.0D, 1000000.0D, 0.0D);
+            value = finite(value, 0.0D);
+            materialMap = materialMap == null ? "" : materialMap.trim();
+            easing = choice(easing, "LINEAR", "HOLD", "EASE_IN", "EASE_OUT", "EASE_IN_OUT", "BACK_OUT");
+        }
+
+        GlossConfig.RealDrops.AnimationKeyframe toConfig() {
+            return new GlossConfig.RealDrops.AnimationKeyframe(
+                tick,
+                value,
+                materialMap,
+                GlossConfig.RealDrops.AnimationEasing.valueOf(easing));
+        }
+    }
+
+    public record AnimationTrack(String target, String blend, List<AnimationKeyframe> keyframes) {
+        public AnimationTrack {
+            target = choice(target, "OFFSET_X", "OFFSET_Y", "OFFSET_Z", "ROTATION_X", "ROTATION_Y",
+                "ROTATION_Z", "SCALE_X", "SCALE_Y", "SCALE_Z", "GLOW", "VISIBLE", "PHYSICS",
+                "LIGHT_LEVEL");
+            blend = choice(blend, "ADD", "REPLACE", "MULTIPLY");
+            keyframes = keyframes == null ? List.of() : List.copyOf(keyframes);
+        }
+
+        GlossConfig.RealDrops.AnimationTrack toConfig() {
+            List<GlossConfig.RealDrops.AnimationKeyframe> converted = new ArrayList<>(keyframes.size());
+            for (AnimationKeyframe keyframe : keyframes) {
+                if (keyframe != null) {
+                    converted.add(keyframe.toConfig());
+                }
+            }
+            return new GlossConfig.RealDrops.AnimationTrack(
+                GlossConfig.RealDrops.AnimationTarget.valueOf(target),
+                GlossConfig.RealDrops.AnimationBlend.valueOf(blend),
+                List.copyOf(converted));
+        }
+    }
+
+    public record AnimationClip(
+        String trigger,
+        Double durationTicks,
+        Boolean loop,
+        List<AnimationTrack> tracks
+    ) {
+        public AnimationClip {
+            trigger = choice(trigger, "SPAWN", "AIRBORNE", "REBOUNDING", "ROLLING", "SLIDING", "SETTLING",
+                "SETTLED", "SUBMERGED", "FLOATING", "IMPACT", "BOUNCE", "ENTER_FLUID", "EXIT_FLUID",
+                "START_ROLL", "SETTLE", "WAKE");
+            durationTicks = clamp(durationTicks, 0.0D, 1000000.0D, 0.0D);
+            loop = loop != null && loop;
+            tracks = tracks == null ? List.of() : List.copyOf(tracks);
+        }
+
+        GlossConfig.RealDrops.AnimationClip toConfig() {
+            List<GlossConfig.RealDrops.AnimationTrack> converted = new ArrayList<>(tracks.size());
+            for (AnimationTrack track : tracks) {
+                if (track != null) {
+                    converted.add(track.toConfig());
+                }
+            }
+            return new GlossConfig.RealDrops.AnimationClip(
+                GlossConfig.RealDrops.AnimationTrigger.valueOf(trigger),
+                durationTicks,
+                loop,
+                List.copyOf(converted));
+        }
+    }
+
+    public record AnimationProfile(
+        String id,
+        Integer priority,
+        List<String> materials,
+        List<AnimationClip> clips
+    ) {
+        public AnimationProfile {
+            id = id == null || id.isBlank() ? "default" : id.trim();
+            priority = clamp(priority, -10000, 10000, 0);
+            materials = materials == null || materials.isEmpty() ? List.of("*") : clean(materials);
+            clips = clips == null ? List.of() : List.copyOf(clips);
+        }
+
+        GlossConfig.RealDrops.AnimationProfile toConfig() {
+            List<GlossConfig.RealDrops.AnimationClip> converted = new ArrayList<>(clips.size());
+            for (AnimationClip clip : clips) {
+                if (clip != null) {
+                    converted.add(clip.toConfig());
+                }
+            }
+            return new GlossConfig.RealDrops.AnimationProfile(
+                id,
+                priority,
+                materials,
+                List.copyOf(converted));
+        }
+    }
+
+    public record Animation(
+        Boolean enabled,
+        Map<String, Map<String, MaterialProperties>> materialProperties,
+        List<AnimationProfile> profiles
+    ) {
+        public Animation {
+            enabled = enabled != null && enabled;
+            materialProperties = cleanMaterialProperties(materialProperties);
+            profiles = profiles == null ? List.of() : List.copyOf(profiles);
+            RealDropAnimationPlan.validate(config(enabled, materialProperties, profiles));
+        }
+
+        GlossConfig.RealDrops.RealDropAnimation toConfig() {
+            return config(enabled, materialProperties, profiles);
+        }
+
+        private static GlossConfig.RealDrops.RealDropAnimation config(
+            boolean enabled,
+            Map<String, Map<String, MaterialProperties>> materialProperties,
+            List<AnimationProfile> profiles
+        ) {
+            Map<String, Map<String, GlossConfig.RealDrops.MaterialProperties>> convertedProperties =
+                new LinkedHashMap<>(materialProperties.size());
+            for (Map.Entry<String, Map<String, MaterialProperties>> group : materialProperties.entrySet()) {
+                Map<String, GlossConfig.RealDrops.MaterialProperties> converted =
+                    new LinkedHashMap<>(group.getValue().size());
+                for (Map.Entry<String, MaterialProperties> entry : group.getValue().entrySet()) {
+                    converted.put(entry.getKey(), entry.getValue().toConfig());
+                }
+                convertedProperties.put(group.getKey(), Collections.unmodifiableMap(converted));
+            }
+            List<GlossConfig.RealDrops.AnimationProfile> convertedProfiles = new ArrayList<>(profiles.size());
+            for (AnimationProfile profile : profiles) {
+                if (profile != null) {
+                    convertedProfiles.add(profile.toConfig());
+                }
+            }
+            return new GlossConfig.RealDrops.RealDropAnimation(
+                enabled,
+                Collections.unmodifiableMap(convertedProperties),
+                List.copyOf(convertedProfiles));
+        }
+
+        private static Map<String, Map<String, MaterialProperties>> cleanMaterialProperties(
+            Map<String, Map<String, MaterialProperties>> source
+        ) {
+            if (source == null || source.isEmpty()) {
+                return Map.of();
+            }
+            Map<String, Map<String, MaterialProperties>> cleaned = new LinkedHashMap<>(source.size());
+            for (Map.Entry<String, Map<String, MaterialProperties>> group : source.entrySet()) {
+                String name = group.getKey() == null ? "" : group.getKey().trim();
+                if (name.isEmpty() || group.getValue() == null) {
+                    continue;
+                }
+                Map<String, MaterialProperties> entries = new LinkedHashMap<>(group.getValue().size());
+                for (Map.Entry<String, MaterialProperties> entry : group.getValue().entrySet()) {
+                    String material = entry.getKey() == null ? "" : entry.getKey().trim();
+                    if (!material.isEmpty() && entry.getValue() != null) {
+                        entries.put(material, entry.getValue());
+                    }
+                }
+                cleaned.put(name, Collections.unmodifiableMap(entries));
+            }
+            return Collections.unmodifiableMap(cleaned);
+        }
+    }
+
     private static int clamp(Integer value, int minimum, int maximum, int fallback) {
         int selected = value == null ? fallback : value;
         return Math.max(minimum, Math.min(maximum, selected));
@@ -317,6 +530,10 @@ public record RealDropSettingsDoc(
     private static double clamp(Double value, double minimum, double maximum, double fallback) {
         double selected = value == null || !Double.isFinite(value) ? fallback : value;
         return Math.max(minimum, Math.min(maximum, selected));
+    }
+
+    private static double finite(Double value, double fallback) {
+        return value == null || !Double.isFinite(value) ? fallback : value;
     }
 
     private static String choice(String value, String... allowed) {

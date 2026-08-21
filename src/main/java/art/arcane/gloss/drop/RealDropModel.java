@@ -3,23 +3,12 @@ package art.arcane.gloss.drop;
 import art.arcane.gloss.GlossConfig;
 import org.bukkit.Material;
 import org.joml.Quaternionf;
-
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.nio.charset.StandardCharsets;
-import java.util.HashSet;
-import java.util.Set;
 import java.util.UUID;
 
 final class RealDropModel {
-    private static final String FLAT_BLOCK_ITEMS_RESOURCE = "/model-shapes/vanilla-flat-block-items.txt";
     private static final float DEG_TO_RAD = (float) (Math.PI / 180.0D);
     private static final float HALF_PI = (float) (Math.PI * 0.5D);
     private static final float STACK_YAW_RADIANS = 0.41F;
-    private static final float FACE_ALIGNMENT_RADIANS = 0.008726646F;
-    private static final double SETTLED_HORIZONTAL_VELOCITY_SQUARED = 0.000001D;
 
     private static final Offset[] OFFSETS = {
         new Offset(0.0F, 0.0F, 0.0F),
@@ -28,8 +17,6 @@ final class RealDropModel {
         new Offset(0.4F, 0.12F, -0.65F),
         new Offset(-0.7F, 0.16F, -0.35F)
     };
-    private static final Set<String> FLAT_BLOCK_ITEMS = loadFlatBlockItems();
-
     private RealDropModel() {
     }
 
@@ -55,7 +42,7 @@ final class RealDropModel {
     }
 
     static ModelKind modelKind(String materialName, boolean block) {
-        if (!block || FLAT_BLOCK_ITEMS.contains(materialName)) {
+        if (!block) {
             return ModelKind.FLAT;
         }
         if (materialName.endsWith("_SLAB") || materialName.endsWith("_CARPET")
@@ -88,22 +75,11 @@ final class RealDropModel {
 
     private static float authoredYOffset(Material material) {
         String name = material.name();
-        if (name.endsWith("SNOW")) {
-            return 0.2F;
-        }
         if (name.endsWith("TRIDENT")) {
             return 0.32F;
         }
-        if (name.endsWith("_CARPET") || name.endsWith("_PRESSURE_PLATE") || name.endsWith("SHIELD")) {
+        if (name.endsWith("SHIELD")) {
             return 0.26F;
-        }
-        if (name.endsWith("_SLAB") || name.endsWith("_STAIRS") || name.endsWith("_WALL")
-            || name.endsWith("_FENCE") || name.endsWith("_FENCE_GATE") || name.equals("DAYLIGHT_DETECTOR")) {
-            return 0.16F;
-        }
-        if (name.contains("BED") || name.contains("SKULL") || name.contains("HEAD")
-            || name.contains("SCULK") || name.contains("_TRAPDOOR") || name.equals("HEAVY_CORE")) {
-            return 0.22F;
         }
         return 0.0F;
     }
@@ -147,8 +123,9 @@ final class RealDropModel {
                 .rotateY(angles.y() * DEG_TO_RAD)
                 .rotateX(angles.x() * DEG_TO_RAD);
         }
-        if ("NATURAL".equals(landing.mode()) && kind == ModelKind.BLOCK) {
-            return blockLandingRotation(itemId, landing, 0);
+        if ("NATURAL".equals(landing.mode()) && kind != ModelKind.FLAT) {
+            long seed = mix(itemId.getMostSignificantBits() ^ itemId.getLeastSignificantBits());
+            return blockLandingRotation(itemId, landing, (int) Math.floorMod(seed, 6L));
         }
         return quaternion(angles);
     }
@@ -165,16 +142,19 @@ final class RealDropModel {
     }
 
     static BlockRoll groundedBlockRotation(Quaternionf current, double deltaX, double deltaZ,
-                                           double horizontalSpeed, float scale) {
-        Quaternionf rolled = rollRotation(current, deltaX, deltaZ, scale);
+                                           double horizontalSpeed, float scale, float rollMultiplier,
+                                           float faceAttraction, float movingFaceAttraction,
+                                           float alignmentRadians) {
+        Quaternionf rolled = rollRotation(
+            current, deltaX * rollMultiplier, deltaZ * rollMultiplier, scale);
         Quaternionf target = faceAlignedRotation(rolled);
         float difference = rotationDifference(rolled, target);
-        if (difference <= FACE_ALIGNMENT_RADIANS) {
+        if (difference <= alignmentRadians) {
             return new BlockRoll(target, true);
         }
         double speedReference = Math.max(0.02D, scale * 0.25D);
         float motionRatio = (float) Math.min(1.0D, horizontalSpeed / speedReference);
-        float gravityBlend = 0.55F - 0.40F * motionRatio;
+        float gravityBlend = faceAttraction + (movingFaceAttraction - faceAttraction) * motionRatio;
         return new BlockRoll(rolled.slerp(target, gravityBlend), false);
     }
 
@@ -231,6 +211,65 @@ final class RealDropModel {
         return new Quaternionf().rotateY(currentHeading - baseHeading).mul(base);
     }
 
+    static Quaternionf broadFaceAlignedRotation(Quaternionf current) {
+        float x = current.x();
+        float y = current.y();
+        float z = current.z();
+        float w = current.w();
+        float rowZ = 2.0F * (y * z - x * w);
+        int face = rowZ <= 0.0F ? 5 : 4;
+        Quaternionf base = blockFaceRotation(face);
+        float currentHeading = tangentHeading(current, false);
+        float baseHeading = tangentHeading(base, false);
+        return new Quaternionf().rotateY(currentHeading - baseHeading).mul(base);
+    }
+
+    static BlockGeometry blockGeometry(Material material) {
+        String name = material.name();
+        if (name.endsWith("_SLAB")) {
+            return new BlockGeometry(0.5F, 0.25F, 0.5F, 0.5F, 0.25F, 0.5F);
+        }
+        if (name.endsWith("_CARPET")) {
+            return new BlockGeometry(0.5F, 0.03125F, 0.5F, 0.5F, 0.03125F, 0.5F);
+        }
+        if (name.endsWith("_PRESSURE_PLATE")) {
+            return new BlockGeometry(0.5F, 0.03125F, 0.5F, 0.5F, 0.03125F, 0.5F);
+        }
+        if (name.equals("SNOW")) {
+            return new BlockGeometry(0.5F, 0.0625F, 0.5F, 0.5F, 0.0625F, 0.5F);
+        }
+        if (name.equals("CAKE")) {
+            return new BlockGeometry(0.5F, 0.25F, 0.5F, 0.4375F, 0.25F, 0.4375F);
+        }
+        if (name.equals("LANTERN") || name.equals("SOUL_LANTERN")) {
+            return new BlockGeometry(0.5F, 0.34375F, 0.5F, 0.25F, 0.34375F, 0.25F);
+        }
+        if (name.endsWith("_CANDLE") || name.equals("CANDLE")) {
+            return new BlockGeometry(0.5F, 0.1875F, 0.5F, 0.0625F, 0.1875F, 0.0625F);
+        }
+        if (name.endsWith("_BED")) {
+            return new BlockGeometry(0.5F, 0.28125F, 0.5F, 0.5F, 0.28125F, 0.5F);
+        }
+        if (name.endsWith("_SAPLING")) {
+            return new BlockGeometry(0.5F, 0.5F, 0.5F, 0.375F, 0.5F, 0.375F);
+        }
+        return new BlockGeometry(0.5F, 0.5F, 0.5F, 0.5F, 0.5F, 0.5F);
+    }
+
+    static float verticalHalfExtent(BlockGeometry geometry, float scaleX, float scaleY,
+                                    float scaleZ, Quaternionf rotation) {
+        float x = rotation.x();
+        float y = rotation.y();
+        float z = rotation.z();
+        float w = rotation.w();
+        float rowX = 2.0F * (x * y + z * w);
+        float rowY = 1.0F - 2.0F * (x * x + z * z);
+        float rowZ = 2.0F * (y * z - x * w);
+        return Math.abs(rowX) * geometry.halfX() * scaleX
+            + Math.abs(rowY) * geometry.halfY() * scaleY
+            + Math.abs(rowZ) * geometry.halfZ() * scaleZ;
+    }
+
     static float verticalHalfExtent(float scale, Quaternionf rotation) {
         float x = rotation.x();
         float y = rotation.y();
@@ -251,20 +290,6 @@ final class RealDropModel {
             .mul(rotation);
     }
 
-    static LandingMotion landingMotion(boolean onGround, boolean wasOnGround, double horizontalVelocitySquared,
-                                       boolean poseAligned, int stableTicks, GlossConfig.RealDrops config) {
-        int updateTicks = config.limits().updateIntervalTicks();
-        boolean stable = onGround && wasOnGround
-            && horizontalVelocitySquared <= SETTLED_HORIZONTAL_VELOCITY_SQUARED && poseAligned;
-        int nextStableTicks = stable ? stableTicks + updateTicks : 0;
-        int requiredStableTicks = Math.max(updateTicks, config.landing().transitionTicks());
-        if (stable && nextStableTicks >= requiredStableTicks) {
-            return new LandingMotion(nextStableTicks, true,
-                new TickTiming(config.limits().settledPollIntervalTicks(), config.landing().transitionTicks()));
-        }
-        return new LandingMotion(nextStableTicks, false, new TickTiming(updateTicks, updateTicks));
-    }
-
     private static float tangentHeading(Quaternionf rotation, boolean zTangent) {
         float x = rotation.x();
         float y = rotation.y();
@@ -279,7 +304,7 @@ final class RealDropModel {
         return (float) Math.atan2(transformedX, transformedZ);
     }
 
-    private static float rotationDifference(Quaternionf first, Quaternionf second) {
+    static float rotationDifference(Quaternionf first, Quaternionf second) {
         float dot = Math.abs(first.x() * second.x() + first.y() * second.y()
             + first.z() * second.z() + first.w() * second.w());
         return 2.0F * (float) Math.acos(Math.min(1.0F, dot));
@@ -291,25 +316,6 @@ final class RealDropModel {
         return new Quaternionf()
             .rotateY((angles.y() + faceTwist) * DEG_TO_RAD)
             .mul(blockFaceRotation(face));
-    }
-
-    private static Set<String> loadFlatBlockItems() {
-        InputStream input = RealDropModel.class.getResourceAsStream(FLAT_BLOCK_ITEMS_RESOURCE);
-        if (input == null) {
-            throw new IllegalStateException("Missing real-drop model-shape resource: " + FLAT_BLOCK_ITEMS_RESOURCE);
-        }
-        Set<String> materials = new HashSet<>();
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(input, StandardCharsets.UTF_8))) {
-            String line;
-            while ((line = reader.readLine()) != null) {
-                if (!line.isBlank()) {
-                    materials.add(line.trim());
-                }
-            }
-        } catch (IOException failure) {
-            throw new IllegalStateException("Could not read real-drop model shapes", failure);
-        }
-        return Set.copyOf(materials);
     }
 
     private static float varied(float configured, float variance, long seed) {
@@ -348,12 +354,10 @@ final class RealDropModel {
     record Offset(float x, float y, float z) {
     }
 
-    record TickTiming(int pollDelayTicks, int interpolationTicks) {
-    }
-
-    record LandingMotion(int stableTicks, boolean settled, TickTiming timing) {
-    }
-
     record BlockRoll(Quaternionf rotation, boolean aligned) {
+    }
+
+    record BlockGeometry(float centerX, float centerY, float centerZ,
+                         float halfX, float halfY, float halfZ) {
     }
 }

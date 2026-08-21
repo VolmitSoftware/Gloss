@@ -4,6 +4,7 @@ import art.arcane.gloss.config.GlossConfigFile;
 import art.arcane.gloss.drop.RealDropSettingsDoc;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 public record GlossConfig(
@@ -128,7 +129,8 @@ public record GlossConfig(
         Labels labels,
         Filters filters,
         Physics physics,
-        Script script
+        Script script,
+        RealDropAnimation animation
     ) {
         public record Limits(
             int updateIntervalTicks,
@@ -150,11 +152,23 @@ public record GlossConfig(
             float degreesPerSecondY,
             float degreesPerSecondZ,
             float variance,
-            boolean changeOnBounce
+            boolean changeOnBounce,
+            float velocityInfluence,
+            float submergedSpinMultiplier,
+            float groundRollMultiplier
         ) {
         }
 
-        public record Landing(String mode, float tiltDegrees, boolean randomYaw, int transitionTicks) {
+        public record Landing(
+            String mode,
+            float tiltDegrees,
+            boolean randomYaw,
+            int transitionTicks,
+            float faceAttraction,
+            float movingFaceAttraction,
+            float alignmentDegrees,
+            int settleDelayTicks
+        ) {
         }
 
         public record Labels(
@@ -203,6 +217,97 @@ public record GlossConfig(
             Axis scale,
             String glow,
             String visible
+        ) {
+        }
+
+        public enum AnimationTrigger {
+            SPAWN,
+            AIRBORNE,
+            REBOUNDING,
+            ROLLING,
+            SLIDING,
+            SETTLING,
+            SETTLED,
+            SUBMERGED,
+            FLOATING,
+            IMPACT,
+            BOUNCE,
+            ENTER_FLUID,
+            EXIT_FLUID,
+            START_ROLL,
+            SETTLE,
+            WAKE
+        }
+
+        public enum AnimationTarget {
+            OFFSET_X,
+            OFFSET_Y,
+            OFFSET_Z,
+            ROTATION_X,
+            ROTATION_Y,
+            ROTATION_Z,
+            SCALE_X,
+            SCALE_Y,
+            SCALE_Z,
+            GLOW,
+            VISIBLE,
+            PHYSICS,
+            LIGHT_LEVEL
+        }
+
+        public enum AnimationBlend {
+            ADD,
+            REPLACE,
+            MULTIPLY
+        }
+
+        public enum AnimationEasing {
+            LINEAR,
+            HOLD,
+            EASE_IN,
+            EASE_OUT,
+            EASE_IN_OUT,
+            BACK_OUT
+        }
+
+        public record MaterialProperties(double glow, double lightLevel) {
+        }
+
+        public record AnimationKeyframe(
+            double tick,
+            double value,
+            String materialMap,
+            AnimationEasing easing
+        ) {
+        }
+
+        public record AnimationTrack(
+            AnimationTarget target,
+            AnimationBlend blend,
+            List<AnimationKeyframe> keyframes
+        ) {
+        }
+
+        public record AnimationClip(
+            AnimationTrigger trigger,
+            double durationTicks,
+            boolean loop,
+            List<AnimationTrack> tracks
+        ) {
+        }
+
+        public record AnimationProfile(
+            String id,
+            int priority,
+            List<String> materials,
+            List<AnimationClip> clips
+        ) {
+        }
+
+        public record RealDropAnimation(
+            boolean enabled,
+            Map<String, Map<String, MaterialProperties>> materialProperties,
+            List<AnimationProfile> profiles
         ) {
         }
     }

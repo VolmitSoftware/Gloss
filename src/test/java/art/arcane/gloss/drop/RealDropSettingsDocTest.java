@@ -23,6 +23,10 @@ class RealDropSettingsDocTest {
         assertEquals("NATURAL", config.landing().mode());
         assertTrue(config.motion().tumble());
         assertTrue(config.motion().changeOnBounce());
+        assertEquals(0.35F, config.motion().velocityInfluence());
+        assertEquals(1.0F, config.motion().groundRollMultiplier());
+        assertEquals(0.55F, config.landing().faceAttraction());
+        assertEquals(4, config.landing().settleDelayTicks());
         assertTrue(config.labels().seeThrough());
         assertEquals(List.of("BEDROCK", "BARRIER"), config.filters().materialBlacklist());
     }
@@ -48,13 +52,20 @@ class RealDropSettingsDocTest {
                 "degreesPerSecondY": 9999,
                 "degreesPerSecondZ": 9999,
                 "variance": 8,
-                "changeOnBounce": false
+                "changeOnBounce": false,
+                "velocityInfluence": 99,
+                "submergedSpinMultiplier": -1,
+                "groundRollMultiplier": 99
               },
               "landing": {
                 "mode": "sideways",
                 "tiltDegrees": 99,
                 "randomYaw": false,
-                "transitionTicks": 99
+                "transitionTicks": 99,
+                "faceAttraction": 99,
+                "movingFaceAttraction": -1,
+                "alignmentDegrees": 99,
+                "settleDelayTicks": 999
               },
               "labels": {
                 "enabled": false,
@@ -90,10 +101,17 @@ class RealDropSettingsDocTest {
         assertEquals(1440.0F, config.motion().degreesPerSecondY());
         assertEquals(1.0F, config.motion().variance());
         assertFalse(config.motion().changeOnBounce());
+        assertEquals(4.0F, config.motion().velocityInfluence());
+        assertEquals(0.0F, config.motion().submergedSpinMultiplier());
+        assertEquals(4.0F, config.motion().groundRollMultiplier());
         assertEquals("NATURAL", config.landing().mode());
         assertEquals(45.0F, config.landing().tiltDegrees());
         assertFalse(config.landing().randomYaw());
         assertEquals(20, config.landing().transitionTicks());
+        assertEquals(1.0F, config.landing().faceAttraction());
+        assertEquals(0.0F, config.landing().movingFaceAttraction());
+        assertEquals(10.0F, config.landing().alignmentDegrees());
+        assertEquals(100, config.landing().settleDelayTicks());
         assertFalse(config.labels().enabled());
         assertFalse(config.labels().seeThrough());
         assertEquals(0, config.labels().backgroundRed());

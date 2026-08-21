@@ -156,7 +156,7 @@ public class GlossSchemaContractTest {
 
     assertEquals(
         List.of("schemaVersion", "revision", "limits", "scale", "motion", "landing", "labels",
-            "filters", "physics", "script"),
+            "filters", "physics", "script", "animation"),
         List.copyOf(properties.keySet()));
     assertEquals(1, properties.getAsJsonObject("schemaVersion").get("const").getAsInt());
     assertEquals(List.of("schemaVersion", "revision"), required(realDropsSchema()));
@@ -190,7 +190,8 @@ public class GlossSchemaContractTest {
         .get("description").getAsString();
 
     for (String variable : List.of("t", "age", "index", "count", "amount", "onGround", "settled",
-        "inWater", "inLava", "bounces", "velocityX", "velocityY", "velocityZ", "speed", "height",
+        "phase", "stateTime", "impactSpeed", "inWater", "inLava", "bounces",
+        "velocityX", "velocityY", "velocityZ", "speed", "height",
         "blockLight", "skyLight", "random", "material", "isBlock", "isFlat", "isThin")) {
       assertTrue("expression description omits variable " + variable, description.contains(variable));
     }

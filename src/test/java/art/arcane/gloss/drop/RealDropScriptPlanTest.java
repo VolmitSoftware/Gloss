@@ -32,7 +32,7 @@ class RealDropScriptPlanTest {
     private static RealDropScriptPlan.RealDropScriptContext context() {
         return new RealDropScriptPlan.RealDropScriptContext(
             2.0D, 40, 1, 3, 12,
-            true, false, false, false, 4,
+            true, false, "ROLLING", 0.4D, 0.7D, false, false, 4,
             0.3D, -0.4D, 0.0D,
             2.5D, 11, 6,
             0.25D, "REDSTONE_TORCH", RealDropModel.ModelKind.FLAT);
@@ -178,6 +178,20 @@ class RealDropScriptPlanTest {
         assertTrue(RealDropScriptPlan.compile(script(
             List.of(new GlossConfig.RealDrops.ScriptVar("lit", "skyLight")),
             ZERO, ZERO, ONE, "", "true")).environmentRequired());
+    }
+
+    @Test
+    void evaluationCadenceAndSharingFollowReferencedInputs() {
+        RealDropScriptPlan staticPlan = RealDropScriptPlan.compile(offsetScript("amount", "count", "0"));
+        assertFalse(staticPlan.continuousUpdatesRequired());
+        assertFalse(staticPlan.perModelRequired());
+
+        RealDropScriptPlan animatedPlan = RealDropScriptPlan.compile(offsetScript("stateTime", "0", "0"));
+        assertTrue(animatedPlan.continuousUpdatesRequired());
+        assertFalse(animatedPlan.perModelRequired());
+
+        RealDropScriptPlan indexedPlan = RealDropScriptPlan.compile(offsetScript("index", "0", "0"));
+        assertTrue(indexedPlan.perModelRequired());
     }
 
     @Test
