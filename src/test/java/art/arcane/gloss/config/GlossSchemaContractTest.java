@@ -150,6 +150,82 @@ public class GlossSchemaContractTest {
     assertFalse(required(action).contains("trigger"));
   }
 
+  @Test
+  public void realDropsSchemaCoversEveryDocumentBlockTheParserAccepts() throws IOException {
+    JsonObject properties = realDropsSchema().getAsJsonObject("properties");
+
+    assertEquals(
+        List.of("schemaVersion", "revision", "limits", "scale", "motion", "landing", "labels",
+            "filters", "physics", "script"),
+        List.copyOf(properties.keySet()));
+    assertEquals(1, properties.getAsJsonObject("schemaVersion").get("const").getAsInt());
+    assertEquals(List.of("schemaVersion", "revision"), required(realDropsSchema()));
+  }
+
+  @Test
+  public void realDropsScriptBlockDeclaresEveryScriptedField() throws IOException {
+    JsonObject script = realDropsSchema().getAsJsonObject("$defs").getAsJsonObject("script")
+        .getAsJsonObject("properties");
+
+    assertEquals(List.of("enabled", "vars", "offset", "rotation", "scale", "glow", "visible"),
+        List.copyOf(script.keySet()));
+    assertEquals(32, script.getAsJsonObject("vars").get("maxProperties").getAsInt());
+    assertTrue(script.getAsJsonObject("vars").has("additionalProperties"));
+  }
+
+  @Test
+  public void realDropsPhysicsBlockDeclaresEveryKnobTheServiceApplies() throws IOException {
+    JsonObject physics = realDropsSchema().getAsJsonObject("$defs").getAsJsonObject("physics")
+        .getAsJsonObject("properties");
+
+    assertEquals(List.of("enabled", "gravityMultiplier", "bounce", "waterBuoyancy", "waterDrag"),
+        List.copyOf(physics.keySet()));
+    assertEquals(4, physics.getAsJsonObject("gravityMultiplier").get("maximum").getAsInt());
+    assertEquals(0.9, physics.getAsJsonObject("bounce").get("maximum").getAsDouble(), 1.0E-9);
+  }
+
+  @Test
+  public void realDropsExpressionDescriptionDocumentsEveryVariableAndDropFunction() throws IOException {
+    String description = realDropsSchema().getAsJsonObject("$defs").getAsJsonObject("expression")
+        .get("description").getAsString();
+
+    for (String variable : List.of("t", "age", "index", "count", "amount", "onGround", "settled",
+        "inWater", "inLava", "bounces", "velocityX", "velocityY", "velocityZ", "speed", "height",
+        "blockLight", "skyLight", "random", "material", "isBlock", "isFlat", "isThin")) {
+      assertTrue("expression description omits variable " + variable, description.contains(variable));
+    }
+    assertTrue("expression description omits materialIs", description.contains("materialIs("));
+    assertTrue("expression description omits materialMatches", description.contains("materialMatches("));
+  }
+
+  @Test
+  public void everyRealDropsPropertyCarriesTheDescriptionTheEditorRenders() throws IOException {
+    JsonObject schema = realDropsSchema();
+    assertDescribed(schema.getAsJsonObject("properties"), "");
+    JsonObject definitions = schema.getAsJsonObject("$defs");
+    for (String name : definitions.keySet()) {
+      JsonObject definition = definitions.getAsJsonObject(name);
+      if (definition.has("properties")) {
+        assertDescribed(definition.getAsJsonObject("properties"), name + ".");
+      }
+    }
+    assertTrue(definitions.getAsJsonObject("expression").has("description"));
+  }
+
+  private static void assertDescribed(JsonObject properties, String prefix) {
+    for (String name : properties.keySet()) {
+      JsonObject property = properties.getAsJsonObject(name);
+      assertTrue("missing description for " + prefix + name, property.has("description"));
+      assertFalse("blank description for " + prefix + name,
+          property.get("description").getAsString().isBlank());
+    }
+  }
+
+  private static JsonObject realDropsSchema() throws IOException {
+    Path path = Path.of(System.getProperty("user.dir"), "schema", "gloss-real-drops.schema.json");
+    return JsonParser.parseString(Files.readString(path)).getAsJsonObject();
+  }
+
   private static JsonObject schema() throws IOException {
     Path path = Path.of(System.getProperty("user.dir"), "schema", "gloss.schema.json");
     return JsonParser.parseString(Files.readString(path)).getAsJsonObject();

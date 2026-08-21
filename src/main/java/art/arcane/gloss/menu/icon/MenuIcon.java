@@ -10,6 +10,7 @@ import art.arcane.gloss.config.icon.IconDisplayStyle;
 import art.arcane.gloss.config.icon.ItemIconData;
 import art.arcane.gloss.config.icon.ItemStackIconData;
 import art.arcane.gloss.config.icon.MenuIconData;
+import art.arcane.gloss.config.icon.PlayerHeadIconData;
 import art.arcane.gloss.config.icon.TextIconData;
 import art.arcane.gloss.config.icon.TextImageIconData;
 import art.arcane.gloss.exceptions.MenuIconException;
@@ -68,6 +69,8 @@ public abstract class MenuIcon<D extends MenuIconData> {
         return new AnimatedTextImageMenuIcon(session, loc, d);
       else if (data instanceof EntityIconData d)
         return new EntityMenuIcon(session, loc, d);
+      else if (data instanceof PlayerHeadIconData d)
+        return new PlayerHeadMenuIcon(session, loc, d);
       return new TextImageMenuIcon(session, loc);
     } catch (MenuIconException | RuntimeException e) {
       Gloss.logExceptionStack(false, e, "An error occurred while creating a Menu Icon for the component \"%s\":", component.getId());

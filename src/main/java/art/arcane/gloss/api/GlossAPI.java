@@ -24,15 +24,15 @@ public interface GlossAPI {
 
     Set<String> menuIds();
 
-    Hologram createHologram(String id, Location location);
+    AnchoredHologram createHologram(String id, Location location);
 
-    Optional<Hologram> hologram(String id);
+    Optional<AnchoredHologram> hologram(String id);
 
     boolean hasHologram(String id);
 
     void deleteHologram(String id);
 
-    List<Hologram> holograms();
+    List<AnchoredHologram> holograms();
 
     TemporaryHologram createTemporaryHologram(String id, Location initial, long durationMs);
 

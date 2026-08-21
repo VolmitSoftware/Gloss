@@ -28,8 +28,8 @@ public class ItemMenuIcon extends MenuIcon<MenuIconData> {
 
   private static final float ITEM_OFFSET = 1F;
   private static final float BLOCK_OFFSET = -.95F;
-  private static final Material GRASS = RegistryUtil.find(Material.class, "grass", "short_grass");
-  private static final List<Material> BLOCK_BLACKLIST = ImmutableList.of(
+  private static final Material GRASS = grassMaterial();
+  private static final List<Material> BLOCK_BLACKLIST = blacklist(
       Material.BARRIER, Material.LIGHT, Material.HOPPER, Material.TURTLE_EGG, GRASS, Material.TALL_GRASS,
       Material.WHITE_STAINED_GLASS_PANE, Material.ORANGE_STAINED_GLASS_PANE, Material.MAGENTA_STAINED_GLASS_PANE,
       Material.LIGHT_BLUE_STAINED_GLASS_PANE, Material.YELLOW_STAINED_GLASS_PANE, Material.LIME_STAINED_GLASS_PANE,
@@ -37,7 +37,34 @@ public class ItemMenuIcon extends MenuIcon<MenuIconData> {
       Material.CYAN_STAINED_GLASS_PANE, Material.PURPLE_STAINED_GLASS_PANE, Material.BLUE_STAINED_GLASS_PANE,
       Material.BROWN_STAINED_GLASS_PANE, Material.GREEN_STAINED_GLASS_PANE, Material.RED_STAINED_GLASS_PANE,
       Material.BLACK_STAINED_GLASS_PANE, Material.GLASS_PANE, Material.POPPY, Material.DANDELION);
-  private final ItemStack item;
+  private ItemStack item;
+
+  /**
+   * The registry rename this constant exists for, resolved defensively. {@code org.bukkit.Registry}
+   * needs a live server to initialize, and a class initializer that throws stays broken for the
+   * life of the JVM — which would take every item icon down with it. Falling through to the enum
+   * name, and to null when even that is gone, only ever widens or narrows the blacklist by one
+   * entry.
+   */
+  private static Material grassMaterial() {
+    try {
+      return RegistryUtil.find(Material.class, "grass", "short_grass");
+    } catch (RuntimeException | LinkageError unavailableRegistry) {
+      Material renamed = Material.getMaterial("SHORT_GRASS");
+      return renamed == null ? Material.getMaterial("GRASS") : renamed;
+    }
+  }
+
+  /** Drops anything {@link #grassMaterial()} could not resolve; the list rejects nulls. */
+  private static List<Material> blacklist(Material... materials) {
+    ImmutableList.Builder<Material> builder = ImmutableList.builder();
+    for (Material material : materials) {
+      if (material != null) {
+        builder.add(material);
+      }
+    }
+    return builder.build();
+  }
 
   public ItemMenuIcon(MenuSession session, Location loc, ItemIconData data) throws MenuIconException {
     this(session, loc, data, buildStack(data));
@@ -91,6 +118,38 @@ public class ItemMenuIcon extends MenuIcon<MenuIconData> {
       uuids.add(DisplayEntityManager.add(textDisplay(count, countLocation())));
     }
     return uuids;
+  }
+
+  /** The stack currently on the display entity. */
+  protected ItemStack currentItem() {
+    return item;
+  }
+
+  /**
+   * Swaps the rendered stack without respawning the display, so an icon whose item is only known
+   * later — a player head waiting on a profile lookup — resolves in place. Crossing the
+   * item/block boundary is the one case that cannot be done in place: the two use different
+   * vertical offsets ({@link #ITEM_OFFSET} against {@link #BLOCK_OFFSET}), so the display is
+   * rebuilt rather than left hanging at the wrong height.
+   */
+  protected void replaceItem(ItemStack replacement) {
+    if (replacement == null) {
+      return;
+    }
+    boolean wasBlock = isBlock();
+    this.item = replacement;
+    if (displayEntities == null || displayEntities.isEmpty()) {
+      return;
+    }
+    if (wasBlock != isBlock()) {
+      remove();
+      spawn();
+      return;
+    }
+    DisplayEntityManager.changeItem(displayEntities.getFirst(), replacement);
+    if (isBlock()) {
+      applyOrientation();
+    }
   }
 
   public void updateCount(int count) {

@@ -23,6 +23,7 @@ import art.arcane.gloss.importer.LegacyGlossDataImporter;
 import art.arcane.gloss.indicator.DamageIndicatorsService;
 import art.arcane.gloss.integrate.IntegrationBridgeService;
 import art.arcane.gloss.integration.ItemProviderRegistry;
+import art.arcane.gloss.profile.PlayerHeadService;
 import art.arcane.gloss.integration.protection.ContainerProtectionService;
 import art.arcane.gloss.locale.GlossLocalization;
 import art.arcane.gloss.menu.MenuSessionManager;
@@ -119,6 +120,7 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
     private PanelRuntimeManager panelRuntime;
     private PreviewDocumentRegistry previewRegistry;
     private ItemProviderRegistry itemProviders;
+    private PlayerHeadService playerHeads;
     private ContainerProtectionService containerProtection;
     private MenuSessionManager sessionManager;
     private PanelCreationService panelCreation;
@@ -252,6 +254,9 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
             startPreviewRegistry();
             itemProviders = new ItemProviderRegistry(this);
             enableService("item-providers", itemProviders::activateAll, itemProviders::shutdown);
+            enableService("player-heads",
+                () -> playerHeads = PlayerHeadService.fromConfig(cfg().playerHeads()),
+                () -> playerHeads = null);
             containerProtection = new ContainerProtectionService(this);
             enableService("protection", containerProtection::activate, containerProtection::shutdown);
             sessionManager = new MenuSessionManager();
@@ -555,6 +560,11 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
                 panelRuntime.refreshVisuals();
             }
         }
+        if (playerHeads != null && !previous.playerHeads().equals(next.playerHeads())) {
+            // TTLs and the cache ceiling are baked into the service, and an operator who just fixed
+            // a name or flipped resolution on should see it on the next refresh, not in six hours.
+            playerHeads = PlayerHeadService.fromConfig(next.playerHeads());
+        }
         boolean customItemsChanged = previous.customItems().enabled() != next.customItems().enabled()
             || !previous.customItems().providers().equals(next.customItems().providers());
         if (customItemsChanged && itemProviders != null) {
@@ -676,6 +686,14 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
 
     public ItemProviderRegistry getItemProviders() {
         return itemProviders;
+    }
+
+    /**
+     * The player-head profile cache. Null before enable finishes and after disable, which every
+     * caller already treats as "no head resolved yet" rather than an error.
+     */
+    public PlayerHeadService playerHeads() {
+        return playerHeads;
     }
 
     public ContainerProtectionService getContainerProtection() {

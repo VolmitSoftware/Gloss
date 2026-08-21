@@ -49,6 +49,11 @@ public final class GlossMessages {
     public static final TextKey HELP_HOLOGRAM_RENDERTEXT_ID = text("command.help.hologram.rendertext.id", "Unique hologram id");
     public static final TextKey HELP_HOLOGRAM_RENDERTEXT_TEXT = text("command.help.hologram.rendertext.text", "Text to rasterize; quote it to include spaces");
     public static final TextKey HELP_HOLOGRAM_RENDERTEXT_SCALE = text("command.help.hologram.rendertext.scale", "Font scale multiplier");
+    public static final TextKey HELP_HOLOGRAM_ORIENT = text("command.help.hologram.orient", "Set how a hologram turns to face viewers");
+    public static final TextKey HELP_HOLOGRAM_ORIENT_ID = text("command.help.hologram.orient.id", "Hologram id");
+    public static final TextKey HELP_HOLOGRAM_ORIENT_BILLBOARD = text("command.help.hologram.orient.billboard", "CENTER, VERTICAL, HORIZONTAL or FIXED");
+    public static final TextKey HELP_HOLOGRAM_ORIENT_YAW = text("command.help.hologram.orient.yaw", "Facing yaw in degrees, -180 to 180");
+    public static final TextKey HELP_HOLOGRAM_ORIENT_PITCH = text("command.help.hologram.orient.pitch", "Facing pitch in degrees, -90 to 90");
 
     public static final TextKey HELP_BOARD = text("command.help.board", "Create and manage scoreboards");
     public static final TextKey HELP_BOARD_CREATE = text("command.help.board.create", "Create a scoreboard");
@@ -96,10 +101,11 @@ public final class GlossMessages {
     public static final TextKey HELP_TABLIST_RESET = text("command.help.tablist.reset", "Restore the shipped tablist document");
     public static final TextKey HELP_MOTD = text("command.help.motd", "MOTD tools");
     public static final TextKey HELP_MOTD_RESET = text("command.help.motd.reset", "Restore the shipped MOTD document");
+    public static final TextKey HELP_DROPS = text("command.help.drops", "Dropped item presentation tools");
+    public static final TextKey HELP_DROPS_RESET = text("command.help.drops.reset", "Restore the shipped real drop settings document");
     public static final TextKey HELP_ARG_RESET_NAME = text("command.help.arg.reset_name", "Name to reset, or * for every shipped default");
     public static final TextKey HELP_STATUS = text("command.help.status", "Show terse runtime counts");
     public static final TextKey HELP_RELOAD = text("command.help.reload", "Reload Gloss configuration and services");
-    public static final TextKey HELP_VERSION = text("command.help.version", "Show the Gloss version and supported Minecraft range");
 
     public static final TextKey HELP_ARG_PANEL_AXES = text("command.help.arg.panel_axes", "Axes: x, y, z, xy, xz, yz, or xyz");
     public static final TextKey HELP_ARG_PANEL_FOLLOW_ROTATION = text("command.help.arg.panel_follow_rotation", "Follow rotation: fixed, yaw, or full");
@@ -238,6 +244,10 @@ public final class GlossMessages {
     public static final TextKey HOLOGRAM_INFO_LINE = text("command.hologram.info.line", " &8{line}. &f{text}");
     public static final TextKey HOLOGRAM_RENDERED = text("command.hologram.rendered", PREFIX + "&aRendered &f{rows}&a rows of text art into &f{id}&a.");
     public static final TextKey HOLOGRAM_RENDER_EMPTY = text("command.hologram.render_empty", PREFIX + "&cThat text rendered no visible pixels.");
+    public static final TextKey HOLOGRAM_INFO_ORIENTATION = text("command.hologram.info.orientation", " &8billboard &f{billboard} &8yaw &f{yaw} &8pitch &f{pitch}");
+    public static final TextKey HOLOGRAM_ORIENTED = text("command.hologram.oriented", PREFIX + "&aSet &f{id}&a to billboard &f{billboard}&a, yaw &f{yaw}&a, pitch &f{pitch}&a.");
+    public static final TextKey HOLOGRAM_BILLBOARD_UNKNOWN = text("command.hologram.billboard_unknown", PREFIX + "&cUnknown billboard '&f{billboard}&c'. Use one of &f{options}&c.");
+    public static final TextKey HOLOGRAM_ANGLE_OUT_OF_RANGE = text("command.hologram.angle_out_of_range", PREFIX + "&cThe {axis} {value} is out of range; it must be between &f-{limit}&c and &f{limit}&c degrees.");
 
     public static final TextKey BOARD_EXISTS = text("command.board.exists", PREFIX + "&cBoard '&f{id}&c' already exists.");
     public static final TextKey BOARD_MISSING = text("command.board.missing", PREFIX + "&cNo board named '&f{id}&c'.");
@@ -291,7 +301,6 @@ public final class GlossMessages {
     public static final TextKey IMPORT_CONFIG_UNREADABLE = text("command.import.config_unreadable", PREFIX + "&cconfig.toml could not be loaded: &f{reason}");
 
     public static final TextKey RELOAD_DONE = text("command.reload.done", PREFIX + "&aReloaded Gloss configuration and services.");
-    public static final TextKey VERSION_LINE = text("command.version.line", PREFIX + "&dGloss &f{version} &8| &7MC Support: &f{mc}");
 
     public static final TextKey ERROR_MENU_NAME_REQUIRED = text("gloss.error.menu_name_required", "Menu name cannot be empty");
     public static final TextKey ERROR_HOLOGRAM_ID_REQUIRED = text("gloss.error.hologram_id_required", "Hologram id cannot be empty");

@@ -9,8 +9,6 @@ import org.bukkit.command.CommandSender;
 
 @Director(name = "gloss", aliases = {"gl", "glo", "gg"}, descriptionKey = "command.help.root", description = "Gloss command root")
 public class CommandGloss {
-    private static final String SUPPORTED_MC_VERSION = "26.1.2 - 26.2";
-
     private final Gloss plugin;
     private CommandGlossHologram hologram;
     private CommandGlossBoard board;
@@ -19,6 +17,7 @@ public class CommandGloss {
     private CommandGlossBubbles bubbles;
     private CommandGlossTablist tablist;
     private CommandGlossMotd motd;
+    private CommandGlossDrops drops;
     private CommandGlossMenu menu;
     private CommandGlossPanel panel;
     private CommandGlossPreview preview;
@@ -35,6 +34,7 @@ public class CommandGloss {
         this.bubbles = new CommandGlossBubbles(plugin);
         this.tablist = new CommandGlossTablist(plugin);
         this.motd = new CommandGlossMotd(plugin);
+        this.drops = new CommandGlossDrops(plugin);
         this.menu = new CommandGlossMenu(plugin);
         this.panel = new CommandGlossPanel();
         this.preview = new CommandGlossPreview();
@@ -87,12 +87,5 @@ public class CommandGloss {
 
         plugin.reloadAll();
         GlossCommandMessages.send(sender, GlossMessages.RELOAD_DONE);
-    }
-
-    @Director(name = "version", descriptionKey = "command.help.version", description = "Show the Gloss version and supported Minecraft range")
-    public void version(@Param(name = "sender", contextual = true) CommandSender sender) {
-        GlossCommandMessages.send(sender, GlossMessages.VERSION_LINE,
-                MessageArgument.trusted("version", plugin.getDescription().getVersion()),
-                MessageArgument.trusted("mc", SUPPORTED_MC_VERSION));
     }
 }

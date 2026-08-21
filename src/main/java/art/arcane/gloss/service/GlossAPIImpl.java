@@ -1,6 +1,7 @@
 package art.arcane.gloss.service;
 
 import art.arcane.gloss.Gloss;
+import art.arcane.gloss.api.AnchoredHologram;
 import art.arcane.gloss.api.GlossAPI;
 import art.arcane.gloss.api.HoloMenu;
 import art.arcane.gloss.api.HoloMenuHandle;
@@ -60,12 +61,12 @@ public final class GlossAPIImpl implements GlossAPI {
     }
 
     @Override
-    public Hologram createHologram(String id, Location location) {
+    public AnchoredHologram createHologram(String id, Location location) {
         return plugin.holograms().create(id, location);
     }
 
     @Override
-    public Optional<Hologram> hologram(String id) {
+    public Optional<AnchoredHologram> hologram(String id) {
         return Optional.ofNullable(plugin.holograms().get(id));
     }
 
@@ -80,7 +81,7 @@ public final class GlossAPIImpl implements GlossAPI {
     }
 
     @Override
-    public List<Hologram> holograms() {
+    public List<AnchoredHologram> holograms() {
         return plugin.holograms().all();
     }
 

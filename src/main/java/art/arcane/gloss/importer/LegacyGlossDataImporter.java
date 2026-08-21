@@ -163,7 +163,8 @@ public final class LegacyGlossDataImporter {
             legacy.get("z").getAsDouble());
         HologramDoc.Anchor anchor = new HologramDoc.Anchor(legacy.get("world").getAsString(), position);
         return new HologramDoc(HologramDoc.CURRENT_SCHEMA_VERSION, DocumentEnvelope.INITIAL_REVISION,
-            anchor, stringList(legacy.getAsJsonArray("lines")), true);
+            anchor, stringList(legacy.getAsJsonArray("lines")), true,
+            HologramDoc.DEFAULT_BILLBOARD, 0.0D, 0.0D);
     }
 
     private static BoardDoc convertBoard(JsonObject legacy) {

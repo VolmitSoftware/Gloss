@@ -397,7 +397,8 @@
             "item",
             "block",
             "customItem",
-            "entity"
+            "entity",
+            "playerHead"
           ]
         },
         "style": {
@@ -507,6 +508,18 @@
               }
             ]
           }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "playerHead"
+              }
+            }
+          },
+          "then": {
+            "$ref": "#/$defs/playerHeadIcon"
+          }
         }
       ]
     },
@@ -571,7 +584,12 @@
         "hoverEasing": {
           "description": "Easing curve used for hover entry and exit. Defaults to ease_out_cubic.",
           "type": "string",
-          "enum": ["linear", "ease_out_cubic", "ease_in_out_cubic", "back_out"]
+          "enum": [
+            "linear",
+            "ease_out_cubic",
+            "ease_in_out_cubic",
+            "back_out"
+          ]
         },
         "actions": {
           "description": "Defines what happens upon a interaction.",
@@ -630,7 +648,12 @@
         "hoverEasing": {
           "description": "Easing curve used for hover entry and exit. Defaults to ease_out_cubic.",
           "type": "string",
-          "enum": ["linear", "ease_out_cubic", "ease_in_out_cubic", "back_out"]
+          "enum": [
+            "linear",
+            "ease_out_cubic",
+            "ease_in_out_cubic",
+            "back_out"
+          ]
         },
         "condition": {
           "description": "Defines what placeholder value is used to determine the toggles initial state.",
@@ -1010,6 +1033,29 @@
           "exclusiveMinimum": 0,
           "maximum": 64,
           "default": 1
+        }
+      }
+    },
+    "playerHeadIcon": {
+      "title": "Player Head Icon Data Object",
+      "description": "Defines a head rendered from a Minecraft account. The profile is resolved asynchronously and cached; until it lands the icon draws an unowned head, and a name that does not exist draws the configured fallback block instead.",
+      "type": "object",
+      "required": [
+        "player"
+      ],
+      "properties": {
+        "player": {
+          "description": "Defines whose head to draw: a literal Minecraft username, or a placeholder resolved per viewer. %player_name%, %player% and {{ player.name }} always mean the viewer and need no PlaceholderAPI; any other placeholder resolves through the text pipeline and needs whatever provides it.",
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "refreshTicks": {
+          "description": "Ticks between re-reading the name and the profile cache. Omitted defaults to 20. Zero never re-reads, which leaves a head whose lookup was still in flight as the unowned head.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1200,
+          "default": 20
         }
       }
     }

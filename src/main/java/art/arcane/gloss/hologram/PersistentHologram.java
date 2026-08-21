@@ -1,11 +1,12 @@
 package art.arcane.gloss.hologram;
 
-import art.arcane.gloss.api.Hologram;
+import art.arcane.gloss.api.AnchoredHologram;
 import art.arcane.gloss.doc.DocumentEnvelope;
 import art.arcane.gloss.text.TextPipeline;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.World;
+import org.bukkit.entity.Display;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.TextDisplay;
 import org.bukkit.util.Vector;
@@ -22,7 +23,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.logging.Level;
 
-final class PersistentHologram implements Hologram {
+final class PersistentHologram implements AnchoredHologram {
     private static final double POSITION_EPSILON_SQUARED = 1.0E-6D;
     private record LineSet(List<String> lines, int flags, boolean viewerDependent, long generation) {
     }
@@ -48,6 +49,9 @@ final class PersistentHologram implements Hologram {
     private volatile double y;
     private volatile double z;
     private volatile boolean seeThrough;
+    private volatile String billboard;
+    private volatile double yaw;
+    private volatile double pitch;
     private volatile long revision;
     private volatile Location appliedAnchor;
     private volatile TextDisplay sharedDisplay;
@@ -72,6 +76,9 @@ final class PersistentHologram implements Hologram {
         this.y = location.getY();
         this.z = location.getZ();
         this.seeThrough = true;
+        this.billboard = HologramDoc.DEFAULT_BILLBOARD;
+        this.yaw = 0.0D;
+        this.pitch = 0.0D;
     }
 
     PersistentHologram(HologramService service, String id, HologramDoc doc) {
@@ -166,6 +173,30 @@ final class PersistentHologram implements Hologram {
         service.persist(this);
     }
 
+    @Override
+    public String billboard() {
+        return billboard;
+    }
+
+    @Override
+    public double yaw() {
+        return yaw;
+    }
+
+    @Override
+    public double pitch() {
+        return pitch;
+    }
+
+    @Override
+    public void setOrientation(String billboard, double yaw, double pitch) {
+        this.billboard = HologramDoc.requireBillboard(billboard);
+        this.yaw = HologramDoc.requireYaw(yaw);
+        this.pitch = HologramDoc.requirePitch(pitch);
+        applyOrientation();
+        service.persist(this);
+    }
+
     void apply(HologramDoc doc) {
         HologramDoc.Anchor anchor = doc.anchor();
         worldName = anchor.world();
@@ -173,7 +204,13 @@ final class PersistentHologram implements Hologram {
         y = anchor.position().getY();
         z = anchor.position().getZ();
         boolean visibilityChanged = seeThrough != doc.seeThrough();
+        boolean orientationChanged = !doc.billboard().equals(billboard)
+            || doc.yaw() != yaw
+            || doc.pitch() != pitch;
         seeThrough = doc.seeThrough();
+        billboard = doc.billboard();
+        yaw = doc.yaw();
+        pitch = doc.pitch();
         revision = doc.revision();
         synchronized (linesLock) {
             publishLines(doc.lines());
@@ -181,11 +218,15 @@ final class PersistentHologram implements Hologram {
         if (visibilityChanged) {
             applySeeThrough();
         }
+        if (orientationChanged) {
+            applyOrientation();
+        }
     }
 
     HologramDoc toDoc(long revision) {
         return new HologramDoc(HologramDoc.CURRENT_SCHEMA_VERSION, revision,
-            new HologramDoc.Anchor(worldName, new Vector(x, y, z)), lineSet.lines(), seeThrough);
+            new HologramDoc.Anchor(worldName, new Vector(x, y, z)), lineSet.lines(), seeThrough,
+            billboard, yaw, pitch);
     }
 
     long nextRevision() {
@@ -248,7 +289,7 @@ final class PersistentHologram implements Hologram {
             return;
         }
 
-        Location anchor = new Location(world, x, y, z);
+        Location anchor = new Location(world, x, y, z, (float) yaw, (float) pitch);
         reconcilePosition(world, anchor);
         List<HologramTick.Viewer> viewers = tick.viewers(world);
         if (snapshot.viewerDependent() && service.perViewerPlaceholders()) {
@@ -389,7 +430,7 @@ final class PersistentHologram implements Hologram {
                 }
 
                 Consumer<TextDisplay> configurer = spawned -> {
-                    service.configureDisplay(spawned, seeThrough);
+                    service.configureDisplay(spawned, seeThrough, billboardMode());
                     spawned.setText(rendered);
                 };
                 TextDisplay spawned = world.spawn(anchor, TextDisplay.class, configurer);
@@ -474,7 +515,7 @@ final class PersistentHologram implements Hologram {
                 }
 
                 Consumer<TextDisplay> configurer = spawned -> {
-                    service.configureDisplay(spawned, seeThrough);
+                    service.configureDisplay(spawned, seeThrough, billboardMode());
                     DisplayVisibility.setVisibleByDefault(spawned, false);
                 };
                 TextDisplay spawned = world.spawn(anchor, TextDisplay.class, configurer);
@@ -616,6 +657,33 @@ final class PersistentHologram implements Hologram {
             service.plugin().scheduler().runEntity(display, () -> {
                 if (display.isValid()) {
                     display.setSeeThrough(seeThrough);
+                }
+            });
+        }
+    }
+
+    private Display.Billboard billboardMode() {
+        return Display.Billboard.valueOf(billboard);
+    }
+
+    private void applyOrientation() {
+        Display.Billboard mode = billboardMode();
+        float entityYaw = (float) yaw;
+        float entityPitch = (float) pitch;
+        TextDisplay shared = sharedDisplay;
+        if (shared != null) {
+            service.plugin().scheduler().runEntity(shared, () -> {
+                if (shared.isValid()) {
+                    shared.setBillboard(mode);
+                    shared.setRotation(entityYaw, entityPitch);
+                }
+            });
+        }
+        for (TextDisplay display : viewerDisplays.values()) {
+            service.plugin().scheduler().runEntity(display, () -> {
+                if (display.isValid()) {
+                    display.setBillboard(mode);
+                    display.setRotation(entityYaw, entityPitch);
                 }
             });
         }

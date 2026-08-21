@@ -6,12 +6,17 @@ import org.bukkit.util.Vector;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 
 public record HologramDoc(int schemaVersion, long revision, Anchor anchor, List<String> lines,
-                          Boolean seeThrough) {
+                          Boolean seeThrough, String billboard, Double yaw, Double pitch) {
     public static final String KIND = "holograms";
     public static final int CURRENT_SCHEMA_VERSION = 1;
+    public static final List<String> BILLBOARDS = List.of("CENTER", "FIXED", "HORIZONTAL", "VERTICAL");
+    public static final String DEFAULT_BILLBOARD = "CENTER";
+    public static final double MAX_YAW_DEGREES = 180.0D;
+    public static final double MAX_PITCH_DEGREES = 90.0D;
 
     public record Anchor(String world, Vector position) {
         public Anchor {
@@ -33,14 +38,58 @@ public record HologramDoc(int schemaVersion, long revision, Anchor anchor, List<
         anchor = Objects.requireNonNull(anchor, "hologram requires an anchor");
         lines = copyLines(lines);
         seeThrough = seeThrough == null || seeThrough;
+        billboard = requireBillboard(billboard);
+        yaw = requireAngle("yaw", yaw, MAX_YAW_DEGREES);
+        pitch = requireAngle("pitch", pitch, MAX_PITCH_DEGREES);
     }
 
     public HologramDoc withRevision(long revision) {
-        return new HologramDoc(schemaVersion, revision, anchor, lines, seeThrough);
+        return new HologramDoc(schemaVersion, revision, anchor, lines, seeThrough, billboard, yaw, pitch);
     }
 
     public static HologramDoc parse(String fileName, String raw) {
         return DocumentParsers.parseJson(fileName, raw, HologramDoc.class);
+    }
+
+    public static String normalizeBillboard(String billboard) {
+        if (billboard == null || billboard.isBlank()) {
+            return DEFAULT_BILLBOARD;
+        }
+
+        String normalized = billboard.trim().toUpperCase(Locale.ROOT);
+        return BILLBOARDS.contains(normalized) ? normalized : null;
+    }
+
+    public static String requireBillboard(String billboard) {
+        String normalized = normalizeBillboard(billboard);
+        if (normalized == null) {
+            throw new IllegalArgumentException("hologram billboard must be one of "
+                + String.join(", ", BILLBOARDS) + "; got '" + billboard + "'");
+        }
+        return normalized;
+    }
+
+    public static boolean angleInRange(double angle, double limit) {
+        return Double.isFinite(angle) && Math.abs(angle) <= limit;
+    }
+
+    public static double requireYaw(double yaw) {
+        return requireAngle("yaw", yaw, MAX_YAW_DEGREES);
+    }
+
+    public static double requirePitch(double pitch) {
+        return requireAngle("pitch", pitch, MAX_PITCH_DEGREES);
+    }
+
+    private static double requireAngle(String name, Double angle, double limit) {
+        if (angle == null) {
+            return 0.0D;
+        }
+        if (!angleInRange(angle, limit)) {
+            throw new IllegalArgumentException("hologram " + name + " must be a finite angle between -"
+                + limit + " and " + limit + " degrees; got " + angle);
+        }
+        return angle;
     }
 
     private static List<String> copyLines(List<String> lines) {

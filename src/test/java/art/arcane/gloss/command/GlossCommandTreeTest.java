@@ -32,6 +32,7 @@ class GlossCommandTreeTest {
             List.of("hologram", "list"),
             List.of("hologram", "info"),
             List.of("hologram", "rendertext"),
+            List.of("hologram", "orient"),
             List.of("board"),
             List.of("board", "create"),
             List.of("board", "delete"),
@@ -59,9 +60,10 @@ class GlossCommandTreeTest {
             List.of("tablist", "reset"),
             List.of("motd"),
             List.of("motd", "reset"),
+            List.of("drops"),
+            List.of("drops", "reset"),
             List.of("status"),
             List.of("reload"),
-            List.of("version"),
             List.of("menu"),
             List.of("menu", "list"),
             List.of("menu", "create"),
@@ -133,7 +135,7 @@ class GlossCommandTreeTest {
             List.of("import", "legacy")
     );
     private static final Set<String> GROUP_ROOTS = Set.of(
-            "hologram", "board", "emoji", "animations", "bubbles", "tablist", "motd",
+            "hologram", "board", "emoji", "animations", "bubbles", "tablist", "motd", "drops",
             "menu", "panel", "preview", "item", "sync", "import"
     );
 

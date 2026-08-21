@@ -1,6 +1,7 @@
 package art.arcane.gloss.hologram;
 
 import art.arcane.gloss.doc.DocumentEnvelope;
+import art.arcane.gloss.doc.ShippedResources;
 import art.arcane.volmlib.util.bukkit.json.BukkitJson;
 import org.bukkit.util.Vector;
 import org.junit.jupiter.api.Test;
@@ -35,24 +36,31 @@ class HologramDocTest {
         assertEquals(new Vector(12.5D, 64.0D, -7.25D), doc.anchor().position());
         assertEquals(List.of("&dWelcome", "&7Line two"), doc.lines());
         assertTrue(doc.seeThrough());
+        assertEquals(HologramDoc.DEFAULT_BILLBOARD, doc.billboard());
+        assertEquals(0.0D, doc.yaw());
+        assertEquals(0.0D, doc.pitch());
     }
 
     @Test
     void gsonRoundTripPreservesAllFields() {
         HologramDoc original = new HologramDoc(1, 3L,
             new HologramDoc.Anchor("world", new Vector(0.0D, -32.5D, 1000000.125D)),
-            List.of("plain", "", "&x&f&f&0&0&f&fhex"), false);
+            List.of("plain", "", "&x&f&f&0&0&f&fhex"), false, "FIXED", -135.5D, 12.25D);
 
         HologramDoc decoded = HologramDoc.parse("arena.json", BukkitJson.GSON.toJson(original));
 
         assertEquals(original, decoded);
         assertFalse(decoded.seeThrough());
+        assertEquals("FIXED", decoded.billboard());
+        assertEquals(-135.5D, decoded.yaw());
+        assertEquals(12.25D, decoded.pitch());
     }
 
     @Test
     void serializedAnchorPositionIsAnArrayTriple() {
         HologramDoc doc = new HologramDoc(1, 1L,
-            new HologramDoc.Anchor("world", new Vector(1.0D, 2.0D, 3.0D)), List.of("x"), true);
+            new HologramDoc.Anchor("world", new Vector(1.0D, 2.0D, 3.0D)), List.of("x"), true,
+            HologramDoc.DEFAULT_BILLBOARD, 0.0D, 0.0D);
 
         String json = BukkitJson.GSON.toJson(doc);
 
@@ -71,7 +79,8 @@ class HologramDocTest {
 
     @Test
     void missingAnchorIsRejected() {
-        assertThrows(NullPointerException.class, () -> new HologramDoc(1, 1L, null, List.of("x"), true));
+        assertThrows(NullPointerException.class, () -> new HologramDoc(1, 1L, null, List.of("x"), true,
+            HologramDoc.DEFAULT_BILLBOARD, 0.0D, 0.0D));
         assertThrows(RuntimeException.class,
             () -> HologramDoc.parse("bare.json", "{\"schemaVersion\":1,\"revision\":1,\"lines\":[]}"));
     }
@@ -96,15 +105,18 @@ class HologramDocTest {
     @Test
     void revisionBoundsAreEnforced() {
         HologramDoc.Anchor anchor = new HologramDoc.Anchor("world", new Vector(0, 0, 0));
-        assertThrows(IllegalArgumentException.class, () -> new HologramDoc(1, 0L, anchor, List.of(), true));
+        assertThrows(IllegalArgumentException.class, () -> new HologramDoc(1, 0L, anchor, List.of(), true,
+            HologramDoc.DEFAULT_BILLBOARD, 0.0D, 0.0D));
         assertThrows(IllegalArgumentException.class,
-            () -> new HologramDoc(1, DocumentEnvelope.MAX_SAFE_REVISION + 1L, anchor, List.of(), true));
+            () -> new HologramDoc(1, DocumentEnvelope.MAX_SAFE_REVISION + 1L, anchor, List.of(), true,
+                HologramDoc.DEFAULT_BILLBOARD, 0.0D, 0.0D));
     }
 
     @Test
     void linesAreImmutableCopies() {
         HologramDoc doc = new HologramDoc(1, 1L,
-            new HologramDoc.Anchor("world", new Vector(0, 0, 0)), List.of("one"), true);
+            new HologramDoc.Anchor("world", new Vector(0, 0, 0)), List.of("one"), true,
+            HologramDoc.DEFAULT_BILLBOARD, 0.0D, 0.0D);
 
         assertThrows(UnsupportedOperationException.class, () -> doc.lines().add("two"));
     }
@@ -112,7 +124,8 @@ class HologramDocTest {
     @Test
     void withRevisionOnlyChangesTheRevision() {
         HologramDoc doc = new HologramDoc(1, 1L,
-            new HologramDoc.Anchor("world", new Vector(1, 2, 3)), List.of("x"), false);
+            new HologramDoc.Anchor("world", new Vector(1, 2, 3)), List.of("x"), false,
+            "HORIZONTAL", 45.0D, -30.0D);
 
         HologramDoc bumped = doc.withRevision(2L);
 
@@ -120,6 +133,105 @@ class HologramDocTest {
         assertEquals(doc.anchor(), bumped.anchor());
         assertEquals(doc.lines(), bumped.lines());
         assertEquals(doc.seeThrough(), bumped.seeThrough());
+        assertEquals(doc.billboard(), bumped.billboard());
+        assertEquals(doc.yaw(), bumped.yaw());
+        assertEquals(doc.pitch(), bumped.pitch());
+    }
+
+    @Test
+    void orientationDefaultsReproduceTodaysCenterBillboard() {
+        String json = """
+            {
+              "schemaVersion": 1,
+              "revision": 1,
+              "anchor": {"world": "world", "position": [0.0, 0.0, 0.0]},
+              "lines": ["&dNew hologram"],
+              "seeThrough": true
+            }
+            """;
+
+        HologramDoc doc = HologramDoc.parse("legacy.json", json);
+
+        assertEquals("CENTER", doc.billboard());
+        assertEquals(0.0D, doc.yaw());
+        assertEquals(0.0D, doc.pitch());
+    }
+
+    @Test
+    void billboardIsUppercasedAndCheckedAgainstTheFourModes() {
+        HologramDoc.Anchor anchor = new HologramDoc.Anchor("world", new Vector(0, 0, 0));
+
+        assertEquals("VERTICAL", new HologramDoc(1, 1L, anchor, List.of("x"), true, "vertical", 0.0D, 0.0D)
+            .billboard());
+        assertEquals("FIXED", new HologramDoc(1, 1L, anchor, List.of("x"), true, "  Fixed  ", 0.0D, 0.0D)
+            .billboard());
+
+        IllegalArgumentException failure = assertThrows(IllegalArgumentException.class,
+            () -> new HologramDoc(1, 1L, anchor, List.of("x"), true, "SPIN", 0.0D, 0.0D));
+
+        assertTrue(failure.getMessage().contains("CENTER, FIXED, HORIZONTAL, VERTICAL"));
+        assertTrue(failure.getMessage().contains("SPIN"));
+    }
+
+    @Test
+    void anglesOutsideTheirRangeAreRejected() {
+        HologramDoc.Anchor anchor = new HologramDoc.Anchor("world", new Vector(0, 0, 0));
+
+        assertEquals(-180.0D, new HologramDoc(1, 1L, anchor, List.of("x"), true, "FIXED", -180.0D, 90.0D).yaw());
+        assertEquals(90.0D, new HologramDoc(1, 1L, anchor, List.of("x"), true, "FIXED", -180.0D, 90.0D).pitch());
+
+        IllegalArgumentException yawFailure = assertThrows(IllegalArgumentException.class,
+            () -> new HologramDoc(1, 1L, anchor, List.of("x"), true, "FIXED", 181.0D, 0.0D));
+        assertTrue(yawFailure.getMessage().contains("yaw"));
+
+        IllegalArgumentException pitchFailure = assertThrows(IllegalArgumentException.class,
+            () -> new HologramDoc(1, 1L, anchor, List.of("x"), true, "FIXED", 0.0D, -90.5D));
+        assertTrue(pitchFailure.getMessage().contains("pitch"));
+
+        assertThrows(IllegalArgumentException.class,
+            () -> new HologramDoc(1, 1L, anchor, List.of("x"), true, "FIXED", Double.NaN, 0.0D));
+    }
+
+    @Test
+    void aDocumentWithoutOrientationKeysIsTheSameDocumentAsOneSpellingTheDefaultsOut() {
+        String bare = """
+            {
+              "schemaVersion": 1,
+              "revision": 4,
+              "anchor": {"world": "world", "position": [1.0, 2.0, 3.0]},
+              "lines": ["&dNew hologram"],
+              "seeThrough": true
+            }
+            """;
+        String spelled = """
+            {
+              "schemaVersion": 1,
+              "revision": 4,
+              "anchor": {"world": "world", "position": [1.0, 2.0, 3.0]},
+              "lines": ["&dNew hologram"],
+              "seeThrough": true,
+              "billboard": "CENTER",
+              "yaw": 0.0,
+              "pitch": 0.0
+            }
+            """;
+
+        assertEquals(HologramDoc.parse("spelled.json", spelled), HologramDoc.parse("bare.json", bare));
+    }
+
+    @Test
+    void theShippedBaselineStillCarriesNoOrientationKeys() {
+        String raw = ShippedResources.readText(HologramBaselines.RESOURCE);
+
+        assertFalse(raw.contains("billboard"));
+        assertFalse(raw.contains("yaw"));
+        assertFalse(raw.contains("pitch"));
+
+        HologramDoc baseline = HologramBaselines.baseline();
+
+        assertEquals("CENTER", baseline.billboard());
+        assertEquals(0.0D, baseline.yaw());
+        assertEquals(0.0D, baseline.pitch());
     }
 
     @Test

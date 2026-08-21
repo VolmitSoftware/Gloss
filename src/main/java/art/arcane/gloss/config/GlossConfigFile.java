@@ -44,6 +44,7 @@ public final class GlossConfigFile {
     public Preview preview = new Preview();
     public Menus menus = new Menus();
     public Items items = new Items();
+    public PlayerHeads playerHeads = new PlayerHeads();
     public Integration integration = new Integration();
 
     public static final class Features {
@@ -287,6 +288,23 @@ public final class GlossConfigFile {
         public List<String> customItemProviders = new ArrayList<>();
     }
 
+    public static final class PlayerHeads {
+        @ConfigDoc("Resolves playerHead icons into real player skins. Off renders every player-head icon as the unknown-name fallback and makes no outbound request.")
+        public boolean enabled = true;
+
+        @ConfigDoc("Minutes a resolved player profile stays cached. Clamped to 1..10080.")
+        public int cacheMinutes = 360;
+
+        @ConfigDoc("Minutes a name confirmed not to exist stays cached before it is looked up again. Clamped to 1..1440.")
+        public int unknownCacheMinutes = 10;
+
+        @ConfigDoc("Maximum cached profiles. The entries closest to expiry are dropped first; a lookup still in flight is never dropped. Clamped to 16..65536.")
+        public int maxCachedProfiles = 512;
+
+        @ConfigDoc("Block shown in place of a name that does not exist or could not be read. Anything that is not a real block falls back to minecraft:skeleton_skull.")
+        public String unknownFallbackItem = "minecraft:skeleton_skull";
+    }
+
     public static final class Integration {
         @ConfigDoc("Ticks between samples of the metrics other Volmit plugins publish for |metric.<key>| and preview variables. Clamped to 1..200.")
         public int sampleIntervalTicks = 20;
@@ -295,6 +313,9 @@ public final class GlossConfigFile {
     public void normalize() {
         if (features == null) {
             features = new Features();
+        }
+        if (playerHeads == null) {
+            playerHeads = new PlayerHeads();
         }
         if (hotload == null) {
             hotload = new Hotload();
@@ -401,6 +422,11 @@ public final class GlossConfigFile {
         menus.uiScale = clampDouble(menus.uiScale, 0.25D, 4.0D, 1.0D);
 
         items.customItemProviders = normalizeProviders(items.customItemProviders);
+
+        playerHeads.cacheMinutes = clampInt(playerHeads.cacheMinutes, 1, 10080);
+        playerHeads.unknownCacheMinutes = clampInt(playerHeads.unknownCacheMinutes, 1, 1440);
+        playerHeads.maxCachedProfiles = clampInt(playerHeads.maxCachedProfiles, 16, 65536);
+        playerHeads.unknownFallbackItem = orDefault(playerHeads.unknownFallbackItem, "minecraft:skeleton_skull");
     }
 
     public static String sanitizeBuilderUrl(String configured) {

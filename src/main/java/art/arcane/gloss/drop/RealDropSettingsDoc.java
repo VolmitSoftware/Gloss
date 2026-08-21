@@ -5,8 +5,11 @@ import art.arcane.gloss.doc.DocumentEnvelope;
 import art.arcane.gloss.doc.DocumentParsers;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 public record RealDropSettingsDoc(
     int schemaVersion,
@@ -16,7 +19,9 @@ public record RealDropSettingsDoc(
     Motion motion,
     Landing landing,
     Labels labels,
-    Filters filters
+    Filters filters,
+    Physics physics,
+    Script script
 ) {
     public static final String KIND = "real-drops";
     public static final String DEFAULT_ID = "default";
@@ -25,6 +30,8 @@ public record RealDropSettingsDoc(
     public static final RealDropSettingsDoc DEFAULTS = new RealDropSettingsDoc(
         CURRENT_SCHEMA_VERSION,
         DocumentEnvelope.INITIAL_REVISION,
+        null,
+        null,
         null,
         null,
         null,
@@ -42,6 +49,8 @@ public record RealDropSettingsDoc(
         labels = labels == null ? new Labels(null, null, null, null, null, null, null, null,
             null, null, null, null) : labels;
         filters = filters == null ? new Filters(null, null, null) : filters;
+        physics = physics == null ? new Physics(null, null, null, null, null) : physics;
+        script = script == null ? new Script(null, null, null, null, null, null, null) : script;
     }
 
     public static RealDropSettingsDoc parse(String fileName, String raw) {
@@ -91,7 +100,14 @@ public record RealDropSettingsDoc(
             new GlossConfig.RealDrops.Filters(
                 filters.disabledWorlds(),
                 filters.materialBlacklist(),
-                filters.onlyPlayerDrops()));
+                filters.onlyPlayerDrops()),
+            new GlossConfig.RealDrops.Physics(
+                physics.enabled(),
+                physics.gravityMultiplier().floatValue(),
+                physics.bounce().floatValue(),
+                physics.waterBuoyancy().floatValue(),
+                physics.waterDrag().floatValue()),
+            script.toConfig());
     }
 
     public record Limits(
@@ -187,6 +203,109 @@ public record RealDropSettingsDoc(
                 ? List.of("BEDROCK", "BARRIER")
                 : clean(materialBlacklist);
             onlyPlayerDrops = onlyPlayerDrops != null && onlyPlayerDrops;
+        }
+    }
+
+    public record Physics(
+        Boolean enabled,
+        Double gravityMultiplier,
+        Double bounce,
+        Double waterBuoyancy,
+        Double waterDrag
+    ) {
+        public Physics {
+            enabled = enabled != null && enabled;
+            gravityMultiplier = clamp(gravityMultiplier, 0.0D, 4.0D, 1.0D);
+            bounce = clamp(bounce, 0.0D, 0.9D, 0.0D);
+            waterBuoyancy = clamp(waterBuoyancy, 0.0D, 1.0D, 0.0D);
+            waterDrag = clamp(waterDrag, 0.0D, 1.0D, 0.0D);
+        }
+    }
+
+    public record Axis(String x, String y, String z) {
+        Axis withDefaults(Axis defaults) {
+            return new Axis(
+                blank(x) ? defaults.x : x.trim(),
+                blank(y) ? defaults.y : y.trim(),
+                blank(z) ? defaults.z : z.trim());
+        }
+
+        private static boolean blank(String value) {
+            return value == null || value.isBlank();
+        }
+    }
+
+    public record Script(
+        Boolean enabled,
+        Map<String, String> vars,
+        Axis offset,
+        Axis rotation,
+        Axis scale,
+        String glow,
+        String visible
+    ) {
+        public static final int MAX_VARS = 32;
+
+        private static final Axis ZERO = new Axis("0", "0", "0");
+        private static final Axis ONE = new Axis("1", "1", "1");
+
+        public Script {
+            enabled = enabled != null && enabled;
+            vars = cleanVars(vars);
+            offset = offset == null ? ZERO : offset.withDefaults(ZERO);
+            rotation = rotation == null ? ZERO : rotation.withDefaults(ZERO);
+            scale = scale == null ? ONE : scale.withDefaults(ONE);
+            glow = glow == null ? "" : glow.trim();
+            visible = visible == null || visible.isBlank() ? "true" : visible.trim();
+            RealDropScriptPlan.validate(config(enabled, vars, offset, rotation, scale, glow, visible));
+        }
+
+        GlossConfig.RealDrops.Script toConfig() {
+            return config(enabled, vars, offset, rotation, scale, glow, visible);
+        }
+
+        private static GlossConfig.RealDrops.Script config(boolean enabled, Map<String, String> vars,
+                                                           Axis offset, Axis rotation, Axis scale,
+                                                           String glow, String visible) {
+            List<GlossConfig.RealDrops.ScriptVar> declared = new ArrayList<>(vars.size());
+            for (Map.Entry<String, String> entry : vars.entrySet()) {
+                declared.add(new GlossConfig.RealDrops.ScriptVar(entry.getKey(), entry.getValue()));
+            }
+            return new GlossConfig.RealDrops.Script(
+                enabled,
+                List.copyOf(declared),
+                axis(offset),
+                axis(rotation),
+                axis(scale),
+                glow,
+                visible);
+        }
+
+        private static GlossConfig.RealDrops.Axis axis(Axis source) {
+            return new GlossConfig.RealDrops.Axis(source.x(), source.y(), source.z());
+        }
+
+        private static Map<String, String> cleanVars(Map<String, String> values) {
+            if (values == null || values.isEmpty()) {
+                return Map.of();
+            }
+            if (values.size() > MAX_VARS) {
+                throw new IllegalArgumentException(
+                    "script.vars declares " + values.size() + " variables; the limit is " + MAX_VARS);
+            }
+            Map<String, String> cleaned = new LinkedHashMap<>(values.size());
+            for (Map.Entry<String, String> entry : values.entrySet()) {
+                String name = entry.getKey() == null ? "" : entry.getKey().trim();
+                if (name.isEmpty()) {
+                    throw new IllegalArgumentException("script.vars declares an entry with no name");
+                }
+                String source = entry.getValue() == null ? "" : entry.getValue().trim();
+                if (source.isEmpty()) {
+                    throw new IllegalArgumentException("script.vars." + name + " must be a non-blank expression");
+                }
+                cleaned.put(name, source);
+            }
+            return Collections.unmodifiableMap(cleaned);
         }
     }
 

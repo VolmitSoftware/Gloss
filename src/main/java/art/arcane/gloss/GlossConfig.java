@@ -30,6 +30,7 @@ public record GlossConfig(
     EditorSync editorSync,
     Debug debug,
     CustomItems customItems,
+    PlayerHeads playerHeads,
     Integration integration
 ) {
     private static final GlossConfig DEFAULTS = defaults();
@@ -125,7 +126,9 @@ public record GlossConfig(
         Motion motion,
         Landing landing,
         Labels labels,
-        Filters filters
+        Filters filters,
+        Physics physics,
+        Script script
     ) {
         public record Limits(
             int updateIntervalTicks,
@@ -174,6 +177,32 @@ public record GlossConfig(
             List<String> disabledWorlds,
             List<String> materialBlacklist,
             boolean onlyPlayerDrops
+        ) {
+        }
+
+        public record Physics(
+            boolean enabled,
+            float gravityMultiplier,
+            float bounce,
+            float waterBuoyancy,
+            float waterDrag
+        ) {
+        }
+
+        public record Axis(String x, String y, String z) {
+        }
+
+        public record ScriptVar(String name, String expression) {
+        }
+
+        public record Script(
+            boolean enabled,
+            List<ScriptVar> vars,
+            Axis offset,
+            Axis rotation,
+            Axis scale,
+            String glow,
+            String visible
         ) {
         }
     }
@@ -237,6 +266,20 @@ public record GlossConfig(
     public record CustomItems(
         boolean enabled,
         List<String> providers
+    ) {
+    }
+
+    /**
+     * Player-head icon resolution. {@code enabled} is a hard switch on outbound profile lookups:
+     * with it off nothing leaves the server and every player-head icon draws
+     * {@code unknownFallbackItem}.
+     */
+    public record PlayerHeads(
+        boolean enabled,
+        int cacheMinutes,
+        int unknownCacheMinutes,
+        int maxCachedProfiles,
+        String unknownFallbackItem
     ) {
     }
 
@@ -356,6 +399,13 @@ public record GlossConfig(
             new CustomItems(
                 source.items.customItems,
                 List.copyOf(source.items.customItemProviders)
+            ),
+            new PlayerHeads(
+                source.playerHeads.enabled,
+                source.playerHeads.cacheMinutes,
+                source.playerHeads.unknownCacheMinutes,
+                source.playerHeads.maxCachedProfiles,
+                source.playerHeads.unknownFallbackItem
             ),
             new Integration(
                 source.integration.sampleIntervalTicks

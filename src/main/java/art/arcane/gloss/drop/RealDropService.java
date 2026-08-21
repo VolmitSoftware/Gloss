@@ -10,6 +10,7 @@ import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.World;
+import org.bukkit.block.Block;
 import org.bukkit.entity.Display;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Item;
@@ -23,6 +24,7 @@ import org.joml.Quaternionf;
 import org.joml.Vector3f;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
@@ -35,6 +37,11 @@ import java.util.function.Supplier;
 
 final class RealDropService {
     private static final float DEG_TO_RAD = (float) (Math.PI / 180.0D);
+    private static final int MAX_VISUALS = 5;
+    private static final int MAX_HEIGHT_PROBE = 32;
+    private static final double VANILLA_ITEM_GRAVITY = 0.04D;
+    private static final double WATER_BUOYANCY_STEP = 0.02D;
+    private static final double BOUNCE_MIN_APPROACH = 0.08D;
 
     private final Gloss plugin;
     private final Supplier<GlossConfig.RealDrops> configSupplier;
@@ -49,6 +56,7 @@ final class RealDropService {
     private volatile Set<String> materialBlacklist = Set.of();
     private volatile boolean running;
     private volatile long generation;
+    private volatile RealDropScriptPlan scriptPlan;
 
     RealDropService(Gloss plugin, Supplier<GlossConfig.RealDrops> configSupplier) {
         this.plugin = plugin;
@@ -67,11 +75,13 @@ final class RealDropService {
         GlossConfig.RealDrops.Filters filters = config().filters();
         disabledWorlds = normalized(filters.disabledWorlds(), false);
         materialBlacklist = normalized(filters.materialBlacklist(), true);
+        scriptPlan = compileScript(config().script());
     }
 
     void disable() {
         running = false;
         generation++;
+        scriptPlan = null;
         List<State> snapshot = new ArrayList<>(states.values());
         for (State state : snapshot) {
             state.closed = true;
@@ -172,15 +182,19 @@ final class RealDropService {
         state.modelKind = RealDropModel.modelKind(stack.getType());
         state.rotation.set(RealDropModel.baseRotation(state.modelKind));
         state.spin = RealDropModel.spin(item.getUniqueId(), 0, config.motion());
-        state.lastVelocityY = item.getVelocity().getY();
+        state.velocity = item.getVelocity();
+        state.lastVelocityY = state.velocity.getY();
         state.lastItemX = item.getLocation().getX();
         state.lastItemZ = item.getLocation().getZ();
         state.onGround = item.isOnGround();
+        state.inWater = item.isInWater();
+        state.inLava = inLava(item);
+        refreshEnvironment(state, scriptPlan);
         states.put(item.getUniqueId(), state);
 
         try {
             for (int index = 0; index < visualCount; index++) {
-                state.visuals.add(spawnVisual(state, stack, index, config));
+                state.visuals.add(spawnVisual(state, stack, index, visualCount, config));
             }
             if (createLabel) {
                 state.label = spawnLabel(state, label, config);
@@ -209,7 +223,13 @@ final class RealDropService {
         }
     }
 
-    private ItemDisplay spawnVisual(State state, ItemStack stack, int index, GlossConfig.RealDrops config) {
+    private ItemDisplay spawnVisual(State state, ItemStack stack, int index, int count,
+                                    GlossConfig.RealDrops config) {
+        if (index < MAX_VISUALS) {
+            state.appliedGlow[index] = 0;
+            state.appliedViewRange[index] = -1.0F;
+        }
+        RealDropScriptPlan.RealDropScriptSample sample = sample(state, scriptPlan, index, count);
         World world = state.item.getWorld();
         ItemDisplay display = world.spawn(state.item.getLocation(), ItemDisplay.class);
         display.setPersistent(false);
@@ -224,7 +244,10 @@ final class RealDropService {
             display.remove();
             throw new IllegalStateException("ItemDisplay carrier refused an additional dropped-item model");
         }
-        applyVisualTransformation(display, state, index, state.rotation, config);
+        applyVisualTransformation(display, state, index, state.rotation, config, sample);
+        if (sample != null) {
+            applyPresentation(state, index, display, sample, config);
+        }
         return display;
     }
 
@@ -286,7 +309,7 @@ final class RealDropService {
         if (delta > 0 && reserve(state.chunkKey, delta, config.limits().maxVisualsPerChunk())) {
             state.reserved += delta;
             for (int index = state.visuals.size(); index < desired; index++) {
-                state.visuals.add(spawnVisual(state, stack, index, config));
+                state.visuals.add(spawnVisual(state, stack, index, desired, config));
             }
         } else if (delta < 0) {
             for (int index = state.visuals.size() - 1; index >= desired; index--) {
@@ -372,7 +395,13 @@ final class RealDropService {
         Location itemLocation = state.item.getLocation();
         double deltaX = itemLocation.getX() - state.lastItemX;
         double deltaZ = itemLocation.getZ() - state.lastItemZ;
-        Vector velocity = state.item.getVelocity();
+        boolean inWater = state.item.isInWater();
+        state.inWater = inWater;
+        state.inLava = inLava(state.item);
+        PhysicsResult physics = applyPhysics(state, config, onGround, inWater);
+        Vector velocity = physics.velocity();
+        state.velocity = velocity;
+        refreshEnvironment(state, scriptPlan);
         double horizontalVelocitySquared = velocity.getX() * velocity.getX() + velocity.getZ() * velocity.getZ();
         boolean naturalBlock = onGround && state.modelKind == RealDropModel.ModelKind.BLOCK
             && "NATURAL".equals(config.landing().mode());
@@ -389,7 +418,8 @@ final class RealDropService {
             onGround, state.onGround, horizontalVelocitySquared,
             blockRoll == null || blockRoll.aligned(), state.groundedStableTicks, config);
         state.groundedStableTicks = landingMotion.stableTicks();
-        RealDropModel.TickTiming timing = landingMotion.timing();
+        state.settled = landingMotion.settled();
+        RealDropModel.TickTiming timing = timing(landingMotion, config, inWater);
         if (!presentationOwned(state)) {
             moveCarrier(state, timing.interpolationTicks());
             state.onGround = onGround;
@@ -408,9 +438,11 @@ final class RealDropService {
         moveCarrier(state, timing.interpolationTicks());
 
         double velocityY = velocity.getY();
-        boolean bounced = !onGround && state.lastVelocityY < -0.02D && velocityY > 0.02D;
-        if (bounced && config.motion().changeOnBounce()) {
+        boolean bounced = physics.bounced() || (!onGround && state.lastVelocityY < -0.02D && velocityY > 0.02D);
+        if (bounced) {
             state.bounceRevision++;
+        }
+        if (bounced && config.motion().changeOnBounce()) {
             state.spin = RealDropModel.spin(state.item.getUniqueId(), state.bounceRevision, config.motion());
         }
         if (!onGround && config.motion().tumble()) {
@@ -425,6 +457,8 @@ final class RealDropService {
         } else if (onGround && !state.onGround) {
             state.rotation.set(landingRotation(state, config));
             applyPose(state, state.rotation, config.landing().transitionTicks());
+        } else if (scriptPlan != null) {
+            applyPose(state, state.rotation, timing.interpolationTicks());
         }
         state.onGround = onGround;
         state.lastVelocityY = velocityY;
@@ -442,33 +476,226 @@ final class RealDropService {
 
     private void applyPose(State state, Quaternionf rotation, int interpolationTicks) {
         GlossConfig.RealDrops config = config();
-        for (int index = 0; index < state.visuals.size(); index++) {
+        RealDropScriptPlan plan = scriptPlan;
+        int count = state.visuals.size();
+        for (int index = 0; index < count; index++) {
             ItemDisplay display = state.visuals.get(index);
             if (!display.isValid()) {
                 continue;
             }
-            Transformation transformation = visualTransformation(state, index, rotation, config);
+            RealDropScriptPlan.RealDropScriptSample sample = sample(state, plan, index, count);
+            Transformation transformation = visualTransformation(state, index, rotation, config, sample);
             applyInterpolatedTransformation(display, transformation, interpolationTicks);
+            if (sample != null) {
+                applyPresentation(state, index, display, sample, config);
+            }
         }
     }
 
     private void applyVisualTransformation(ItemDisplay display, State state, int index,
-                                           Quaternionf rotation, GlossConfig.RealDrops config) {
-        display.setTransformation(visualTransformation(state, index, rotation, config));
+                                           Quaternionf rotation, GlossConfig.RealDrops config,
+                                           RealDropScriptPlan.RealDropScriptSample sample) {
+        display.setTransformation(visualTransformation(state, index, rotation, config, sample));
     }
 
     private Transformation visualTransformation(State state, int index, Quaternionf rotation,
-                                                GlossConfig.RealDrops config) {
+                                                GlossConfig.RealDrops config,
+                                                RealDropScriptPlan.RealDropScriptSample sample) {
         RealDropModel.Offset offset = RealDropModel.offset(index, config.limits().spread());
         float scale = RealDropModel.scale(state.modelKind, config.scale());
         Quaternionf indexedRotation = RealDropModel.indexedRotation(rotation, index);
+        Material material = state.item.getItemStack().getType();
+        boolean grounded = state.item.isOnGround();
+        if (sample == null) {
+            return new Transformation(
+                new Vector3f(offset.x(), offset.y() + RealDropModel.yOffset(
+                    material, state.modelKind, scale, indexedRotation, grounded), offset.z()),
+                indexedRotation,
+                new Vector3f(scale, scale, scale),
+                new Quaternionf());
+        }
+        Quaternionf posed = indexedRotation.rotateXYZ(
+            (float) sample.rotationX() * DEG_TO_RAD,
+            (float) sample.rotationY() * DEG_TO_RAD,
+            (float) sample.rotationZ() * DEG_TO_RAD);
+        float baseY = RealDropModel.yOffset(material, state.modelKind, scale, posed, grounded);
         return new Transformation(
-            new Vector3f(offset.x(), offset.y() + RealDropModel.yOffset(
-                state.item.getItemStack().getType(), state.modelKind, scale, indexedRotation,
-                state.item.isOnGround()), offset.z()),
-            indexedRotation,
-            new Vector3f(scale, scale, scale),
+            new Vector3f(
+                offset.x() + (float) sample.offsetX(),
+                offset.y() + baseY + (float) sample.offsetY(),
+                offset.z() + (float) sample.offsetZ()),
+            posed,
+            new Vector3f(
+                scale * (float) sample.scaleX(),
+                scale * (float) sample.scaleY(),
+                scale * (float) sample.scaleZ()),
             new Quaternionf());
+    }
+
+    private RealDropScriptPlan compileScript(GlossConfig.RealDrops.Script script) {
+        if (script == null || !script.enabled()) {
+            return null;
+        }
+        try {
+            return RealDropScriptPlan.compile(script);
+        } catch (RuntimeException failure) {
+            Gloss.logExceptionStack(false, failure,
+                "Real drop script is invalid and was ignored; the document's other settings still apply.");
+            return null;
+        }
+    }
+
+    private RealDropScriptPlan.RealDropScriptSample sample(State state, RealDropScriptPlan plan,
+                                                           int index, int count) {
+        if (plan == null) {
+            return null;
+        }
+        ItemStack stack = state.item.getItemStack();
+        return plan.sample(new RealDropScriptPlan.RealDropScriptContext(
+            (System.nanoTime() - state.spawnNanos) / 1.0E9D,
+            state.item.getTicksLived(),
+            index,
+            Math.max(1, count),
+            stack.getAmount(),
+            state.onGround,
+            state.settled,
+            state.inWater,
+            state.inLava,
+            state.bounceRevision,
+            state.velocity.getX(),
+            state.velocity.getY(),
+            state.velocity.getZ(),
+            state.height,
+            state.blockLight,
+            state.skyLight,
+            state.random,
+            stack.getType().name(),
+            state.modelKind));
+    }
+
+    private void applyPresentation(State state, int index, ItemDisplay display,
+                                   RealDropScriptPlan.RealDropScriptSample sample,
+                                   GlossConfig.RealDrops config) {
+        if (index >= MAX_VISUALS) {
+            return;
+        }
+        int glow = sample.glowArgb();
+        if (state.appliedGlow[index] != glow) {
+            state.appliedGlow[index] = glow;
+            if (glow == 0) {
+                display.setGlowing(false);
+                display.setGlowColorOverride(null);
+            } else {
+                display.setGlowColorOverride(Color.fromRGB((glow >> 16) & 0xFF, (glow >> 8) & 0xFF, glow & 0xFF));
+                display.setGlowing(true);
+            }
+        }
+        float viewRange = sample.visible()
+            ? HologramMath.viewRangeMultiplier(config.limits().viewRange())
+            : 0.0F;
+        if (state.appliedViewRange[index] != viewRange) {
+            state.appliedViewRange[index] = viewRange;
+            display.setViewRange(viewRange);
+        }
+    }
+
+    private PhysicsResult applyPhysics(State state, GlossConfig.RealDrops config, boolean onGround,
+                                       boolean inWater) {
+        GlossConfig.RealDrops.Physics physics = config.physics();
+        Vector velocity = state.item.getVelocity();
+        if (!physics.enabled()) {
+            restoreGravity(state);
+            return new PhysicsResult(velocity, false);
+        }
+
+        boolean floating = physics.gravityMultiplier() <= 0.0F;
+        if (floating != state.gravityDisabled) {
+            state.item.setGravity(!floating);
+            state.gravityDisabled = floating;
+        }
+
+        int intervalTicks = Math.max(1, config.limits().updateIntervalTicks());
+        double x = velocity.getX();
+        double y = velocity.getY();
+        double z = velocity.getZ();
+        boolean changed = false;
+        boolean bounced = false;
+
+        if (!floating && physics.gravityMultiplier() != 1.0F && !onGround) {
+            y -= VANILLA_ITEM_GRAVITY * (physics.gravityMultiplier() - 1.0F) * intervalTicks;
+            changed = true;
+        }
+        if (inWater && physics.waterBuoyancy() > 0.0F) {
+            y += WATER_BUOYANCY_STEP * physics.waterBuoyancy() * intervalTicks;
+            changed = true;
+        }
+        if (inWater && physics.waterDrag() > 0.0F) {
+            double retained = Math.pow(1.0D - physics.waterDrag(), intervalTicks);
+            x *= retained;
+            y *= retained;
+            z *= retained;
+            changed = true;
+        }
+        if (physics.bounce() > 0.0F && onGround && !state.onGround
+            && state.lastVelocityY < -BOUNCE_MIN_APPROACH) {
+            y = -state.lastVelocityY * physics.bounce();
+            bounced = true;
+            changed = true;
+        }
+        if (!changed) {
+            return new PhysicsResult(velocity, false);
+        }
+        Vector applied = new Vector(x, y, z);
+        state.item.setVelocity(applied);
+        return new PhysicsResult(applied, bounced);
+    }
+
+    private void restoreGravity(State state) {
+        if (!state.gravityDisabled) {
+            return;
+        }
+        state.gravityDisabled = false;
+        if (state.item.isValid()) {
+            state.item.setGravity(true);
+        }
+    }
+
+    private static RealDropModel.TickTiming timing(RealDropModel.LandingMotion landingMotion,
+                                                   GlossConfig.RealDrops config, boolean inWater) {
+        RealDropModel.TickTiming timing = landingMotion.timing();
+        if (!config.physics().enabled() || !inWater) {
+            return timing;
+        }
+        return new RealDropModel.TickTiming(config.limits().updateIntervalTicks(), timing.interpolationTicks());
+    }
+
+    private static void refreshEnvironment(State state, RealDropScriptPlan plan) {
+        if (plan == null || !plan.environmentRequired()) {
+            return;
+        }
+        Location location = state.item.getLocation();
+        Block block = location.getBlock();
+        state.blockLight = block.getLightFromBlocks();
+        state.skyLight = block.getLightFromSky();
+        state.height = heightAboveSurface(location);
+    }
+
+    private static double heightAboveSurface(Location location) {
+        World world = location.getWorld();
+        int x = location.getBlockX();
+        int z = location.getBlockZ();
+        int start = location.getBlockY();
+        int floor = Math.max(world.getMinHeight(), start - MAX_HEIGHT_PROBE);
+        for (int y = start; y >= floor; y--) {
+            if (world.getBlockAt(x, y, z).getType().isSolid()) {
+                return Math.max(0.0D, location.getY() - (y + 1));
+            }
+        }
+        return Math.max(0.0D, location.getY() - floor);
+    }
+
+    private static boolean inLava(Item item) {
+        return item.getLocation().getBlock().getType() == Material.LAVA;
     }
 
     private Quaternionf landingRotation(State state, GlossConfig.RealDrops config) {
@@ -511,6 +738,7 @@ final class RealDropService {
         state.destroyed = true;
         boolean current = states.remove(state.item.getUniqueId(), state);
         state.closed = true;
+        restoreGravity(state);
         for (ItemDisplay display : state.visuals) {
             removeEntity(display);
         }
@@ -535,6 +763,7 @@ final class RealDropService {
         state.destroyed = true;
         states.remove(state.item.getUniqueId(), state);
         state.closed = true;
+        restoreGravity(state);
         release(state.chunkKey, state.reserved);
         state.reserved = 0;
         for (ItemDisplay display : state.visuals) {
@@ -744,20 +973,33 @@ final class RealDropService {
         private final boolean restoreVisibleByDefault;
         private final Quaternionf rotation;
 
+        private final long spawnNanos;
+        private final double random;
+        private final int[] appliedGlow;
+        private final float[] appliedViewRange;
+
         private ChunkKey chunkKey;
         private TextDisplay label;
         private String labelText = "";
         private RealDropModel.ModelKind modelKind;
         private RealDropModel.Angles spin;
+        private Vector velocity;
         private int reserved;
         private int stackHash;
         private int bounceRevision;
         private int groundedStableTicks;
+        private int blockLight;
+        private int skyLight;
         private double lastItemX;
         private double lastItemZ;
         private double lastVelocityY;
+        private double height;
         private boolean restoreNameVisible;
         private boolean onGround;
+        private boolean settled;
+        private boolean inWater;
+        private boolean inLava;
+        private boolean gravityDisabled;
         private boolean closed;
         private boolean destroyed;
 
@@ -771,7 +1013,16 @@ final class RealDropService {
             this.restoreNameVisible = restoreNameVisible;
             this.visuals = new ArrayList<>();
             this.rotation = new Quaternionf();
+            this.spawnNanos = System.nanoTime();
+            this.random = RealDropScriptPlan.RealDropScriptContext.stableRandom(item.getUniqueId());
+            this.appliedGlow = new int[MAX_VISUALS];
+            this.appliedViewRange = new float[MAX_VISUALS];
+            Arrays.fill(this.appliedViewRange, -1.0F);
+            this.velocity = new Vector();
         }
+    }
+
+    private record PhysicsResult(Vector velocity, boolean bounced) {
     }
 
     private record ChunkKey(UUID worldId, int x, int z) {

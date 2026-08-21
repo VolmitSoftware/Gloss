@@ -9,6 +9,7 @@ import art.arcane.volmlib.util.math.M;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.World;
+import org.bukkit.entity.Display;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.TextDisplay;
 import org.bukkit.util.Transformation;
@@ -293,7 +294,7 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
                 }
 
                 Consumer<TextDisplay> configurer = spawned -> {
-                    service.configureDisplay(spawned);
+                    service.configureDisplay(spawned, false, Display.Billboard.CENTER);
                     spawned.setText(next);
                     if (snapshot.rendered()) {
                         spawned.setLineWidth(RENDERED_LINE_WIDTH);

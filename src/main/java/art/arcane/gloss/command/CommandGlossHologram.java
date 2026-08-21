@@ -1,8 +1,9 @@
 package art.arcane.gloss.command;
 
 import art.arcane.gloss.Gloss;
-import art.arcane.gloss.api.Hologram;
+import art.arcane.gloss.api.AnchoredHologram;
 import art.arcane.gloss.hologram.HologramBaselines;
+import art.arcane.gloss.hologram.HologramDoc;
 import art.arcane.gloss.locale.GlossLocalization;
 import art.arcane.gloss.locale.GlossMessages;
 import art.arcane.volmlib.util.director.DirectorOrigin;
@@ -39,7 +40,7 @@ public class CommandGlossHologram {
             return;
         }
 
-        Hologram hologram = plugin.holograms().create(id, player.getLocation());
+        AnchoredHologram hologram = plugin.holograms().create(id, player.getLocation());
         hologram.setLines(HologramBaselines.defaultLines());
         GlossCommandMessages.send(player, GlossMessages.HOLOGRAM_CREATED, MessageArgument.untrusted("id", id));
     }
@@ -66,7 +67,7 @@ public class CommandGlossHologram {
         if (GlossCommandMessages.denied(sender, "gloss.holograms.edit")) {
             return;
         }
-        Hologram hologram = find(sender, id);
+        AnchoredHologram hologram = find(sender, id);
         if (hologram == null) {
             return;
         }
@@ -85,7 +86,7 @@ public class CommandGlossHologram {
         if (GlossCommandMessages.denied(sender, "gloss.holograms.edit")) {
             return;
         }
-        Hologram hologram = find(sender, id);
+        AnchoredHologram hologram = find(sender, id);
         if (hologram == null) {
             return;
         }
@@ -106,7 +107,7 @@ public class CommandGlossHologram {
         if (GlossCommandMessages.denied(sender, "gloss.holograms.edit")) {
             return;
         }
-        Hologram hologram = find(sender, id);
+        AnchoredHologram hologram = find(sender, id);
         if (hologram == null) {
             return;
         }
@@ -126,7 +127,7 @@ public class CommandGlossHologram {
         if (GlossCommandMessages.denied(sender, "gloss.holograms.edit")) {
             return;
         }
-        Hologram hologram = find(sender, id);
+        AnchoredHologram hologram = find(sender, id);
         if (hologram == null) {
             return;
         }
@@ -141,7 +142,7 @@ public class CommandGlossHologram {
         if (GlossCommandMessages.denied(player, "gloss.holograms.move")) {
             return;
         }
-        Hologram hologram = find(player, id);
+        AnchoredHologram hologram = find(player, id);
         if (hologram == null) {
             return;
         }
@@ -159,7 +160,7 @@ public class CommandGlossHologram {
         if (GlossCommandMessages.denied(sender, "gloss.holograms.move")) {
             return;
         }
-        Hologram hologram = find(sender, id);
+        AnchoredHologram hologram = find(sender, id);
         if (hologram == null) {
             return;
         }
@@ -179,7 +180,7 @@ public class CommandGlossHologram {
         if (GlossCommandMessages.denied(player, "gloss.holograms.teleport")) {
             return;
         }
-        Hologram hologram = find(player, id);
+        AnchoredHologram hologram = find(player, id);
         if (hologram == null) {
             return;
         }
@@ -191,7 +192,7 @@ public class CommandGlossHologram {
     @Director(name = "list", descriptionKey = "command.help.hologram.list", description = "List holograms; click one to teleport")
     public void list(@Param(name = "sender", contextual = true) CommandSender sender,
                      @Param(name = "page", defaultValue = "1", descriptionKey = "command.help.arg.list_page", description = "One-based list page") int page) {
-        List<Hologram> holograms = plugin.holograms().all();
+        List<AnchoredHologram> holograms = plugin.holograms().all();
         if (holograms.isEmpty()) {
             GlossCommandMessages.send(sender, GlossMessages.HOLOGRAM_LIST_EMPTY);
             return;
@@ -202,7 +203,7 @@ public class CommandGlossHologram {
         String hover = DirectorMiniMenu.escapeText(GlossLocalization.globalDirectorText(GlossMessages.HOLOGRAM_LIST_HOVER, MessageArgs.empty()));
         List<String> lines = new ArrayList<>();
         lines.add(DirectorMiniMenu.banner(LIST_COMMAND, theme));
-        for (Hologram hologram : holograms.subList(window.startIndex(), window.endIndex())) {
+        for (AnchoredHologram hologram : holograms.subList(window.startIndex(), window.endIndex())) {
             lines.add(renderListEntry(hologram, theme, hover));
         }
         GlossCommandPager.appendFooter(lines, window, LIST_COMMAND, theme);
@@ -213,7 +214,7 @@ public class CommandGlossHologram {
     @Director(name = "info", descriptionKey = "command.help.hologram.info", description = "Show a hologram's location and lines")
     public void info(@Param(name = "sender", contextual = true) CommandSender sender,
                      @Param(name = "id", descriptionKey = "command.help.hologram.info.id", description = "Hologram id") String id) {
-        Hologram hologram = find(sender, id);
+        AnchoredHologram hologram = find(sender, id);
         if (hologram == null) {
             return;
         }
@@ -226,12 +227,50 @@ public class CommandGlossHologram {
                 MessageArgument.trusted("x", location.getBlockX()),
                 MessageArgument.trusted("y", location.getBlockY()),
                 MessageArgument.trusted("z", location.getBlockZ()));
+        GlossCommandMessages.send(sender, GlossMessages.HOLOGRAM_INFO_ORIENTATION,
+                MessageArgument.trusted("billboard", hologram.billboard()),
+                MessageArgument.trusted("yaw", hologram.yaw()),
+                MessageArgument.trusted("pitch", hologram.pitch()));
         List<String> lines = hologram.lines();
         for (int index = 0; index < lines.size(); index++) {
             GlossCommandMessages.send(sender, GlossMessages.HOLOGRAM_INFO_LINE,
                     MessageArgument.trusted("line", index + 1),
                     MessageArgument.trusted("text", lines.get(index)));
         }
+    }
+
+    @Director(name = "orient", sync = true, descriptionKey = "command.help.hologram.orient", description = "Set how a hologram turns to face viewers")
+    public void orient(@Param(name = "sender", contextual = true) CommandSender sender,
+                       @Param(name = "id", descriptionKey = "command.help.hologram.orient.id", description = "Hologram id") String id,
+                       @Param(name = "billboard", defaultValue = "CENTER", descriptionKey = "command.help.hologram.orient.billboard", description = "CENTER, VERTICAL, HORIZONTAL or FIXED") String billboard,
+                       @Param(name = "yaw", defaultValue = "0", descriptionKey = "command.help.hologram.orient.yaw", description = "Facing yaw in degrees, -180 to 180") double yaw,
+                       @Param(name = "pitch", defaultValue = "0", descriptionKey = "command.help.hologram.orient.pitch", description = "Facing pitch in degrees, -90 to 90") double pitch) {
+        if (GlossCommandMessages.denied(sender, "gloss.holograms.edit")) {
+            return;
+        }
+        AnchoredHologram hologram = find(sender, id);
+        if (hologram == null) {
+            return;
+        }
+
+        String mode = HologramDoc.normalizeBillboard(billboard);
+        if (mode == null) {
+            GlossCommandMessages.send(sender, GlossMessages.HOLOGRAM_BILLBOARD_UNKNOWN,
+                    MessageArgument.untrusted("billboard", billboard),
+                    MessageArgument.trusted("options", String.join(", ", HologramDoc.BILLBOARDS)));
+            return;
+        }
+        if (angleOutOfRange(sender, "yaw", yaw, HologramDoc.MAX_YAW_DEGREES)
+                || angleOutOfRange(sender, "pitch", pitch, HologramDoc.MAX_PITCH_DEGREES)) {
+            return;
+        }
+
+        hologram.setOrientation(mode, yaw, pitch);
+        GlossCommandMessages.send(sender, GlossMessages.HOLOGRAM_ORIENTED,
+                MessageArgument.untrusted("id", id),
+                MessageArgument.trusted("billboard", mode),
+                MessageArgument.trusted("yaw", yaw),
+                MessageArgument.trusted("pitch", pitch));
     }
 
     @Director(name = "rendertext", sync = true, origin = DirectorOrigin.PLAYER, descriptionKey = "command.help.hologram.rendertext", description = "Rasterize text into block-art hologram lines")
@@ -253,22 +292,22 @@ public class CommandGlossHologram {
             return;
         }
 
-        Hologram hologram = plugin.holograms().create(id, player.getLocation());
+        AnchoredHologram hologram = plugin.holograms().create(id, player.getLocation());
         hologram.setLines(rows);
         GlossCommandMessages.send(player, GlossMessages.HOLOGRAM_RENDERED,
                 MessageArgument.trusted("rows", rows.size()),
                 MessageArgument.untrusted("id", id));
     }
 
-    private Hologram find(CommandSender sender, String id) {
-        Hologram hologram = plugin.holograms().get(id);
+    private AnchoredHologram find(CommandSender sender, String id) {
+        AnchoredHologram hologram = plugin.holograms().get(id);
         if (hologram == null) {
             GlossCommandMessages.send(sender, GlossMessages.HOLOGRAM_MISSING, MessageArgument.untrusted("id", id));
         }
         return hologram;
     }
 
-    private boolean outOfRange(CommandSender sender, Hologram hologram, String id, int line) {
+    private boolean outOfRange(CommandSender sender, AnchoredHologram hologram, String id, int line) {
         int count = hologram.lines().size();
         if (line >= 1 && line <= count) {
             return false;
@@ -280,7 +319,18 @@ public class CommandGlossHologram {
         return true;
     }
 
-    private String renderListEntry(Hologram hologram, DirectorMiniMenu.Theme theme, String hover) {
+    private boolean angleOutOfRange(CommandSender sender, String axis, double angle, double limit) {
+        if (HologramDoc.angleInRange(angle, limit)) {
+            return false;
+        }
+        GlossCommandMessages.send(sender, GlossMessages.HOLOGRAM_ANGLE_OUT_OF_RANGE,
+                MessageArgument.trusted("axis", axis),
+                MessageArgument.trusted("value", angle),
+                MessageArgument.trusted("limit", limit));
+        return true;
+    }
+
+    private String renderListEntry(AnchoredHologram hologram, DirectorMiniMenu.Theme theme, String hover) {
         String display = DirectorMiniMenu.escapeText(hologram.id());
         String click = "/gloss hologram tp " + hologram.id().replace("'", "");
         String suffix = DirectorMiniMenu.escapeText(GlossLocalization.globalDirectorText(

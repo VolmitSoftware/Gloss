@@ -134,6 +134,16 @@ public final class DropNameService implements Listener {
         rehydrateLoadedChunks();
     }
 
+    public List<String> resetToDefault(String nameOrStar) {
+        List<String> restored = realDropDefaults.resetToDefault(nameOrStar);
+        if (restored.isEmpty()) {
+            return restored;
+        }
+        loadRealDropSettings();
+        reloadPresentations();
+        return restored;
+    }
+
     public int activeCount() {
         return tracker.size();
     }

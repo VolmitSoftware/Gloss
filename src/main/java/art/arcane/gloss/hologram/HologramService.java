@@ -1,7 +1,7 @@
 package art.arcane.gloss.hologram;
 
 import art.arcane.gloss.Gloss;
-import art.arcane.gloss.api.Hologram;
+import art.arcane.gloss.api.AnchoredHologram;
 import art.arcane.gloss.api.TemporaryHologram;
 import art.arcane.gloss.doc.DocumentDelta;
 import art.arcane.gloss.doc.DocumentRegistry;
@@ -131,7 +131,7 @@ public final class HologramService {
         startTasks();
     }
 
-    public Hologram create(String id, Location location) {
+    public AnchoredHologram create(String id, Location location) {
         String safeId = requireSafeId(id);
         Objects.requireNonNull(location, "Hologram location may not be null.");
         PersistentHologram[] created = new PersistentHologram[1];
@@ -146,7 +146,7 @@ public final class HologramService {
         return hologram;
     }
 
-    public Hologram get(String id) {
+    public AnchoredHologram get(String id) {
         return id == null ? null : holograms.get(id);
     }
 
@@ -170,8 +170,8 @@ public final class HologramService {
         });
     }
 
-    public List<Hologram> all() {
-        return new ArrayList<Hologram>(holograms.values());
+    public List<AnchoredHologram> all() {
+        return new ArrayList<AnchoredHologram>(holograms.values());
     }
 
     public TemporaryHologram createTemporary(String id, Location initial, long durationMs) {
@@ -232,13 +232,9 @@ public final class HologramService {
         temporaries.remove(temporary);
     }
 
-    void configureDisplay(TextDisplay display) {
-        configureDisplay(display, false);
-    }
-
-    void configureDisplay(TextDisplay display, boolean seeThrough) {
+    void configureDisplay(TextDisplay display, boolean seeThrough, Display.Billboard billboard) {
         display.setPersistent(false);
-        display.setBillboard(Display.Billboard.CENTER);
+        display.setBillboard(billboard);
         display.setViewRange(HologramMath.viewRangeMultiplier(plugin.cfg().holograms().viewRange()));
         display.setSeeThrough(seeThrough);
         display.setShadowed(false);

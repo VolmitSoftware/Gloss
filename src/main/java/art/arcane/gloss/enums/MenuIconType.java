@@ -6,6 +6,7 @@ import art.arcane.gloss.config.icon.CustomItemIconData;
 import art.arcane.gloss.config.icon.EntityIconData;
 import art.arcane.gloss.config.icon.ItemIconData;
 import art.arcane.gloss.config.icon.MenuIconData;
+import art.arcane.gloss.config.icon.PlayerHeadIconData;
 import art.arcane.gloss.config.icon.TextIconData;
 import art.arcane.gloss.config.icon.TextImageIconData;
 import art.arcane.volmlib.util.json.EnumType;
@@ -18,6 +19,7 @@ public enum MenuIconType implements EnumType.Values<MenuIconData> {
   TEXT_IMAGE("textImage", TextImageIconData.class),
   TEXT("text", TextIconData.class),
   ENTITY("entity", EntityIconData.class),
+  PLAYER_HEAD("playerHead", PlayerHeadIconData.class),
   ITEM_STACK("itemStack", null);
 
   private final String value;
