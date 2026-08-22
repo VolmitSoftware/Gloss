@@ -45,6 +45,8 @@ final class RealDropService {
     private static final double VANILLA_ITEM_GRAVITY = 0.04D;
     private static final double WATER_BUOYANCY_STEP = 0.02D;
     private static final double BOUNCE_MIN_APPROACH = 0.08D;
+    private static final double ACTIVE_CARRIER_POSITION_EPSILON = 1.0E-7D;
+    private static final double SETTLED_CARRIER_POSITION_EPSILON = 1.0D / 512.0D;
     private static final int MAX_DYNAMIC_LIGHTS_PER_CHUNK = 8;
     private static final int DYNAMIC_LIGHT_UPDATE_TICKS = 4;
 
@@ -318,12 +320,14 @@ final class RealDropService {
     }
 
     private void refreshVisuals(State state, GlossConfig.RealDrops config) {
+        boolean poseRefreshRequired = false;
         for (int index = state.visuals.size() - 1; index >= 0; index--) {
             Display display = state.visuals.get(index);
             if (!display.isValid()) {
                 state.visuals.remove(index);
                 release(state.chunkKey, 1);
                 state.reserved--;
+                poseRefreshRequired = true;
             }
         }
         ItemStack stack = state.item.getItemStack();
@@ -340,6 +344,7 @@ final class RealDropService {
                 }
             }
             state.stackHash = stackHash;
+            poseRefreshRequired = true;
         }
         int delta = desired - state.visuals.size();
         if (delta > 0 && reserve(state.chunkKey, delta, config.limits().maxVisualsPerChunk())) {
@@ -347,14 +352,18 @@ final class RealDropService {
             for (int index = state.visuals.size(); index < desired; index++) {
                 state.visuals.add(spawnVisual(state, stack, index, desired, config));
             }
+            poseRefreshRequired = true;
         } else if (delta < 0) {
             for (int index = state.visuals.size() - 1; index >= desired; index--) {
                 removeEntity(state.visuals.remove(index));
                 release(state.chunkKey, 1);
                 state.reserved--;
             }
+            poseRefreshRequired = true;
         }
-        applyPose(state, state.animation.rotation(), config.limits().updateIntervalTicks());
+        if (poseRefreshRequired) {
+            applyPose(state, state.animation.rotation(), config.limits().updateIntervalTicks());
+        }
     }
 
     private void replaceVisuals(State state, ItemStack stack, RealDropModel.ModelKind nextKind,
@@ -1209,10 +1218,9 @@ final class RealDropService {
             return;
         }
         Location destination = state.item.getLocation().clone();
-        if (state.carrierPositionKnown
-            && Math.abs(destination.getX() - state.lastCarrierX) <= 1.0E-7D
-            && Math.abs(destination.getY() - state.lastCarrierY) <= 1.0E-7D
-            && Math.abs(destination.getZ() - state.lastCarrierZ) <= 1.0E-7D) {
+        if (!carrierPositionChanged(state.carrierPositionKnown, state.settled,
+            destination.getX(), destination.getY(), destination.getZ(),
+            state.lastCarrierX, state.lastCarrierY, state.lastCarrierZ)) {
             return;
         }
         state.carrierPositionKnown = true;
@@ -1227,6 +1235,20 @@ final class RealDropService {
             carrier.setTeleportDuration(duration);
             plugin.scheduler().teleport(carrier, destination);
         });
+    }
+
+    static boolean carrierPositionChanged(boolean positionKnown, boolean settled,
+                                          double x, double y, double z,
+                                          double lastX, double lastY, double lastZ) {
+        if (!positionKnown) {
+            return true;
+        }
+        double epsilon = settled
+            ? SETTLED_CARRIER_POSITION_EPSILON
+            : ACTIVE_CARRIER_POSITION_EPSILON;
+        return Math.abs(x - lastX) > epsilon
+            || Math.abs(y - lastY) > epsilon
+            || Math.abs(z - lastZ) > epsilon;
     }
 
     private static Display carrier(State state) {
