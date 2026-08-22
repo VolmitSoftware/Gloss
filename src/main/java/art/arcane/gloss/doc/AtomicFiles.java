@@ -3,6 +3,7 @@ package art.arcane.gloss.doc;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
+import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
@@ -22,6 +23,10 @@ import java.nio.file.StandardOpenOption;
  */
 public final class AtomicFiles {
     private static final String TEMPORARY_SUFFIX = ".tmp";
+
+    /** Directories can only be opened and fsynced on POSIX filesystems; see {@link #forceDirectory}. */
+    private static final boolean DIRECTORY_FLUSH_SUPPORTED =
+            FileSystems.getDefault().supportedFileAttributeViews().contains("posix");
 
     private AtomicFiles() {
     }
@@ -79,8 +84,15 @@ public final class AtomicFiles {
         }
     }
 
+    /**
+     * Flushes a directory entry so a preceding atomic rename survives a crash.
+     *
+     * <p>Only POSIX filesystems allow a directory to be opened as a file for this purpose. Windows
+     * rejects the open with {@code AccessDeniedException} and exposes no NIO equivalent, so the
+     * flush is skipped there rather than failing the write that asked for it.
+     */
     public static void forceDirectory(Path directory) throws IOException {
-        if (directory == null) {
+        if (directory == null || !DIRECTORY_FLUSH_SUPPORTED) {
             return;
         }
         try (FileChannel channel = FileChannel.open(directory, StandardOpenOption.READ)) {

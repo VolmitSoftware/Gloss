@@ -119,13 +119,29 @@ public final class ShippedDefaults {
         }
     }
 
+    /**
+     * Reports whether the file still holds the untouched shipped form, ignoring line-ending style.
+     *
+     * <p>The expected forms are Java string literals, so they always carry a bare line feed, while
+     * the file on disk carries whatever the checkout produced: a carriage return plus line feed on
+     * a Windows clone. A byte-exact comparison reads every such file as operator-edited and skips
+     * the upgrade. Only a carriage return that immediately precedes a line feed is folded away, so
+     * a genuine operator edit still counts as one.
+     */
     private boolean matchesExact(Path file, byte[] expected) throws IOException {
-        if (Files.size(file) != expected.length) {
-            return false;
+        return Arrays.equals(foldLineEndings(Files.readAllBytes(file)), foldLineEndings(expected));
+    }
+
+    private static byte[] foldLineEndings(byte[] content) {
+        byte[] folded = new byte[content.length];
+        int length = 0;
+        for (int index = 0; index < content.length; index++) {
+            if (content[index] == '\r' && index + 1 < content.length && content[index + 1] == '\n') {
+                continue;
+            }
+            folded[length++] = content[index];
         }
-        try (InputStream stream = Files.newInputStream(file)) {
-            return Arrays.equals(stream.readNBytes(expected.length), expected) && stream.read() == -1;
-        }
+        return Arrays.copyOf(folded, length);
     }
 
     private boolean replaceAtomically(Path file, byte[] expected, byte[] content) throws IOException {

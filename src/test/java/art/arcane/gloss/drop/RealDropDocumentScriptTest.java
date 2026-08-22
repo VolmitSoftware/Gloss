@@ -304,7 +304,7 @@ class RealDropDocumentScriptTest {
         Path document = Path.of(System.getProperty("user.dir"), "DROP_SCRIPT_FORMAT.md");
         assertTrue(Files.isRegularFile(document), "missing " + document);
         Matcher blocks = Pattern.compile("```json\\n(.*?)```", Pattern.DOTALL)
-            .matcher(Files.readString(document, StandardCharsets.UTF_8));
+            .matcher(Files.readString(document, StandardCharsets.UTF_8).replace("\r\n", "\n"));
         List<String> examples = new ArrayList<>();
         while (blocks.find()) {
             String block = blocks.group(1);

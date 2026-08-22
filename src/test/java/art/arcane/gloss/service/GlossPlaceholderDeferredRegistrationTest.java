@@ -13,7 +13,7 @@ public class GlossPlaceholderDeferredRegistrationTest {
 
   @Test
   public void theEnableTimeAttemptStillRunsSoSpigotOrderingKeepsWorking() throws Exception {
-    String source = Files.readString(PLUGIN_SOURCE);
+    String source = Files.readString(PLUGIN_SOURCE).replace("\r\n", "\n");
     assertTrue(
         "installPlaceholders must remain the enable-time starter for the placeholders service",
         source.contains("enableService(\"placeholders\", this::installPlaceholders, this::shutdownPlaceholders);"));
@@ -24,7 +24,7 @@ public class GlossPlaceholderDeferredRegistrationTest {
 
   @Test
   public void aDeferredWatchInstallsTheExpansionWhenPlaceholderApiEnablesAfterGloss() throws Exception {
-    String source = Files.readString(PLUGIN_SOURCE);
+    String source = Files.readString(PLUGIN_SOURCE).replace("\r\n", "\n");
     assertTrue(
         "Gloss enables at STARTUP, so a PluginEnableEvent watch is the only way to catch a later PlaceholderAPI",
         source.contains("Events.listen(this, PluginEnableEvent.class, event -> {"));
@@ -37,7 +37,7 @@ public class GlossPlaceholderDeferredRegistrationTest {
 
   @Test
   public void theInstallIsIdempotentAndTheWatchIsDroppedOnSuccessAndOnShutdown() throws Exception {
-    String source = Files.readString(PLUGIN_SOURCE);
+    String source = Files.readString(PLUGIN_SOURCE).replace("\r\n", "\n");
     assertTrue(
         "an already-registered expansion must never be installed twice",
         source.contains("if (placeholderRegistration.isRegistered()) {\n            return true;\n        }"));

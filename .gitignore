@@ -22,3 +22,7 @@ logs/
 AGENTS.md
 
 .run/
+
+# Local build tooling, not part of the project
+build-lt.sh
+BUILDS/

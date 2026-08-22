@@ -80,7 +80,14 @@ public final class ImageAssets {
     }
 
     File root = imageRoot.getCanonicalFile();
-    File image = new File(root, relative).getCanonicalFile();
+    File image;
+    try {
+      image = new File(root, relative).getCanonicalFile();
+    } catch (IOException rejectedByTheFilesystem) {
+      // Joining the root with an absolute path produces a malformed path on Windows rather than
+      // one that merely sits outside the root. Either way it is not an image inside the root.
+      throw new FileNotFoundException(relative);
+    }
     Path rootPath = root.toPath();
     if (!image.toPath().startsWith(rootPath) || !image.isFile()) {
       throw new FileNotFoundException(relative);
