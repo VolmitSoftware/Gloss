@@ -129,7 +129,7 @@ class BubbleSenderStateTest {
     }
 
     @Test
-    void stackedLineCountIncludesEveryLineInThisAndNewerMessageBlocks() {
+    void stackedLineCountIncludesEveryLineInNewerMessageBlocks() {
         SenderState state = new SenderState();
         BubbleRecord oldest = record(false, 0L, 3);
         BubbleRecord middle = record(false, 0L, 2);
@@ -138,8 +138,8 @@ class BubbleSenderStateTest {
         state.add(middle);
         state.add(newest);
 
-        assertEquals(6, state.stackedLineCount(oldest));
-        assertEquals(3, state.stackedLineCount(middle));
-        assertEquals(1, state.stackedLineCount(newest));
+        assertEquals(3, state.stackedLineCount(oldest));
+        assertEquals(1, state.stackedLineCount(middle));
+        assertEquals(0, state.stackedLineCount(newest));
     }
 }

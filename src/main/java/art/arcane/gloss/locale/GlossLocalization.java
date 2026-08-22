@@ -38,11 +38,14 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.TimeUnit;
+import java.util.function.LongSupplier;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public final class GlossLocalization implements AutoCloseable {
   private static final long MAX_LANGUAGE_BYTES = 2L * 1024L * 1024L;
+  private static final long CONTENT_RECONCILIATION_NANOS = TimeUnit.SECONDS.toNanos(9L);
   private static final int MAX_REPORTED_ISSUES = 12;
   private static final MessageCatalog CATALOG = GlossMessages.catalog();
 
@@ -51,19 +54,27 @@ public final class GlossLocalization implements AutoCloseable {
   private final File languageFile;
   private final Logger logger;
   private final LocalizationManager manager;
+  private final LongSupplier clock;
   private volatile FileWatcher watcher;
   private volatile String activeLocale;
   private volatile String observedHash;
   private volatile LanguageSnapshot pendingAutomaticSnapshot;
+  private volatile long nextContentReconciliationNanos;
 
   public GlossLocalization(File dataFolder, Logger logger) {
+    this(dataFolder, logger, System::nanoTime);
+  }
+
+  GlossLocalization(File dataFolder, Logger logger, LongSupplier clock) {
     this.languageFile = new File(dataFolder, "language.yml");
     this.logger = logger;
+    this.clock = Objects.requireNonNull(clock, "clock");
     this.manager = new LocalizationManager(LocalizationCandidate.english(CATALOG, PluralSelector.oneOther()));
     this.activeLocale = CATALOG.englishLocale();
     ensureDefaultFile();
     reload();
     this.watcher = new FileWatcher(languageFile);
+    this.nextContentReconciliationNanos = this.clock.getAsLong() + CONTENT_RECONCILIATION_NANOS;
   }
 
   public String activeLocale() {
@@ -83,7 +94,15 @@ public final class GlossLocalization implements AutoCloseable {
     if (current == null) {
       return;
     }
-    current.checkModified();
+    boolean watcherChanged = current.checkModifiedEvents();
+    long now = clock.getAsLong();
+    boolean reconciliationDue = now >= nextContentReconciliationNanos;
+    if (reconciliationDue) {
+      nextContentReconciliationNanos = now + CONTENT_RECONCILIATION_NANOS;
+    }
+    if (!watcherChanged && pendingAutomaticSnapshot == null && !reconciliationDue) {
+      return;
+    }
     LanguageSnapshot snapshot;
     try {
       snapshot = captureSnapshot();

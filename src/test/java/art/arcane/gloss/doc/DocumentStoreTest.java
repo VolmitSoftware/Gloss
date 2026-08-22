@@ -74,6 +74,17 @@ class DocumentStoreTest {
     }
 
     @Test
+    void oversizedOwnWriteCandidateIsRejectedBeforeHashingPastTheDocumentLimit() throws IOException {
+        DocumentStore<TestDoc> store = store();
+        store.write("alpha", new TestDoc(1L, "hello"));
+        File file = new File(folder, "alpha.json");
+        byte[] oversized = new byte[(int) DocumentRegistry.MAX_DOCUMENT_BYTES + 1];
+        Files.write(file.toPath(), oversized);
+
+        assertFalse(store.isOwnWrite(file));
+    }
+
+    @Test
     void unknownFileIsNotAnOwnWrite() {
         assertFalse(store().isOwnWrite(new File(folder, "never-written.json")));
         assertFalse(store().isOwnWrite(null));

@@ -20,6 +20,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -148,11 +150,17 @@ public class GlossLocalizationTest {
 
   @Test
   public void automaticReloadQueuesStableExactContentAndDoesNotRecreateDeletion() throws Exception {
+    localization.close();
+    AtomicLong clock = new AtomicLong();
+    Logger logger = Logger.getAnonymousLogger();
+    logger.setUseParentHandlers(false);
+    localization = new GlossLocalization(temporaryFolder.newFolder("clocked-localization"), logger, clock::get);
     YamlConfiguration yaml = loadLanguageFile();
     yaml.set("messages." + GlossMessages.MENU_UNAVAILABLE.id(), "Alpha {menu}");
     yaml.save(localization.languageFile());
     MessageArgs arguments = MessageArgs.builder().untrusted("menu", "market").build();
 
+    clock.addAndGet(TimeUnit.SECONDS.toNanos(9L));
     localization.update();
     assertFalse("Alpha market".equals(localization.text(GlossMessages.MENU_UNAVAILABLE, arguments)));
     localization.update();
@@ -163,13 +171,14 @@ public class GlossLocalizationTest {
     yaml.save(localization.languageFile());
     Files.setLastModifiedTime(localization.languageFile().toPath(), appliedTime);
 
+    clock.addAndGet(TimeUnit.SECONDS.toNanos(9L));
     localization.update();
     assertEquals("Alpha market", localization.text(GlossMessages.MENU_UNAVAILABLE, arguments));
     localization.update();
     assertEquals("Bravo market", localization.text(GlossMessages.MENU_UNAVAILABLE, arguments));
 
     Files.delete(localization.languageFile().toPath());
-    localization.update();
+    clock.addAndGet(TimeUnit.SECONDS.toNanos(9L));
     localization.update();
     assertFalse(localization.languageFile().exists());
     assertEquals("Bravo market", localization.text(GlossMessages.MENU_UNAVAILABLE, arguments));
@@ -313,4 +322,5 @@ public class GlossLocalizationTest {
     yaml.load(file);
     return yaml;
   }
+
 }

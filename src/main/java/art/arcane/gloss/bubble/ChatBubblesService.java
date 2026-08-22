@@ -648,7 +648,7 @@ public final class ChatBubblesService implements Listener {
                 return 0;
             }
             int count = 0;
-            for (int position = index; position < live.size(); position++) {
+            for (int position = index + 1; position < live.size(); position++) {
                 count += live.get(position).lineCount;
             }
             return count;

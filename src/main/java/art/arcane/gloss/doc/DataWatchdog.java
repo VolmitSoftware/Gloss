@@ -64,7 +64,7 @@ public final class DataWatchdog {
         entries.removeIf(entry -> entry.name().equals(name));
     }
 
-    public void start(int intervalTicks) {
+    public synchronized void start(int intervalTicks) {
         if (taskId != NO_TASK) {
             return;
         }
@@ -78,7 +78,7 @@ public final class DataWatchdog {
         taskId = plugin.scheduler().ar(this::pump, intervalTicks);
     }
 
-    public void stop() {
+    public synchronized void stop() {
         if (taskId == NO_TASK) {
             return;
         }
@@ -102,10 +102,13 @@ public final class DataWatchdog {
         }
     }
 
-    public void restart(int intervalTicks) {
-        stop();
-        batchGate.deferFromNow();
-        start(intervalTicks);
+    public synchronized void restart(int intervalTicks) {
+        if (taskId == NO_TASK) {
+            start(intervalTicks);
+            return;
+        }
+        plugin.scheduler().car(taskId);
+        taskId = plugin.scheduler().ar(this::pump, intervalTicks);
     }
 
     public void deferAutomaticPass() {
@@ -133,7 +136,7 @@ public final class DataWatchdog {
     }
 
     private void runPass(long generation) {
-        try {
+        try (HotloadReconciliationBudget budget = HotloadReconciliationBudget.open()) {
             tick(generation);
         } finally {
             completeAfterApplyBatch(generation);

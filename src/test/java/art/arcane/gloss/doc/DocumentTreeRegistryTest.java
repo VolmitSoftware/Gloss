@@ -1,5 +1,6 @@
 package art.arcane.gloss.doc;
 
+import art.arcane.volmlib.util.io.FolderWatcher;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -13,6 +14,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.BooleanSupplier;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -76,50 +78,80 @@ class DocumentTreeRegistryTest {
     }
 
     @Test
-    void pollReportsNestedCreationsIncludingAWholeNewSubdirectory() throws IOException {
+    void aMissingRootThatAppearsTransitionsFromFallbackScanToEvents() throws Exception {
+        File missing = new File(root, "menus");
+        DocumentRegistry<String> registry = DocumentRegistry.folderTree("menus", missing, PARSER,
+            value -> DocumentRegistry.UNVERSIONED, clock::get);
+        registry.reload();
+        File nested = new File(missing, "archive/new.json");
+        assertTrue(nested.getParentFile().mkdirs());
+        Files.writeString(nested.toPath(), "one", StandardCharsets.UTF_8);
+
+        clock.addAndGet(TimeUnit.SECONDS.toNanos(5L));
+        DocumentDelta created = registry.poll();
+        assertEquals(List.of("archive/new"), created.loaded());
+        assertTrue(registry.acknowledge(created));
+
+        Files.writeString(nested.toPath(), "two", StandardCharsets.UTF_8);
+        DocumentDelta changed = awaitDelta(registry);
+
+        assertEquals(List.of("archive/new"), changed.loaded());
+        assertEquals("two", registry.get(changed, "archive/new").value());
+    }
+
+    @Test
+    void pollReportsNestedCreationsIncludingAWholeNewSubdirectory() throws Exception {
         write("shop.json", "one");
         DocumentRegistry<String> registry = registry();
         registry.reload();
 
         write("quests.json", "two");
+        DocumentDelta first = awaitDelta(registry);
+        assertEquals(List.of("quests"), first.loaded());
+        assertTrue(registry.acknowledge(first));
+
         write("archive/old.json", "three");
         write("archive/notes.txt", "ignored");
+        DocumentDelta delta = awaitDelta(registry);
 
-        DocumentDelta delta = registry.poll();
-
-        assertEquals(List.of("archive/old", "quests"), sorted(delta.loaded()));
+        assertEquals(List.of("archive/old"), delta.loaded());
         assertEquals("three", registry.get(delta, "archive/old").value());
         assertTrue(registry.acknowledge(delta));
         assertEquals("three", registry.get("archive/old").value());
     }
 
     @Test
-    void pollReportsNestedChangesUnderTheirRelativeIds() throws IOException {
+    void pollReportsNestedChangesUnderTheirRelativeIds() throws Exception {
         write("shop.json", "one");
         write("archive/old.json", "two");
         DocumentRegistry<String> registry = registry();
         registry.reload();
 
         write("shop.json", "one edited");
+        DocumentDelta first = awaitDelta(registry);
+        assertEquals(List.of("shop"), first.loaded());
+        assertTrue(registry.acknowledge(first));
+
         write("archive/old.json", "two edited");
+        DocumentDelta delta = awaitDelta(registry);
 
-        DocumentDelta delta = registry.poll();
-
-        assertEquals(List.of("archive/old", "shop"), sorted(delta.loaded()));
+        assertEquals(List.of("archive/old"), delta.loaded());
         assertEquals("two edited", registry.get(delta, "archive/old").value());
         assertTrue(registry.acknowledge(delta));
         assertEquals("two edited", registry.get("archive/old").value());
     }
 
     @Test
-    void deletingADocumentUnregistersIt() throws IOException {
+    void deletingADocumentUnregistersIt() throws Exception {
         write("archive/old.json", "two");
         DocumentRegistry<String> registry = registry();
         registry.reload();
 
+        TrackingFolderWatcher watcher = new TrackingFolderWatcher(root);
+        registry.replaceFolderWatcher(watcher);
         assertTrue(new File(root, "archive/old.json").delete());
 
-        assertTrue(registry.poll().isEmpty());
+        awaitWatcherEvent(registry, watcher::eventSeen);
         clock.addAndGet(TimeUnit.SECONDS.toNanos(3L));
         DocumentDelta delta = registry.poll();
 
@@ -130,16 +162,18 @@ class DocumentTreeRegistryTest {
     }
 
     @Test
-    void deletingASubdirectoryUnregistersEveryDocumentBelowIt() throws IOException {
+    void deletingASubdirectoryUnregistersEveryDocumentBelowIt() throws Exception {
         write("shop.json", "one");
         write("archive/old.json", "two");
         write("archive/deep/older.json", "three");
         DocumentRegistry<String> registry = registry();
         registry.reload();
 
+        TrackingFolderWatcher watcher = new TrackingFolderWatcher(root);
+        registry.replaceFolderWatcher(watcher);
         deleteTree(new File(root, "archive"));
 
-        assertTrue(registry.poll().isEmpty());
+        awaitWatcherEvent(registry, watcher::eventSeen);
         clock.addAndGet(TimeUnit.SECONDS.toNanos(3L));
         DocumentDelta delta = registry.poll();
 
@@ -216,6 +250,31 @@ class DocumentTreeRegistryTest {
         return ids.stream().sorted(Comparator.naturalOrder()).toList();
     }
 
+    private static DocumentDelta awaitDelta(DocumentRegistry<String> registry) throws InterruptedException {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5L);
+        DocumentDelta delta = DocumentDelta.EMPTY;
+        while (delta.isEmpty() && System.nanoTime() < deadline) {
+            delta = registry.poll();
+            if (delta.isEmpty()) {
+                Thread.sleep(25L);
+            }
+        }
+        assertFalse(delta.isEmpty());
+        return delta;
+    }
+
+    private static void awaitWatcherEvent(DocumentRegistry<String> registry, BooleanSupplier eventSeen)
+        throws InterruptedException {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5L);
+        while (!eventSeen.getAsBoolean() && System.nanoTime() < deadline) {
+            registry.poll();
+            if (!eventSeen.getAsBoolean()) {
+                Thread.sleep(25L);
+            }
+        }
+        assertTrue(eventSeen.getAsBoolean());
+    }
+
     private static void deleteTree(File directory) throws IOException {
         try (Stream<Path> paths = Files.walk(directory.toPath())) {
             for (Path path : paths.sorted(Comparator.reverseOrder()).toList()) {
@@ -230,5 +289,27 @@ class DocumentTreeRegistryTest {
         Files.writeString(file.toPath(), content, StandardCharsets.UTF_8);
         stamp += 5000L;
         assertTrue(file.setLastModified(stamp));
+    }
+
+    private static final class TrackingFolderWatcher extends FolderWatcher {
+        private boolean eventSeen;
+
+        private TrackingFolderWatcher(File folder) {
+            super(folder);
+        }
+
+        @Override
+        public boolean checkModifiedEvents() {
+            boolean modified = super.checkModifiedEvents();
+            if (!modified) {
+                modified = super.checkModified();
+            }
+            eventSeen |= modified;
+            return modified;
+        }
+
+        private boolean eventSeen() {
+            return eventSeen;
+        }
     }
 }

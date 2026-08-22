@@ -73,6 +73,7 @@ import java.nio.file.NoSuchFileException;
 import java.util.ArrayDeque;
 import java.util.Collection;
 import java.util.Deque;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -81,6 +82,7 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
     private static final int BSTATS_PLUGIN_ID = 33525;
     private static final String PLACEHOLDER_API_PLUGIN = "PlaceholderAPI";
     private static final String LOCALE_WATCHDOG_ENTRY = "locale";
+    private static final long CONFIG_RECONCILIATION_NANOS = TimeUnit.SECONDS.toNanos(6L);
 
     public static Gloss instance;
 
@@ -91,6 +93,7 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
     private GlossConfigLoader configLoader;
     private FileWatcher configWatcher;
     private volatile GlossConfigLoader.ReloadSnapshot pendingConfigSnapshot;
+    private volatile long nextConfigReconciliationNanos;
     private DataWatchdog watchdog;
     private volatile GlossConfig config;
     private TextPipeline text;
@@ -462,6 +465,7 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
     private void startDataWatchdog() {
         FileWatcher previous = configWatcher;
         configWatcher = new FileWatcher(configLoader.file());
+        nextConfigReconciliationNanos = System.nanoTime() + CONFIG_RECONCILIATION_NANOS;
         if (previous != null) {
             previous.close();
         }
@@ -505,7 +509,15 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
         if (watcher == null) {
             return;
         }
-        boolean watcherChanged = watcher.checkModified();
+        boolean watcherChanged = watcher.checkModifiedEvents();
+        long now = System.nanoTime();
+        boolean reconciliationDue = now >= nextConfigReconciliationNanos;
+        if (reconciliationDue) {
+            nextConfigReconciliationNanos = now + CONFIG_RECONCILIATION_NANOS;
+        }
+        if (!watcherChanged && pendingConfigSnapshot == null && !reconciliationDue) {
+            return;
+        }
         GlossConfigLoader.ReloadSnapshot snapshot;
         try {
             snapshot = configLoader.captureReloadSnapshot();

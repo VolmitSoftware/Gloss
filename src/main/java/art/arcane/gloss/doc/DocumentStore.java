@@ -4,6 +4,7 @@ import art.arcane.volmlib.util.bukkit.json.BukkitJson;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.Map;
@@ -52,8 +53,10 @@ public final class DocumentStore<T> {
         if (expected == null) {
             return false;
         }
-        try {
-            return expected.equals(DocumentHashes.sha256(Files.readAllBytes(file.toPath())));
+        try (InputStream input = Files.newInputStream(file.toPath())) {
+            byte[] content = input.readNBytes((int) DocumentRegistry.MAX_DOCUMENT_BYTES + 1);
+            return content.length <= DocumentRegistry.MAX_DOCUMENT_BYTES
+                && expected.equals(DocumentHashes.sha256(content));
         } catch (IOException failure) {
             return false;
         }

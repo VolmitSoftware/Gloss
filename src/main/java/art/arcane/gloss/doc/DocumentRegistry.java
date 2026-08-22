@@ -8,6 +8,7 @@ import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -26,9 +27,14 @@ import java.util.function.ToLongFunction;
 
 public final class DocumentRegistry<T> implements AutoCloseable {
     private static final String EXTENSION = ".json";
-    private static final long MAX_DOCUMENT_BYTES = 2L * 1024L * 1024L;
+    static final long MAX_DOCUMENT_BYTES = 2L * 1024L * 1024L;
     private static final long RECONCILIATION_BYTE_BUDGET = 8L * 1024L * 1024L;
-    private static final int RECONCILIATION_FILE_BUDGET = 256;
+    private static final long RECONCILIATION_TIME_BUDGET_NANOS = TimeUnit.MILLISECONDS.toNanos(10L);
+    private static final long FULL_WATCH_SCAN_WINDOW_NANOS = TimeUnit.SECONDS.toNanos(18L);
+    static final long CONTENT_RECONCILIATION_WINDOW_NANOS = TimeUnit.SECONDS.toNanos(6L);
+    private static final long RECONCILIATION_SLOT_NANOS = TimeUnit.SECONDS.toNanos(3L);
+    private static final int RECONCILIATION_SLOT_COUNT = 2;
+    static final int RECONCILIATION_FILE_BUDGET = 32;
     private static final long DELETION_GRACE_NANOS = TimeUnit.SECONDS.toNanos(3L);
 
     /**
@@ -57,11 +63,16 @@ public final class DocumentRegistry<T> implements AutoCloseable {
     private final Map<String, Long> pendingDeletions;
     private final Set<String> retryIds;
     private final Set<String> failedIds;
+    private final Set<String> reconciliationLoaded;
+    private final long reconciliationInitialOffsetNanos;
     private volatile Map<String, GlossDocument<T>> snapshot;
     private volatile FolderWatcher folderWatcher;
     private volatile FileWatcher fileWatcher;
     private List<File> reconciliationFiles;
     private int reconciliationIndex;
+    private long nextFullWatchScanNanos;
+    private long nextContentReconciliationNanos;
+    private boolean reconciliationInProgress;
     private DocumentDelta pendingDelta;
     private Map<String, GlossDocument<T>> pendingSnapshot;
     private PendingState pendingState;
@@ -85,9 +96,12 @@ public final class DocumentRegistry<T> implements AutoCloseable {
         this.pendingDeletions = new HashMap<>();
         this.retryIds = new HashSet<>();
         this.failedIds = new HashSet<>();
+        this.reconciliationLoaded = new HashSet<>();
+        this.reconciliationInitialOffsetNanos = reconciliationInitialOffsetNanos(kind);
         this.snapshot = Map.of();
         this.reconciliationFiles = List.of();
         this.pendingSnapshot = Map.of();
+        scheduleReconciliationWindows();
     }
 
     public static <T> DocumentRegistry<T> folder(String kind, File folder, DocumentParser<T> parser,
@@ -166,6 +180,7 @@ public final class DocumentRegistry<T> implements AutoCloseable {
         Objects.requireNonNull(raw, "raw");
         Objects.requireNonNull(value, "value");
         invalidatePending(id);
+        reconciliationLoaded.remove(id);
         GlossDocument<T> document = GlossDocument.of(id, raw, value, revisionOf.applyAsLong(value));
         documents.put(id, document);
         pendingDeletions.remove(id);
@@ -179,6 +194,7 @@ public final class DocumentRegistry<T> implements AutoCloseable {
             return false;
         }
         invalidatePending(id);
+        reconciliationLoaded.remove(id);
         pendingDeletions.remove(id);
         boolean workingRemoved = documents.remove(id) != null;
         if (!workingRemoved && !snapshot.containsKey(id)) {
@@ -225,7 +241,18 @@ public final class DocumentRegistry<T> implements AutoCloseable {
         FolderWatcher watcher = folderWatcher;
         List<String> loaded = new ArrayList<>();
         List<String> removed = new ArrayList<>();
-        if (watcher != null && watcher.checkModified()) {
+        long now = clock.getAsLong();
+        boolean fullWatchScan = now >= nextFullWatchScanNanos;
+        boolean watcherChanged;
+        try {
+            watcherChanged = watcher != null
+                && (fullWatchScan ? watcher.checkModified() : watcher.checkModifiedEvents());
+        } finally {
+            if (fullWatchScan) {
+                nextFullWatchScanNanos = clock.getAsLong() + FULL_WATCH_SCAN_WINDOW_NANOS;
+            }
+        }
+        if (watcherChanged) {
             for (File file : watcher.getChanged()) {
                 loadTouched(file, loaded, false);
             }
@@ -235,8 +262,14 @@ public final class DocumentRegistry<T> implements AutoCloseable {
             for (File file : watcher.getDeleted()) {
                 queueDeleted(file);
             }
+            reconciliationLoaded.removeAll(loaded);
+            reconciliationLoaded.removeAll(pendingDeletions.keySet());
         }
-        reconcileContent(loaded);
+        startContentReconciliation(now);
+        if (reconciliationInProgress) {
+            reconcileContent(loaded);
+        }
+        reconcileRetries(loaded);
         applyMatureDeletions(removed);
         return stage(loaded, removed);
     }
@@ -319,6 +352,7 @@ public final class DocumentRegistry<T> implements AutoCloseable {
                 present.add(file);
             }
         }
+        present.sort(Comparator.comparing(File::getAbsolutePath));
         return present;
     }
 
@@ -407,11 +441,12 @@ public final class DocumentRegistry<T> implements AutoCloseable {
         clearPending();
         retryIds.clear();
         failedIds.clear();
+        reconciliationLoaded.clear();
         pendingDeletions.clear();
         resetReconciliation();
     }
 
-    private void replaceFolderWatcher(FolderWatcher replacement) {
+    void replaceFolderWatcher(FolderWatcher replacement) {
         FolderWatcher previous = folderWatcher;
         folderWatcher = replacement;
         if (previous != null) {
@@ -419,7 +454,7 @@ public final class DocumentRegistry<T> implements AutoCloseable {
         }
     }
 
-    private void replaceFileWatcher(FileWatcher replacement) {
+    void replaceFileWatcher(FileWatcher replacement) {
         FileWatcher previous = fileWatcher;
         fileWatcher = replacement;
         if (previous != null) {
@@ -429,24 +464,35 @@ public final class DocumentRegistry<T> implements AutoCloseable {
 
     private DocumentDelta pollSingle() {
         FileWatcher watcher = fileWatcher;
-        boolean modified = watcher != null && watcher.checkModified();
-        String id = baseName(target);
-        if (!target.isFile()) {
-            if (modified || documents.containsKey(id)) {
-                markDeleted(id);
+        long now = clock.getAsLong();
+        boolean reconcileContent = now >= nextContentReconciliationNanos;
+        try {
+            boolean modified = watcher != null && watcher.checkModifiedEvents();
+            String id = baseName(target);
+            if (!target.isFile()) {
+                if (modified || (reconcileContent && documents.containsKey(id))) {
+                    markDeleted(id);
+                }
+                List<String> removed = new ArrayList<>();
+                applyMatureDeletions(removed);
+                return stage(List.of(), removed);
             }
-            List<String> removed = new ArrayList<>();
-            applyMatureDeletions(removed);
-            return stage(List.of(), removed);
+            pendingDeletions.remove(id);
+            if (!modified && !reconcileContent && !retryIds.contains(id)) {
+                return stage(List.of(), List.of());
+            }
+            if (ownWrite.test(target)) {
+                return DocumentDelta.EMPTY;
+            }
+            if (!load(id, target)) {
+                return stage(List.of(), List.of());
+            }
+            return stage(List.of(id), List.of());
+        } finally {
+            if (reconcileContent) {
+                nextContentReconciliationNanos = clock.getAsLong() + CONTENT_RECONCILIATION_WINDOW_NANOS;
+            }
         }
-        pendingDeletions.remove(id);
-        if (ownWrite.test(target)) {
-            return DocumentDelta.EMPTY;
-        }
-        if (!load(id, target)) {
-            return stage(List.of(), List.of());
-        }
-        return stage(List.of(id), List.of());
     }
 
     private DocumentDelta stage(List<String> detectedLoaded, List<String> detectedRemoved) {
@@ -609,24 +655,52 @@ public final class DocumentRegistry<T> implements AutoCloseable {
     }
 
     private void reconcileContent(List<String> loaded) {
-        if (reconciliationIndex >= reconciliationFiles.size()) {
-            reconciliationFiles = currentFiles();
-            reconciliationIndex = 0;
-        }
+        long startedAt = HotloadReconciliationBudget.nanoTime();
         long bytes = 0L;
         int files = 0;
+        List<String> sliceLoaded = new ArrayList<>();
         while (reconciliationIndex < reconciliationFiles.size() && files < RECONCILIATION_FILE_BUDGET) {
+            if (files > 0
+                && HotloadReconciliationBudget.nanoTime() - startedAt >= RECONCILIATION_TIME_BUDGET_NANOS) {
+                break;
+            }
             File file = reconciliationFiles.get(reconciliationIndex);
             long size = file.isFile() ? Math.max(0L, file.length()) : 0L;
             if (files > 0 && bytes + Math.min(size, MAX_DOCUMENT_BYTES) > RECONCILIATION_BYTE_BUDGET) {
+                break;
+            }
+            if (!HotloadReconciliationBudget.tryAcquire(size)) {
                 break;
             }
             reconciliationIndex++;
             files++;
             bytes += Math.min(size, MAX_DOCUMENT_BYTES);
             if (file.isFile()) {
-                acceptTouched(file, loaded);
+                acceptTouched(file, sliceLoaded);
             }
+        }
+        reconciliationLoaded.addAll(sliceLoaded);
+        if (reconciliationIndex >= reconciliationFiles.size()) {
+            reconciliationFiles = List.of();
+            reconciliationIndex = 0;
+            reconciliationInProgress = false;
+            nextContentReconciliationNanos = clock.getAsLong() + CONTENT_RECONCILIATION_WINDOW_NANOS;
+            for (String id : reconciliationLoaded) {
+                if (!loaded.contains(id)) {
+                    loaded.add(id);
+                }
+            }
+            reconciliationLoaded.clear();
+        }
+    }
+
+    private void reconcileRetries(List<String> loaded) {
+        for (String id : List.copyOf(retryIds)) {
+            File file = fileForId(id);
+            if (!file.isFile()) {
+                continue;
+            }
+            acceptTouched(file, loaded);
         }
     }
 
@@ -664,6 +738,38 @@ public final class DocumentRegistry<T> implements AutoCloseable {
     private void resetReconciliation() {
         reconciliationFiles = List.of();
         reconciliationIndex = 0;
+        reconciliationInProgress = false;
+        reconciliationLoaded.clear();
+        scheduleReconciliationWindows();
+    }
+
+    private void scheduleReconciliationWindows() {
+        long now = clock.getAsLong();
+        nextFullWatchScanNanos = now + FULL_WATCH_SCAN_WINDOW_NANOS + reconciliationInitialOffsetNanos;
+        nextContentReconciliationNanos = now + CONTENT_RECONCILIATION_WINDOW_NANOS
+            + reconciliationInitialOffsetNanos;
+    }
+
+    static long reconciliationInitialOffsetNanos(String kind) {
+        return Math.floorMod(kind.length(), RECONCILIATION_SLOT_COUNT) * RECONCILIATION_SLOT_NANOS;
+    }
+
+    private void startContentReconciliation(long now) {
+        if (reconciliationInProgress || now < nextContentReconciliationNanos) {
+            return;
+        }
+        List<String> ids = new ArrayList<>(documents.keySet());
+        ids.sort(String::compareTo);
+        List<File> files = new ArrayList<>(ids.size());
+        for (String id : ids) {
+            files.add(fileForId(id));
+        }
+        reconciliationFiles = List.copyOf(files);
+        reconciliationIndex = 0;
+        reconciliationInProgress = !reconciliationFiles.isEmpty();
+        if (!reconciliationInProgress) {
+            nextContentReconciliationNanos = clock.getAsLong() + CONTENT_RECONCILIATION_WINDOW_NANOS;
+        }
     }
 
     private void publish() {
