@@ -65,7 +65,7 @@ class GlossConfigTest {
         assertFalse(snapshot.debug().position());
         assertFalse(snapshot.debug().animator());
         assertTrue(snapshot.drops().preserveCustomNames());
-        assertTrue(snapshot.drops().useItemDisplayNames());
+        assertFalse(snapshot.drops().useItemDisplayNames());
         assertTrue(snapshot.drops().bundleVerticalLabels());
         assertEquals(GlossConfigFile.BUNDLE_HEADER_FORMAT_DEFAULT, snapshot.drops().bundleHeaderFormat());
         assertEquals(GlossConfigFile.BUNDLE_ENTRY_FORMAT_DEFAULT, snapshot.drops().bundleEntryFormat());
@@ -82,6 +82,18 @@ class GlossConfigTest {
         assertEquals(List.of("BEDROCK", "BARRIER"), snapshot.realDrops().filters().materialBlacklist());
         assertTrue(snapshot.customItems().enabled());
         assertTrue(snapshot.customItems().providers().isEmpty());
+    }
+
+    @Test
+    void missingItemDisplayNameSettingDecodesAsDisabled() throws IOException {
+        GlossConfigFile parsed = TomlCodec.fromToml("""
+            [drops]
+            preserveCustomNames = true
+            """, GlossConfigFile.class);
+        parsed.normalize();
+
+        assertFalse(parsed.drops.useItemDisplayNames);
+        assertFalse(GlossConfig.from(parsed).drops().useItemDisplayNames());
     }
 
     @Test

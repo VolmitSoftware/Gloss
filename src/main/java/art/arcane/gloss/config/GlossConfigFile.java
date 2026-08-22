@@ -220,8 +220,8 @@ public final class GlossConfigFile {
         @ConfigDoc("Leaves custom names other plugins already set on dropped items untouched.")
         public boolean preserveCustomNames = true;
 
-        @ConfigDoc("Uses an item's display name from its item meta as {type} instead of the material name.")
-        public boolean useItemDisplayNames = true;
+        @ConfigDoc("Uses an item's display name from its item meta as {type} instead of the material name when enabled.")
+        public boolean useItemDisplayNames = false;
     }
 
     public static final class Commands {

@@ -183,8 +183,8 @@ class DropNameFormatterTest {
     }
 
     @Test
-    void dropKnobsDefaultOn() {
+    void itemDisplayNamesRequireExplicitOptIn() {
         assertTrue(new GlossConfigFile.Drops().preserveCustomNames);
-        assertTrue(new GlossConfigFile.Drops().useItemDisplayNames);
+        assertFalse(new GlossConfigFile.Drops().useItemDisplayNames);
     }
 }
