@@ -24,6 +24,7 @@ import java.util.Map;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
 public class ApiMenuTranslatorTest {
@@ -101,6 +102,14 @@ public class ApiMenuTranslatorTest {
         ApiMenuTranslator.iconData(HoloIcon.image("icons/buy.png")));
     assertEquals(new AnimatedImageData(List.of("a.png", "b.png"), 4, null),
         ApiMenuTranslator.iconData(HoloIcon.animatedImage(List.of("a.png", "b.png"), 4)));
+  }
+
+  @Test
+  public void animatedImageApiRejectsUnsafeCadences() {
+    assertThrows(IllegalArgumentException.class,
+        () -> HoloIcon.animatedImage(List.of("a.png"), 1));
+    assertThrows(IllegalArgumentException.class,
+        () -> HoloIcon.animatedImage(List.of("a.png"), 1201));
   }
 
   @Test

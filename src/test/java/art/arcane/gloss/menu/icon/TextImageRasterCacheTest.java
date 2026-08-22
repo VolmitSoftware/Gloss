@@ -9,6 +9,7 @@ import java.util.List;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertSame;
+import static org.junit.Assert.assertThrows;
 
 /**
  * Pins the shared image raster (plan item C8): two icons built from the same picture share one
@@ -48,11 +49,27 @@ public class TextImageRasterCacheTest {
   }
 
   @Test
-  public void transparentPixelsBecomeTheBoldSpacePair() {
+  public void transparentPixelsShareOneBoldAndPlainRun() {
     List<Component> lines = TextImageRasterCache.lines(solid(2, 1, 0x00000000), false);
 
-    assertEquals("each transparent pixel is a bold space plus a plain space",
-        4, lines.getFirst().children().size());
+    assertEquals(1, lines.getFirst().children().size());
+    assertEquals(2, lines.getFirst().children().getFirst().children().size());
+  }
+
+  @Test
+  public void sameColourPixelsShareOneTextRun() {
+    List<Component> lines = TextImageRasterCache.lines(solid(8, 1, 0xFF204060), false);
+
+    assertEquals(1, lines.getFirst().children().size());
+  }
+
+  @Test
+  public void imagesLargerThanTheRuntimeBudgetAreRejected() {
+    IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
+        () -> TextImageRasterCache.lines(solid(17, 16, 0xFF204060), false));
+
+    assertEquals("Text images must be at most 16 by 16 pixels, but this image is 17 by 16",
+        error.getMessage());
   }
 
   @Test

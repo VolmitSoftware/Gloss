@@ -46,7 +46,9 @@ public sealed interface HoloIcon permits HoloIcon.Text, HoloIcon.Item, HoloIcon.
   record AnimatedImage(List<String> relativePaths, int tickSpeed) implements HoloIcon {
     public AnimatedImage {
       relativePaths = HoloText.sanitizePaths(relativePaths);
-      tickSpeed = Math.max(1, tickSpeed);
+      if (tickSpeed < 2 || tickSpeed > 1200) {
+        throw new IllegalArgumentException("tickSpeed must be between 2 and 1200");
+      }
     }
   }
 

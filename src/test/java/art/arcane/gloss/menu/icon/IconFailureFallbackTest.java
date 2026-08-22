@@ -50,6 +50,15 @@ public class IconFailureFallbackTest {
   }
 
   @Test
+  public void animatedImageCadenceRejectsClientHeavyValues() {
+    assertThrows(IllegalArgumentException.class,
+        () -> new AnimatedImageData(List.of("frame0.png"), 1, null));
+    assertThrows(IllegalArgumentException.class,
+        () -> new AnimatedImageData(List.of("frame0.png"), 1201, null));
+    assertEquals(2, new AnimatedImageData(List.of("frame0.png"), 2, null).speed());
+  }
+
+  @Test
   public void itemIconWithoutAResolvedMaterialFailsAsAMenuIconException() {
     assertThrows(MenuIconException.class, () -> new ItemIconData(null, 1, 0, null).requireMaterial());
   }

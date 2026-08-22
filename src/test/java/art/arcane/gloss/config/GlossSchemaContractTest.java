@@ -30,8 +30,9 @@ public class GlossSchemaContractTest {
     assertTrue(imagePath.has("pattern"));
     assertEquals("integer", item.getAsJsonObject("count").get("type").getAsString());
     assertFalse(item.getAsJsonObject("customModelValue").has("minimum"));
-    assertFalse(required(animated).contains("speed"));
-    assertFalse(animated.getAsJsonObject("properties").getAsJsonObject("speed").has("minimum"));
+    assertTrue(required(animated).contains("speed"));
+    assertEquals(2, animated.getAsJsonObject("properties").getAsJsonObject("speed").get("minimum").getAsInt());
+    assertEquals(1200, animated.getAsJsonObject("properties").getAsJsonObject("speed").get("maximum").getAsInt());
   }
 
   @Test

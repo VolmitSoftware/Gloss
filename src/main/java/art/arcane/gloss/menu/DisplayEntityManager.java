@@ -305,6 +305,31 @@ public class DisplayEntityManager {
     PacketUtils.sendOne(player, DisplayEntity.textUpdate(displayEntity.id(), text));
   }
 
+  public static void changeNames(List<UUID> uuids, List<Component> names) {
+    if (unsupportedVersion() || uuids == null || names == null || uuids.size() != names.size()) {
+      return;
+    }
+    Map<Player, List<PacketWrapper<?>>> byViewer = new IdentityHashMap<>(2);
+    for (int index = 0; index < uuids.size(); index++) {
+      UUID uuid = uuids.get(index);
+      DisplayEntity displayEntity = displayEntities.get(uuid);
+      Player player = playerVisibility.get(uuid);
+      if (displayEntity == null || player == null || !displayEntity.isTextDisplay()) {
+        continue;
+      }
+      Component text = names.get(index) == null ? Component.empty() : names.get(index);
+      if (text.equals(displayEntity.text())) {
+        continue;
+      }
+      displayEntity.text(text);
+      byViewer.computeIfAbsent(player, ignored -> new ArrayList<>(uuids.size()))
+          .add(DisplayEntity.textUpdate(displayEntity.id(), text));
+    }
+    for (Map.Entry<Player, List<PacketWrapper<?>>> entry : byViewer.entrySet()) {
+      PacketUtils.send(entry.getKey(), entry.getValue());
+    }
+  }
+
   public static void changeTextBackground(UUID uuid, int backgroundColor) {
     if (unsupportedVersion())
       return;

@@ -916,7 +916,8 @@
       "description": "Defines the data for an animated text-image icon.",
       "type": "object",
       "required": [
-        "source"
+        "source",
+        "speed"
       ],
       "properties": {
         "source": {
@@ -939,8 +940,10 @@
           ]
         },
         "speed": {
-          "description": "Defines the amount of ticks between frame advances. Values of 1 or less advance every tick.",
-          "type": "integer"
+          "description": "Defines the amount of ticks between frame advances.",
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 1200
         }
       }
     },

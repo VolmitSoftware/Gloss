@@ -71,12 +71,12 @@ public class EditorSyncSnapshotBuilderTest {
   }
 
   @Test
-  public void decodedImagesAreLimitedToSixtyFourPixelsPerDimension() throws Exception {
+  public void decodedImagesAreLimitedToSixteenPixelsPerDimension() throws Exception {
     EditorSyncSnapshotBuilder.ValidatedImage valid = EditorSyncSnapshotBuilder.validateImage(
-        "valid.png", png(64, 64));
-    assertEquals(4096L, valid.pixels());
+        "valid.png", png(16, 16));
+    assertEquals(256L, valid.pixels());
     assertThrows(IllegalArgumentException.class,
-        () -> EditorSyncSnapshotBuilder.validateImage("wide.png", png(65, 1)));
+        () -> EditorSyncSnapshotBuilder.validateImage("wide.png", png(17, 1)));
   }
 
   @Test

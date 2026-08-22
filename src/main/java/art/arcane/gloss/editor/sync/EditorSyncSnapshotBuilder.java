@@ -37,8 +37,8 @@ public final class EditorSyncSnapshotBuilder implements EditorSyncSnapshotSource
   static final int MAX_MENU_SOURCE_BYTES = 2 * 1024 * 1024;
   static final int MAX_WARNING_COUNT = 256;
   static final int MAX_WARNING_CHARACTERS = 512;
-  static final int MAX_IMAGE_DIMENSION = 64;
-  static final long MAX_IMAGE_PIXELS = 4_096L;
+  static final int MAX_IMAGE_DIMENSION = 16;
+  static final long MAX_IMAGE_PIXELS = 256L;
   static final long MAX_PROJECT_IMAGE_PIXELS = 262_144L;
   static final long MAX_PROJECT_IMAGE_ROWS = 4_096L;
   private static final Pattern PLAYER_OPEN_COMMAND = Pattern.compile(

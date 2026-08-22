@@ -8,6 +8,12 @@ import java.util.List;
 public record AnimatedImageData(List<String> source,
                                 int speed,
                                 IconDisplayStyle style) implements MenuIconData {
+  public AnimatedImageData {
+    if (speed < 2 || speed > 1200) {
+      throw new IllegalArgumentException("Animated image speed must be between 2 and 1200 ticks");
+    }
+  }
+
   public MenuIconType getType() {
     return MenuIconType.ANIMATED_TEXT_IMAGE;
   }

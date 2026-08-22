@@ -105,7 +105,6 @@ public class AnimatedTextImageMenuIcon extends MenuIcon<AnimatedImageData> {
 
   private void updateFrame() {
     List<Component> components = frameComponents.get(currentFrame);
-    for (int i = 0; i < displayEntities.size(); i++)
-      DisplayEntityManager.changeName(displayEntities.get(i), components.get(i));
+    DisplayEntityManager.changeNames(displayEntities, components);
   }
 }
