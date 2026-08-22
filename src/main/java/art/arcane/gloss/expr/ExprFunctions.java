@@ -201,7 +201,7 @@ public final class ExprFunctions {
   // Lists / strings
   // ---------------------------------------------------------------------
 
-  /** Index is {@code (int) floor(index)}, wrapped into range with {@code floorMod}. */
+  /** Index is {@code (long) floor(index)}, wrapped into range with {@code floorMod}. */
   private static double palette(String name, List<Object> args) {
     requireCount(name, args, 2);
     Object listArg = args.get(0);
@@ -211,7 +211,7 @@ public final class ExprFunctions {
     if (list.isEmpty()) {
       throw new ExprException(name + " list must not be empty", NO_POSITION);
     }
-    int index = (int) Math.floor(numArg(name, args, 1));
+    long index = (long) Math.floor(numArg(name, args, 1));
     int wrapped = Math.floorMod(index, list.size());
     Object item = list.get(wrapped);
     if (!(item instanceof Double d)) {
@@ -229,7 +229,7 @@ public final class ExprFunctions {
     if (list.isEmpty()) {
       throw new ExprException(name + " list must not be empty", NO_POSITION);
     }
-    int index = (int) Math.floor(numArg(name, args, 1));
+    long index = (long) Math.floor(numArg(name, args, 1));
     return list.get(Math.floorMod(index, list.size()));
   }
 

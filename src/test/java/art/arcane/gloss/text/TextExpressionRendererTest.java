@@ -28,6 +28,14 @@ class TextExpressionRendererTest {
     }
 
     @Test
+    void timeDrivenSelectionPreservesEpochScaleIndices() {
+        assertEquals("&a▲ &f&lBOOSTED", renderer.render(null,
+            "{{ select(['&a', '&8', '&a', '&7'], floor(1750000000 * 4)) }}▲ &f&lBOOSTED"));
+        assertEquals("&8▲ &f&lBOOSTED", renderer.render(null,
+            "{{ select(['&a', '&8', '&a', '&7'], floor(1750000000.25 * 4)) }}▲ &f&lBOOSTED"));
+    }
+
+    @Test
     void leavesInvalidOrUnclosedExpressionsEditable() {
         assertEquals("A {{ nope() }} B", renderer.render(null, "A {{ nope() }} B"));
         assertEquals("A {{ 1 + 2", renderer.render(null, "A {{ 1 + 2"));

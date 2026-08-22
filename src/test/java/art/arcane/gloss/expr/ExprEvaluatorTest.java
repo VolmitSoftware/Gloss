@@ -348,6 +348,18 @@ public class ExprEvaluatorTest {
     Assert.assertEquals(30.0, (Double) eval("palette([10, 20, 30], -1)"), DELTA);
   }
 
+  @Test
+  public void paletteWrapsEpochScaleIndicesWithoutIntSaturation() {
+    Assert.assertEquals(10.0, (Double) eval("palette([10, 20, 30, 40], 7000000000)"), DELTA);
+    Assert.assertEquals(40.0, (Double) eval("palette([10, 20, 30, 40], -7000000001)"), DELTA);
+  }
+
+  @Test
+  public void selectWrapsEpochScaleIndicesWithoutIntSaturation() {
+    Assert.assertEquals("A", eval("select(['A', 'B', 'C', 'D'], 7000000000)"));
+    Assert.assertEquals("D", eval("select(['A', 'B', 'C', 'D'], -7000000001)"));
+  }
+
   @Test(expected = ExprException.class)
   public void paletteRejectsEmptyList() {
     eval("palette([], 0)");
