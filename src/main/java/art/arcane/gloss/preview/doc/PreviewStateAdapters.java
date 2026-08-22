@@ -14,6 +14,7 @@ import org.bukkit.block.data.BlockData;
 import org.bukkit.block.data.Levelled;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
+import org.bukkit.entity.minecart.PoweredMinecart;
 import org.bukkit.inventory.CookingRecipe;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
@@ -46,6 +47,7 @@ final class PreviewStateAdapters {
   static final String CATEGORY_BEEHIVE = "beehive";
   static final String CATEGORY_CAULDRON = "cauldron";
   static final String CATEGORY_JUKEBOX = "jukebox";
+  static final String CATEGORY_POWERED_MINECART = "poweredMinecart";
   static final String CATEGORY_INVENTORY = "inventory";
   static final String CATEGORY_STATIC = "static";
 
@@ -83,6 +85,7 @@ final class PreviewStateAdapters {
     catalog.put(CATEGORY_BEEHIVE, names("bees", "maxBees", "honey", "maxHoney"));
     catalog.put(CATEGORY_CAULDRON, names("level", "maxLevel", "fluid"));
     catalog.put(CATEGORY_JUKEBOX, names("playing", "record"));
+    catalog.put(CATEGORY_POWERED_MINECART, names("fuelTicks", "fuelSeconds", "powered"));
     return Collections.unmodifiableMap(catalog);
   }
 
@@ -162,6 +165,9 @@ final class PreviewStateAdapters {
   }
 
   static Selection selectEntity(Entity entity) {
+    if (entity instanceof PoweredMinecart) {
+      return new Selection(CATEGORY_POWERED_MINECART, null);
+    }
     if (entity instanceof InventoryHolder holder) {
       return new Selection(CATEGORY_INVENTORY, holder.getInventory());
     }
@@ -197,6 +203,7 @@ final class PreviewStateAdapters {
       case CATEGORY_BEEHIVE -> sampleBeehive(state, out);
       case CATEGORY_CAULDRON -> sampleCauldron(block, out);
       case CATEGORY_JUKEBOX -> sampleJukebox(state, out);
+      case CATEGORY_POWERED_MINECART -> samplePoweredMinecart(entity, out);
       default -> {
       }
     }
@@ -323,6 +330,16 @@ final class PreviewStateAdapters {
     out.put("playing", hasRecord && jukebox.isPlaying());
     // Empty string rather than absent, so documents can branch on `record != ""`.
     out.put("record", hasRecord ? ExprFunctions.readable(jukebox.getRecord().getType().name()) : "");
+  }
+
+  private static void samplePoweredMinecart(Entity entity, Map<String, Object> out) {
+    if (!(entity instanceof PoweredMinecart minecart)) {
+      return;
+    }
+    int fuelTicks = Math.max(0, minecart.getFuel());
+    out.put("fuelTicks", (double) fuelTicks);
+    out.put("fuelSeconds", (double) (fuelTicks / TICKS_PER_SECOND));
+    out.put("powered", fuelTicks > 0);
   }
 
   // ---------------------------------------------------------------------

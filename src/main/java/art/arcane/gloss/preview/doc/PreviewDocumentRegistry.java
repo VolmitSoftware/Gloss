@@ -48,11 +48,10 @@ import java.util.logging.Level;
  * {@code anyInventoryHolder} fallback. A genuine tie is broken by document name so the outcome is
  * stable across restarts, and warned about once per pair of documents.
  *
- * <p><b>Raycast eligibility.</b> A block is only eligible when some document names its material —
- * exactly, or through a glob. The {@code anyInventoryHolder} fallback contributes no materials:
- * it exists for entities (any inventory-holding cart or boat) and as the document users copy to
- * extend the set. To preview a new block type, add its material or a glob to a document's
- * {@code match.blocks}.
+ * <p><b>Raycast eligibility.</b> A block or entity is eligible when some document names its type,
+ * exactly or through a glob. The {@code anyInventoryHolder} fallback contributes no materials or
+ * entity types; it separately admits inventory-holding carts and chest boats. To preview another
+ * target, add its material or entity type to a document matcher.
  *
  * <p><b>Failure policy.</b> A document that fails to compile logs {@code previews/<name>.json:
  * <message>} and is skipped on first load; on a reload the previously compiled version stays live,
@@ -74,7 +73,7 @@ public final class PreviewDocumentRegistry {
    */
   static final List<String> SHIPPED = List.of(
       "beehive", "brewing_stand", "cauldron", "chest", "chiseled_bookshelf", "dispenser",
-      "ender_chest", "furnace", "hopper", "jukebox", "locked", "minecart", "shelf");
+      "ender_chest", "furnace", "furnace_minecart", "hopper", "jukebox", "locked", "minecart", "shelf");
 
   private static final String FOLDER_NAME = "previews";
   private static final String EXTENSION = ".json";
@@ -150,38 +149,24 @@ public final class PreviewDocumentRegistry {
         }
       }
     }
-    boolean entityMatchers = false;
+    EnumSet<EntityType> entityTypes = EnumSet.noneOf(EntityType.class);
+    boolean inventoryHolderFallback = false;
     for (CompiledPreviewDocument document : ordered) {
-      if (declaresEntityMatchers(document)) {
-        entityMatchers = true;
-        break;
+      if (SPECIAL_ANY_INVENTORY_HOLDER.equals(document.special())) {
+        inventoryHolderFallback = true;
+      }
+      for (EntityType type : EntityType.values()) {
+        if (explicitEntityGrade(document, type.name()) != GRADE_NONE) {
+          entityTypes.add(type);
+        }
       }
     }
-    return new Snapshot(List.copyOf(ordered), blockTypes, entityMatchers);
+    return new Snapshot(List.copyOf(ordered), blockTypes, entityTypes, inventoryHolderFallback);
   }
 
   private void publish(Snapshot replacement) {
     warnedTies.clear();
     snapshot = replacement;
-  }
-
-  private static boolean declaresEntityMatchers(CompiledPreviewDocument document) {
-    if (SPECIAL_ANY_INVENTORY_HOLDER.equals(document.special())) {
-      return true;
-    }
-    if (declaresEntityMatch(document.match())) {
-      return true;
-    }
-    for (CompiledVariant variant : document.variants()) {
-      if (declaresEntityMatch(variant.match())) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  private static boolean declaresEntityMatch(CompiledMatch match) {
-    return !match.exactEntities().isEmpty() || !match.entityGlobs().isEmpty();
   }
 
   // ---------------------------------------------------------------------
@@ -357,17 +342,23 @@ public final class PreviewDocumentRegistry {
   }
 
   public boolean hasEntityMatchers() {
-    return snapshot.hasEntityMatchers();
+    Snapshot current = snapshot;
+    return !current.entityTypes().isEmpty() || current.inventoryHolderFallback();
   }
 
-  /**
-   * The retired gate — an inventory-holding minecart or chest boat — plus the requirement that some
-   * document actually claims it, so deleting {@code minecart.json} stops carts being previewed.
-   */
+  /** Explicit entity matches plus the bounded inventory-cart and chest-boat fallback. */
   public boolean isPreviewEntity(Entity entity) {
-    return entity instanceof InventoryHolder
-        && (entity instanceof Minecart || entity instanceof ChestBoat)
-        && best(snapshot.ordered(), null, entity) != null;
+    if (entity == null) {
+      return false;
+    }
+    Snapshot current = snapshot;
+    EntityType type = entity.getType();
+    if (type != null && current.entityTypes().contains(type)) {
+      return true;
+    }
+    return current.inventoryHolderFallback()
+        && entity instanceof InventoryHolder
+        && (entity instanceof Minecart || entity instanceof ChestBoat);
   }
 
   /** The base names of every loaded document, i.e. the file names without {@code .json}. */
@@ -428,21 +419,27 @@ public final class PreviewDocumentRegistry {
   private static int entityGrade(CompiledPreviewDocument document, Entity entity) {
     EntityType type = entity.getType();
     if (type != null) {
-      String name = type.name();
-      int grade = grade(document.match().exactEntities(), document.match().entityGlobs(), name);
-      for (CompiledVariant variant : document.variants()) {
-        if (grade == GRADE_EXACT) {
-          break;
-        }
-        CompiledMatch match = variant.match();
-        grade = Math.max(grade, grade(match.exactEntities(), match.entityGlobs(), name));
-      }
+      int grade = explicitEntityGrade(document, type.name());
       if (grade != GRADE_NONE) {
         return grade;
       }
     }
-    boolean fallback = SPECIAL_ANY_INVENTORY_HOLDER.equals(document.special()) && entity instanceof InventoryHolder;
+    boolean fallback = SPECIAL_ANY_INVENTORY_HOLDER.equals(document.special())
+        && entity instanceof InventoryHolder
+        && (entity instanceof Minecart || entity instanceof ChestBoat);
     return fallback ? GRADE_FALLBACK : GRADE_NONE;
+  }
+
+  private static int explicitEntityGrade(CompiledPreviewDocument document, String name) {
+    int grade = grade(document.match().exactEntities(), document.match().entityGlobs(), name);
+    for (CompiledVariant variant : document.variants()) {
+      if (grade == GRADE_EXACT) {
+        break;
+      }
+      CompiledMatch match = variant.match();
+      grade = Math.max(grade, grade(match.exactEntities(), match.entityGlobs(), name));
+    }
+    return grade;
   }
 
   private static int grade(Set<String> exact, List<Predicate<String>> globs, String name) {
@@ -470,10 +467,15 @@ public final class PreviewDocumentRegistry {
   // Helpers
   // ---------------------------------------------------------------------
 
-  /** The published state: the resolution order, the materials a raycast may stop on, and whether any document declares entity matchers. */
-  private record Snapshot(List<CompiledPreviewDocument> ordered, Set<Material> blockTypes, boolean hasEntityMatchers) {
+  /** The published resolution order and allocation-free block and entity raycast eligibility sets. */
+  private record Snapshot(
+      List<CompiledPreviewDocument> ordered,
+      Set<Material> blockTypes,
+      Set<EntityType> entityTypes,
+      boolean inventoryHolderFallback
+  ) {
 
-    private static final Snapshot EMPTY = new Snapshot(List.of(), Set.of(), false);
+    private static final Snapshot EMPTY = new Snapshot(List.of(), Set.of(), Set.of(), false);
   }
 
   /**

@@ -5,6 +5,7 @@ import org.bukkit.entity.ChestBoat;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.minecart.HopperMinecart;
+import org.bukkit.entity.minecart.PoweredMinecart;
 import org.bukkit.entity.minecart.RideableMinecart;
 import org.bukkit.entity.minecart.StorageMinecart;
 import org.junit.Before;
@@ -38,7 +39,7 @@ import static org.junit.Assert.assertTrue;
  *
  * <p>The last two tests are the equivalence gate that outlives Task 10's deletion of
  * {@code MenuSessionManager.isPreviewBlockType}: its material list is ported here verbatim and
- * asserted against what the thirteen shipped documents actually claim.
+ * asserted against what the fourteen shipped documents actually claim.
  */
 public class PreviewRegistryTest {
 
@@ -357,20 +358,46 @@ public class PreviewRegistryTest {
 
     assertEquals("minecart.json", registry.forEntity(storageMinecart()).doc().name());
     assertEquals("minecart.json", registry.forEntity(chestBoat()).doc().name());
+    assertEquals("furnace_minecart.json", registry.forEntity(furnaceMinecart()).doc().name());
     assertNull(registry.forEntity(rideableMinecart()));
     assertNull(registry.forEntity(null));
   }
 
   @Test
-  public void theEntityGateStillRequiresAnInventoryHoldingCartOrBoat() {
+  public void explicitEntityMatchesAndInventoryCartFallbacksAreEligible() {
     PreviewDocumentRegistry registry = new PreviewDocumentRegistry(configDir);
 
     assertTrue(registry.isPreviewEntity(storageMinecart()));
     assertTrue(registry.isPreviewEntity(hopperMinecart()));
     assertTrue(registry.isPreviewEntity(chestBoat()));
+    assertTrue(registry.isPreviewEntity(furnaceMinecart()));
     assertFalse(registry.isPreviewEntity(rideableMinecart()));
     assertFalse(registry.isPreviewEntity(PreviewFakes.entity(EntityType.ZOMBIE).build()));
+    assertFalse(registry.isPreviewEntity(PreviewFakes.entity(EntityType.ZOMBIE)
+        .inventory(PreviewFakes.inventory(9).build())
+        .build()));
     assertFalse(registry.isPreviewEntity(null));
+  }
+
+  @Test
+  public void entityGlobsMakeNonInventoryEntitiesEligible() throws IOException {
+    write("all_minecarts", "{ \"match\": { \"entities\": [\"*MINECART\"], \"priority\": 20 },"
+        + " \"elements\": [ " + CELL + " ] }");
+    PreviewDocumentRegistry registry = new PreviewDocumentRegistry(configDir);
+
+    assertTrue(registry.isPreviewEntity(rideableMinecart()));
+    assertEquals("all_minecarts.json", registry.forEntity(rideableMinecart()).doc().name());
+  }
+
+  @Test
+  public void removingTheFurnaceMinecartDocumentRemovesItsEligibility() {
+    PreviewDocumentRegistry registry = new PreviewDocumentRegistry(configDir);
+    assertTrue(document("furnace_minecart").delete());
+
+    registry.reload();
+
+    assertNull(registry.forEntity(furnaceMinecart()));
+    assertFalse(registry.isPreviewEntity(furnaceMinecart()));
   }
 
   /**
@@ -405,6 +432,7 @@ public class PreviewRegistryTest {
     assertTrue(registry.hasEntityMatchers());
 
     assertTrue(document("minecart").delete());
+    assertTrue(document("furnace_minecart").delete());
     registry.reload();
     assertFalse(registry.hasEntityMatchers());
 
@@ -542,6 +570,10 @@ public class PreviewRegistryTest {
 
   private static Entity rideableMinecart() {
     return PreviewFakes.entity(EntityType.MINECART).as(RideableMinecart.class).build();
+  }
+
+  private static Entity furnaceMinecart() {
+    return PreviewFakes.entity(EntityType.FURNACE_MINECART).as(PoweredMinecart.class).build();
   }
 
   private static String doc(String blocks, int priority) {

@@ -1,5 +1,8 @@
 package art.arcane.gloss.preview.doc;
 
+import art.arcane.gloss.expr.ExprEvaluator;
+import art.arcane.gloss.expr.ExprFunctions;
+import art.arcane.gloss.expr.ExprScope;
 import art.arcane.gloss.preview.PreviewElement;
 import art.arcane.gloss.util.common.TextUtils;
 import net.kyori.adventure.text.Component;
@@ -7,19 +10,22 @@ import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Material;
 import org.bukkit.entity.Entity;
+import org.bukkit.entity.EntityType;
+import org.bukkit.entity.minecart.PoweredMinecart;
 import org.junit.Test;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 /**
- * Contract checks on the thirteen shipped documents that the golden snapshots cannot make: every
+ * Contract checks on the fourteen shipped documents that the golden snapshots cannot make: every
  * file compiles, and the two title paths the captures never exercised (a player-named container,
  * a material-derived name behind a glob) still render what the retired layouts drew.
  *
@@ -33,11 +39,11 @@ public class ShippedPreviewDocumentTest {
 
   static final List<String> SHIPPED = List.of(
       "chest", "ender_chest", "furnace", "brewing_stand", "hopper", "dispenser", "shelf",
-      "chiseled_bookshelf", "jukebox", "beehive", "cauldron", "minecart", "locked");
+      "chiseled_bookshelf", "jukebox", "beehive", "cauldron", "minecart", "furnace_minecart", "locked");
 
   @Test
   public void everyShippedDocumentCompiles() throws IOException {
-    assertEquals(13, SHIPPED.size());
+    assertEquals(14, SHIPPED.size());
     for (String name : SHIPPED) {
       CompiledPreviewDocument doc = parse(name);
       assertEquals(name + ".json", doc.name());
@@ -63,6 +69,31 @@ public class ShippedPreviewDocumentTest {
         PreviewStateContext.forBlock(GoldenFakes.chest(27).build(), null, doc.varsForBlock(Material.CHEST)));
 
     assertEquals("Chest", title(elements));
+  }
+
+  @Test
+  public void anUnnamedChestFallsBackToItsMaterialWhenLocalizationIsEmpty() throws IOException {
+    CompiledPreviewDocument doc = parse("chest");
+    Map<String, Object> vars = doc.varsForBlock(Material.CHEST);
+    ExprScope emptyLanguage = new ExprScope() {
+      @Override
+      public Object variable(String name) {
+        if (name.equals("customName")) {
+          return "";
+        }
+        if (name.equals("blockType")) {
+          return Material.CHEST.name();
+        }
+        return name.startsWith("vars.") ? vars.get(name.substring("vars.".length())) : null;
+      }
+
+      @Override
+      public Object call(String name, List<Object> args) {
+        return name.equals("lang") ? "" : ExprFunctions.call(name, args);
+      }
+    };
+
+    assertEquals("&f&lChest", ExprEvaluator.string(doc.card().title().expr(), emptyLanguage));
   }
 
   /** Copper chests and shelves match by glob, so their titles come from the material name. */
@@ -131,6 +162,34 @@ public class ShippedPreviewDocumentTest {
     List<PreviewElement> elements = doc.build(PreviewStateContext.forEntity(cart, null, doc.varsForEntity(cart)));
 
     assertEquals(bold("Hopper Minecart"), component(elements));
+  }
+
+  @Test
+  public void furnaceMinecartHasAFuelAwareCardAndReadableFallbackTitle() throws IOException {
+    CompiledPreviewDocument doc = parse("furnace_minecart");
+    Entity cart = PreviewFakes.entity(EntityType.FURNACE_MINECART)
+        .as(PoweredMinecart.class)
+        .fuel(120)
+        .build();
+
+    List<PreviewElement> elements = doc.build(PreviewStateContext.forEntity(cart, null, doc.varsForEntity(cart)));
+
+    assertEquals("Furnace Minecart", title(elements));
+    assertEquals("Fuel 6s", TextUtils.content(((PreviewElement.Label) elements.get(elements.size() - 1)).text().get()));
+  }
+
+  @Test
+  public void namedFurnaceMinecartKeepsItsCustomName() throws IOException {
+    CompiledPreviewDocument doc = parse("furnace_minecart");
+    Entity cart = PreviewFakes.entity(EntityType.FURNACE_MINECART)
+        .as(PoweredMinecart.class)
+        .customName("Rail Heater")
+        .build();
+
+    List<PreviewElement> elements = doc.build(PreviewStateContext.forEntity(cart, null, doc.varsForEntity(cart)));
+
+    assertEquals("Rail Heater", title(elements));
+    assertEquals("No fuel", TextUtils.content(((PreviewElement.Label) elements.get(elements.size() - 1)).text().get()));
   }
 
   /**

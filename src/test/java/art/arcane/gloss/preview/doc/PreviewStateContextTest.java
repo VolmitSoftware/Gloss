@@ -12,6 +12,7 @@ import org.bukkit.Material;
 import org.bukkit.block.Block;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.EntityType;
+import org.bukkit.entity.minecart.PoweredMinecart;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.CookingRecipe;
 import org.bukkit.inventory.Inventory;
@@ -289,6 +290,21 @@ public class PreviewStateContextTest {
     assertEquals(7.0D, number(context, "time"), EPSILON);
     assertEquals(5.0D, number(context, "inventory.size"), EPSILON);
     assertEquals(1.0D, number(context, "inventory.occupied"), EPSILON);
+  }
+
+  @Test
+  public void poweredMinecartContextPublishesFuelWithoutAnInventory() {
+    Entity entity = PreviewFakes.entity(EntityType.FURNACE_MINECART)
+        .as(PoweredMinecart.class)
+        .fuel(125)
+        .build();
+    PreviewStateContext context = PreviewStateContext.forEntity(entity, null, Map.of());
+
+    assertEquals("poweredMinecart", context.category());
+    assertNull(context.inventory());
+    assertEquals(125.0D, number(context, "fuelTicks"), EPSILON);
+    assertEquals(6.0D, number(context, "fuelSeconds"), EPSILON);
+    assertEquals(Boolean.TRUE, context.variable("powered"));
   }
 
   @Test
@@ -713,7 +729,7 @@ public class PreviewStateContextTest {
     Map<String, Set<String>> catalog = PreviewStateAdapters.catalog();
 
     assertEquals(
-        Set.of("universal", "inventory", "furnace", "brewing", "beehive", "cauldron", "jukebox"),
+        Set.of("universal", "inventory", "furnace", "brewing", "beehive", "cauldron", "jukebox", "poweredMinecart"),
         catalog.keySet()
     );
     assertEquals(names("time", "blockType", "customName"), catalog.get("universal"));
@@ -729,6 +745,7 @@ public class PreviewStateContextTest {
     assertEquals(names("bees", "maxBees", "honey", "maxHoney"), catalog.get("beehive"));
     assertEquals(names("level", "maxLevel", "fluid"), catalog.get("cauldron"));
     assertEquals(names("playing", "record"), catalog.get("jukebox"));
+    assertEquals(names("fuelTicks", "fuelSeconds", "powered"), catalog.get("poweredMinecart"));
   }
 
   @Test

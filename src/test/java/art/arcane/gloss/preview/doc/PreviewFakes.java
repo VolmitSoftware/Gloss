@@ -646,6 +646,7 @@ public final class PreviewFakes {
     private Inventory inventory;
     private long gameTime;
     private String customName;
+    private int fuel;
 
     EntityFake(EntityType type) {
       this.type = type;
@@ -672,6 +673,11 @@ public final class PreviewFakes {
       return this;
     }
 
+    public EntityFake fuel(int value) {
+      this.fuel = value;
+      return this;
+    }
+
     public int calls(String methodName) {
       return calls.of(methodName);
     }
@@ -687,6 +693,7 @@ public final class PreviewFakes {
           case "getInventory" -> inventory;
           case "getWorld" -> world();
           case "getCustomName" -> customName;
+          case "getFuel" -> fuel;
           default -> identity(proxy, method, arguments);
         };
       });

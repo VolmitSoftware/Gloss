@@ -116,7 +116,7 @@ public class CommandGlossPreview {
 
     String target = name == null || name.trim().isEmpty() ? "*" : name.trim();
 
-    // resetToDefault performs up to thirteen file writes plus a full reparse; never block the
+    // resetToDefault performs up to fourteen file writes plus a full reparse; never block the
     // calling thread (which may be the main thread) on that.
     SchedulerUtils.runAsync(Gloss.instance, () -> {
       sendOnSender(sender, Gloss.instance.getLocalization().legacy(

@@ -100,11 +100,11 @@
           "$ref": "#/$defs/names"
         },
         "entities": {
-          "description": "Entity types this document draws.",
+          "description": "Entity types this document draws. Exact names and globs make matching entities raycast targets even when they do not hold an inventory.",
           "$ref": "#/$defs/names"
         },
         "special": {
-          "description": "Marks this document as the one the plugin looks up by role rather than by target. 'enderChest' draws the viewer's own ender chest instead of a tile entity, 'locked' is the target-less card shown when a viewer may not open the container, and 'anyInventoryHolder' is the fallback for an inventory-holding entity no document names. Read from the top-level match only.",
+          "description": "Marks this document as the one the plugin looks up by role rather than by target. 'enderChest' draws the viewer's own ender chest instead of a tile entity, 'locked' is the target-less card shown when a viewer may not open the container, and 'anyInventoryHolder' is the fallback for an inventory-holding minecart or chest boat no document names. Read from the top-level match only.",
           "type": "string",
           "enum": [
             "enderChest",

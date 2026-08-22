@@ -768,7 +768,7 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
     }
 
     /**
-     * Constructing the registry extracts thirteen shipped documents into {@code previews/}. With
+     * Constructing the registry extracts fourteen shipped documents into {@code previews/}. With
      * previews off there is nothing to serve them to, so the registry is never built and the folder
      * is never created; every caller of {@link #getPreviewRegistry()} already reads it as nullable.
      */

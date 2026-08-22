@@ -12,6 +12,7 @@ import org.bukkit.entity.Entity;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.minecart.StorageMinecart;
+import org.bukkit.entity.minecart.PoweredMinecart;
 import org.bukkit.util.RayTraceResult;
 import org.bukkit.util.Vector;
 import org.junit.After;
@@ -152,6 +153,18 @@ public class CharacterizationPreviewRaycastTest {
   public void anEntityAloneIsAcquiredWithoutAnyBlockHit() {
     Entity minecart = storageMinecart();
     world.entityHit(minecart, 6.0D);
+
+    Object target = lookedAtTarget(player(world.bukkit(), new AtomicInteger()));
+
+    assertSame(minecart, entity(target));
+  }
+
+  @Test
+  public void anExplicitlyMatchedFurnaceMinecartIsAcquired() {
+    Entity minecart = PreviewFakes.entity(EntityType.FURNACE_MINECART)
+        .as(PoweredMinecart.class)
+        .build();
+    world.entityHit(minecart, 4.0D);
 
     Object target = lookedAtTarget(player(world.bukkit(), new AtomicInteger()));
 
