@@ -4,6 +4,6 @@
   "mode": "ascend",
   "frameIntervalMs": 1000,
   "frames": [
-    "&d{{ wipe('WELCOME', floor(time.seconds / 2) + 7) }}"
+    "&d{{ wipe('WELCOME', floor(time.seconds * 4) + 7) }}"
   ]
 }

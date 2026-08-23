@@ -132,6 +132,7 @@ final class PersistentHologram implements AnchoredHologram {
         }
 
         service.persist(this);
+        service.persistentTextChanged();
     }
 
     @Override
@@ -142,6 +143,7 @@ final class PersistentHologram implements AnchoredHologram {
         }
 
         service.persist(this);
+        service.persistentTextChanged();
     }
 
     @Override
@@ -153,6 +155,7 @@ final class PersistentHologram implements AnchoredHologram {
         }
 
         service.persist(this);
+        service.persistentTextChanged();
     }
 
     @Override
@@ -162,6 +165,7 @@ final class PersistentHologram implements AnchoredHologram {
         }
 
         service.persist(this);
+        service.persistentTextChanged();
     }
 
     @Override
@@ -171,6 +175,7 @@ final class PersistentHologram implements AnchoredHologram {
         }
 
         service.persist(this);
+        service.persistentTextChanged();
     }
 
     @Override
@@ -390,7 +395,7 @@ final class PersistentHologram implements AnchoredHologram {
         long emojiGeneration = TextPipeline.emojiGeneration();
         SharedText cached = sharedTextCache;
         if (cached != null && cached.generation() == snapshot.generation()
-            && cached.emojiGeneration() == emojiGeneration && !hasRegisteredFunction(snapshot)) {
+            && cached.emojiGeneration() == emojiGeneration && !hasDynamicText(snapshot)) {
             return cached.text();
         }
 
@@ -399,18 +404,28 @@ final class PersistentHologram implements AnchoredHologram {
         return rendered;
     }
 
-    private boolean hasRegisteredFunction(LineSet snapshot) {
+    private boolean hasDynamicText(LineSet snapshot) {
         if ((snapshot.flags() & TextPipeline.HAS_FUNCTION) == 0) {
             return false;
         }
 
         TextPipeline text = service.plugin().text();
         for (String line : snapshot.lines()) {
-            if (HologramMath.containsRegisteredFunction(line, text::hasFunction)) {
+            if (TextPipeline.containsExpression(line)
+                || HologramMath.containsRegisteredFunction(line, text::hasFunction)) {
                 return true;
             }
         }
 
+        return false;
+    }
+
+    boolean requiresFastRefresh() {
+        for (String line : lineSet.lines()) {
+            if (TextPipeline.requiresFastRefresh(line)) {
+                return true;
+            }
+        }
         return false;
     }
 

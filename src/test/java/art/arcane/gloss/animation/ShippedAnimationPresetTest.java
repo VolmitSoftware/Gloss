@@ -24,21 +24,21 @@ class ShippedAnimationPresetTest {
       "marquee", "timeline", "typewriter", "flash", "wipe", "scanner", "decode", "odometer", "wave");
 
   @Test
-  void shippedEffectsRenderAndAdvanceAtDefaultTablistCadence() throws IOException {
+  void shippedEffectsRenderAndAdvanceAtTickCadence() throws IOException {
     assertTrue(ShippedDocumentCatalog.ANIMATIONS.names().containsAll(EFFECT_NAMES));
     for (String name : EFFECT_NAMES) {
       AnimationDoc document = read(name);
       assertEquals(1, document.frames().size(), name);
       String frame = document.frames().getFirst();
       Set<String> samples = new HashSet<>();
-      for (double seconds : List.of(0.0D, 2.0D, 4.0D)) {
+      for (double seconds : List.of(0.0D, 0.25D, 0.5D)) {
         String rendered = render(frame, seconds);
         assertFalse(rendered.contains("{{"), name);
         assertFalse(rendered.contains("\n"), name);
         assertTrue(rendered.length() <= 32, name + " delivered " + rendered.length() + " units");
         samples.add(rendered);
       }
-      assertTrue(samples.size() > 1, name + " stayed unchanged across default tablist samples");
+      assertTrue(samples.size() > 1, name + " stayed unchanged across tick samples");
     }
   }
 

@@ -8,6 +8,7 @@ import art.arcane.gloss.doc.DocumentRegistry;
 import art.arcane.gloss.doc.DocumentReviser;
 import art.arcane.gloss.doc.DocumentStore;
 import art.arcane.gloss.doc.GlossDocument;
+import art.arcane.gloss.text.TextPipeline;
 import art.arcane.volmlib.util.entity.StackExclusion;
 import art.arcane.volmlib.util.scheduling.FoliaScheduler;
 import art.arcane.volmlib.util.scheduling.SchedulerUtils;
@@ -41,12 +42,14 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.logging.Level;
 
 public final class HologramService {
     private static final String DISPLAY_TAG = "gloss_display";
     private static final int NO_TASK = -1;
+    private static final int ANIMATION_REFRESH_INTERVAL_TICKS = 1;
 
     private static final DocumentReviser<HologramDoc> REVISER = new DocumentReviser<>() {
         @Override
@@ -69,8 +72,11 @@ public final class HologramService {
     private final Map<UUID, TextDisplay> leased;
     private final ExecutorService fileExecutor;
     private final HologramListener listener;
+    private final AtomicBoolean driverReconcileQueued;
     private int driverTaskId;
+    private int driverIntervalTicks;
     private int temporaryTaskId;
+    private volatile boolean driverRunning;
     private volatile HologramTick lastTick;
 
     public HologramService(Gloss plugin) {
@@ -85,7 +91,9 @@ public final class HologramService {
         this.leased = new ConcurrentHashMap<>();
         this.fileExecutor = Executors.newSingleThreadExecutor(HologramService::createFileThread);
         this.listener = new HologramListener();
+        this.driverReconcileQueued = new AtomicBoolean();
         this.driverTaskId = NO_TASK;
+        this.driverIntervalTicks = NO_TASK;
         this.temporaryTaskId = NO_TASK;
     }
 
@@ -141,6 +149,7 @@ public final class HologramService {
         });
         if (hologram == created[0]) {
             persist(hologram);
+            requestDriverIntervalReconcile();
         }
 
         return hologram;
@@ -159,6 +168,7 @@ public final class HologramService {
         PersistentHologram removed = holograms.remove(safeId);
         if (removed != null) {
             removed.despawnAll();
+            requestDriverIntervalReconcile();
         }
 
         submitFileTask(() -> {
@@ -286,6 +296,10 @@ public final class HologramService {
         });
     }
 
+    void persistentTextChanged() {
+        requestDriverIntervalReconcile();
+    }
+
     private void submitFileTask(Runnable task) {
         if (fileExecutor.isShutdown()) {
             task.run();
@@ -324,15 +338,21 @@ public final class HologramService {
     }
 
     private void startTasks() {
-        driverTaskId = plugin.scheduler().sr(this::driveHolograms, plugin.cfg().holograms().updateIntervalTicks());
+        driverRunning = true;
+        int intervalTicks = desiredDriverIntervalTicks();
+        driverTaskId = plugin.scheduler().sr(this::driveHolograms, intervalTicks);
+        driverIntervalTicks = intervalTicks;
         temporaryTaskId = plugin.scheduler().sr(this::driveTemporaries, plugin.cfg().holograms().temporaryUpdateIntervalTicks());
     }
 
     private void stopTasks() {
+        driverRunning = false;
+        driverReconcileQueued.set(false);
         if (driverTaskId != NO_TASK) {
             plugin.scheduler().csr(driverTaskId);
             driverTaskId = NO_TASK;
         }
+        driverIntervalTicks = NO_TASK;
         if (temporaryTaskId != NO_TASK) {
             plugin.scheduler().csr(temporaryTaskId);
             temporaryTaskId = NO_TASK;
@@ -356,6 +376,55 @@ public final class HologramService {
 
         publishTick(tick);
         sweepLeases();
+    }
+
+    private int desiredDriverIntervalTicks() {
+        int configuredIntervalTicks = plugin.cfg().holograms().updateIntervalTicks();
+        if (!plugin.cfg().text().functions()) {
+            return configuredIntervalTicks;
+        }
+        for (PersistentHologram hologram : holograms.values()) {
+            if (hologram.requiresFastRefresh()) {
+                return Math.min(configuredIntervalTicks, ANIMATION_REFRESH_INTERVAL_TICKS);
+            }
+        }
+        return configuredIntervalTicks;
+    }
+
+    private void requestDriverIntervalReconcile() {
+        if (!driverRunning || !plugin.isEnabled() || !driverReconcileQueued.compareAndSet(false, true)) {
+            return;
+        }
+        if (!SchedulerUtils.runGlobal(plugin, () -> {
+            driverReconcileQueued.set(false);
+            reconcileDriverInterval();
+        })) {
+            driverReconcileQueued.set(false);
+        }
+    }
+
+    private void reconcileDriverInterval() {
+        if (!driverRunning) {
+            return;
+        }
+        int intervalTicks = desiredDriverIntervalTicks();
+        if (driverTaskId != NO_TASK && driverIntervalTicks == intervalTicks) {
+            return;
+        }
+        if (driverTaskId != NO_TASK) {
+            plugin.scheduler().csr(driverTaskId);
+        }
+        driverTaskId = plugin.scheduler().sr(this::driveHolograms, intervalTicks);
+        driverIntervalTicks = intervalTicks;
+    }
+
+    static int refreshIntervalTicks(List<String> lines, int configuredIntervalTicks) {
+        for (String line : lines) {
+            if (TextPipeline.requiresFastRefresh(line)) {
+                return Math.min(configuredIntervalTicks, ANIMATION_REFRESH_INTERVAL_TICKS);
+            }
+        }
+        return configuredIntervalTicks;
     }
 
     private void driveTemporaries() {
@@ -472,6 +541,7 @@ public final class HologramService {
             removed.despawnAll();
             Gloss.info("Hologram " + id + " removed from disk.");
         }
+        requestDriverIntervalReconcile();
     }
 
     private void loadAll() {

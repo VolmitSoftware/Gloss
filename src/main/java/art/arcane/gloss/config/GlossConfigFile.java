@@ -97,7 +97,10 @@ public final class GlossConfigFile {
         @ConfigDoc("Vertical distance in blocks between stacked hologram lines. Clamped to 0.05..2.0.")
         public double stackDistance = 0.26D;
 
-        @ConfigDoc("Ticks between hologram text refreshes. Clamped to 1..200.")
+        @ConfigDoc(
+            "Ticks between ordinary hologram text refreshes. Clock-driven expressions and named animations "
+                + "automatically sample every tick. Clamped to 1..200."
+        )
         public int updateIntervalTicks = 10;
 
         @ConfigDoc("Distance in blocks at which holograms become visible. Clamped to 4..128.")
@@ -126,12 +129,18 @@ public final class GlossConfigFile {
     }
 
     public static final class Boards {
-        @ConfigDoc("Ticks between scoreboard refreshes. Clamped to 1..200.")
+        @ConfigDoc(
+            "Ticks between ordinary scoreboard refreshes. Active boards with clock-driven expressions or named "
+                + "animations automatically sample every tick. Clamped to 1..200."
+        )
         public int updateIntervalTicks = 20;
     }
 
     public static final class Tablist {
-        @ConfigDoc("Ticks between tablist refreshes. Clamped to 1..400.")
+        @ConfigDoc(
+            "Ticks between ordinary tablist refreshes. Clock-driven expressions and named animations automatically "
+                + "sample every tick. Clamped to 1..400."
+        )
         public int updateIntervalTicks = 40;
     }
 

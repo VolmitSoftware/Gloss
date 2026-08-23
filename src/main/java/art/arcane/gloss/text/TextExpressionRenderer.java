@@ -81,6 +81,65 @@ public final class TextExpressionRenderer {
         failed.clear();
     }
 
+    static boolean dependsOnTime(String input) {
+        if (input == null || input.isEmpty()) {
+            return false;
+        }
+        int open = input.indexOf("{{");
+        while (open >= 0) {
+            int close = input.indexOf("}}", open + 2);
+            if (close < 0) {
+                return false;
+            }
+            String source = input.substring(open + 2, close).trim();
+            if (!source.isEmpty() && source.length() <= SOURCE_LIMIT) {
+                try {
+                    if (dependsOnTime(ExprParser.parse(source))) {
+                        return true;
+                    }
+                } catch (RuntimeException ignored) {
+                }
+            }
+            open = input.indexOf("{{", close + 2);
+        }
+        return false;
+    }
+
+    private static boolean dependsOnTime(Expr expression) {
+        if (expression instanceof Expr.Var variable) {
+            return variable.name().equals("time.ms")
+                || variable.name().equals("time.seconds")
+                || variable.name().equals("time.ticks");
+        }
+        if (expression instanceof Expr.ListLiteral list) {
+            return containsTimeDependency(list.items());
+        }
+        if (expression instanceof Expr.Unary unary) {
+            return dependsOnTime(unary.operand());
+        }
+        if (expression instanceof Expr.Binary binary) {
+            return dependsOnTime(binary.left()) || dependsOnTime(binary.right());
+        }
+        if (expression instanceof Expr.Ternary ternary) {
+            return dependsOnTime(ternary.condition())
+                || dependsOnTime(ternary.ifTrue())
+                || dependsOnTime(ternary.ifFalse());
+        }
+        if (expression instanceof Expr.Call call) {
+            return containsTimeDependency(call.args());
+        }
+        return false;
+    }
+
+    private static boolean containsTimeDependency(List<Expr> expressions) {
+        for (Expr expression : expressions) {
+            if (dependsOnTime(expression)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     ExprScope scope(Player viewer) {
         return new Scope(viewer, System.currentTimeMillis());
     }

@@ -36,7 +36,7 @@ public final class ShippedDocumentCatalog {
             "odometer", "wave"), AnimationDoc::parse);
 
     public static final Entry<BoardDoc> BOARDS =
-        new Entry<>(BoardDoc.KIND, List.of("default"), BoardDoc::parse);
+        new Entry<>(BoardDoc.KIND, List.of("default", "animation-showcase"), BoardDoc::parse);
 
     public static final Entry<BubbleStyleDoc> BUBBLES =
         new Entry<>(BubbleStyleDoc.KIND, List.of("default"), BubbleStyleDoc::parse);

@@ -411,7 +411,7 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
 
         service.animator().removeGroup(animatorGroup);
         boolean dirty = textDirty.compareAndSet(true, false);
-        if (!dirty && !hasRegisteredFunction(snapshot)) {
+        if (!dirty && !hasDynamicText(snapshot)) {
             return;
         }
 
@@ -456,14 +456,15 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
         });
     }
 
-    private boolean hasRegisteredFunction(LineSet snapshot) {
+    private boolean hasDynamicText(LineSet snapshot) {
         if ((snapshot.flags() & TextPipeline.HAS_FUNCTION) == 0) {
             return false;
         }
 
         TextPipeline text = service.plugin().text();
         for (String line : snapshot.lines()) {
-            if (HologramMath.containsRegisteredFunction(line, text::hasFunction)) {
+            if (TextPipeline.containsExpression(line)
+                || HologramMath.containsRegisteredFunction(line, text::hasFunction)) {
                 return true;
             }
         }

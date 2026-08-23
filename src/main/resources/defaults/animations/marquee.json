@@ -4,6 +4,6 @@
   "mode": "ascend",
   "frameIntervalMs": 1000,
   "frames": [
-    "&b{{ marquee('GLOSS REALMS', 12, floor(time.seconds / 2)) }}"
+    "&b{{ marquee('GLOSS REALMS', 12, floor(time.seconds * 4)) }}"
   ]
 }

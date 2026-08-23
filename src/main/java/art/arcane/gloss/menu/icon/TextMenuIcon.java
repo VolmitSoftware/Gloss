@@ -1,6 +1,7 @@
 package art.arcane.gloss.menu.icon;
 
 import art.arcane.gloss.Gloss;
+import art.arcane.gloss.GlossConfig;
 import art.arcane.gloss.config.icon.TextIconData;
 import art.arcane.gloss.exceptions.MenuIconException;
 import art.arcane.gloss.menu.DisplayEntityManager;
@@ -20,7 +21,7 @@ import java.util.UUID;
 public class TextMenuIcon extends MenuIcon<TextIconData> {
 
   private final List<Component> components;
-  private final int refreshInterval;
+  private int refreshInterval;
   /**
    * The post-pipeline string each line was last parsed from. MiniMessage parsing is deterministic,
    * so an unchanged string re-parses to an equal Component — comparing the strings first lets a
@@ -39,7 +40,7 @@ public class TextMenuIcon extends MenuIcon<TextIconData> {
     parsedFrom = new ArrayList<>();
     components = new ArrayList<>();
     components.addAll(render(sourceText));
-    refreshInterval = data.resolvedRefreshTicks();
+    refreshInterval = refreshInterval(data, sourceText, GlossConfig.current().text().functions());
     refreshCountdown = refreshInterval;
   }
 
@@ -100,6 +101,8 @@ public class TextMenuIcon extends MenuIcon<TextIconData> {
   public boolean updateText(String text) {
     sourceText = text;
     dynamicSource = TextPipeline.viewerDependent(sourceText);
+    refreshInterval = refreshInterval(data, sourceText, GlossConfig.current().text().functions());
+    refreshCountdown = refreshInterval;
     if (displayEntities == null || displayEntities.size() != components.size())
       return false;
 
@@ -125,6 +128,13 @@ public class TextMenuIcon extends MenuIcon<TextIconData> {
 
     markGeometryChanged();
     return true;
+  }
+
+  static int refreshInterval(TextIconData data, String text, boolean functionsEnabled) {
+    if (data.refreshTicks() != null) {
+      return data.refreshTicks();
+    }
+    return functionsEnabled && TextPipeline.requiresFastRefresh(text) ? 1 : TextIconData.DEFAULT_REFRESH_TICKS;
   }
 
   /**

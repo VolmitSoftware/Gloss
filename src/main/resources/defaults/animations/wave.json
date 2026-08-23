@@ -4,6 +4,6 @@
   "mode": "ascend",
   "frameIntervalMs": 1000,
   "frames": [
-    "{{ wave('GLOSS', ['&a', '&7'], floor(time.seconds / 2)) }}"
+    "{{ wave('GLOSS', ['&a', '&7'], floor(time.seconds * 4)) }}"
   ]
 }

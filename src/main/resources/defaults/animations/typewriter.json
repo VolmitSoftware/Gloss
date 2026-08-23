@@ -4,6 +4,6 @@
   "mode": "ascend",
   "frameIntervalMs": 1000,
   "frames": [
-    "&f{{ typewriter('WELCOME', floor(time.seconds / 2) + 7, 1) }}"
+    "&f{{ typewriter('WELCOME', floor(time.seconds * 4) + 7, 1) }}"
   ]
 }

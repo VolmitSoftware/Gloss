@@ -42,6 +42,7 @@ import java.util.logging.Level;
 
 public final class BoardService implements Listener {
     private static final int MAX_LINES = 15;
+    private static final int ANIMATION_REFRESH_INTERVAL_TICKS = 1;
 
     private static final DocumentReviser<BoardDoc> REVISER = new DocumentReviser<>() {
         @Override
@@ -63,8 +64,9 @@ public final class BoardService implements Listener {
     private final Map<UUID, String> selections;
     private final Set<UUID> sticky;
     private final UnaryOperator<String> staticRender;
-    private volatile BoardManager<Board> manager;
-    private volatile int managerIntervalTicks;
+    private volatile BoardManager<Board> ordinaryManager;
+    private volatile BoardManager<Board> animationManager;
+    private volatile int ordinaryManagerIntervalTicks;
     private volatile List<GlossBoardMeta> boardSnapshot;
 
     public BoardService(Gloss plugin) {
@@ -118,7 +120,7 @@ public final class BoardService implements Listener {
         loadAllBoards();
         Bukkit.getPluginManager().registerEvents(this, plugin);
         if (plugin.cfg().boards().enabled()) {
-            createManager();
+            createManagers();
         }
         plugin.watchdog().register("boards", this::pollRegistry);
         plugin.scheduler().s(this::selectAllAutomatically, 1);
@@ -128,11 +130,7 @@ public final class BoardService implements Listener {
         HandlerList.unregisterAll(this);
         plugin.watchdog().unregister("boards");
         registry.close();
-        BoardManager<Board> activeManager = manager;
-        manager = null;
-        if (activeManager != null) {
-            activeManager.onDisable();
-        }
+        stopManagers();
         selections.clear();
         sticky.clear();
         metas.clear();
@@ -146,16 +144,13 @@ public final class BoardService implements Listener {
             defaults.extractMissing();
         }
         loadAllBoards();
-        BoardManager<Board> activeManager = manager;
-        if (enabled && activeManager == null) {
-            createManager();
-        } else if (enabled && managerIntervalTicks != plugin.cfg().boards().updateIntervalTicks()) {
-            manager = null;
-            activeManager.onDisable();
-            createManager();
-        } else if (!enabled && activeManager != null) {
-            manager = null;
-            activeManager.onDisable();
+        if (enabled && ordinaryManager == null) {
+            createManagers();
+        } else if (enabled && ordinaryManagerIntervalTicks != plugin.cfg().boards().updateIntervalTicks()) {
+            stopManagers();
+            createManagers();
+        } else if (!enabled && ordinaryManager != null) {
+            stopManagers();
         }
         selectAllAutomatically();
     }
@@ -218,6 +213,7 @@ public final class BoardService implements Listener {
         }
         metas.put(meta.id(), meta);
         boardSnapshot = null;
+        reselectAll();
         BoardDoc doc = meta.toDoc(meta.nextRevision());
         plugin.scheduler().a(() -> writeBoard(meta.id(), doc), 0);
     }
@@ -271,22 +267,40 @@ public final class BoardService implements Listener {
         UUID uuid = event.getPlayer().getUniqueId();
         selections.remove(uuid);
         sticky.remove(uuid);
-        BoardManager<Board> activeManager = manager;
-        if (activeManager != null) {
-            activeManager.remove(event.getPlayer());
+        removeFromManagers(event.getPlayer());
+    }
+
+    private void createManagers() {
+        int ordinaryIntervalTicks = plugin.cfg().boards().updateIntervalTicks();
+        ordinaryManager = createManager(ordinaryIntervalTicks, "ordinary");
+        ordinaryManagerIntervalTicks = ordinaryIntervalTicks;
+        int animationIntervalTicks = Math.min(ordinaryIntervalTicks, ANIMATION_REFRESH_INTERVAL_TICKS);
+        animationManager = animationIntervalTicks == ordinaryIntervalTicks
+            ? null
+            : createManager(animationIntervalTicks, "animation");
+    }
+
+    private BoardManager<Board> createManager(int intervalTicks, String cadenceName) {
+        BoardSettings settings = new BoardSettings(new SelectionBoardProvider(), ScoreDirection.DOWN, intervalTicks);
+        try {
+            return new BoardManager<>(plugin, settings, Board::new);
+        } catch (Throwable failure) {
+            Gloss.warn("Sidebar " + cadenceName + " driver unavailable: " + failure.getClass().getSimpleName()
+                + (failure.getMessage() == null ? "" : ": " + failure.getMessage()));
+            return null;
         }
     }
 
-    private void createManager() {
-        int intervalTicks = plugin.cfg().boards().updateIntervalTicks();
-        BoardSettings settings = new BoardSettings(new SelectionBoardProvider(), ScoreDirection.DOWN, intervalTicks);
-        try {
-            manager = new BoardManager<>(plugin, settings, Board::new);
-            managerIntervalTicks = intervalTicks;
-        } catch (Throwable failure) {
-            manager = null;
-            Gloss.warn("Sidebar driver unavailable: " + failure.getClass().getSimpleName()
-                + (failure.getMessage() == null ? "" : ": " + failure.getMessage()));
+    private void stopManagers() {
+        BoardManager<Board> activeOrdinaryManager = ordinaryManager;
+        BoardManager<Board> activeAnimationManager = animationManager;
+        ordinaryManager = null;
+        animationManager = null;
+        if (activeOrdinaryManager != null) {
+            activeOrdinaryManager.onDisable();
+        }
+        if (activeAnimationManager != null && activeAnimationManager != activeOrdinaryManager) {
+            activeAnimationManager.onDisable();
         }
     }
 
@@ -312,20 +326,66 @@ public final class BoardService implements Listener {
     }
 
     private void syncManager(Player player) {
-        BoardManager<Board> activeManager = manager;
-        if (activeManager == null) {
+        BoardManager<Board> activeOrdinaryManager = ordinaryManager;
+        if (activeOrdinaryManager == null) {
             return;
         }
         plugin.scheduler().runEntity(player, () -> {
-            String boardId = selections.get(player.getUniqueId());
-            if (boardId != null && metas.containsKey(boardId)) {
-                if (!activeManager.hasBoard(player)) {
-                    activeManager.setup(player);
+            GlossBoardMeta meta = selectedMeta(player);
+            BoardManager<Board> activeAnimationManager = animationManager;
+            BoardManager<Board> target = meta != null && usesFastRefresh(meta)
+                && activeAnimationManager != null ? activeAnimationManager : activeOrdinaryManager;
+            BoardManager<Board> other = target == activeOrdinaryManager ? activeAnimationManager : activeOrdinaryManager;
+            if (meta != null) {
+                if (other != null) {
+                    other.remove(player);
+                }
+                if (!target.hasBoard(player)) {
+                    target.setup(player);
                 }
                 return;
             }
-            activeManager.remove(player);
+            activeOrdinaryManager.remove(player);
+            if (activeAnimationManager != null) {
+                activeAnimationManager.remove(player);
+            }
         });
+    }
+
+    private void removeFromManagers(Player player) {
+        BoardManager<Board> activeOrdinaryManager = ordinaryManager;
+        BoardManager<Board> activeAnimationManager = animationManager;
+        if (activeOrdinaryManager != null) {
+            activeOrdinaryManager.remove(player);
+        }
+        if (activeAnimationManager != null) {
+            activeAnimationManager.remove(player);
+        }
+    }
+
+    private boolean usesFastRefresh(GlossBoardMeta meta) {
+        return plugin.cfg().text().functions() && usesFastRefreshText(meta);
+    }
+
+    static int refreshIntervalTicks(GlossBoardMeta meta, int configuredIntervalTicks) {
+        return usesFastRefreshText(meta)
+            ? Math.min(configuredIntervalTicks, ANIMATION_REFRESH_INTERVAL_TICKS)
+            : configuredIntervalTicks;
+    }
+
+    private static boolean usesFastRefreshText(GlossBoardMeta meta) {
+        if (meta == null) {
+            return false;
+        }
+        if (TextPipeline.requiresFastRefresh(meta.title())) {
+            return true;
+        }
+        for (String line : meta.lines()) {
+            if (TextPipeline.requiresFastRefresh(line)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private GlossBoardMeta selectedMeta(Player player) {

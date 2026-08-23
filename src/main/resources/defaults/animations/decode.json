@@ -4,6 +4,6 @@
   "mode": "ascend",
   "frameIntervalMs": 1000,
   "frames": [
-    "&d{{ scramble('GHOSTWOOD', floor(time.seconds / 2)) }}"
+    "&d{{ scramble('GHOSTWOOD', floor(time.seconds * 4)) }}"
   ]
 }

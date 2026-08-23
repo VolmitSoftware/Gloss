@@ -121,11 +121,36 @@ public final class TextPipeline implements TextRenderer {
         if (raw == null || raw.isEmpty()) {
             return false;
         }
-        int expression = raw.indexOf("{{");
-        if (expression >= 0 && raw.indexOf("}}", expression + 2) >= 0) {
+        if (containsExpression(raw)) {
             return true;
         }
         return containsPair(raw, '%') || containsPair(raw, '|');
+    }
+
+    public static boolean containsExpression(String raw) {
+        if (raw == null || raw.isEmpty()) {
+            return false;
+        }
+        int expression = raw.indexOf("{{");
+        return expression >= 0 && raw.indexOf("}}", expression + 2) >= 0;
+    }
+
+    public static boolean requiresFastRefresh(String raw) {
+        if (raw == null || raw.isEmpty()) {
+            return false;
+        }
+        int open = raw.indexOf('|');
+        while (open >= 0) {
+            int close = raw.indexOf('|', open + 1);
+            if (close < 0) {
+                break;
+            }
+            if (raw.startsWith("animation.", open + 1) && close > open + "|animation.".length()) {
+                return true;
+            }
+            open = raw.indexOf('|', close + 1);
+        }
+        return TextExpressionRenderer.dependsOnTime(raw);
     }
 
     private static boolean containsPair(String raw, char marker) {

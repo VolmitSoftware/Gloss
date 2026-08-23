@@ -18,6 +18,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerQuitEvent;
 
 import java.io.File;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
@@ -30,6 +31,7 @@ import java.util.concurrent.atomic.AtomicLong;
 public final class TablistService implements Listener {
     private static final String PLAYER_TOKEN = "$player";
     private static final String GROUP_TOKEN = "$group";
+    private static final int ANIMATION_REFRESH_INTERVAL_TICKS = 1;
     private static final int VIEWER_DEPENDENT = TextPipeline.HAS_PLACEHOLDER | TextPipeline.HAS_FUNCTION;
 
     private final Gloss plugin;
@@ -42,6 +44,7 @@ public final class TablistService implements Listener {
     private final AtomicLong docGeneration;
     private volatile TablistDoc activeDoc;
     private volatile int driverTaskId;
+    private volatile int driverIntervalTicks;
     private volatile HeaderFooterMemo headerFooterMemo;
 
     public TablistService(Gloss plugin) {
@@ -57,6 +60,7 @@ public final class TablistService implements Listener {
         this.docGeneration = new AtomicLong();
         this.activeDoc = TablistDoc.DEFAULTS;
         this.driverTaskId = -1;
+        this.driverIntervalTicks = -1;
     }
 
     /** Single-pass splice of the {@code $player} and {@code $group} tokens; substituted text is never rescanned. */
@@ -175,11 +179,13 @@ public final class TablistService implements Listener {
 
     public void setTab(Player player, String header, String footer) {
         overrides.put(player.getUniqueId(), new TabOverride(header == null ? "" : header, footer == null ? "" : footer));
+        reconcileDriverInterval();
         pushNow(player);
     }
 
     public void resetTab(Player player) {
         overrides.remove(player.getUniqueId());
+        reconcileDriverInterval();
         pushNow(player);
     }
 
@@ -190,6 +196,7 @@ public final class TablistService implements Listener {
         appliedListNames.remove(uuid);
         appliedHeaderFooters.remove(uuid);
         listNameSources.remove(uuid);
+        reconcileDriverInterval();
     }
 
     private TablistDoc doc() {
@@ -228,13 +235,16 @@ public final class TablistService implements Listener {
         }
         activeDoc = updated;
         docGeneration.incrementAndGet();
+        reconcileDriverInterval();
     }
 
     private void startDriver() {
         if (!plugin.cfg().tablist().enabled()) {
             return;
         }
-        driverTaskId = plugin.scheduler().sr(this::tick, plugin.cfg().tablist().updateIntervalTicks());
+        int intervalTicks = desiredDriverIntervalTicks();
+        driverTaskId = plugin.scheduler().sr(this::tick, intervalTicks);
+        driverIntervalTicks = intervalTicks;
     }
 
     private void stopDriver() {
@@ -242,6 +252,38 @@ public final class TablistService implements Listener {
             plugin.scheduler().csr(driverTaskId);
             driverTaskId = -1;
         }
+        driverIntervalTicks = -1;
+    }
+
+    private void reconcileDriverInterval() {
+        if (!plugin.cfg().tablist().enabled()) {
+            return;
+        }
+        int intervalTicks = desiredDriverIntervalTicks();
+        if (driverTaskId != -1 && driverIntervalTicks == intervalTicks) {
+            return;
+        }
+        stopDriver();
+        startDriver();
+    }
+
+    private int desiredDriverIntervalTicks() {
+        int configuredIntervalTicks = plugin.cfg().tablist().updateIntervalTicks();
+        if (!plugin.cfg().text().functions()) {
+            return configuredIntervalTicks;
+        }
+        TablistDoc doc = doc();
+        int documentIntervalTicks = refreshIntervalTicks(doc, List.of(), configuredIntervalTicks);
+        if (documentIntervalTicks != configuredIntervalTicks || !doc.useHeaderFooter()) {
+            return documentIntervalTicks;
+        }
+        for (TabOverride override : overrides.values()) {
+            if (TextPipeline.requiresFastRefresh(override.header())
+                || TextPipeline.requiresFastRefresh(override.footer())) {
+                return Math.min(configuredIntervalTicks, ANIMATION_REFRESH_INTERVAL_TICKS);
+            }
+        }
+        return configuredIntervalTicks;
     }
 
     private void tick() {
@@ -381,6 +423,34 @@ public final class TablistService implements Listener {
         if (FoliaScheduler.isOwnedByCurrentRegion(player)) {
             action.run();
         }
+    }
+
+    static int refreshIntervalTicks(TablistDoc doc, Collection<String> overrideText, int configuredIntervalTicks) {
+        if (usesAnimatedText(doc, overrideText)) {
+            return Math.min(configuredIntervalTicks, ANIMATION_REFRESH_INTERVAL_TICKS);
+        }
+        return configuredIntervalTicks;
+    }
+
+    private static boolean usesAnimatedText(TablistDoc doc, Collection<String> overrideText) {
+        if (doc.useHeaderFooter()
+            && (TextPipeline.requiresFastRefresh(doc.header())
+            || TextPipeline.requiresFastRefresh(doc.footer()) || containsAnimatedText(overrideText))) {
+            return true;
+        }
+        if (!doc.groupListNames()) {
+            return false;
+        }
+        return containsAnimatedText(doc.nameFormats().values());
+    }
+
+    private static boolean containsAnimatedText(Collection<String> values) {
+        for (String value : values) {
+            if (TextPipeline.requiresFastRefresh(value)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public record ListNameChoice(String template, String groupName) {

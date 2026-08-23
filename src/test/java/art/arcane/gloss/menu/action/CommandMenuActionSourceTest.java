@@ -41,6 +41,22 @@ public class CommandMenuActionSourceTest {
     assertTrue("a server source must never be routed through the player", dispatched.isEmpty());
   }
 
+  @Test
+  public void commandPlayerTokensResolveToTheClickingPlayerName() {
+    Player player = player(new ArrayList<>());
+
+    assertEquals("give tester obsidian 1", CommandMenuAction.personalizeCommand("give %player% obsidian 1", player));
+    assertEquals("tell %player_uuid% tester tester", CommandMenuAction.personalizeCommand(
+        "tell %player_uuid% %player_name% %player%", player));
+  }
+
+  @Test
+  public void aCommandWithoutPlayerTokensRemainsUnchanged() {
+    Player player = player(new ArrayList<>());
+
+    assertEquals("time set day", CommandMenuAction.personalizeCommand("time set day", player));
+  }
+
   private static ActionContext context(List<String> dispatched) {
     Player player = player(dispatched);
     return new ActionContext() {

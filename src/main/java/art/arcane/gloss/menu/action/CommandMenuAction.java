@@ -5,6 +5,7 @@ import art.arcane.gloss.config.action.CommandActionData;
 import art.arcane.gloss.enums.MenuActionCommandSource;
 import art.arcane.volmlib.util.scheduling.SchedulerUtils;
 import org.bukkit.Bukkit;
+import org.bukkit.entity.Player;
 
 public class CommandMenuAction extends MenuAction<CommandActionData> {
 
@@ -22,12 +23,18 @@ public class CommandMenuAction extends MenuAction<CommandActionData> {
 
   @Override
   public ActionOutcome execute(ActionContext context) {
-    String declared = data.command().trim();
+    String declared = personalizeCommand(data.command().trim(), context.player());
     String command = declared.startsWith("/") ? declared.substring(1) : declared;
-    if (data.sourceOrDefault() == MenuActionCommandSource.PLAYER)
+    if (data.sourceOrDefault() == MenuActionCommandSource.PLAYER) {
       context.player().performCommand(command);
-    else
+    } else {
       SchedulerUtils.runGlobal(Gloss.instance, () -> Bukkit.getServer().dispatchCommand(Bukkit.getServer().getConsoleSender(), command));
+    }
     return ActionOutcome.CONTINUE;
+  }
+
+  static String personalizeCommand(String command, Player player) {
+    String playerName = player.getName();
+    return command.replace("%player_name%", playerName).replace("%player%", playerName);
   }
 }
