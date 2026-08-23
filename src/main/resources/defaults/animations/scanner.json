@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "revision": 1,
+  "mode": "ascend",
+  "frameIntervalMs": 1000,
+  "frames": [
+    "{{ scanner('BOOSTED', '&7', '&a', floor(time.seconds / 2)) }}"
+  ]
+}

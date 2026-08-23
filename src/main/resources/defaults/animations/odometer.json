@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "revision": 1,
+  "mode": "ascend",
+  "frameIntervalMs": 1000,
+  "frames": [
+    "&6${{ odometer(0, 9999, mod(time.seconds, 20) / 20, 4) }}"
+  ]
+}

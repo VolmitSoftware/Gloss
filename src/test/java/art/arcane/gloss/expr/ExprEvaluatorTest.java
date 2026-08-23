@@ -449,6 +449,53 @@ public class ExprEvaluatorTest {
     eval("readable(5)");
   }
 
+  @Test
+  public void textAnimationFunctionsTransformCallerContent() {
+    Assert.assertEquals("LOSS ", eval("marquee('GLOSS', 5, 1)"));
+    Assert.assertEquals("    G", eval("marquee('GLOSS', 5, 6)"));
+    Assert.assertEquals("WELCOME", eval("timeline([['WELCOME', 2], ['BOOSTED', 0.5]], 1.99)"));
+    Assert.assertEquals("BOOSTED", eval("timeline([['WELCOME', 2], ['BOOSTED', 0.5]], 2)"));
+    Assert.assertEquals("BOOSTED", eval("timeline([['WELCOME', 2], ['BOOSTED', 0.5]], -0.1)"));
+    Assert.assertEquals("GLO", eval("typewriter('GLOSS', 3, 2)"));
+    Assert.assertEquals("GLOSS", eval("typewriter('GLOSS', 6, 2)"));
+    Assert.assertEquals("&6&lBOOSTED", eval("flash('&6&lBOOSTED', '&fBOOSTED', 0)"));
+    Assert.assertEquals("&fBOOSTED", eval("flash('&6&lBOOSTED', '&fBOOSTED', 1)"));
+    Assert.assertEquals("GLO  ", eval("wipe('GLOSS', 3)"));
+    Assert.assertEquals("&7A&fB&7", eval("scanner('AB', '&7', '&f', 1)"));
+    Assert.assertEquals("GLOSS", eval("scramble('GLOSS', 5)"));
+    Assert.assertEquals("0500", eval("odometer(0, 999, 0.5, 4)"));
+    Assert.assertEquals("&bA&aB&bC&a", eval("wave('ABC', ['&a', '&b'], 1)"));
+  }
+
+  @Test
+  public void textAnimationFunctionsHandleUnicodeAsWholeCharacters() {
+    Assert.assertEquals("A😀 ", eval("wipe('A😀B', 2)"));
+    Assert.assertEquals("😀B ", eval("marquee('A😀B', 3, 1)"));
+  }
+
+  @Test
+  public void textAnimationFunctionsRejectUnsafeBounds() {
+    assertEvalMessage("marquee('x', 0, 0)", "marquee argument 2 must be a whole number in [1, 64]");
+    assertEvalMessage("timeline([], 0)", "timeline argument 1 must contain between 1 and 64 steps");
+    assertEvalMessage("timeline([['x', 0]], 0)", "timeline step 1 must be [text, positiveSeconds]");
+    assertEvalMessage("wave('x', [], 0)", "wave argument 2 must contain between 1 and 16 styles");
+    assertEvalMessage("odometer(0, 1, 0.5, 17)",
+        "odometer argument 4 must be a whole number in [1, 16]");
+    assertEvalMessage("marquee('&aText', 8, 0)",
+        "marquee text must be plain; put formatting outside the text argument");
+    assertEvalMessage("wave('Text', ['not-a-style'], 0)",
+        "wave styles must start with a color or reset and contain at most two formatting codes");
+  }
+
+  private static void assertEvalMessage(String source, String expected) {
+    try {
+      eval(source);
+      Assert.fail();
+    } catch (ExprException failure) {
+      Assert.assertEquals(expected, failure.getMessage());
+    }
+  }
+
   // ---------------------------------------------------------------------
   // String concatenation / integral-string coercion
   // ---------------------------------------------------------------------

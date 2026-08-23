@@ -31,7 +31,9 @@ public final class ShippedDocumentCatalog {
         "1h", "2h", "3h", "4h", "5h", "6h", "7h", "8h", "9h", "10h"), EmojiDoc::parse);
 
     public static final Entry<AnimationDoc> ANIMATIONS =
-        new Entry<>(AnimationDoc.KIND, List.of("rainbow"), AnimationDoc::parse);
+        new Entry<>(AnimationDoc.KIND, List.of(
+            "rainbow", "marquee", "timeline", "typewriter", "flash", "wipe", "scanner", "decode",
+            "odometer", "wave"), AnimationDoc::parse);
 
     public static final Entry<BoardDoc> BOARDS =
         new Entry<>(BoardDoc.KIND, List.of("default"), BoardDoc::parse);

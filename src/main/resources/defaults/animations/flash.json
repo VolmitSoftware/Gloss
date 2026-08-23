@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "revision": 1,
+  "mode": "ascend",
+  "frameIntervalMs": 1000,
+  "frames": [
+    "{{ flash('&a&lBOOSTED', '&7BOOSTED', floor(time.seconds / 2)) }}"
+  ]
+}

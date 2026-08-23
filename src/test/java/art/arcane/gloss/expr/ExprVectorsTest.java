@@ -27,7 +27,7 @@ public class ExprVectorsTest {
 
   private static final String RESOURCE_NAME = "expr_test_vectors.json";
   private static final double DELTA = 1e-9;
-  private static final int MINIMUM_VECTOR_COUNT = 40;
+  private static final int MINIMUM_VECTOR_COUNT = 134;
 
   @Test
   public void everyVectorMatchesItsExpectation() throws IOException {

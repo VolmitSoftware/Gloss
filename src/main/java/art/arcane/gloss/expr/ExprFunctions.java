@@ -57,7 +57,7 @@ public final class ExprFunctions {
       case "fixed" -> fixed(name, args);
       case "plain" -> plain(name, args);
       case "readable" -> readable(name, args);
-      default -> null;
+      default -> TextAnimationFunctions.call(name, args);
     };
   }
 
@@ -66,7 +66,7 @@ public final class ExprFunctions {
       case "clamp", "lerp", "min", "max", "floor", "ceil", "round", "abs", "mod", "pow",
           "smoothstep", "sin", "cos", "rgb", "argb", "alpha", "mix", "palette", "select",
           "number", "bar", "hex", "str", "fixed", "plain", "readable" -> true;
-      default -> false;
+      default -> TextAnimationFunctions.isSupported(name);
     };
   }
 
