@@ -3,6 +3,7 @@ package art.arcane.gloss.config;
 import art.arcane.gloss.Gloss;
 import art.arcane.volmlib.util.config.ConfigDescription;
 import art.arcane.volmlib.util.config.ConfigDoc;
+import art.arcane.volmlib.util.localization.VolmitLocales;
 
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -20,31 +21,54 @@ public final class GlossConfigFile {
     public static final String BUNDLE_MORE_FORMAT_DEFAULT = "&8+{remaining} more";
     public static final String EDITOR_SYNC_ENDPOINT_DEFAULT = "https://sync.gloss.volmitsoftware.com/v2";
 
-    @ConfigDoc("Prints the Gloss splash screen during startup.")
-    public boolean splashScreen = true;
+    @ConfigDoc("Server-wide locale used for in-game text. Blank values fall back to en_US; language.yml only overrides individual messages.")
+    public String language = VolmitLocales.ENGLISH;
 
     @ConfigDoc("Sends anonymous bStats usage metrics.")
     public boolean metrics = true;
 
+    @ConfigDoc("Prints the Gloss splash screen during startup.")
+    public boolean splashScreen = true;
+
+    @ConfigDoc("Master switches for Gloss rendering, chat, menus, previews and server-list features.")
     public Features features = new Features();
+    @ConfigDoc("Polling cadence for the shared data, configuration, locale and asset watchdog.")
     public Hotload hotload = new Hotload();
+    @ConfigDoc("Persistent and temporary hologram rendering, visibility and animation limits.")
     public Holograms holograms = new Holograms();
+    @ConfigDoc("Scoreboard sidebar refresh settings.")
     public Boards boards = new Boards();
+    @ConfigDoc("Tablist refresh settings; authored header, footer and name formats live in tablist.json.")
     public Tablist tablist = new Tablist();
+    @ConfigDoc("Player-group resolution settings.")
     public Groups groups = new Groups();
+    @ConfigDoc("Emoji permissions and chat-completion behavior.")
     public Emoji emoji = new Emoji();
+    @ConfigDoc("Placeholder and function stages of the shared text pipeline.")
     public Text text = new Text();
+    @ConfigDoc("Player chat formatting settings.")
     public Chat chat = new Chat();
+    @ConfigDoc("Global chat-bubble admission settings; authored styles live under bubbles/.")
     public ChatBubbles chatBubbles = new ChatBubbles();
+    @ConfigDoc("Floating damage and healing indicator motion, capacity and formatting.")
     public DamageIndicators damageIndicators = new DamageIndicators();
+    @ConfigDoc("Dropped-item label formatting and custom-name preservation.")
     public Drops drops = new Drops();
+    @ConfigDoc("Command feedback behavior.")
     public Commands commands = new Commands();
+    @ConfigDoc("Operator diagnostics and visual debug overlays.")
     public Debug debug = new Debug();
+    @ConfigDoc("Hosted editor and live relay connection settings.")
     public Editor editor = new Editor();
+    @ConfigDoc("Container-preview reach and base scale.")
     public Preview preview = new Preview();
+    @ConfigDoc("Shared holographic menu and panel rendering scale.")
     public Menus menus = new Menus();
+    @ConfigDoc("Custom item-provider discovery and allowlisting.")
     public Items items = new Items();
+    @ConfigDoc("Player-head profile resolution, caching and fallback rendering.")
     public PlayerHeads playerHeads = new PlayerHeads();
+    @ConfigDoc("Sampling cadence for metrics published by other Volmit plugins.")
     public Integration integration = new Integration();
 
     public static final class Features {
@@ -253,6 +277,7 @@ public final class GlossConfigFile {
         @ConfigDoc("Base URL of the hosted web editor; must be a plain http(s) link or the default is used.")
         public String builderUrl = BUILDER_URL_DEFAULT;
 
+        @ConfigDoc("Live web-editor relay authentication, polling and project limits.")
         public Sync sync = new Sync();
 
         public static final class Sync {
@@ -320,6 +345,7 @@ public final class GlossConfigFile {
     }
 
     public void normalize() {
+        language = language == null || language.isBlank() ? VolmitLocales.ENGLISH : language.trim();
         if (features == null) {
             features = new Features();
         }

@@ -401,8 +401,8 @@ public final class HologramService {
                 try {
                     entry.getValue().run();
                 } catch (Throwable failure) {
-                    plugin.getLogger().log(Level.WARNING,
-                        "Hologram viewer refresh failed for " + playerId, failure);
+                    Gloss.logExceptionStackThrottled(false, "hologram-viewer-refresh", failure,
+                        "Hologram viewer refresh failed for %s.", playerId);
                 }
             }
             queue.scheduled.set(false);
@@ -483,9 +483,8 @@ public final class HologramService {
                 store.write(mutation.id(), mutation.doc());
             }
         } catch (IOException failure) {
-            plugin.getLogger().log(Level.WARNING,
-                "Failed to " + (mutation.kind() == FileMutationKind.DELETE ? "delete" : "save")
-                    + " hologram " + mutation.id(), failure);
+            Gloss.logExceptionStack(false, failure, "Failed to %s hologram %s.",
+                mutation.kind() == FileMutationKind.DELETE ? "delete" : "save", mutation.id());
         }
     }
 
@@ -504,11 +503,10 @@ public final class HologramService {
                 return;
             }
             fileExecutor.shutdownNow();
-            plugin.getLogger().log(Level.WARNING,
-                "Timed out waiting for hologram file writes; interrupted the IO worker with "
-                    + pendingFileMutations.size() + " coalesced mutation(s) still pending.");
+            Gloss.warn("Timed out waiting for hologram file writes; interrupted the IO worker with %d "
+                + "coalesced mutation(s) still pending.", pendingFileMutations.size());
             if (!fileExecutor.awaitTermination(1L, TimeUnit.SECONDS)) {
-                plugin.getLogger().log(Level.SEVERE,
+                Gloss.log(Level.SEVERE,
                     "Gloss hologram IO worker did not stop after interruption; it is a daemon and may outlive cleanup.");
             }
         } catch (InterruptedException interrupted) {
@@ -536,24 +534,44 @@ public final class HologramService {
     }
 
     private void retirePersistentHolograms(List<PersistentHologram> retiring, String operation) {
+        Throwable firstFailure = null;
+        int failures = 0;
         for (PersistentHologram hologram : retiring) {
             try {
                 hologram.despawnAll();
             } catch (Throwable failure) {
-                plugin.getLogger().log(Level.WARNING,
-                    "Failed to retire persistent hologram " + hologram.id() + " during " + operation, failure);
+                failures++;
+                if (firstFailure == null) {
+                    firstFailure = failure;
+                } else {
+                    firstFailure.addSuppressed(failure);
+                }
             }
+        }
+        if (firstFailure != null) {
+            Gloss.logExceptionStack(false, firstFailure,
+                "Failed to retire %d of %d persistent holograms during %s.", failures, retiring.size(), operation);
         }
     }
 
     private void retireTemporaryHolograms(List<TemporaryHologramDisplay> retiring, String operation) {
+        Throwable firstFailure = null;
+        int failures = 0;
         for (TemporaryHologramDisplay temporary : retiring) {
             try {
                 temporary.destroy();
             } catch (Throwable failure) {
-                plugin.getLogger().log(Level.WARNING,
-                    "Failed to retire temporary hologram " + temporary.id() + " during " + operation, failure);
+                failures++;
+                if (firstFailure == null) {
+                    firstFailure = failure;
+                } else {
+                    firstFailure.addSuppressed(failure);
+                }
             }
+        }
+        if (firstFailure != null) {
+            Gloss.logExceptionStack(false, firstFailure,
+                "Failed to retire %d of %d temporary holograms during %s.", failures, retiring.size(), operation);
         }
     }
 
@@ -815,7 +833,8 @@ public final class HologramService {
             return;
         }
 
-        Gloss.warn("Hologram hot reload could not reach the server thread; the change will be retried.");
+        Gloss.warnThrottled("hologram-hotload-scheduling",
+            "Hologram hot reload could not reach the server thread; the change will be retried.");
     }
 
     /**

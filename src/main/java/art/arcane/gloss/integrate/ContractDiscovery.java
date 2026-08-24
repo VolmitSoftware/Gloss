@@ -8,7 +8,6 @@ import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.logging.Level;
 
 public final class ContractDiscovery {
     private final Set<String> warned;
@@ -56,8 +55,6 @@ public final class ContractDiscovery {
             return;
         }
 
-        String message = failure.getMessage();
-        Gloss.log(Level.WARNING, "Integration bridge: %s is not adaptable: %s%s", signature,
-            failure.getClass().getSimpleName(), message == null || message.isEmpty() ? "" : ": " + message);
+        Gloss.logExceptionStack(false, failure, "Integration bridge: %s is not adaptable.", signature);
     }
 }

@@ -275,7 +275,7 @@ public final class DamageIndicatorsService implements Listener {
             retained = true;
             GlossTelemetry.countIndicatorSpawn();
         } catch (RuntimeException failure) {
-            Gloss.logExceptionStack(false, failure,
+            Gloss.logExceptionStackThrottled(false, "damage-indicator-create", failure,
                 "Could not create a damage indicator for entity %s.", target.getUniqueId());
         } finally {
             if (!retained) {
@@ -398,7 +398,8 @@ public final class DamageIndicatorsService implements Listener {
         try {
             hologram.destroy();
         } catch (Throwable failure) {
-            Gloss.logExceptionStack(false, failure, "Could not clean up a failed damage indicator spawn.");
+            Gloss.logExceptionStackThrottled(false, "damage-indicator-cleanup", failure,
+                "Could not clean up a failed damage indicator spawn.");
         }
     }
 
@@ -428,7 +429,8 @@ public final class DamageIndicatorsService implements Listener {
                 }
                 return true;
             } catch (Throwable failure) {
-                Gloss.logExceptionStack(false, failure, "Could not destroy a damage indicator.");
+                Gloss.logExceptionStackThrottled(false, "damage-indicator-destroy", failure,
+                    "Could not destroy a damage indicator.");
                 return false;
             } finally {
                 admission.close();

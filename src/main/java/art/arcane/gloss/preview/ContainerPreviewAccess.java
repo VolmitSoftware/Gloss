@@ -23,7 +23,6 @@ import org.bukkit.util.BoundingBox;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.logging.Level;
 
 public final class ContainerPreviewAccess {
   public static final String PERMISSION = "gloss.preview";
@@ -236,11 +235,8 @@ public final class ContainerPreviewAccess {
     if (!LOCK_FAILURE_LOGGED.compareAndSet(false, true)) {
       return;
     }
-    Gloss instance = Gloss.instance;
-    if (instance != null) {
-      instance.getLogger().log(Level.SEVERE,
-          "Container lock access could not be evaluated. Locked container previews will remain hidden.", throwable);
-    }
+    Gloss.logExceptionStack(true, throwable,
+        "Container lock access could not be evaluated. Locked container previews will remain hidden.");
   }
 
   private static Block connectedChest(Block block) {

@@ -281,7 +281,7 @@ final class RealDropService {
             } catch (RuntimeException | Error cleanupFailure) {
                 failure.addSuppressed(cleanupFailure);
             }
-            Gloss.logExceptionStack(false, failure,
+            Gloss.logExceptionStackThrottled(false, "real-drop-create", failure,
                 "Could not create a real-drop presentation for item %s.", item.getUniqueId());
             if (failure instanceof Error error) {
                 throw error;
@@ -573,7 +573,7 @@ final class RealDropService {
     private void failState(State state, RuntimeException failure) {
         state.closed = true;
         teardownOwned(state);
-        Gloss.logExceptionStack(false, failure,
+        Gloss.logExceptionStackThrottled(false, "real-drop-update", failure,
             "Could not update a real-drop presentation for item %s.", state.item.getUniqueId());
     }
 

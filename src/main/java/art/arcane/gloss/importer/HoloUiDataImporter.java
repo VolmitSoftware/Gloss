@@ -28,7 +28,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.Consumer;
-import java.util.logging.Level;
 import java.util.stream.Stream;
 
 /**
@@ -43,7 +42,7 @@ import java.util.stream.Stream;
  * the rewritten bytes are identical to a shipped default (those re-extract anyway; the receipt
  * disposition detail notes the rewrite), {@code preview-scales.json} and
  * {@code language.yml} copy verbatim, and {@code settings.json} overlays its flat keys onto the
- * just-loaded {@link GlossConfigFile} before re-serializing {@code config.toml} through the loader
+ * just-loaded {@link GlossConfigFile} before re-serializing {@code gloss.toml} through the loader
  * so comments regenerate. Editor sync sessions, transactions, and backups are secrets and never
  * copy; {@code custom-items.json} is regenerable and never copies either.
  */
@@ -398,7 +397,7 @@ public final class HoloUiDataImporter {
                 files.add(candidate);
             });
         } catch (IOException failure) {
-            Gloss.log(Level.WARNING, "holoui import: unable to scan %s: %s", rootPath, detail(failure));
+            Gloss.logExceptionStack(false, failure, "HoloUi import could not scan %s.", rootPath);
         }
         return files;
     }
@@ -427,12 +426,12 @@ public final class HoloUiDataImporter {
             Files.writeString(receiptFile().toPath(),
                 RECEIPT_GSON.toJson(receipt) + System.lineSeparator(), StandardCharsets.UTF_8);
         } catch (IOException failure) {
-            Gloss.log(Level.WARNING, "holoui import: unable to write %s: %s", RECEIPT_FILE_NAME, detail(failure));
+            Gloss.logExceptionStack(false, failure, "HoloUi import could not write %s.", RECEIPT_FILE_NAME);
         }
     }
 
     private void logSummary(File source, List<HoloUiImportEntry> entries) {
-        Gloss.log(Level.INFO, "holoui import from %s: %d entries", source.getAbsolutePath(), entries.size());
+        Gloss.info("HoloUi import from %s: %d entries.", source.getAbsolutePath(), entries.size());
         Map<String, EnumMap<HoloUiImportDisposition, Integer>> byCategory = new LinkedHashMap<>();
         for (HoloUiImportEntry entry : entries) {
             byCategory.computeIfAbsent(entry.category(), key -> new EnumMap<>(HoloUiImportDisposition.class))
@@ -443,7 +442,7 @@ public final class HoloUiDataImporter {
             for (Map.Entry<HoloUiImportDisposition, Integer> count : category.getValue().entrySet()) {
                 line.append(' ').append(count.getValue()).append(' ').append(count.getKey().id());
             }
-            Gloss.log(Level.INFO, "  %s", line);
+            Gloss.info("HoloUi import: %s", line);
         }
     }
 

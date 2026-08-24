@@ -281,7 +281,8 @@ public final class MenuSessionManager {
       try {
         boardTarget.dispatch(trigger);
       } catch (Exception ex) {
-        Gloss.logExceptionStack(false, ex, "Board component %s of board %s threw while handling a click from %s.",
+        Gloss.logExceptionStackThrottled(false, "panel-component-click", ex,
+            "Board component %s of board %s threw while handling a click from %s.",
             boardTarget.component().getId(), boardTarget.view().definition().id(), player.getName());
       }
       return true;
@@ -424,7 +425,8 @@ public final class MenuSessionManager {
     try {
       component.onClick(trigger);
     } catch (Exception ex) {
-      Gloss.logExceptionStack(false, ex, "Menu component %s of menu %s threw while handling a click from %s.",
+      Gloss.logExceptionStackThrottled(false, "menu-component-click", ex,
+          "Menu component %s of menu %s threw while handling a click from %s.",
           component.getId(), snapshot.menuId(), player.getName());
     }
 
@@ -750,7 +752,8 @@ public final class MenuSessionManager {
         }
       });
     } catch (Exception ex) {
-      Gloss.logExceptionStack(false, ex, "Failed to manage inventory preview for %s.", p.getName());
+      Gloss.logExceptionStackThrottled(false, "container-preview-update", ex,
+          "Failed to manage inventory preview for %s.", p.getName());
     }
   }
 
@@ -783,7 +786,8 @@ public final class MenuSessionManager {
       }
     } catch (RuntimeException failure) {
       retired.run();
-      Gloss.logExceptionStack(false, failure, "Failed to schedule preview discovery for %s.", player.getName());
+      Gloss.logExceptionStackThrottled(false, "container-preview-scheduling", failure,
+          "Failed to schedule preview discovery for %s.", player.getName());
     }
   }
 

@@ -18,7 +18,7 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.util.Objects;
 
 public final class GlossConfigLoader {
-    public static final String FILE_NAME = "config.toml";
+    public static final String FILE_NAME = "gloss.toml";
 
     private static final String SOURCE_TAG = "gloss";
     private static final long MAX_CONFIG_BYTES = 2L * 1024L * 1024L;
@@ -150,7 +150,7 @@ public final class GlossConfigLoader {
             new GlossConfigFile(),
             overwriteOnReadFailure,
             SOURCE_TAG,
-            "Created config.toml with defaults.",
+            "Created gloss.toml with defaults.",
             GlossConfigFile::normalize,
             true,
             null,

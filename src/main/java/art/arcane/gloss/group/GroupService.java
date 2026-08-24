@@ -140,8 +140,8 @@ public final class GroupService implements Listener {
             vault = new VaultPermissionHook();
         } catch (Throwable failure) {
             vault = null;
-            Gloss.warn("Vault permission hook failed to initialize: " + failure.getClass().getSimpleName()
-                + (failure.getMessage() == null ? "" : ": " + failure.getMessage()));
+            Gloss.logExceptionStack(false, failure,
+                "Vault permission hook failed to initialize; primary groups are unavailable.");
         }
     }
 

@@ -128,7 +128,7 @@
       "drops":
         "bundle_more": "+{count} נוספים"
       "items":
-        "disabled": "&7[&bGloss&7]: &7Custom items are disabled. Set &fcustomItems&7 to true in config.toml."
+        "disabled": "&7[&bGloss&7]: &7Custom items are disabled. Set &fcustomItems&7 to true in gloss.toml."
         "status":
           "header": "Custom Items"
           "summary": "{active}/{total} providers active"
@@ -528,5 +528,5 @@
   "command.import.holoui.missing": "&8[&dGloss&8] &cלא נמצאה תיקיית נתונים של holoui לצד תיקיית הנתונים של Gloss."
   "command.import.holoui.done": "&8[&dGloss&8] &aייבוא HoloUi הסתיים: &f{copied}&a הועתקו, &f{skipped}&a דולגו, &f{overlaid}&a מפתחות תצורה, &f{errors}&a שגיאות."
   "command.import.legacy.done": "&8[&dGloss&8] &aההעברה מדור קודם הסתיימה: &f{migrated}&a הועברו, &f{absorbed}&a נקלטו, &f{overlaid}&a מפתחות תצורה, &f{errors}&a שגיאות."
-  "command.import.config_unreadable": "&8[&dGloss&8] &cלא ניתן לטעון את config.toml: &f{reason}"
+  "command.import.config_unreadable": "&8[&dGloss&8] &cלא ניתן לטעון את gloss.toml: &f{reason}"
   "command.reload.done": "&8[&dGloss&8] &aהתצורה והשירותים של Gloss נטענו מחדש."

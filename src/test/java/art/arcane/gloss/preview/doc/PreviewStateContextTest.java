@@ -1,5 +1,6 @@
 package art.arcane.gloss.preview.doc;
 
+import art.arcane.gloss.locale.GlossMessages;
 import art.arcane.gloss.api.PreviewStateProvider;
 import art.arcane.gloss.api.PreviewStateProviders;
 import art.arcane.gloss.expr.ExprEvaluator;
@@ -650,6 +651,21 @@ public class PreviewStateContextTest {
     assertEquals(List.of("item", "percent"), new ArrayList<>(arguments.names()));
     assertEquals("Iron Ore", arguments.require("item").value());
     assertEquals("42", arguments.require("percent").value());
+  }
+
+  @Test
+  public void langArgumentsDropSurplusValuesForKnownKeys() {
+    MessageArgs zeroPlaceholderArguments = PreviewStateContext.langArguments(
+        GlossMessages.THEME_TITLE_BARREL,
+        List.of(GlossMessages.THEME_TITLE_BARREL.id(), "Barrel")
+    );
+    MessageArgs extraPlaceholderArguments = PreviewStateContext.langArguments(
+        GlossMessages.PREVIEW_SMELTING_ITEM,
+        List.of(GlossMessages.PREVIEW_SMELTING_ITEM.id(), "Iron Ore", 42.0D, "spare")
+    );
+
+    assertTrue(zeroPlaceholderArguments.names().isEmpty());
+    assertEquals(List.of("item", "percent"), new ArrayList<>(extraPlaceholderArguments.names()));
   }
 
   /** An id the catalog does not know has no placeholders, so its arguments fall back to position. */

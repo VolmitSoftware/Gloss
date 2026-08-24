@@ -31,7 +31,6 @@ import java.nio.file.FileAlreadyExistsException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CancellationException;
-import java.util.logging.Level;
 
 @Director(name = "menu", aliases = {"menus"}, description = "Create, open and edit hologram menus", descriptionKey = "command.help.menu")
 public class CommandGlossMenu {
@@ -560,7 +559,7 @@ public class CommandGlossMenu {
         ? SchedulerUtils.runEntity(plugin, player, task)
         : SchedulerUtils.runGlobal(plugin, task);
     if (!accepted) {
-      Gloss.log(java.util.logging.Level.WARNING,
+      Gloss.warnThrottled("menu-feedback-scheduling",
           "Unable to schedule editor sync feedback for %s.", sender.getName());
     }
   }
@@ -676,7 +675,8 @@ public class CommandGlossMenu {
         ? SchedulerUtils.runEntity(plugin, player, feedback)
         : SchedulerUtils.runGlobal(plugin, feedback);
     if (!accepted) {
-      Gloss.log(Level.WARNING, "Unable to schedule hologram creation feedback for %s.",
+      Gloss.warnThrottled("hologram-command-feedback-scheduling",
+          "Unable to schedule hologram creation feedback for %s.",
           sender.getName());
     }
   }

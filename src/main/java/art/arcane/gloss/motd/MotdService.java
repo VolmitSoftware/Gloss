@@ -102,8 +102,7 @@ public final class MotdService {
         } catch (Throwable failure) {
             if (!failureLogged) {
                 failureLogged = true;
-                Gloss.warn("MOTD render failed: " + failure.getClass().getSimpleName()
-                    + (failure.getMessage() == null ? "" : ": " + failure.getMessage()));
+                Gloss.logExceptionStack(false, failure, "MOTD render failed; keeping the server default.");
             }
         }
     }

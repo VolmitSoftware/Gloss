@@ -35,7 +35,8 @@ public final class ApiEvents {
     try {
       Bukkit.getPluginManager().callEvent(event);
     } catch (Throwable error) {
-      Gloss.logExceptionStack(false, error, "Failed to dispatch %s.", event.getEventName());
+      Gloss.logExceptionStackThrottled(false, "api-event-dispatch", error,
+          "Failed to dispatch %s.", event.getEventName());
       return false;
     }
 

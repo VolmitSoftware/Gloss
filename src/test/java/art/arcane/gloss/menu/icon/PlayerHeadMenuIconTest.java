@@ -226,10 +226,11 @@ public class PlayerHeadMenuIconTest {
     GlossConfig defaults = GlossConfig.current();
     GlossConfig.PlayerHeads heads = defaults.playerHeads();
     return new GlossConfig(
+        defaults.language(), defaults.metrics(), defaults.splashScreen(),
         defaults.holograms(), defaults.boards(), defaults.tablist(), defaults.emoji(), defaults.animations(),
         defaults.chat(), defaults.text(), defaults.bubbles(), defaults.indicators(), defaults.drops(),
         defaults.realDrops(), defaults.motd(), defaults.groups(), defaults.hotload(), defaults.commands(),
-        defaults.splashScreen(), defaults.metrics(), defaults.menus(), defaults.panels(), defaults.previews(),
+        defaults.menus(), defaults.panels(), defaults.previews(),
         defaults.editorSync(), defaults.debug(), defaults.customItems(),
         new GlossConfig.PlayerHeads(enabled, heads.cacheMinutes(), heads.unknownCacheMinutes(),
             heads.maxCachedProfiles(), heads.unknownFallbackItem()),

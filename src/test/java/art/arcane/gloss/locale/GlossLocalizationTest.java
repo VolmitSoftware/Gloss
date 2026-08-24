@@ -19,9 +19,13 @@ import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.logging.Handler;
+import java.util.logging.LogRecord;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -34,13 +38,28 @@ public class GlossLocalizationTest {
   @Rule
   public TemporaryFolder temporaryFolder = new TemporaryFolder();
 
+  private final List<LogRecord> logRecords = new ArrayList<>();
   private GlossLocalization localization;
 
   @Before
   public void setUp() throws Exception {
     Logger logger = Logger.getAnonymousLogger();
     logger.setUseParentHandlers(false);
-    localization = new GlossLocalization(temporaryFolder.newFolder(), logger);
+    logger.addHandler(new Handler() {
+      @Override
+      public void publish(LogRecord record) {
+        logRecords.add(record);
+      }
+
+      @Override
+      public void flush() {
+      }
+
+      @Override
+      public void close() {
+      }
+    });
+    localization = new GlossLocalization(temporaryFolder.newFolder(), logger, VolmitLocales.ENGLISH);
   }
 
   @After
@@ -49,23 +68,19 @@ public class GlossLocalizationTest {
   }
 
   @Test
-  public void generatesSparseLocaleSelectorWithEnglishInTheTypedCatalog() throws Exception {
+  public void generatesSparseOverrideFileWithEnglishInTheTypedCatalog() throws Exception {
     YamlConfiguration yaml = loadLanguageFile();
 
-    assertEquals("en_US", yaml.getString("locale"));
-    assertFalse(yaml.contains("messages"));
+    assertFalse(yaml.contains("locale"));
+    assertTrue(yaml.isConfigurationSection("messages"));
+    assertTrue(Files.readString(localization.languageFile().toPath()).contains("language key in gloss.toml"));
     assertEquals("Open a menu by id, or show the menu list when set to *", GlossMessages.HELP_MENU_OPEN.english());
   }
 
   @Test
   public void everyBundledLocaleFullyCoversTheTypedCatalog() throws Exception {
     for (String locale : VolmitLocales.nonEnglish()) {
-      YamlConfiguration yaml = loadLanguageFile();
-      yaml.set("locale", locale);
-      yaml.set("messages", null);
-      yaml.save(localization.languageFile());
-
-      assertTrue(locale, localization.reload());
+      assertTrue(locale, localization.selectLocale(locale));
       for (MessageKey key : localization.snapshot().catalog().keys()) {
         assertEquals(locale + ":" + key.id(), locale, localization.snapshot().sourceLocale(key));
       }
@@ -117,11 +132,10 @@ public class GlossLocalizationTest {
   @Test
   public void appliesExternalOverrideWithNamedArguments() throws Exception {
     YamlConfiguration yaml = loadLanguageFile();
-    yaml.set("locale", "fr_FR");
     yaml.set("messages." + GlossMessages.MENU_UNAVAILABLE.id(), "&cMenu indisponible: {menu}");
     yaml.save(localization.languageFile());
 
-    assertTrue(localization.reload());
+    assertTrue(localization.selectLocale("fr_FR"));
     String rendered = localization.legacy(
         GlossMessages.MENU_UNAVAILABLE,
         MessageArgs.builder().untrusted("menu", "market").build()
@@ -129,6 +143,36 @@ public class GlossLocalizationTest {
 
     assertEquals(ChatColor.RED + "Menu indisponible: market", rendered);
     assertEquals("fr_FR", localization.activeLocale());
+  }
+
+  @Test
+  public void customLocaleUsesOverridesOverEnglishWithoutABundledCatalog() throws Exception {
+    YamlConfiguration yaml = loadLanguageFile();
+    yaml.set("messages." + GlossMessages.MENU_UNAVAILABLE.id(), "Custom {menu}");
+    yaml.save(localization.languageFile());
+
+    assertTrue(localization.selectLocale("pirate_SEA"));
+    assertEquals("pirate_SEA", localization.activeLocale());
+    assertEquals("Custom market", localization.text(
+        GlossMessages.MENU_UNAVAILABLE,
+        MessageArgs.builder().untrusted("menu", "market").build()
+    ));
+    assertEquals(GlossMessages.MENU_CLOSED.english(), localization.text(GlossMessages.MENU_CLOSED));
+  }
+
+  @Test
+  public void rejectsStaleLanguageFileLocaleSelector() throws Exception {
+    YamlConfiguration yaml = loadLanguageFile();
+    yaml.set("locale", "fr_FR");
+    yaml.save(localization.languageFile());
+
+    assertFalse(localization.reload());
+    assertEquals("en_US", localization.activeLocale());
+    assertTrue(logRecords.stream().anyMatch(record -> record.getThrown() != null
+        && record.getThrown().getMessage().contains("remove its top-level locale key")
+        && record.getThrown().getMessage().contains("set language in plugins/Gloss/gloss.toml")
+        && record.getThrown().getMessage().contains("/gloss reload")
+        && record.getThrown().getMessage().contains("does not migrate the obsolete locale key")));
   }
 
   @Test
@@ -154,7 +198,8 @@ public class GlossLocalizationTest {
     AtomicLong clock = new AtomicLong();
     Logger logger = Logger.getAnonymousLogger();
     logger.setUseParentHandlers(false);
-    localization = new GlossLocalization(temporaryFolder.newFolder("clocked-localization"), logger, clock::get);
+    localization = new GlossLocalization(
+        temporaryFolder.newFolder("clocked-localization"), logger, VolmitLocales.ENGLISH, clock::get);
     YamlConfiguration yaml = loadLanguageFile();
     yaml.set("messages." + GlossMessages.MENU_UNAVAILABLE.id(), "Alpha {menu}");
     yaml.save(localization.languageFile());

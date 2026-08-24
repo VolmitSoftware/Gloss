@@ -23,7 +23,6 @@ import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.concurrent.CompletionException;
-import java.util.logging.Level;
 
 @Director(name = "sync", description = "Manage active web editor sync sessions",
     descriptionKey = "command.help.sync")
@@ -218,7 +217,8 @@ public final class CommandGlossSync {
         ? SchedulerUtils.runEntity(plugin(), player, task)
         : SchedulerUtils.runGlobal(plugin(), task);
     if (!accepted) {
-      Gloss.log(Level.WARNING, "Unable to schedule editor sync feedback for %s.", sender.getName());
+      Gloss.warnThrottled("editor-sync-feedback-scheduling",
+          "Unable to schedule editor sync feedback for %s.", sender.getName());
     }
   }
 

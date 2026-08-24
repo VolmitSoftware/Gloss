@@ -212,7 +212,7 @@ public final class TextExpressionRenderer {
             return ExprEvaluator.string(expression, scope);
         } catch (RuntimeException failure) {
             if (failed.add(source)) {
-                Gloss.warn("Text expression {{ " + source + " }} failed: " + failure.getMessage());
+                Gloss.logExceptionStack(false, failure, "Text expression {{ %s }} failed.", source);
             }
             return null;
         }

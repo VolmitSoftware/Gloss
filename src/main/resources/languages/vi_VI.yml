@@ -128,7 +128,7 @@
       "drops":
         "bundle_more": "+{count} loại nữa"
       "items":
-        "disabled": "&7[&bGloss&7]: &7Custom items are disabled. Set &fcustomItems&7 to true in config.toml."
+        "disabled": "&7[&bGloss&7]: &7Custom items are disabled. Set &fcustomItems&7 to true in gloss.toml."
         "status":
           "header": "Custom Items"
           "summary": "{active}/{total} providers active"
@@ -528,5 +528,5 @@
   "command.import.holoui.missing": "&8[&dGloss&8] &cKhông tìm thấy thư mục dữ liệu holoui bên cạnh thư mục dữ liệu Gloss."
   "command.import.holoui.done": "&8[&dGloss&8] &aNhập HoloUi hoàn tất: &f{copied}&a đã sao chép, &f{skipped}&a đã bỏ qua, &f{overlaid}&a khóa cấu hình, &f{errors}&a lỗi."
   "command.import.legacy.done": "&8[&dGloss&8] &aDi chuyển dữ liệu cũ hoàn tất: &f{migrated}&a đã di chuyển, &f{absorbed}&a đã hấp thụ, &f{overlaid}&a khóa cấu hình, &f{errors}&a lỗi."
-  "command.import.config_unreadable": "&8[&dGloss&8] &cKhông thể tải config.toml: &f{reason}"
+  "command.import.config_unreadable": "&8[&dGloss&8] &cKhông thể tải gloss.toml: &f{reason}"
   "command.reload.done": "&8[&dGloss&8] &aĐã tải lại cấu hình và dịch vụ của Gloss."

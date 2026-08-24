@@ -46,14 +46,14 @@ Java 25 is required. The local `VolmLib` sibling checkout is resolved automatica
 
 ## Data layout
 
-Gloss never creates a folder it has nothing to put in. Only `config.toml` and the shipped defaults
-of enabled features exist after a first boot; every other folder appears the moment something is
-written into it, and stays gone otherwise.
+Gloss never creates a folder it has nothing to put in. Only the commented `gloss.toml`, the sparse
+`language.yml` message override, and the shipped defaults of enabled features exist after a first
+boot; every other folder appears the moment something is written into it, and stays gone otherwise.
 
 ```
 plugins/Gloss/
-├── config.toml                      always
-├── language.yml                     always
+├── gloss.toml                       language, metrics and every runtime control; always
+├── language.yml                     sparse message overrides only; always
 ├── tablist.json                     shipped default, while tablist is enabled
 ├── motd.json                        shipped default, while motd is enabled (off by default)
 ├── boards/<id>.json                 2 shipped defaults, while boards are enabled

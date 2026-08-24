@@ -268,7 +268,7 @@ class LegacyGlossDataImporterTest {
         assertEquals("&e{count}x {type}", config.drops.nameFormat);
 
         String toml = read(GlossConfigLoader.FILE_NAME);
-        assertTrue(toml.contains("stackDistance = 0.5"), "overlay must re-serialize config.toml");
+        assertTrue(toml.contains("stackDistance = 0.5"), "overlay must re-serialize gloss.toml");
 
         TablistDoc tablist = TablistDoc.parse("tablist.json", read("tablist.json"));
         assertFalse(tablist.useHeaderFooter());

@@ -29,7 +29,7 @@ public final class TextArtRenderer {
         try {
             return renderRows(text.trim(), fontSize(scale), Math.max(1, maxWidth));
         } catch (Throwable failure) {
-            Gloss.warn("Text art rasterization failed: " + failure.getClass().getSimpleName());
+            Gloss.logExceptionStack(false, failure, "Text art rasterization failed.");
             return List.of();
         }
     }

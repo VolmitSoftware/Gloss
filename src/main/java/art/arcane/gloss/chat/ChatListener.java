@@ -33,7 +33,8 @@ final class ChatListener implements Listener {
             try {
                 hook.accept(sender, message);
             } catch (Throwable failure) {
-                Gloss.warn("Chat hook failed: " + failure);
+                Gloss.logExceptionStackThrottled(false, "chat-hook", failure,
+                    "Chat hook %s failed for %s.", hook.getClass().getName(), sender.getName());
             }
         }
     }

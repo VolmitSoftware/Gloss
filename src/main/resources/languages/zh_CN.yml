@@ -128,7 +128,7 @@
       "drops":
         "bundle_more": "另有 {count} 种"
       "items":
-        "disabled": "&7[&bGloss&7]: &7Custom items are disabled. Set &fcustomItems&7 to true in config.toml."
+        "disabled": "&7[&bGloss&7]: &7Custom items are disabled. Set &fcustomItems&7 to true in gloss.toml."
         "status":
           "header": "Custom Items"
           "summary": "{active}/{total} providers active"
@@ -528,5 +528,5 @@
   "command.import.holoui.missing": "&8[&dGloss&8] &c在 Gloss 数据文件夹旁未找到 holoui 数据文件夹。"
   "command.import.holoui.done": "&8[&dGloss&8] &aHoloUi 导入完成: 复制 &f{copied}&a 个，跳过 &f{skipped}&a 个，&f{overlaid}&a 个配置键，&f{errors}&a 个错误。"
   "command.import.legacy.done": "&8[&dGloss&8] &a旧版迁移完成: 迁移 &f{migrated}&a 个，吸收 &f{absorbed}&a 个，&f{overlaid}&a 个配置键，&f{errors}&a 个错误。"
-  "command.import.config_unreadable": "&8[&dGloss&8] &cconfig.toml 无法加载: &f{reason}"
+  "command.import.config_unreadable": "&8[&dGloss&8] &cgloss.toml 无法加载: &f{reason}"
   "command.reload.done": "&8[&dGloss&8] &a已重新加载 Gloss 配置和服务。"

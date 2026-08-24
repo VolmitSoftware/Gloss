@@ -23,7 +23,7 @@ public final class MetricsRuntime {
                 () -> String.valueOf(plugin.cfg().boards().enabled())));
             return new MetricsRuntime(metrics);
         } catch (Throwable failure) {
-            Gloss.warn("Metrics failed to start: " + failure.getClass().getSimpleName());
+            Gloss.logExceptionStack(false, failure, "Metrics failed to start.");
             return null;
         }
     }
@@ -32,7 +32,7 @@ public final class MetricsRuntime {
         try {
             metrics.shutdown();
         } catch (Throwable failure) {
-            Gloss.verbose("Metrics shutdown failed: " + failure.getClass().getSimpleName());
+            Gloss.logExceptionStack(false, failure, "Metrics failed to shut down cleanly.");
         }
     }
 }

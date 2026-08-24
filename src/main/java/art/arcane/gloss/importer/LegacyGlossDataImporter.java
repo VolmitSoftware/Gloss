@@ -56,7 +56,7 @@ import java.util.stream.Stream;
  * mode + frameIntervalMs), {@code groups/*.yml} (tablist-name merges into tablist.json
  * nameFormats, default-board appends the group onto its board's groups; the folder is fully
  * absorbed and MOVES into the backup), and a legacy {@code config.yml} (mechanics overlay onto
- * config.toml, content keys into their documents, then renamed {@code config.yml.imported}).
+ * gloss.toml, content keys into their documents, then renamed {@code config.yml.imported}).
  */
 public final class LegacyGlossDataImporter {
     public static final String BACKUP_DIRECTORY_NAME = "import-backups";
@@ -592,7 +592,7 @@ public final class LegacyGlossDataImporter {
             if (active == 0) {
                 continue;
             }
-            StringBuilder line = new StringBuilder("legacy import: ").append(kind.getKey());
+            StringBuilder line = new StringBuilder("Legacy import: ").append(kind.getKey());
             for (Status status : Status.values()) {
                 if (counts[status.ordinal()] > 0) {
                     line.append(' ').append(counts[status.ordinal()]).append(' ')

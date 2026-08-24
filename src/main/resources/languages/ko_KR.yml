@@ -128,7 +128,7 @@
       "drops":
         "bundle_more": "외 {count}종"
       "items":
-        "disabled": "&7[&bGloss&7]: &7Custom items are disabled. Set &fcustomItems&7 to true in config.toml."
+        "disabled": "&7[&bGloss&7]: &7Custom items are disabled. Set &fcustomItems&7 to true in gloss.toml."
         "status":
           "header": "Custom Items"
           "summary": "{active}/{total} providers active"
@@ -528,5 +528,5 @@
   "command.import.holoui.missing": "&8[&dGloss&8] &cGloss 데이터 폴더 옆에 holoui 데이터 폴더가 없습니다."
   "command.import.holoui.done": "&8[&dGloss&8] &aHoloUi 가져오기 완료: 복사 &f{copied}&a개, 건너뜀 &f{skipped}&a개, 설정 키 &f{overlaid}&a개, 오류 &f{errors}&a개."
   "command.import.legacy.done": "&8[&dGloss&8] &a레거시 마이그레이션 완료: 마이그레이션 &f{migrated}&a개, 흡수 &f{absorbed}&a개, 설정 키 &f{overlaid}&a개, 오류 &f{errors}&a개."
-  "command.import.config_unreadable": "&8[&dGloss&8] &cconfig.toml을 불러올 수 없습니다: &f{reason}"
+  "command.import.config_unreadable": "&8[&dGloss&8] &cgloss.toml을 불러올 수 없습니다: &f{reason}"
   "command.reload.done": "&8[&dGloss&8] &aGloss 설정 및 서비스를 다시 불러왔습니다."

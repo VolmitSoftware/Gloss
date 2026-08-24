@@ -32,7 +32,6 @@ import java.util.Arrays;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
-import java.util.logging.Level;
 
 @Director(name = "import", description = "Migrate legacy holograms without modifying source files",
     descriptionKey = "command.help.import")
@@ -301,7 +300,8 @@ public final class CommandGlossImport {
         ? SchedulerUtils.runEntity(Gloss.instance, player, feedback)
         : SchedulerUtils.runGlobal(Gloss.instance, feedback);
     if (!accepted) {
-      Gloss.log(Level.WARNING, "Unable to schedule legacy import feedback for %s.", sender.getName());
+      Gloss.warnThrottled("legacy-import-feedback-scheduling",
+          "Unable to schedule legacy import feedback for %s.", sender.getName());
     }
   }
 

@@ -56,20 +56,22 @@ public final class GlossLocalization implements AutoCloseable {
   private final LocalizationManager manager;
   private final LongSupplier clock;
   private volatile FileWatcher watcher;
+  private volatile String configuredLocale;
   private volatile String activeLocale;
   private volatile String observedHash;
   private volatile LanguageSnapshot pendingAutomaticSnapshot;
   private volatile long nextContentReconciliationNanos;
 
-  public GlossLocalization(File dataFolder, Logger logger) {
-    this(dataFolder, logger, System::nanoTime);
+  public GlossLocalization(File dataFolder, Logger logger, String configuredLocale) {
+    this(dataFolder, logger, configuredLocale, System::nanoTime);
   }
 
-  GlossLocalization(File dataFolder, Logger logger, LongSupplier clock) {
+  GlossLocalization(File dataFolder, Logger logger, String configuredLocale, LongSupplier clock) {
     this.languageFile = new File(dataFolder, "language.yml");
     this.logger = logger;
     this.clock = Objects.requireNonNull(clock, "clock");
     this.manager = new LocalizationManager(LocalizationCandidate.english(CATALOG, PluralSelector.oneOther()));
+    this.configuredLocale = normalizeLocale(configuredLocale);
     this.activeLocale = CATALOG.englishLocale();
     ensureDefaultFile();
     reload();
@@ -123,7 +125,7 @@ public final class GlossLocalization implements AutoCloseable {
       return false;
     }
     pendingAutomaticSnapshot = null;
-    return reload(snapshot);
+    return reload(snapshot, configuredLocale);
   }
 
   @Override
@@ -152,11 +154,16 @@ public final class GlossLocalization implements AutoCloseable {
       logger.severe("Language reload failed: source is not a regular file: " + languageFile.getPath());
       return false;
     }
-    return reload(snapshot);
+    return reload(snapshot, configuredLocale);
   }
 
-  private synchronized boolean reload(LanguageSnapshot snapshot) {
-    LocalizationReloadResult result = manager.reload(() -> loadCandidate(snapshot.rawContent()));
+  public synchronized boolean selectLocale(String locale) {
+    configuredLocale = normalizeLocale(locale);
+    return reload();
+  }
+
+  private synchronized boolean reload(LanguageSnapshot snapshot, String locale) {
+    LocalizationReloadResult result = manager.reload(() -> loadCandidate(snapshot.rawContent(), locale));
     observedHash = snapshot.sha256();
     if (!result.applied()) {
       reportRejectedReload(result);
@@ -282,16 +289,17 @@ public final class GlossLocalization implements AutoCloseable {
     return GlossLocalization::globalDirectorText;
   }
 
-  private LocalizationCandidate loadCandidate(String rawContent) throws Exception {
+  private LocalizationCandidate loadCandidate(String rawContent, String selectedLocale) throws Exception {
     YamlConfiguration yaml = new YamlConfiguration();
     yaml.options().pathSeparator(YAML_PATH_SEPARATOR);
     yaml.loadFromString(rawContent);
-    String locale = yaml.getString("locale", CATALOG.englishLocale());
-    if (locale == null || locale.isBlank()) {
-      locale = CATALOG.englishLocale();
+    if (yaml.contains("locale")) {
+      throw new IllegalArgumentException(
+          "language.yml no longer selects the locale; remove its top-level locale key (or delete language.yml, losing its "
+              + "overrides, and restart Gloss to regenerate it), set language in plugins/Gloss/gloss.toml, then run "
+              + "/gloss reload. This version does not migrate the obsolete locale key"
+      );
     }
-
-    String selectedLocale = locale.trim();
     LocaleOverlay.Builder overlay = LocaleOverlay.builder(languageFile.getPath(), selectedLocale);
     ConfigurationSection messages = yaml.getConfigurationSection("messages");
     if (messages != null) {
@@ -382,11 +390,19 @@ public final class GlossLocalization implements AutoCloseable {
     try {
       Files.createDirectories(languageFile.toPath().getParent());
       YamlConfiguration yaml = new YamlConfiguration();
-      yaml.set("locale", CATALOG.englishLocale());
+      yaml.options().header(
+          "Gloss message overrides. Set the active language with the leading language key in gloss.toml.\n"
+              + "Add only the message keys you want to replace below messages; bundled translations and English fill the rest."
+      );
+      yaml.createSection("messages");
       yaml.save(languageFile);
     } catch (Exception exception) {
       logger.log(Level.SEVERE, "Unable to create the default language file", exception);
     }
+  }
+
+  private static String normalizeLocale(String locale) {
+    return locale == null || locale.isBlank() ? VolmitLocales.ENGLISH : locale.trim();
   }
 
   private void reportRejectedReload(LocalizationReloadResult result) {

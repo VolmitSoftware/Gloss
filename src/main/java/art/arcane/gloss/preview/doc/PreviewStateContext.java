@@ -251,9 +251,7 @@ public final class PreviewStateContext implements ExprScope {
     if (!WARNED_NAMESPACES.add(key)) {
       return;
     }
-    String message = failure.getMessage();
-    Gloss.log(Level.WARNING, "Preview provider '%s' threw %s%s; provider ignored.",
-        key, failure.getClass().getSimpleName(), message == null || message.isEmpty() ? "" : ": " + message);
+    Gloss.logExceptionStack(false, failure, "Preview provider '%s' threw; provider ignored.", key);
   }
 
   /**
@@ -336,22 +334,24 @@ public final class PreviewStateContext implements ExprScope {
    * is what lets a document write {@code lang("gloss.preview.state.smelting_item", item, percent)}
    * and get {@code "Smelting Iron Ore 42%"} out of the template {@code "Smelting {item} {percent}%"}.
    *
-   * <p>Arguments past the last placeholder are named {@code arg0}, {@code arg1}, ... by position and
-   * simply go unused; VolmLib rejects a placeholder name that does not start with a letter, so a
-   * bare {@code "0"} is not a legal name and never was. Values are stringified with the expression
-   * language's own rule, so {@code 42.0} inserts as {@code "42"}, and they are inserted as untrusted
-   * text so a container name can never smuggle in colour codes.
+   * <p>Arguments past the last placeholder are ignored for catalog keys so strict localization does
+   * not receive unexpected names. Unknown headless-only keys retain positional names such as
+   * {@code arg0}. Values are stringified with the expression language's own rule, so {@code 42.0}
+   * inserts as {@code "42"}, and they are inserted as untrusted text so a container name can never
+   * smuggle in colour codes.
    */
   static MessageArgs langArguments(TextKey key, List<Object> args) {
     if (args.size() <= 1) {
       return MessageArgs.empty();
     }
     List<String> placeholders = orderedPlaceholders(key.english());
+    boolean knownKey = GlossMessages.catalog().key(key.id()) != null;
+    int suppliedArguments = args.size() - 1;
+    int boundArguments = knownKey ? Math.min(suppliedArguments, placeholders.size()) : suppliedArguments;
     MessageArgs.Builder builder = MessageArgs.builder();
-    for (int index = 1; index < args.size(); index++) {
-      int position = index - 1;
-      String name = position < placeholders.size() ? placeholders.get(position) : LANG_ARG_PREFIX + position;
-      builder.untrusted(name, ExprFunctions.call("str", List.of(args.get(index))));
+    for (int position = 0; position < boundArguments; position++) {
+      String name = knownKey ? placeholders.get(position) : LANG_ARG_PREFIX + position;
+      builder.untrusted(name, ExprFunctions.call("str", List.of(args.get(position + 1))));
     }
     return builder.build();
   }

@@ -29,7 +29,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.function.LongFunction;
 import java.util.function.Supplier;
-import java.util.logging.Level;
 
 final class TemporaryHologramDisplay implements TemporaryHologram {
     private static final double POSITION_EPSILON_SQUARED = 1.0E-6D;
@@ -468,7 +467,8 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
                 display = spawned;
                 applyVisibility(spawned);
             } catch (RuntimeException failure) {
-                service.plugin().getLogger().log(Level.WARNING, "Failed to spawn temporary hologram " + id, failure);
+                Gloss.logExceptionStackThrottled(false, "temporary-hologram-spawn", failure,
+                    "Failed to spawn temporary hologram %s.", id);
             } finally {
                 spawning.set(false);
             }
@@ -808,7 +808,8 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
         try {
             return binder.get();
         } catch (RuntimeException failure) {
-            Gloss.verbose("Temporary hologram binder failed for " + id + ": " + failure.getClass().getSimpleName());
+            Gloss.verbose("Temporary hologram binder failed for %s: %s.", id,
+                failure.getClass().getSimpleName());
             return null;
         }
     }
@@ -817,8 +818,8 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
         try {
             return binder.get();
         } catch (RuntimeException failure) {
-            Gloss.verbose("Temporary hologram presentation binder failed for " + id + ": "
-                + failure.getClass().getSimpleName());
+            Gloss.verbose("Temporary hologram presentation binder failed for %s: %s.", id,
+                failure.getClass().getSimpleName());
             return null;
         }
     }

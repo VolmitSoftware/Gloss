@@ -136,7 +136,7 @@ final class RealDropScriptPlan {
             double result = ExprEvaluator.number(variable.expression(), scope);
             return Double.isFinite(result) ? result : 0.0D;
         } catch (RuntimeException failure) {
-            warnRuntime("script.vars." + variable.name(), failure.getMessage());
+            warnRuntime("script.vars." + variable.name(), failure.getMessage(), failure);
             return 0.0D;
         }
     }
@@ -146,12 +146,12 @@ final class RealDropScriptPlan {
         try {
             double result = ExprEvaluator.number(expression, scope);
             if (!Double.isFinite(result)) {
-                warnRuntime(path, "result was not finite");
+                warnRuntime(path, "result was not finite", null);
                 return fallback;
             }
             return Math.max(minimum, Math.min(maximum, result));
         } catch (RuntimeException failure) {
-            warnRuntime(path, failure.getMessage());
+            warnRuntime(path, failure.getMessage(), failure);
             return fallback;
         }
     }
@@ -160,7 +160,7 @@ final class RealDropScriptPlan {
         try {
             return ExprEvaluator.bool(expression, scope);
         } catch (RuntimeException failure) {
-            warnRuntime(path, failure.getMessage());
+            warnRuntime(path, failure.getMessage(), failure);
             return true;
         }
     }
@@ -172,15 +172,20 @@ final class RealDropScriptPlan {
         try {
             return color(ExprEvaluator.eval(glow, scope));
         } catch (RuntimeException failure) {
-            warnRuntime("script.glow", failure.getMessage());
+            warnRuntime("script.glow", failure.getMessage(), failure);
             return 0;
         }
     }
 
-    private void warnRuntime(String path, String detail) {
+    private void warnRuntime(String path, String detail, RuntimeException failure) {
         if (runtimeFailureWarned.compareAndSet(false, true)) {
-            Gloss.warn("real drop " + path + " failed at runtime; neutral fallback applied"
-                + (detail == null || detail.isBlank() ? "." : ": " + detail));
+            String message = "Real drop " + path + " failed at runtime; neutral fallback applied"
+                + (detail == null || detail.isBlank() ? "." : ": " + detail);
+            if (failure == null) {
+                Gloss.warn(message);
+            } else {
+                Gloss.logExceptionStack(false, failure, "%s", message);
+            }
         }
     }
 

@@ -24,7 +24,6 @@ import java.util.Locale;
 import java.util.NoSuchElementException;
 import java.util.concurrent.CancellationException;
 import java.util.function.UnaryOperator;
-import java.util.logging.Level;
 
 /**
  * Shared persistence plumbing for the menu-content commands: {@code /gloss menu addrow|...|image}
@@ -149,7 +148,8 @@ final class MenuRowCommandSupport {
         ? SchedulerUtils.runEntity(Gloss.instance, player, feedback)
         : SchedulerUtils.runGlobal(Gloss.instance, feedback);
     if (!accepted) {
-      Gloss.log(Level.WARNING, "Unable to schedule persistent menu command feedback for %s.", sender.getName());
+      Gloss.warnThrottled("menu-command-feedback-scheduling",
+          "Unable to schedule persistent menu command feedback for %s.", sender.getName());
     }
   }
 

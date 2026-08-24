@@ -67,8 +67,7 @@ public final class ShippedDefaults {
             }
             return replaceAtomically(file, expected, replacement);
         } catch (IOException failure) {
-            Gloss.log(Level.WARNING, "%s/%s%s: %s", kind, name, EXTENSION,
-                failure.getMessage() == null ? failure.getClass().getSimpleName() : failure.getMessage());
+            Gloss.logExceptionStack(false, failure, "%s/%s%s could not be upgraded.", kind, name, EXTENSION);
             return false;
         }
     }
@@ -106,8 +105,8 @@ public final class ShippedDefaults {
                 Files.write(file.toPath(), content);
                 written.add(name);
             } catch (IOException failure) {
-                Gloss.log(Level.WARNING, "%s/%s%s: %s", kind, name, EXTENSION,
-                    failure.getMessage() == null ? failure.getClass().getSimpleName() : failure.getMessage());
+                Gloss.logExceptionStack(false, failure, "%s/%s%s could not be extracted.",
+                    kind, name, EXTENSION);
             }
         }
         return written;

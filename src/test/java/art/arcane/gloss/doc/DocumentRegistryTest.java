@@ -719,7 +719,8 @@ class DocumentRegistryTest {
         return new Handler() {
             @Override
             public void publish(LogRecord record) {
-                if (record.getMessage() != null && record.getMessage().startsWith("test/alpha.json:")) {
+                if (record.getMessage() != null
+                    && record.getMessage().startsWith("[Gloss] test/alpha.json:")) {
                     records.add(record);
                 }
             }

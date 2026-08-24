@@ -5,8 +5,6 @@ import art.arcane.gloss.panel.PanelDefinition;
 import art.arcane.gloss.panel.PanelService;
 import art.arcane.gloss.config.menu.MenuCatalog;
 import art.arcane.volmlib.util.scheduling.SchedulerUtils;
-import org.bukkit.World;
-
 import java.io.File;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -24,7 +22,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.logging.Logger;
 
 public final class LegacyHologramImportService {
   private static final long SHUTDOWN_TIMEOUT_SECONDS = 30L;
@@ -82,8 +79,7 @@ public final class LegacyHologramImportService {
     try {
       if (!scannerExecutor.awaitTermination(SHUTDOWN_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
         scannerExecutor.shutdownNow();
-        plugin.getLogger().warning(
-            "Legacy hologram source scan exceeded the shutdown timeout and was interrupted.");
+        Gloss.warn("Legacy hologram source scan exceeded the shutdown timeout and was interrupted.");
       }
     } catch (InterruptedException interruption) {
       scannerExecutor.shutdownNow();
@@ -264,7 +260,7 @@ public final class LegacyHologramImportService {
       thread.setDaemon(true);
       thread.setContextClassLoader(classLoader);
       thread.setUncaughtExceptionHandler((failedThread, failure) ->
-          Logger.getLogger("Gloss").severe("Legacy hologram scanner failed: " + failure));
+          Gloss.logExceptionStack(true, failure, "Legacy hologram scanner thread failed."));
       return thread;
     };
   }

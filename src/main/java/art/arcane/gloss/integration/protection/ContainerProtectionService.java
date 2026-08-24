@@ -1,5 +1,6 @@
 package art.arcane.gloss.integration.protection;
 
+import art.arcane.gloss.Gloss;
 import art.arcane.gloss.api.GlossContainerPreviewAccessEvent;
 import org.bukkit.Bukkit;
 import org.bukkit.block.Block;
@@ -17,7 +18,6 @@ import org.bukkit.plugin.Plugin;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
-import java.util.logging.Level;
 
 public final class ContainerProtectionService implements Listener {
   private static final String WORLD_GUARD = "WorldGuard";
@@ -119,7 +119,7 @@ public final class ContainerProtectionService implements Listener {
     try {
       provider = new WorldGuardContainerProtectionProvider(worldGuard);
       failureLogged.set(false);
-      plugin.getLogger().info("Container previews are using WorldGuard access checks.");
+      Gloss.info("Container previews are using WorldGuard access checks.");
     } catch (ReflectiveOperationException | RuntimeException | LinkageError ex) {
       provider = DENY_ALL;
       logFailure(ex);
@@ -128,8 +128,8 @@ public final class ContainerProtectionService implements Listener {
 
   private void logFailure(Throwable throwable) {
     if (failureLogged.compareAndSet(false, true)) {
-      plugin.getLogger().log(Level.SEVERE,
-          "Container access protection failed. Previews will remain locked until the protection provider recovers.", throwable);
+      Gloss.logExceptionStack(true, throwable,
+          "Container access protection failed. Previews will remain locked until the protection provider recovers.");
     }
   }
 }

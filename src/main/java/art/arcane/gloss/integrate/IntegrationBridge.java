@@ -232,7 +232,7 @@ public final class IntegrationBridge {
                 return null;
             }
 
-            Gloss.log(Level.INFO, "Integration bridge: %s v%s accepted on protocol %s with %d metrics",
+            Gloss.verbose("Integration bridge: %s v%s accepted on protocol %s with %d metrics.",
                 pluginId, response.responderVersion(),
                 response.negotiatedProtocol() == null ? "unknown" : response.negotiatedProtocol().asText(),
                 keys.size());
@@ -273,8 +273,6 @@ public final class IntegrationBridge {
     }
 
     private static void warn(String pluginId, String stage, Throwable failure) {
-        String message = failure.getMessage();
-        Gloss.log(Level.WARNING, "Integration bridge: %s %s failed: %s%s", pluginId, stage,
-            failure.getClass().getSimpleName(), message == null || message.isEmpty() ? "" : ": " + message);
+        Gloss.logExceptionStack(false, failure, "Integration bridge: %s %s failed.", pluginId, stage);
     }
 }

@@ -34,7 +34,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.IntConsumer;
 import java.util.function.IntSupplier;
-import java.util.logging.Level;
 
 public final class TablistService implements Listener {
     private static final String PLAYER_TOKEN = "$player";
@@ -289,7 +288,8 @@ public final class TablistService implements Listener {
         }
         if (!registry.dispatch(delta, task -> SchedulerUtils.runGlobal(plugin, task),
             () -> applyDelta(delta))) {
-            Gloss.warn("Tablist hot reload could not reach the server thread; the change will be retried.");
+            Gloss.warnThrottled("tablist-hotload-scheduling",
+                "Tablist hot reload could not reach the server thread; the change will be retried.");
         }
     }
 
@@ -474,8 +474,8 @@ public final class TablistService implements Listener {
                     applyFastPlayer(request.player());
                 }
             } catch (Throwable failure) {
-                plugin.getLogger().log(Level.WARNING,
-                    "Tablist refresh failed for " + uuid, failure);
+                Gloss.logExceptionStackThrottled(false, "tablist-player-refresh", failure,
+                    "Tablist refresh failed for %s.", uuid);
             }
         }
     }

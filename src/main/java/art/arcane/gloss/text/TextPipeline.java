@@ -390,8 +390,7 @@ public final class TextPipeline implements TextRenderer {
             return value == null ? "" : value;
         } catch (Throwable failure) {
             if (failedFunctions.add(name)) {
-                Gloss.warn("Text function |" + name + "| failed: " + failure.getClass().getSimpleName()
-                    + (failure.getMessage() == null ? "" : ": " + failure.getMessage()));
+                Gloss.logExceptionStack(false, failure, "Text function |%s| failed.", name);
             }
             return "";
         }

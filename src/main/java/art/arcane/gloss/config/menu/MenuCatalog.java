@@ -291,7 +291,7 @@ public final class MenuCatalog {
     boolean scheduled = registry.dispatch(delta,
         task -> SchedulerUtils.runGlobal(Gloss.instance, task), () -> applyDelta(delta, known));
     if (!scheduled) {
-      Gloss.log(Level.WARNING,
+      Gloss.warnThrottled("menu-hotload-scheduling",
           "Menu hot reload could not reach the server thread; %d change(s) will be retried.",
           delta.loaded().size() + delta.removed().size());
     }

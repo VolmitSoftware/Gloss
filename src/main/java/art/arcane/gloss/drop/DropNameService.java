@@ -435,8 +435,8 @@ public final class DropNameService implements Listener {
         RealDropSettingsDoc updated = document == null ? RealDropSettingsDoc.DEFAULTS : document.value();
         if (!realDropSettings.dispatch(delta, task -> SchedulerUtils.runGlobal(plugin, task),
             () -> applyRealDropSettings(updated))) {
-            Gloss.warn("Could not apply hot-reloaded real-drop settings on the server thread;"
-                + " the change will be retried.");
+            Gloss.warnThrottled("real-drop-hotload-scheduling",
+                "Could not apply hot-reloaded real-drop settings on the server thread; the change will be retried.");
         }
     }
 

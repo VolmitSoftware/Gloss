@@ -73,6 +73,8 @@ import java.nio.file.NoSuchFileException;
 import java.util.ArrayDeque;
 import java.util.Collection;
 import java.util.Deque;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
@@ -83,6 +85,9 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
     private static final String PLACEHOLDER_API_PLUGIN = "PlaceholderAPI";
     private static final String LOCALE_WATCHDOG_ENTRY = "locale";
     private static final long CONFIG_RECONCILIATION_NANOS = TimeUnit.SECONDS.toNanos(6L);
+    private static final long FAILURE_LOG_THROTTLE_NANOS = TimeUnit.MINUTES.toNanos(1L);
+    private static final ConcurrentMap<String, FailureLogThrottle> FAILURE_LOG_THROTTLES = new ConcurrentHashMap<>();
+    private static final Logger FALLBACK_LOGGER = Logger.getLogger("Gloss");
 
     public static Gloss instance;
 
@@ -140,26 +145,41 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
         getLogger().info("Dependencies loaded.");
     }
 
-    public static void info(String message) {
-        if (instance != null) {
-            instance.getLogger().info(message);
-        }
+    public static void info(String message, Object... args) {
+        log(Level.INFO, message, args);
     }
 
-    public static void warn(String message) {
-        if (instance != null) {
-            instance.getLogger().warning(message);
-        }
+    public static void warn(String message, Object... args) {
+        log(Level.WARNING, message, args);
     }
 
-    public static void verbose(String message) {
-        if (instance != null) {
-            instance.getLogger().fine(message);
-        }
+    public static void verbose(String message, Object... args) {
+        log(Level.FINE, message, args);
+    }
+
+    public static void warnThrottled(String key, String message, Object... args) {
+        logThrottled(Level.WARNING, key, message, args);
     }
 
     public static void log(Level logLevel, String message, Object... args) {
-        logger().log(logLevel, args.length > 0 ? String.format(message, args) : message);
+        Logger current = logger();
+        if (!current.isLoggable(logLevel)) {
+            return;
+        }
+        current.log(logLevel, operatorMessage(current, format(message, args)));
+    }
+
+    public static void logThrottled(Level logLevel, String key, String message, Object... args) {
+        Logger current = logger();
+        if (!current.isLoggable(logLevel)) {
+            return;
+        }
+        long suppressed = claimFailureLog(key);
+        if (suppressed < 0L) {
+            return;
+        }
+        current.log(logLevel,
+            operatorMessage(current, withSuppressed(format(message, args), suppressed)));
     }
 
     public static void logException(boolean isSevere, Throwable failure, int indents) {
@@ -173,13 +193,50 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
     }
 
     public static void logExceptionStack(boolean isSevere, Throwable failure, String message, Object... args) {
-        String formatted = args.length > 0 ? String.format(message, args) : message;
-        logger().log(isSevere ? Level.SEVERE : Level.WARNING, formatted, failure);
+        Level level = isSevere ? Level.SEVERE : Level.WARNING;
+        Logger current = logger();
+        if (!current.isLoggable(level)) {
+            return;
+        }
+        current.log(level, operatorMessage(current, format(message, args)), failure);
+    }
+
+    public static void logExceptionStackThrottled(boolean isSevere, String key, Throwable failure,
+                                                   String message, Object... args) {
+        Level level = isSevere ? Level.SEVERE : Level.WARNING;
+        Logger current = logger();
+        if (!current.isLoggable(level)) {
+            return;
+        }
+        long suppressed = claimFailureLog(key);
+        if (suppressed < 0L) {
+            return;
+        }
+        current.log(level,
+            operatorMessage(current, withSuppressed(format(message, args), suppressed)), failure);
     }
 
     private static Logger logger() {
         Gloss current = instance;
-        return current == null ? Logger.getLogger("Gloss") : current.getLogger();
+        return current == null ? FALLBACK_LOGGER : current.getLogger();
+    }
+
+    private static String format(String message, Object... args) {
+        return args.length > 0 ? String.format(message, args) : message;
+    }
+
+    private static String operatorMessage(Logger logger, String message) {
+        return logger == FALLBACK_LOGGER ? "[Gloss] " + message : message;
+    }
+
+    private static long claimFailureLog(String key) {
+        FailureLogThrottle throttle = FAILURE_LOG_THROTTLES.computeIfAbsent(key,
+            ignored -> new FailureLogThrottle());
+        return throttle.claim(System.nanoTime());
+    }
+
+    private static String withSuppressed(String message, long suppressed) {
+        return suppressed > 0L ? message + " (" + suppressed + " similar failures suppressed.)" : message;
     }
 
     @Override
@@ -195,7 +252,6 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
     public void onEnable() {
         instance = this;
         boolean success = true;
-        String errorMessage = null;
         Throwable startupFailure = null;
         try {
             scheduler = installSchedulerBridge();
@@ -240,7 +296,7 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
             hudBar = new HudActionBar(this);
             enableService("hud", () -> {
             }, hudBar::shutdown);
-            localization = new GlossLocalization(getDataFolder(), getLogger());
+            localization = new GlossLocalization(getDataFolder(), getLogger(), config.language());
             persistenceCoordinator = new GlossPersistenceCoordinator();
             projectTransaction = new GlossProjectTransaction(getDataFolder().toPath());
             try {
@@ -304,16 +360,14 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
         } catch (Throwable failure) {
             success = false;
             startupFailure = failure;
-            errorMessage = failure.getClass().getSimpleName()
-                + (failure.getMessage() == null ? "" : ": " + failure.getMessage());
-            getLogger().log(Level.SEVERE, "Gloss failed to enable", failure);
+            logExceptionStack(true, failure, "Gloss failed to enable.");
             GlossAPIProvider.set(null);
             shutdownServices();
         }
 
         GlossConfig activeConfig = config;
         if (!success || activeConfig == null || activeConfig.splashScreen()) {
-            SplashScreen.print(this, success, errorMessage);
+            SplashScreen.print(this, success);
         }
         if (startupFailure != null) {
             throw propagateEnableFailure(startupFailure);
@@ -353,7 +407,7 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
 
     /**
      * Operator-facing reload (/gloss reload). Cycles every service unconditionally: the operator is
-     * asking for everything on disk to be re-read, not just the parts config.toml happens to
+     * asking for everything on disk to be re-read, not just the parts gloss.toml happens to
      * mention.
      */
     public void reloadAll() {
@@ -384,14 +438,14 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
                 : configLoader.loadForReload(reloadSnapshot);
         } catch (IOException failure) {
             logExceptionStack(false, failure,
-                "config.toml is invalid; keeping the last good configuration.");
+                "gloss.toml is invalid; keeping the last good configuration.");
             return false;
         }
         GlossConfig previous = config;
         GlossConfig next = GlossConfig.from(reloaded);
         config = next;
         reloadServices(previous, next, cycleEveryService);
-        applyMergedConfigHooks(previous, next);
+        applyMergedConfigHooks(previous, next, cycleEveryService);
         info("Reloaded in-place from disk.");
         return true;
     }
@@ -399,7 +453,7 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
     /**
      * A service reload re-parses that service's documents and, for holograms, despawns and respawns
      * every display it owns. On the watchdog path that cost is only owed to services whose own
-     * config section actually moved — editing an unrelated key in config.toml used to respawn every
+     * config section actually moved — editing an unrelated key in gloss.toml used to respawn every
      * hologram on the server. The sections are records, so an unchanged section compares equal.
      * Documents themselves keep hot-reloading through their own watchdog entries either way.
      */
@@ -457,12 +511,12 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
         try {
             return configLoader.loadForBoot();
         } catch (IOException failure) {
-            throw new IllegalStateException("Unable to load config.toml", failure);
+            throw new IllegalStateException("Unable to load gloss.toml", failure);
         }
     }
 
     /**
-     * The data importers run in exactly this slot: after config.toml is loaded (so the HoloUi
+     * The data importers run in exactly this slot: after gloss.toml is loaded (so the HoloUi
      * settings overlay lands in the in-memory boot config before {@link GlossConfig#from}
      * snapshots it) and before the DataWatchdog and every service constructs — MenuCatalog
      * scans menus/ in its constructor and PanelService/registries scan on start, so imported and
@@ -551,7 +605,7 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
             pendingConfigSnapshot = null;
             return;
         } catch (IOException failure) {
-            throw new IllegalStateException("Could not capture a stable config.toml snapshot", failure);
+            throw new IllegalStateException("Could not capture a stable gloss.toml snapshot", failure);
         }
         boolean selfWrite = configLoader.isSelfWrite(snapshot);
         if (!watcherChanged && selfWrite) {
@@ -568,20 +622,37 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
             return;
         }
         pendingConfigSnapshot = null;
-        info("config.toml changed on disk; reloading.");
+        info("gloss.toml changed on disk; reloading.");
         if (SchedulerUtils.runGlobal(this, () -> {
             if (reloadGeneration == configReloadGeneration.get()
                 && applyReloadedConfig(false, snapshot)) {
-                watchdog.recordHotload("config.toml", 1);
+                watchdog.recordHotload("gloss.toml", 1);
             }
         })) {
             return;
         }
         pendingConfigSnapshot = snapshot;
-        warn("config.toml reload could not be scheduled onto the server thread; skipping this pass.");
+        warnThrottled("config-hotload-scheduling",
+            "gloss.toml reload could not be scheduled onto the server thread; skipping this pass.");
     }
 
-    private void applyMergedConfigHooks(GlossConfig previous, GlossConfig next) {
+    private void applyMergedConfigHooks(GlossConfig previous, GlossConfig next, boolean cycleEveryService) {
+        if (localization != null) {
+            if (!previous.language().equals(next.language())) {
+                localization.selectLocale(next.language());
+            } else if (cycleEveryService) {
+                localization.reload();
+            }
+        }
+        if (previous.metrics() != next.metrics()) {
+            if (metrics != null) {
+                metrics.shutdown();
+                metrics = null;
+            }
+            if (next.metrics()) {
+                metrics = MetricsRuntime.start(this, BSTATS_PLUGIN_ID);
+            }
+        }
         if (sessionManager != null) {
             sessionManager.controlHitboxDebug(next.debug().hitbox());
             sessionManager.controlPositionDebug(next.debug().position());
@@ -826,10 +897,9 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
         try {
             editorSyncService.start();
         } catch (RuntimeException failure) {
-            getLogger().log(Level.SEVERE,
+            logExceptionStack(true, failure,
                 "Editor sync was disabled because its secure session store could not be loaded. "
-                    + "Repair or remove editor-sync-sessions.json; Gloss will keep one-way editor handoffs available.",
-                failure);
+                    + "Repair or remove editor-sync-sessions.json; Gloss will keep one-way editor handoffs available.");
         }
     }
 
@@ -933,7 +1003,7 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
         try {
             action.run();
         } catch (Throwable failure) {
-            getLogger().log(Level.WARNING, "Failed to shut down " + system, failure);
+            logExceptionStack(false, failure, "Failed to shut down %s.", system);
         }
     }
 
@@ -941,9 +1011,9 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
         SchedulerRuntime runtime = new SchedulerRuntime(
             () -> this,
             this::runAsyncTask,
-            message -> getLogger().fine(message),
-            message -> getLogger().warning(message),
-            throwable -> getLogger().log(Level.SEVERE, "Gloss scheduler error", throwable)
+            Gloss::verbose,
+            Gloss::warn,
+            throwable -> logExceptionStack(true, throwable, "Gloss scheduler error.")
         );
 
         SchedulerBridge.setSyncScheduler(runtime::s);
@@ -953,14 +1023,33 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
         SchedulerBridge.setSyncRepeatingScheduler(runtime::sr);
         SchedulerBridge.setAsyncRepeatingScheduler(runtime::ar);
         SchedulerBridge.setCancelScheduler(runtime::csr);
-        SchedulerBridge.setErrorHandler(throwable -> getLogger().log(Level.SEVERE, "Gloss scheduler error", throwable));
-        SchedulerBridge.setInfoLogger(message -> getLogger().info(message));
+        SchedulerBridge.setErrorHandler(throwable -> logExceptionStack(true, throwable, "Gloss scheduler error."));
+        SchedulerBridge.setInfoLogger(Gloss::verbose);
         return runtime;
     }
 
     private void runAsyncTask(Runnable runnable) {
         if (!FoliaScheduler.runAsync(this, runnable)) {
-            getLogger().warning("An asynchronous Gloss task was rejected by the scheduler and did not run.");
+            logThrottled(Level.WARNING, "async-task-rejected",
+                "An asynchronous Gloss task was rejected by the scheduler and did not run.");
+        }
+    }
+
+    private static final class FailureLogThrottle {
+        private final AtomicLong nextLogAtNanos = new AtomicLong(Long.MIN_VALUE);
+        private final AtomicLong suppressed = new AtomicLong();
+
+        private long claim(long nowNanos) {
+            while (true) {
+                long next = nextLogAtNanos.get();
+                if (next != Long.MIN_VALUE && nowNanos - next < 0L) {
+                    suppressed.incrementAndGet();
+                    return -1L;
+                }
+                if (nextLogAtNanos.compareAndSet(next, nowNanos + FAILURE_LOG_THROTTLE_NANOS)) {
+                    return suppressed.getAndSet(0L);
+                }
+            }
         }
     }
 }

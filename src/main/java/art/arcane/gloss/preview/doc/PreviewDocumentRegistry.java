@@ -208,7 +208,7 @@ public final class PreviewDocumentRegistry {
         Files.write(file.toPath(), content);
         written.add(name);
       } catch (IOException failure) {
-        Gloss.log(Level.WARNING, "previews/%s%s: %s", name, EXTENSION, detail(name, failure));
+        Gloss.logExceptionStack(false, failure, "previews/%s%s could not be extracted.", name, EXTENSION);
       }
     }
     return written;
@@ -255,7 +255,7 @@ public final class PreviewDocumentRegistry {
           return () -> applyHotload(delta, replacement);
         });
     if (!scheduled) {
-      Gloss.log(Level.WARNING,
+      Gloss.warnThrottled("preview-hotload-scheduling",
           "Preview hot reload could not reach the server thread; the change will be retried.");
     }
   }

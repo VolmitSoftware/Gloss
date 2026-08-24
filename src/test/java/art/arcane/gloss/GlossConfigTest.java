@@ -3,6 +3,7 @@ package art.arcane.gloss;
 import art.arcane.gloss.config.GlossConfigFile;
 import art.arcane.gloss.config.GlossConfigLoader;
 import art.arcane.volmlib.util.config.ConfigExposePolicy;
+import art.arcane.volmlib.util.config.ConfigDoc;
 import art.arcane.volmlib.util.config.TomlCodec;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -36,6 +37,7 @@ class GlossConfigTest {
         assertEquals(GlossConfig.from(defaults), GlossConfig.from(parsed));
 
         GlossConfig snapshot = GlossConfig.from(parsed);
+        assertEquals("en_US", snapshot.language());
         assertTrue(snapshot.splashScreen());
         assertTrue(snapshot.metrics());
         assertEquals(5, snapshot.hotload().watchIntervalTicks());
@@ -94,6 +96,18 @@ class GlossConfigTest {
 
         assertFalse(parsed.drops.useItemDisplayNames);
         assertFalse(GlossConfig.from(parsed).drops().useItemDisplayNames());
+    }
+
+    @Test
+    void customLocaleIdsArePreservedWhileBlankFallsBackToEnglish() {
+        GlossConfigFile config = new GlossConfigFile();
+        config.language = "  pirate_SEA  ";
+        config.normalize();
+        assertEquals("pirate_SEA", config.language);
+
+        config.language = "   ";
+        config.normalize();
+        assertEquals("en_US", config.language);
     }
 
     @Test
@@ -180,6 +194,54 @@ class GlossConfigTest {
                     "knob " + where + " is not preceded by a comment line");
             }
         }
+    }
+
+    @Test
+    void leadingControlsAreLanguageThenMetrics() {
+        String toml = TomlCodec.toToml(new GlossConfigFile(), "gloss", ConfigExposePolicy.ALL);
+        List<String> assignments = toml.lines()
+            .filter(line -> !line.isBlank() && !line.startsWith("#") && !line.startsWith("["))
+            .toList();
+
+        assertTrue(assignments.get(0).startsWith("language = "));
+        assertTrue(assignments.get(1).startsWith("metrics = "));
+    }
+
+    @Test
+    void everySectionIsEmittedWithItsExplicitDescription() {
+        String toml = TomlCodec.toToml(new GlossConfigFile(), "gloss", ConfigExposePolicy.ALL);
+        List<String> lines = toml.lines().toList();
+        Map<String, Field> sections = new LinkedHashMap<>();
+        collectSections("", GlossConfigFile.class, sections);
+
+        assertFalse(sections.isEmpty());
+        for (Map.Entry<String, Field> section : sections.entrySet()) {
+            ConfigDoc doc = section.getValue().getAnnotation(ConfigDoc.class);
+            assertTrue(doc != null, "section " + section.getKey() + " has no explicit ConfigDoc");
+            int header = lines.indexOf("[" + section.getKey() + "]");
+            assertTrue(header > 0, "missing section header [" + section.getKey() + "]");
+            assertEquals("# " + doc.value(), lines.get(header - 1));
+        }
+    }
+
+    @Test
+    void freshLoadWritesGlossTomlDirectlyInDataFolder(@TempDir Path tempDir) throws IOException {
+        new GlossConfigLoader(tempDir.toFile()).loadForBoot();
+
+        assertTrue(Files.isRegularFile(tempDir.resolve("gloss.toml")));
+        assertFalse(Files.exists(tempDir.resolve("Gloss")));
+    }
+
+    @Test
+    void unrelatedTomlFilesDoNotAffectCanonicalConfig(@TempDir Path tempDir) throws IOException {
+        Path unrelated = tempDir.resolve("other.toml");
+        Files.writeString(unrelated, "metrics = false\n");
+
+        GlossConfigFile loaded = new GlossConfigLoader(tempDir.toFile()).loadForBoot();
+
+        assertTrue(loaded.metrics);
+        assertEquals("metrics = false\n", Files.readString(unrelated));
+        assertTrue(Files.isRegularFile(tempDir.resolve("gloss.toml")));
     }
 
     @Test
@@ -275,8 +337,25 @@ class GlossConfigTest {
             if (fieldType.getName().startsWith(GlossConfigFile.class.getName() + "$")) {
                 collectLeaves(childPath, fieldType, leavesBySection);
             } else {
+                assertTrue(field.isAnnotationPresent(ConfigDoc.class),
+                    "knob " + childPath + " has no explicit ConfigDoc");
                 leavesBySection.computeIfAbsent(path, ignored -> new ArrayList<>()).add(field.getName());
             }
+        }
+    }
+
+    private static void collectSections(String path, Class<?> type, Map<String, Field> sections) {
+        for (Field field : type.getDeclaredFields()) {
+            if (Modifier.isStatic(field.getModifiers()) || field.isSynthetic()) {
+                continue;
+            }
+            Class<?> fieldType = field.getType();
+            if (!fieldType.getName().startsWith(GlossConfigFile.class.getName() + "$")) {
+                continue;
+            }
+            String childPath = path.isEmpty() ? field.getName() : path + "." + field.getName();
+            sections.put(childPath, field);
+            collectSections(childPath, fieldType, sections);
         }
     }
 

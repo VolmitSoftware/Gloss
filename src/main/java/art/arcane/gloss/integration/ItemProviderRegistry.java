@@ -20,7 +20,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.logging.Level;
 import java.util.stream.Collectors;
 
 public final class ItemProviderRegistry implements Listener {
@@ -177,7 +176,7 @@ public final class ItemProviderRegistry implements Listener {
     }
     if (removed) {
       prototypes.clear();
-      Gloss.log(Level.INFO, "[items] provider for %s dropped, it was disabled", pluginName);
+      Gloss.verbose("Item provider for %s was removed because the plugin was disabled.", pluginName);
     }
   }
 
@@ -195,9 +194,9 @@ public final class ItemProviderRegistry implements Listener {
       if (!isAllowed(provider) || !register(provider)) {
         return;
       }
-      Gloss.log(Level.INFO, "[items] provider %s active from %s", provider.id(), definition.pluginName());
+      Gloss.verbose("Item provider %s is active from %s.", provider.id(), definition.pluginName());
     } catch (Throwable failure) {
-      Gloss.logExceptionStack(false, failure, "[items] failed to activate the %s item provider:", definition.pluginName());
+      Gloss.logExceptionStack(false, failure, "Failed to activate the %s item provider.", definition.pluginName());
     }
   }
 
@@ -249,7 +248,7 @@ public final class ItemProviderRegistry implements Listener {
     // an off-thread caller must not block on a main-thread-only API, it just misses this lookup
     if (provider.requiresMainThread() && !Bukkit.isPrimaryThread()) {
       if (offThreadWarned.add(provider.id())) {
-        Gloss.log(Level.WARNING, "[items] provider %s is main thread only and was skipped off thread", provider.id());
+        Gloss.warn("Item provider %s is main-thread-only and was skipped off-thread.", provider.id());
       }
       return null;
     }
@@ -288,7 +287,8 @@ public final class ItemProviderRegistry implements Listener {
     if (!faultWarned.add(provider.id())) {
       return;
     }
-    Gloss.logExceptionStack(false, failure, "[items] provider %s faulted, lookups against it will keep failing:", provider.id());
+    Gloss.logExceptionStack(false, failure,
+        "Item provider %s faulted; lookups against it will keep failing.", provider.id());
   }
 
   private ItemProvider byPluginName(String pluginName) {

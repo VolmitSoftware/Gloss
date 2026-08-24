@@ -17,7 +17,6 @@ import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.LongSupplier;
-import java.util.logging.Level;
 
 /**
  * The non-blocking profile cache behind {@code playerHead} icons.
@@ -134,7 +133,7 @@ public final class PlayerHeadService {
   }
 
   /**
-   * Drops everything cached. Called when {@code config.toml} changes the head settings, so an
+   * Drops everything cached. Called when {@code gloss.toml} changes the head settings, so an
    * operator who fixed a name or turned resolution back on sees it on the next refresh instead of
    * waiting out a six-hour TTL.
    */
@@ -156,7 +155,7 @@ public final class PlayerHeadService {
     return entries.size();
   }
 
-  /** Builds the service the running plugin uses, from the current {@code config.toml} values. */
+  /** Builds the service the running plugin uses, from the current {@code gloss.toml} values. */
   public static PlayerHeadService fromConfig(GlossConfig.PlayerHeads settings) {
     return new PlayerHeadService(
         new BukkitPlayerHeadResolver(),
@@ -295,9 +294,9 @@ public final class PlayerHeadService {
     if (!failureLogged.add(name.toLowerCase(Locale.ROOT))) {
       return;
     }
-    Gloss.log(Level.WARNING,
-        "Player head lookup for \"%s\" failed (%s); showing the fallback head and retrying in %d s.",
-        name, failure.getClass().getSimpleName(), FAILURE_TTL.toSeconds());
+    Gloss.logExceptionStack(false, failure,
+        "Player head lookup for \"%s\" failed; showing the fallback head and retrying in %d s.",
+        name, FAILURE_TTL.toSeconds());
   }
 
   /**

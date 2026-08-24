@@ -128,7 +128,7 @@
       "drops":
         "bundle_more": "+{count} kt."
       "items":
-        "disabled": "&7[&bGloss&7]: &7Custom items are disabled. Set &fcustomItems&7 to true in config.toml."
+        "disabled": "&7[&bGloss&7]: &7Custom items are disabled. Set &fcustomItems&7 to true in gloss.toml."
         "status":
           "header": "Custom Items"
           "summary": "{active}/{total} providers active"
@@ -528,5 +528,5 @@
   "command.import.holoui.missing": "&8[&dGloss&8] &cŠalia Gloss duomenų aplanko nerastas holoui duomenų aplankas."
   "command.import.holoui.done": "&8[&dGloss&8] &aHoloUi importas baigtas: nukopijuota &f{copied}&a, praleista &f{skipped}&a, konfigūracijos raktų &f{overlaid}&a, klaidų &f{errors}&a."
   "command.import.legacy.done": "&8[&dGloss&8] &aSenų duomenų perkėlimas baigtas: perkelta &f{migrated}&a, įtraukta &f{absorbed}&a, konfigūracijos raktų &f{overlaid}&a, klaidų &f{errors}&a."
-  "command.import.config_unreadable": "&8[&dGloss&8] &cNepavyko įkelti config.toml: &f{reason}"
+  "command.import.config_unreadable": "&8[&dGloss&8] &cNepavyko įkelti gloss.toml: &f{reason}"
   "command.reload.done": "&8[&dGloss&8] &aGloss konfigūracija ir paslaugos įkeltos iš naujo."

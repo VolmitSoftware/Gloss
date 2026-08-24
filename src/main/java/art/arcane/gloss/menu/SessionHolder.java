@@ -168,7 +168,8 @@ class SessionHolder {
             safelyClosePreview();
           }
         } catch (Exception ex) {
-          Gloss.logExceptionStack(false, ex, "Failed to tick preview for %s. Closing preview.", player.getName());
+          Gloss.logExceptionStackThrottled(false, "container-preview-tick", ex,
+              "Failed to tick preview for %s. Closing preview.", player.getName());
           safelyClosePreview();
         }
       }

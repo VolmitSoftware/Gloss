@@ -238,7 +238,8 @@ public final class PanelRuntimeManager implements PanelServiceListener {
     try {
       applyPendingFollowPoses();
     } catch (RuntimeException failure) {
-      Gloss.logExceptionStack(false, failure, "Failed to sample persistent panel follow targets.");
+      Gloss.logExceptionStackThrottled(false, "panel-follow-sampling", failure,
+          "Failed to sample persistent panel follow targets.");
     }
     if (idle()) {
       return;
@@ -329,7 +330,8 @@ public final class PanelRuntimeManager implements PanelServiceListener {
         }
         viewers.computeIfAbsent(playerId, ignored -> new ViewerState(player)).tick();
       } catch (RuntimeException failure) {
-        Gloss.logExceptionStack(false, failure, "Failed to update persistent panels for %s.", player.getName());
+        Gloss.logExceptionStackThrottled(false, "panel-viewer-update", failure,
+            "Failed to update persistent panels for %s.", player.getName());
         closeViewer(player);
       } finally {
         tickingViewers.remove(playerId);

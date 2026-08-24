@@ -19,15 +19,15 @@ public final class SplashScreen {
     private SplashScreen() {
     }
 
-    public static void print(Gloss plugin, boolean success, String errorMessage) {
+    public static void print(Gloss plugin, boolean success) {
         try {
-            printSplash(plugin, success, errorMessage);
+            printSplash(plugin, success);
         } catch (RuntimeException failure) {
-            plugin.getLogger().warning("Splash screen failed to render: " + failure);
+            Gloss.logExceptionStack(false, failure, "Splash screen failed to render.");
         }
     }
 
-    private static void printSplash(Gloss plugin, boolean success, String errorMessage) {
+    private static void printSplash(Gloss plugin, boolean success) {
         ChatColor fill = ChatColor.of("#2a1245");
         ChatColor edge = ChatColor.of("#8a2be2");
         ChatColor meta = ChatColor.of("#9a86c9");
@@ -54,9 +54,6 @@ public final class SplashScreen {
         }
 
         Bukkit.getConsoleSender().sendMessage(splash.toString());
-        if (!success && errorMessage != null && !errorMessage.isBlank()) {
-            plugin.getLogger().warning("Startup error: " + errorMessage);
-        }
     }
 
     private static String colorize(String row, ChatColor fill, ChatColor edge) {

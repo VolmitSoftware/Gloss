@@ -63,7 +63,7 @@ public final class ChatService {
             plugin.getServer().getPluginManager().registerEvents(instance, plugin);
             tabCompleteListener = instance;
         } catch (ReflectiveOperationException | ClassCastException failure) {
-            Gloss.warn("Emoji tab-complete listener failed to register: " + failure);
+            Gloss.logExceptionStack(false, failure, "Emoji tab-complete listener failed to register.");
         }
     }
 }

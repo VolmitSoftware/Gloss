@@ -297,8 +297,7 @@ public final class BoardService implements Listener {
         try {
             return new BoardManager<>(plugin, settings, Board::new);
         } catch (Throwable failure) {
-            Gloss.warn("Sidebar " + cadenceName + " driver unavailable: " + failure.getClass().getSimpleName()
-                + (failure.getMessage() == null ? "" : ": " + failure.getMessage()));
+            Gloss.logExceptionStack(false, failure, "Sidebar %s driver is unavailable.", cadenceName);
             return null;
         }
     }
@@ -423,7 +422,8 @@ public final class BoardService implements Listener {
         }
         if (!registry.dispatch(delta, task -> SchedulerUtils.runGlobal(plugin, task),
             () -> applyRegistryDelta(delta))) {
-            Gloss.warn("Board hot reload could not reach the server thread; the change will be retried.");
+            Gloss.warnThrottled("board-hotload-scheduling",
+                "Board hot reload could not reach the server thread; the change will be retried.");
         }
     }
 

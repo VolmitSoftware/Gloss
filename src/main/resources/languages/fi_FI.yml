@@ -128,7 +128,7 @@
       "drops":
         "bundle_more": "+{count} muuta"
       "items":
-        "disabled": "&7[&bGloss&7]: &7Custom items are disabled. Set &fcustomItems&7 to true in config.toml."
+        "disabled": "&7[&bGloss&7]: &7Custom items are disabled. Set &fcustomItems&7 to true in gloss.toml."
         "status":
           "header": "Custom Items"
           "summary": "{active}/{total} providers active"
@@ -528,5 +528,5 @@
   "command.import.holoui.missing": "&8[&dGloss&8] &cGlossin datakansion vierestä ei löytynyt holoui-datakansiota."
   "command.import.holoui.done": "&8[&dGloss&8] &aHoloUi-tuonti valmis: &f{copied}&a kopioitu, &f{skipped}&a ohitettu, &f{overlaid}&a asetusavainta, &f{errors}&a virhettä."
   "command.import.legacy.done": "&8[&dGloss&8] &aVanhan datan siirto valmis: &f{migrated}&a siirretty, &f{absorbed}&a sulautettu, &f{overlaid}&a asetusavainta, &f{errors}&a virhettä."
-  "command.import.config_unreadable": "&8[&dGloss&8] &cTiedostoa config.toml ei voitu ladata: &f{reason}"
+  "command.import.config_unreadable": "&8[&dGloss&8] &cTiedostoa gloss.toml ei voitu ladata: &f{reason}"
   "command.reload.done": "&8[&dGloss&8] &aGloss-asetukset ja -palvelut ladattu uudelleen."

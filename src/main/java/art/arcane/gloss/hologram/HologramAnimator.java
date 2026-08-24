@@ -506,7 +506,8 @@ public final class HologramAnimator {
             try {
                 reportSends += pass(nowMs);
             } catch (Throwable failure) {
-                Gloss.logExceptionStack(false, failure, "Hologram animator pass failed; continuing.");
+                Gloss.logExceptionStackThrottled(false, "hologram-animator-pass", failure,
+                    "Hologram animator pass failed; continuing.");
             }
 
             reportPasses++;
@@ -514,8 +515,8 @@ public final class HologramAnimator {
             interval = AnimatorLoopPolicy.nextIntervalMillis(interval, passMillis, floor);
             settledIntervalMillis = interval;
             if (config.get().debug().animator() && nowMs >= reportAtMs) {
-                Gloss.info("animator interval=" + interval + "ms targets=" + targets.size()
-                    + " sends=" + reportSends + " passes=" + reportPasses + " (10s window)");
+                Gloss.verbose("Animator interval=%dms targets=%d sends=%d passes=%d (10s window).",
+                    interval, targets.size(), reportSends, reportPasses);
                 reportAtMs = nowMs + REPORT_INTERVAL_MILLIS;
                 reportSends = 0L;
                 reportPasses = 0L;

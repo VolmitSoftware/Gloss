@@ -22,7 +22,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.function.ToDoubleFunction;
-import java.util.logging.Level;
 import java.util.stream.Collectors;
 
 public final class GlossIntegrationService implements IntegrationServiceContract {
@@ -40,7 +39,7 @@ public final class GlossIntegrationService implements IntegrationServiceContract
 
   public void register() {
     Bukkit.getServicesManager().register(IntegrationServiceContract.class, this, Gloss.instance, ServicePriority.Normal);
-    Gloss.log(Level.INFO, "Integration provider registered for Gloss");
+    Gloss.verbose("Integration provider registered for Gloss.");
   }
 
   public void unregister() {

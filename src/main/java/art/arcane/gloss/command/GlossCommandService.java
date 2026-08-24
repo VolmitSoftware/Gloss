@@ -40,7 +40,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
-import java.util.logging.Level;
 
 public final class GlossCommandService implements CommandExecutor, TabCompleter, DirectorInvocationHook {
     private static final String ROOT_COMMAND = "gloss";
@@ -582,7 +581,7 @@ public final class GlossCommandService implements CommandExecutor, TabCompleter,
         try {
             return getDirector().execute(new DirectorInvocation(new BukkitDirectorSender(sender), label, Arrays.asList(args)));
         } catch (Throwable e) {
-            plugin.getLogger().log(Level.SEVERE, "Director command execution failed", e);
+            Gloss.logExceptionStack(true, e, "Director command execution failed.");
             return DirectorExecutionResult.notHandled();
         }
     }
@@ -591,7 +590,7 @@ public final class GlossCommandService implements CommandExecutor, TabCompleter,
         try {
             return getDirector().tabComplete(new DirectorInvocation(new BukkitDirectorSender(sender), alias, Arrays.asList(args)));
         } catch (Throwable e) {
-            plugin.getLogger().log(Level.WARNING, "Director tab completion failed", e);
+            Gloss.logExceptionStack(false, e, "Director tab completion failed.");
             return List.of();
         }
     }

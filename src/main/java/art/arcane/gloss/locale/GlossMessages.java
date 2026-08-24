@@ -298,7 +298,7 @@ public final class GlossMessages {
     public static final TextKey IMPORT_HOLOUI_MISSING = text("command.import.holoui.missing", PREFIX + "&cNo holoui data folder found beside the Gloss data folder.");
     public static final TextKey IMPORT_HOLOUI_DONE = text("command.import.holoui.done", PREFIX + "&aHoloUi import finished: &f{copied}&a copied, &f{skipped}&a skipped, &f{overlaid}&a config keys, &f{errors}&a errors.");
     public static final TextKey IMPORT_LEGACY_DONE = text("command.import.legacy.done", PREFIX + "&aLegacy migration finished: &f{migrated}&a migrated, &f{absorbed}&a absorbed, &f{overlaid}&a config keys, &f{errors}&a errors.");
-    public static final TextKey IMPORT_CONFIG_UNREADABLE = text("command.import.config_unreadable", PREFIX + "&cconfig.toml could not be loaded: &f{reason}");
+    public static final TextKey IMPORT_CONFIG_UNREADABLE = text("command.import.config_unreadable", PREFIX + "&cgloss.toml could not be loaded: &f{reason}");
 
     public static final TextKey RELOAD_DONE = text("command.reload.done", PREFIX + "&aReloaded Gloss configuration and services.");
 
@@ -360,7 +360,7 @@ public final class GlossMessages {
     public static final TextKey SYNC_PULLED = text("gloss.message.sync.pulled", "&7[&bGloss&7]: &aPolled editor sync session &f{session}&a.");
     public static final TextKey SYNC_UNKNOWN = text("gloss.message.sync.unknown", "&7[&bGloss&7]: &cUnknown or expired editor sync session &f{session}&c.");
     public static final TextKey SYNC_FAILED = text("gloss.message.sync.failed", "&7[&bGloss&7]: &cEditor sync operation failed for &f{session}&c: {reason}");
-    public static final TextKey ITEMS_DISABLED = text("gloss.message.items.disabled", "&7[&bGloss&7]: &7Custom items are disabled. Set &fcustomItems&7 to true in config.toml.");
+    public static final TextKey ITEMS_DISABLED = text("gloss.message.items.disabled", "&7[&bGloss&7]: &7Custom items are disabled. Set &fcustomItems&7 to true in gloss.toml.");
     public static final TextKey ITEMS_STATUS_HEADER = text("gloss.message.items.status.header", "Custom Items");
     public static final TextKey ITEMS_STATUS_SUMMARY = text("gloss.message.items.status.summary", "{active}/{total} providers active");
     public static final TextKey ITEMS_STATUS_ENTRY = text("gloss.message.items.status.entry", "Provider {provider} from plugin {plugin}.");

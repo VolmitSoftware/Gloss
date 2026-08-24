@@ -24,7 +24,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
-import java.util.logging.Level;
 import java.util.regex.Pattern;
 
 /**
@@ -118,7 +117,7 @@ public final class CustomItemCatalogWriter {
       return new CustomItemCatalogResult(false, providers.size(), items.size(), discarded, file.getPath());
     }
 
-    Gloss.log(Level.INFO, "[items] catalog written to %s providers=%d items=%d discarded=%d",
+    Gloss.info("Custom item catalog written to %s: providers=%d items=%d discarded=%d.",
         file.getPath(), providers.size(), items.size(), discarded);
     return new CustomItemCatalogResult(true, providers.size(), items.size(), discarded, file.getPath());
   }
@@ -133,7 +132,7 @@ public final class CustomItemCatalogWriter {
       }
       Files.writeString(target, json, StandardCharsets.UTF_8);
     } catch (IOException | RuntimeException failure) {
-      Gloss.logExceptionStack(true, failure, "[items] failed to write the custom item catalog to %s:", file.getPath());
+      Gloss.logExceptionStack(true, failure, "Failed to write the custom item catalog to %s.", file.getPath());
       return false;
     }
     return true;
@@ -149,7 +148,8 @@ public final class CustomItemCatalogWriter {
   private ProviderHarvest harvestOnMainThread(ItemProvider provider) {
     CompletableFuture<ProviderHarvest> harvested = new CompletableFuture<>();
     if (!SchedulerUtils.runGlobal(plugin, () -> harvested.complete(harvestDirect(provider)))) {
-      Gloss.log(Level.WARNING, "[items] provider %s needs the main thread and could not be scheduled, it is not in the catalog", provider.id());
+      Gloss.warn("Item provider %s needs the main thread and could not be scheduled; it is not in the catalog.",
+          provider.id());
       return ProviderHarvest.EMPTY;
     }
 
@@ -159,7 +159,8 @@ public final class CustomItemCatalogWriter {
       Thread.currentThread().interrupt();
       return ProviderHarvest.EMPTY;
     } catch (Exception failure) {
-      Gloss.logExceptionStack(false, failure, "[items] provider %s did not finish enumerating on the main thread:", provider.id());
+      Gloss.logExceptionStack(false, failure,
+          "Item provider %s did not finish enumerating on the main thread.", provider.id());
       return ProviderHarvest.EMPTY;
     }
   }
@@ -174,7 +175,7 @@ public final class CustomItemCatalogWriter {
     int discarded = 0;
     for (String id : ids) {
       if (entries.size() >= MAX_ITEMS_PER_PROVIDER) {
-        Gloss.log(Level.WARNING, "[items] provider %s exposes %d ids, the catalog keeps the first %d",
+        Gloss.warn("Item provider %s exposes %d ids; the catalog keeps the first %d.",
             provider.id(), ids.size(), MAX_ITEMS_PER_PROVIDER);
         break;
       }
@@ -197,7 +198,7 @@ public final class CustomItemCatalogWriter {
       }
       ids = provider.listIds();
     } catch (Throwable failure) {
-      Gloss.logExceptionStack(false, failure, "[items] provider %s failed to enumerate its ids:", provider.id());
+      Gloss.logExceptionStack(false, failure, "Item provider %s failed to enumerate its ids.", provider.id());
       return List.of();
     }
 

@@ -175,20 +175,25 @@ final class BubbleMotionPlan {
         try {
             double value = ExprEvaluator.number(expression, scope);
             if (!Double.isFinite(value)) {
-                warnRuntime(path, "result was not finite");
+                warnRuntime(path, "result was not finite", null);
                 return fallback;
             }
             return Math.max(minimum, Math.min(maximum, value));
         } catch (RuntimeException failure) {
-            warnRuntime(path, failure.getMessage());
+            warnRuntime(path, failure.getMessage(), failure);
             return fallback;
         }
     }
 
-    private void warnRuntime(String path, String detail) {
+    private void warnRuntime(String path, String detail, RuntimeException failure) {
         if (runtimeFailureWarned.compareAndSet(false, true)) {
-            Gloss.warn(diagnosticLabel + " " + path + " failed at runtime; neutral fallback applied"
-                + (detail == null || detail.isBlank() ? "." : ": " + detail));
+            String message = diagnosticLabel + " " + path + " failed at runtime; neutral fallback applied"
+                + (detail == null || detail.isBlank() ? "." : ": " + detail);
+            if (failure == null) {
+                Gloss.warn(message);
+            } else {
+                Gloss.logExceptionStack(false, failure, "%s", message);
+            }
         }
     }
 

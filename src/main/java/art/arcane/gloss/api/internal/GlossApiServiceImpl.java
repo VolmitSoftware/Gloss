@@ -49,7 +49,7 @@ public final class GlossApiServiceImpl {
     published = Objects.requireNonNull(api, "api");
     Bukkit.getServicesManager().register(GlossAPI.class, published, plugin, ServicePriority.Normal);
     pluginDisableListener = Events.listen(plugin, PluginDisableEvent.class, event -> onOwnerDisabled(event.getPlugin()));
-    Gloss.log(Level.INFO, "Gloss API registered on the ServicesManager");
+    Gloss.verbose("Gloss API registered on the ServicesManager.");
   }
 
   public void unregister() {

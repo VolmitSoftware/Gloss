@@ -51,7 +51,6 @@ import java.util.concurrent.CancellationException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 import java.util.function.UnaryOperator;
-import java.util.logging.Level;
 
 @Director(name = "panel", aliases = {"panels"}, description = "Persistent world panel tools", descriptionKey = "command.help.panel")
 public final class CommandGlossPanel {
@@ -1252,7 +1251,7 @@ public final class CommandGlossPanel {
       accepted = SchedulerUtils.runGlobal(plugin(), task);
     }
     if (!accepted) {
-      Gloss.log(Level.WARNING,
+      Gloss.warnThrottled("panel-command-work-scheduling",
           "Unable to schedule persistent panel command work for %s.", sender.getName());
     }
   }
@@ -1362,7 +1361,7 @@ public final class CommandGlossPanel {
       accepted = SchedulerUtils.runGlobal(plugin(), feedback);
     }
     if (!accepted) {
-      Gloss.log(Level.WARNING,
+      Gloss.warnThrottled("panel-command-feedback-scheduling",
           "Unable to schedule persistent panel command feedback for %s.", sender.getName());
     }
   }

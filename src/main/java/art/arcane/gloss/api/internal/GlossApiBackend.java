@@ -30,8 +30,7 @@ final class GlossApiBackend implements ApiBackend {
     }
 
     if (FoliaScheduler.isFolia(plugin)) {
-      plugin.getLogger().warning("Failed to run entity task on Folia for plugin " + plugin.getName()
-          + "; refusing unsafe global fallback.");
+      Gloss.warn("Failed to run a Gloss API entity task on Folia; refusing an unsafe global fallback.");
       return false;
     }
 

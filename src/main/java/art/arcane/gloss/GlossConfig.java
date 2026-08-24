@@ -8,6 +8,9 @@ import java.util.Map;
 import java.util.Objects;
 
 public record GlossConfig(
+    String language,
+    boolean metrics,
+    boolean splashScreen,
     Holograms holograms,
     Boards boards,
     Tablist tablist,
@@ -23,8 +26,6 @@ public record GlossConfig(
     Groups groups,
     Hotload hotload,
     Commands commands,
-    boolean splashScreen,
-    boolean metrics,
     Menus menus,
     Panels panels,
     Previews previews,
@@ -396,6 +397,9 @@ public record GlossConfig(
     public static GlossConfig from(GlossConfigFile file) {
         GlossConfigFile source = Objects.requireNonNull(file, "file");
         return new GlossConfig(
+            source.language,
+            source.metrics,
+            source.splashScreen,
             new Holograms(
                 source.features.holograms,
                 source.holograms.stackDistance,
@@ -473,8 +477,6 @@ public record GlossConfig(
             new Commands(
                 source.commands.sounds
             ),
-            source.splashScreen,
-            source.metrics,
             new Menus(
                 source.features.menus,
                 (float) source.menus.uiScale

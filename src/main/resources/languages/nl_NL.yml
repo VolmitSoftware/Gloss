@@ -128,7 +128,7 @@
       "drops":
         "bundle_more": "+{count} meer"
       "items":
-        "disabled": "&7[&bGloss&7]: &7Custom items are disabled. Set &fcustomItems&7 to true in config.toml."
+        "disabled": "&7[&bGloss&7]: &7Custom items are disabled. Set &fcustomItems&7 to true in gloss.toml."
         "status":
           "header": "Custom Items"
           "summary": "{active}/{total} providers active"
@@ -528,5 +528,5 @@
   "command.import.holoui.missing": "&8[&dGloss&8] &cGeen holoui-gegevensmap gevonden naast de Gloss-gegevensmap."
   "command.import.holoui.done": "&8[&dGloss&8] &aHoloUi-import voltooid: &f{copied}&a gekopieerd, &f{skipped}&a overgeslagen, &f{overlaid}&a configuratiesleutels, &f{errors}&a fouten."
   "command.import.legacy.done": "&8[&dGloss&8] &aMigratie van verouderde gegevens voltooid: &f{migrated}&a gemigreerd, &f{absorbed}&a opgenomen, &f{overlaid}&a configuratiesleutels, &f{errors}&a fouten."
-  "command.import.config_unreadable": "&8[&dGloss&8] &cconfig.toml kon niet worden geladen: &f{reason}"
+  "command.import.config_unreadable": "&8[&dGloss&8] &cgloss.toml kon niet worden geladen: &f{reason}"
   "command.reload.done": "&8[&dGloss&8] &aGloss-configuratie en -services opnieuw geladen."

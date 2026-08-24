@@ -45,6 +45,8 @@ class GlossPermissionDeclarationTest {
   private static final Set<String> PLAYER_DEFAULT_NODES = Set.of(
       "gloss.emoji.use", "gloss.bubbles.send", "gloss.indicators.show");
 
+  private static final Set<String> NON_PERMISSION_LITERALS = Set.of("gloss.toml");
+
   private static final Pattern PERMISSION_LITERAL = Pattern.compile("\"(gloss(?:\\.[a-z]+)+)\"");
 
   @Test
@@ -129,7 +131,10 @@ class GlossPermissionDeclarationTest {
           .toList()) {
         Matcher matcher = PERMISSION_LITERAL.matcher(Files.readString(file, StandardCharsets.UTF_8));
         while (matcher.find()) {
-          used.add(matcher.group(1));
+          String literal = matcher.group(1);
+          if (!NON_PERMISSION_LITERALS.contains(literal)) {
+            used.add(literal);
+          }
         }
       }
     }

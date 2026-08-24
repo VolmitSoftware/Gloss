@@ -1,5 +1,6 @@
 package art.arcane.gloss.hologram;
 
+import art.arcane.gloss.Gloss;
 import art.arcane.gloss.api.AnchoredHologram;
 import art.arcane.gloss.doc.DocumentEnvelope;
 import art.arcane.gloss.text.TextPipeline;
@@ -21,7 +22,6 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
-import java.util.logging.Level;
 
 final class PersistentHologram implements AnchoredHologram {
     private static final double POSITION_EPSILON_SQUARED = 1.0E-6D;
@@ -570,7 +570,8 @@ final class PersistentHologram implements AnchoredHologram {
                     publishSpawnedSharedAnimation(spawned, snapshot, viewers);
                 }
             } catch (RuntimeException failure) {
-                service.plugin().getLogger().log(Level.WARNING, "Failed to spawn hologram " + id, failure);
+                Gloss.logExceptionStackThrottled(false, "persistent-hologram-spawn", failure,
+                    "Failed to spawn hologram %s.", id);
             } finally {
                 sharedSpawning.set(false);
             }
