@@ -1,6 +1,5 @@
 package art.arcane.gloss.editor.sync;
 
-import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 
 import java.nio.charset.StandardCharsets;
@@ -29,14 +28,6 @@ public record EditorSyncProject(EditorSyncKind kind, String subjectId, String ba
     if (encodedBytes > maximumBytes) {
       throw new EditorSyncProjectTooLargeException(encodedBytes, maximumBytes);
     }
-    JsonElement version = copy.get("version");
-    if (EditorSyncJson.RETIRED_V1_PROJECT_FORMAT.equals(rawFormat(copy))
-        || (version != null && version.isJsonPrimitive() && version.getAsJsonPrimitive().isNumber()
-        && version.getAsBigDecimal().compareTo(java.math.BigDecimal.ONE) == 0)) {
-      throw new IllegalArgumentException("sync project uses protocol v1 ("
-          + EditorSyncJson.RETIRED_V1_PROJECT_FORMAT
-          + "); Gloss speaks v2 only. Open a fresh session with a v2 editor and relay.");
-    }
     if (!EditorSyncJson.PROJECT_FORMAT.equals(EditorSyncJson.requireString(copy, "format"))) {
       throw new IllegalArgumentException("unsupported sync project format");
     }
@@ -53,10 +44,4 @@ public record EditorSyncProject(EditorSyncKind kind, String subjectId, String ba
     return new EditorSyncProject(kind, subjectId, baseRevision, copy, encodedBytes);
   }
 
-  private static String rawFormat(JsonObject project) {
-    JsonElement format = project.get("format");
-    return format != null && format.isJsonPrimitive() && format.getAsJsonPrimitive().isString()
-        ? format.getAsString()
-        : null;
-  }
 }

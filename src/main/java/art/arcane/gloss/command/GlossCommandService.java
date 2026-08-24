@@ -46,6 +46,16 @@ public final class GlossCommandService implements CommandExecutor, TabCompleter,
     private static final String ROOT_COMMAND = "gloss";
     private static final String HOLOGRAM_COMMAND = "hologram";
     private static final String BOARD_COMMAND = "board";
+    private static final DirectorMiniMenu.Theme MENU_THEME = new DirectorMiniMenu.Theme(
+            "#AA00AA",
+            "#FF55FF",
+            "#555555",
+            "#555555",
+            "#AAAAAA",
+            "#FF5555",
+            "#FF55FF",
+            "#555555"
+    );
     private static final List<String> BASE_COMMAND_PERMISSIONS = List.of(
             "gloss.admin",
             "gloss.holograms",
@@ -76,24 +86,26 @@ public final class GlossCommandService implements CommandExecutor, TabCompleter,
             "gloss.menus.back",
             "gloss.menus.create",
             "gloss.menus.edit",
-            "gloss.menus.builder",
             "gloss.panels",
-            "gloss.panels.editweb",
             "gloss.previews",
             "gloss.previews.reset",
             "gloss.previews.dump",
             "gloss.items",
             "gloss.items.export",
-            "gloss.sync",
+            "gloss.web",
+            "gloss.web.open",
+            "gloss.web.edit",
+            "gloss.web.workspace",
+            "gloss.web.sessions",
             "gloss.import",
             "gloss.import.apply"
     );
     /**
-     * The six ported subtrees keep HoloUi's positional-to-keyed convenience pre-pass. Everything
+     * The ported subtrees keep HoloUi's positional-to-keyed convenience pre-pass. Everything
      * else on /gloss (hologram, board, emoji, ...) stays strictly keyed per the Director law.
      */
     private static final Set<String> SCOPED_POSITIONAL_ROOTS = Set.of(
-            "menu", "menus", "panel", "panels", "preview", "previews", "item", "items", "sync", "import"
+            "menu", "menus", "panel", "panels", "preview", "previews", "item", "items", "web", "import"
     );
     private final Gloss plugin;
     private final DirectorTheme theme;
@@ -105,7 +117,7 @@ public final class GlossCommandService implements CommandExecutor, TabCompleter,
     }
 
     static DirectorMiniMenu.Theme menuTheme() {
-        return DirectorMiniMenu.Theme.fromDirectorTheme(DirectorThemes.forProduct(DirectorProduct.GLOSS));
+        return MENU_THEME;
     }
 
     public void register() {
@@ -180,11 +192,14 @@ public final class GlossCommandService implements CommandExecutor, TabCompleter,
             return List.of();
         }
         String[] routed = routedArgs(commandName, args, true);
-        if (!isScopedPositionalRoot(routed)) {
-            return runDirectorTab(sender, commandName, routed);
+        boolean scoped = isScopedPositionalRoot(routed);
+        String[] normalized = scoped ? normalizeTabArgs(routed) : routed;
+        if (!canCompleteRoute(sender, normalized)) {
+            return List.of();
         }
-        List<String> suggestions = runDirectorTab(sender, commandName, normalizeTabArgs(routed));
-        return restorePositionalSuggestions(routed, suggestions);
+        List<String> suggestions = filterWebCompletions(
+                sender, routed, runDirectorTab(sender, commandName, normalized));
+        return scoped ? restorePositionalSuggestions(routed, suggestions) : suggestions;
     }
 
     @Override
@@ -300,6 +315,13 @@ public final class GlossCommandService implements CommandExecutor, TabCompleter,
             return new String[]{args[0], "list", "page=" + args[2]};
         }
         if (args.length == 4
+                && args[0].equalsIgnoreCase("web")
+                && args[1].equalsIgnoreCase("sessions")
+                && args[2].equalsIgnoreCase("list")
+                && isBareOptionalValue(args[3])) {
+            return new String[]{args[0], args[1], args[2], "page=" + args[3]};
+        }
+        if (args.length == 4
                 && isGroup(args[0], "panel", "panels")
                 && args[1].equalsIgnoreCase("create")
                 && isBareOptionalValue(args[3])) {
@@ -379,6 +401,13 @@ public final class GlossCommandService implements CommandExecutor, TabCompleter,
             return new String[]{args[0], "list", "page=" + args[2]};
         }
         if (args.length == 4
+                && args[0].equalsIgnoreCase("web")
+                && args[1].equalsIgnoreCase("sessions")
+                && args[2].equalsIgnoreCase("list")
+                && isBareTabValue(args[3])) {
+            return new String[]{args[0], args[1], args[2], "page=" + args[3]};
+        }
+        if (args.length == 4
                 && isGroup(args[0], "panel", "panels")
                 && args[1].equalsIgnoreCase("create")
                 && isBareTabValue(args[3])) {
@@ -392,6 +421,55 @@ public final class GlossCommandService implements CommandExecutor, TabCompleter,
         return normalizedArgs.length > 1
                 && isGroup(normalizedArgs[0], "menu", "menus")
                 && normalizedArgs[1].equalsIgnoreCase("create");
+    }
+
+    private static boolean canCompleteRoute(CommandSender sender, String[] args) {
+        if (args.length < 2 || !args[0].equalsIgnoreCase("web")) {
+            return true;
+        }
+        String permission = webChildPermission(args[1]);
+        return permission == null || sender.hasPermission(permission);
+    }
+
+    private static List<String> filterWebCompletions(CommandSender sender, String[] args,
+                                                     List<String> suggestions) {
+        if (args.length <= 1) {
+            if (hasAnyWebPermission(sender)) {
+                return suggestions;
+            }
+            return suggestions.stream()
+                    .filter(suggestion -> !suggestion.equalsIgnoreCase("web"))
+                    .toList();
+        }
+        if (!args[0].equalsIgnoreCase("web") || args.length != 2) {
+            return suggestions;
+        }
+        return suggestions.stream()
+                .filter(suggestion -> {
+                    String permission = webChildPermission(suggestion);
+                    return permission == null || sender.hasPermission(permission);
+                })
+                .toList();
+    }
+
+    private static boolean hasAnyWebPermission(CommandSender sender) {
+        return sender.hasPermission(CommandGlossWeb.OPEN_PERMISSION)
+                || sender.hasPermission(CommandGlossWeb.EDIT_PERMISSION)
+                || sender.hasPermission(CommandGlossWeb.WORKSPACE_PERMISSION)
+                || sender.hasPermission(CommandGlossWebSessions.PERMISSION);
+    }
+
+    private static String webChildPermission(String child) {
+        if (child == null) {
+            return null;
+        }
+        return switch (child.toLowerCase(Locale.ROOT)) {
+            case "open" -> CommandGlossWeb.OPEN_PERMISSION;
+            case "edit" -> CommandGlossWeb.EDIT_PERMISSION;
+            case "workspace" -> CommandGlossWeb.WORKSPACE_PERMISSION;
+            case "sessions" -> CommandGlossWebSessions.PERMISSION;
+            default -> null;
+        };
     }
 
     static List<String> restorePositionalSuggestions(String[] args, List<String> suggestions) {
@@ -445,6 +523,13 @@ public final class GlossCommandService implements CommandExecutor, TabCompleter,
                 && isGroup(args[0], "panel", "panels")
                 && args[1].equalsIgnoreCase("list")
                 && isBareTabValue(args[2])) {
+            return "page=";
+        }
+        if (args.length == 4
+                && args[0].equalsIgnoreCase("web")
+                && args[1].equalsIgnoreCase("sessions")
+                && args[2].equalsIgnoreCase("list")
+                && isBareTabValue(args[3])) {
             return "page=";
         }
         if (args.length == 4
@@ -604,8 +689,7 @@ public final class GlossCommandService implements CommandExecutor, TabCompleter,
             return false;
         }
 
-        DirectorMiniMenu.Theme helpTheme = DirectorMiniMenu.Theme.fromDirectorTheme(theme);
-        DirectorMiniMenu.deliver(sender, page.get(), helpTheme, GlossLocalization.globalDirectorResolver());
+        DirectorMiniMenu.deliver(sender, page.get(), MENU_THEME, GlossLocalization.globalDirectorResolver());
 
         return true;
     }

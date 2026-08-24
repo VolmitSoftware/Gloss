@@ -15,9 +15,8 @@ import java.util.HexFormat;
 import java.util.List;
 
 public final class EditorSyncJson {
-  public static final int PROTOCOL_VERSION = 2;
+  public static final int PROTOCOL_VERSION = 3;
   public static final String PROJECT_FORMAT = "gloss-sync-project";
-  public static final String RETIRED_V1_PROJECT_FORMAT = "holoui-sync-project";
   public static final long MAX_SAFE_INTEGER = 9_007_199_254_740_991L;
 
   private EditorSyncJson() {

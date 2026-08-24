@@ -2,13 +2,10 @@ package art.arcane.gloss.editor.sync;
 
 import art.arcane.gloss.Gloss;
 import art.arcane.gloss.panel.PanelDefinition;
-import art.arcane.gloss.panel.PanelRepository;
 import art.arcane.gloss.config.GlossConfigFile;
-import art.arcane.gloss.config.menu.MenuDocument;
-import art.arcane.gloss.editor.EditorMenuHandoff;
+import art.arcane.gloss.editor.EditorUrl;
 import art.arcane.gloss.persistence.GlossPersistenceCoordinator;
 import art.arcane.gloss.persistence.GlossProjectTransaction;
-import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -62,6 +59,7 @@ public final class EditorSyncService {
   private final ScopedProjectReader scopedProjectReader;
   private final Map<String, EditorSyncStoredSession> sessions;
   private final Map<String, EditorSyncPollBackoff> pollBackoffs;
+  private final Map<EditorSyncKind, List<String>> subjectIdCache;
   private final Set<String> inFlight;
   private final Set<String> recoveryRequired;
   private final Set<CompletableFuture<?>> activeOperations;
@@ -92,6 +90,7 @@ public final class EditorSyncService {
         "scopedProjectReader");
     this.sessions = new ConcurrentHashMap<>();
     this.pollBackoffs = new ConcurrentHashMap<>();
+    this.subjectIdCache = new ConcurrentHashMap<>();
     this.inFlight = ConcurrentHashMap.newKeySet();
     this.recoveryRequired = ConcurrentHashMap.newKeySet();
     this.activeOperations = ConcurrentHashMap.newKeySet();
@@ -156,11 +155,8 @@ public final class EditorSyncService {
       throw new IllegalStateException("Unable to load editor sync sessions", failure);
     }
     long period = settings.pollSeconds();
+    executor.execute(this::refreshSubjectIds);
     executor.scheduleWithFixedDelay(this::pollAllSafely, period, period, TimeUnit.SECONDS);
-  }
-
-  public CompletableFuture<EditorSyncOpenResult> openMenu(String menuId) {
-    return create(EditorSyncKind.MENU, menuId);
   }
 
   public boolean isRunning() {
@@ -171,8 +167,17 @@ public final class EditorSyncService {
     return running.get() && persistenceHealthy.get();
   }
 
-  public CompletableFuture<EditorSyncOpenResult> openBoard(String boardId) {
-    return create(EditorSyncKind.PANEL, boardId);
+  public CompletableFuture<EditorSyncOpenResult> open(
+      EditorSyncKind kind, String subjectId) {
+    return create(Objects.requireNonNull(kind, "kind"), subjectId);
+  }
+
+  public CompletableFuture<EditorSyncOpenResult> openWorkspace() {
+    return open(EditorSyncKind.WORKSPACE, EditorSyncContentSnapshotBuilder.WORKSPACE_SUBJECT_ID);
+  }
+
+  public List<String> subjectIds(EditorSyncKind kind) {
+    return subjectIdCache.getOrDefault(Objects.requireNonNull(kind, "kind"), List.of());
   }
 
   public List<EditorSyncSessionInfo> sessions() {
@@ -307,7 +312,11 @@ public final class EditorSyncService {
           "the official editor sync relay requires editorSyncCreateToken"));
     }
     return startTracked(() ->
-        CompletableFuture.supplyAsync(() -> currentProject(kind, subjectId), executor)
+        CompletableFuture.supplyAsync(() -> {
+          EditorSyncProject project = currentProject(kind, subjectId);
+          refreshSubjectIds();
+          return project;
+        }, executor)
             .thenCompose(project -> {
               reserveCreate(project);
               return relay.create(endpoint, createToken, project,
@@ -540,22 +549,14 @@ public final class EditorSyncService {
   private CompletableFuture<Void> applyPublication(
       EditorSyncStoredSession session, EditorSyncPublication publication,
       EditorSyncPublicationValidator.ValidatedProject validated) {
-    PanelDefinition previousBoard = session.kind() == EditorSyncKind.PANEL
-        ? plugin.getPanelService().get(session.subjectId()).orElse(null)
-        : null;
-    if (session.kind() == EditorSyncKind.PANEL && previousBoard == null) {
-      return queueAndSend(session, new EditorSyncPendingAck(publication.revision(), "rejected",
-          "The board no longer exists.", null));
-    }
-    PanelDefinition appliedBoard = nextBoard(previousBoard, validated.board());
-    Map<String, String> menus = normalizedMenus(validated.menus());
-    EditorSyncProject expectedApplied = snapshotBuilder.fromContent(session.kind(), session.subjectId(),
-        appliedBoard, menus, validated.images(),
-        EditorSyncJson.requireObject(session.baseProject(), "constraints"),
-        settings.maximumProjectBytes());
+    EditorSyncProject expectedApplied = validated.project();
     EditorSyncPendingAck acknowledgement = new EditorSyncPendingAck(publication.revision(), "applied",
         "Published to the server.", expectedApplied.json());
     EditorSyncStoredSession pendingSession = storePending(session, acknowledgement);
+
+    if (validated.noOp()) {
+      return sendPending(pendingSession);
+    }
 
     GlossPersistenceCoordinator.ExternalTransaction lease;
     try {
@@ -586,37 +587,36 @@ public final class EditorSyncService {
     GlossProjectTransaction.Pending transaction;
     try {
       Map<Path, byte[]> expectedFiles = expectedFiles(session, validated);
-      transaction = plugin.getProjectTransaction().apply(session.sessionId(), menus,
-          validated.images(), appliedBoard, expectedFiles);
+      transaction = plugin.getProjectTransaction().apply(session.sessionId(),
+          mutations(validated), expectedFiles);
     } catch (IOException | RuntimeException failure) {
       clearPending(pendingSession);
       lease.close();
       return CompletableFuture.failedFuture(failure);
     }
 
-    CompletableFuture<List<MenuDocument>> menuPublication =
-        plugin.getMenuCatalog().publishEditorSyncProject(menus);
+    CompletableFuture<?> menuPublication = validated.changedKinds()
+        .contains(EditorSyncDocumentKind.MENU)
+        ? plugin.getMenuCatalog().publishEditorSyncProject(
+            validated.appliedMenus(), validated.deletedMenus())
+        : CompletableFuture.completedFuture(null);
     trackSchedulerPublication(menuPublication);
-    CompletableFuture<PanelDefinition> published = menuPublication.thenApply(documents -> {
-          if (appliedBoard == null) {
-            return null;
-          }
-          try {
-            return plugin.getPanelService().publishExternalUpdate(previousBoard, appliedBoard);
-          } catch (IOException failure) {
-            throw new CompletionException(failure);
-          }
-        });
+    CompletableFuture<Void> published = menuPublication.thenCompose(ignored ->
+        plugin.publishEditorSyncRuntime(validated.changedKinds(), validated.imagesChanged()));
+    trackSchedulerPublication(published);
     CompletableFuture<Void> result = new CompletableFuture<>();
     published.whenCompleteAsync((ignored, failure) -> {
       if (failure != null) {
-        rollbackPublication(session, pendingSession, transaction, previousBoard, appliedBoard,
-            lease, failure, result);
+        rollbackPublication(session, pendingSession, transaction, validated, lease, failure, result);
         return;
       }
       EditorSyncStoredSession actualPendingSession = pendingSession;
       try {
         EditorSyncProject actualProject = currentProject(session, expectedApplied.json());
+        if (!actualProject.baseRevision().equals(expectedApplied.baseRevision())) {
+          throw new IllegalStateException(
+              "server content changed while the editor sync transaction was publishing");
+        }
         actualPendingSession = storePending(pendingSession,
             new EditorSyncPendingAck(publication.revision(), "applied",
                 "Published to the server.", actualProject.json()));
@@ -638,12 +638,13 @@ public final class EditorSyncService {
         result.completeExceptionally(uncertainFailure);
         return;
       } catch (IOException | RuntimeException commitFailure) {
-        rollbackPublication(session, pendingSession, transaction, previousBoard, appliedBoard,
+        rollbackPublication(session, pendingSession, transaction, validated,
             lease, commitFailure, result);
         return;
       }
       sendPending(actualPendingSession).whenComplete((acknowledged, ackFailure) -> {
         if (ackFailure == null) {
+          refreshSubjectIds();
           result.complete(null);
         } else {
           result.completeExceptionally(ackFailure);
@@ -656,7 +657,7 @@ public final class EditorSyncService {
   private void rollbackPublication(EditorSyncStoredSession baseSession,
                                    EditorSyncStoredSession pendingSession,
                                    GlossProjectTransaction.Pending transaction,
-                                   PanelDefinition previousBoard, PanelDefinition appliedBoard,
+                                   EditorSyncPublicationValidator.ValidatedProject validated,
                                    GlossPersistenceCoordinator.ExternalTransaction lease,
                                    Throwable originalFailure, CompletableFuture<Void> result) {
     Throwable failure = rootCause(originalFailure);
@@ -679,19 +680,16 @@ public final class EditorSyncService {
       return;
     }
     Map<String, String> baseMenus = menuSources(baseSession.baseProject());
-    CompletableFuture<List<MenuDocument>> menuPublication =
-        plugin.getMenuCatalog().publishEditorSyncProject(baseMenus);
+    Set<String> rolledBackMenus = new java.util.TreeSet<>(validated.appliedMenus().keySet());
+    rolledBackMenus.removeAll(baseMenus.keySet());
+    CompletableFuture<?> menuPublication = validated.changedKinds()
+        .contains(EditorSyncDocumentKind.MENU)
+        ? plugin.getMenuCatalog().publishEditorSyncProject(baseMenus, rolledBackMenus)
+        : CompletableFuture.completedFuture(null);
     trackRollbackPublication(menuPublication);
-    CompletableFuture<PanelDefinition> republished = menuPublication.thenApply(documents -> {
-          if (previousBoard == null || appliedBoard == null) {
-            return previousBoard;
-          }
-          try {
-            return plugin.getPanelService().recoverExternalUpdate(appliedBoard, previousBoard);
-          } catch (IOException rollbackFailure) {
-            throw new CompletionException(rollbackFailure);
-          }
-        });
+    CompletableFuture<Void> republished = menuPublication.thenCompose(ignored ->
+        plugin.publishEditorSyncRuntime(validated.changedKinds(), validated.imagesChanged()));
+    trackRollbackPublication(republished);
     republished.whenCompleteAsync((ignored, rollbackFailure) -> {
       try {
         clearPending(pendingSession);
@@ -778,24 +776,85 @@ public final class EditorSyncService {
 
   private Map<Path, byte[]> expectedFiles(
       EditorSyncStoredSession session,
-      EditorSyncPublicationValidator.ValidatedProject publication) throws IOException {
+      EditorSyncPublicationValidator.ValidatedProject publication) {
     Path data = plugin.getDataFolder().toPath().toAbsolutePath().normalize();
-    Map<String, String> baseMenus = menuSources(session.baseProject());
-    Map<String, byte[]> baseImages = imageContents(session.baseProject());
     Map<Path, byte[]> expected = new LinkedHashMap<>();
-    for (String id : publication.menus().keySet()) {
-      String baseSource = baseMenus.get(id);
-      expected.put(data.resolve("menus").resolve(id + ".json").normalize(),
-          baseSource == null ? null : baseSource.getBytes(StandardCharsets.UTF_8));
+    Set<EditorSyncPublicationValidator.DocumentKey> documentKeys = new java.util.HashSet<>(
+        publication.baseDocuments().keySet());
+    documentKeys.addAll(publication.appliedDocuments().keySet());
+    for (EditorSyncPublicationValidator.DocumentKey key : documentKeys) {
+      EditorSyncPublicationValidator.ParsedEntry base = publication.baseDocuments().get(key);
+      EditorSyncPublicationValidator.ParsedEntry applied = publication.appliedDocuments().get(key);
+      if (sameEntry(base, applied)) {
+        continue;
+      }
+      Path target = key.kind().path(data, key.id());
+      byte[] expectedBytes;
+      if (base == null) {
+        expectedBytes = null;
+      } else if (key.kind() == EditorSyncDocumentKind.PANEL) {
+        try {
+          expectedBytes = expectedBoardFile(target, session.baseProject());
+        } catch (IOException failure) {
+          throw new CompletionException(failure);
+        }
+      } else {
+        expectedBytes = base.entry().json().getBytes(StandardCharsets.UTF_8);
+      }
+      expected.put(target, expectedBytes);
     }
-    for (String path : publication.images().keySet()) {
-      expected.put(data.resolve("images").resolve(path).normalize(), baseImages.get(path));
+    Set<String> imagePaths = new java.util.HashSet<>(publication.baseImages().keySet());
+    imagePaths.addAll(publication.appliedImages().keySet());
+    for (String path : imagePaths) {
+      byte[] base = publication.baseImages().get(path);
+      byte[] applied = publication.appliedImages().get(path);
+      if (java.util.Arrays.equals(base, applied)) {
+        continue;
+      }
+      expected.put(data.resolve("images").resolve(path).normalize(), base);
     }
-    if (publication.board() != null) {
-      Path board = data.resolve(PanelRepository.DIRECTORY_NAME).resolve(session.subjectId() + ".json").normalize();
-      expected.put(board, expectedBoardFile(board, session.baseProject()));
+    return java.util.Collections.unmodifiableMap(new LinkedHashMap<>(expected));
+  }
+
+  private Map<Path, GlossProjectTransaction.Mutation> mutations(
+      EditorSyncPublicationValidator.ValidatedProject publication) {
+    Path data = plugin.getDataFolder().toPath().toAbsolutePath().normalize();
+    Map<Path, GlossProjectTransaction.Mutation> mutations = new LinkedHashMap<>();
+    Set<EditorSyncPublicationValidator.DocumentKey> documentKeys = new java.util.HashSet<>(
+        publication.baseDocuments().keySet());
+    documentKeys.addAll(publication.appliedDocuments().keySet());
+    for (EditorSyncPublicationValidator.DocumentKey key : documentKeys) {
+      EditorSyncPublicationValidator.ParsedEntry base = publication.baseDocuments().get(key);
+      EditorSyncPublicationValidator.ParsedEntry applied = publication.appliedDocuments().get(key);
+      if (sameEntry(base, applied)) {
+        continue;
+      }
+      Path path = key.kind().path(data, key.id());
+      mutations.put(path, applied == null
+          ? GlossProjectTransaction.Mutation.delete()
+          : GlossProjectTransaction.Mutation.write(
+              key.kind().persistedBytes(key.id(), applied.entry().json())));
     }
-    return Map.copyOf(expected);
+    Set<String> imagePaths = new java.util.HashSet<>(publication.baseImages().keySet());
+    imagePaths.addAll(publication.appliedImages().keySet());
+    for (String path : imagePaths) {
+      byte[] base = publication.baseImages().get(path);
+      byte[] applied = publication.appliedImages().get(path);
+      if (java.util.Arrays.equals(base, applied)) {
+        continue;
+      }
+      Path target = data.resolve("images").resolve(path).normalize();
+      mutations.put(target, applied == null
+          ? GlossProjectTransaction.Mutation.delete()
+          : GlossProjectTransaction.Mutation.write(applied));
+    }
+    return Map.copyOf(mutations);
+  }
+
+  private boolean sameEntry(EditorSyncPublicationValidator.ParsedEntry left,
+                            EditorSyncPublicationValidator.ParsedEntry right) {
+    return left == null ? right == null : right != null
+        && left.entry().json().equals(right.entry().json());
   }
 
   static byte[] expectedBoardFile(Path boardPath, JsonObject baseProject) throws IOException {
@@ -812,11 +871,13 @@ public final class EditorSyncService {
         throw new IllegalArgumentException("board document must be an object");
       }
       persisted = GSON.fromJson(parsed, PanelDefinition.class);
-      JsonObject capturedPanel = EditorSyncDocuments.panelJson(baseProject);
-      if (capturedPanel == null) {
+      List<EditorSyncDocuments.Entry> panels = EditorSyncDocuments.ofKind(
+          EditorSyncDocuments.parse(baseProject), EditorSyncDocumentKind.PANEL.wireName());
+      if (panels.size() != 1) {
         throw new IllegalArgumentException("sync project is missing its panel document");
       }
-      captured = GSON.fromJson(capturedPanel, PanelDefinition.class);
+      captured = GSON.fromJson(JsonParser.parseString(panels.getFirst().json()),
+          PanelDefinition.class);
     } catch (RuntimeException failure) {
       throw new IOException("board snapshot file is invalid", failure);
     }
@@ -827,9 +888,7 @@ public final class EditorSyncService {
   }
 
   private EditorSyncProject currentProject(EditorSyncKind kind, String subjectId) {
-    return kind == EditorSyncKind.MENU
-        ? snapshotBuilder.menu(subjectId, settings.maximumProjectBytes())
-        : snapshotBuilder.board(subjectId, settings.maximumProjectBytes());
+    return snapshotBuilder.open(kind, subjectId, settings.maximumProjectBytes());
   }
 
   private EditorSyncProject currentProject(EditorSyncStoredSession session, JsonObject scopeProject) {
@@ -839,36 +898,7 @@ public final class EditorSyncService {
   private static EditorSyncProject scopedProject(
       Gloss plugin, EditorSyncSnapshotSource snapshotBuilder,
       EditorSyncStoredSession session, JsonObject scopeProject, int maximumBytes) {
-    Map<String, String> menus = new LinkedHashMap<>();
-    for (String id : menuSources(scopeProject).keySet()) {
-      String source = plugin.getMenuCatalog().source(id)
-          .orElseThrow(() -> new IllegalStateException("scoped sync menu is no longer loaded: " + id));
-      menus.put(id, source);
-    }
-    Map<String, byte[]> images = new LinkedHashMap<>();
-    Path imageRoot = plugin.getDataFolder().toPath().toAbsolutePath().normalize().resolve("images");
-    for (String path : imageContents(scopeProject).keySet()) {
-      try {
-        Path image = EditorSyncSnapshotBuilder.resolveConfinedFile(imageRoot, path, true);
-        byte[] content = Files.readAllBytes(image);
-        if (content.length > EditorSyncSnapshotBuilder.MAX_IMAGE_BYTES) {
-          throw new EditorSyncProjectTooLargeException(content.length,
-              EditorSyncSnapshotBuilder.MAX_IMAGE_BYTES);
-        }
-        EditorSyncSnapshotBuilder.detectMediaType(content);
-        images.put(path, content);
-      } catch (IOException failure) {
-        throw new CompletionException(failure);
-      }
-    }
-    PanelDefinition board = session.kind() == EditorSyncKind.PANEL
-        ? plugin.getPanelService().get(session.subjectId())
-        .orElseThrow(() -> new IllegalStateException(
-            "scoped sync board is no longer loaded: " + session.subjectId()))
-        : null;
-    return snapshotBuilder.fromContent(session.kind(), session.subjectId(), board, menus, images,
-        EditorSyncJson.requireObject(scopeProject, "constraints"),
-        maximumBytes);
+    return snapshotBuilder.open(session.kind(), session.subjectId(), maximumBytes);
   }
 
   private void validateStoredSession(EditorSyncStoredSession session) {
@@ -985,6 +1015,17 @@ public final class EditorSyncService {
     return pollBackoffs.computeIfAbsent(sessionId, ignored -> new EditorSyncPollBackoff());
   }
 
+  private void refreshSubjectIds() {
+    for (EditorSyncKind kind : EditorSyncKind.values()) {
+      try {
+        subjectIdCache.put(kind, snapshotBuilder.subjectIds(kind));
+      } catch (RuntimeException failure) {
+        logger.log(Level.WARNING,
+            "Unable to refresh editor sync subject ids for " + kind.wireName() + ".", failure);
+      }
+    }
+  }
+
   void trackSchedulerPublication(CompletableFuture<?> publication) {
     synchronized (lifecycleLock) {
       if (!running.get()) {
@@ -1008,7 +1049,7 @@ public final class EditorSyncService {
     }
     String relay = Base64.getUrlEncoder().withoutPadding()
         .encodeToString(endpoint.getBytes(StandardCharsets.UTF_8));
-    return EditorMenuHandoff.editorBase(builderUrl) + "#/sync/" + sessionId + "/"
+    return EditorUrl.base(builderUrl) + "#/sync/" + sessionId + "/"
         + editorToken + "?relay=" + relay;
   }
 
@@ -1016,51 +1057,8 @@ public final class EditorSyncService {
     return sessionId.length() <= 12 ? sessionId : sessionId.substring(0, 12);
   }
 
-  private static PanelDefinition nextBoard(PanelDefinition previous, PanelDefinition changed) {
-    if (previous == null) {
-      return null;
-    }
-    if (changed == null || changed.revision() != previous.revision()
-        || !changed.id().equals(previous.id()) || !changed.uuid().equals(previous.uuid())) {
-      throw new IllegalArgumentException("published board identity or revision does not match the server");
-    }
-    if (previous.revision() == PanelDefinition.MAX_SAFE_REVISION) {
-      throw new IllegalStateException("board revision overflow");
-    }
-    return new PanelDefinition(changed.schemaVersion(), changed.id(), changed.uuid(),
-        previous.revision() + 1L, changed.rootMenuId(), changed.transform(), changed.follow(),
-        changed.visibility());
-  }
-
-  static Map<String, String> normalizedMenus(Map<String, String> menus) {
-    Map<String, String> normalized = new LinkedHashMap<>();
-    menus.entrySet().stream().sorted(Map.Entry.comparingByKey()).forEach(entry -> {
-      String source = entry.getValue();
-      normalized.put(entry.getKey(), source.endsWith("\n") || source.endsWith("\r")
-          ? source
-          : source + System.lineSeparator());
-    });
-    return Map.copyOf(normalized);
-  }
-
   private static Map<String, String> menuSources(JsonObject project) {
     return Map.copyOf(EditorSyncDocuments.menuSources(EditorSyncDocuments.parse(project)));
-  }
-
-  private static Map<String, byte[]> imageContents(JsonObject project) {
-    Map<String, byte[]> images = new LinkedHashMap<>();
-    JsonArray entries = EditorSyncJson.requireArray(project, "images");
-    for (JsonElement value : entries) {
-      JsonObject entry = value.getAsJsonObject();
-      String data = EditorSyncJson.requireString(entry, "data");
-      int separator = data.indexOf(',');
-      if (separator < 0) {
-        throw new IllegalArgumentException("stored image data URL is malformed");
-      }
-      images.put(EditorSyncJson.requireString(entry, "path"),
-          Base64.getDecoder().decode(data.substring(separator + 1)));
-    }
-    return Map.copyOf(images);
   }
 
   private static Throwable rootCause(Throwable failure) {

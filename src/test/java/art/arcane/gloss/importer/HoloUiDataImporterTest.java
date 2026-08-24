@@ -44,7 +44,6 @@ class HoloUiDataImporterTest {
           "debugPosition": true,
           "builderUrl": "https://editor.example.com",
           "editorSyncEnabled": false,
-          "editorSyncEndpoint": "https://sync.holoui.volmitsoftware.com/v1",
           "editorSyncCreateToken": "abcdefghijklmnopqrstuv",
           "editorSyncSessionMinutes": 120,
           "editorSyncPollSeconds": 7,
@@ -146,7 +145,7 @@ class HoloUiDataImporterTest {
     }
 
     @Test
-    void settingsOverlayLandsInConfigAndRejectsTheRetiredEndpoint() throws IOException {
+    void settingsOverlayLandsInConfig() throws IOException {
         GlossConfigFile config = loader.loadForBoot();
 
         HoloUiDataImporter.Result result = importer().run(config, false);
@@ -166,9 +165,6 @@ class HoloUiDataImporterTest {
         assertEquals(2.0D, config.menus.uiScale);
         assertFalse(config.items.customItems);
         assertEquals(List.of("oraxen", "mmoitems", "nexo"), config.items.customItemProviders);
-        assertEquals(HoloUiImportDisposition.SKIPPED_RETIRED_ENDPOINT,
-            disposition(result, "settings.json:editorSyncEndpoint"));
-
         String toml = Files.readString(dataFolder.resolve(GlossConfigLoader.FILE_NAME), StandardCharsets.UTF_8);
         assertTrue(toml.contains("lookDistance = 14.5"));
         assertTrue(toml.contains(GlossConfigFile.EDITOR_SYNC_ENDPOINT_DEFAULT));
@@ -193,7 +189,6 @@ class HoloUiDataImporterTest {
         assertEquals("skipped-shipped-identical", receiptDisposition(entries, "previews/chest.json"));
         assertEquals("skipped-secret", receiptDisposition(entries, "editor-sync-sessions.json"));
         assertEquals("overlaid-config-key", receiptDisposition(entries, "settings.json:previewScale"));
-        assertEquals("skipped-retired-endpoint", receiptDisposition(entries, "settings.json:editorSyncEndpoint"));
     }
 
     @Test
@@ -262,14 +257,6 @@ class HoloUiDataImporterTest {
         assertFalse(result.sourcePresent());
         assertTrue(result.entries().isEmpty());
         assertFalse(Files.exists(dataFolder.resolve(HoloUiDataImporter.RECEIPT_FILE_NAME)));
-    }
-
-    @Test
-    void retiredEndpointDetectionCoversAnyV1Path() {
-        assertTrue(HoloUiDataImporter.isRetiredEndpoint("https://sync.holoui.volmitsoftware.com/v1"));
-        assertTrue(HoloUiDataImporter.isRetiredEndpoint("https://relay.example.com/api/v1/"));
-        assertFalse(HoloUiDataImporter.isRetiredEndpoint("https://sync.gloss.volmitsoftware.com/v2"));
-        assertFalse(HoloUiDataImporter.isRetiredEndpoint("https://relay.example.com/v10"));
     }
 
     private static HoloUiImportDisposition disposition(HoloUiDataImporter.Result result, String path) {

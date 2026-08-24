@@ -11,8 +11,11 @@ import art.arcane.gloss.config.menu.MenuDocumentParser;
 import art.arcane.gloss.config.menu.MenuIds;
 import art.arcane.gloss.persistence.GlossPersistenceCoordinator;
 import art.arcane.gloss.persistence.GlossProjectTransaction;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
@@ -35,6 +38,11 @@ import java.util.logging.Logger;
 public final class PanelCreationService {
   private static final long SHUTDOWN_TIMEOUT_SECONDS = 30L;
   private static final long FORCE_SHUTDOWN_TIMEOUT_SECONDS = 5L;
+  private static final Gson GSON = new GsonBuilder()
+      .serializeNulls()
+      .disableHtmlEscaping()
+      .setPrettyPrinting()
+      .create();
 
   private final Dependencies dependencies;
   private final ExecutorService executor;
@@ -125,9 +133,18 @@ public final class PanelCreationService {
       lease = dependencies.persistenceCoordinator().beginExternalTransaction();
       ensureAvailable(id);
       Map<Path, byte[]> expectedFiles = expectedFiles(id);
+      Path data = dependencies.dataDirectory().toAbsolutePath().normalize();
+      Path menuPath = data.resolve("menus").resolve(id + ".json").normalize();
+      Path panelPath = data.resolve(PanelRepository.DIRECTORY_NAME)
+          .resolve(id + ".json").normalize();
+      Map<Path, GlossProjectTransaction.Mutation> mutations = Map.of(
+          menuPath, GlossProjectTransaction.Mutation.write(
+              ensureLineEnd(menuSource).getBytes(StandardCharsets.UTF_8)),
+          panelPath, GlossProjectTransaction.Mutation.write(
+              (GSON.toJson(board) + System.lineSeparator()).getBytes(StandardCharsets.UTF_8)));
       transactionAttempted = true;
       transaction = dependencies.projectTransaction().apply(
-          "create-" + id, Map.of(id, menuSource), Map.of(), board, expectedFiles);
+          "create-" + id, mutations, expectedFiles);
       MenuDocument publishedMenu = dependencies.menus().publish(id, menuSource);
       PanelDefinition publishedBoard = dependencies.boards().publish(board);
       try {
@@ -165,6 +182,12 @@ public final class PanelCreationService {
         lease.close();
       }
     }
+  }
+
+  private static String ensureLineEnd(String source) {
+    return source.endsWith("\n") || source.endsWith("\r")
+        ? source
+        : source + System.lineSeparator();
   }
 
   private void ensureAvailable(String id) throws IOException {

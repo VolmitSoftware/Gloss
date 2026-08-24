@@ -12,6 +12,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -47,6 +48,22 @@ class GlossCommandHelpDeliveryTest {
     for (String line : received) {
       assertFalse(line.startsWith("---"), line);
     }
+    assertTrue(received.stream().anyMatch(line -> line.contains("<click:")));
+    assertTrue(received.stream().anyMatch(line -> line.contains("<hover:")));
+  }
+
+  @Test
+  void glossHelpUsesReadablePurpleWithDarkGreyStructure() {
+    DirectorMiniMenu.Theme theme = GlossCommandService.menuTheme();
+
+    assertEquals("#AA00AA", theme.primaryLeft());
+    assertEquals("#FF55FF", theme.primaryRight());
+    assertEquals("#555555", theme.borderLeft());
+    assertEquals("#555555", theme.borderRight());
+    assertEquals("#AAAAAA", theme.description());
+    assertEquals("#FF5555", theme.required());
+    assertEquals("#FF55FF", theme.optional());
+    assertEquals("#555555", theme.muted());
   }
 
   private static void deliver(CommandSender sender) {

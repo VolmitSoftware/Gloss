@@ -10,7 +10,10 @@ import org.bukkit.World;
 import org.bukkit.entity.Display;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.TextDisplay;
+import org.bukkit.util.Transformation;
 import org.bukkit.util.Vector;
+import org.joml.Quaternionf;
+import org.joml.Vector3f;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -68,6 +71,7 @@ final class PersistentHologram implements AnchoredHologram {
     private volatile LineSet lineSet;
     private volatile AnchorState anchorState;
     private volatile boolean seeThrough;
+    private volatile double scale;
     private volatile String billboard;
     private volatile double yaw;
     private volatile double pitch;
@@ -97,6 +101,7 @@ final class PersistentHologram implements AnchoredHologram {
         this.anchorState = new AnchorState(world.getName(), location.getX(), location.getY(),
             location.getZ(), 0L);
         this.seeThrough = true;
+        this.scale = HologramDoc.DEFAULT_SCALE;
         this.billboard = HologramDoc.DEFAULT_BILLBOARD;
         this.yaw = 0.0D;
         this.pitch = 0.0D;
@@ -204,6 +209,11 @@ final class PersistentHologram implements AnchoredHologram {
     }
 
     @Override
+    public double scale() {
+        return scale;
+    }
+
+    @Override
     public double yaw() {
         return yaw;
     }
@@ -211,6 +221,13 @@ final class PersistentHologram implements AnchoredHologram {
     @Override
     public double pitch() {
         return pitch;
+    }
+
+    @Override
+    public void setScale(double scale) {
+        this.scale = HologramDoc.requireScale(scale);
+        applyScale();
+        service.persist(this);
     }
 
     @Override
@@ -231,10 +248,12 @@ final class PersistentHologram implements AnchoredHologram {
         anchorState = new AnchorState(anchor.world(), anchor.position().getX(), anchor.position().getY(),
             anchor.position().getZ(), previousAnchor == null ? 0L : previousAnchor.generation() + 1L);
         boolean visibilityChanged = seeThrough != doc.seeThrough();
+        boolean scaleChanged = scale != doc.scale();
         boolean orientationChanged = !doc.billboard().equals(billboard)
             || doc.yaw() != yaw
             || doc.pitch() != pitch;
         seeThrough = doc.seeThrough();
+        scale = doc.scale();
         billboard = doc.billboard();
         yaw = doc.yaw();
         pitch = doc.pitch();
@@ -245,6 +264,9 @@ final class PersistentHologram implements AnchoredHologram {
         if (visibilityChanged) {
             applySeeThrough();
         }
+        if (scaleChanged) {
+            applyScale();
+        }
         if (orientationChanged) {
             applyOrientation();
         }
@@ -254,7 +276,7 @@ final class PersistentHologram implements AnchoredHologram {
         AnchorState anchor = anchorState;
         return new HologramDoc(HologramDoc.CURRENT_SCHEMA_VERSION, revision,
             new HologramDoc.Anchor(anchor.worldName(), new Vector(anchor.x(), anchor.y(), anchor.z())), lineSet.lines(), seeThrough,
-            billboard, yaw, pitch);
+            scale, billboard, yaw, pitch);
     }
 
     long nextRevision() {
@@ -545,6 +567,7 @@ final class PersistentHologram implements AnchoredHologram {
 
                 Consumer<TextDisplay> configurer = spawned -> {
                     service.configureDisplay(spawned, seeThrough, billboardMode());
+                    spawned.setTransformation(scaleTransformation());
                     spawned.setText(rendered);
                 };
                 TextDisplay spawned = world.spawn(anchor, TextDisplay.class, configurer);
@@ -794,6 +817,20 @@ final class PersistentHologram implements AnchoredHologram {
             service.runEntity(shared, () -> shared.setSeeThrough(seeThrough),
                 () -> clearShared(shared));
         }
+    }
+
+    private void applyScale() {
+        TextDisplay shared = sharedDisplay;
+        if (shared != null) {
+            service.runEntity(shared, () -> shared.setTransformation(scaleTransformation()),
+                () -> clearShared(shared));
+        }
+    }
+
+    private Transformation scaleTransformation() {
+        float displayScale = (float) scale;
+        return new Transformation(new Vector3f(), new Quaternionf(),
+            new Vector3f(displayScale, displayScale, displayScale), new Quaternionf());
     }
 
     private Display.Billboard billboardMode() {

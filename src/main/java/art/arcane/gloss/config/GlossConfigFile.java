@@ -19,7 +19,7 @@ public final class GlossConfigFile {
     public static final String BUNDLE_FORMAT_DEFAULT = "&7Bundle &8(&7{total} items&8): &7{contents}";
     public static final String BUNDLE_HEADER_FORMAT_DEFAULT = "&eBundle &8(&e{total} items&8)";
     public static final String BUNDLE_MORE_FORMAT_DEFAULT = "&8+{remaining} more";
-    public static final String EDITOR_SYNC_ENDPOINT_DEFAULT = "https://sync.gloss.volmitsoftware.com/v2";
+    public static final String EDITOR_SYNC_ENDPOINT_DEFAULT = "https://sync.gloss.volmitsoftware.com/v3";
 
     @ConfigDoc("Server-wide locale used for in-game text. Blank values fall back to en_US; language.yml only overrides individual messages.")
     public String language = VolmitLocales.ENGLISH;
@@ -148,8 +148,6 @@ public final class GlossConfigFile {
         @ConfigDoc("Animation text packets per second allowed across each animated display's audience; large audiences degrade frame rate proportionally. Clamped to 100..1000000.")
         public int animationPacketBudget = 20000;
 
-        @ConfigDoc("Maximum width in characters for rendered text art. Clamped to 8..128.")
-        public int textArtMaxWidth = 48;
     }
 
     public static final class Boards {
@@ -284,7 +282,7 @@ public final class GlossConfigFile {
             @ConfigDoc("Enables live editor sync sessions through the relay.")
             public boolean enabled = true;
 
-            @ConfigDoc("Relay endpoint URL; must be https (or loopback http) ending in /v2 or the default is used.")
+            @ConfigDoc("Relay endpoint URL; must be https (or loopback http) ending in /v3 or the default is used.")
             public String endpoint = EDITOR_SYNC_ENDPOINT_DEFAULT;
 
             @ConfigDoc("Relay session creation token of 22..128 characters from A-Z, a-z, 0-9, _ and -; anything else is treated as empty.")
@@ -418,7 +416,6 @@ public final class GlossConfigFile {
         holograms.updateIntervalTicks = clampInt(holograms.updateIntervalTicks, 1, 200);
         holograms.viewRange = clampDouble(holograms.viewRange, 4.0D, 128.0D, 48.0D);
         holograms.temporaryUpdateIntervalTicks = clampInt(holograms.temporaryUpdateIntervalTicks, 1, 20);
-        holograms.textArtMaxWidth = clampInt(holograms.textArtMaxWidth, 8, 128);
         holograms.maxAnimationFps = clampInt(holograms.maxAnimationFps, 1, 240);
         holograms.animationPacketBudget = clampInt(holograms.animationPacketBudget, 100, 1_000_000);
 
@@ -504,7 +501,7 @@ public final class GlossConfigFile {
         boolean https = scheme.equalsIgnoreCase("https");
         boolean loopbackHttp = scheme.equalsIgnoreCase("http") && isLoopbackHost(host);
         String path = uri.getPath();
-        if ((!https && !loopbackHttp) || path == null || !path.endsWith("/v2")
+        if ((!https && !loopbackHttp) || path == null || !path.endsWith("/v3")
             || path.contains("//") || path.contains("/../") || path.contains("/./")) {
             return EDITOR_SYNC_ENDPOINT_DEFAULT;
         }

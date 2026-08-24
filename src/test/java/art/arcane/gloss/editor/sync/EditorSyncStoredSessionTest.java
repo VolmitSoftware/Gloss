@@ -53,7 +53,7 @@ public class EditorSyncStoredSessionTest {
 
   private EditorSyncStoredSession session(JsonObject project) {
     return new EditorSyncStoredSession(new EditorSyncStoredSession.Capability(
-        "session_id_123456789ab", "server_token_123456789", "https://relay.example/v2"),
+        "session_id_123456789ab", "server_token_123456789", "https://relay.example/v3"),
         new EditorSyncStoredSession.Subject(EditorSyncKind.MENU, "fixture"),
         Instant.now().plusSeconds(3600L), 0L, project, null);
   }

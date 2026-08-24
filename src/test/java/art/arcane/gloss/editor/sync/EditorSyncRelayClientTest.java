@@ -63,7 +63,7 @@ public class EditorSyncRelayClientTest {
       requestBody.set(JsonParser.parseString(new String(
           exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8)).getAsJsonObject());
       respond(exchange, 201, "application/json", """
-          {"protocol":2,
+          {"protocol":3,
            "sessionId":"session_id_123456789ab",
            "editorToken":"editor_token_123456789",
            "serverToken":"server_token_123456789",
@@ -79,7 +79,7 @@ public class EditorSyncRelayClientTest {
     assertEquals("session_id_123456789ab", created.sessionId());
     assertEquals(java.util.Set.of("protocol", "expiresInSeconds", "snapshot"),
         requestBody.get().keySet());
-    assertEquals(2, requestBody.get().get("protocol").getAsInt());
+    assertEquals(3, requestBody.get().get("protocol").getAsInt());
     assertEquals(3600, requestBody.get().get("expiresInSeconds").getAsInt());
     assertEquals("Bearer create_token_1234567890", authorization.get());
     assertEquals(null, upgrade.get());
@@ -92,7 +92,7 @@ public class EditorSyncRelayClientTest {
     start(exchange -> {
       authorization.set(exchange.getRequestHeaders().getFirst("Authorization"));
       respond(exchange, 201, "application/json", """
-          {"protocol":2,
+          {"protocol":3,
            "sessionId":"session_id_123456789ab",
            "editorToken":"editor_token_123456789",
            "serverToken":"server_token_123456789",
@@ -232,30 +232,28 @@ public class EditorSyncRelayClientTest {
   }
 
   @Test
-  public void v1RelayResponsesAreRejectedWithAnActionableProtocolError() throws Exception {
+  public void mismatchedRelayProtocolIsRejected() throws Exception {
     JsonObject response = JsonParser.parseString(publicationResponse("small")).getAsJsonObject();
-    response.addProperty("protocol", 1);
+    response.addProperty("protocol", EditorSyncJson.PROTOCOL_VERSION + 1);
     start(exchange -> respond(exchange, 200, "application/json", response.toString()));
 
     CompletionException failure = assertThrows(CompletionException.class,
         () -> client(1024 * 1024).publication(session()).join());
     assertTrue(failure.getCause() instanceof EditorSyncRelayException);
     assertTrue(failure.getCause().getMessage(),
-        failure.getCause().getMessage().contains("protocol v1"));
-    assertTrue(failure.getCause().getMessage(),
-        failure.getCause().getMessage().contains("v2 only"));
+        failure.getCause().getMessage().contains("protocol version does not match"));
   }
 
   @Test
   public void endpointParserRejectsCredentialsQueryAndFragments() {
     assertThrows(EditorSyncRelayException.class,
-        () -> EditorSyncRelayClient.endpointUri("https://trusted@evil.example/v2", "/sessions"));
+        () -> EditorSyncRelayClient.endpointUri("https://trusted@evil.example/v3", "/sessions"));
     assertThrows(EditorSyncRelayException.class,
-        () -> EditorSyncRelayClient.endpointUri("https://relay.example/v2?q=x", "/sessions"));
+        () -> EditorSyncRelayClient.endpointUri("https://relay.example/v3?q=x", "/sessions"));
     assertThrows(EditorSyncRelayException.class,
-        () -> EditorSyncRelayClient.endpointUri("https://relay.example/v2#x", "/sessions"));
-    assertEquals("https://relay.example/v2/sessions",
-        EditorSyncRelayClient.endpointUri("https://relay.example/v2/", "/sessions").toString());
+        () -> EditorSyncRelayClient.endpointUri("https://relay.example/v3#x", "/sessions"));
+    assertEquals("https://relay.example/v3/sessions",
+        EditorSyncRelayClient.endpointUri("https://relay.example/v3/", "/sessions").toString());
   }
 
   @Test
@@ -280,7 +278,7 @@ public class EditorSyncRelayClientTest {
   @Test
   public void createRejectsAmbiguousResponseFieldsAndMismatchedBase() throws Exception {
     start(exchange -> respond(exchange, 201, "application/json", """
-        {"protocol":2,
+        {"protocol":3,
          "sessionId":"session_id_123456789ab",
          "editorToken":"editor_token_123456789",
          "serverToken":"server_token_123456789",
@@ -298,7 +296,7 @@ public class EditorSyncRelayClientTest {
   public void acknowledgementRequiresTheOfficialMatchingResponseEnvelope() throws Exception {
     String baseRevision = project().baseRevision();
     start(exchange -> respond(exchange, 200, "application/json", """
-        {"protocol":2,"baseRevision":"%s","publication":{
+        {"protocol":3,"baseRevision":"%s","publication":{
           "revision":1,"state":"rejected","ack":{
             "status":"rejected","message":"Invalid edit.","serverRevision":null,
             "acknowledgedAt":"2026-08-12T00:00:01Z"}}}
@@ -361,7 +359,7 @@ public class EditorSyncRelayClientTest {
     publication.addProperty("publishedAt", "2026-08-12T00:00:00Z");
     publication.addProperty("state", "pending");
     JsonObject response = new JsonObject();
-    response.addProperty("protocol", 2);
+    response.addProperty("protocol", EditorSyncJson.PROTOCOL_VERSION);
     response.addProperty("sessionId", "session_id_123456789ab");
     response.add("publication", publication);
     return response.toString();
@@ -369,7 +367,7 @@ public class EditorSyncRelayClientTest {
 
   private void start(ExchangeHandler handler) throws IOException {
     server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
-    server.createContext("/v2/sessions", exchange -> {
+    server.createContext("/v3/sessions", exchange -> {
       try {
         handler.handle(exchange);
       } finally {
@@ -380,7 +378,7 @@ public class EditorSyncRelayClientTest {
   }
 
   private String endpoint() {
-    return "http://127.0.0.1:" + server.getAddress().getPort() + "/v2";
+    return "http://127.0.0.1:" + server.getAddress().getPort() + "/v3";
   }
 
   private void respond(HttpExchange exchange, int status, String contentType, String body)

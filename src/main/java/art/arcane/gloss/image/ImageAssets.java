@@ -70,6 +70,15 @@ public final class ImageAssets {
     return Pair.of(Imaging.guessFormat(file), Imaging.getBufferedImage(file));
   }
 
+  public void publishEditorSyncChanges() {
+    if (Gloss.instance.getSessionManager() != null) {
+      Gloss.instance.getSessionManager().refreshVisuals();
+    }
+    if (Gloss.instance.getPanelRuntime() != null) {
+      Gloss.instance.getPanelRuntime().refreshVisuals();
+    }
+  }
+
   /**
    * Resolves a relative image path against the image root, refusing anything that leaves it. The
    * canonical form is compared, so a traversal and an absolute path are both rejected.

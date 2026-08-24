@@ -20,6 +20,7 @@ import org.bukkit.event.player.PlayerRespawnEvent;
 import org.bukkit.event.world.EntitiesLoadEvent;
 import org.bukkit.plugin.PluginDescriptionFile;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.util.Transformation;
 
 import java.io.File;
 import java.lang.reflect.Field;
@@ -85,6 +86,7 @@ final class CharacterizationHarness implements AutoCloseable {
         final Map<String, Object> dataContainer = new ConcurrentHashMap<>();
         volatile String text;
         volatile Boolean visibleByDefault;
+        volatile Transformation transformation;
         volatile boolean visibleByDefaultSupported = true;
         volatile boolean removed;
         TextDisplay proxy;
@@ -636,6 +638,10 @@ final class CharacterizationHarness implements AutoCloseable {
                     return null;
                 case "getText":
                     return handle.text;
+                case "setTransformation":
+                    handle.transformation = (Transformation) args[0];
+                    handle.callLog.add("setTransformation");
+                    return null;
                 case "teleport":
                     handle.teleports.add(((Location) args[0]).clone());
                     return true;

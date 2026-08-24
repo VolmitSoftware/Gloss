@@ -10,7 +10,7 @@ Server polish and display suite: holograms, menus, scoreboards, tablist, emoji c
 
 ## Features
 
-- **Holograms** — TextDisplay-based floating text with per-player placeholder rendering, hotloadable JSON files, text-to-block-art rendering and full command management.
+- **Holograms** — TextDisplay-based floating text with per-player placeholder rendering, hotloadable JSON files, native display scaling and full command management.
 - **Scoreboards** — JSON-defined sidebars with primary/world defaults, permission-gated boards and per-group defaults.
 - **Tablist** — configurable header/footer and per-group player list names.
 - **Emoji** — `:emoji:` and trigger replacement in chat with tab completion and per-emoji permissions.

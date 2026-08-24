@@ -227,6 +227,7 @@ public class CommandGlossHologram {
                 MessageArgument.trusted("y", location.getBlockY()),
                 MessageArgument.trusted("z", location.getBlockZ()));
         GlossCommandMessages.send(sender, GlossMessages.HOLOGRAM_INFO_ORIENTATION,
+                MessageArgument.trusted("scale", hologram.scale()),
                 MessageArgument.trusted("billboard", hologram.billboard()),
                 MessageArgument.trusted("yaw", hologram.yaw()),
                 MessageArgument.trusted("pitch", hologram.pitch()));
@@ -272,11 +273,11 @@ public class CommandGlossHologram {
                 MessageArgument.trusted("pitch", pitch));
     }
 
-    @Director(name = "rendertext", sync = true, origin = DirectorOrigin.PLAYER, descriptionKey = "command.help.hologram.rendertext", description = "Rasterize text into block-art hologram lines")
+    @Director(name = "rendertext", sync = true, origin = DirectorOrigin.PLAYER, descriptionKey = "command.help.hologram.rendertext", description = "Create a natively scaled text hologram")
     public void rendertext(@Param(name = "player", contextual = true) Player player,
                            @Param(name = "id", descriptionKey = "command.help.hologram.rendertext.id", description = "Unique hologram id") String id,
-                           @Param(name = "text", descriptionKey = "command.help.hologram.rendertext.text", description = "Text to rasterize; quote it to include spaces") String text,
-                           @Param(name = "scale", defaultValue = "1", descriptionKey = "command.help.hologram.rendertext.scale", description = "Font scale multiplier") double scale) {
+                           @Param(name = "text", descriptionKey = "command.help.hologram.rendertext.text", description = "Text to display; quote it to include spaces") String text,
+                           @Param(name = "scale", defaultValue = "1", descriptionKey = "command.help.hologram.rendertext.scale", description = "TextDisplay scale multiplier") double scale) {
         if (GlossCommandMessages.denied(player, "gloss.holograms.create")) {
             return;
         }
@@ -285,17 +286,24 @@ public class CommandGlossHologram {
             return;
         }
 
-        List<String> rows = TextArtRenderer.render(text, scale, plugin.cfg().holograms().textArtMaxWidth());
-        if (rows.isEmpty()) {
-            GlossCommandMessages.send(player, GlossMessages.HOLOGRAM_RENDER_EMPTY);
+        if (text == null || text.isBlank()) {
+            GlossCommandMessages.send(player, GlossMessages.HOLOGRAM_TEXT_EMPTY);
+            return;
+        }
+        if (!HologramDoc.scaleInRange(scale)) {
+            GlossCommandMessages.send(player, GlossMessages.HOLOGRAM_SCALE_OUT_OF_RANGE,
+                    MessageArgument.trusted("value", scale),
+                    MessageArgument.trusted("minimum", HologramDoc.MIN_SCALE),
+                    MessageArgument.trusted("maximum", HologramDoc.MAX_SCALE));
             return;
         }
 
         AnchoredHologram hologram = plugin.holograms().create(id, player.getLocation());
-        hologram.setLines(rows);
+        hologram.setScale(scale);
+        hologram.setLines(List.of(text));
         GlossCommandMessages.send(player, GlossMessages.HOLOGRAM_RENDERED,
-                MessageArgument.trusted("rows", rows.size()),
-                MessageArgument.untrusted("id", id));
+                MessageArgument.untrusted("id", id),
+                MessageArgument.trusted("scale", scale));
     }
 
     private AnchoredHologram find(CommandSender sender, String id) {

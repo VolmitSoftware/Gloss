@@ -3,7 +3,6 @@ package art.arcane.gloss.editor.sync;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
 
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -13,20 +12,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-/**
- * The sync v2 {@code documents[]} codec: one uniform array of
- * {@code {kind, id, [revision], json}} entries replaces v1's {@code menus[]}
- * array and conditional {@code board} object. Entries are sorted by kind then
- * id, unique per (kind, id), and each document's JSON source is limited to
- * {@link #MAX_DOCUMENT_BYTES}. Kinds are open slugs on the wire; Gloss rejects
- * the ones it has no codec for with an actionable per-document error.
- */
 final class EditorSyncDocuments {
   static final int MAX_DOCUMENTS = 512;
   static final int MAX_DOCUMENT_BYTES = 2 * 1024 * 1024;
   static final int MAX_DOCUMENT_ID_CHARS = 256;
-  static final String MENU_KIND = "menu";
-  static final String PANEL_KIND = "panel";
+  static final String MENU_KIND = EditorSyncDocumentKind.MENU.wireName();
+  static final String PANEL_KIND = EditorSyncDocumentKind.PANEL.wireName();
 
   private EditorSyncDocuments() {
   }
@@ -36,8 +27,8 @@ final class EditorSyncDocuments {
 
   static List<Entry> parse(JsonObject project) {
     JsonArray values = EditorSyncJson.requireArray(project, "documents");
-    if (values.isEmpty() || values.size() > MAX_DOCUMENTS) {
-      throw new IllegalArgumentException("documents must contain between 1 and "
+    if (values.size() > MAX_DOCUMENTS) {
+      throw new IllegalArgumentException("documents must contain at most "
           + MAX_DOCUMENTS + " entries");
     }
     List<Entry> documents = new ArrayList<>(values.size());
@@ -61,10 +52,7 @@ final class EditorSyncDocuments {
 
   static void requireHandledKinds(List<Entry> documents) {
     for (Entry entry : documents) {
-      if (!MENU_KIND.equals(entry.kind()) && !PANEL_KIND.equals(entry.kind())) {
-        throw new IllegalArgumentException("sync document '" + entry.id() + "' has kind '"
-            + entry.kind() + "', which this Gloss build cannot edit; update Gloss");
-      }
+      EditorSyncDocumentKind.parseWireName(entry.kind());
     }
   }
 
@@ -88,61 +76,28 @@ final class EditorSyncDocuments {
     return matched;
   }
 
-  /**
-   * The parsed panel document of a project, or null when the project carries
-   * none. Panel document text is canonical JSON, so the returned object
-   * canonicalizes back to the wire bytes.
-   */
-  static JsonObject panelJson(JsonObject project) {
-    for (Entry entry : parse(project)) {
-      if (PANEL_KIND.equals(entry.kind())) {
-        return parsePanelText(entry);
-      }
-    }
-    return null;
-  }
-
-  static JsonObject parsePanelText(Entry entry) {
-    JsonElement parsed;
-    try {
-      parsed = JsonParser.parseString(entry.json());
-    } catch (RuntimeException failure) {
-      throw new IllegalArgumentException("panel document is not valid JSON: " + entry.id(),
-          failure);
-    }
-    if (!parsed.isJsonObject()) {
-      throw new IllegalArgumentException("panel document must be a JSON object: " + entry.id());
-    }
-    if (!entry.json().equals(EditorSyncJson.canonical(parsed))) {
-      throw new IllegalArgumentException("panel document must be canonical JSON text: "
-          + entry.id());
-    }
-    return parsed.getAsJsonObject();
-  }
-
-  /**
-   * Builds the sorted v2 documents array from menu sources plus an optional
-   * panel definition. Menu ids arrive pre-sorted (TreeMap order) and
-   * {@code "menu" < "panel"}, so appending the panel entry keeps the
-   * kind-then-id ordering.
-   */
-  static JsonArray build(Map<String, String> sortedMenus, JsonObject panelJson, String panelId) {
-    JsonArray documents = new JsonArray();
-    for (Map.Entry<String, String> menu : sortedMenus.entrySet()) {
-      documents.add(entry(MENU_KIND, menu.getKey(), menu.getValue()));
-    }
-    if (panelJson != null) {
-      documents.add(entry(PANEL_KIND, panelId, EditorSyncJson.canonical(panelJson)));
-    }
-    return documents;
-  }
-
-  private static JsonObject entry(String kind, String id, String json) {
+  static JsonObject entry(String kind, String id, String json) {
     JsonObject entry = new JsonObject();
     entry.addProperty("kind", kind);
     entry.addProperty("id", id);
     entry.addProperty("json", json);
     return entry;
+  }
+
+  static JsonObject entry(String kind, String id, long revision, String json) {
+    JsonObject entry = entry(kind, id, json);
+    entry.addProperty("revision", revision);
+    return entry;
+  }
+
+  static JsonArray build(List<Entry> sortedDocuments) {
+    JsonArray documents = new JsonArray();
+    for (Entry document : sortedDocuments) {
+      documents.add(document.revision() == null
+          ? entry(document.kind(), document.id(), document.json())
+          : entry(document.kind(), document.id(), document.revision(), document.json()));
+    }
+    return documents;
   }
 
   private static Entry parseEntry(JsonElement value) {
@@ -158,8 +113,9 @@ final class EditorSyncDocuments {
     }
     String kind = EditorSyncJson.requireString(entry, "kind");
     if (!EditorSyncKind.WIRE_KIND_PATTERN.matcher(kind).matches()) {
-      throw new IllegalArgumentException("sync document kind must be a sync v2 slug: " + kind);
+      throw new IllegalArgumentException("sync document kind must be a sync v3 slug: " + kind);
     }
+    EditorSyncDocumentKind.parseWireName(kind);
     String id = EditorSyncJson.requireString(entry, "id");
     if (id.length() > MAX_DOCUMENT_ID_CHARS) {
       throw new IllegalArgumentException("sync document id exceeds "
@@ -179,6 +135,13 @@ final class EditorSyncDocuments {
       }
       revision = parsed;
     }
-    return new Entry(kind, id, revision, json);
+    EditorSyncDocumentKind documentKind = EditorSyncDocumentKind.parseWireName(kind);
+    String canonicalId = documentKind.canonicalId(id);
+    if (documentKind.versioned() != (revision != null)) {
+      throw new IllegalArgumentException(documentKind.versioned()
+          ? "versioned sync document is missing its entry revision: " + kind + " " + id
+          : "unversioned sync document cannot carry an entry revision: " + kind + " " + id);
+    }
+    return new Entry(kind, canonicalId, revision, json);
   }
 }

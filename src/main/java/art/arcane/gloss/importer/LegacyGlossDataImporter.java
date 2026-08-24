@@ -164,7 +164,7 @@ public final class LegacyGlossDataImporter {
         HologramDoc.Anchor anchor = new HologramDoc.Anchor(legacy.get("world").getAsString(), position);
         return new HologramDoc(HologramDoc.CURRENT_SCHEMA_VERSION, DocumentEnvelope.INITIAL_REVISION,
             anchor, stringList(legacy.getAsJsonArray("lines")), true,
-            HologramDoc.DEFAULT_BILLBOARD, 0.0D, 0.0D);
+            HologramDoc.DEFAULT_SCALE, HologramDoc.DEFAULT_BILLBOARD, 0.0D, 0.0D);
     }
 
     private static BoardDoc convertBoard(JsonObject legacy) {
@@ -321,7 +321,6 @@ public final class LegacyGlossDataImporter {
         overlay(yaml, "holograms.view-range", entries, () -> config.holograms.viewRange = yaml.getDouble("holograms.view-range"));
         overlay(yaml, "holograms.per-viewer-placeholders", entries, () -> config.holograms.perViewerPlaceholders = yaml.getBoolean("holograms.per-viewer-placeholders"));
         overlay(yaml, "holograms.temporary-update-interval-ticks", entries, () -> config.holograms.temporaryUpdateIntervalTicks = yaml.getInt("holograms.temporary-update-interval-ticks"));
-        overlay(yaml, "holograms.text-art-max-width", entries, () -> config.holograms.textArtMaxWidth = yaml.getInt("holograms.text-art-max-width"));
         overlay(yaml, "boards.update-interval-ticks", entries, () -> config.boards.updateIntervalTicks = yaml.getInt("boards.update-interval-ticks"));
         overlay(yaml, "tablist.update-interval-ticks", entries, () -> config.tablist.updateIntervalTicks = yaml.getInt("tablist.update-interval-ticks"));
         overlay(yaml, "groups.use-vault", entries, () -> config.groups.useVault = yaml.getBoolean("groups.use-vault"));

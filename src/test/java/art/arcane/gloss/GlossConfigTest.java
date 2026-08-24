@@ -44,7 +44,6 @@ class GlossConfigTest {
         assertEquals(0.26D, snapshot.holograms().stackDistance());
         assertEquals(2, snapshot.holograms().temporaryUpdateIntervalTicks());
         assertTrue(snapshot.holograms().interpolatedMotion());
-        assertEquals(48, snapshot.holograms().textArtMaxWidth());
         assertTrue(snapshot.holograms().highFrequencyAnimations());
         assertEquals(120, snapshot.holograms().maxAnimationFps());
         assertEquals(20000, snapshot.holograms().animationPacketBudget());
@@ -122,7 +121,6 @@ class GlossConfigTest {
             [holograms]
             temporaryUpdateIntervalTicks = 9999
             interpolatedMotion = false
-            textArtMaxWidth = 1
             maxAnimationFps = 9999
             animationPacketBudget = 1
 
@@ -145,7 +143,6 @@ class GlossConfigTest {
         assertEquals(1, loaded.hotload.watchIntervalTicks);
         assertEquals(20, loaded.holograms.temporaryUpdateIntervalTicks);
         assertFalse(loaded.holograms.interpolatedMotion);
-        assertEquals(8, loaded.holograms.textArtMaxWidth);
         assertEquals(240, loaded.holograms.maxAnimationFps);
         assertEquals(100, loaded.holograms.animationPacketBudget);
         assertEquals(5, loaded.editor.sync.sessionMinutes);
@@ -157,7 +154,6 @@ class GlossConfigTest {
         assertTrue(rewritten.contains("watchIntervalTicks = 1"));
         assertTrue(rewritten.contains("temporaryUpdateIntervalTicks = 20"));
         assertTrue(rewritten.contains("interpolatedMotion = false"));
-        assertTrue(rewritten.contains("textArtMaxWidth = 8"));
         assertTrue(rewritten.contains("maxAnimationFps = 240"));
         assertTrue(rewritten.contains("animationPacketBudget = 100"));
         assertTrue(rewritten.contains("sessionMinutes = 5"));
@@ -299,22 +295,22 @@ class GlossConfigTest {
 
     @Test
     void syncEndpointSanitizerFallsBackOnUnsafeValues() {
-        assertEquals("https://relay.example.net/custom/v2",
-            GlossConfigFile.sanitizeSyncEndpoint("HTTPS://relay.example.net/custom/v2/"));
-        assertEquals("http://localhost:8080/v2",
-            GlossConfigFile.sanitizeSyncEndpoint("http://localhost:8080/v2"));
-        assertEquals("http://[::1]:8080/v2",
-            GlossConfigFile.sanitizeSyncEndpoint("http://[::1]:8080/v2"));
+        assertEquals("https://relay.example.net/custom/v3",
+            GlossConfigFile.sanitizeSyncEndpoint("HTTPS://relay.example.net/custom/v3/"));
+        assertEquals("http://localhost:8080/v3",
+            GlossConfigFile.sanitizeSyncEndpoint("http://localhost:8080/v3"));
+        assertEquals("http://[::1]:8080/v3",
+            GlossConfigFile.sanitizeSyncEndpoint("http://[::1]:8080/v3"));
 
         String fallback = GlossConfigFile.EDITOR_SYNC_ENDPOINT_DEFAULT;
-        assertEquals(fallback, GlossConfigFile.sanitizeSyncEndpoint("http://relay.example.net/v2"));
-        assertEquals(fallback, GlossConfigFile.sanitizeSyncEndpoint("https://trusted@evil.example/v2"));
-        assertEquals(fallback, GlossConfigFile.sanitizeSyncEndpoint("https://relay.example/v1"));
-        assertEquals(fallback, GlossConfigFile.sanitizeSyncEndpoint("https://relay.example/v2?token=x"));
-        assertEquals(fallback, GlossConfigFile.sanitizeSyncEndpoint("https://relay.example/v2#fragment"));
-        assertEquals(fallback, GlossConfigFile.sanitizeSyncEndpoint(" https://relay.example/v2"));
+        assertEquals(fallback, GlossConfigFile.sanitizeSyncEndpoint("http://relay.example.net/v3"));
+        assertEquals(fallback, GlossConfigFile.sanitizeSyncEndpoint("https://trusted@evil.example/v3"));
+        assertEquals(fallback, GlossConfigFile.sanitizeSyncEndpoint("https://relay.example/api"));
+        assertEquals(fallback, GlossConfigFile.sanitizeSyncEndpoint("https://relay.example/v3?token=x"));
+        assertEquals(fallback, GlossConfigFile.sanitizeSyncEndpoint("https://relay.example/v3#fragment"));
+        assertEquals(fallback, GlossConfigFile.sanitizeSyncEndpoint(" https://relay.example/v3"));
         assertEquals(fallback, GlossConfigFile.sanitizeSyncEndpoint(
-            "https://relay.example/" + "a".repeat(1100) + "/v2"));
+            "https://relay.example/" + "a".repeat(1100) + "/v3"));
     }
 
     @Test

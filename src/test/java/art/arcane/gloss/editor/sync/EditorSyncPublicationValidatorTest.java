@@ -1,10 +1,14 @@
 package art.arcane.gloss.editor.sync;
 
+import art.arcane.gloss.panel.PanelDefinition;
+import art.arcane.gloss.panel.PanelTransform;
+import art.arcane.volmlib.util.bukkit.json.BukkitJson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import org.junit.Test;
 
 import java.time.Instant;
+import java.util.UUID;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotEquals;
@@ -25,7 +29,10 @@ public class EditorSyncPublicationValidatorTest {
             new EditorSyncPublication(1L, session.baseRevision(), changed), 1024 * 1024);
 
     assertEquals("shop", validated.project().subjectId());
-    assertEquals(changed.get("baseRevision").getAsString(), validated.project().baseRevision());
+    assertNotEquals(changed.get("baseRevision").getAsString(),
+        validated.project().baseRevision());
+    assertEquals("{\"offset\":[0,0,1],\"components\":[]}\n",
+        EditorSyncDocuments.parse(validated.project().json()).getFirst().json());
   }
 
   @Test
@@ -49,15 +56,20 @@ public class EditorSyncPublicationValidatorTest {
     JsonObject base = EditorSyncTestProjects.menuProject("shop", "{\"components\":[]}");
     EditorSyncStoredSession session = session(base);
     JsonObject changed = EditorSyncTestProjects.menuProject("shop", "{\"components\":[]}");
-    changed.getAsJsonArray("documents").add(EditorSyncTestProjects.document(
-        "panel", "shop", EditorSyncJson.canonical(
-            com.google.gson.JsonParser.parseString("{\"id\":\"shop\"}"))));
+    PanelDefinition panel = PanelDefinition.create(
+        "shop", "shop", PanelTransform.at(
+            "minecraft:overworld", UUID.randomUUID(), 0.0D, 64.0D, 0.0D, 0.0D));
+    JsonObject panelDocument = EditorSyncTestProjects.document("panel", "shop",
+        EditorSyncJson.canonical(
+            BukkitJson.GSON.toJsonTree(panel)));
+    panelDocument.addProperty("revision", panel.revision());
+    changed.getAsJsonArray("documents").add(panelDocument);
     EditorSyncTestProjects.sign(changed);
 
     IllegalArgumentException failure = assertThrows(IllegalArgumentException.class, () ->
         new EditorSyncPublicationValidator().validate(session,
             new EditorSyncPublication(1L, session.baseRevision(), changed), 1024 * 1024));
-    assertTrue(failure.getMessage(), failure.getMessage().contains("panel document"));
+    assertTrue(failure.getMessage(), failure.getMessage().contains("panel"));
   }
 
   @Test
@@ -74,7 +86,7 @@ public class EditorSyncPublicationValidatorTest {
 
   private static EditorSyncStoredSession session(JsonObject project) {
     return new EditorSyncStoredSession(new EditorSyncStoredSession.Capability(
-        "session_id_123456789ab", "server_token_123456789", "https://relay.example/v2"),
+        "session_id_123456789ab", "server_token_123456789", "https://relay.example/v3"),
         new EditorSyncStoredSession.Subject(EditorSyncKind.MENU, "shop"),
         Instant.now().plusSeconds(3600L), 0L, project, null);
   }

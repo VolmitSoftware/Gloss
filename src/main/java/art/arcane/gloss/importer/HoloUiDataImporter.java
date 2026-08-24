@@ -65,7 +65,6 @@ public final class HoloUiDataImporter {
     private static final String PREVIEW_LANG_PREFIX = "gloss.preview.";
     private static final String PREVIEW_LANG_REWRITE_DETAIL =
         "lang keys rewritten " + LEGACY_PREVIEW_LANG_PREFIX + "* -> " + PREVIEW_LANG_PREFIX + "*";
-    private static final String RETIRED_ENDPOINT_SUFFIX = "/v1";
     private static final Gson RECEIPT_GSON = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();
 
     private final File dataFolder;
@@ -255,7 +254,6 @@ public final class HoloUiDataImporter {
         overlayBoolean(settings, "debugPosition", value -> config.debug.position = value, entries);
         overlayString(settings, "builderUrl", value -> config.editor.builderUrl = value, entries);
         overlayBoolean(settings, "editorSyncEnabled", value -> config.editor.sync.enabled = value, entries);
-        overlaySyncEndpoint(settings, config, entries);
         overlayString(settings, "editorSyncCreateToken", value -> config.editor.sync.createToken = value, entries);
         overlayInt(settings, "editorSyncSessionMinutes", value -> config.editor.sync.sessionMinutes = value, entries);
         overlayInt(settings, "editorSyncPollSeconds", value -> config.editor.sync.pollSeconds = value, entries);
@@ -273,42 +271,6 @@ public final class HoloUiDataImporter {
             entries.add(new HoloUiImportEntry(CATEGORY_CONFIG, GlossConfigLoader.FILE_NAME,
                 HoloUiImportDisposition.ERROR, detail(failure)));
         }
-    }
-
-    private void overlaySyncEndpoint(JsonObject settings, GlossConfigFile config, List<HoloUiImportEntry> entries) {
-        String key = "editorSyncEndpoint";
-        if (!settings.has(key)) {
-            return;
-        }
-        String value;
-        try {
-            value = settings.get(key).getAsString().trim();
-        } catch (RuntimeException failure) {
-            entries.add(new HoloUiImportEntry(CATEGORY_CONFIG, settingsPath(key),
-                HoloUiImportDisposition.ERROR, detail(failure)));
-            return;
-        }
-        if (isRetiredEndpoint(value)) {
-            entries.add(new HoloUiImportEntry(CATEGORY_CONFIG, settingsPath(key),
-                HoloUiImportDisposition.SKIPPED_RETIRED_ENDPOINT,
-                "retired /v1 endpoint cannot speak sync v2; kept " + GlossConfigFile.EDITOR_SYNC_ENDPOINT_DEFAULT));
-            return;
-        }
-        config.editor.sync.endpoint = value;
-        entries.add(HoloUiImportEntry.of(CATEGORY_CONFIG, settingsPath(key),
-            HoloUiImportDisposition.OVERLAID_CONFIG_KEY));
-    }
-
-    /** A {@code /v1} relay endpoint predates the Gloss sync protocol and never imports. */
-    static boolean isRetiredEndpoint(String endpoint) {
-        if (endpoint == null) {
-            return false;
-        }
-        String normalized = endpoint.trim().toLowerCase(Locale.ROOT);
-        while (normalized.endsWith("/")) {
-            normalized = normalized.substring(0, normalized.length() - 1);
-        }
-        return normalized.endsWith(RETIRED_ENDPOINT_SUFFIX);
     }
 
     static List<String> splitCsv(String csv) {

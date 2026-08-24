@@ -65,7 +65,9 @@ public class PanelRepositoryTest {
     Map<Path, byte[]> expected = new HashMap<>();
     expected.put(boardFile, null);
 
-    transaction.apply("create", Map.of(), Map.of(), created, expected);
+    transaction.apply("create", Map.of(boardFile, GlossProjectTransaction.Mutation.write(
+        art.arcane.volmlib.util.bukkit.json.BukkitJson.GSON.toJson(created)
+            .getBytes(java.nio.charset.StandardCharsets.UTF_8))), expected);
     assertEquals(created, repository.publishExternalCreate(created));
     assertEquals(created, repository.get(created.id()).orElseThrow());
 

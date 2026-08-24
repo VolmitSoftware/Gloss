@@ -36,8 +36,8 @@ public class HoloUiProjectTransactionTest {
     Files.write(menu, original);
     GlossProjectTransaction transaction = new GlossProjectTransaction(data);
 
-    transaction.apply("session", Map.of("shop", "{\"offset\":[0,0,1],\"components\":[]}"),
-        Map.of(), null, Map.of(menu, original));
+    transaction.apply("session", write(menu, "{\"offset\":[0,0,1],\"components\":[]}"),
+        Map.of(menu, original));
     assertTrue(Files.readString(menu).contains("offset"));
 
     new GlossProjectTransaction(data).recover();
@@ -45,6 +45,90 @@ public class HoloUiProjectTransactionTest {
     assertEquals(new String(original, StandardCharsets.UTF_8), Files.readString(menu));
     assertTrue(Files.list(data.resolve("editor-sync-transactions")).findAny().isEmpty());
     assertEquals(1L, Files.list(data.resolve("editor-sync-backups")).count());
+  }
+
+  @Test
+  public void preparedDeleteRecoveryAcceptsTheUntouchedOriginal() throws Exception {
+    Path data = temp.newFolder("prepared-delete").toPath();
+    Path menu = data.resolve("menus/shop.json");
+    Files.createDirectories(menu.getParent());
+    byte[] original = "{\"components\":[]}".getBytes(StandardCharsets.UTF_8);
+    Files.write(menu, original);
+    GlossProjectTransaction transaction = new GlossProjectTransaction(data);
+    GlossProjectTransaction.Pending pending = transaction.apply("session",
+        Map.of(menu, GlossProjectTransaction.Mutation.delete()), Map.of(menu, original));
+    Files.write(menu, original);
+    setState(pending, "prepared");
+
+    new GlossProjectTransaction(data).recover();
+
+    assertEquals(new String(original, StandardCharsets.UTF_8), Files.readString(menu));
+  }
+
+  @Test
+  public void publishingDeleteRecoveryRestoresTheDeletedOriginal() throws Exception {
+    Path data = temp.newFolder("publishing-delete").toPath();
+    Path menu = data.resolve("menus/shop.json");
+    Files.createDirectories(menu.getParent());
+    byte[] original = "{\"components\":[]}".getBytes(StandardCharsets.UTF_8);
+    Files.write(menu, original);
+    GlossProjectTransaction transaction = new GlossProjectTransaction(data);
+    GlossProjectTransaction.Pending pending = transaction.apply("session",
+        Map.of(menu, GlossProjectTransaction.Mutation.delete()), Map.of(menu, original));
+    setState(pending, "publishing");
+
+    new GlossProjectTransaction(data).recover();
+
+    assertEquals(new String(original, StandardCharsets.UTF_8), Files.readString(menu));
+  }
+
+  @Test
+  public void publishedDeleteRecoveryRestoresTheDeletedOriginal() throws Exception {
+    Path data = temp.newFolder("published-delete").toPath();
+    Path menu = data.resolve("menus/shop.json");
+    Files.createDirectories(menu.getParent());
+    byte[] original = "{\"components\":[]}".getBytes(StandardCharsets.UTF_8);
+    Files.write(menu, original);
+    GlossProjectTransaction transaction = new GlossProjectTransaction(data);
+
+    transaction.apply("session", Map.of(menu, GlossProjectTransaction.Mutation.delete()),
+        Map.of(menu, original));
+    assertFalse(Files.exists(menu));
+
+    new GlossProjectTransaction(data).recover();
+
+    assertEquals(new String(original, StandardCharsets.UTF_8), Files.readString(menu));
+  }
+
+  @Test
+  public void midBatchDeleteFailureRollsBackEveryMutation() throws Exception {
+    Path data = temp.newFolder("delete-mid-batch").toPath();
+    Path first = data.resolve("menus/a.json");
+    Path second = data.resolve("menus/b.json");
+    Files.createDirectories(first.getParent());
+    byte[] firstOriginal = "{\"components\":[]}".getBytes(StandardCharsets.UTF_8);
+    byte[] secondOriginal = "{\"components\":[{\"id\":\"old\"}]}".getBytes(StandardCharsets.UTF_8);
+    Files.write(first, firstOriginal);
+    Files.write(second, secondOriginal);
+    AtomicBoolean injected = new AtomicBoolean();
+    GlossProjectTransaction transaction = new GlossProjectTransaction(data, directory -> {
+      if (directory.equals(first.getParent()) && !Files.exists(first)
+          && injected.compareAndSet(false, true)) {
+        throw new IOException("injected publish failure");
+      }
+    });
+    Map<Path, GlossProjectTransaction.Mutation> mutations = Map.of(
+        first, GlossProjectTransaction.Mutation.delete(),
+        second, GlossProjectTransaction.Mutation.write(
+            "{\"components\":[{\"id\":\"new\"}]}".getBytes(StandardCharsets.UTF_8)));
+
+    assertThrows(IOException.class,
+        () -> transaction.apply("session", mutations,
+            Map.of(first, firstOriginal, second, secondOriginal)));
+
+    assertEquals(new String(firstOriginal, StandardCharsets.UTF_8), Files.readString(first));
+    assertEquals(new String(secondOriginal, StandardCharsets.UTF_8), Files.readString(second));
+    assertTrue(injected.get());
   }
 
   @Test
@@ -63,8 +147,7 @@ public class HoloUiProjectTransactionTest {
     GlossProjectTransaction transaction = new GlossProjectTransaction(data);
 
     transaction.apply("create-spawn-welcome",
-        Map.of("spawn/welcome", "{\"offset\":[0,1.7,0],\"components\":[]}"),
-        Map.of(), definition, expected);
+        write(menu, "{\"offset\":[0,1.7,0],\"components\":[]}", board, definition), expected);
     assertTrue(Files.isRegularFile(menu));
     assertTrue(Files.isRegularFile(board));
 
@@ -82,8 +165,7 @@ public class HoloUiProjectTransactionTest {
     Files.write(menu, original);
     GlossProjectTransaction transaction = new GlossProjectTransaction(data);
     GlossProjectTransaction.Pending pending = transaction.apply("session",
-        Map.of("shop", "{\"offset\":[0,0,1],\"components\":[]}"), Map.of(), null,
-        Map.of(menu, original));
+        write(menu, "{\"offset\":[0,0,1],\"components\":[]}"), Map.of(menu, original));
 
     transaction.commit(pending);
     transaction.recover();
@@ -101,8 +183,8 @@ public class HoloUiProjectTransactionTest {
     byte[] original = "{\"components\":[]}".getBytes(StandardCharsets.UTF_8);
     Files.write(menu, original);
     GlossProjectTransaction transaction = new GlossProjectTransaction(data);
-    transaction.apply("session", Map.of("shop", "{\"offset\":[0,0,1],\"components\":[]}"),
-        Map.of(), null, Map.of(menu, original));
+    transaction.apply("session", write(menu, "{\"offset\":[0,0,1],\"components\":[]}"),
+        Map.of(menu, original));
     Files.writeString(menu, "external-change", StandardCharsets.UTF_8);
 
     assertThrows(IOException.class, transaction::recover);
@@ -116,8 +198,7 @@ public class HoloUiProjectTransactionTest {
     GlossProjectTransaction transaction = new GlossProjectTransaction(data);
     Map<Path, byte[]> expected = new HashMap<>();
     expected.put(menu, null);
-    transaction.apply("session", Map.of("new", "{\"components\":[]}"), Map.of(), null,
-        expected);
+    transaction.apply("session", write(menu, "{\"components\":[]}"), expected);
     Files.writeString(menu, "unrelated", StandardCharsets.UTF_8);
 
     assertThrows(IOException.class, transaction::recover);
@@ -133,8 +214,7 @@ public class HoloUiProjectTransactionTest {
     Files.write(menu, original);
     GlossProjectTransaction transaction = new GlossProjectTransaction(data);
     GlossProjectTransaction.Pending pending = transaction.apply("session",
-        Map.of("shop", "{\"offset\":[0,0,1],\"components\":[]}"), Map.of(), null,
-        Map.of(menu, original));
+        write(menu, "{\"offset\":[0,0,1],\"components\":[]}"), Map.of(menu, original));
     Path journal = pending.transactionDirectory().resolve("journal.json");
     JsonObject root = JsonParser.parseString(Files.readString(journal)).getAsJsonObject();
     root.getAsJsonArray("entries").add(root.getAsJsonArray("entries").get(0).deepCopy());
@@ -153,8 +233,7 @@ public class HoloUiProjectTransactionTest {
     Files.write(menu, original);
     GlossProjectTransaction transaction = new GlossProjectTransaction(data);
     GlossProjectTransaction.Pending pending = transaction.apply("session",
-        Map.of("shop", "{\"offset\":[0,0,1],\"components\":[]}"), Map.of(), null,
-        Map.of(menu, original));
+        write(menu, "{\"offset\":[0,0,1],\"components\":[]}"), Map.of(menu, original));
     Path staged = pending.transactionDirectory().resolve("stage/menus/shop.json");
     Files.createDirectories(staged.getParent());
     Files.writeString(staged, "tampered", StandardCharsets.UTF_8);
@@ -174,7 +253,7 @@ public class HoloUiProjectTransactionTest {
     GlossProjectTransaction transaction = new GlossProjectTransaction(data);
 
     assertThrows(IOException.class, () -> transaction.apply("session",
-        Map.of("shop", "{\"offset\":[0,0,1],\"components\":[]}"), Map.of(), null,
+        write(menu, "{\"offset\":[0,0,1],\"components\":[]}"),
         Map.of(menu, "stale".getBytes(StandardCharsets.UTF_8))));
 
     assertEquals(new String(original, StandardCharsets.UTF_8), Files.readString(menu));
@@ -219,8 +298,7 @@ public class HoloUiProjectTransactionTest {
     Files.write(menu, original);
     GlossProjectTransaction transaction = new GlossProjectTransaction(data);
     GlossProjectTransaction.Pending pending = transaction.apply("session",
-        Map.of("shop", "{\"offset\":[0,0,1],\"components\":[]}"), Map.of(), null,
-        Map.of(menu, original));
+        write(menu, "{\"offset\":[0,0,1],\"components\":[]}"), Map.of(menu, original));
     Path journal = pending.transactionDirectory().resolve("journal.json");
     JsonObject root = JsonParser.parseString(Files.readString(journal)).getAsJsonObject();
     root.addProperty("state", "publishing");
@@ -240,8 +318,7 @@ public class HoloUiProjectTransactionTest {
     Files.write(menu, original);
     GlossProjectTransaction transaction = new GlossProjectTransaction(data);
     GlossProjectTransaction.Pending pending = transaction.apply("session",
-        Map.of("shop", "{\"offset\":[0,0,1],\"components\":[]}"), Map.of(), null,
-        Map.of(menu, original));
+        write(menu, "{\"offset\":[0,0,1],\"components\":[]}"), Map.of(menu, original));
     Path blockingBackup = data.resolve("editor-sync-backups").resolve(pending.id());
     Files.createDirectories(blockingBackup);
 
@@ -262,8 +339,7 @@ public class HoloUiProjectTransactionTest {
     Files.write(menu, original);
     GlossProjectTransaction transaction = new GlossProjectTransaction(data);
     GlossProjectTransaction.Pending pending = transaction.apply("session",
-        Map.of("shop", "{\"offset\":[0,0,1],\"components\":[]}"), Map.of(), null,
-        Map.of(menu, original));
+        write(menu, "{\"offset\":[0,0,1],\"components\":[]}"), Map.of(menu, original));
     Path journal = pending.transactionDirectory().resolve("journal.json");
     JsonObject root = JsonParser.parseString(Files.readString(journal)).getAsJsonObject();
     root.addProperty("state", "committed");
@@ -290,8 +366,7 @@ public class HoloUiProjectTransactionTest {
       }
     });
     GlossProjectTransaction.Pending pending = transaction.apply("session",
-        Map.of("shop", "{\"offset\":[0,0,1],\"components\":[]}"), Map.of(), null,
-        Map.of(menu, original));
+        write(menu, "{\"offset\":[0,0,1],\"components\":[]}"), Map.of(menu, original));
 
     failDirectoryForce.set(true);
     assertThrows(GlossProjectTransaction.CommitUncertainException.class,
@@ -322,7 +397,29 @@ public class HoloUiProjectTransactionTest {
     Map<Path, byte[]> expected = new HashMap<>();
     expected.put(escaped, null);
     assertThrows(IOException.class, () -> transaction.apply("session",
-        Map.of("shop", "{\"components\":[]}"), Map.of(), null, expected));
+        write(escaped, "{\"components\":[]}"), expected));
     assertFalse(Files.exists(outside.resolve("shop.json")));
+  }
+
+  private static Map<Path, GlossProjectTransaction.Mutation> write(Path path, String source) {
+    return Map.of(path, GlossProjectTransaction.Mutation.write(
+        source.getBytes(StandardCharsets.UTF_8)));
+  }
+
+  private static Map<Path, GlossProjectTransaction.Mutation> write(
+      Path menu, String source, Path panel, PanelDefinition definition) {
+    return Map.of(
+        menu, GlossProjectTransaction.Mutation.write(source.getBytes(StandardCharsets.UTF_8)),
+        panel, GlossProjectTransaction.Mutation.write(
+            art.arcane.volmlib.util.bukkit.json.BukkitJson.GSON.toJson(definition)
+                .getBytes(StandardCharsets.UTF_8)));
+  }
+
+  private static void setState(GlossProjectTransaction.Pending pending, String state)
+      throws IOException {
+    Path journal = pending.transactionDirectory().resolve("journal.json");
+    JsonObject root = JsonParser.parseString(Files.readString(journal)).getAsJsonObject();
+    root.addProperty("state", state);
+    Files.writeString(journal, root.toString());
   }
 }

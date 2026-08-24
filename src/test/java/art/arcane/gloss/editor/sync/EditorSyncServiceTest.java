@@ -64,7 +64,7 @@ public class EditorSyncServiceTest {
 
   @Test
   public void editorUrlNormalizesTheBuilderAndKeepsRelayDataInTheFragment() {
-    String endpoint = "https://relay.example/custom/v2";
+    String endpoint = "https://relay.example/custom/v3";
     String url = EditorSyncService.editorUrl(
         "HTTPS://Editor.Example/path?discard=yes#old",
         endpoint, "session_id_123456789ab", "editor_token_123456789");
@@ -90,8 +90,10 @@ public class EditorSyncServiceTest {
     Files.write(boardFile, source);
     JsonObject project = new JsonObject();
     JsonArray documents = new JsonArray();
-    documents.add(EditorSyncTestProjects.document("panel", captured.id(),
-        EditorSyncJson.canonical(GSON.toJsonTree(captured))));
+    JsonObject panelDocument = EditorSyncTestProjects.document("panel", captured.id(),
+        EditorSyncJson.canonical(GSON.toJsonTree(captured)));
+    panelDocument.addProperty("revision", captured.revision());
+    documents.add(panelDocument);
     project.add("documents", documents);
 
     assertArrayEquals(source, EditorSyncService.expectedBoardFile(boardFile, project));
@@ -148,7 +150,8 @@ public class EditorSyncServiceTest {
     EditorSyncService service = service(persistence, relay, new TestSettings(true), baseReader());
     service.start();
 
-    assertThrows(CompletionException.class, () -> service.openMenu("fixture").join());
+    assertThrows(CompletionException.class,
+        () -> service.open(EditorSyncKind.MENU, "fixture").join());
 
     assertEquals(1, relay.creates.get());
     assertEquals(1, relay.revocations.get());
@@ -164,7 +167,7 @@ public class EditorSyncServiceTest {
     service.start();
 
     CompletionException failure = assertThrows(CompletionException.class,
-        () -> service.openMenu("fixture").join());
+        () -> service.open(EditorSyncKind.MENU, "fixture").join());
 
     assertTrue(failure.getCause().getMessage().contains("editorSyncCreateToken"));
     assertEquals(0, relay.creates.get());
@@ -178,12 +181,14 @@ public class EditorSyncServiceTest {
     EditorSyncService service = service(persistence, relay, new TestSettings(true), baseReader());
     service.start();
 
-    assertThrows(CompletionException.class, () -> service.openMenu("fixture").join());
+    assertThrows(CompletionException.class,
+        () -> service.open(EditorSyncKind.MENU, "fixture").join());
 
     assertFalse(service.isAvailable());
     assertTrue(service.isRunning());
     assertEquals(1, relay.revocations.get());
-    assertThrows(CompletionException.class, () -> service.openMenu("fixture").join());
+    assertThrows(CompletionException.class,
+        () -> service.open(EditorSyncKind.MENU, "fixture").join());
     assertEquals(1, relay.creates.get());
   }
 
@@ -234,7 +239,7 @@ public class EditorSyncServiceTest {
     EditorSyncService service = service(persistence, new ControlledRelay(),
         new TestSettings(true), baseReader());
     service.start();
-    CompletableFuture<EditorSyncOpenResult> open = service.openMenu("fixture");
+    CompletableFuture<EditorSyncOpenResult> open = service.open(EditorSyncKind.MENU, "fixture");
     assertTrue(persistence.saveStarted.await(1L, TimeUnit.SECONDS));
 
     try {
@@ -415,20 +420,13 @@ public class EditorSyncServiceTest {
         new TestSettings(true), baseReader());
     service.start();
     for (int index = 0; index < EditorSyncStorageLimits.MAX_ACTIVE_SESSIONS; index++) {
-      service.openMenu("fixture").join();
+      service.open(EditorSyncKind.MENU, "fixture").join();
     }
 
     CompletionException full = assertThrows(CompletionException.class,
-        () -> service.openMenu("fixture").join());
+        () -> service.open(EditorSyncKind.MENU, "fixture").join());
     assertTrue(full.getCause() instanceof IllegalStateException);
     assertEquals(EditorSyncStorageLimits.MAX_ACTIVE_SESSIONS, relay.creates.get());
-  }
-
-  @Test
-  public void normalizedMenuSourceNeverAppendsCrLfAfterExistingLf() {
-    Map<String, String> normalized = EditorSyncService.normalizedMenus(
-        Map.of("fixture", "{\"components\":[]}\n"));
-    assertEquals("{\"components\":[]}\n", normalized.get("fixture"));
   }
 
   private EditorSyncService service(
@@ -449,7 +447,7 @@ public class EditorSyncServiceTest {
   private static EditorSyncStoredSession session(JsonObject project,
                                                  EditorSyncPendingAck pending) {
     return new EditorSyncStoredSession(new EditorSyncStoredSession.Capability(
-        "session_id_123456789ab", "server_token_123456789", "https://relay.example/v2"),
+        "session_id_123456789ab", "server_token_123456789", "https://relay.example/v3"),
         new EditorSyncStoredSession.Subject(EditorSyncKind.MENU, "fixture"),
         Instant.now().plusSeconds(3600L), 0L, project, pending);
   }
@@ -565,21 +563,13 @@ public class EditorSyncServiceTest {
 
   private static final class FixedSnapshotSource implements EditorSyncSnapshotSource {
     @Override
-    public EditorSyncProject menu(String menuId, int maximumBytes) {
+    public EditorSyncProject open(EditorSyncKind kind, String subjectId, int maximumBytes) {
       return EditorSyncProject.validated(menuProject("{\"components\":[]}"), maximumBytes);
     }
 
     @Override
-    public EditorSyncProject board(String boardId, int maximumBytes) {
-      throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public EditorSyncProject fromContent(
-        EditorSyncKind kind, String subjectId, PanelDefinition board,
-        Map<String, String> menuSources, Map<String, byte[]> imageContents,
-        JsonObject immutableConstraints, int maximumBytes) {
-      throw new UnsupportedOperationException();
+    public List<String> subjectIds(EditorSyncKind kind) {
+      return kind == EditorSyncKind.MENU ? List.of("shop") : List.of();
     }
   }
 
@@ -589,7 +579,7 @@ public class EditorSyncServiceTest {
 
     private TestSettings(boolean enabled) {
       this.enabled = new AtomicBoolean(enabled);
-      this.endpoint = "https://relay.example/v2";
+      this.endpoint = "https://relay.example/v3";
     }
 
     @Override

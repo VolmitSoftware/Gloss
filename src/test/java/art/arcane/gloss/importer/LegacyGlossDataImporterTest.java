@@ -94,7 +94,7 @@ class LegacyGlossDataImporterTest {
         HologramDoc expected = new HologramDoc(HologramDoc.CURRENT_SCHEMA_VERSION, DocumentEnvelope.INITIAL_REVISION,
             new HologramDoc.Anchor("world", new Vector(10.5D, 70.0D, -4.25D)),
             List.of("&aWelcome", "&7Second line"), true,
-            HologramDoc.DEFAULT_BILLBOARD, 0.0D, 0.0D);
+            HologramDoc.DEFAULT_SCALE, HologramDoc.DEFAULT_BILLBOARD, 0.0D, 0.0D);
         assertEquals(document(expected), read("holograms/spawn.json"));
         assertFalse(read("holograms/spawn.json").contains("\"id\""));
         assertEquals(LEGACY_HOLOGRAM, backedUp(result, "holograms/spawn.json"));

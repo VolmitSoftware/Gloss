@@ -151,7 +151,7 @@ public class EditorSyncSessionStoreTest {
 
   private EditorSyncStoredSession.Capability capability() {
     return new EditorSyncStoredSession.Capability("session_id_123456789ab",
-        "server_token_123456789", "https://relay.example/v2");
+        "server_token_123456789", "https://relay.example/v3");
   }
 
   private Logger logger() {

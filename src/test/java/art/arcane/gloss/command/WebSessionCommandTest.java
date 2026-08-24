@@ -11,17 +11,17 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
-public class SyncCommandTest {
+public class WebSessionCommandTest {
   @Test
   public void exactAndUniqueTwelveCharacterPrefixesResolve() {
     EditorSyncSessionInfo first = session("abcdefghijkl-first-capability");
     EditorSyncSessionInfo second = session("zyxwvutsrqpo-second-capability");
 
-    assertEquals(first.sessionId(), CommandGlossSync.resolveSessionId(
+    assertEquals(first.sessionId(), CommandGlossWebSessions.resolveSessionId(
         first.sessionId(), List.of(first, second)).orElseThrow());
-    assertEquals(first.sessionId(), CommandGlossSync.resolveSessionId(
+    assertEquals(first.sessionId(), CommandGlossWebSessions.resolveSessionId(
         "abcdefghijkl", List.of(first, second)).orElseThrow());
-    assertTrue(CommandGlossSync.resolveSessionId("abcdefghijk", List.of(first, second)).isEmpty());
+    assertTrue(CommandGlossWebSessions.resolveSessionId("abcdefghijk", List.of(first, second)).isEmpty());
   }
 
   @Test
@@ -30,7 +30,7 @@ public class SyncCommandTest {
     EditorSyncSessionInfo second = session("abcdefghijkl-second-capability");
 
     assertThrows(IllegalArgumentException.class, () ->
-        CommandGlossSync.resolveSessionId("abcdefghijkl", List.of(first, second)));
+        CommandGlossWebSessions.resolveSessionId("abcdefghijkl", List.of(first, second)));
   }
 
   private static EditorSyncSessionInfo session(String id) {

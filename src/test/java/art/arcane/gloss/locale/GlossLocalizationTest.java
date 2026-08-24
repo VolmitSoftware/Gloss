@@ -89,6 +89,26 @@ public class GlossLocalizationTest {
   }
 
   @Test
+  public void bundledMessagesUsePurpleBrandingWithDarkGreyStructure() throws Exception {
+    assertTrue(GlossMessages.PERMISSION_DENIED.english().startsWith("&8[&dGloss&8]: &c"));
+    assertTrue(GlossMessages.MENU_CLOSED.english().startsWith("&8[&dGloss&8]: &a"));
+    assertTrue(GlossMessages.WEB_CAPABILITY_WARNING.english().startsWith("&8[&dGloss&8]: &e"));
+    assertTrue(GlossMessages.PANELS_NEAR_HEADER.english().contains("&d{radius}"));
+    assertTrue(GlossMessages.PANELS_NEAR_HEADER.english().contains("&d{count}"));
+
+    for (String locale : VolmitLocales.nonEnglish()) {
+      String messages = Files.readString(Path.of("src/main/resources/languages", locale + ".yml"));
+      assertTrue(locale, messages.contains("&8[&dGloss&8]: "));
+      assertFalse(locale, messages.contains("&7[&bGloss&7]: "));
+      assertFalse(locale, messages.contains("&b{count}"));
+      assertFalse(locale, messages.contains("&b{radius}"));
+      assertFalse(locale, messages.contains("&b{board}"));
+      assertFalse(locale, messages.contains("&b{resume}"));
+      assertTrue(locale, messages.contains("&b&l"));
+    }
+  }
+
+  @Test
   public void bundledResourceSetExactlyMatchesSharedManifest() throws Exception {
     Set<String> expected = VolmitLocales.nonEnglish().stream()
         .map(locale -> locale + ".yml")
@@ -106,7 +126,7 @@ public class GlossLocalizationTest {
   @Test
   public void builderLinkTakesItsUrlFromSettingsAndNoLocaleHardcodesOne() throws Exception {
     assertEquals("https://gloss.volmitsoftware.com", GlossConfig.current().editorSync().builderUrl());
-    assertTrue(GlossMessages.BUILDER_OPEN.english().contains("{url}"));
+    assertTrue(GlossMessages.WEB_OPEN.english().contains("{url}"));
 
     for (String locale : VolmitLocales.nonEnglish()) {
       Path resource = Path.of("src/main/resources/languages", locale + ".yml");
@@ -281,12 +301,12 @@ public class GlossLocalizationTest {
 
   @Test
   public void zeroArgumentRenderingTranslatesTheTemplateOnlyForLegacy() {
-    String english = GlossMessages.SYNC_CAPABILITY_WARNING.english();
+    String english = GlossMessages.WEB_CAPABILITY_WARNING.english();
 
-    assertEquals(english, localization.text(GlossMessages.SYNC_CAPABILITY_WARNING));
+    assertEquals(english, localization.text(GlossMessages.WEB_CAPABILITY_WARNING));
     assertEquals(
         ChatColor.translateAlternateColorCodes('&', english),
-        localization.legacy(GlossMessages.SYNC_CAPABILITY_WARNING)
+        localization.legacy(GlossMessages.WEB_CAPABILITY_WARNING)
     );
   }
 
@@ -348,13 +368,13 @@ public class GlossLocalizationTest {
   }
 
   @Test
-  public void syncConsoleMessagesAcceptOnlyTheirDeclaredArguments() {
-    assertEquals(Set.of(), GlossMessages.SYNC_CAPABILITY_WARNING.placeholders());
-    assertEquals(Set.of("subject", "url"), GlossMessages.SYNC_OPEN_CONSOLE.placeholders());
-    assertEquals(Set.of("subject", "session"), GlossMessages.SYNC_LINK_HOVER.placeholders());
-    String warning = localization.legacy(GlossMessages.SYNC_CAPABILITY_WARNING);
+  public void webConsoleMessagesAcceptOnlyTheirDeclaredArguments() {
+    assertEquals(Set.of(), GlossMessages.WEB_CAPABILITY_WARNING.placeholders());
+    assertEquals(Set.of("subject", "url"), GlossMessages.WEB_OPEN_CONSOLE.placeholders());
+    assertEquals(Set.of("session"), GlossMessages.WEB_LINK_HOVER.placeholders());
+    String warning = localization.legacy(GlossMessages.WEB_CAPABILITY_WARNING);
     String open = localization.legacy(
-        GlossMessages.SYNC_OPEN_CONSOLE,
+        GlossMessages.WEB_OPEN_CONSOLE,
         MessageArgs.builder()
             .untrusted("subject", "sync-qa")
             .untrusted("url", "https://editor.example/#/sync/secret")
@@ -364,13 +384,11 @@ public class GlossLocalizationTest {
     assertTrue(open.contains("sync-qa"));
     assertTrue(open.contains("https://editor.example/#/sync/secret"));
     String hover = localization.text(
-        GlossMessages.SYNC_LINK_HOVER,
+        GlossMessages.WEB_LINK_HOVER,
         MessageArgs.builder()
-            .untrusted("subject", "sync-qa")
             .untrusted("session", "session12345")
             .build()
     );
-    assertTrue(hover.contains("sync-qa"));
     assertTrue(hover.contains("session12345"));
   }
 

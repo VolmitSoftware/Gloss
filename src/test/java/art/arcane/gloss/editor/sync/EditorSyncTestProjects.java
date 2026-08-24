@@ -3,9 +3,6 @@ package art.arcane.gloss.editor.sync;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 
-/**
- * Builders for sync protocol-v2 project JSON used across the editor sync tests.
- */
 final class EditorSyncTestProjects {
   private EditorSyncTestProjects() {
   }
@@ -22,10 +19,10 @@ final class EditorSyncTestProjects {
     project.add("images", new JsonArray());
     JsonObject constraints = new JsonObject();
     constraints.addProperty("subjectId", id);
-    JsonArray menuIds = new JsonArray();
-    menuIds.add(id);
-    constraints.add("menuIds", menuIds);
-    constraints.add("imagePaths", new JsonArray());
+    JsonArray documentKinds = new JsonArray();
+    documentKinds.add("menu");
+    constraints.add("documentKinds", documentKinds);
+    constraints.add("createDocumentKinds", new JsonArray());
     constraints.addProperty("newImagePrefix", "sync/menus/" + id + "/");
     constraints.addProperty("allowDeletes", false);
     project.add("constraints", constraints);

@@ -9,7 +9,6 @@ public enum HoloUiImportDisposition {
     SKIPPED_SHIPPED_IDENTICAL("skipped-shipped-identical"),
     SKIPPED_EXISTING("skipped-existing"),
     SKIPPED_SECRET("skipped-secret"),
-    SKIPPED_RETIRED_ENDPOINT("skipped-retired-endpoint"),
     OVERLAID_CONFIG_KEY("overlaid-config-key"),
     ERROR("error");
 

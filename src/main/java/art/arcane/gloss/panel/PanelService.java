@@ -90,6 +90,24 @@ public final class PanelService {
     return enqueue("reload persistent panels", this::loadBoards);
   }
 
+  public PanelLoadResult publishExternalReload() throws IOException {
+    PanelLoadResult result;
+    List<PanelDefinition> loadedBoards;
+    List<PanelServiceListener> notificationListeners;
+    synchronized (lifecycleLock) {
+      if (lifecycle != Lifecycle.RUNNING) {
+        throw new CancellationException("panel service is not running");
+      }
+      result = store.load();
+      loadedBoards = store.list();
+      publishReloadedIndex(new PanelReload(result, loadedBoards));
+      notificationListeners = List.copyOf(listeners);
+    }
+    afterPublication.run();
+    notifyReloaded(new PanelReload(result, loadedBoards), notificationListeners);
+    return result;
+  }
+
   public CompletableFuture<PanelDefinition> create(PanelDefinition definition) {
     PanelDefinition requiredDefinition = Objects.requireNonNull(definition, "definition");
     return enqueue("create panel '" + requiredDefinition.id() + "'", () -> {

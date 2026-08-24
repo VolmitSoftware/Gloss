@@ -36,7 +36,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class GlossPermissionDeclarationTest {
 
   /** Nodes that exist purely as grouping parents in the descriptor tree. */
-  private static final Set<String> STRUCTURAL_NODES = Set.of("gloss.*");
+  private static final Set<String> STRUCTURAL_NODES = Set.of("gloss.*", "gloss.web");
 
   /** Dynamic per-content prefixes that must never be declared as bare parents. */
   private static final Set<String> DYNAMIC_PREFIXES = Set.of("gloss.open.", "gloss.emoji.", "gloss.bubbles.style.");

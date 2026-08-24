@@ -13,6 +13,7 @@ import art.arcane.gloss.config.GlossConfigLoader;
 import art.arcane.gloss.doc.DataWatchdog;
 import art.arcane.gloss.drop.DropNameService;
 import art.arcane.gloss.editor.sync.EditorSyncService;
+import art.arcane.gloss.editor.sync.EditorSyncDocumentKind;
 import art.arcane.gloss.emoji.EmojiService;
 import art.arcane.gloss.group.GroupService;
 import art.arcane.gloss.hologram.HologramAnimator;
@@ -74,6 +75,8 @@ import java.nio.file.NoSuchFileException;
 import java.util.ArrayDeque;
 import java.util.Collection;
 import java.util.Deque;
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
@@ -420,6 +423,60 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
                 current.deferAutomaticPass();
             }
         }
+    }
+
+    public CompletableFuture<Void> publishEditorSyncRuntime(
+        Set<EditorSyncDocumentKind> changedKinds,
+        boolean imagesChanged
+    ) {
+        Set<EditorSyncDocumentKind> kinds = Set.copyOf(changedKinds);
+        CompletableFuture<Void> publication = new CompletableFuture<>();
+        boolean accepted = SchedulerUtils.runGlobal(this, () -> {
+            try {
+                if (kinds.contains(EditorSyncDocumentKind.ANIMATION)) {
+                    animations.reload();
+                }
+                if (kinds.contains(EditorSyncDocumentKind.EMOJI)) {
+                    emoji.reload();
+                }
+                if (kinds.contains(EditorSyncDocumentKind.HOLOGRAM)) {
+                    holograms.reload();
+                }
+                if (kinds.contains(EditorSyncDocumentKind.SCOREBOARD)) {
+                    boards.reload();
+                }
+                if (kinds.contains(EditorSyncDocumentKind.MOTD)) {
+                    motd.reload();
+                }
+                if (kinds.contains(EditorSyncDocumentKind.BUBBLE_STYLE)) {
+                    bubbles.reload();
+                }
+                if (kinds.contains(EditorSyncDocumentKind.TABLIST)) {
+                    tablist.reload();
+                }
+                if (kinds.contains(EditorSyncDocumentKind.REAL_DROPS)) {
+                    drops.reload();
+                }
+                if (kinds.contains(EditorSyncDocumentKind.CONTAINER_PREVIEW)
+                    && previewRegistry != null) {
+                    previewRegistry.reload();
+                }
+                if (imagesChanged) {
+                    imageAssets.publishEditorSyncChanges();
+                }
+                if (kinds.contains(EditorSyncDocumentKind.PANEL)) {
+                    panelService.publishExternalReload();
+                }
+                publication.complete(null);
+            } catch (IOException | RuntimeException failure) {
+                publication.completeExceptionally(failure);
+            }
+        });
+        if (!accepted) {
+            publication.completeExceptionally(
+                new IllegalStateException("unable to schedule editor sync runtime publication"));
+        }
+        return publication;
     }
 
     private void applyReloadedConfig(boolean cycleEveryService) {
@@ -898,7 +955,7 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
         } catch (RuntimeException failure) {
             logExceptionStack(true, failure,
                 "Editor sync was disabled because its secure session store could not be loaded. "
-                    + "Repair or remove editor-sync-sessions.json; Gloss will keep one-way editor handoffs available.");
+                    + "Repair or remove editor-sync-sessions.json; live web edit commands remain unavailable until restart.");
         }
     }
 

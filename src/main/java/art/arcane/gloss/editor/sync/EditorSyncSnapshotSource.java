@@ -1,17 +1,7 @@
 package art.arcane.gloss.editor.sync;
 
-import art.arcane.gloss.panel.PanelDefinition;
-import com.google.gson.JsonObject;
-
-import java.util.Map;
-
 interface EditorSyncSnapshotSource {
-  EditorSyncProject menu(String menuId, int maximumBytes);
+  EditorSyncProject open(EditorSyncKind kind, String subjectId, int maximumBytes);
 
-  EditorSyncProject board(String boardId, int maximumBytes);
-
-  EditorSyncProject fromContent(EditorSyncKind kind, String subjectId,
-                                PanelDefinition board, Map<String, String> menuSources,
-                                Map<String, byte[]> imageContents,
-                                JsonObject immutableConstraints, int maximumBytes);
+  java.util.List<String> subjectIds(EditorSyncKind kind);
 }

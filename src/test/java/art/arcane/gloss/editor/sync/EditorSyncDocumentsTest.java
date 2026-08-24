@@ -2,71 +2,56 @@ package art.arcane.gloss.editor.sync;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
 import org.junit.Test;
 
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.nio.charset.StandardCharsets;
+import java.util.List;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
 public class EditorSyncDocumentsTest {
   @Test
-  public void v1ProjectsAreRejectedWithAnActionableProtocolError() {
+  public void unsupportedProjectVersionIsRejected() {
     JsonObject project = EditorSyncTestProjects.menuProject("fixture", "{\"components\":[]}");
-    project.addProperty("format", "holoui-sync-project");
-    project.addProperty("version", 1);
-    project.remove("documents");
-    JsonArray menus = new JsonArray();
-    menus.add(EditorSyncTestProjects.document("menu", "fixture", "{\"components\":[]}"));
-    project.add("menus", menus);
+    project.addProperty("version", EditorSyncJson.PROTOCOL_VERSION + 1);
     EditorSyncTestProjects.sign(project);
 
     IllegalArgumentException failure = assertThrows(IllegalArgumentException.class,
         () -> EditorSyncProject.validated(project, 1024 * 1024));
-    assertTrue(failure.getMessage(), failure.getMessage().contains("protocol v1"));
-    assertTrue(failure.getMessage(), failure.getMessage().contains("Gloss speaks v2 only"));
+
+    assertTrue(failure.getMessage(),
+        failure.getMessage().contains("unsupported sync project version"));
   }
 
   @Test
-  public void unknownDocumentKindsAreRejectedByNameNotByShapeCrash() {
+  public void unsupportedDocumentKindsAreRejectedByName() {
     JsonObject project = EditorSyncTestProjects.menuProject("fixture", "{\"components\":[]}");
     JsonArray documents = new JsonArray();
-    documents.add(EditorSyncTestProjects.document("hologram", "fixture", "{\"lines\":[]}"));
-    documents.addAll(project.getAsJsonArray("documents"));
+    documents.add(EditorSyncTestProjects.document("unknown-kind", "fixture", "{}"));
     project.add("documents", documents);
     EditorSyncTestProjects.sign(project);
 
     IllegalArgumentException failure = assertThrows(IllegalArgumentException.class,
         () -> EditorSyncProject.validated(project, 1024 * 1024));
-    assertTrue(failure.getMessage(), failure.getMessage().contains("'hologram'"));
-    assertTrue(failure.getMessage(), failure.getMessage().contains("update Gloss"));
+
+    assertTrue(failure.getMessage(), failure.getMessage().contains("unknown-kind"));
   }
 
   @Test
-  public void unknownTopLevelSubjectKindNamesTheKindUsingTheV2Fixture() throws Exception {
-    InputStream resource = getClass().getResourceAsStream("/editor-sync-canonical-v2.json");
-    if (resource == null) {
-      throw new IllegalStateException("missing editor sync canonical fixture");
+  public void allCanonicalDocumentKindsAreHandled() {
+    for (EditorSyncDocumentKind kind : EditorSyncDocumentKind.ORDERED) {
+      assertEquals(kind, EditorSyncDocumentKind.parseWireName(kind.wireName()));
     }
-    JsonObject project;
-    try (InputStream input = resource;
-         InputStreamReader reader = new InputStreamReader(input, StandardCharsets.UTF_8)) {
-      project = JsonParser.parseReader(reader).getAsJsonObject().getAsJsonObject("project");
-    }
-
-    IllegalArgumentException failure = assertThrows(IllegalArgumentException.class,
-        () -> EditorSyncProject.validated(project, 1024 * 1024));
-    assertTrue(failure.getMessage(), failure.getMessage().contains("hologram"));
-    assertTrue(failure.getMessage(), failure.getMessage().contains("update Gloss"));
+    assertEquals(11, EditorSyncDocumentKind.ORDERED.size());
   }
 
   @Test
-  public void documentCollectionIsLimitedToFiveHundredTwelveEntries() {
+  public void documentCollectionAllowsEmptyAndLimitsFiveHundredTwelveEntries() {
+    JsonObject empty = new JsonObject();
+    empty.add("documents", new JsonArray());
+    assertTrue(EditorSyncDocuments.parse(empty).isEmpty());
+
     JsonObject project = EditorSyncTestProjects.menuProject("fixture", "{\"components\":[]}");
     JsonArray documents = new JsonArray();
     for (int index = 0; index < EditorSyncDocuments.MAX_DOCUMENTS + 1; index++) {
@@ -78,8 +63,8 @@ public class EditorSyncDocumentsTest {
 
     IllegalArgumentException failure = assertThrows(IllegalArgumentException.class,
         () -> EditorSyncProject.validated(project, 32 * 1024 * 1024));
-    assertTrue(failure.getMessage(),
-        failure.getMessage().contains("between 1 and " + EditorSyncDocuments.MAX_DOCUMENTS));
+    assertTrue(failure.getMessage(), failure.getMessage().contains("at most "
+        + EditorSyncDocuments.MAX_DOCUMENTS));
   }
 
   @Test
@@ -102,10 +87,10 @@ public class EditorSyncDocumentsTest {
   }
 
   @Test
-  public void documentKindsMustBeOpenLowercaseSlugs() {
+  public void documentKindsMustBeLowercaseSlugs() {
     JsonObject project = EditorSyncTestProjects.menuProject("fixture", "{\"components\":[]}");
-    project.getAsJsonArray("documents").add(
-        EditorSyncTestProjects.document("Menu", "fixture", "{\"components\":[]}"));
+    project.getAsJsonArray("documents").get(0).getAsJsonObject()
+        .addProperty("kind", "Menu");
     EditorSyncTestProjects.sign(project);
 
     IllegalArgumentException failure = assertThrows(IllegalArgumentException.class,
@@ -122,71 +107,44 @@ public class EditorSyncDocumentsTest {
     IllegalArgumentException failure = assertThrows(IllegalArgumentException.class,
         () -> EditorSyncProject.validated(project, 32 * 1024 * 1024));
     assertTrue(failure.getMessage(),
-        failure.getMessage().contains("" + EditorSyncDocuments.MAX_DOCUMENT_BYTES));
+        failure.getMessage().contains(String.valueOf(EditorSyncDocuments.MAX_DOCUMENT_BYTES)));
   }
 
   @Test
-  public void optionalServerOwnedRevisionMustBeAPositiveSafeInteger() {
-    JsonObject valid = EditorSyncTestProjects.menuProject("fixture", "{\"components\":[]}");
-    valid.getAsJsonArray("documents").get(0).getAsJsonObject()
-        .addProperty("revision", EditorSyncJson.MAX_SAFE_INTEGER);
-    EditorSyncTestProjects.sign(valid);
-    assertEquals("fixture", EditorSyncProject.validated(valid, 1024 * 1024).subjectId());
+  public void revisionsAreRequiredExactlyForServerVersionedKinds() {
+    JsonObject project = EditorSyncTestProjects.menuProject("fixture", "{\"components\":[]}");
+    project.getAsJsonArray("documents").get(0).getAsJsonObject().addProperty("revision", 1L);
+    EditorSyncTestProjects.sign(project);
+    IllegalArgumentException menuRevision = assertThrows(IllegalArgumentException.class,
+        () -> EditorSyncProject.validated(project, 1024 * 1024));
+    assertTrue(menuRevision.getMessage(), menuRevision.getMessage().contains("unversioned"));
 
-    JsonObject invalid = EditorSyncTestProjects.menuProject("fixture", "{\"components\":[]}");
-    invalid.getAsJsonArray("documents").get(0).getAsJsonObject().addProperty("revision", 0L);
-    EditorSyncTestProjects.sign(invalid);
-    assertThrows(IllegalArgumentException.class,
-        () -> EditorSyncProject.validated(invalid, 1024 * 1024));
+    JsonObject versionedProject = EditorSyncTestProjects.menuProject(
+        "fixture", "{\"components\":[]}");
+    JsonArray versionedDocuments = new JsonArray();
+    versionedDocuments.add(EditorSyncTestProjects.document("hologram", "fixture", "{}"));
+    versionedProject.add("documents", versionedDocuments);
+    EditorSyncTestProjects.sign(versionedProject);
+    IllegalArgumentException missingRevision = assertThrows(IllegalArgumentException.class,
+        () -> EditorSyncProject.validated(versionedProject, 1024 * 1024));
+    assertTrue(missingRevision.getMessage(), missingRevision.getMessage().contains("missing"));
+
+    versionedDocuments.get(0).getAsJsonObject().addProperty("revision", 1L);
+    EditorSyncTestProjects.sign(versionedProject);
+    assertEquals("fixture",
+        EditorSyncProject.validated(versionedProject, 1024 * 1024).subjectId());
   }
 
   @Test
-  public void builderEmitsMenuEntriesThenTheCanonicalPanelEntryInWireOrder() {
-    java.util.TreeMap<String, String> menus = new java.util.TreeMap<>();
-    menus.put("shop/main", "{\"components\":[]}");
-    menus.put("shop/armor", "{\"components\":[]}");
-    JsonObject panel = JsonParser.parseString("{\"rootMenuId\":\"shop/main\",\"id\":\"shop\"}")
-        .getAsJsonObject();
+  public void genericBuilderPreservesCanonicalDocumentOrderAndRevisionShape() {
+    List<EditorSyncDocuments.Entry> entries = List.of(
+        new EditorSyncDocuments.Entry("menu", "shop/main", null, "{\"components\":[]}"),
+        new EditorSyncDocuments.Entry("panel", "shop", 4L, "{\"id\":\"shop\"}"));
 
-    JsonArray documents = EditorSyncDocuments.build(menus, panel, "shop");
+    JsonArray documents = EditorSyncDocuments.build(entries);
 
-    assertEquals("[{\"kind\":\"menu\",\"id\":\"shop/armor\",\"json\":\"{\\\"components\\\":[]}\"},"
-            + "{\"kind\":\"menu\",\"id\":\"shop/main\",\"json\":\"{\\\"components\\\":[]}\"},"
-            + "{\"kind\":\"panel\",\"id\":\"shop\","
-            + "\"json\":\"{\\\"id\\\":\\\"shop\\\",\\\"rootMenuId\\\":\\\"shop/main\\\"}\"}]",
-        documents.toString());
-    JsonObject project = new JsonObject();
-    project.add("documents", documents);
-    assertEquals(menus, new java.util.TreeMap<>(
-        EditorSyncDocuments.menuSources(EditorSyncDocuments.parse(project))));
-    assertEquals(EditorSyncJson.canonical(panel),
-        EditorSyncJson.canonical(EditorSyncDocuments.panelJson(project)));
-  }
-
-  @Test
-  public void panelDocumentsMustCarryCanonicalJsonText() {
-    JsonObject panelSource = JsonParser.parseString(
-        "{\"b\":1,\"a\":2}").getAsJsonObject();
-    JsonObject canonicalProject = new JsonObject();
-    JsonArray documents = new JsonArray();
-    documents.add(EditorSyncTestProjects.document("panel", "fixture",
-        EditorSyncJson.canonical(panelSource)));
-    canonicalProject.add("documents", documents);
-    assertEquals(EditorSyncJson.canonical(panelSource),
-        EditorSyncJson.canonical(EditorSyncDocuments.panelJson(canonicalProject)));
-
-    JsonObject nonCanonicalProject = new JsonObject();
-    JsonArray nonCanonical = new JsonArray();
-    nonCanonical.add(EditorSyncTestProjects.document("panel", "fixture", "{\"b\":1,\"a\":2}"));
-    nonCanonicalProject.add("documents", nonCanonical);
-    IllegalArgumentException failure = assertThrows(IllegalArgumentException.class,
-        () -> EditorSyncDocuments.panelJson(nonCanonicalProject));
-    assertTrue(failure.getMessage(), failure.getMessage().contains("canonical JSON text"));
-
-    JsonObject menuOnlyProject = new JsonObject();
-    JsonArray menuOnly = new JsonArray();
-    menuOnly.add(EditorSyncTestProjects.document("menu", "fixture", "{\"components\":[]}"));
-    menuOnlyProject.add("documents", menuOnly);
-    assertNull(EditorSyncDocuments.panelJson(menuOnlyProject));
+    assertEquals("menu", documents.get(0).getAsJsonObject().get("kind").getAsString());
+    assertEquals("shop/main", documents.get(0).getAsJsonObject().get("id").getAsString());
+    assertEquals(4L, documents.get(1).getAsJsonObject().get("revision").getAsLong());
   }
 }

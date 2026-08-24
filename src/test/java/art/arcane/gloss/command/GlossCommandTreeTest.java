@@ -71,8 +71,6 @@ class GlossCommandTreeTest {
             List.of("menu", "back"),
             List.of("menu", "close"),
             List.of("menu", "move"),
-            List.of("menu", "builder"),
-            List.of("menu", "edit"),
             List.of("menu", "addrow"),
             List.of("menu", "insertrow"),
             List.of("menu", "setrow"),
@@ -113,7 +111,6 @@ class GlossCommandTreeTest {
             List.of("panel", "follow"),
             List.of("panel", "unfollow"),
             List.of("panel", "edit"),
-            List.of("panel", "web"),
             List.of("panel", "save"),
             List.of("panel", "cancel"),
             List.of("preview"),
@@ -123,20 +120,37 @@ class GlossCommandTreeTest {
             List.of("item"),
             List.of("item", "status"),
             List.of("item", "export"),
-            List.of("sync"),
-            List.of("sync", "list"),
-            List.of("sync", "status"),
-            List.of("sync", "revoke"),
-            List.of("sync", "pull"),
+            List.of("web"),
+            List.of("web", "open"),
+            List.of("web", "workspace"),
+            List.of("web", "edit"),
+            List.of("web", "edit", "menu"),
+            List.of("web", "edit", "panel"),
+            List.of("web", "edit", "hologram"),
+            List.of("web", "edit", "scoreboard"),
+            List.of("web", "edit", "emoji"),
+            List.of("web", "edit", "animation"),
+            List.of("web", "edit", "bubble-style"),
+            List.of("web", "edit", "container-preview"),
+            List.of("web", "edit", "tablist"),
+            List.of("web", "edit", "motd"),
+            List.of("web", "edit", "real-drops"),
+            List.of("web", "sessions"),
+            List.of("web", "sessions", "list"),
+            List.of("web", "sessions", "status"),
+            List.of("web", "sessions", "revoke"),
+            List.of("web", "sessions", "pull"),
             List.of("import"),
             List.of("import", "preview"),
             List.of("import", "apply"),
             List.of("import", "holoui"),
             List.of("import", "legacy")
     );
-    private static final Set<String> GROUP_ROOTS = Set.of(
-            "hologram", "board", "emoji", "animations", "bubbles", "tablist", "motd", "drops",
-            "menu", "panel", "preview", "item", "sync", "import"
+    private static final Set<List<String>> GROUP_PATHS = Set.of(
+            List.of("hologram"), List.of("board"), List.of("emoji"), List.of("animations"),
+            List.of("bubbles"), List.of("tablist"), List.of("motd"), List.of("drops"),
+            List.of("menu"), List.of("panel"), List.of("preview"), List.of("item"),
+            List.of("web"), List.of("web", "edit"), List.of("web", "sessions"), List.of("import")
     );
 
     @Test
@@ -169,7 +183,7 @@ class GlossCommandTreeTest {
             for (String token : path) {
                 cursor = findExactChild(cursor, token);
             }
-            boolean group = path.size() == 1 && GROUP_ROOTS.contains(path.get(0));
+            boolean group = GROUP_PATHS.contains(path);
             Assertions.assertEquals(!group, cursor.isInvocable(), "Wrong invocability for path " + path);
         }
     }

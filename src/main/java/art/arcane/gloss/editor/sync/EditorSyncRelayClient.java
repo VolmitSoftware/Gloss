@@ -208,7 +208,7 @@ final class EditorSyncRelayClient implements EditorSyncRelayGateway {
     HttpRequest.Builder builder = HttpRequest.newBuilder(uri)
         .timeout(requestTimeout)
         .header("Accept", "application/json")
-        .header("User-Agent", "Gloss-Editor-Sync/2");
+        .header("User-Agent", "Gloss-Editor-Sync/3");
     if (token != null) {
       builder.header("Authorization", "Bearer " + token);
     }
@@ -428,7 +428,7 @@ final class EditorSyncRelayClient implements EditorSyncRelayGateway {
     String path = base.getPath();
     if ((!https && !loopbackHttp)
         || base.getHost() == null || base.getUserInfo() != null || base.getQuery() != null
-        || base.getFragment() != null || path == null || !path.endsWith("/v2")
+        || base.getFragment() != null || path == null || !path.endsWith("/v3")
         || path.contains("//") || path.contains("/../") || path.contains("/./")) {
       throw new EditorSyncRelayException(
           "relay endpoint must be versioned HTTPS or loopback HTTP without credentials or query data");
@@ -471,10 +471,6 @@ final class EditorSyncRelayClient implements EditorSyncRelayGateway {
 
   private static void requireProtocol(JsonObject body) {
     int protocol = EditorSyncJson.requireInt(body, "protocol");
-    if (protocol == 1) {
-      throw new EditorSyncRelayException(
-          "relay answered with protocol v1; Gloss speaks v2 only. Point editor.sync.endpoint at a v2 relay.");
-    }
     if (protocol != EditorSyncJson.PROTOCOL_VERSION) {
       throw new EditorSyncRelayException("relay protocol version does not match");
     }

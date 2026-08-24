@@ -22,16 +22,17 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 
-@Director(name = "sync", description = "Manage active web editor sync sessions",
-    descriptionKey = "command.help.sync")
-public final class CommandGlossSync {
-  public static final String PERMISSION = "gloss.sync";
-  private static final String LIST_COMMAND = "/gloss sync list";
+@Director(name = "sessions", description = "Manage active web editor sessions",
+    descriptionKey = "command.help.web.sessions")
+public final class CommandGlossWebSessions {
+  public static final String PERMISSION = "gloss.web.sessions";
+  private static final String LIST_COMMAND = "/gloss web sessions list";
 
-  @Director(name = "list", description = "List active editor sync sessions",
-      descriptionKey = "command.help.sync.list")
+  @Director(name = "list", description = "List active web editor sessions",
+      descriptionKey = "command.help.web.sessions.list")
   public void list(
       @Param(name = "page", defaultValue = "1", description = "One-based list page",
           descriptionKey = "command.help.arg.list_page") int page,
@@ -39,9 +40,13 @@ public final class CommandGlossSync {
     if (!checkPermission(sender)) {
       return;
     }
-    List<EditorSyncSessionInfo> sessions = service().sessions();
+    EditorSyncService service = availableService(sender);
+    if (service == null) {
+      return;
+    }
+    List<EditorSyncSessionInfo> sessions = service.sessions();
     if (sessions.isEmpty()) {
-      send(sender, GlossMessages.SYNC_LIST_EMPTY);
+      send(sender, GlossMessages.WEB_SESSION_LIST_EMPTY);
       return;
     }
     DirectorMiniMenu.ContentPage window = GlossCommandPager.window(sessions.size(), page, GlossCommandPager.TEXT_PAGE_SIZE);
@@ -59,45 +64,60 @@ public final class CommandGlossSync {
     DirectorMiniMenu.deliver(sender, lines);
   }
 
-  @Director(name = "status", description = "Show one editor sync session",
-      descriptionKey = "command.help.sync.status")
+  @Director(name = "status", description = "Show one web editor session",
+      descriptionKey = "command.help.web.sessions.status")
   public void status(
-      @Param(name = "session", description = "Editor sync session id",
-          descriptionKey = "command.help.arg.sync_session", customHandler = SessionIdHandler.class)
+      @Param(name = "session", description = "Web editor session id",
+          descriptionKey = "command.help.arg.web_session", customHandler = SessionIdHandler.class)
       String sessionId,
       @Param(name = "sender", contextual = true) CommandSender sender) {
     if (!checkPermission(sender)) {
       return;
     }
-    String resolved = resolveForSender(sender, sessionId);
+    EditorSyncService service = availableService(sender);
+    if (service == null) {
+      return;
+    }
+    String resolved = resolveForSender(sender, sessionId, service);
     if (resolved == null) {
       return;
     }
-    EditorSyncSessionInfo session = service().session(resolved).orElse(null);
+    EditorSyncSessionInfo session = service.session(resolved).orElse(null);
     if (session == null) {
       unknown(sender, sessionId);
       return;
     }
-    send(sender, GlossMessages.SYNC_STATUS, infoArguments(session));
+    send(sender, GlossMessages.WEB_SESSION_STATUS, infoArguments(session));
   }
 
-  @Director(name = "revoke", description = "Revoke an editor sync capability",
-      descriptionKey = "command.help.sync.revoke")
+  @Director(name = "revoke", description = "Revoke a web editor capability",
+      descriptionKey = "command.help.web.sessions.revoke")
   public void revoke(
-      @Param(name = "session", description = "Editor sync session id",
-          descriptionKey = "command.help.arg.sync_session", customHandler = SessionIdHandler.class)
+      @Param(name = "session", description = "Web editor session id",
+          descriptionKey = "command.help.arg.web_session", customHandler = SessionIdHandler.class)
       String sessionId,
       @Param(name = "sender", contextual = true) CommandSender sender) {
     if (!checkPermission(sender)) {
       return;
     }
-    String resolved = resolveForSender(sender, sessionId);
+    EditorSyncService service = availableService(sender);
+    if (service == null) {
+      return;
+    }
+    String resolved = resolveForSender(sender, sessionId, service);
     if (resolved == null) {
       return;
     }
-    service().revoke(resolved).whenComplete((ignored, failure) -> runForSender(sender, () -> {
+    CompletableFuture<Void> revocation;
+    try {
+      revocation = service.revoke(resolved);
+    } catch (RuntimeException failure) {
+      reportInvocationFailure(sender, resolved, service, failure);
+      return;
+    }
+    revocation.whenComplete((ignored, failure) -> runForSender(sender, () -> {
       if (failure == null) {
-        send(sender, GlossMessages.SYNC_REVOKED,
+        send(sender, GlossMessages.WEB_SESSION_REVOKED,
             MessageArgs.builder().untrusted("session", EditorSyncService.abbreviate(resolved)).build());
       } else {
         reportFailure(sender, resolved, failure);
@@ -105,23 +125,34 @@ public final class CommandGlossSync {
     }));
   }
 
-  @Director(name = "pull", aliases = {"poll"}, description = "Poll an editor sync session now",
-      descriptionKey = "command.help.sync.pull")
+  @Director(name = "pull", description = "Poll a web editor session now",
+      descriptionKey = "command.help.web.sessions.pull")
   public void pull(
-      @Param(name = "session", description = "Editor sync session id",
-          descriptionKey = "command.help.arg.sync_session", customHandler = SessionIdHandler.class)
+      @Param(name = "session", description = "Web editor session id",
+          descriptionKey = "command.help.arg.web_session", customHandler = SessionIdHandler.class)
       String sessionId,
       @Param(name = "sender", contextual = true) CommandSender sender) {
     if (!checkPermission(sender)) {
       return;
     }
-    String resolved = resolveForSender(sender, sessionId);
+    EditorSyncService service = availableService(sender);
+    if (service == null) {
+      return;
+    }
+    String resolved = resolveForSender(sender, sessionId, service);
     if (resolved == null) {
       return;
     }
-    service().pullNow(resolved).whenComplete((ignored, failure) -> runForSender(sender, () -> {
+    CompletableFuture<Void> pull;
+    try {
+      pull = service.pullNow(resolved);
+    } catch (RuntimeException failure) {
+      reportInvocationFailure(sender, resolved, service, failure);
+      return;
+    }
+    pull.whenComplete((ignored, failure) -> runForSender(sender, () -> {
       if (failure == null) {
-        send(sender, GlossMessages.SYNC_PULLED,
+        send(sender, GlossMessages.WEB_SESSION_PULLED,
             MessageArgs.builder().untrusted("session", EditorSyncService.abbreviate(resolved)).build());
       } else {
         reportFailure(sender, resolved, failure);
@@ -158,28 +189,38 @@ public final class CommandGlossSync {
     }
     Gloss.logExceptionStack(false, cause, "Editor sync command failed for session %s.",
         EditorSyncService.abbreviate(sessionId));
-    send(sender, GlossMessages.SYNC_FAILED,
+    send(sender, GlossMessages.WEB_SESSION_FAILED,
         MessageArgs.builder()
             .untrusted("session", EditorSyncService.abbreviate(sessionId))
             .untrusted("reason", safeMessage(cause))
             .build());
   }
 
+  private void reportInvocationFailure(CommandSender sender, String sessionId,
+                                       EditorSyncService service, RuntimeException failure) {
+    if (!service.isAvailable()) {
+      send(sender, GlossMessages.WEB_UNAVAILABLE);
+      return;
+    }
+    reportFailure(sender, sessionId, failure);
+  }
+
   private void unknown(CommandSender sender, String sessionId) {
-    send(sender, GlossMessages.SYNC_UNKNOWN,
+    send(sender, GlossMessages.WEB_SESSION_UNKNOWN,
         MessageArgs.builder().untrusted("session", EditorSyncService.abbreviate(sessionId)).build());
   }
 
-  private String resolveForSender(CommandSender sender, String supplied) {
+  private String resolveForSender(CommandSender sender, String supplied,
+                                  EditorSyncService service) {
     try {
-      Optional<String> resolved = resolveSessionId(supplied, service().sessions());
+      Optional<String> resolved = resolveSessionId(supplied, service.sessions());
       if (resolved.isPresent()) {
         return resolved.get();
       }
       unknown(sender, supplied);
       return null;
     } catch (IllegalArgumentException failure) {
-      send(sender, GlossMessages.SYNC_FAILED,
+      send(sender, GlossMessages.WEB_SESSION_FAILED,
           MessageArgs.builder()
               .untrusted("session", EditorSyncService.abbreviate(supplied))
               .untrusted("reason", safeMessage(failure))
@@ -231,8 +272,13 @@ public final class CommandGlossSync {
     plugin().getLocalization().send(sender, key, arguments);
   }
 
-  private EditorSyncService service() {
-    return plugin().getEditorSyncService();
+  private EditorSyncService availableService(CommandSender sender) {
+    EditorSyncService service = plugin().getEditorSyncService();
+    if (service != null && service.isAvailable()) {
+      return service;
+    }
+    send(sender, GlossMessages.WEB_UNAVAILABLE);
+    return null;
   }
 
   private Gloss plugin() {
@@ -261,10 +307,14 @@ public final class CommandGlossSync {
     public KList<String> getPossibilities() {
       KList<String> ids = new KList<>();
       Gloss plugin = Gloss.instance;
-      if (plugin == null || plugin.getEditorSyncService() == null) {
+      if (plugin == null) {
         return ids;
       }
-      plugin.getEditorSyncService().sessions().stream()
+      EditorSyncService service = plugin.getEditorSyncService();
+      if (service == null || !service.isAvailable()) {
+        return ids;
+      }
+      service.sessions().stream()
           .map(EditorSyncSessionInfo::sessionId)
           .forEach(ids::add);
       return ids;
@@ -279,7 +329,7 @@ public final class CommandGlossSync {
     public String parse(String in, boolean force) throws DirectorParsingException {
       if (in == null || in.isBlank()) {
         throw new DirectorParsingException(
-            GlossLocalization.globalText(GlossMessages.ERROR_SYNC_SESSION_REQUIRED));
+            GlossLocalization.globalText(GlossMessages.ERROR_WEB_SESSION_REQUIRED));
       }
       return in.strip();
     }

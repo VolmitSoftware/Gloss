@@ -45,7 +45,6 @@ public record GlossConfig(
         boolean perViewerPlaceholders,
         int temporaryUpdateIntervalTicks,
         boolean interpolatedMotion,
-        int textArtMaxWidth,
         boolean highFrequencyAnimations,
         int maxAnimationFps,
         int animationPacketBudget
@@ -408,7 +407,6 @@ public record GlossConfig(
                 source.holograms.perViewerPlaceholders,
                 source.holograms.temporaryUpdateIntervalTicks,
                 source.holograms.interpolatedMotion,
-                source.holograms.textArtMaxWidth,
                 source.holograms.highFrequencyAnimations,
                 source.holograms.maxAnimationFps,
                 source.holograms.animationPacketBudget

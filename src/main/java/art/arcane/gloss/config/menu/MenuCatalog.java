@@ -222,12 +222,14 @@ public final class MenuCatalog {
     return requiredCreated;
   }
 
-  public CompletableFuture<List<MenuDocument>> publishEditorSyncProject(Map<String, String> sources) {
+  public CompletableFuture<List<MenuDocument>> publishEditorSyncProject(
+      Map<String, String> sources, Set<String> deletedIds) {
     if (!acceptingMenuMutations) {
       return CompletableFuture.failedFuture(
           new CancellationException("menu mutation service is shut down"));
     }
     Map<String, String> requiredSources = Map.copyOf(sources);
+    Set<String> requiredDeletedIds = Set.copyOf(deletedIds);
     List<MenuDocument> documents;
     try {
       documents = new ArrayList<>(requiredSources.size());
@@ -251,6 +253,15 @@ public final class MenuCatalog {
             });
           }
           refreshBoardMenu(document.id());
+        }
+        for (String id : requiredDeletedIds) {
+          String canonicalId = MenuIds.require(id);
+          if (Gloss.instance.getSessionManager() != null) {
+            Gloss.instance.getSessionManager().destroyAllType(canonicalId, player -> {
+            });
+          }
+          registry.remove(canonicalId);
+          refreshBoardMenu(canonicalId);
         }
         publication.complete(parsed);
       } catch (RuntimeException failure) {

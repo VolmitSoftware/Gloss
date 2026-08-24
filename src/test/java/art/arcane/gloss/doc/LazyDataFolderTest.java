@@ -192,7 +192,8 @@ class LazyDataFolderTest {
         expectedAbsent.put(menu, null);
 
         GlossProjectTransaction.Pending pending = transaction.apply("session",
-            Map.of("new", "{\"components\":[]}"), Map.of(), null, expectedAbsent);
+            Map.of(menu, GlossProjectTransaction.Mutation.write(
+                "{\"components\":[]}".getBytes(StandardCharsets.UTF_8))), expectedAbsent);
         assertFalse(Files.exists(pending.transactionDirectory().resolve("backup")));
 
         transaction.commit(pending);
@@ -216,7 +217,8 @@ class LazyDataFolderTest {
         expectedAbsent.put(menu, null);
 
         GlossProjectTransaction.Pending pending = transaction.apply("session",
-            Map.of("deep/new", "{\"components\":[]}"), Map.of(), null, expectedAbsent);
+            Map.of(menu, GlossProjectTransaction.Mutation.write(
+                "{\"components\":[]}".getBytes(StandardCharsets.UTF_8))), expectedAbsent);
         assertTrue(Files.isDirectory(pending.transactionDirectory().resolve("stage/menus/deep")));
 
         transaction.commit(pending);
@@ -238,7 +240,8 @@ class LazyDataFolderTest {
         GlossProjectTransaction transaction = new GlossProjectTransaction(data);
 
         GlossProjectTransaction.Pending pending = transaction.apply("session",
-            Map.of("shop", "{\"offset\":[0,0,1],\"components\":[]}"), Map.of(), null,
+            Map.of(menu, GlossProjectTransaction.Mutation.write(
+                "{\"offset\":[0,0,1],\"components\":[]}".getBytes(StandardCharsets.UTF_8))),
             Map.of(menu, original));
 
         assertTrue(Files.isRegularFile(pending.transactionDirectory()

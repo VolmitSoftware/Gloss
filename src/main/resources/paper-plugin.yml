@@ -98,7 +98,7 @@ permissions:
       gloss.preview: true
       gloss.previews: true
       gloss.items: true
-      gloss.sync: true
+      gloss.web: true
       gloss.import: true
       gloss.emoji.use: true
       gloss.chat.color: true
@@ -174,7 +174,6 @@ permissions:
       gloss.menus.back: true
       gloss.menus.create: true
       gloss.menus.edit: true
-      gloss.menus.builder: true
   gloss.menus.list:
     description: Allows listing hologram menus.
     default: op
@@ -194,18 +193,10 @@ permissions:
     description: Allows creating a hologram menu and the panel that places it; also requires gloss.panels.
     default: op
   gloss.menus.edit:
-    description: Allows editing menu content and opening menus in the web editor.
-    default: op
-  gloss.menus.builder:
-    description: Allows linking the hosted Gloss web editor.
+    description: Allows editing menu content.
     default: op
   gloss.panels:
     description: Allows managing persistent world panels.
-    default: op
-    children:
-      gloss.panels.editweb: true
-  gloss.panels.editweb:
-    description: Allows opening panel projects in the web editor.
     default: op
   gloss.preview:
     description: Allows seeing container previews and adjusting their scale.
@@ -230,8 +221,25 @@ permissions:
   gloss.items.export:
     description: Allows exporting the custom item catalog for the web editor.
     default: op
-  gloss.sync:
-    description: Allows managing web editor sync sessions.
+  gloss.web:
+    description: Gives access to all Gloss web editor permissions.
+    default: op
+    children:
+      gloss.web.open: true
+      gloss.web.edit: true
+      gloss.web.workspace: true
+      gloss.web.sessions: true
+  gloss.web.open:
+    description: Allows opening an empty hosted Gloss editor.
+    default: op
+  gloss.web.edit:
+    description: Allows opening individual live Gloss documents in the web editor.
+    default: op
+  gloss.web.workspace:
+    description: Allows opening the complete live Gloss workspace.
+    default: op
+  gloss.web.sessions:
+    description: Allows managing live Gloss web editor sessions.
     default: op
   gloss.import:
     description: Allows previewing legacy hologram migrations.

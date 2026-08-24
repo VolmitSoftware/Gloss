@@ -10,8 +10,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * The positional-to-keyed convenience pre-pass is scoped to the six subtrees ported from HoloUi
- * (menu, panel, preview, item, sync, import). Native Gloss subtrees (hologram, board, emoji, ...)
+ * The positional-to-keyed convenience pre-pass is scoped to the ported workflow subtrees
+ * (menu, panel, preview, item, web, import). Native Gloss subtrees (hologram, board, emoji, ...)
  * stay strictly keyed: the pre-pass must never touch them.
  */
 class GlossCommandNormalizeArgsTest {
@@ -25,7 +25,7 @@ class GlossCommandNormalizeArgsTest {
     assertTrue(GlossCommandService.isScopedPositionalRoot(new String[]{"preview"}));
     assertTrue(GlossCommandService.isScopedPositionalRoot(new String[]{"previews", "reset", "chest"}));
     assertTrue(GlossCommandService.isScopedPositionalRoot(new String[]{"item", "export"}));
-    assertTrue(GlossCommandService.isScopedPositionalRoot(new String[]{"sync", "list"}));
+    assertTrue(GlossCommandService.isScopedPositionalRoot(new String[]{"web", "sessions", "list"}));
     assertTrue(GlossCommandService.isScopedPositionalRoot(new String[]{"import", "preview", "source=holoui"}));
 
     assertFalse(GlossCommandService.isScopedPositionalRoot(new String[]{}));
@@ -66,8 +66,8 @@ class GlossCommandNormalizeArgsTest {
         GlossCommandService.normalizePositionalArgs(new String[]{"panels"}));
     assertArrayEquals(new String[]{"preview", "list"},
         GlossCommandService.normalizePositionalArgs(new String[]{"previews"}));
-    assertArrayEquals(new String[]{"sync"},
-        GlossCommandService.normalizePositionalArgs(new String[]{"sync"}));
+    assertArrayEquals(new String[]{"web"},
+        GlossCommandService.normalizePositionalArgs(new String[]{"web"}));
   }
 
   @Test
@@ -109,6 +109,16 @@ class GlossCommandNormalizeArgsTest {
     assertArrayEquals(
         new String[]{"panels", "list", "page="},
         GlossCommandService.normalizeTabArgs(new String[]{"panels", "list", ""}));
+  }
+
+  @Test
+  void bareWebSessionPageRewritesToAKeyedValue() {
+    assertArrayEquals(
+        new String[]{"web", "sessions", "list", "page=2"},
+        GlossCommandService.normalizePositionalArgs(new String[]{"web", "sessions", "list", "2"}));
+    assertArrayEquals(
+        new String[]{"web", "sessions", "list", "page="},
+        GlossCommandService.normalizeTabArgs(new String[]{"web", "sessions", "list", ""}));
   }
 
   @Test
@@ -194,6 +204,10 @@ class GlossCommandNormalizeArgsTest {
         List.of("2"),
         GlossCommandService.restorePositionalSuggestions(
             new String[]{"panels", "list", "2"}, List.of("page=2")));
+    assertEquals(
+        List.of("2"),
+        GlossCommandService.restorePositionalSuggestions(
+            new String[]{"web", "sessions", "list", "2"}, List.of("page=2")));
     assertEquals(
         List.of("menus/welcome"),
         GlossCommandService.restorePositionalSuggestions(

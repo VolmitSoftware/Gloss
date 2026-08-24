@@ -789,53 +789,6 @@ public final class CommandGlossPanel {
     sendInfo(sender, board, effectiveTransform, true);
   }
 
-  @Director(name = "web", aliases = {"editweb", "webedit"},
-      description = "Open a panel project in the web editor",
-      descriptionKey = "command.help.panel.web")
-  public void editWeb(
-      @Param(name = "panel", description = "Persistent panel id",
-          descriptionKey = "command.help.arg.panel_id", customHandler = PanelIdHandler.class)
-      String id,
-      @Param(name = "sender", contextual = true) CommandSender sender
-  ) {
-    String permission = "gloss.panels.editweb";
-    if (!sender.hasPermission(permission)) {
-      send(sender, GlossMessages.PERMISSION_DENIED,
-          MessageArgs.builder().untrusted("permission", permission).build());
-      return;
-    }
-    PanelDefinition board = publishedBoard(sender, id);
-    if (board == null) {
-      return;
-    }
-    String source = plugin().getMenuCatalog().source(board.rootMenuId()).orElse(null);
-    if (source == null) {
-      send(sender, GlossMessages.PANELS_MENU_UNAVAILABLE,
-          MessageArgs.builder().untrusted("menu", board.rootMenuId()).build());
-      return;
-    }
-    if (!plugin().cfg().editorSync().enabled()
-        || plugin().getEditorSyncService() == null
-        || !plugin().getEditorSyncService().isAvailable()
-        || !sender.hasPermission(CommandGlossSync.PERMISSION)) {
-      CommandGlossMenu.deliverLegacyEditorLink(plugin(), sender, board.rootMenuId(), source, true);
-      return;
-    }
-    send(sender, GlossMessages.SYNC_PREPARING,
-        MessageArgs.builder().untrusted("subject", board.id()).build());
-    plugin().getEditorSyncService().openBoard(board.id()).whenComplete((result, failure) ->
-        runForSender(sender, () -> {
-          if (failure == null) {
-            CommandGlossMenu.deliverSyncLink(plugin(), sender, result);
-            return;
-          }
-          Gloss.logExceptionStack(false, PanelCommandSupport.rootCause(failure),
-              "Unable to create editor sync session for panel \"%s\"; using its root-menu handoff.",
-              board.id());
-          CommandGlossMenu.deliverLegacyEditorLink(plugin(), sender, board.rootMenuId(), source, true);
-        }));
-  }
-
   @Director(name = "save", description = "Persist your staged panel edit", descriptionKey = "command.help.panel.save")
   public void save(
       @Param(name = "sender", contextual = true)

@@ -5,8 +5,6 @@ import art.arcane.gloss.panel.PanelIds;
 import art.arcane.gloss.panel.PanelTransform;
 import art.arcane.gloss.config.MenuDefinitionData;
 import art.arcane.gloss.config.menu.MenuRowMutations;
-import art.arcane.gloss.editor.EditorMenuHandoff;
-import art.arcane.gloss.editor.sync.EditorSyncOpenResult;
 import art.arcane.gloss.locale.GlossLocalization;
 import art.arcane.gloss.locale.GlossMessages;
 import art.arcane.gloss.service.PanelCreationService;
@@ -215,87 +213,6 @@ public class CommandGlossMenu {
     }
   }
 
-  @Director(name = "builder", description = "Link to the hosted Gloss web editor", descriptionKey = "command.help.menu.builder")
-  public void builder(@Param(name = "sender", contextual = true) CommandSender sender) {
-    String permission = "gloss.menus.builder";
-    if (!sender.hasPermission(permission)) {
-      sendPermissionDenied(sender, permission);
-      return;
-    }
-
-    String url = plugin.cfg().editorSync().builderUrl();
-    if (!(sender instanceof Player)) {
-      // a terminal cannot click, so the bare url is the only useful form
-      plugin.getLocalization().send(sender,
-          GlossMessages.BUILDER_OPEN,
-          MessageArgs.builder().untrusted("url", url).build()
-      );
-      return;
-    }
-
-    DirectorMiniMenu.Theme theme = GlossCommandService.menuTheme();
-    String hover = plugin.getLocalization().text(GlossMessages.BUILDER_LINK_HOVER);
-    List<String> lines = new ArrayList<>();
-    lines.add(DirectorMiniMenu.banner(plugin.getLocalization().text(GlossMessages.BUILDER_HEADER), theme));
-    lines.add("<hover:show_text:'" + DirectorMiniMenu.escapeText(hover).replace("\\", "\\\\").replace("'", "\\'") + "'>"
-        + "<click:open_url:'" + url + "'>"
-        + "<" + theme.muted() + ">⇀</" + theme.muted() + "> "
-        + "<gradient:" + theme.primaryLeft() + ":" + theme.primaryRight() + ">" + DirectorMiniMenu.escapeText(url) + "</gradient>"
-        + "</click></hover>");
-    lines.add(DirectorMiniMenu.bar(theme));
-    DirectorMiniMenu.deliver(sender, lines);
-  }
-
-  @Director(name = "edit", description = "Open a loaded menu in the web editor", descriptionKey = "command.help.menu.edit")
-  public void edit(
-      @Param(name = "menu", description = "Loaded menu id", descriptionKey = "command.help.arg.edit_menu", customHandler = ExistingMenuHandler.class)
-      String menuName,
-      @Param(name = "sender", contextual = true)
-      CommandSender sender
-  ) {
-    if (!sender.hasPermission(EDIT_PERMISSION)) {
-      sendPermissionDenied(sender, EDIT_PERMISSION);
-      return;
-    }
-
-    MenuDefinitionData menu = plugin.getMenuCatalog().definition(menuName).orElse(null);
-    if (menu == null) {
-      plugin.getLocalization().send(sender,
-          GlossMessages.MENU_UNAVAILABLE,
-          MessageArgs.builder().untrusted("menu", menuName).build()
-      );
-      return;
-    }
-    String source = plugin.getMenuCatalog().source(menu.getId()).orElse(null);
-    if (source == null) {
-      sendEditorFailure(sender, menu.getId());
-      return;
-    }
-
-    if (!plugin.cfg().editorSync().enabled() || plugin.getEditorSyncService() == null
-        || !plugin.getEditorSyncService().isAvailable()
-        || !sender.hasPermission(CommandGlossSync.PERMISSION)) {
-      deliverLegacyEditorLink(plugin, sender, menu.getId(), source, true);
-      return;
-    }
-
-    plugin.getLocalization().send(sender,
-        GlossMessages.SYNC_PREPARING,
-        MessageArgs.builder().untrusted("subject", menu.getId()).build()
-    );
-    plugin.getEditorSyncService().openMenu(menu.getId()).whenComplete((result, failure) ->
-        runForSender(plugin, sender, () -> {
-          if (failure == null) {
-            deliverSyncLink(plugin, sender, result);
-            return;
-          }
-          Gloss.logExceptionStack(false, rootCause(failure),
-              "Unable to create editor sync session for menu \"%s\"; using one-way handoff.",
-              menu.getId());
-          deliverLegacyEditorLink(plugin, sender, menu.getId(), source, true);
-        }));
-  }
-
   @Director(name = "addrow", description = "Append a text decoration row", descriptionKey = "command.help.menu.addrow")
   public void addRow(
       @Param(name = "menu", description = "Loaded menu id", descriptionKey = "command.help.arg.content_menu", customHandler = ExistingMenuHandler.class)
@@ -469,116 +386,12 @@ public class CommandGlossMenu {
         });
   }
 
-  static void deliverLegacyEditorLink(Gloss plugin, CommandSender sender, String menuId,
-                                      String source, boolean fallback) {
-    String url;
-    try {
-      url = EditorMenuHandoff.createUrl(plugin.cfg().editorSync().builderUrl(), menuId, source);
-    } catch (EditorMenuHandoff.PayloadTooLargeException exception) {
-      plugin.getLocalization().send(sender,
-          GlossMessages.EDITOR_MENU_TOO_LARGE,
-          MessageArgs.builder().untrusted("menu", menuId).build()
-      );
-      return;
-    } catch (RuntimeException exception) {
-      Gloss.logExceptionStack(true, exception,
-          "Failed to prepare editor handoff for menu \"%s\".", menuId);
-      plugin.getLocalization().send(sender,
-          GlossMessages.EDITOR_MENU_FAILED,
-          MessageArgs.builder().untrusted("menu", menuId).build());
-      return;
-    }
-
-    if (fallback) {
-      plugin.getLocalization().send(sender,
-          GlossMessages.SYNC_FALLBACK,
-          MessageArgs.builder().untrusted("subject", menuId).build());
-    }
-
-    if (!(sender instanceof Player)) {
-      plugin.getLocalization().send(sender,
-          GlossMessages.EDITOR_MENU_OPEN,
-          MessageArgs.builder()
-              .untrusted("menu", menuId)
-              .untrusted("url", url)
-              .build()
-      );
-      return;
-    }
-
-    DirectorMiniMenu.Theme theme = GlossCommandService.menuTheme();
-    MessageArgs arguments = MessageArgs.builder().untrusted("menu", menuId).build();
-    String label = plugin.getLocalization().text(GlossMessages.EDITOR_MENU_LINK, arguments);
-    String hover = plugin.getLocalization().text(GlossMessages.EDITOR_MENU_HOVER, arguments);
-    List<String> lines = new ArrayList<>();
-    lines.add(DirectorMiniMenu.banner(plugin.getLocalization().text(GlossMessages.BUILDER_HEADER), theme));
-    lines.add(editorEntryLine(url, label, hover, theme));
-    lines.add(DirectorMiniMenu.bar(theme));
-    DirectorMiniMenu.deliver(sender, lines);
-  }
-
-  static void deliverSyncLink(Gloss plugin, CommandSender sender, EditorSyncOpenResult result) {
-    MessageArgs linkArguments = MessageArgs.builder()
-        .untrusted("subject", result.subjectId())
-        .untrusted("session", art.arcane.gloss.editor.sync.EditorSyncService.abbreviate(result.sessionId()))
-        .build();
-    if (!(sender instanceof Player)) {
-      plugin.getLocalization().send(sender, GlossMessages.SYNC_CAPABILITY_WARNING);
-      plugin.getLocalization().send(sender,
-          GlossMessages.SYNC_OPEN_CONSOLE,
-          MessageArgs.builder()
-              .untrusted("subject", result.subjectId())
-              .untrusted("url", result.editorUrl())
-              .build()
-      );
-      return;
-    }
-    DirectorMiniMenu.Theme theme = GlossCommandService.menuTheme();
-    String open = plugin.getLocalization().text(GlossMessages.SYNC_OPEN_LABEL);
-    String copy = plugin.getLocalization().text(GlossMessages.SYNC_COPY_LABEL);
-    String revoke = plugin.getLocalization().text(GlossMessages.SYNC_REVOKE_LABEL);
-    String hover = plugin.getLocalization().text(GlossMessages.SYNC_LINK_HOVER, linkArguments);
-    String escapedHover = DirectorMiniMenu.escapeText(hover).replace("\\", "\\\\").replace("'", "\\'");
-    String url = result.editorUrl();
-    String line = "<hover:show_text:'" + escapedHover + "'>"
-        + "<click:open_url:'" + url + "'><gradient:" + theme.primaryLeft() + ":"
-        + theme.primaryRight() + ">[" + DirectorMiniMenu.escapeText(open) + "]</gradient></click> "
-        + "<click:copy_to_clipboard:'" + url + "'><" + theme.muted() + ">["
-        + DirectorMiniMenu.escapeText(copy) + "]</" + theme.muted() + "></click> "
-        + "<click:run_command:'/gloss sync revoke session=" + result.sessionId() + "'><red>["
-        + DirectorMiniMenu.escapeText(revoke) + "]</red></click></hover>";
-    List<String> lines = new ArrayList<>();
-    lines.add(DirectorMiniMenu.banner(plugin.getLocalization().text(GlossMessages.BUILDER_HEADER), theme));
-    lines.add(line);
-    lines.add(DirectorMiniMenu.bar(theme));
-    DirectorMiniMenu.deliver(sender, lines);
-  }
-
-  private static void runForSender(Gloss plugin, CommandSender sender, Runnable task) {
-    boolean accepted = sender instanceof Player player
-        ? SchedulerUtils.runEntity(plugin, player, task)
-        : SchedulerUtils.runGlobal(plugin, task);
-    if (!accepted) {
-      Gloss.warnThrottled("menu-feedback-scheduling",
-          "Unable to schedule editor sync feedback for %s.", sender.getName());
-    }
-  }
-
   private static Throwable rootCause(Throwable failure) {
     Throwable current = failure;
     while (current instanceof java.util.concurrent.CompletionException && current.getCause() != null) {
       current = current.getCause();
     }
     return current;
-  }
-
-  static String editorEntryLine(String url, String label, String hover, DirectorMiniMenu.Theme theme) {
-    return "<hover:show_text:'" + DirectorMiniMenu.escapeText(hover).replace("\\", "\\\\").replace("'", "\\'") + "'>"
-        + "<click:open_url:'" + url + "'>"
-        + "<" + theme.muted() + ">⇀</" + theme.muted() + "> "
-        + "<gradient:" + theme.primaryLeft() + ":" + theme.primaryRight() + ">"
-        + DirectorMiniMenu.escapeText(label) + "</gradient>"
-        + "</click></hover>";
   }
 
   static String menuEntryLine(String menu, String hover, DirectorMiniMenu.Theme theme) {
@@ -692,13 +505,6 @@ public class CommandGlossMenu {
     player.playSound(player.getLocation(),
         successful ? theme.getSuccessSound() : theme.getErrorSound(),
         SoundCategory.MASTER, 0.8F, successful ? 1.3F : 0.85F);
-  }
-
-  private void sendEditorFailure(CommandSender sender, String menuId) {
-    plugin.getLocalization().send(sender,
-        GlossMessages.EDITOR_MENU_FAILED,
-        MessageArgs.builder().untrusted("menu", menuId).build()
-    );
   }
 
   public static class ExistingMenuHandler implements DirectorParameterHandler<String> {

@@ -2,7 +2,6 @@ package art.arcane.gloss.persistence;
 
 import art.arcane.gloss.doc.AtomicFiles;
 import art.arcane.gloss.doc.DocumentHashes;
-import art.arcane.gloss.panel.PanelDefinition;
 import art.arcane.gloss.panel.PanelRepository;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -34,7 +33,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 public final class GlossProjectTransaction {
-  private static final int JOURNAL_VERSION = 1;
+  private static final int JOURNAL_VERSION = 2;
   private static final int MAX_BACKUPS = 20;
   private static final long MAX_JOURNAL_BYTES = 1024L * 1024L;
   private static final Pattern TRANSACTION_DIRECTORY = Pattern.compile(
@@ -44,7 +43,6 @@ public final class GlossProjectTransaction {
       .disableHtmlEscaping()
       .setPrettyPrinting()
       .create();
-
   private final Path dataDirectory;
   private final Path transactionsDirectory;
   private final Path backupsDirectory;
@@ -94,15 +92,14 @@ public final class GlossProjectTransaction {
     pruneBackups();
   }
 
-  public Pending apply(String transactionId, Map<String, String> menus,
-                       Map<String, byte[]> images, PanelDefinition board,
+  public Pending apply(String transactionId, Map<Path, Mutation> requestedMutations,
                        Map<Path, byte[]> expectedExisting) throws IOException {
     ensureRootDirectories();
     String label = safeLabel(transactionId);
     String id = Instant.now().toEpochMilli() + "-" + label + "-" + UUID.randomUUID();
-    LinkedHashMap<Path, byte[]> replacements = replacements(menus, images, board);
-    if (replacements.isEmpty()) {
-      throw new IllegalArgumentException("editor sync transaction has no replacements");
+    LinkedHashMap<Path, Mutation> mutations = orderedMutations(requestedMutations);
+    if (mutations.isEmpty()) {
+      throw new IllegalArgumentException("editor sync transaction has no mutations");
     }
     Path transaction = transactionsDirectory.resolve(id).normalize();
     createChildDirectory(transactionsDirectory, transaction);
@@ -110,17 +107,25 @@ public final class GlossProjectTransaction {
     // Created by the first replacement that overwrites an existing file. A publication that is all
     // new files backs nothing up, and would otherwise archive an empty backup/ forever.
     Path backup = transaction.resolve("backup");
-    List<Entry> entries = new ArrayList<>(replacements.size());
+    List<Entry> entries = new ArrayList<>(mutations.size());
     try {
       createChildDirectory(transaction, stage);
-      for (Map.Entry<Path, byte[]> replacement : replacements.entrySet()) {
-        Path target = replacement.getKey();
+      for (Map.Entry<Path, Mutation> mutationEntry : mutations.entrySet()) {
+        Path target = mutationEntry.getKey();
+        Mutation mutation = mutationEntry.getValue();
         validateTarget(target);
         Path relative = dataDirectory.relativize(target);
-        Path staged = stage.resolve(relative).normalize();
-        safePrepareParent(stage, staged);
-        writeNewFile(staged, replacement.getValue());
         boolean existed = Files.exists(target, LinkOption.NOFOLLOW_LINKS);
+        if (mutation.operation() == Operation.DELETE && !existed) {
+          throw new IOException("editor sync delete target does not exist: " + target);
+        }
+        String stagedHash = null;
+        if (mutation.operation() == Operation.WRITE) {
+          Path staged = stage.resolve(relative).normalize();
+          safePrepareParent(stage, staged);
+          writeNewFile(staged, mutation.content());
+          stagedHash = DocumentHashes.sha256(mutation.content());
+        }
         String originalHash = null;
         if (existed) {
           byte[] original = readRegularFile(target);
@@ -130,8 +135,8 @@ public final class GlossProjectTransaction {
           safePrepareParent(backup, backupFile);
           writeNewFile(backupFile, original);
         }
-        entries.add(new Entry(relativePath(relative), existed, originalHash,
-            DocumentHashes.sha256(replacement.getValue())));
+        entries.add(new Entry(relativePath(relative), mutation.operation(), existed,
+            originalHash, stagedHash));
       }
     } catch (IOException | RuntimeException failure) {
       try {
@@ -161,17 +166,21 @@ public final class GlossProjectTransaction {
     try {
       for (Entry entry : entries) {
         Path target = target(entry);
-        Path staged = stage.resolve(entry.relativePath()).normalize();
-        safePrepareParent(dataDirectory, target);
-        Files.move(staged, target, StandardCopyOption.ATOMIC_MOVE,
-            StandardCopyOption.REPLACE_EXISTING);
-        forceFile(target);
+        if (entry.operation() == Operation.WRITE) {
+          Path staged = stage.resolve(entry.relativePath()).normalize();
+          safePrepareParent(dataDirectory, target);
+          Files.move(staged, target, StandardCopyOption.ATOMIC_MOVE,
+              StandardCopyOption.REPLACE_EXISTING);
+          forceFile(target);
+        } else {
+          Files.delete(target);
+        }
         forceDirectory(target.getParent());
       }
       Journal published = prepared.withState("published");
       writeJournal(transaction, published);
-      return new Pending(transaction, id, List.copyOf(replacements.keySet()));
-    } catch (IOException failure) {
+      return new Pending(transaction, id, List.copyOf(mutations.keySet()));
+    } catch (IOException | RuntimeException failure) {
       try {
         rollback(transaction, publishing);
         writeJournal(transaction, prepared.withState("rolledback"));
@@ -223,20 +232,19 @@ public final class GlossProjectTransaction {
     }
   }
 
-  private LinkedHashMap<Path, byte[]> replacements(Map<String, String> menus,
-                                                    Map<String, byte[]> images,
-                                                    PanelDefinition board) {
-    LinkedHashMap<Path, byte[]> replacements = new LinkedHashMap<>();
-    menus.entrySet().stream().sorted(Map.Entry.comparingByKey()).forEach(entry ->
-        replacements.put(menuPath(entry.getKey()), ensureLineEnd(entry.getValue())
-            .getBytes(StandardCharsets.UTF_8)));
-    images.entrySet().stream().sorted(Map.Entry.comparingByKey()).forEach(entry ->
-        replacements.put(imagePath(entry.getKey()), entry.getValue().clone()));
-    if (board != null) {
-      replacements.put(boardPath(board.id()), (GSON.toJson(board) + System.lineSeparator())
-          .getBytes(StandardCharsets.UTF_8));
-    }
-    return replacements;
+  private LinkedHashMap<Path, Mutation> orderedMutations(Map<Path, Mutation> requested) {
+    LinkedHashMap<Path, Mutation> mutations = new LinkedHashMap<>();
+    Objects.requireNonNull(requested, "requestedMutations").entrySet().stream()
+        .sorted(Comparator.comparing(entry -> entry.getKey().toString()))
+        .forEach(entry -> {
+          Path target = entry.getKey().toAbsolutePath().normalize();
+          Mutation previous = mutations.put(target,
+              Objects.requireNonNull(entry.getValue(), "mutation"));
+          if (previous != null) {
+            throw new IllegalArgumentException("duplicate editor sync mutation target: " + target);
+          }
+        });
+    return mutations;
   }
 
   private void verifyExpected(Map<Path, byte[]> expectedExisting) throws IOException {
@@ -266,12 +274,17 @@ public final class GlossProjectTransaction {
       try {
         Path stagedFile = stage.resolve(entry.relativePath()).normalize();
         requireChild(stage, stagedFile);
-        if (Files.exists(stagedFile, LinkOption.NOFOLLOW_LINKS)) {
-          if (!DocumentHashes.sha256(readRegularFile(stagedFile)).equals(entry.stagedHash())) {
-            throw new IOException("editor sync staged-file hash mismatch: " + entry.relativePath());
+        if (entry.operation() == Operation.WRITE) {
+          if (Files.exists(stagedFile, LinkOption.NOFOLLOW_LINKS)) {
+            if (!DocumentHashes.sha256(readRegularFile(stagedFile)).equals(entry.stagedHash())) {
+              throw new IOException("editor sync staged-file hash mismatch: " + entry.relativePath());
+            }
+          } else if (journal.state().equals("prepared")) {
+            throw new IOException("prepared editor sync transaction is missing a staged file: "
+                + entry.relativePath());
           }
-        } else if (journal.state().equals("prepared")) {
-          throw new IOException("prepared editor sync transaction is missing a staged file: "
+        } else if (Files.exists(stagedFile, LinkOption.NOFOLLOW_LINKS)) {
+          throw new IOException("delete mutation unexpectedly has a staged file: "
               + entry.relativePath());
         }
         if (entry.existed()) {
@@ -282,6 +295,10 @@ public final class GlossProjectTransaction {
             throw new IOException("editor sync backup hash mismatch: " + entry.relativePath());
           }
           if (!Files.exists(target, LinkOption.NOFOLLOW_LINKS)) {
+            if (entry.operation() == Operation.DELETE) {
+              replaceDurably(target, original);
+              continue;
+            }
             throw new IOException("editor sync target disappeared during recovery: "
                 + entry.relativePath());
           }
@@ -289,12 +306,15 @@ public final class GlossProjectTransaction {
           if (targetHash.equals(entry.originalHash())) {
             continue;
           }
-          if (!targetHash.equals(entry.stagedHash())) {
+          if (entry.operation() == Operation.DELETE || !targetHash.equals(entry.stagedHash())) {
             throw new IOException("editor sync target changed independently during recovery: "
                 + entry.relativePath());
           }
           replaceDurably(target, original);
         } else {
+          if (entry.operation() != Operation.WRITE) {
+            throw new IOException("delete mutation has no original file: " + entry.relativePath());
+          }
           validateTarget(target);
           if (Files.exists(target, LinkOption.NOFOLLOW_LINKS)) {
             String targetHash = DocumentHashes.sha256(readRegularFile(target));
@@ -365,8 +385,8 @@ public final class GlossProjectTransaction {
             throw new IOException("unjournaled editor sync transaction root entry is not a directory");
           }
           if (relative.getNameCount() >= 2
-              && !List.of("menus", "images", PanelRepository.DIRECTORY_NAME)
-              .contains(relative.getName(1).toString())) {
+              && !validUnjournaledEntry(path,
+              relative.subpath(1, relative.getNameCount()))) {
             throw new IOException("unjournaled editor sync transaction has an invalid collection");
           }
           if (!Files.isDirectory(path, LinkOption.NOFOLLOW_LINKS)
@@ -380,6 +400,19 @@ public final class GlossProjectTransaction {
       }
     }
     forceDirectory(transactionsDirectory);
+  }
+
+  private boolean validUnjournaledEntry(Path path, Path dataRelative) {
+    if (!Files.isDirectory(path, LinkOption.NOFOLLOW_LINKS)) {
+      return validRelativeTarget(dataRelative);
+    }
+    String collection = dataRelative.getName(0).toString();
+    if (Set.of("menus", "panels", "images").contains(collection)) {
+      return true;
+    }
+    return dataRelative.getNameCount() == 1
+        && Set.of("previews", "holograms", "animations", "boards", "emoji", "bubbles",
+        "real-drops").contains(collection);
   }
 
   private Journal readJournal(Path transaction) throws IOException {
@@ -397,6 +430,9 @@ public final class GlossProjectTransaction {
     }
     try {
       JsonObject object = parsed.getAsJsonObject();
+      if (!object.keySet().equals(Set.of("version", "id", "state", "entries"))) {
+        throw new IllegalArgumentException("journal contains unsupported fields");
+      }
       int version = object.get("version").getAsInt();
       String id = object.get("id").getAsString();
       String state = object.get("state").getAsString();
@@ -409,6 +445,10 @@ public final class GlossProjectTransaction {
       JsonArray array = object.getAsJsonArray("entries");
       for (JsonElement value : array) {
         JsonObject entry = value.getAsJsonObject();
+        if (!entry.keySet().equals(Set.of("relativePath", "operation", "existed",
+            "originalHash", "stagedHash"))) {
+          throw new IllegalArgumentException("journal mutation contains unsupported fields");
+        }
         String relative = entry.get("relativePath").getAsString();
         if (!targetPaths.add(relative)) {
           throw new IllegalArgumentException("duplicate journal target path");
@@ -418,15 +458,21 @@ public final class GlossProjectTransaction {
             || !relativePath(normalized).equals(relative)) {
           throw new IllegalArgumentException("invalid journal target path");
         }
+        Operation operation = Operation.valueOf(entry.get("operation").getAsString());
         boolean existed = entry.get("existed").getAsBoolean();
         String originalHash = entry.has("originalHash") && !entry.get("originalHash").isJsonNull()
             ? entry.get("originalHash").getAsString()
             : null;
-        String stagedHash = entry.get("stagedHash").getAsString();
-        if ((existed && !validHash(originalHash)) || !validHash(stagedHash)) {
+        String stagedHash = entry.get("stagedHash").isJsonNull()
+            ? null
+            : entry.get("stagedHash").getAsString();
+        if ((existed && !validHash(originalHash))
+            || (!existed && originalHash != null)
+            || (operation == Operation.WRITE && !validHash(stagedHash))
+            || (operation == Operation.DELETE && (!existed || stagedHash != null))) {
           throw new IllegalArgumentException("invalid journal content hash");
         }
-        entries.add(new Entry(relative, existed, originalHash, stagedHash));
+        entries.add(new Entry(relative, operation, existed, originalHash, stagedHash));
       }
       if (entries.isEmpty()) {
         throw new IllegalArgumentException("transaction journal has no entries");
@@ -446,13 +492,18 @@ public final class GlossProjectTransaction {
     for (Entry entry : journal.entries()) {
       JsonObject value = new JsonObject();
       value.addProperty("relativePath", entry.relativePath());
+      value.addProperty("operation", entry.operation().name());
       value.addProperty("existed", entry.existed());
       if (entry.originalHash() == null) {
         value.add("originalHash", com.google.gson.JsonNull.INSTANCE);
       } else {
         value.addProperty("originalHash", entry.originalHash());
       }
-      value.addProperty("stagedHash", entry.stagedHash());
+      if (entry.stagedHash() == null) {
+        value.add("stagedHash", com.google.gson.JsonNull.INSTANCE);
+      } else {
+        value.addProperty("stagedHash", entry.stagedHash());
+      }
       entries.add(value);
     }
     object.add("entries", entries);
@@ -526,11 +577,7 @@ public final class GlossProjectTransaction {
   private void validateTarget(Path target) throws IOException {
     requireChild(dataDirectory, target);
     Path relative = dataDirectory.relativize(target);
-    if (relative.getNameCount() < 2) {
-      throw new IOException("editor sync target must be inside a data collection");
-    }
-    String collection = relative.getName(0).toString();
-    if (!List.of("menus", "images", PanelRepository.DIRECTORY_NAME).contains(collection)) {
+    if (!validRelativeTarget(relative)) {
       throw new IOException("editor sync target uses an unsupported data collection");
     }
     Path parent = target.getParent();
@@ -547,6 +594,31 @@ public final class GlossProjectTransaction {
     if (Files.isSymbolicLink(target)) {
       throw new IOException("editor sync target must not be a symbolic link");
     }
+  }
+
+  private boolean validRelativeTarget(Path relative) {
+    if (relative == null || relative.isAbsolute() || relative.startsWith("..")) {
+      return false;
+    }
+    String normalized = relativePath(relative);
+    if (normalized.equals("motd.json") || normalized.equals("tablist.json")) {
+      return true;
+    }
+    if (relative.getNameCount() < 2) {
+      return false;
+    }
+    String collection = relative.getName(0).toString();
+    if (collection.equals("images")) {
+      return true;
+    }
+    if (collection.equals("menus") || collection.equals(PanelRepository.DIRECTORY_NAME)) {
+      return normalized.endsWith(".json");
+    }
+    if (collection.equals("real-drops")) {
+      return normalized.equals("real-drops/default.json");
+    }
+    return List.of("previews", "holograms", "animations", "boards", "emoji", "bubbles")
+        .contains(collection) && relative.getNameCount() == 2 && normalized.endsWith(".json");
   }
 
   private byte[] readRegularFile(Path file) throws IOException {
@@ -656,27 +728,6 @@ public final class GlossProjectTransaction {
     return target;
   }
 
-  private Path menuPath(String id) {
-    return confined(dataDirectory.resolve("menus"), id + ".json");
-  }
-
-  private Path imagePath(String path) {
-    return confined(dataDirectory.resolve("images"), path);
-  }
-
-  private Path boardPath(String id) {
-    return confined(dataDirectory.resolve(PanelRepository.DIRECTORY_NAME), id + ".json");
-  }
-
-  private Path confined(Path root, String relative) {
-    Path normalizedRoot = root.toAbsolutePath().normalize();
-    Path target = normalizedRoot.resolve(relative).normalize();
-    if (target.equals(normalizedRoot) || !target.startsWith(normalizedRoot)) {
-      throw new IllegalArgumentException("editor sync target escapes its collection");
-    }
-    return target;
-  }
-
   /**
    * Drops every empty directory below {@code root} before it is archived.
    *
@@ -730,12 +781,6 @@ public final class GlossProjectTransaction {
     return normalized.isBlank() ? "sync" : normalized.substring(0, Math.min(normalized.length(), 64));
   }
 
-  private static String ensureLineEnd(String source) {
-    return source.endsWith("\n") || source.endsWith("\r")
-        ? source
-        : source + System.lineSeparator();
-  }
-
   public record Pending(Path transactionDirectory, String id, List<Path> publishedFiles) {
     public Pending {
       transactionDirectory = Objects.requireNonNull(transactionDirectory, "transactionDirectory");
@@ -743,6 +788,35 @@ public final class GlossProjectTransaction {
         throw new IllegalArgumentException("transaction id must not be blank");
       }
       publishedFiles = List.copyOf(publishedFiles);
+    }
+  }
+
+  public enum Operation {
+    WRITE,
+    DELETE
+  }
+
+  public record Mutation(Operation operation, byte[] content) {
+    public Mutation {
+      operation = Objects.requireNonNull(operation, "operation");
+      if (operation == Operation.WRITE) {
+        content = Objects.requireNonNull(content, "content").clone();
+      } else if (content != null) {
+        throw new IllegalArgumentException("delete mutation cannot carry content");
+      }
+    }
+
+    @Override
+    public byte[] content() {
+      return content == null ? null : content.clone();
+    }
+
+    public static Mutation write(byte[] content) {
+      return new Mutation(Operation.WRITE, content);
+    }
+
+    public static Mutation delete() {
+      return new Mutation(Operation.DELETE, null);
     }
   }
 
@@ -769,8 +843,8 @@ public final class GlossProjectTransaction {
     }
   }
 
-  private record Entry(String relativePath, boolean existed, String originalHash,
-                       String stagedHash) {
+  private record Entry(String relativePath, Operation operation, boolean existed,
+                       String originalHash, String stagedHash) {
   }
 
   private record Journal(int version, String id, String state, List<Entry> entries) {

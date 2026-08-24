@@ -24,7 +24,7 @@ public class GlossCommandDiscoveryTest {
     List<String> suggestions = engine.tabComplete(
         new DirectorInvocation(new TestSender(), "gloss", List.of("")));
 
-    assertTrue(suggestions.containsAll(List.of("menu", "panel", "preview", "item", "sync", "import")));
+    assertTrue(suggestions.containsAll(List.of("menu", "panel", "preview", "item", "web", "import")));
     assertFalse(suggestions.contains("panels"));
     assertFalse(suggestions.contains("menus"));
     assertFalse(suggestions.contains("previews"));
@@ -45,7 +45,7 @@ public class GlossCommandDiscoveryTest {
         "move", "here", "teleport", "rotate", "scale", "align", "menu", "ranges",
         "visibility", "permissions", "follow", "unfollow", "edit", "save", "cancel",
         "addrow", "insertrow", "setrow", "removerow", "offsetrow", "seticon", "style",
-        "image", "web"
+        "image"
     ), names);
   }
 
@@ -59,7 +59,7 @@ public class GlossCommandDiscoveryTest {
         .map(node -> node.getDescriptor().getName())
         .collect(Collectors.toUnmodifiableSet());
     assertEquals(Set.of(
-        "list", "create", "open", "back", "close", "move", "builder", "edit",
+        "list", "create", "open", "back", "close", "move",
         "addrow", "insertrow", "setrow", "removerow", "offsetrow", "seticon", "style",
         "image", "copy", "new"
     ), names);
@@ -119,8 +119,6 @@ public class GlossCommandDiscoveryTest {
     assertTrue(child(panel, "here").allNames().contains("movehere"));
     assertTrue(child(panel, "here").allNames().contains("tphere"));
     assertTrue(child(panel, "teleport").allNames().contains("tp"));
-    assertTrue(child(panel, "web").allNames().contains("editweb"));
-    assertTrue(child(panel, "web").allNames().contains("webedit"));
     assertTrue(child(panel, "menu").allNames().contains("root"));
     assertTrue(panel.allNames().contains("panels"));
     assertFalse(panel.allNames().contains("board"));
@@ -141,22 +139,37 @@ public class GlossCommandDiscoveryTest {
   }
 
   @Test
-  public void syncGroupExposesOperatorControlsForEverySenderSurface() {
+  public void webGroupExposesEveryDocumentAndSessionSurface() {
     DirectorRuntimeEngine engine = engine();
-    DirectorRuntimeNode sync = child(engine.getRoot(), "sync");
-    DirectorRuntimeNode panel = child(engine.getRoot(), "panel");
+    DirectorRuntimeNode web = child(engine.getRoot(), "web");
+    DirectorRuntimeNode edit = child(web, "edit");
+    DirectorRuntimeNode sessions = child(web, "sessions");
 
-    assertNotNull(sync);
-    Set<String> names = sync.getChildren().stream()
+    assertNotNull(web);
+    Set<String> webNames = web.getChildren().stream()
         .map(node -> node.getDescriptor().getName())
         .collect(Collectors.toUnmodifiableSet());
-    assertEquals(Set.of("list", "status", "revoke", "pull"), names);
-    assertEquals(List.of("page", "sender"), parameterNames(child(sync, "list")));
-    assertEquals(List.of("session", "sender"), parameterNames(child(sync, "status")));
-    assertEquals(List.of("session", "sender"), parameterNames(child(sync, "revoke")));
-    assertEquals(List.of("session", "sender"), parameterNames(child(sync, "pull")));
-    assertTrue(child(sync, "pull").allNames().contains("poll"));
-    assertTrue(child(panel, "web").allNames().contains("webedit"));
+    assertEquals(Set.of("open", "workspace", "edit", "sessions"), webNames);
+
+    Set<String> editNames = edit.getChildren().stream()
+        .map(node -> node.getDescriptor().getName())
+        .collect(Collectors.toUnmodifiableSet());
+    assertEquals(Set.of("menu", "panel", "hologram", "scoreboard", "emoji", "animation",
+        "bubble-style", "container-preview", "tablist", "motd", "real-drops"), editNames);
+    assertTrue(parameter(child(edit, "menu"), "id").getCustomHandlerOrNull()
+        instanceof CommandGlossWebEdit.MenuIdHandler);
+    assertTrue(parameter(child(edit, "panel"), "id").getCustomHandlerOrNull()
+        instanceof CommandGlossWebEdit.PanelIdHandler);
+
+    Set<String> sessionNames = sessions.getChildren().stream()
+        .map(node -> node.getDescriptor().getName())
+        .collect(Collectors.toUnmodifiableSet());
+    assertEquals(Set.of("list", "status", "revoke", "pull"), sessionNames);
+    assertEquals(List.of("page", "sender"), parameterNames(child(sessions, "list")));
+    assertEquals(List.of("session", "sender"), parameterNames(child(sessions, "status")));
+    assertEquals(List.of("session", "sender"), parameterNames(child(sessions, "revoke")));
+    assertEquals(List.of("session", "sender"), parameterNames(child(sessions, "pull")));
+    assertFalse(child(sessions, "pull").allNames().contains("poll"));
   }
 
   private static DirectorRuntimeEngine engine() {

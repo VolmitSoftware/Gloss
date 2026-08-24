@@ -22,7 +22,7 @@ public class CommandGloss {
     private CommandGlossPanel panel;
     private CommandGlossPreview preview;
     private CommandGlossItem item;
-    private CommandGlossSync sync;
+    private CommandGlossWeb web;
     private CommandGlossImport legacyImport;
 
     public CommandGloss(Gloss plugin) {
@@ -39,7 +39,7 @@ public class CommandGloss {
         this.panel = new CommandGlossPanel();
         this.preview = new CommandGlossPreview();
         this.item = new CommandGlossItem();
-        this.sync = new CommandGlossSync();
+        this.web = new CommandGlossWeb(plugin);
         this.legacyImport = new CommandGlossImport();
     }
 

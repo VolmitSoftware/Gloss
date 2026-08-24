@@ -9,63 +9,25 @@ import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertThrows;
 
 public class EditorSyncJsonTest {
   @Test
-  public void canonicalAlgorithmStillMatchesTheRetiredV1Fixture() throws Exception {
-    JsonObject fixture = fixture("/editor-sync-canonical-v1.json");
+  public void canonicalHashMatchesTheCrossSurfaceV3Fixture() throws Exception {
+    JsonObject fixture = fixture("/editor-sync-canonical-v3.json");
     JsonObject project = fixture.getAsJsonObject("project");
-    String expected = project.get("baseRevision").getAsString().substring("sha256:".length());
+    String expected =
+        "sha256:2385d7a78bd1d85df5f4ca2dae063a99efbead0d950d8a1d6122e7bab640d9fd";
 
-    assertEquals("7e322c580c650ebd93ab4e19dc4b550bbd3f11436d694b38b96143996f8727d0",
-        expected);
-    assertEquals("sha256:" + expected, EditorSyncJson.revision(project));
-    JsonObject withoutRevision = project.deepCopy();
-    withoutRevision.remove("baseRevision");
-    assertEquals(fixture.get("canonicalWithoutBaseRevision").getAsString(),
-        EditorSyncJson.canonical(withoutRevision));
-  }
-
-  @Test
-  public void canonicalHashMatchesTheCrossSurfaceV2Fixture() throws Exception {
-    JsonObject fixture = fixture("/editor-sync-canonical-v2.json");
-    JsonObject project = fixture.getAsJsonObject("project");
-    String expected = project.get("baseRevision").getAsString();
-
-    assertEquals("sha256:48c21681018e9de3765ff48e0500557b6e0389151857ccf14633ede08a878a8e",
-        expected);
+    assertEquals(expected, project.get("baseRevision").getAsString());
     assertEquals(expected, EditorSyncJson.revision(project));
     JsonObject withoutRevision = project.deepCopy();
     withoutRevision.remove("baseRevision");
     assertEquals(fixture.get("canonicalWithoutBaseRevision").getAsString(),
         EditorSyncJson.canonical(withoutRevision));
-  }
-
-  @Test
-  public void panelDocumentTextIsTheCanonicalFormOfItsSource() throws Exception {
-    JsonObject fixture = fixture("/editor-sync-canonical-v2.json");
-    JsonObject project = fixture.getAsJsonObject("project");
-    String panelText = null;
-    for (com.google.gson.JsonElement value : project.getAsJsonArray("documents")) {
-      JsonObject entry = value.getAsJsonObject();
-      if ("panel".equals(entry.get("kind").getAsString())) {
-        panelText = entry.get("json").getAsString();
-      }
-    }
-
-    assertEquals(EditorSyncJson.canonical(fixture.getAsJsonObject("panelSource")), panelText);
-  }
-
-  private JsonObject fixture(String resourcePath) throws Exception {
-    InputStream resource = getClass().getResourceAsStream(resourcePath);
-    if (resource == null) {
-      throw new IllegalStateException("missing editor sync canonical fixture: " + resourcePath);
-    }
-    try (InputStream input = resource;
-         InputStreamReader reader = new InputStreamReader(input, StandardCharsets.UTF_8)) {
-      return JsonParser.parseReader(reader).getAsJsonObject();
-    }
+    assertEquals(EditorSyncKind.WORKSPACE,
+        EditorSyncProject.validated(project, 1024 * 1024).kind());
   }
 
   @Test
@@ -89,11 +51,11 @@ public class EditorSyncJsonTest {
     project.addProperty("baseRevision", "changed-root");
     assertEquals(first, EditorSyncJson.revision(project));
     project.getAsJsonObject("nested").addProperty("baseRevision", "changed-inner");
-    org.junit.Assert.assertNotEquals(first, EditorSyncJson.revision(project));
+    assertNotEquals(first, EditorSyncJson.revision(project));
   }
 
   @Test
-  public void projectLimitsRejectDeepOrHugeDocumentsBeforeDomainParsing() {
+  public void projectLimitsRejectDeepDocumentsBeforeDomainParsing() {
     JsonObject deep = new JsonObject();
     JsonObject current = deep;
     for (int index = 0; index < 70; index++) {
@@ -102,6 +64,17 @@ public class EditorSyncJsonTest {
       current = child;
     }
     assertThrows(IllegalArgumentException.class,
-        () -> EditorSyncProject.validated(deep, 1024 * 1024));
+        () -> EditorSyncJsonLimits.validate(deep));
+  }
+
+  private JsonObject fixture(String resourcePath) throws Exception {
+    InputStream resource = getClass().getResourceAsStream(resourcePath);
+    if (resource == null) {
+      throw new IllegalStateException("missing editor sync canonical fixture: " + resourcePath);
+    }
+    try (InputStream input = resource;
+         InputStreamReader reader = new InputStreamReader(input, StandardCharsets.UTF_8)) {
+      return JsonParser.parseReader(reader).getAsJsonObject();
+    }
   }
 }

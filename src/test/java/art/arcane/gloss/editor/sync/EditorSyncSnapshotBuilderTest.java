@@ -28,7 +28,7 @@ public class EditorSyncSnapshotBuilderTest {
             "data": {
               "trueActions": [
                 {"type":"navigate","target":"shops/tools","mode":"push"},
-                {"type":"command","source":"player","command":"/hui open menu=shops/armor"}
+                {"type":"command","source":"player","command":"/gloss menu open menu=shops/armor"}
               ],
               "falseActions": [
                 {"type":"navigate","target":"shops/tools","mode":"replace"},
