@@ -3,6 +3,7 @@ package art.arcane.gloss.locale;
 import art.arcane.gloss.Gloss;
 import art.arcane.gloss.doc.DocumentHashes;
 import art.arcane.volmlib.util.director.DirectorTextResolver;
+import art.arcane.volmlib.util.format.ColorFormatter;
 import art.arcane.volmlib.util.io.FileWatcher;
 import art.arcane.volmlib.util.localization.LocaleOverlay;
 import art.arcane.volmlib.util.localization.LocalizationCandidate;
@@ -20,7 +21,9 @@ import art.arcane.volmlib.util.localization.PluralSelector;
 import art.arcane.volmlib.util.localization.ResolvedText;
 import art.arcane.volmlib.util.localization.TextKey;
 import art.arcane.volmlib.util.localization.VolmitLocales;
-import org.bukkit.ChatColor;
+import art.arcane.volmlib.util.plugin.ComponentMessenger;
+import art.arcane.volmlib.util.plugin.ComponentText;
+import org.bukkit.command.CommandSender;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
 
@@ -230,14 +233,30 @@ public final class GlossLocalization implements AutoCloseable {
     return render(manager.snapshot().resolve(key, arguments), true);
   }
 
+  public ComponentText component(TextKey key) {
+    return component(key, MessageArgs.empty());
+  }
+
+  public ComponentText component(TextKey key, MessageArgs arguments) {
+    return renderComponent(manager.snapshot().resolve(key, arguments));
+  }
+
+  public void send(CommandSender sender, TextKey key) {
+    send(sender, key, MessageArgs.empty());
+  }
+
+  public void send(CommandSender sender, TextKey key, MessageArgs arguments) {
+    ComponentMessenger.send(sender, component(key, arguments));
+  }
+
   public DirectorTextResolver directorResolver() {
     return (key, arguments) -> {
       MessageKey definition = CATALOG.key(key.id());
       if (!(definition instanceof TextKey textKey)) {
         return DirectorTextResolver.ENGLISH.resolve(key, arguments);
       }
-      String rendered = ChatColor.translateAlternateColorCodes('&', text(textKey, arguments));
-      String plain = ChatColor.stripColor(rendered);
+      String rendered = ColorFormatter.translateColors(text(textKey, arguments));
+      String plain = ColorFormatter.stripColor(rendered);
       return plain == null ? DirectorTextResolver.ENGLISH.resolve(key, arguments) : plain;
     };
   }
@@ -270,6 +289,26 @@ public final class GlossLocalization implements AutoCloseable {
     return localization == null ? renderEnglish(key, arguments, true) : localization.legacy(key, arguments);
   }
 
+  public static ComponentText globalComponent(TextKey key) {
+    return globalComponent(key, MessageArgs.empty());
+  }
+
+  public static ComponentText globalComponent(TextKey key, MessageArgs arguments) {
+    Gloss plugin = Gloss.instance;
+    GlossLocalization localization = plugin == null ? null : plugin.getLocalization();
+    return localization == null
+        ? renderTemplateComponent(key.english(), arguments)
+        : localization.component(key, arguments);
+  }
+
+  public static void sendGlobal(CommandSender sender, TextKey key) {
+    sendGlobal(sender, key, MessageArgs.empty());
+  }
+
+  public static void sendGlobal(CommandSender sender, TextKey key, MessageArgs arguments) {
+    ComponentMessenger.send(sender, globalComponent(key, arguments));
+  }
+
   public static String globalDirectorText(TextKey key, MessageArgs arguments) {
     Gloss plugin = Gloss.instance;
     GlossLocalization localization = plugin == null ? null : plugin.getLocalization();
@@ -280,8 +319,8 @@ public final class GlossLocalization implements AutoCloseable {
     if (!(definition instanceof TextKey textKey)) {
       return DirectorTextResolver.ENGLISH.resolve(key, arguments);
     }
-    String rendered = ChatColor.translateAlternateColorCodes('&', renderEnglish(textKey, arguments, false));
-    String plain = ChatColor.stripColor(rendered);
+    String rendered = ColorFormatter.translateColors(renderEnglish(textKey, arguments, false));
+    String plain = ColorFormatter.stripColor(rendered);
     return plain == null ? DirectorTextResolver.ENGLISH.resolve(key, arguments) : plain;
   }
 
@@ -424,8 +463,67 @@ public final class GlossLocalization implements AutoCloseable {
     return renderTemplate(resolved.template(), resolved.arguments(), legacy);
   }
 
+  private static ComponentText renderComponent(ResolvedText resolved) {
+    return renderTemplateComponent(resolved.template(), resolved.arguments());
+  }
+
   private static String renderEnglish(TextKey key, MessageArgs arguments, boolean legacy) {
     return renderTemplate(key.english(), arguments, legacy);
+  }
+
+  private static ComponentText renderTemplateComponent(String template, MessageArgs arguments) {
+    Collection<MessageArgument> values = arguments.arguments().values();
+    if (values.isEmpty()) {
+      return ComponentText.legacy(template);
+    }
+
+    List<Placeholder> placeholders = new ArrayList<>(values.size());
+    for (MessageArgument argument : values) {
+      placeholders.add(new Placeholder("{" + argument.name() + "}", argument));
+    }
+
+    ComponentText output = ComponentText.empty();
+    int copied = 0;
+    int cursor = template.indexOf('{');
+    while (cursor >= 0) {
+      Placeholder match = null;
+      for (Placeholder placeholder : placeholders) {
+        if (template.startsWith(placeholder.token(), cursor)) {
+          match = placeholder;
+          break;
+        }
+      }
+      if (match == null) {
+        cursor = template.indexOf('{', cursor + 1);
+        continue;
+      }
+
+      output = appendComponentLiteral(output, template, copied, cursor);
+      output = appendComponentArgument(output, match.argument());
+      copied = cursor + match.token().length();
+      cursor = template.indexOf('{', copied);
+    }
+
+    return appendComponentLiteral(output, template, copied, template.length());
+  }
+
+  private static ComponentText appendComponentLiteral(
+      ComponentText output,
+      String template,
+      int from,
+      int to) {
+    if (from >= to) {
+      return output;
+    }
+    return output.append(ComponentText.legacy(template.substring(from, to)));
+  }
+
+  private static ComponentText appendComponentArgument(ComponentText output, MessageArgument argument) {
+    String value = String.valueOf(argument.value());
+    if (argument.kind() == MessageArgumentKind.TRUSTED) {
+      return output.append(ComponentText.legacy(value));
+    }
+    return output.append(ComponentText.literal(sanitizeUntrusted(value)));
   }
 
   /**
@@ -437,7 +535,7 @@ public final class GlossLocalization implements AutoCloseable {
   private static String renderTemplate(String template, MessageArgs arguments, boolean legacy) {
     Collection<MessageArgument> values = arguments.arguments().values();
     if (values.isEmpty()) {
-      return legacy ? ChatColor.translateAlternateColorCodes('&', template) : template;
+      return legacy ? ColorFormatter.translateColors(template) : template;
     }
 
     List<Placeholder> placeholders = new ArrayList<>(values.size());
@@ -477,21 +575,21 @@ public final class GlossLocalization implements AutoCloseable {
     }
 
     String segment = template.substring(from, to);
-    output.append(legacy ? ChatColor.translateAlternateColorCodes('&', segment) : segment);
+    output.append(legacy ? ColorFormatter.translateColors(segment) : segment);
   }
 
   private static void appendArgument(StringBuilder output, MessageArgument argument, boolean legacy) {
     String value = String.valueOf(argument.value());
     if (argument.kind() == MessageArgumentKind.TRUSTED) {
-      output.append(legacy ? ChatColor.translateAlternateColorCodes('&', value) : value);
+      output.append(legacy ? ColorFormatter.translateColors(value) : value);
       return;
     }
     output.append(sanitizeUntrusted(value));
   }
 
   private static String sanitizeUntrusted(String value) {
-    String stripped = ChatColor.stripColor(value);
-    return stripped == null ? "" : stripped.replace(String.valueOf(ChatColor.COLOR_CHAR), "");
+    String stripped = ColorFormatter.stripColor(value);
+    return stripped == null ? "" : stripped.replace("§", "");
   }
 
   private record Placeholder(String token, MessageArgument argument) {

@@ -14,6 +14,8 @@ import art.arcane.volmlib.util.director.theme.DirectorTheme;
 import art.arcane.volmlib.util.director.theme.DirectorThemes;
 import art.arcane.volmlib.util.localization.MessageArgs;
 import art.arcane.volmlib.util.localization.TextKey;
+import art.arcane.volmlib.util.plugin.ComponentMessenger;
+import art.arcane.volmlib.util.plugin.ComponentText;
 import art.arcane.volmlib.util.scheduling.SchedulerUtils;
 import org.bukkit.SoundCategory;
 import org.bukkit.command.CommandSender;
@@ -28,8 +30,8 @@ public class CommandGlossItem {
 
   private volatile CustomItemCatalogWriter writer;
 
-  private static void sendOnSender(CommandSender sender, String message) {
-    runOnSender(sender, () -> sender.sendMessage(message));
+  private static void sendOnSender(CommandSender sender, ComponentText message) {
+    runOnSender(sender, () -> ComponentMessenger.send(sender, message));
   }
 
   private static void runOnSender(CommandSender sender, Runnable action) {
@@ -55,7 +57,7 @@ public class CommandGlossItem {
     }
 
     if (!Gloss.instance.cfg().customItems().enabled()) {
-      sender.sendMessage(Gloss.instance.getLocalization().legacy(GlossMessages.ITEMS_DISABLED));
+      Gloss.instance.getLocalization().send(sender, GlossMessages.ITEMS_DISABLED);
       return;
     }
 
@@ -114,19 +116,19 @@ public class CommandGlossItem {
     }
 
     if (!Gloss.instance.cfg().customItems().enabled()) {
-      sender.sendMessage(Gloss.instance.getLocalization().legacy(GlossMessages.ITEMS_DISABLED));
+      Gloss.instance.getLocalization().send(sender, GlossMessages.ITEMS_DISABLED);
       return;
     }
 
     CustomItemCatalogWriter catalogWriter = writer();
     if (catalogWriter.isRunning()) {
-      sender.sendMessage(Gloss.instance.getLocalization().legacy(GlossMessages.ITEMS_EXPORT_BUSY));
+      Gloss.instance.getLocalization().send(sender, GlossMessages.ITEMS_EXPORT_BUSY);
       return;
     }
 
-    sender.sendMessage(Gloss.instance.getLocalization().legacy(GlossMessages.ITEMS_EXPORT_STARTED));
+    Gloss.instance.getLocalization().send(sender, GlossMessages.ITEMS_EXPORT_STARTED);
     if (!catalogWriter.exportAsync(result -> report(sender, result))) {
-      sender.sendMessage(Gloss.instance.getLocalization().legacy(GlossMessages.ITEMS_EXPORT_BUSY));
+      Gloss.instance.getLocalization().send(sender, GlossMessages.ITEMS_EXPORT_BUSY);
     }
   }
 
@@ -146,13 +148,13 @@ public class CommandGlossItem {
 
   private void report(CommandSender sender, CustomItemCatalogResult result) {
     if (!result.success()) {
-      sendOnSender(sender, Gloss.instance.getLocalization().legacy(GlossMessages.ITEMS_EXPORT_FAILED));
+      sendOnSender(sender, Gloss.instance.getLocalization().component(GlossMessages.ITEMS_EXPORT_FAILED));
       playSound(sender, false);
       return;
     }
 
     if (result.itemCount() == 0) {
-      sendOnSender(sender, Gloss.instance.getLocalization().legacy(
+      sendOnSender(sender, Gloss.instance.getLocalization().component(
           GlossMessages.ITEMS_EXPORT_EMPTY,
           MessageArgs.builder().untrusted("path", result.path()).build()
       ));
@@ -160,7 +162,7 @@ public class CommandGlossItem {
       return;
     }
 
-    sendOnSender(sender, Gloss.instance.getLocalization().legacy(
+    sendOnSender(sender, Gloss.instance.getLocalization().component(
         GlossMessages.ITEMS_EXPORT_DONE,
         MessageArgs.builder()
             .untrusted("count", result.itemCount())
@@ -218,9 +220,9 @@ public class CommandGlossItem {
   }
 
   private void sendPermissionDenied(CommandSender sender, String permission) {
-    sender.sendMessage(Gloss.instance.getLocalization().legacy(
+    Gloss.instance.getLocalization().send(sender,
         GlossMessages.PERMISSION_DENIED,
         MessageArgs.builder().untrusted("permission", permission).build()
-    ));
+    );
   }
 }

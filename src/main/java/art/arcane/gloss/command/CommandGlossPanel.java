@@ -1372,7 +1372,7 @@ public final class CommandGlossPanel {
 
   private void send(CommandSender sender, TextKey key,
                     MessageArgs arguments) {
-    sender.sendMessage(plugin().getLocalization().legacy(key, arguments));
+    plugin().getLocalization().send(sender, key, arguments);
   }
 
   private PanelService service() {

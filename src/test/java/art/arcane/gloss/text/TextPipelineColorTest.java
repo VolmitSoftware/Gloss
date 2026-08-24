@@ -65,6 +65,15 @@ class TextPipelineColorTest {
     }
 
     @Test
+    void sharedHexSpellingsRenderIdentically() {
+        String expected = "§x§f§f§0§0§a§aHi";
+
+        assertEquals(expected, pipeline.renderStatic("&#FF00AAHi"));
+        assertEquals(expected, pipeline.renderStatic("&xFF00AAHi"));
+        assertEquals(expected, pipeline.renderStatic("&x&F&F&0&0&A&AHi"));
+    }
+
+    @Test
     void plainTextIsUnchanged() {
         assertEquals("plain text", pipeline.renderStatic("plain text"));
     }

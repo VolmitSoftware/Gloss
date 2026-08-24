@@ -251,7 +251,7 @@ public class CommandGlossBoard {
         }
 
         String permission = meta.permission() == null || meta.permission().isBlank()
-                ? GlossLocalization.globalLegacy(GlossMessages.BOARD_PERMISSION_NONE)
+                ? GlossLocalization.globalText(GlossMessages.BOARD_PERMISSION_NONE)
                 : meta.permission();
         GlossCommandMessages.send(sender, GlossMessages.BOARD_INFO_HEADER,
                 MessageArgument.untrusted("id", id),

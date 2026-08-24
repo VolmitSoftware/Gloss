@@ -225,6 +225,7 @@ dependencies {
     slim(libs.adventure.minimessage)
     slim(libs.adventure.nbt)
     slim(libs.adventure.legacy)
+    slim(libs.adventure.plain)
     slim(libs.commons.io)
     slim(libs.commons.imaging)
     slim(libs.toml4j) {

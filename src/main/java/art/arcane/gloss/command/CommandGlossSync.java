@@ -228,7 +228,7 @@ public final class CommandGlossSync {
 
   private void send(CommandSender sender, art.arcane.volmlib.util.localization.TextKey key,
                     MessageArgs arguments) {
-    sender.sendMessage(plugin().getLocalization().legacy(key, arguments));
+    plugin().getLocalization().send(sender, key, arguments);
   }
 
   private EditorSyncService service() {

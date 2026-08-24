@@ -20,6 +20,7 @@ import art.arcane.volmlib.util.director.theme.DirectorProduct;
 import art.arcane.volmlib.util.director.theme.DirectorTheme;
 import art.arcane.volmlib.util.director.theme.DirectorThemes;
 import art.arcane.volmlib.util.localization.MessageArgument;
+import art.arcane.volmlib.util.plugin.ComponentMessenger;
 import org.bukkit.SoundCategory;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
@@ -147,7 +148,7 @@ public final class GlossCommandService implements CommandExecutor, TabCompleter,
             routed = normalizePositionalArgs(routed);
         }
         if (!hasBaseCommandAccess(sender)) {
-            sender.sendMessage(GlossLocalization.globalLegacy(GlossMessages.COMMAND_NO_PERMISSION_USE));
+            GlossLocalization.sendGlobal(sender, GlossMessages.COMMAND_NO_PERMISSION_USE);
             playFailureChime(sender);
             return true;
         }
@@ -165,10 +166,11 @@ public final class GlossCommandService implements CommandExecutor, TabCompleter,
             return true;
         }
 
-        sender.sendMessage(GlossLocalization.globalLegacy(
-                GlossMessages.COMMAND_USAGE_HELP,
-                GlossLocalization.args(MessageArgument.trusted("command", commandName))
-        ));
+        GlossLocalization.sendGlobal(
+            sender,
+            GlossMessages.COMMAND_USAGE_HELP,
+            GlossLocalization.args(MessageArgument.trusted("command", commandName))
+        );
         playFailureChime(sender);
         return true;
     }
@@ -652,7 +654,7 @@ public final class GlossCommandService implements CommandExecutor, TabCompleter,
         @Override
         public void sendMessage(String message) {
             if (message != null && !message.trim().isEmpty()) {
-                sender.sendMessage(message);
+                ComponentMessenger.sendLiteral(sender, message);
             }
         }
     }

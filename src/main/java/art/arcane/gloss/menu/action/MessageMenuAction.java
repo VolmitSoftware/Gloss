@@ -3,21 +3,15 @@ package art.arcane.gloss.menu.action;
 import art.arcane.gloss.config.action.MessageActionData;
 import art.arcane.gloss.text.TextPipeline;
 import art.arcane.gloss.util.common.TextUtils;
-import net.kyori.adventure.audience.Audience;
+import art.arcane.volmlib.util.plugin.ComponentMessenger;
+import art.arcane.volmlib.util.plugin.ComponentText;
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.bukkit.entity.Player;
 
 import java.util.ArrayList;
 import java.util.List;
 
 public final class MessageMenuAction extends MenuAction<MessageActionData> {
-  private static final LegacyComponentSerializer LEGACY = LegacyComponentSerializer.builder()
-      .character(LegacyComponentSerializer.SECTION_CHAR)
-      .hexColors()
-      .useUnusualXRepeatedCharacterHexFormat()
-      .build();
-
   public MessageMenuAction(MessageActionData data) {
     super(data);
   }
@@ -36,11 +30,7 @@ public final class MessageMenuAction extends MenuAction<MessageActionData> {
   }
 
   private static void deliver(Player player, Component message) {
-    if (player instanceof Audience audience) {
-      audience.sendMessage(message);
-      return;
-    }
-    player.sendMessage(LEGACY.serialize(message));
+    ComponentMessenger.send(player, ComponentText.component(message));
   }
 
   private static Component sanitizeInteractions(Component component) {

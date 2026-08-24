@@ -184,19 +184,19 @@ public final class PanelViewSession implements MenuNavigator {
     MenuDefinitionData menu = menuLookup.apply(menuId);
     if (menu == null) {
       if (notifyFailure) {
-        viewer.sendMessage(Gloss.instance.getLocalization().legacy(
+        Gloss.instance.getLocalization().send(viewer,
             GlossMessages.MENU_UNAVAILABLE,
             MessageArgs.builder().untrusted("menu", menuId).build()
-        ));
+        );
       }
       return NavigationResult.NOT_FOUND;
     }
     if (!boardRootAdmission && !viewer.hasPermission("gloss.open." + menu.getId())) {
       if (notifyFailure) {
-        viewer.sendMessage(Gloss.instance.getLocalization().legacy(
+        Gloss.instance.getLocalization().send(viewer,
             GlossMessages.MENU_PERMISSION_DENIED,
             MessageArgs.builder().untrusted("menu", menu.getId()).build()
-        ));
+        );
       }
       return NavigationResult.DENIED;
     }

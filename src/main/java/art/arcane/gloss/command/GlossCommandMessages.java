@@ -20,11 +20,11 @@ final class GlossCommandMessages {
     }
 
     static void send(CommandSender sender, TextKey key) {
-        sender.sendMessage(GlossLocalization.globalLegacy(key));
+        GlossLocalization.sendGlobal(sender, key);
     }
 
     static void send(CommandSender sender, TextKey key, MessageArgument... arguments) {
-        sender.sendMessage(GlossLocalization.globalLegacy(key, GlossLocalization.args(arguments)));
+        GlossLocalization.sendGlobal(sender, key, GlossLocalization.args(arguments));
     }
 
     static void sendResetResult(CommandSender sender, String kind, String name, java.util.List<String> affected) {

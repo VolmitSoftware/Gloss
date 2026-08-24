@@ -7,6 +7,7 @@ import art.arcane.gloss.config.action.MenuActionData;
 import art.arcane.gloss.config.action.TeleportActionData;
 import art.arcane.gloss.util.common.TextUtils;
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.minimessage.MiniMessage;
 import org.bukkit.entity.Player;
 import org.junit.Test;
 
@@ -101,9 +102,13 @@ public class InteractionMenuActionTest {
   private static Player player(AtomicReference<Component> delivered) {
     return (Player) Proxy.newProxyInstance(Player.class.getClassLoader(), new Class<?>[]{Player.class},
         (proxy, method, args) -> switch (method.getName()) {
+          case "sendRichMessage" -> {
+            delivered.set(MiniMessage.miniMessage().deserialize(String.valueOf(args[0])));
+            yield null;
+          }
           case "sendMessage" -> {
-            if (args != null && args.length == 1 && args[0] instanceof Component component) {
-              delivered.set(component);
+            if (args != null && args.length == 1 && args[0] instanceof String legacy) {
+              delivered.set(TextUtils.parseLegacy(legacy));
             }
             yield null;
           }

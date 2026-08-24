@@ -3,7 +3,8 @@ package art.arcane.gloss.util;
 import art.arcane.gloss.Gloss;
 import art.arcane.volmlib.util.plugin.SplashScreenSupport;
 import net.md_5.bungee.api.ChatColor;
-import org.bukkit.Bukkit;
+
+import java.util.logging.Level;
 
 public final class SplashScreen {
     private static final String SUPPORTED_MC_VERSION = "26.1.2 - 26.2";
@@ -53,7 +54,7 @@ public final class SplashScreen {
             splash.append(colorize(ART[row], fill, edge)).append(column[row]).append('\n');
         }
 
-        Bukkit.getConsoleSender().sendMessage(splash.toString());
+        Gloss.log(Level.INFO, splash.toString());
     }
 
     private static String colorize(String row, ChatColor fill, ChatColor edge) {

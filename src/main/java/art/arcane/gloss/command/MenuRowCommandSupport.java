@@ -154,7 +154,7 @@ final class MenuRowCommandSupport {
   }
 
   private static void send(CommandSender sender, TextKey key, MessageArgs arguments) {
-    sender.sendMessage(Gloss.instance.getLocalization().legacy(key, arguments));
+    Gloss.instance.getLocalization().send(sender, key, arguments);
   }
 
   static String shortRevision(String revision) {

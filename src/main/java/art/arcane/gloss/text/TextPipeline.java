@@ -4,11 +4,10 @@ import art.arcane.gloss.Gloss;
 import art.arcane.gloss.GlossConfig;
 import art.arcane.gloss.expr.ExprScope;
 import art.arcane.volmlib.util.bukkit.Placeholders;
-import net.md_5.bungee.api.ChatColor;
+import art.arcane.volmlib.util.format.ColorFormatter;
 import org.bukkit.entity.Player;
 
 import java.util.Collection;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -24,7 +23,6 @@ public final class TextPipeline implements TextRenderer {
     public static final int HAS_EMOJI_CANDIDATE = 1 << 2;
     public static final int HAS_COLOR = 1 << 3;
 
-    private static final int HEX_CACHE_LIMIT = 4096;
     private static final int ALL_FLAGS = HAS_FUNCTION | HAS_PLACEHOLDER | HAS_EMOJI_CANDIDATE | HAS_COLOR;
 
     private static final AtomicLong EMOJI_GENERATION = new AtomicLong();
@@ -35,7 +33,6 @@ public final class TextPipeline implements TextRenderer {
     private final Gloss plugin;
     private final Map<String, Function<Player, String>> functions;
     private final Set<String> failedFunctions;
-    private final Map<String, String> hexCache;
     private final AtomicLong renderGeneration;
     private final ServerTickSampler serverTicks;
     private final TextExpressionRenderer expressions;
@@ -46,7 +43,6 @@ public final class TextPipeline implements TextRenderer {
         this.plugin = plugin;
         this.functions = new ConcurrentHashMap<>();
         this.failedFunctions = ConcurrentHashMap.newKeySet();
-        this.hexCache = new ConcurrentHashMap<>();
         this.renderGeneration = new AtomicLong();
         this.serverTicks = new ServerTickSampler(plugin);
         this.expressions = new TextExpressionRenderer(plugin, serverTicks::tps);
@@ -288,13 +284,18 @@ public final class TextPipeline implements TextRenderer {
         }
 
         GlossConfig config = plugin.cfg();
-        String out = message;
         BiFunction<Player, String, String> emoji = viewerEmojiFilter;
-        if (emoji != null && config.emoji().enabled() && activeSender.hasPermission("gloss.emoji.use")) {
-            out = emoji.apply(activeSender, out);
+        return renderChat(activeSender, message, emoji, config.emoji().enabled(), config.chat().colorEnabled());
+    }
+
+    static String renderChat(Player sender, String message, BiFunction<Player, String, String> emoji,
+                             boolean emojiEnabled, boolean colorEnabled) {
+        String out = message;
+        if (emoji != null && emojiEnabled && sender.hasPermission("gloss.emoji.use")) {
+            out = emoji.apply(sender, out);
         }
-        if (config.chat().colorEnabled() && activeSender.hasPermission("gloss.chat.color")) {
-            out = applyColors(out);
+        if (colorEnabled && sender.hasPermission("gloss.chat.color")) {
+            out = ColorFormatter.translateColors(out);
         }
         return out;
     }
@@ -397,65 +398,6 @@ public final class TextPipeline implements TextRenderer {
     }
 
     private String applyColors(String input) {
-        String out = input;
-        if (out.indexOf('[') >= 0) {
-            out = translateBracketHex(out);
-        }
-        if (out.indexOf('&') >= 0) {
-            out = ChatColor.translateAlternateColorCodes('&', out);
-        }
-        return out;
-    }
-
-    private String translateBracketHex(String input) {
-        StringBuilder out = null;
-        int cursor = 0;
-        int open = input.indexOf('[');
-        while (open >= 0) {
-            if (open + 7 >= input.length() || input.charAt(open + 7) != ']' || !isHex(input, open + 1)) {
-                open = input.indexOf('[', open + 1);
-                continue;
-            }
-
-            if (out == null) {
-                out = new StringBuilder(input.length() + 24);
-            }
-
-            out.append(input, cursor, open);
-            out.append(translateHex(input.substring(open + 1, open + 7).toLowerCase(Locale.ROOT)));
-            cursor = open + 8;
-            open = input.indexOf('[', cursor);
-        }
-
-        if (out == null) {
-            return input;
-        }
-
-        out.append(input, cursor, input.length());
-        return out.toString();
-    }
-
-    private String translateHex(String hex) {
-        String cached = hexCache.get(hex);
-        if (cached != null) {
-            return cached;
-        }
-        if (hexCache.size() >= HEX_CACHE_LIMIT) {
-            return ChatColor.of("#" + hex).toString();
-        }
-        return hexCache.computeIfAbsent(hex, key -> ChatColor.of("#" + key).toString());
-    }
-
-    private boolean isHex(String input, int offset) {
-        for (int i = offset; i < offset + 6; i++) {
-            char value = input.charAt(i);
-            boolean hex = (value >= '0' && value <= '9')
-                || (value >= 'a' && value <= 'f')
-                || (value >= 'A' && value <= 'F');
-            if (!hex) {
-                return false;
-            }
-        }
-        return true;
+        return ColorFormatter.translateColors(input);
     }
 }

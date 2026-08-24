@@ -61,7 +61,7 @@ public class CommandGlossMenu {
 
     List<String> menus = new ArrayList<>(plugin.getMenuCatalog().keys());
     if (menus.isEmpty()) {
-      sender.sendMessage(plugin.getLocalization().legacy(GlossMessages.NO_MENUS));
+      plugin.getLocalization().send(sender, GlossMessages.NO_MENUS);
       return;
     }
 
@@ -100,7 +100,7 @@ public class CommandGlossMenu {
       return;
     }
     if (!(sender instanceof Player player)) {
-      sender.sendMessage(plugin.getLocalization().legacy(GlossMessages.COMMAND_PLAYER_ONLY));
+      plugin.getLocalization().send(sender, GlossMessages.COMMAND_PLAYER_ONLY);
       playCreateOutcome(sender, false);
       return;
     }
@@ -108,10 +108,10 @@ public class CommandGlossMenu {
     Location location = player.getLocation().clone();
     World world = location.getWorld();
     if (world == null) {
-      sender.sendMessage(plugin.getLocalization().legacy(
+      plugin.getLocalization().send(sender,
           GlossMessages.PANELS_WORLD_UNAVAILABLE,
           MessageArgs.builder().untrusted("world", "unknown").build()
-      ));
+      );
       playCreateOutcome(sender, false);
       return;
     }
@@ -150,7 +150,7 @@ public class CommandGlossMenu {
     }
 
     if (!(sender instanceof Player player)) {
-      sender.sendMessage(plugin.getLocalization().legacy(GlossMessages.MENUS_PLAYER_ONLY));
+      plugin.getLocalization().send(sender, GlossMessages.MENUS_PLAYER_ONLY);
       return;
     }
 
@@ -166,12 +166,12 @@ public class CommandGlossMenu {
     }
 
     if (!(sender instanceof Player player)) {
-      sender.sendMessage(plugin.getLocalization().legacy(GlossMessages.COMMAND_PLAYER_ONLY));
+      plugin.getLocalization().send(sender, GlossMessages.COMMAND_PLAYER_ONLY);
       return;
     }
 
     if (!plugin.getSessionManager().openLastSession(player)) {
-      player.sendMessage(plugin.getLocalization().legacy(GlossMessages.NO_PREVIOUS_MENU));
+      plugin.getLocalization().send(player, GlossMessages.NO_PREVIOUS_MENU);
     }
   }
 
@@ -184,14 +184,14 @@ public class CommandGlossMenu {
     }
 
     if (!(sender instanceof Player player)) {
-      sender.sendMessage(plugin.getLocalization().legacy(GlossMessages.COMMAND_PLAYER_ONLY));
+      plugin.getLocalization().send(sender, GlossMessages.COMMAND_PLAYER_ONLY);
       return;
     }
 
     if (plugin.getSessionManager().destroySession(player, false)) {
-      player.sendMessage(plugin.getLocalization().legacy(GlossMessages.MENU_CLOSED));
+      plugin.getLocalization().send(player, GlossMessages.MENU_CLOSED);
     } else {
-      player.sendMessage(plugin.getLocalization().legacy(GlossMessages.NO_OPEN_MENU));
+      plugin.getLocalization().send(player, GlossMessages.NO_OPEN_MENU);
     }
   }
 
@@ -204,14 +204,14 @@ public class CommandGlossMenu {
     }
 
     if (!(sender instanceof Player player)) {
-      sender.sendMessage(plugin.getLocalization().legacy(GlossMessages.COMMAND_PLAYER_ONLY));
+      plugin.getLocalization().send(sender, GlossMessages.COMMAND_PLAYER_ONLY);
       return;
     }
 
     if (plugin.getSessionManager().moveSession(player)) {
-      player.sendMessage(plugin.getLocalization().legacy(GlossMessages.MENU_MOVED));
+      plugin.getLocalization().send(player, GlossMessages.MENU_MOVED);
     } else {
-      player.sendMessage(plugin.getLocalization().legacy(GlossMessages.NO_OPEN_MENU));
+      plugin.getLocalization().send(player, GlossMessages.NO_OPEN_MENU);
     }
   }
 
@@ -226,10 +226,10 @@ public class CommandGlossMenu {
     String url = plugin.cfg().editorSync().builderUrl();
     if (!(sender instanceof Player)) {
       // a terminal cannot click, so the bare url is the only useful form
-      sender.sendMessage(plugin.getLocalization().legacy(
+      plugin.getLocalization().send(sender,
           GlossMessages.BUILDER_OPEN,
           MessageArgs.builder().untrusted("url", url).build()
-      ));
+      );
       return;
     }
 
@@ -260,10 +260,10 @@ public class CommandGlossMenu {
 
     MenuDefinitionData menu = plugin.getMenuCatalog().definition(menuName).orElse(null);
     if (menu == null) {
-      sender.sendMessage(plugin.getLocalization().legacy(
+      plugin.getLocalization().send(sender,
           GlossMessages.MENU_UNAVAILABLE,
           MessageArgs.builder().untrusted("menu", menuName).build()
-      ));
+      );
       return;
     }
     String source = plugin.getMenuCatalog().source(menu.getId()).orElse(null);
@@ -279,10 +279,10 @@ public class CommandGlossMenu {
       return;
     }
 
-    sender.sendMessage(plugin.getLocalization().legacy(
+    plugin.getLocalization().send(sender,
         GlossMessages.SYNC_PREPARING,
         MessageArgs.builder().untrusted("subject", menu.getId()).build()
-    ));
+    );
     plugin.getEditorSyncService().openMenu(menu.getId()).whenComplete((result, failure) ->
         runForSender(plugin, sender, () -> {
           if (failure == null) {
@@ -475,34 +475,34 @@ public class CommandGlossMenu {
     try {
       url = EditorMenuHandoff.createUrl(plugin.cfg().editorSync().builderUrl(), menuId, source);
     } catch (EditorMenuHandoff.PayloadTooLargeException exception) {
-      sender.sendMessage(plugin.getLocalization().legacy(
+      plugin.getLocalization().send(sender,
           GlossMessages.EDITOR_MENU_TOO_LARGE,
           MessageArgs.builder().untrusted("menu", menuId).build()
-      ));
+      );
       return;
     } catch (RuntimeException exception) {
       Gloss.logExceptionStack(true, exception,
           "Failed to prepare editor handoff for menu \"%s\".", menuId);
-      sender.sendMessage(plugin.getLocalization().legacy(
+      plugin.getLocalization().send(sender,
           GlossMessages.EDITOR_MENU_FAILED,
-          MessageArgs.builder().untrusted("menu", menuId).build()));
+          MessageArgs.builder().untrusted("menu", menuId).build());
       return;
     }
 
     if (fallback) {
-      sender.sendMessage(plugin.getLocalization().legacy(
+      plugin.getLocalization().send(sender,
           GlossMessages.SYNC_FALLBACK,
-          MessageArgs.builder().untrusted("subject", menuId).build()));
+          MessageArgs.builder().untrusted("subject", menuId).build());
     }
 
     if (!(sender instanceof Player)) {
-      sender.sendMessage(plugin.getLocalization().legacy(
+      plugin.getLocalization().send(sender,
           GlossMessages.EDITOR_MENU_OPEN,
           MessageArgs.builder()
               .untrusted("menu", menuId)
               .untrusted("url", url)
               .build()
-      ));
+      );
       return;
     }
 
@@ -523,14 +523,14 @@ public class CommandGlossMenu {
         .untrusted("session", art.arcane.gloss.editor.sync.EditorSyncService.abbreviate(result.sessionId()))
         .build();
     if (!(sender instanceof Player)) {
-      sender.sendMessage(plugin.getLocalization().legacy(GlossMessages.SYNC_CAPABILITY_WARNING));
-      sender.sendMessage(plugin.getLocalization().legacy(
+      plugin.getLocalization().send(sender, GlossMessages.SYNC_CAPABILITY_WARNING);
+      plugin.getLocalization().send(sender,
           GlossMessages.SYNC_OPEN_CONSOLE,
           MessageArgs.builder()
               .untrusted("subject", result.subjectId())
               .untrusted("url", result.editorUrl())
               .build()
-      ));
+      );
       return;
     }
     DirectorMiniMenu.Theme theme = GlossCommandService.menuTheme();
@@ -592,10 +592,10 @@ public class CommandGlossMenu {
   private boolean openMenu(Player player, CommandSender feedback, String menuName, boolean includeRootPermission) {
     MenuDefinitionData ui = plugin.getMenuCatalog().definition(menuName).orElse(null);
     if (ui == null) {
-      feedback.sendMessage(plugin.getLocalization().legacy(
+      plugin.getLocalization().send(feedback,
           GlossMessages.MENU_UNAVAILABLE,
           MessageArgs.builder().untrusted("menu", menuName).build()
-      ));
+      );
       return false;
     }
 
@@ -605,10 +605,10 @@ public class CommandGlossMenu {
     }
 
     if (!player.hasPermission("gloss.open." + ui.getId())) {
-      feedback.sendMessage(plugin.getLocalization().legacy(
+      plugin.getLocalization().send(feedback,
           GlossMessages.MENU_PERMISSION_DENIED,
           MessageArgs.builder().untrusted("menu", ui.getId()).build()
-      ));
+      );
       return false;
     }
 
@@ -617,19 +617,19 @@ public class CommandGlossMenu {
       return true;
     } catch (Throwable e) {
       Gloss.logExceptionStack(true, e, "Error opening menu \"%s\".", ui.getId());
-      feedback.sendMessage(plugin.getLocalization().legacy(
+      plugin.getLocalization().send(feedback,
           GlossMessages.MENU_OPEN_FAILED,
           MessageArgs.builder().untrusted("menu", ui.getId()).build()
-      ));
+      );
       return false;
     }
   }
 
   private void sendPermissionDenied(CommandSender sender, String permission) {
-    sender.sendMessage(plugin.getLocalization().legacy(
+    plugin.getLocalization().send(sender,
         GlossMessages.PERMISSION_DENIED,
         MessageArgs.builder().untrusted("permission", permission).build()
-    ));
+    );
   }
 
   private void sendCreateResult(CommandSender sender, String requestedId,
@@ -637,28 +637,28 @@ public class CommandGlossMenu {
     Runnable feedback = () -> {
       playCreateOutcome(sender, failure == null);
       if (failure == null) {
-        sender.sendMessage(plugin.getLocalization().legacy(
+        plugin.getLocalization().send(sender,
             GlossMessages.HOLOGRAM_MENU_CREATED,
             MessageArgs.builder()
                 .untrusted("hologram", creation.board().id())
                 .untrusted("menu", creation.menu().id())
                 .build()
-        ));
+        );
         return;
       }
       Throwable cause = rootCause(failure);
       if (cause instanceof FileAlreadyExistsException) {
-        sender.sendMessage(plugin.getLocalization().legacy(
+        plugin.getLocalization().send(sender,
             GlossMessages.HOLOGRAM_ALREADY_EXISTS,
             MessageArgs.builder().untrusted("hologram", requestedId).build()
-        ));
+        );
         return;
       }
       if (cause instanceof PanelCreationService.DurabilityUncertainException) {
-        sender.sendMessage(plugin.getLocalization().legacy(
+        plugin.getLocalization().send(sender,
             GlossMessages.HOLOGRAM_DURABILITY_UNCERTAIN,
             MessageArgs.builder().untrusted("hologram", requestedId).build()
-        ));
+        );
         return;
       }
       if (!(cause instanceof IllegalArgumentException)
@@ -666,10 +666,10 @@ public class CommandGlossMenu {
         Gloss.logExceptionStack(true, cause,
             "Persistent hologram creation failed for \"%s\".", requestedId);
       }
-      sender.sendMessage(plugin.getLocalization().legacy(
+      plugin.getLocalization().send(sender,
           GlossMessages.HOLOGRAM_CREATE_FAILED,
           MessageArgs.builder().untrusted("hologram", requestedId).build()
-      ));
+      );
     };
     boolean accepted = sender instanceof Player player
         ? SchedulerUtils.runEntity(plugin, player, feedback)
@@ -695,10 +695,10 @@ public class CommandGlossMenu {
   }
 
   private void sendEditorFailure(CommandSender sender, String menuId) {
-    sender.sendMessage(plugin.getLocalization().legacy(
+    plugin.getLocalization().send(sender,
         GlossMessages.EDITOR_MENU_FAILED,
         MessageArgs.builder().untrusted("menu", menuId).build()
-    ));
+    );
   }
 
   public static class ExistingMenuHandler implements DirectorParameterHandler<String> {

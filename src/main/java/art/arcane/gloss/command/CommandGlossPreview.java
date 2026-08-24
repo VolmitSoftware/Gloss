@@ -10,6 +10,8 @@ import art.arcane.volmlib.util.director.annotations.Director;
 import art.arcane.volmlib.util.director.annotations.Param;
 import art.arcane.volmlib.util.director.help.DirectorMiniMenu;
 import art.arcane.volmlib.util.localization.MessageArgs;
+import art.arcane.volmlib.util.plugin.ComponentMessenger;
+import art.arcane.volmlib.util.plugin.ComponentText;
 import art.arcane.volmlib.util.scheduling.SchedulerUtils;
 import org.bukkit.block.Block;
 import org.bukkit.command.CommandSender;
@@ -29,8 +31,8 @@ public class CommandGlossPreview {
   private static final int MAX_REPORTED_ERRORS = 3;
   private static final String LIST_COMMAND = "/gloss preview list";
 
-  private static void sendOnSender(CommandSender sender, String message) {
-    runOnSender(sender, () -> sender.sendMessage(message));
+  private static void sendOnSender(CommandSender sender, ComponentText message) {
+    runOnSender(sender, () -> ComponentMessenger.send(sender, message));
   }
 
   private static void runOnSender(CommandSender sender, Runnable action) {
@@ -119,20 +121,20 @@ public class CommandGlossPreview {
     // resetToDefault performs up to fourteen file writes plus a full reparse; never block the
     // calling thread (which may be the main thread) on that.
     SchedulerUtils.runAsync(Gloss.instance, () -> {
-      sendOnSender(sender, Gloss.instance.getLocalization().legacy(
+      sendOnSender(sender, Gloss.instance.getLocalization().component(
           GlossMessages.PREVIEWS_RESET_STARTED,
           MessageArgs.builder().untrusted("name", target).build()
       ));
       PreviewDocumentRegistry registry = Gloss.instance.getPreviewRegistry();
       List<String> affected = registry == null ? List.of() : registry.resetToDefault(target);
       if (affected.isEmpty()) {
-        sendOnSender(sender, Gloss.instance.getLocalization().legacy(
+        sendOnSender(sender, Gloss.instance.getLocalization().component(
             GlossMessages.PREVIEWS_RESET_NONE,
             MessageArgs.builder().untrusted("name", target).build()
         ));
         return;
       }
-      sendOnSender(sender, Gloss.instance.getLocalization().legacy(
+      sendOnSender(sender, Gloss.instance.getLocalization().component(
           GlossMessages.PREVIEWS_RESET_DONE,
           MessageArgs.builder().untrusted("count", affected.size()).build()
       ));
@@ -172,10 +174,10 @@ public class CommandGlossPreview {
         ? null
         : registry.get(PreviewDocumentRegistry.normalize(docName));
     if (document == null) {
-      sender.sendMessage(Gloss.instance.getLocalization().legacy(
+      Gloss.instance.getLocalization().send(sender,
           GlossMessages.PREVIEWS_DUMP_UNKNOWN,
           MessageArgs.builder().untrusted("name", docName).build()
-      ));
+      );
       return;
     }
 
@@ -214,7 +216,7 @@ public class CommandGlossPreview {
       }
     }
 
-    sender.sendMessage(Gloss.instance.getLocalization().legacy(
+    Gloss.instance.getLocalization().send(sender,
         GlossMessages.PREVIEWS_DUMP_RESULT,
         MessageArgs.builder()
             .untrusted("name", document.name())
@@ -224,38 +226,38 @@ public class CommandGlossPreview {
             .untrusted("slots", slots)
             .untrusted("labels", labels)
             .build()
-    ));
+    );
     reportDumpErrors(sender, errors);
   }
 
   /** Up to {@link #MAX_REPORTED_ERRORS} build-error strings, then a "+N more" tail pointing at the console log. */
   private void reportDumpErrors(CommandSender sender, List<String> errors) {
     if (errors.isEmpty()) {
-      sender.sendMessage(Gloss.instance.getLocalization().legacy(GlossMessages.PREVIEWS_DUMP_NO_ERRORS));
+      Gloss.instance.getLocalization().send(sender, GlossMessages.PREVIEWS_DUMP_NO_ERRORS);
       return;
     }
 
     int shown = Math.min(MAX_REPORTED_ERRORS, errors.size());
     for (int index = 0; index < shown; index++) {
-      sender.sendMessage(Gloss.instance.getLocalization().legacy(
+      Gloss.instance.getLocalization().send(sender,
           GlossMessages.PREVIEWS_DUMP_ERROR_LINE,
           MessageArgs.builder().untrusted("message", errors.get(index)).build()
-      ));
+      );
     }
 
     int remaining = errors.size() - shown;
     if (remaining > 0) {
-      sender.sendMessage(Gloss.instance.getLocalization().legacy(
+      Gloss.instance.getLocalization().send(sender,
           GlossMessages.PREVIEWS_DUMP_ERROR_MORE,
           MessageArgs.builder().untrusted("count", remaining).build()
-      ));
+      );
     }
   }
 
   private void sendPermissionDenied(CommandSender sender, String permission) {
-    sender.sendMessage(Gloss.instance.getLocalization().legacy(
+    Gloss.instance.getLocalization().send(sender,
         GlossMessages.PERMISSION_DENIED,
         MessageArgs.builder().untrusted("permission", permission).build()
-    ));
+    );
   }
 }

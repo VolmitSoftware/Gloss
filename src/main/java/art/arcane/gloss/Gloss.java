@@ -47,6 +47,7 @@ import art.arcane.volmlib.util.bukkit.Events;
 import art.arcane.volmlib.util.bukkit.papi.PlaceholderRegistration;
 import art.arcane.volmlib.util.hud.HudActionBar;
 import art.arcane.volmlib.util.io.FileWatcher;
+import art.arcane.volmlib.util.plugin.ComponentLog;
 import art.arcane.volmlib.util.scheduling.FoliaScheduler;
 import art.arcane.volmlib.util.scheduling.SchedulerBridge;
 import art.arcane.volmlib.util.scheduling.SchedulerRuntime;
@@ -166,7 +167,8 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
         if (!current.isLoggable(logLevel)) {
             return;
         }
-        current.log(logLevel, operatorMessage(current, format(message, args)));
+        ComponentLog.logLegacy(instance, FALLBACK_LOGGER, "[Gloss] ", logLevel,
+            format(message, args), null);
     }
 
     public static void logThrottled(Level logLevel, String key, String message, Object... args) {
@@ -178,8 +180,8 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
         if (suppressed < 0L) {
             return;
         }
-        current.log(logLevel,
-            operatorMessage(current, withSuppressed(format(message, args), suppressed)));
+        ComponentLog.logLegacy(instance, FALLBACK_LOGGER, "[Gloss] ", logLevel,
+            withSuppressed(format(message, args), suppressed), null);
     }
 
     public static void logException(boolean isSevere, Throwable failure, int indents) {
@@ -198,7 +200,8 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
         if (!current.isLoggable(level)) {
             return;
         }
-        current.log(level, operatorMessage(current, format(message, args)), failure);
+        ComponentLog.logLegacy(instance, FALLBACK_LOGGER, "[Gloss] ", level,
+            format(message, args), failure);
     }
 
     public static void logExceptionStackThrottled(boolean isSevere, String key, Throwable failure,
@@ -212,8 +215,8 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
         if (suppressed < 0L) {
             return;
         }
-        current.log(level,
-            operatorMessage(current, withSuppressed(format(message, args), suppressed)), failure);
+        ComponentLog.logLegacy(instance, FALLBACK_LOGGER, "[Gloss] ", level,
+            withSuppressed(format(message, args), suppressed), failure);
     }
 
     private static Logger logger() {
@@ -223,10 +226,6 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
 
     private static String format(String message, Object... args) {
         return args.length > 0 ? String.format(message, args) : message;
-    }
-
-    private static String operatorMessage(Logger logger, String message) {
-        return logger == FALLBACK_LOGGER ? "[Gloss] " + message : message;
     }
 
     private static long claimFailureLog(String key) {

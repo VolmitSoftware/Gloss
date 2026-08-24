@@ -473,17 +473,17 @@ public final class MenuSessionManager {
 
     MenuDefinitionData menu = Gloss.instance.getMenuCatalog().definition(target).orElse(null);
     if (menu == null) {
-      player.sendMessage(Gloss.instance.getLocalization().legacy(
+      Gloss.instance.getLocalization().send(player,
           GlossMessages.MENU_UNAVAILABLE,
           MessageArgs.builder().untrusted("menu", target).build()
-      ));
+      );
       return NavigationResult.NOT_FOUND;
     }
     if (!player.hasPermission("gloss.open." + menu.getId())) {
-      player.sendMessage(Gloss.instance.getLocalization().legacy(
+      Gloss.instance.getLocalization().send(player,
           GlossMessages.MENU_PERMISSION_DENIED,
           MessageArgs.builder().untrusted("menu", menu.getId()).build()
-      ));
+      );
       return NavigationResult.DENIED;
     }
     if (!ApiEvents.fireOpen(player, menu.getId(), null)) {

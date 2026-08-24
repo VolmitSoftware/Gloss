@@ -25,7 +25,6 @@ class OperatorLoggingPolicyTest {
     @Test
     void productionSourcesDoNotBypassTheGlossLogger() throws IOException {
         List<Path> sources = javaSources();
-        int rawConsoleMessages = 0;
         for (Path source : sources) {
             String text = Files.readString(source);
             assertFalse(text.contains("System.out"), source.toString());
@@ -33,20 +32,18 @@ class OperatorLoggingPolicyTest {
             assertFalse(text.contains("printStackTrace("), source.toString());
             assertFalse(text.contains("Bukkit.getLogger("), source.toString());
             assertFalse(text.contains("getServer().getLogger("), source.toString());
+            assertFalse(text.contains(".sendMessage("), source.toString());
             if (!source.endsWith(Path.of("art/arcane/gloss/Gloss.java"))) {
                 assertFalse(text.contains("Logger.getLogger("), source.toString());
                 assertFalse(hasDirectPluginLogCall(text), source.toString());
             }
-            int index = text.indexOf("Bukkit.getConsoleSender().sendMessage(");
-            while (index >= 0) {
-                rawConsoleMessages++;
-                assertTrue(source.endsWith(Path.of("art/arcane/gloss/util/SplashScreen.java")), source.toString());
-                index = text.indexOf("Bukkit.getConsoleSender().sendMessage(", index + 1);
-            }
+            assertFalse(text.contains("Bukkit.getConsoleSender().sendMessage("), source.toString());
         }
-        assertEquals(1, rawConsoleMessages);
         assertContains("art/arcane/gloss/Gloss.java", "Logger.getLogger(\"Gloss\")");
-        assertContains("art/arcane/gloss/Gloss.java", "\"[Gloss] \" + message");
+        assertContains("art/arcane/gloss/Gloss.java", "ComponentLog.logLegacy(");
+        assertContains("art/arcane/gloss/util/SplashScreen.java", "Gloss.log(Level.INFO, splash.toString())");
+        assertFalse(Files.readString(MAIN_SOURCE.resolve(
+            "art/arcane/gloss/menu/action/MessageMenuAction.java")).contains("LegacyComponentSerializer"));
     }
 
     @Test
@@ -86,7 +83,7 @@ class OperatorLoggingPolicyTest {
         fallback.setLevel(Level.ALL);
         fallback.addHandler(handler);
         try {
-            Gloss.logExceptionStack(false, failure, "Late async failure.");
+            Gloss.logExceptionStack(false, failure, "§cLate async failure.");
             assertEquals("[Gloss] Late async failure.", captured.get().getMessage());
             assertSame(failure, captured.get().getThrown());
         } finally {

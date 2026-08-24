@@ -7,6 +7,7 @@ import art.arcane.volmlib.util.director.runtime.DirectorRuntimeMessages;
 import art.arcane.volmlib.util.localization.MessageArgs;
 import art.arcane.volmlib.util.localization.MessageKey;
 import art.arcane.volmlib.util.localization.VolmitLocales;
+import art.arcane.volmlib.util.plugin.ComponentText;
 import org.bukkit.ChatColor;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.junit.After;
@@ -250,6 +251,18 @@ public class GlossLocalizationTest {
     );
     assertTrue(rendered.contains("&cBadName"));
     assertFalse(rendered.contains(String.valueOf(ChatColor.DARK_RED)));
+  }
+
+  @Test
+  public void componentRenderingKeepsUntrustedColorAndMarkupLiteral() {
+    ComponentText rendered = localization.component(
+        GlossMessages.MENU_UNAVAILABLE,
+        MessageArgs.builder().untrusted("menu", "<red>&cBad" + ChatColor.DARK_RED + "Name").build()
+    );
+
+    assertEquals("[Gloss]: \"<red>&cBadName\" is not available.", rendered.plain());
+    assertTrue(rendered.legacy().contains("<red>&cBadName"));
+    assertFalse(rendered.legacy().contains(ChatColor.DARK_RED + "Name"));
   }
 
   @Test
