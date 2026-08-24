@@ -338,6 +338,8 @@
   "command.help.motd.reset": "Palauta mukana toimitettu MOTD-dokumentti"
   "command.help.drops": "Pudonneiden esineiden esitystyökalut"
   "command.help.drops.reset": "Palauta mukana toimitettu pudonneiden esineiden asetusdokumentti"
+  "command.help.indicators": "Vahinko- ja parannusilmaisimien työkalut"
+  "command.help.indicators.reset": "Palauta mukana toimitettu vahinkoilmaisimien asetusdokumentti"
   "command.help.arg.reset_name": "Palautettava nimi, tai * kaikille mukana toimitetuille oletuksille"
   "command.help.status": "Näytä tiiviit ajonaikaiset lukumäärät"
   "command.help.reload": "Lataa Gloss-asetukset ja -palvelut uudelleen"

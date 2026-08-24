@@ -338,6 +338,8 @@
   "command.help.motd.reset": "기본 제공 MOTD 문서 복원"
   "command.help.drops": "떨어진 아이템 표현 도구"
   "command.help.drops.reset": "기본 제공 아이템 드롭 설정 문서 복원"
+  "command.help.indicators": "피해 및 회복 표시 도구"
+  "command.help.indicators.reset": "기본 제공 피해 표시 설정 문서 복원"
   "command.help.arg.reset_name": "초기화할 이름, 모든 기본 제공 기본값은 *"
   "command.help.status": "런타임 개수를 간단히 표시"
   "command.help.reload": "Gloss 설정 및 서비스 다시 불러오기"

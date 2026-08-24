@@ -338,6 +338,8 @@
   "command.help.motd.reset": "Yerleşik MOTD belgesini geri yükle"
   "command.help.drops": "Yere düşen eşya gösterimi araçları"
   "command.help.drops.reset": "Yerleşik yere düşen eşya ayarları belgesini geri yükle"
+  "command.help.indicators": "Hasar ve iyileştirme göstergesi araçları"
+  "command.help.indicators.reset": "Yerleşik hasar göstergesi ayarları belgesini geri yükle"
   "command.help.arg.reset_name": "Sıfırlanacak ad veya tüm yerleşik varsayılanlar için *"
   "command.help.status": "Kısa çalışma zamanı sayımlarını göster"
   "command.help.reload": "Gloss yapılandırmasını ve hizmetlerini yeniden yükle"

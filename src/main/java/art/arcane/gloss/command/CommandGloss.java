@@ -18,6 +18,7 @@ public class CommandGloss {
     private CommandGlossTablist tablist;
     private CommandGlossMotd motd;
     private CommandGlossDrops drops;
+    private CommandGlossIndicators indicators;
     private CommandGlossMenu menu;
     private CommandGlossPanel panel;
     private CommandGlossPreview preview;
@@ -35,6 +36,7 @@ public class CommandGloss {
         this.tablist = new CommandGlossTablist(plugin);
         this.motd = new CommandGlossMotd(plugin);
         this.drops = new CommandGlossDrops(plugin);
+        this.indicators = new CommandGlossIndicators(plugin);
         this.menu = new CommandGlossMenu(plugin);
         this.panel = new CommandGlossPanel();
         this.preview = new CommandGlossPreview();

@@ -338,6 +338,8 @@
   "command.help.motd.reset": "Restaurer le document MOTD fourni"
   "command.help.drops": "Outils de présentation des objets au sol"
   "command.help.drops.reset": "Restaurer le document de réglages des objets au sol fourni"
+  "command.help.indicators": "Outils d'indicateurs de dégâts et de soins"
+  "command.help.indicators.reset": "Restaurer le document d'indicateurs de dégâts fourni"
   "command.help.arg.reset_name": "Nom à réinitialiser, ou * pour toutes les valeurs par défaut fournies"
   "command.help.status": "Afficher des compteurs d'exécution concis"
   "command.help.reload": "Recharger la configuration et les services de Gloss"

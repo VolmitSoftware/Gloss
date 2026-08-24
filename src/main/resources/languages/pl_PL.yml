@@ -338,6 +338,8 @@
   "command.help.motd.reset": "Przywróć wbudowany dokument MOTD"
   "command.help.drops": "Narzędzia prezentacji upuszczonych przedmiotów"
   "command.help.drops.reset": "Przywróć wbudowany dokument ustawień upuszczonych przedmiotów"
+  "command.help.indicators": "Narzędzia wskaźników obrażeń i leczenia"
+  "command.help.indicators.reset": "Przywróć wbudowany dokument ustawień wskaźników obrażeń"
   "command.help.arg.reset_name": "Nazwa do zresetowania lub * dla wszystkich wbudowanych domyślnych"
   "command.help.status": "Pokaż zwięzłe liczniki działania"
   "command.help.reload": "Przeładuj konfigurację i usługi Gloss"

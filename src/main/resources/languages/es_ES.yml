@@ -338,6 +338,8 @@
   "command.help.motd.reset": "Restaurar el documento MOTD incluido"
   "command.help.drops": "Herramientas de presentación de objetos soltados"
   "command.help.drops.reset": "Restaurar el documento de ajustes de objetos soltados incluido"
+  "command.help.indicators": "Herramientas de indicadores de daño y curación"
+  "command.help.indicators.reset": "Restaurar el documento de indicadores de daño incluido"
   "command.help.arg.reset_name": "Nombre a restablecer, o * para todos los valores predeterminados incluidos"
   "command.help.status": "Mostrar recuentos breves del estado de ejecución"
   "command.help.reload": "Recargar la configuración y los servicios de Gloss"

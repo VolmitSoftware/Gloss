@@ -338,6 +338,8 @@
   "command.help.motd.reset": "同梱のMOTDドキュメントを復元する"
   "command.help.drops": "ドロップアイテム表示ツール"
   "command.help.drops.reset": "同梱のドロップアイテム設定ドキュメントを復元する"
+  "command.help.indicators": "ダメージ・回復インジケーターのツール"
+  "command.help.indicators.reset": "同梱のダメージインジケーター設定ドキュメントを復元する"
   "command.help.arg.reset_name": "リセットする名前。*で同梱デフォルトすべて"
   "command.help.status": "実行時のカウントを簡潔に表示する"
   "command.help.reload": "Glossの設定とサービスを再読み込みする"

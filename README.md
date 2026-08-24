@@ -15,7 +15,7 @@ Server polish and display suite: holograms, menus, scoreboards, tablist, emoji c
 - **Tablist** — configurable header/footer and per-group player list names.
 - **Emoji** — `:emoji:` and trigger replacement in chat with tab completion and per-emoji permissions.
 - **Chat bubbles** — messages float above the speaker's head, stack, and fly away as they expire.
-- **Damage indicators** — floating damage and heal numbers with ballistic motion, measured from actual applied health deltas.
+- **Damage indicators** — floating damage and healing numbers measured from actual applied health deltas, with a hot-reloading JSON profile for formats, continuous ballistic motion, spin, scale, fade, limits and world filters.
 - **Menus and previews** — packet-only holographic menus, persistent world panels and look-at container previews.
 - **Dropped items** — configurable labels plus optional display-backed block and item models while the native item remains authoritative.
 - **Animations** — frame-based text animations usable in any hologram, board or tablist line via `|animation.<id>|`.
@@ -52,7 +52,7 @@ boot; every other folder appears the moment something is written into it, and st
 
 ```
 plugins/Gloss/
-├── gloss.toml                       language, metrics and every runtime control; always
+├── gloss.toml                       language, metrics and global runtime controls; always
 ├── language.yml                     sparse message overrides only; always
 ├── tablist.json                     shipped default, while tablist is enabled
 ├── motd.json                        shipped default, while motd is enabled (off by default)
@@ -60,6 +60,7 @@ plugins/Gloss/
 ├── emoji/<id>.json                  shipped defaults, while emoji is enabled
 ├── animations/<id>.json             10 shipped defaults, while animations are enabled
 ├── bubbles/<id>.json                shipped default, while chat bubbles are enabled
+├── damage-indicators/default.json   shipped default, while damage indicators are enabled
 ├── real-drops/default.json          shipped default, while real drops are enabled
 ├── previews/<name>.json             14 shipped defaults, while container previews are enabled
 ├── holograms/<id>.json              on the first hologram

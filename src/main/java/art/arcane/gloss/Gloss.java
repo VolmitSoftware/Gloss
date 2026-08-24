@@ -461,6 +461,9 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
                     && previewRegistry != null) {
                     previewRegistry.reload();
                 }
+                if (kinds.contains(EditorSyncDocumentKind.DAMAGE_INDICATORS)) {
+                    indicators.reloadSettings();
+                }
                 if (imagesChanged) {
                     imageAssets.publishEditorSyncChanges();
                 }

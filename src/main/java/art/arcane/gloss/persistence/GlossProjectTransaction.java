@@ -412,7 +412,7 @@ public final class GlossProjectTransaction {
     }
     return dataRelative.getNameCount() == 1
         && Set.of("previews", "holograms", "animations", "boards", "emoji", "bubbles",
-        "real-drops").contains(collection);
+        "real-drops", "damage-indicators").contains(collection);
   }
 
   private Journal readJournal(Path transaction) throws IOException {
@@ -616,6 +616,9 @@ public final class GlossProjectTransaction {
     }
     if (collection.equals("real-drops")) {
       return normalized.equals("real-drops/default.json");
+    }
+    if (collection.equals("damage-indicators")) {
+      return normalized.equals("damage-indicators/default.json");
     }
     return List.of("previews", "holograms", "animations", "boards", "emoji", "bubbles")
         .contains(collection) && relative.getNameCount() == 2 && normalized.endsWith(".json");

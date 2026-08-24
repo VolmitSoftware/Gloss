@@ -62,6 +62,8 @@ class GlossCommandTreeTest {
             List.of("motd", "reset"),
             List.of("drops"),
             List.of("drops", "reset"),
+            List.of("indicators"),
+            List.of("indicators", "reset"),
             List.of("status"),
             List.of("reload"),
             List.of("menu"),
@@ -135,6 +137,7 @@ class GlossCommandTreeTest {
             List.of("web", "edit", "tablist"),
             List.of("web", "edit", "motd"),
             List.of("web", "edit", "real-drops"),
+            List.of("web", "edit", "damage-indicators"),
             List.of("web", "sessions"),
             List.of("web", "sessions", "list"),
             List.of("web", "sessions", "status"),
@@ -149,6 +152,7 @@ class GlossCommandTreeTest {
     private static final Set<List<String>> GROUP_PATHS = Set.of(
             List.of("hologram"), List.of("board"), List.of("emoji"), List.of("animations"),
             List.of("bubbles"), List.of("tablist"), List.of("motd"), List.of("drops"),
+            List.of("indicators"),
             List.of("menu"), List.of("panel"), List.of("preview"), List.of("item"),
             List.of("web"), List.of("web", "edit"), List.of("web", "sessions"), List.of("import")
     );
@@ -222,8 +226,8 @@ class GlossCommandTreeTest {
         DirectorMiniMenu.DirectorHelpPage submenu = DirectorMiniMenu.resolveHelp(
                 engine, List.of("panel")).orElseThrow();
 
-        Assertions.assertEquals(16, root.entries().size());
-        Assertions.assertEquals(18, DirectorMiniMenu.render(
+        Assertions.assertEquals(17, root.entries().size());
+        Assertions.assertEquals(19, DirectorMiniMenu.render(
                 root, GlossCommandService.menuTheme(), GlossLocalization.globalDirectorResolver()).size());
         Assertions.assertEquals(DirectorMiniMenu.MAX_ENTRIES_PER_PAGE, submenu.entries().size());
         Assertions.assertEquals(DirectorMiniMenu.MAX_ENTRIES_PER_PAGE + 3, DirectorMiniMenu.render(

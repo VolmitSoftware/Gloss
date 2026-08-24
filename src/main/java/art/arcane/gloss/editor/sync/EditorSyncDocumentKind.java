@@ -9,6 +9,7 @@ import art.arcane.gloss.doc.DocumentIds;
 import art.arcane.gloss.drop.RealDropSettingsDoc;
 import art.arcane.gloss.emoji.EmojiDoc;
 import art.arcane.gloss.hologram.HologramDoc;
+import art.arcane.gloss.indicator.DamageIndicatorSettingsDoc;
 import art.arcane.gloss.motd.MotdDoc;
 import art.arcane.gloss.panel.PanelDefinition;
 import art.arcane.gloss.panel.PanelIds;
@@ -32,6 +33,7 @@ public enum EditorSyncDocumentKind {
   ANIMATION("animation", "animations", Layout.FOLDER, true),
   BUBBLE_STYLE("bubble-style", "bubbles", Layout.FOLDER, true),
   CONTAINER_PREVIEW("container-preview", "previews", Layout.FOLDER, false),
+  DAMAGE_INDICATORS("damage-indicators", "damage-indicators", Layout.FOLDER, true),
   EMOJI("emoji", "emoji", Layout.FOLDER, true),
   HOLOGRAM("hologram", "holograms", Layout.FOLDER, true),
   MENU("menu", "menus", Layout.TREE, false),
@@ -85,6 +87,7 @@ public enum EditorSyncDocumentKind {
     String canonical = switch (this) {
       case MENU -> MenuIds.require(value);
       case PANEL -> PanelIds.canonicalize(value);
+      case DAMAGE_INDICATORS -> requireSingleton(value, DamageIndicatorSettingsDoc.DEFAULT_ID);
       case MOTD -> requireSingleton(value, "motd");
       case TABLIST -> requireSingleton(value, "tablist");
       case REAL_DROPS -> requireSingleton(value, RealDropSettingsDoc.DEFAULT_ID);
@@ -118,6 +121,7 @@ public enum EditorSyncDocumentKind {
       case ANIMATION -> AnimationDoc.parse(canonicalId + ".json", source);
       case BUBBLE_STYLE -> BubbleStyleDoc.parse(canonicalId + ".json", source);
       case CONTAINER_PREVIEW -> PreviewDocumentParser.parse(canonicalId, source);
+      case DAMAGE_INDICATORS -> DamageIndicatorSettingsDoc.parse(canonicalId + ".json", source);
       case EMOJI -> EmojiDoc.parse(canonicalId + ".json", source);
       case HOLOGRAM -> HologramDoc.parse(canonicalId + ".json", source);
       case MENU -> MenuDocumentParser.parse(canonicalId, source);

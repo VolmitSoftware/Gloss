@@ -330,15 +330,6 @@ public final class LegacyGlossDataImporter {
         overlay(yaml, "text.functions", entries, () -> config.text.functions = yaml.getBoolean("text.functions"));
         overlay(yaml, "chat.color", entries, () -> config.chat.color = yaml.getBoolean("chat.color"));
         overlay(yaml, "chat-bubbles.blacklist-worlds", entries, () -> config.chatBubbles.blacklistWorlds = new ArrayList<>(yaml.getStringList("chat-bubbles.blacklist-worlds")));
-        overlay(yaml, "damage-indicators.motion.random-throw-force", entries, () -> config.damageIndicators.randomThrowForce = yaml.getDouble("damage-indicators.motion.random-throw-force"));
-        overlay(yaml, "damage-indicators.motion.initial-up-force", entries, () -> config.damageIndicators.initialUpForce = yaml.getDouble("damage-indicators.motion.initial-up-force"));
-        overlay(yaml, "damage-indicators.motion.gravity-factor", entries, () -> config.damageIndicators.gravityFactor = yaml.getDouble("damage-indicators.motion.gravity-factor"));
-        overlay(yaml, "damage-indicators.max-indicators-per-second", entries, () -> config.damageIndicators.maxPerSecond = yaml.getInt("damage-indicators.max-indicators-per-second"));
-        overlay(yaml, "damage-indicators.max-ms-alive", entries, () -> config.damageIndicators.maxMsAlive = yaml.getLong("damage-indicators.max-ms-alive"));
-        overlay(yaml, "damage-indicators.damage-indicator-prefix", entries, () -> config.damageIndicators.damagePrefix = yaml.getString("damage-indicators.damage-indicator-prefix"));
-        overlay(yaml, "damage-indicators.heal-indicator-prefix", entries, () -> config.damageIndicators.healPrefix = yaml.getString("damage-indicators.heal-indicator-prefix"));
-        overlay(yaml, "damage-indicators.decimals", entries, () -> config.damageIndicators.decimals = yaml.getInt("damage-indicators.decimals"));
-        overlay(yaml, "damage-indicators.show-heals", entries, () -> config.damageIndicators.showHeals = yaml.getBoolean("damage-indicators.show-heals"));
         overlay(yaml, "drops.name-format", entries, () -> config.drops.nameFormat = yaml.getString("drops.name-format"));
         overlay(yaml, "commands.sounds", entries, () -> config.commands.sounds = yaml.getBoolean("commands.sounds"));
     }

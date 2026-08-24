@@ -338,6 +338,8 @@
   "command.help.motd.reset": "Khôi phục tài liệu MOTD đi kèm"
   "command.help.drops": "Công cụ hiển thị vật phẩm rơi"
   "command.help.drops.reset": "Khôi phục tài liệu cài đặt vật phẩm rơi đi kèm"
+  "command.help.indicators": "Công cụ chỉ báo sát thương và hồi máu"
+  "command.help.indicators.reset": "Khôi phục tài liệu cài đặt chỉ báo sát thương đi kèm"
   "command.help.arg.reset_name": "Tên cần đặt lại, hoặc * cho mọi mặc định đi kèm"
   "command.help.status": "Hiển thị số liệu thời gian chạy ngắn gọn"
   "command.help.reload": "Tải lại cấu hình và dịch vụ của Gloss"

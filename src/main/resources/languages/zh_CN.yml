@@ -338,6 +338,8 @@
   "command.help.motd.reset": "恢复内置的 MOTD 文档"
   "command.help.drops": "掉落物展示工具"
   "command.help.drops.reset": "恢复内置的掉落物设置文档"
+  "command.help.indicators": "伤害与治疗指示器工具"
+  "command.help.indicators.reset": "恢复内置的伤害指示器设置文档"
   "command.help.arg.reset_name": "要重置的名称，或 * 表示所有内置默认"
   "command.help.status": "显示简要的运行时计数"
   "command.help.reload": "重新加载 Gloss 配置和服务"

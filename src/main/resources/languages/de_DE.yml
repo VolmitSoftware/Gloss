@@ -338,6 +338,8 @@
   "command.help.motd.reset": "Das mitgelieferte MOTD-Dokument wiederherstellen"
   "command.help.drops": "Werkzeuge für die Darstellung fallengelassener Items"
   "command.help.drops.reset": "Das mitgelieferte Dokument für Item-Drop-Einstellungen wiederherstellen"
+  "command.help.indicators": "Werkzeuge für Schadens- und Heilungsanzeigen"
+  "command.help.indicators.reset": "Das mitgelieferte Dokument für Schadensanzeigen wiederherstellen"
   "command.help.arg.reset_name": "Zurückzusetzender Name, oder * für alle mitgelieferten Standards"
   "command.help.status": "Knappe Laufzeitzähler anzeigen"
   "command.help.reload": "Gloss-Konfiguration und -Dienste neu laden"

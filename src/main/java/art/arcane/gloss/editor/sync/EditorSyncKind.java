@@ -6,6 +6,7 @@ public enum EditorSyncKind {
   ANIMATION("animation"),
   BUBBLE_STYLE("bubble-style"),
   CONTAINER_PREVIEW("container-preview"),
+  DAMAGE_INDICATORS("damage-indicators"),
   EMOJI("emoji"),
   HOLOGRAM("hologram"),
   MENU("menu"),

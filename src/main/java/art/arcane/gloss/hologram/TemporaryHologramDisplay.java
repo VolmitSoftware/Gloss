@@ -510,6 +510,10 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
         }
         appliedPresentation = presentation;
         int interpolationTicks = desiredTeleportTicks();
+        if (FoliaScheduler.isOwnedByCurrentRegion(active)) {
+            applyPresentationNow(active, presentation, interpolationTicks, true);
+            return;
+        }
         service.plugin().scheduler().runEntity(active, () -> {
             if (active.isValid()) {
                 applyPresentationNow(active, presentation, interpolationTicks, true);

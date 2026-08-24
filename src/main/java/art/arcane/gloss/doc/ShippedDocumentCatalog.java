@@ -5,6 +5,7 @@ import art.arcane.gloss.board.BoardDoc;
 import art.arcane.gloss.bubble.BubbleStyleDoc;
 import art.arcane.gloss.emoji.EmojiDoc;
 import art.arcane.gloss.drop.RealDropSettingsDoc;
+import art.arcane.gloss.indicator.DamageIndicatorSettingsDoc;
 import art.arcane.gloss.motd.MotdDoc;
 import art.arcane.gloss.tab.TablistDoc;
 
@@ -51,10 +52,15 @@ public final class ShippedDocumentCatalog {
         new Entry<>(RealDropSettingsDoc.KIND, List.of(RealDropSettingsDoc.DEFAULT_ID),
             RealDropSettingsDoc::parse);
 
+    public static final Entry<DamageIndicatorSettingsDoc> DAMAGE_INDICATORS =
+        new Entry<>(DamageIndicatorSettingsDoc.KIND, List.of(DamageIndicatorSettingsDoc.DEFAULT_ID),
+            DamageIndicatorSettingsDoc::parse);
+
     private ShippedDocumentCatalog() {
     }
 
     public static List<Entry<?>> all() {
-        return List.of(EMOJI, ANIMATIONS, BOARDS, BUBBLES, TABLIST, MOTD, REAL_DROPS);
+        return List.of(EMOJI, ANIMATIONS, BOARDS, BUBBLES, TABLIST, MOTD, REAL_DROPS,
+            DAMAGE_INDICATORS);
     }
 }

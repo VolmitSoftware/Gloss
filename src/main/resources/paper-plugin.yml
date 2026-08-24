@@ -115,6 +115,7 @@ permissions:
       gloss.tablist.reset: true
       gloss.motd.reset: true
       gloss.drops.reset: true
+      gloss.indicators.reset: true
   gloss.holograms:
     description: Gives access to all Gloss hologram permissions.
     default: op
@@ -278,6 +279,9 @@ permissions:
     default: op
   gloss.drops.reset:
     description: Allows restoring the shipped real drop settings document.
+    default: op
+  gloss.indicators.reset:
+    description: Allows restoring the shipped damage-indicator settings document.
     default: op
   gloss.indicators.show:
     description: Shows damage and heal indicators to this player.

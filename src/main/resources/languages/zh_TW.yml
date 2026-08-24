@@ -338,6 +338,8 @@
   "command.help.motd.reset": "還原內建的 MOTD 文件"
   "command.help.drops": "掉落物顯示工具"
   "command.help.drops.reset": "還原內建的掉落物設定文件"
+  "command.help.indicators": "傷害與治療指示器工具"
+  "command.help.indicators.reset": "還原內建的傷害指示器設定文件"
   "command.help.arg.reset_name": "要重設的名稱，或 * 代表所有內建預設值"
   "command.help.status": "顯示簡要的執行階段計數"
   "command.help.reload": "重新載入 Gloss 設定與服務"

@@ -92,18 +92,7 @@ public record GlossConfig(
     ) {
     }
 
-    public record Indicators(
-        boolean enabled,
-        double randomThrowForce,
-        double initialUpForce,
-        double gravityForce,
-        int maxPerSecond,
-        long maxMsAlive,
-        String damagePrefix,
-        String healPrefix,
-        int decimals,
-        boolean showHeals
-    ) {
+    public record Indicators(boolean enabled) {
     }
 
     public record Drops(
@@ -439,16 +428,7 @@ public record GlossConfig(
                 List.copyOf(source.chatBubbles.blacklistWorlds)
             ),
             new Indicators(
-                source.features.damageIndicators,
-                source.damageIndicators.randomThrowForce,
-                source.damageIndicators.initialUpForce,
-                source.damageIndicators.gravityFactor,
-                source.damageIndicators.maxPerSecond,
-                source.damageIndicators.maxMsAlive,
-                source.damageIndicators.damagePrefix,
-                source.damageIndicators.healPrefix,
-                source.damageIndicators.decimals,
-                source.damageIndicators.showHeals
+                source.features.damageIndicators
             ),
             new Drops(
                 source.features.drops,

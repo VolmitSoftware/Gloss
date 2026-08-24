@@ -338,6 +338,8 @@
   "command.help.motd.reset": "Atkurti numatytąjį MOTD dokumentą"
   "command.help.drops": "Numestų daiktų vaizdavimo įrankiai"
   "command.help.drops.reset": "Atkurti numatytąjį numestų daiktų nustatymų dokumentą"
+  "command.help.indicators": "Žalos ir gydymo indikatorių įrankiai"
+  "command.help.indicators.reset": "Atkurti numatytąjį žalos indikatorių nustatymų dokumentą"
   "command.help.arg.reset_name": "Atkuriamas pavadinimas arba * visoms numatytosioms reikšmėms"
   "command.help.status": "Rodyti glaustą vykdymo statistiką"
   "command.help.reload": "Iš naujo įkelti Gloss konfigūraciją ir paslaugas"

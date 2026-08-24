@@ -338,6 +338,8 @@
   "command.help.motd.reset": "Het meegeleverde MOTD-document herstellen"
   "command.help.drops": "Hulpmiddelen voor de weergave van gedropte items"
   "command.help.drops.reset": "Het meegeleverde document met instellingen voor gedropte items herstellen"
+  "command.help.indicators": "Hulpmiddelen voor schade- en genezingsindicatoren"
+  "command.help.indicators.reset": "Het meegeleverde document met schade-indicatorinstellingen herstellen"
   "command.help.arg.reset_name": "Naam om te herstellen, of * voor elke meegeleverde standaard"
   "command.help.status": "Beknopte runtime-aantallen tonen"
   "command.help.reload": "Gloss-configuratie en -services opnieuw laden"

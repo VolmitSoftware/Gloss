@@ -338,6 +338,8 @@
   "command.help.motd.reset": "שחזור מסמך ה-MOTD המובנה"
   "command.help.drops": "כלים להצגת פריטים מושלכים"
   "command.help.drops.reset": "שחזור מסמך הגדרות הפריטים המושלכים המובנה"
+  "command.help.indicators": "כלים למחווני נזק וריפוי"
+  "command.help.indicators.reset": "שחזור מסמך מחווני הנזק המובנה"
   "command.help.arg.reset_name": "השם לאיפוס, או * לכל ברירות המחדל המובנות"
   "command.help.status": "הצגת ספירות זמן ריצה תמציתיות"
   "command.help.reload": "טעינה מחדש של התצורה והשירותים של Gloss"

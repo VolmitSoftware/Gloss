@@ -1,0 +1,164 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://volmit.com/gloss/damage-indicators.schema.json",
+  "title": "Gloss Damage Indicators Document",
+  "description": "Controls damage and healing number formatting, ballistic motion, presentation, admission, and world filtering. The document lives at plugins/Gloss/damage-indicators/default.json and hot reloads.",
+  "type": "object",
+  "required": ["schemaVersion", "revision"],
+  "properties": {
+    "schemaVersion": {
+      "description": "Document format version. Must be exactly 1.",
+      "type": "integer",
+      "const": 1
+    },
+    "revision": {
+      "description": "Server-owned monotonic revision counter.",
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991
+    },
+    "limits": {
+      "description": "Global admission, lifetime, delta, and numeric formatting limits.",
+      "$ref": "#/$defs/limits"
+    },
+    "damage": {
+      "description": "Presentation used when health decreases.",
+      "$ref": "#/$defs/style"
+    },
+    "healing": {
+      "description": "Presentation used when health increases.",
+      "$ref": "#/$defs/style"
+    },
+    "filters": {
+      "description": "Worlds where neither damage nor healing indicators render.",
+      "$ref": "#/$defs/filters"
+    }
+  },
+  "$defs": {
+    "limits": {
+      "type": "object",
+      "properties": {
+        "maxPerSecond": {
+          "description": "Server-wide indicator admission rate.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000
+        },
+        "lifetimeMs": {
+          "description": "Lifetime of each indicator in milliseconds.",
+          "type": "integer",
+          "minimum": 250,
+          "maximum": 30000
+        },
+        "minimumDelta": {
+          "description": "Applied health changes at or below this amount are ignored.",
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1000
+        },
+        "decimals": {
+          "description": "Decimal places rendered in the amount token.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4
+        }
+      }
+    },
+    "style": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "description": "Whether this health-change direction renders.",
+          "type": "boolean"
+        },
+        "format": {
+          "description": "Complete Gloss text template. Must contain {amount}.",
+          "type": "string",
+          "pattern": "\\{amount\\}"
+        },
+        "offset": {
+          "description": "Spawn offset from the affected entity as [x, y, z].",
+          "type": "array",
+          "prefixItems": [
+            {"type": "number", "minimum": -32, "maximum": 32},
+            {"type": "number", "minimum": -32, "maximum": 32},
+            {"type": "number", "minimum": -32, "maximum": 32}
+          ],
+          "minItems": 3,
+          "maxItems": 3
+        },
+        "motion": {
+          "description": "Cadence-independent ballistic motion in blocks and seconds.",
+          "$ref": "#/$defs/motion"
+        },
+        "presentation": {
+          "description": "Uniform scale animation and final-life fade.",
+          "$ref": "#/$defs/presentation"
+        }
+      }
+    },
+    "motion": {
+      "type": "object",
+      "properties": {
+        "horizontalSpeed": {
+          "description": "Horizontal speed in a random fixed direction, in blocks per second.",
+          "type": "number",
+          "minimum": 0,
+          "maximum": 16
+        },
+        "verticalSpeed": {
+          "description": "Initial vertical speed in blocks per second.",
+          "type": "number",
+          "minimum": -16,
+          "maximum": 16
+        },
+        "verticalAcceleration": {
+          "description": "Vertical acceleration in blocks per second squared.",
+          "type": "number",
+          "minimum": -32,
+          "maximum": 32
+        },
+        "spinDegreesPerSecond": {
+          "description": "Text-plane rotation speed in degrees per second.",
+          "type": "number",
+          "minimum": -1440,
+          "maximum": 1440
+        }
+      }
+    },
+    "presentation": {
+      "type": "object",
+      "properties": {
+        "startScale": {
+          "description": "Uniform scale at spawn.",
+          "type": "number",
+          "minimum": 0,
+          "maximum": 16
+        },
+        "endScale": {
+          "description": "Uniform scale at expiry.",
+          "type": "number",
+          "minimum": 0,
+          "maximum": 16
+        },
+        "fadeStartFraction": {
+          "description": "Lifetime fraction where opacity begins fading linearly to zero.",
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "filters": {
+      "type": "object",
+      "properties": {
+        "disabledWorlds": {
+          "description": "Exact world folder names where indicators are disabled.",
+          "type": "array",
+          "items": {"type": "string"},
+          "uniqueItems": true
+        }
+      }
+    }
+  }
+}

@@ -338,6 +338,8 @@
   "command.help.motd.reset": "Repor o documento de MOTD incluído"
   "command.help.drops": "Ferramentas de apresentação de itens largados"
   "command.help.drops.reset": "Repor o documento de definições de itens largados incluído"
+  "command.help.indicators": "Ferramentas de indicadores de dano e cura"
+  "command.help.indicators.reset": "Repor o documento de indicadores de dano incluído"
   "command.help.arg.reset_name": "Nome a repor, ou * para todas as predefinições incluídas"
   "command.help.status": "Mostrar contagens de execução resumidas"
   "command.help.reload": "Recarregar a configuração e os serviços do Gloss"

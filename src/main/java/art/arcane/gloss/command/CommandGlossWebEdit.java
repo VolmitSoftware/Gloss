@@ -109,6 +109,16 @@ public final class CommandGlossWebEdit {
     web.openSubject("real-drops", id, sender);
   }
 
+  @Director(name = "damage-indicators", description = "Open this live document in the web editor",
+      descriptionKey = "command.help.web.edit.document")
+  public void damageIndicators(
+      @Param(name = "id", description = "Live Gloss document id",
+          descriptionKey = "command.help.arg.web_subject",
+          customHandler = DamageIndicatorsIdHandler.class) String id,
+      @Param(name = "sender", contextual = true) CommandSender sender) {
+    web.openSubject("damage-indicators", id, sender);
+  }
+
   public abstract static class SubjectIdHandler implements DirectorParameterHandler<String> {
     private final String wireKind;
 
@@ -190,5 +200,9 @@ public final class CommandGlossWebEdit {
 
   public static final class RealDropsIdHandler extends SubjectIdHandler {
     public RealDropsIdHandler() { super("real-drops"); }
+  }
+
+  public static final class DamageIndicatorsIdHandler extends SubjectIdHandler {
+    public DamageIndicatorsIdHandler() { super("damage-indicators"); }
   }
 }

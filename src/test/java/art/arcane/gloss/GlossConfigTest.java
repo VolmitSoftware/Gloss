@@ -51,7 +51,7 @@ class GlossConfigTest {
         assertTrue(snapshot.groups().useVault());
         assertTrue(snapshot.bubbles().enabled());
         assertTrue(snapshot.bubbles().blacklistWorlds().isEmpty());
-        assertTrue(snapshot.indicators().showHeals());
+        assertTrue(snapshot.indicators().enabled());
         assertTrue(snapshot.commands().sounds());
         assertFalse(snapshot.motd().enabled());
         assertEquals(1.0F, snapshot.menus().uiScale());
@@ -190,6 +190,17 @@ class GlossConfigTest {
                     "knob " + where + " is not preceded by a comment line");
             }
         }
+    }
+
+    @Test
+    void damageIndicatorPresentationIsNotPartOfToml() {
+        String toml = TomlCodec.toToml(new GlossConfigFile(), "gloss", ConfigExposePolicy.ALL);
+
+        assertTrue(toml.contains("damageIndicators = true"));
+        assertFalse(toml.contains("[damageIndicators]"));
+        assertFalse(toml.contains("randomThrowForce"));
+        assertFalse(toml.contains("damagePrefix"));
+        assertFalse(toml.contains("showHeals"));
     }
 
     @Test

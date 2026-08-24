@@ -1,9 +1,11 @@
 package art.arcane.gloss.editor.sync;
 
+import art.arcane.gloss.indicator.DamageIndicatorSettingsDoc;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import org.junit.Test;
 
+import java.nio.file.Path;
 import java.util.List;
 
 import static org.junit.Assert.assertEquals;
@@ -43,7 +45,23 @@ public class EditorSyncDocumentsTest {
     for (EditorSyncDocumentKind kind : EditorSyncDocumentKind.ORDERED) {
       assertEquals(kind, EditorSyncDocumentKind.parseWireName(kind.wireName()));
     }
-    assertEquals(11, EditorSyncDocumentKind.ORDERED.size());
+    assertEquals(12, EditorSyncDocumentKind.ORDERED.size());
+  }
+
+  @Test
+  public void damageIndicatorsUseTheVersionedCanonicalSingletonContract() {
+    EditorSyncDocumentKind kind = EditorSyncDocumentKind.DAMAGE_INDICATORS;
+    Path dataDirectory = Path.of("build", "sync-contract");
+    EditorSyncDocumentKind.ParsedDocument parsed = kind.parse("default", """
+        {"schemaVersion":1,"revision":7,"damage":{},"healing":{}}
+        """);
+
+    assertEquals("damage-indicators", kind.wireName());
+    assertEquals(dataDirectory.toAbsolutePath().normalize()
+        .resolve("damage-indicators/default.json"), kind.path(dataDirectory, "default"));
+    assertEquals(Long.valueOf(7L), parsed.revision());
+    assertTrue(parsed.value() instanceof DamageIndicatorSettingsDoc);
+    assertThrows(IllegalArgumentException.class, () -> kind.canonicalId("custom"));
   }
 
   @Test

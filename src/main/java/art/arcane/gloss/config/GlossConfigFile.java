@@ -50,8 +50,6 @@ public final class GlossConfigFile {
     public Chat chat = new Chat();
     @ConfigDoc("Global chat-bubble admission settings; authored styles live under bubbles/.")
     public ChatBubbles chatBubbles = new ChatBubbles();
-    @ConfigDoc("Floating damage and healing indicator motion, capacity and formatting.")
-    public DamageIndicators damageIndicators = new DamageIndicators();
     @ConfigDoc("Dropped-item label formatting and custom-name preservation.")
     public Drops drops = new Drops();
     @ConfigDoc("Command feedback behavior.")
@@ -195,35 +193,6 @@ public final class GlossConfigFile {
     public static final class ChatBubbles {
         @ConfigDoc("World folder names where chat bubbles never appear.")
         public List<String> blacklistWorlds = new ArrayList<>();
-    }
-
-    public static final class DamageIndicators {
-        @ConfigDoc("Random sideways force applied to spawned indicators. Clamped to 0.0..2.0.")
-        public double randomThrowForce = 0.08D;
-
-        @ConfigDoc("Initial upward force applied to spawned indicators. Clamped to 0.0..2.0.")
-        public double initialUpForce = 0.13D;
-
-        @ConfigDoc("Gravity pull applied to indicators each tick. Clamped to 0.0..1.0.")
-        public double gravityFactor = 0.0093D;
-
-        @ConfigDoc("Maximum indicators spawned per second before new ones are dropped. Clamped to 1..1000.")
-        public int maxPerSecond = 40;
-
-        @ConfigDoc("Milliseconds an indicator stays alive. Clamped to 250..30000.")
-        public long maxMsAlive = 3000L;
-
-        @ConfigDoc("Color-code prefix applied to damage numbers.")
-        public String damagePrefix = "&c&l";
-
-        @ConfigDoc("Color-code prefix applied to heal numbers.")
-        public String healPrefix = "&a&l";
-
-        @ConfigDoc("Decimal places shown on indicator numbers. Clamped to 0..2.")
-        public int decimals = 0;
-
-        @ConfigDoc("Shows heal indicators in addition to damage indicators.")
-        public boolean showHeals = true;
     }
 
     public static final class Drops {
@@ -377,9 +346,6 @@ public final class GlossConfigFile {
         if (chatBubbles == null) {
             chatBubbles = new ChatBubbles();
         }
-        if (damageIndicators == null) {
-            damageIndicators = new DamageIndicators();
-        }
         if (drops == null) {
             drops = new Drops();
         }
@@ -424,15 +390,6 @@ public final class GlossConfigFile {
         tablist.updateIntervalTicks = clampInt(tablist.updateIntervalTicks, 1, 400);
 
         chatBubbles.blacklistWorlds = cleanStrings(chatBubbles.blacklistWorlds);
-
-        damageIndicators.randomThrowForce = clampDouble(damageIndicators.randomThrowForce, 0.0D, 2.0D, 0.08D);
-        damageIndicators.initialUpForce = clampDouble(damageIndicators.initialUpForce, 0.0D, 2.0D, 0.13D);
-        damageIndicators.gravityFactor = clampDouble(damageIndicators.gravityFactor, 0.0D, 1.0D, 0.0093D);
-        damageIndicators.maxPerSecond = clampInt(damageIndicators.maxPerSecond, 1, 1000);
-        damageIndicators.maxMsAlive = clampLong(damageIndicators.maxMsAlive, 250L, 30000L);
-        damageIndicators.damagePrefix = orDefault(damageIndicators.damagePrefix, "&c&l");
-        damageIndicators.healPrefix = orDefault(damageIndicators.healPrefix, "&a&l");
-        damageIndicators.decimals = clampInt(damageIndicators.decimals, 0, 2);
 
         drops.nameFormat = orDefault(drops.nameFormat, "&7{count}x {type}");
         drops.bundleFormat = orDefault(drops.bundleFormat, BUNDLE_FORMAT_DEFAULT);
@@ -564,10 +521,6 @@ public final class GlossConfigFile {
     }
 
     private static int clampInt(int value, int minimum, int maximum) {
-        return Math.max(minimum, Math.min(maximum, value));
-    }
-
-    private static long clampLong(long value, long minimum, long maximum) {
         return Math.max(minimum, Math.min(maximum, value));
     }
 

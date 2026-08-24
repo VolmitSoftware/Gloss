@@ -104,6 +104,8 @@ public final class GlossMessages {
     public static final TextKey HELP_MOTD_RESET = text("command.help.motd.reset", "Restore the shipped MOTD document");
     public static final TextKey HELP_DROPS = text("command.help.drops", "Dropped item presentation tools");
     public static final TextKey HELP_DROPS_RESET = text("command.help.drops.reset", "Restore the shipped real drop settings document");
+    public static final TextKey HELP_INDICATORS = text("command.help.indicators", "Damage and healing indicator tools");
+    public static final TextKey HELP_INDICATORS_RESET = text("command.help.indicators.reset", "Restore the shipped damage-indicator settings document");
     public static final TextKey HELP_ARG_RESET_NAME = text("command.help.arg.reset_name", "Name to reset, or * for every shipped default");
     public static final TextKey HELP_STATUS = text("command.help.status", "Show terse runtime counts");
     public static final TextKey HELP_RELOAD = text("command.help.reload", "Reload Gloss configuration and services");

@@ -139,6 +139,15 @@ public class GlossCommandDiscoveryTest {
   }
 
   @Test
+  public void indicatorResetTargetsTheSingletonWithoutAnIdParameter() {
+    DirectorRuntimeEngine engine = engine();
+    DirectorRuntimeNode indicators = child(engine.getRoot(), "indicators");
+
+    assertNotNull(indicators);
+    assertEquals(List.of("sender"), parameterNames(child(indicators, "reset")));
+  }
+
+  @Test
   public void webGroupExposesEveryDocumentAndSessionSurface() {
     DirectorRuntimeEngine engine = engine();
     DirectorRuntimeNode web = child(engine.getRoot(), "web");
@@ -155,7 +164,8 @@ public class GlossCommandDiscoveryTest {
         .map(node -> node.getDescriptor().getName())
         .collect(Collectors.toUnmodifiableSet());
     assertEquals(Set.of("menu", "panel", "hologram", "scoreboard", "emoji", "animation",
-        "bubble-style", "container-preview", "tablist", "motd", "real-drops"), editNames);
+        "bubble-style", "container-preview", "tablist", "motd", "real-drops",
+        "damage-indicators"), editNames);
     assertTrue(parameter(child(edit, "menu"), "id").getCustomHandlerOrNull()
         instanceof CommandGlossWebEdit.MenuIdHandler);
     assertTrue(parameter(child(edit, "panel"), "id").getCustomHandlerOrNull()
