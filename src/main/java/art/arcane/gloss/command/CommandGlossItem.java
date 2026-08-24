@@ -60,10 +60,10 @@ public class CommandGlossItem {
     }
 
     List<ProviderStatus> statuses = Gloss.instance.getItemProviders().providerStatuses();
-    GlossCommandPager.Window window = GlossCommandPager.window(statuses.size(), page, GlossCommandPager.ITEM_STATUS_PAGE_SIZE);
+    DirectorMiniMenu.ContentPage window = GlossCommandPager.window(statuses.size(), page, GlossCommandPager.ITEM_STATUS_PAGE_SIZE);
     DirectorMiniMenu.Theme theme = GlossCommandService.menuTheme();
     List<String> lines = new ArrayList<>();
-    lines.add(DirectorMiniMenu.banner(Gloss.instance.getLocalization().text(GlossMessages.ITEMS_STATUS_HEADER), theme));
+    GlossCommandPager.appendHeader(lines, Gloss.instance.getLocalization().text(GlossMessages.ITEMS_STATUS_HEADER), window, theme);
 
     int active = 0;
     for (ProviderStatus status : statuses) {
@@ -92,8 +92,6 @@ public class CommandGlossItem {
           + "</hover>");
     }
 
-    GlossCommandPager.appendFooter(lines, window, STATUS_COMMAND, theme);
-
     if (sender.hasPermission("gloss.items.export")) {
       String hint = Gloss.instance.getLocalization().text(GlossMessages.ITEMS_STATUS_HINT);
       lines.add("<hover:show_text:'" + DirectorMiniMenu.escapeText(hint).replace("\\", "\\\\").replace("'", "\\'") + "'>"
@@ -103,7 +101,7 @@ public class CommandGlossItem {
           + "</click></hover>");
     }
 
-    lines.add(DirectorMiniMenu.bar(theme));
+    GlossCommandPager.appendFooter(lines, window, STATUS_COMMAND, theme);
     DirectorMiniMenu.deliver(sender, lines);
   }
 

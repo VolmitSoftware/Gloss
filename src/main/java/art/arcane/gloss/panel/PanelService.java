@@ -27,6 +27,7 @@ import java.util.logging.Logger;
 
 public final class PanelService {
   private static final long SHUTDOWN_TIMEOUT_SECONDS = 30L;
+  private static final long FORCE_SHUTDOWN_TIMEOUT_SECONDS = 5L;
   private final PanelStore store;
   private final StorageTaskRunner taskRunner;
   private final Logger logger;
@@ -282,15 +283,17 @@ public final class PanelService {
     }
     taskRunner.shutdown();
     boolean interrupted = false;
-    while (true) {
-      try {
-        if (taskRunner.awaitTermination(SHUTDOWN_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
-          break;
+    try {
+      if (!taskRunner.awaitTermination(SHUTDOWN_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+        logger.warning("Timed out draining panel storage operations; cancelling remaining work.");
+        taskRunner.shutdownNow();
+        if (!taskRunner.awaitTermination(FORCE_SHUTDOWN_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+          logger.warning("Panel storage operations did not stop after forced cancellation.");
         }
-        logger.warning("Still waiting for the active panel storage operation to finish before shutdown.");
-      } catch (InterruptedException interruption) {
-        interrupted = true;
       }
+    } catch (InterruptedException interruption) {
+      interrupted = true;
+      taskRunner.shutdownNow();
     }
     if (interrupted) {
       Thread.currentThread().interrupt();

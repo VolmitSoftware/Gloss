@@ -16,8 +16,11 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 
 public final class AnimationService {
@@ -60,6 +63,7 @@ public final class AnimationService {
     private final DocumentRegistry<AnimationDoc> registry;
     private final List<String> registeredFunctions;
     private final AnimationFrameCache frameCache;
+    private final AtomicLong generation;
     private volatile List<AnimationClip> clips;
     private volatile Map<String, AnimationClip> clipsById;
 
@@ -70,6 +74,7 @@ public final class AnimationService {
         this.registry = DocumentRegistry.folder(AnimationDoc.KIND, folder, AnimationDoc::parse, AnimationDoc::revision);
         this.registeredFunctions = new ArrayList<>();
         this.frameCache = new AnimationFrameCache(raw -> plugin.text().renderStatic(raw));
+        this.generation = new AtomicLong();
         this.clips = List.of();
         this.clipsById = Map.of();
     }
@@ -95,6 +100,7 @@ public final class AnimationService {
         frameCache.clear();
         clips = List.of();
         clipsById = Map.of();
+        generation.incrementAndGet();
     }
 
     public void reload() {
@@ -116,7 +122,38 @@ public final class AnimationService {
     }
 
     public List<String> staticFrames(AnimationClip clip) {
+        if (hasDynamicFrames(clip, new HashSet<>())) {
+            return null;
+        }
         return frameCache.staticFrames(clip, TextPipeline.emojiGeneration());
+    }
+
+    public long generation() {
+        return generation.get();
+    }
+
+    public boolean framesViewerSpecific(String raw) {
+        return inspectAnimationTokens(raw, true, new HashSet<>());
+    }
+
+    public boolean hasDynamicAnimationContent(List<String> lines) {
+        for (String line : lines) {
+            if (hasDynamicTextOutsideAnimationTokens(line)
+                || inspectAnimationTokens(line, false, new HashSet<>())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public boolean hasFastDynamicAnimationContent(List<String> lines) {
+        for (String line : lines) {
+            if (TextPipeline.timeDependent(line)
+                || inspectAnimationTimeDependencies(line, new HashSet<>())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public List<String> resetToDefault(String nameOrStar) {
@@ -181,6 +218,113 @@ public final class AnimationService {
             plugin.text().registerFunction(name, player -> clip.frameAt(M.ms()));
             registeredFunctions.add(name);
         }
+        generation.incrementAndGet();
+    }
+
+    private boolean inspectAnimationTokens(String raw, boolean viewerSpecific, Set<String> visiting) {
+        if (raw == null || raw.isEmpty()) {
+            return false;
+        }
+        int open = raw.indexOf('|');
+        while (open >= 0) {
+            int close = raw.indexOf('|', open + 1);
+            if (close < 0) {
+                return false;
+            }
+            String name = raw.substring(open + 1, close);
+            if (name.startsWith(FUNCTION_PREFIX)) {
+                String id = name.substring(FUNCTION_PREFIX.length());
+                AnimationClip clip = clipsById.get(id);
+                if (clip != null && visiting.add(id)) {
+                    try {
+                        for (String frame : clip.frames()) {
+                            boolean direct = viewerSpecific
+                                ? TextPipeline.viewerSpecific(frame)
+                                : hasDynamicTextOutsideAnimationTokens(frame);
+                            if (direct || inspectAnimationTokens(frame, viewerSpecific, visiting)) {
+                                return true;
+                            }
+                        }
+                    } finally {
+                        visiting.remove(id);
+                    }
+                }
+            }
+            open = raw.indexOf('|', close + 1);
+        }
+        return false;
+    }
+
+    private boolean hasDynamicFrames(AnimationClip clip, Set<String> visiting) {
+        if (!visiting.add(clip.id())) {
+            return true;
+        }
+        try {
+            for (String frame : clip.frames()) {
+                if (hasDynamicTextOutsideAnimationTokens(frame)
+                    || inspectAnimationTokens(frame, false, visiting)) {
+                    return true;
+                }
+            }
+            return false;
+        } finally {
+            visiting.remove(clip.id());
+        }
+    }
+
+    private boolean inspectAnimationTimeDependencies(String raw, Set<String> visiting) {
+        int open = raw.indexOf('|');
+        while (open >= 0) {
+            int close = raw.indexOf('|', open + 1);
+            if (close < 0) {
+                return false;
+            }
+            String name = raw.substring(open + 1, close);
+            if (name.startsWith(FUNCTION_PREFIX)) {
+                String id = name.substring(FUNCTION_PREFIX.length());
+                AnimationClip clip = clipsById.get(id);
+                if (clip != null && visiting.add(id)) {
+                    try {
+                        for (String frame : clip.frames()) {
+                            if (TextPipeline.timeDependent(frame)
+                                || inspectAnimationTimeDependencies(frame, visiting)) {
+                                return true;
+                            }
+                        }
+                    } finally {
+                        visiting.remove(id);
+                    }
+                }
+            }
+            open = raw.indexOf('|', close + 1);
+        }
+        return false;
+    }
+
+    private static boolean hasDynamicTextOutsideAnimationTokens(String raw) {
+        StringBuilder retained = null;
+        int cursor = 0;
+        int open = raw.indexOf('|');
+        while (open >= 0) {
+            int close = raw.indexOf('|', open + 1);
+            if (close < 0) {
+                break;
+            }
+            String name = raw.substring(open + 1, close);
+            if (name.startsWith(FUNCTION_PREFIX)) {
+                if (retained == null) {
+                    retained = new StringBuilder(raw.length());
+                }
+                retained.append(raw, cursor, open);
+                cursor = close + 1;
+            }
+            open = raw.indexOf('|', close + 1);
+        }
+        if (retained == null) {
+            return TextPipeline.viewerDependent(raw);
+        }
+        retained.append(raw, cursor, raw.length());
+        return TextPipeline.viewerDependent(retained.toString());
     }
 
     private synchronized void unregisterFunctions() {

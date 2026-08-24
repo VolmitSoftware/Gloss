@@ -116,6 +116,9 @@
         "failed": "&7[&bGloss&7]: &cLegacy hologram migration from &f{source}&c failed: {reason}"
       "config":
         "reloaded": "&2設定 \"{name}\" 已重新載入."
+      "hotload":
+        "singular": "&2已熱重載 {kinds}（{count} 項變更）."
+        "plural": "&2已熱重載 {kinds}（{count} 項變更）."
       "preview_scale":
         "adjusting": "&7預覽大小：&f{percent}% &8- &7按住潛行並捲動以調整大小；連按兩下潛行以儲存"
         "hidden": "&7預覽已&c隱藏 &8- &7向上捲動以還原"

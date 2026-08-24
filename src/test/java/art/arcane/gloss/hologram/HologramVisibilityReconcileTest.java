@@ -115,20 +115,21 @@ class HologramVisibilityReconcileTest {
     }
 
     @Test
-    void quitReleasesThePerViewerDisplayAndItsRendering() {
+    void quitReleasesPersonalizedStateWithoutDuplicatingTheEntity() {
         harness.registerFunction("who", player -> player == null ? "console" : player.getName());
         PersistentHologram hologram = harness.persistent("h-quit", harness.at(world, 0.5D, 64.0D, 0.5D));
         hologram.setLines(List.of("%p% |who|"));
         hologram.update();
-        assertEquals(3, harness.liveSpawned(world).size());
+        harness.drainDelayed();
+        assertEquals(1, harness.liveSpawned(world).size());
+        assertEquals(3, hologram.activeViewerCount());
 
         harness.quit(cara);
 
-        List<DisplayHandle> live = harness.liveSpawned(world);
-        assertEquals(2, live.size(), "a quitting viewer must release its private display immediately");
-        for (DisplayHandle display : live) {
-            assertFalse(display.lastText().contains("Cara"));
-        }
-        assertEquals(2, harness.service.activeEntityCount());
+        assertEquals(1, harness.liveSpawned(world).size(),
+            "personalized viewers must share one server entity");
+        assertEquals(2, hologram.activeViewerCount(),
+            "a quitting viewer must release its personalized packet state immediately");
+        assertEquals(1, harness.service.activeEntityCount());
     }
 }

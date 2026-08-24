@@ -116,6 +116,9 @@
         "failed": "&7[&bGloss&7]: &cLegacy hologram migration from &f{source}&c failed: {reason}"
       "config":
         "reloaded": "&2Configurazione \"{name}\" ricaricata."
+      "hotload":
+        "singular": "&2Ricaricati {kinds} ({count} modifica)."
+        "plural": "&2Ricaricati {kinds} ({count} modifiche)."
       "preview_scale":
         "adjusting": "&7Dimensione anteprima: &f{percent}% &8- &7tieni premuto Accovacciati + scorri per ridimensionare; premi due volte Accovacciati per salvare"
         "hidden": "&7Anteprima &cnascosta &8- &7scorri verso l'alto per ripristinarla"

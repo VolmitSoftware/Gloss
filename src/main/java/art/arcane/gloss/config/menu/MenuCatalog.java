@@ -16,7 +16,6 @@ import art.arcane.volmlib.util.hud.HudSlot;
 import art.arcane.volmlib.util.localization.MessageArgs;
 import art.arcane.volmlib.util.scheduling.SchedulerUtils;
 import com.google.gson.JsonObject;
-import org.bukkit.Sound;
 
 import java.io.File;
 import java.io.IOException;
@@ -324,7 +323,6 @@ public final class MenuCatalog {
             MessageArgs.builder().untrusted("name", name).build()
         );
         Gloss.instance.getHudBar().publish(p, new HudSegment(RELOAD_PURPOSE, HudPriority.NOTICE, RELOAD_TTL_MILLIS, List.of(HudSlot.CENTER, HudSlot.RIGHT), notice));
-        p.playSound(p.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, .5F, 1);
       });
     });
     refreshBoardMenu(name);

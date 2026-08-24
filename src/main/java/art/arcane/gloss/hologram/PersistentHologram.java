@@ -25,56 +25,77 @@ import java.util.logging.Level;
 
 final class PersistentHologram implements AnchoredHologram {
     private static final double POSITION_EPSILON_SQUARED = 1.0E-6D;
-    private record LineSet(List<String> lines, int flags, boolean viewerDependent, long generation) {
+    private record LineSet(List<String> lines, int flags, long generation, boolean fastRefresh) {
     }
 
-    private record SharedText(long generation, long emojiGeneration, String text) {
+    private record AnchorState(String worldName, double x, double y, double z, long generation) {
     }
 
-    private record StaticSegments(long generation, long emojiGeneration, String[] segments) {
+    record TickAnchor(long generation, Location location) {
+    }
+
+    private record DependencyMemo(long lineGeneration, long animationGeneration,
+                                  boolean viewerSpecific, boolean fastDynamic) {
+    }
+
+    private record AppliedAnchor(long generation, Location location) {
+    }
+
+    private record SharedText(long generation, long emojiGeneration, long renderGeneration, String text) {
+    }
+
+    private record StaticSegments(long generation, long emojiGeneration, long renderGeneration, String[] segments) {
+    }
+
+    private record SharedAnimation(long generation, long emojiGeneration, long renderGeneration,
+                                   long animationGeneration, AnimationTemplate template) {
+    }
+
+    private record ViewerAnimation(long lineGeneration, long emojiGeneration, long renderGeneration,
+                                   long animationGeneration, long refreshAfterMs,
+                                   AnimationTemplate template) {
     }
 
     private final HologramService service;
     private final String id;
     private final String animatorGroup;
     private final Object linesLock;
-    private final Map<UUID, TextDisplay> viewerDisplays;
     private final Map<UUID, String> viewerRendered;
-    private final Set<UUID> viewerSpawning;
+    private final Map<UUID, ViewerAnimation> viewerAnimations;
+    private final Map<UUID, Player> activeViewers;
     private final AtomicBoolean sharedSpawning;
     private long lineGenerations;
     private volatile LineSet lineSet;
-    private volatile String worldName;
-    private volatile double x;
-    private volatile double y;
-    private volatile double z;
+    private volatile AnchorState anchorState;
     private volatile boolean seeThrough;
     private volatile String billboard;
     private volatile double yaw;
     private volatile double pitch;
     private volatile long revision;
-    private volatile Location appliedAnchor;
+    private volatile AppliedAnchor appliedAnchor;
     private volatile TextDisplay sharedDisplay;
+    private volatile int sharedEntityId;
+    private volatile boolean personalizedDisplay;
     private volatile String sharedRendered;
     private volatile SharedText sharedTextCache;
     private volatile StaticSegments staticSegmentsCache;
+    private volatile SharedAnimation sharedAnimationCache;
+    private volatile DependencyMemo dependencyMemo;
 
     PersistentHologram(HologramService service, String id, Location location) {
         this.service = service;
         this.id = id;
         this.animatorGroup = "holo:" + id;
         this.linesLock = new Object();
-        this.lineSet = new LineSet(List.of(), 0, false, 0L);
-        this.viewerDisplays = new ConcurrentHashMap<>();
+        this.lineSet = new LineSet(List.of(), 0, 0L, false);
         this.viewerRendered = new ConcurrentHashMap<>();
-        this.viewerSpawning = ConcurrentHashMap.newKeySet();
+        this.viewerAnimations = new ConcurrentHashMap<>();
+        this.activeViewers = new ConcurrentHashMap<>();
         this.sharedSpawning = new AtomicBoolean();
         this.revision = 0L;
         World world = Objects.requireNonNull(location.getWorld(), "Hologram location requires a loaded world.");
-        this.worldName = world.getName();
-        this.x = location.getX();
-        this.y = location.getY();
-        this.z = location.getZ();
+        this.anchorState = new AnchorState(world.getName(), location.getX(), location.getY(),
+            location.getZ(), 0L);
         this.seeThrough = true;
         this.billboard = HologramDoc.DEFAULT_BILLBOARD;
         this.yaw = 0.0D;
@@ -86,10 +107,10 @@ final class PersistentHologram implements AnchoredHologram {
         this.id = id;
         this.animatorGroup = "holo:" + id;
         this.linesLock = new Object();
-        this.lineSet = new LineSet(List.of(), 0, false, 0L);
-        this.viewerDisplays = new ConcurrentHashMap<>();
+        this.lineSet = new LineSet(List.of(), 0, 0L, false);
         this.viewerRendered = new ConcurrentHashMap<>();
-        this.viewerSpawning = ConcurrentHashMap.newKeySet();
+        this.viewerAnimations = new ConcurrentHashMap<>();
+        this.activeViewers = new ConcurrentHashMap<>();
         this.sharedSpawning = new AtomicBoolean();
         this.revision = 0L;
         apply(doc);
@@ -102,18 +123,17 @@ final class PersistentHologram implements AnchoredHologram {
 
     @Override
     public Location location() {
-        World world = Bukkit.getWorld(worldName);
-        return world == null ? null : new Location(world, x, y, z);
+        TickAnchor snapshot = tickAnchor();
+        return snapshot == null ? null : snapshot.location().clone();
     }
 
     @Override
     public void teleport(Location location) {
         Objects.requireNonNull(location, "Hologram teleport requires a location.");
         World world = Objects.requireNonNull(location.getWorld(), "Hologram teleport requires a loaded world.");
-        worldName = world.getName();
-        x = location.getX();
-        y = location.getY();
-        z = location.getZ();
+        AnchorState previous = anchorState;
+        anchorState = new AnchorState(world.getName(), location.getX(), location.getY(), location.getZ(),
+            previous == null ? 0L : previous.generation() + 1L);
         service.persist(this);
     }
 
@@ -195,19 +215,21 @@ final class PersistentHologram implements AnchoredHologram {
 
     @Override
     public void setOrientation(String billboard, double yaw, double pitch) {
-        this.billboard = HologramDoc.requireBillboard(billboard);
-        this.yaw = HologramDoc.requireYaw(yaw);
-        this.pitch = HologramDoc.requirePitch(pitch);
+        String validatedBillboard = HologramDoc.requireBillboard(billboard);
+        double validatedYaw = HologramDoc.requireYaw(yaw);
+        double validatedPitch = HologramDoc.requirePitch(pitch);
+        this.billboard = validatedBillboard;
+        this.yaw = validatedYaw;
+        this.pitch = validatedPitch;
         applyOrientation();
         service.persist(this);
     }
 
     void apply(HologramDoc doc) {
         HologramDoc.Anchor anchor = doc.anchor();
-        worldName = anchor.world();
-        x = anchor.position().getX();
-        y = anchor.position().getY();
-        z = anchor.position().getZ();
+        AnchorState previousAnchor = anchorState;
+        anchorState = new AnchorState(anchor.world(), anchor.position().getX(), anchor.position().getY(),
+            anchor.position().getZ(), previousAnchor == null ? 0L : previousAnchor.generation() + 1L);
         boolean visibilityChanged = seeThrough != doc.seeThrough();
         boolean orientationChanged = !doc.billboard().equals(billboard)
             || doc.yaw() != yaw
@@ -229,8 +251,9 @@ final class PersistentHologram implements AnchoredHologram {
     }
 
     HologramDoc toDoc(long revision) {
+        AnchorState anchor = anchorState;
         return new HologramDoc(HologramDoc.CURRENT_SCHEMA_VERSION, revision,
-            new HologramDoc.Anchor(worldName, new Vector(x, y, z)), lineSet.lines(), seeThrough,
+            new HologramDoc.Anchor(anchor.worldName(), new Vector(anchor.x(), anchor.y(), anchor.z())), lineSet.lines(), seeThrough,
             billboard, yaw, pitch);
     }
 
@@ -244,14 +267,15 @@ final class PersistentHologram implements AnchoredHologram {
 
     private void publishLines(List<String> next) {
         lineGenerations++;
-        boolean viewerDependent = false;
+        boolean fastRefresh = false;
         for (String line : next) {
-            if (TextPipeline.viewerDependent(line)) {
-                viewerDependent = true;
+            if (TextPipeline.requiresFastRefresh(line)) {
+                fastRefresh = true;
                 break;
             }
         }
-        lineSet = new LineSet(next, HologramMath.classify(next), viewerDependent, lineGenerations);
+        lineSet = new LineSet(next, HologramMath.classify(next), lineGenerations, fastRefresh);
+        dependencyMemo = null;
     }
 
     private boolean replaceLine(int index, String line) {
@@ -283,95 +307,154 @@ final class PersistentHologram implements AnchoredHologram {
     }
 
     void update() {
-        update(new HologramTick());
+        TickAnchor anchor = tickAnchor();
+        if (anchor == null) {
+            despawnAll();
+            return;
+        }
+        update(new HologramTick(), anchor);
     }
 
     void update(HologramTick tick) {
+        TickAnchor anchor = tickAnchor();
+        if (anchor == null) {
+            despawnAll();
+            return;
+        }
+        update(tick, anchor);
+    }
+
+    void update(HologramTick tick, TickAnchor tickAnchor) {
         LineSet snapshot = lineSet;
-        World world = Bukkit.getWorld(worldName);
-        if (world == null || snapshot.lines().isEmpty()) {
+        if (!isCurrent(tickAnchor)) {
+            return;
+        }
+        if (snapshot.lines().isEmpty()) {
             despawnAll();
             return;
         }
 
-        Location anchor = new Location(world, x, y, z, (float) yaw, (float) pitch);
-        reconcilePosition(world, anchor);
-        List<HologramTick.Viewer> viewers = tick.viewers(world);
-        if (snapshot.viewerDependent() && service.perViewerPlaceholders()) {
-            despawnShared();
-            updatePerViewer(world, anchor, snapshot, viewers);
-        } else {
-            despawnViewers();
-            updateShared(world, anchor, snapshot, viewers);
+        Location anchor = tickAnchor.location();
+        anchor.setYaw((float) yaw);
+        anchor.setPitch((float) pitch);
+        World world = anchor.getWorld();
+        if (world == null) {
+            despawnAll();
+            return;
         }
+        reconcilePosition(tickAnchor, anchor);
+        List<HologramTick.Viewer> viewers = tick.viewers(world, anchor, service.viewRange());
+        if (viewerSpecific(snapshot) && service.perViewerPlaceholders()) {
+            updatePersonalized(world, tickAnchor, anchor, snapshot, viewers);
+        } else {
+            updateShared(world, tickAnchor, anchor, snapshot, viewers);
+        }
+    }
+
+    TickAnchor tickAnchor() {
+        AnchorState snapshot = anchorState;
+        if (snapshot == null) {
+            return null;
+        }
+        World world = Bukkit.getWorld(snapshot.worldName());
+        if (world == null) {
+            return null;
+        }
+        return new TickAnchor(snapshot.generation(), new Location(world, snapshot.x(), snapshot.y(), snapshot.z()));
+    }
+
+    boolean isCurrent(TickAnchor anchor) {
+        AnchorState current = anchorState;
+        return current != null && current.generation() == anchor.generation();
+    }
+
+    private boolean viewerSpecific(LineSet snapshot) {
+        return dependencies(snapshot).viewerSpecific();
+    }
+
+    private DependencyMemo dependencies(LineSet snapshot) {
+        long animationGeneration = service.animationGeneration();
+        DependencyMemo cached = dependencyMemo;
+        if (cached != null && cached.lineGeneration() == snapshot.generation()
+            && cached.animationGeneration() == animationGeneration) {
+            return cached;
+        }
+        boolean dependent = false;
+        for (String line : snapshot.lines()) {
+            if (TextPipeline.viewerSpecific(line)
+                || service.animationFramesViewerSpecific(line)) {
+                dependent = true;
+                break;
+            }
+        }
+        DependencyMemo resolved = new DependencyMemo(snapshot.generation(), animationGeneration,
+            dependent, service.hasFastDynamicAnimationContent(snapshot.lines()));
+        dependencyMemo = resolved;
+        return resolved;
     }
 
     void despawnAll() {
-        service.animator().removeGroup(animatorGroup);
+        if (sharedDisplay == null && activeViewers.isEmpty()) {
+            return;
+        }
         despawnShared();
-        despawnViewers();
     }
 
     void onPlayerQuit(UUID playerId) {
-        viewerRendered.remove(playerId);
-        viewerSpawning.remove(playerId);
-        TextDisplay display = viewerDisplays.remove(playerId);
-        if (display == null) {
-            return;
-        }
-
-        service.animator().remove(animatorGroup, playerId.toString());
-        service.despawnEntity(display, location());
+        invalidateViewer(playerId, false);
     }
 
-    private void reconcilePosition(World world, Location anchor) {
-        Location applied = appliedAnchor;
-        if (applied != null && applied.getWorld() == world && applied.distanceSquared(anchor) < POSITION_EPSILON_SQUARED) {
-            return;
-        }
-
-        appliedAnchor = anchor.clone();
-        TextDisplay shared = sharedDisplay;
-        if (shared != null && shared.isValid()) {
-            service.plugin().scheduler().teleport(shared, anchor.clone());
-        }
-
-        for (TextDisplay display : viewerDisplays.values()) {
-            if (display.isValid()) {
-                service.plugin().scheduler().teleport(display, anchor.clone());
+    private void reconcilePosition(TickAnchor tickAnchor, Location anchor) {
+        AppliedAnchor applied = appliedAnchor;
+        if (applied != null && applied.location().getWorld() == anchor.getWorld()
+            && applied.location().distanceSquared(anchor) < POSITION_EPSILON_SQUARED) {
+            if (applied.generation() != tickAnchor.generation()) {
+                appliedAnchor = new AppliedAnchor(tickAnchor.generation(), anchor.clone());
             }
+            return;
+        }
+
+        appliedAnchor = new AppliedAnchor(tickAnchor.generation(), anchor.clone());
+        TextDisplay shared = sharedDisplay;
+        if (shared != null) {
+            service.runEntity(shared, () -> {
+                if (isCurrent(tickAnchor)) {
+                    service.plugin().scheduler().teleport(shared, anchor.clone());
+                }
+            }, () -> clearShared(shared));
         }
     }
 
-    private void updateShared(World world, Location anchor, LineSet snapshot, List<HologramTick.Viewer> viewers) {
+    private void updateShared(World world, TickAnchor tickAnchor, Location anchor, LineSet snapshot,
+                              List<HologramTick.Viewer> viewers) {
         TextDisplay display = sharedDisplay;
-        if (display != null && !display.isValid()) {
-            sharedDisplay = null;
-            sharedRendered = null;
-            service.animator().remove(animatorGroup, HologramAnimator.SHARED_SUB);
-            service.despawnEntity(display, anchor);
-            display = null;
-        }
-
         boolean anyInRange = anyInRange(viewers);
         if (display == null) {
             if (anyInRange) {
-                spawnShared(world, anchor, snapshot);
+                spawnDisplay(world, tickAnchor, anchor, snapshot, false, viewers);
             }
 
             return;
         }
         if (!anyInRange) {
-            service.animator().remove(animatorGroup, HologramAnimator.SHARED_SUB);
+            despawnAll();
             return;
         }
+        if (personalizedDisplay) {
+            personalizedDisplay = false;
+            clearPersonalizedState();
+            sharedRendered = null;
+        }
         if ((snapshot.flags() & TextPipeline.HAS_FUNCTION) != 0) {
-            AnimationTemplate template = service.animator().compileTemplate(snapshot.lines(),
-                line -> service.plugin().text().renderStatic(line));
+            AnimationTemplate template = sharedAnimation(snapshot);
             if (template != null) {
                 sharedRendered = null;
-                service.animator().publish(animatorGroup, HologramAnimator.SHARED_SUB,
-                    new HologramAnimator.Target(display.getEntityId(), template, captureViewers(viewers)));
+                TextDisplay target = display;
+                List<Player> audience = captureViewers(viewers);
+                service.runEntity(target, () -> service.animator().publish(animatorGroup,
+                    HologramAnimator.SHARED_SUB,
+                    new HologramAnimator.Target(target.getEntityId(), template, audience)),
+                    () -> clearShared(target));
                 return;
             }
         }
@@ -384,24 +467,43 @@ final class PersistentHologram implements AnchoredHologram {
 
         sharedRendered = rendered;
         TextDisplay target = display;
-        service.plugin().scheduler().runEntity(target, () -> {
-            if (target.isValid()) {
-                target.setText(rendered);
-            }
-        });
+        service.runEntity(target, () -> target.setText(rendered), () -> clearShared(target));
     }
 
     private String sharedText(LineSet snapshot) {
         long emojiGeneration = TextPipeline.emojiGeneration();
+        long renderGeneration = service.plugin().text().renderGeneration();
         SharedText cached = sharedTextCache;
         if (cached != null && cached.generation() == snapshot.generation()
-            && cached.emojiGeneration() == emojiGeneration && !hasDynamicText(snapshot)) {
+            && cached.emojiGeneration() == emojiGeneration
+            && cached.renderGeneration() == renderGeneration && !hasDynamicText(snapshot)) {
             return cached.text();
         }
 
         String rendered = service.renderStaticLines(snapshot.lines());
-        sharedTextCache = new SharedText(snapshot.generation(), emojiGeneration, rendered);
+        sharedTextCache = new SharedText(snapshot.generation(), emojiGeneration, renderGeneration, rendered);
         return rendered;
+    }
+
+    private AnimationTemplate sharedAnimation(LineSet snapshot) {
+        long emojiGeneration = TextPipeline.emojiGeneration();
+        long renderGeneration = service.plugin().text().renderGeneration();
+        long animationGeneration = service.animationGeneration();
+        boolean dynamic = service.hasDynamicAnimationContent(snapshot.lines());
+        SharedAnimation cached = sharedAnimationCache;
+        if (!dynamic && cached != null && cached.generation() == snapshot.generation()
+            && cached.emojiGeneration() == emojiGeneration
+            && cached.renderGeneration() == renderGeneration
+            && cached.animationGeneration() == animationGeneration) {
+            return cached.template();
+        }
+        AnimationTemplate template = service.animator().compileTemplate(snapshot.lines(),
+            line -> service.plugin().text().renderStatic(line));
+        if (template != null && !dynamic) {
+            sharedAnimationCache = new SharedAnimation(snapshot.generation(), emojiGeneration,
+                renderGeneration, animationGeneration, template);
+        }
+        return template;
     }
 
     private boolean hasDynamicText(LineSet snapshot) {
@@ -421,15 +523,11 @@ final class PersistentHologram implements AnchoredHologram {
     }
 
     boolean requiresFastRefresh() {
-        for (String line : lineSet.lines()) {
-            if (TextPipeline.requiresFastRefresh(line)) {
-                return true;
-            }
-        }
-        return false;
+        return lineSet.fastRefresh();
     }
 
-    private void spawnShared(World world, Location anchor, LineSet snapshot) {
+    private void spawnDisplay(World world, TickAnchor tickAnchor, Location anchor, LineSet snapshot,
+                              boolean personalized, List<HologramTick.Viewer> viewers) {
         if (!isChunkLoaded(world, anchor)) {
             return;
         }
@@ -437,10 +535,11 @@ final class PersistentHologram implements AnchoredHologram {
             return;
         }
 
-        String rendered = sharedText(snapshot);
+        String rendered = personalized ? "" : sharedText(snapshot);
         boolean scheduled = service.plugin().scheduler().runAt(anchor, () -> {
             try {
-                if (!service.isActive(this)) {
+                if (!service.isActive(this) || !service.plugin().cfg().holograms().enabled()
+                    || !isCurrent(tickAnchor)) {
                     return;
                 }
 
@@ -449,13 +548,27 @@ final class PersistentHologram implements AnchoredHologram {
                     spawned.setText(rendered);
                 };
                 TextDisplay spawned = world.spawn(anchor, TextDisplay.class, configurer);
-                if (!service.isActive(this)) {
+                if (!service.isActive(this) || !service.plugin().cfg().holograms().enabled()
+                    || !isCurrent(tickAnchor)) {
                     service.despawnEntity(spawned, anchor);
                     return;
                 }
 
                 sharedDisplay = spawned;
+                sharedEntityId = spawned.getEntityId();
+                personalizedDisplay = personalized;
                 sharedRendered = rendered;
+                if (!service.isActive(this) || !service.plugin().cfg().holograms().enabled()
+                    || !isCurrent(tickAnchor)) {
+                    clearShared(spawned);
+                    service.despawnEntity(spawned, anchor);
+                    return;
+                }
+                if (personalized) {
+                    refreshPersonalizedViewers(spawned.getEntityId(), snapshot, viewers, 1L);
+                } else {
+                    publishSpawnedSharedAnimation(spawned, snapshot, viewers);
+                }
             } catch (RuntimeException failure) {
                 service.plugin().getLogger().log(Level.WARNING, "Failed to spawn hologram " + id, failure);
             } finally {
@@ -467,143 +580,152 @@ final class PersistentHologram implements AnchoredHologram {
         }
     }
 
-    private void updatePerViewer(World world, Location anchor, LineSet snapshot, List<HologramTick.Viewer> viewers) {
-        double range = service.viewRange();
-        double rangeSquared = range * range;
-        Set<UUID> active = null;
+    private void publishSpawnedSharedAnimation(TextDisplay spawned, LineSet snapshot,
+                                               List<HologramTick.Viewer> viewers) {
+        if ((snapshot.flags() & TextPipeline.HAS_FUNCTION) == 0) {
+            return;
+        }
+        AnimationTemplate template = sharedAnimation(snapshot);
+        if (template == null) {
+            return;
+        }
+
+        sharedRendered = null;
+        service.animator().publish(animatorGroup, HologramAnimator.SHARED_SUB,
+            new HologramAnimator.Target(spawned.getEntityId(), template, captureViewers(viewers)));
+    }
+
+    private void updatePersonalized(World world, TickAnchor tickAnchor, Location anchor, LineSet snapshot,
+                                    List<HologramTick.Viewer> viewers) {
+        if (viewers.isEmpty()) {
+            despawnAll();
+            return;
+        }
+        TextDisplay display = sharedDisplay;
+        if (display == null) {
+            spawnDisplay(world, tickAnchor, anchor, snapshot, true, viewers);
+            return;
+        }
+
+        long delayTicks = 0L;
+        if (!personalizedDisplay) {
+            personalizedDisplay = true;
+            service.animator().removeGroup(animatorGroup);
+            clearPersonalizedState();
+            sharedRendered = "";
+            TextDisplay target = display;
+            service.runEntity(target, () -> target.setText(""), () -> clearShared(target));
+            delayTicks = 1L;
+        }
+        refreshPersonalizedViewers(display.getEntityId(), snapshot, viewers, delayTicks);
+    }
+
+    private void refreshPersonalizedViewers(int entityId, LineSet snapshot,
+                                            List<HologramTick.Viewer> viewers, long delayTicks) {
+        Set<UUID> current = new HashSet<>(viewers.size());
         for (HologramTick.Viewer viewer : viewers) {
-            if (distanceSquared(viewer) > rangeSquared) {
-                continue;
-            }
-
-            UUID viewerId = viewer.id();
-            if (active == null) {
-                active = new HashSet<>();
-            }
-
-            active.add(viewerId);
-            TextDisplay display = viewerDisplays.get(viewerId);
-            if (display == null || !display.isValid()) {
-                service.animator().remove(animatorGroup, viewerId.toString());
-                if (display != null) {
-                    viewerDisplays.remove(viewerId);
-                    viewerRendered.remove(viewerId);
-                    service.despawnEntity(display, anchor);
-                }
-
-                spawnViewer(world, anchor, snapshot, viewer.player());
-                continue;
-            }
-
-            refreshViewerText(viewer.player(), display, snapshot);
+            current.add(viewer.id());
+            activeViewers.put(viewer.id(), viewer.player());
+            refreshViewerText(viewer.id(), viewer.player(), entityId, snapshot, delayTicks);
         }
-        if (viewerDisplays.isEmpty()) {
-            return;
-        }
-
-        for (Map.Entry<UUID, TextDisplay> entry : viewerDisplays.entrySet()) {
-            if (active != null && active.contains(entry.getKey())) {
-                continue;
+        for (UUID viewerId : activeViewers.keySet()) {
+            if (!current.contains(viewerId)) {
+                invalidateViewer(viewerId, true);
             }
-
-            service.animator().remove(animatorGroup, entry.getKey().toString());
-            viewerDisplays.remove(entry.getKey());
-            viewerRendered.remove(entry.getKey());
-            service.despawnEntity(entry.getValue(), anchor);
         }
     }
 
-    private void spawnViewer(World world, Location anchor, LineSet snapshot, Player player) {
-        if (!isChunkLoaded(world, anchor)) {
+    void invalidateTrackingFor(Player player, boolean clearClientText) {
+        if (personalizedDisplay) {
+            invalidateViewer(player.getUniqueId(), clearClientText);
+        }
+    }
+
+    void refreshTrackingFor(Player player) {
+        if (!personalizedDisplay) {
             return;
         }
-
         UUID viewerId = player.getUniqueId();
-        if (!viewerSpawning.add(viewerId)) {
+        if (!activeViewers.containsKey(viewerId)) {
             return;
         }
 
-        boolean scheduled = service.plugin().scheduler().runAt(anchor, () -> {
-            try {
-                if (!service.isActive(this) || !player.isOnline()) {
-                    return;
-                }
+        int entityId = sharedEntityId;
+        viewerRendered.remove(viewerId);
+        viewerAnimations.remove(viewerId);
+        service.animator().remove(animatorGroup, viewerId.toString());
+        service.animator().discardText(viewerId, entityId);
+    }
 
-                Consumer<TextDisplay> configurer = spawned -> {
-                    service.configureDisplay(spawned, seeThrough, billboardMode());
-                    DisplayVisibility.setVisibleByDefault(spawned, false);
-                };
-                TextDisplay spawned = world.spawn(anchor, TextDisplay.class, configurer);
-                if (!service.isActive(this)) {
-                    service.despawnEntity(spawned, anchor);
-                    return;
-                }
+    int activeViewerCount() {
+        return activeViewers.size();
+    }
 
-                if (!DisplayVisibility.canHideByDefault()) {
-                    hideFromOthers(world, spawned, viewerId);
-                }
-
-                viewerDisplays.put(viewerId, spawned);
-                showToViewer(spawned, player);
-                refreshViewerText(player, spawned, snapshot);
-            } catch (RuntimeException failure) {
-                service.plugin().getLogger().log(Level.WARNING, "Failed to spawn viewer hologram " + id, failure);
-            } finally {
-                viewerSpawning.remove(viewerId);
-            }
-        });
-        if (!scheduled) {
-            viewerSpawning.remove(viewerId);
+    private void refreshViewerText(UUID viewerId, Player player, int entityId, LineSet snapshot,
+                                   long delayTicks) {
+        if ((snapshot.flags() & TextPipeline.HAS_FUNCTION) != 0
+            && viewerAnimationFresh(viewerId, snapshot, System.currentTimeMillis())) {
+            return;
         }
+        service.runViewerWork(player, viewerId, id,
+            () -> refreshViewerTextOnOwner(viewerId, player, entityId, snapshot), delayTicks);
     }
 
-    private void hideFromOthers(World world, TextDisplay display, UUID viewerId) {
-        for (Player online : world.getPlayers()) {
-            if (!online.getUniqueId().equals(viewerId)) {
-                online.hideEntity(service.plugin(), display);
-            }
+    private void refreshViewerTextOnOwner(UUID viewerId, Player player, int entityId,
+                                          LineSet snapshot) {
+        if (!player.isOnline()) {
+            return;
         }
-    }
-
-    private void showToViewer(TextDisplay display, Player player) {
-        service.plugin().scheduler().runEntity(player, () -> {
-            if (player.isOnline()) {
-                player.showEntity(service.plugin(), display);
-            }
-        });
-    }
-
-    private void refreshViewerText(Player player, TextDisplay display, LineSet snapshot) {
-        service.plugin().scheduler().runEntity(player, () -> {
-            if (!player.isOnline()) {
+        if (!personalizedDisplay || !activeViewers.containsKey(viewerId) || sharedEntityId != entityId) {
+            return;
+        }
+        if ((snapshot.flags() & TextPipeline.HAS_FUNCTION) != 0) {
+            long nowMs = System.currentTimeMillis();
+            if (viewerAnimationFresh(viewerId, snapshot, nowMs)) {
                 return;
             }
-
-            UUID viewerId = player.getUniqueId();
-            if ((snapshot.flags() & TextPipeline.HAS_FUNCTION) != 0) {
-                AnimationTemplate template = service.animator().compileTemplate(snapshot.lines(),
-                    line -> service.plugin().text().render(player, line));
-                if (template != null) {
-                    viewerRendered.remove(viewerId);
-                    service.animator().publish(animatorGroup, viewerId.toString(),
-                        new HologramAnimator.Target(display.getEntityId(), template, List.of(player)));
-                    return;
-                }
-            }
-
-            service.animator().remove(animatorGroup, viewerId.toString());
-            String rendered = composeViewerText(player, snapshot);
-            if (rendered.equals(viewerRendered.get(viewerId))) {
+            long emojiGeneration = TextPipeline.emojiGeneration();
+            long renderGeneration = service.plugin().text().renderGeneration();
+            long animationGeneration = service.animationGeneration();
+            AnimationTemplate template = service.animator().compileTemplate(snapshot.lines(),
+                line -> service.plugin().text().render(player, line));
+            if (template != null) {
+                long intervalMs = viewerRefreshIntervalMs(snapshot);
+                viewerAnimations.put(viewerId, new ViewerAnimation(snapshot.generation(),
+                    emojiGeneration, renderGeneration, animationGeneration, nowMs + intervalMs, template));
+                viewerRendered.remove(viewerId);
+                service.animator().discardText(viewerId, entityId);
+                service.animator().publish(animatorGroup,
+                    viewerId.toString(),
+                    new HologramAnimator.Target(entityId, template, List.of(player)));
                 return;
             }
+        }
 
-            viewerRendered.put(viewerId, rendered);
-            service.plugin().scheduler().runEntity(display, () -> {
-                if (display.isValid()) {
-                    display.setText(rendered);
-                }
-            });
-        });
+        viewerAnimations.remove(viewerId);
+        service.animator().remove(animatorGroup, viewerId.toString());
+        String rendered = composeViewerText(player, snapshot);
+        if (rendered.equals(viewerRendered.get(viewerId))) {
+            return;
+        }
+
+        viewerRendered.put(viewerId, rendered);
+        service.animator().sendText(player, viewerId, entityId, rendered);
+    }
+
+    private long viewerRefreshIntervalMs(LineSet snapshot) {
+        return dependencies(snapshot).fastDynamic()
+            ? 50L
+            : service.persistentUpdateIntervalTicks() * 50L;
+    }
+
+    private boolean viewerAnimationFresh(UUID viewerId, LineSet snapshot, long nowMs) {
+        ViewerAnimation cached = viewerAnimations.get(viewerId);
+        return cached != null && cached.lineGeneration() == snapshot.generation()
+            && cached.emojiGeneration() == TextPipeline.emojiGeneration()
+            && cached.renderGeneration() == service.plugin().text().renderGeneration()
+            && cached.animationGeneration() == service.animationGeneration()
+            && nowMs < cached.refreshAfterMs();
     }
 
     private String composeViewerText(Player player, LineSet snapshot) {
@@ -625,9 +747,11 @@ final class PersistentHologram implements AnchoredHologram {
 
     private String[] staticSegments(LineSet snapshot) {
         long emojiGeneration = TextPipeline.emojiGeneration();
+        long renderGeneration = service.plugin().text().renderGeneration();
         StaticSegments cached = staticSegmentsCache;
         if (cached != null && cached.generation() == snapshot.generation()
-            && cached.emojiGeneration() == emojiGeneration) {
+            && cached.emojiGeneration() == emojiGeneration
+            && cached.renderGeneration() == renderGeneration) {
             return cached.segments();
         }
 
@@ -643,37 +767,31 @@ final class PersistentHologram implements AnchoredHologram {
             segments[index] = text.renderStatic(line);
         }
 
-        staticSegmentsCache = new StaticSegments(snapshot.generation(), emojiGeneration, segments);
+        staticSegmentsCache = new StaticSegments(snapshot.generation(), emojiGeneration,
+            renderGeneration, segments);
         return segments;
     }
 
     private void despawnShared() {
         TextDisplay display = sharedDisplay;
+        service.animator().removeGroup(animatorGroup);
+        clearPersonalizedState();
+        sharedDisplay = null;
+        sharedEntityId = 0;
+        personalizedDisplay = false;
+        sharedRendered = null;
         if (display == null) {
             return;
         }
 
-        service.animator().remove(animatorGroup, HologramAnimator.SHARED_SUB);
-        sharedDisplay = null;
-        sharedRendered = null;
         service.despawnEntity(display, location());
     }
 
     private void applySeeThrough() {
         TextDisplay shared = sharedDisplay;
         if (shared != null) {
-            service.plugin().scheduler().runEntity(shared, () -> {
-                if (shared.isValid()) {
-                    shared.setSeeThrough(seeThrough);
-                }
-            });
-        }
-        for (TextDisplay display : viewerDisplays.values()) {
-            service.plugin().scheduler().runEntity(display, () -> {
-                if (display.isValid()) {
-                    display.setSeeThrough(seeThrough);
-                }
-            });
+            service.runEntity(shared, () -> shared.setSeeThrough(seeThrough),
+                () -> clearShared(shared));
         }
     }
 
@@ -687,68 +805,65 @@ final class PersistentHologram implements AnchoredHologram {
         float entityPitch = (float) pitch;
         TextDisplay shared = sharedDisplay;
         if (shared != null) {
-            service.plugin().scheduler().runEntity(shared, () -> {
-                if (shared.isValid()) {
-                    shared.setBillboard(mode);
-                    shared.setRotation(entityYaw, entityPitch);
-                }
-            });
+            service.runEntity(shared, () -> {
+                shared.setBillboard(mode);
+                shared.setRotation(entityYaw, entityPitch);
+            }, () -> clearShared(shared));
         }
-        for (TextDisplay display : viewerDisplays.values()) {
-            service.plugin().scheduler().runEntity(display, () -> {
-                if (display.isValid()) {
-                    display.setBillboard(mode);
-                    display.setRotation(entityYaw, entityPitch);
-                }
-            });
-        }
-    }
-
-    private void despawnViewers() {
-        if (viewerDisplays.isEmpty()) {
-            return;
-        }
-
-        Location anchor = location();
-        for (Map.Entry<UUID, TextDisplay> entry : viewerDisplays.entrySet()) {
-            service.animator().remove(animatorGroup, entry.getKey().toString());
-            viewerDisplays.remove(entry.getKey());
-            service.despawnEntity(entry.getValue(), anchor);
-        }
-
-        viewerRendered.clear();
     }
 
     private List<Player> captureViewers(List<HologramTick.Viewer> viewers) {
-        double range = service.viewRange();
-        double rangeSquared = range * range;
         List<Player> captured = new ArrayList<>(viewers.size());
         for (HologramTick.Viewer viewer : viewers) {
-            if (distanceSquared(viewer) <= rangeSquared) {
-                captured.add(viewer.player());
-            }
+            captured.add(viewer.player());
         }
 
         return List.copyOf(captured);
     }
 
     private boolean anyInRange(List<HologramTick.Viewer> viewers) {
-        double range = service.viewRange();
-        double rangeSquared = range * range;
-        for (HologramTick.Viewer viewer : viewers) {
-            if (distanceSquared(viewer) <= rangeSquared) {
-                return true;
-            }
-        }
-
-        return false;
+        return !viewers.isEmpty();
     }
 
-    private double distanceSquared(HologramTick.Viewer viewer) {
-        double dx = viewer.x() - x;
-        double dy = viewer.y() - y;
-        double dz = viewer.z() - z;
-        return dx * dx + dy * dy + dz * dz;
+    private void clearShared(TextDisplay display) {
+        if (sharedDisplay != display) {
+            return;
+        }
+        service.animator().removeGroup(animatorGroup);
+        clearPersonalizedState();
+        sharedDisplay = null;
+        sharedEntityId = 0;
+        personalizedDisplay = false;
+        sharedRendered = null;
+    }
+
+    private void invalidateViewer(UUID viewerId, boolean clearClientText) {
+        Player viewer = activeViewers.remove(viewerId);
+        viewerRendered.remove(viewerId);
+        viewerAnimations.remove(viewerId);
+        service.animator().remove(animatorGroup, viewerId.toString());
+        int entityId = sharedEntityId;
+        service.animator().discardText(viewerId, entityId);
+        if (!clearClientText || viewer == null) {
+            return;
+        }
+
+        service.runViewerWork(viewer, viewerId, id, () -> {
+            if (personalizedDisplay && sharedEntityId == entityId && !activeViewers.containsKey(viewerId)) {
+                service.animator().sendText(viewer, viewerId, entityId, "");
+            }
+        });
+    }
+
+    private void clearPersonalizedState() {
+        int entityId = sharedEntityId;
+        for (UUID viewerId : activeViewers.keySet()) {
+            service.animator().remove(animatorGroup, viewerId.toString());
+            service.animator().discardText(viewerId, entityId);
+        }
+        activeViewers.clear();
+        viewerRendered.clear();
+        viewerAnimations.clear();
     }
 
     private static boolean isChunkLoaded(World world, Location anchor) {

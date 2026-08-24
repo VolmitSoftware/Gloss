@@ -116,6 +116,9 @@
         "failed": "&7[&bGloss&7]: &cLegacy hologram migration from &f{source}&c failed: {reason}"
       "config":
         "reloaded": "&2Configuratie \"{name}\" opnieuw geladen."
+      "hotload":
+        "singular": "&2Hot-reload uitgevoerd voor {kinds} ({count} wijziging)."
+        "plural": "&2Hot-reload uitgevoerd voor {kinds} ({count} wijzigingen)."
       "preview_scale":
         "adjusting": "&7Voorbeeldgrootte: &f{percent}% &8- &7houd Sluipen ingedrukt + scroll om te wijzigen; tik Sluipen tweemaal om op te slaan"
         "hidden": "&7Voorbeeld &cverborgen &8- &7scroll omhoog om te herstellen"

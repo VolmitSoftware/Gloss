@@ -24,6 +24,7 @@ import art.arcane.volmlib.util.director.DirectorParameterHandler;
 import art.arcane.volmlib.util.director.annotations.Director;
 import art.arcane.volmlib.util.director.annotations.Param;
 import art.arcane.volmlib.util.director.exceptions.DirectorParsingException;
+import art.arcane.volmlib.util.director.help.DirectorMiniMenu;
 import art.arcane.volmlib.util.localization.MessageArgs;
 import art.arcane.volmlib.util.localization.TextKey;
 import art.arcane.volmlib.util.bukkit.Events;
@@ -39,6 +40,7 @@ import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerTeleportEvent;
 
 import java.nio.file.FileAlreadyExistsException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -100,17 +102,22 @@ public final class CommandGlossPanel {
       return;
     }
     List<PanelDefinition> boards = service().list();
-    send(sender, GlossMessages.PANELS_LIST_HEADER,
-        MessageArgs.builder().untrusted("count", boards.size()).build());
     if (boards.isEmpty()) {
       send(sender, GlossMessages.PANELS_LIST_EMPTY);
       return;
     }
-    GlossCommandPager.Window window = GlossCommandPager.window(boards.size(), page, GlossCommandPager.TEXT_PAGE_SIZE);
+    DirectorMiniMenu.ContentPage window = GlossCommandPager.window(boards.size(), page, GlossCommandPager.TEXT_PAGE_SIZE);
+    DirectorMiniMenu.Theme theme = GlossCommandService.menuTheme();
+    List<String> lines = new ArrayList<>();
+    GlossCommandPager.appendHeader(lines, LIST_COMMAND + " · " + boards.size(), window, theme);
     for (PanelDefinition board : boards.subList(window.startIndex(), window.endIndex())) {
-      send(sender, GlossMessages.PANELS_LIST_ENTRY, boardSummary(board));
+      lines.add(GlossCommandPager.entry(
+          board.id(),
+          "menu=" + board.rootMenuId() + " revision=" + board.revision(),
+          theme));
     }
-    GlossCommandPager.sendFooter(sender, window, LIST_COMMAND);
+    GlossCommandPager.appendFooter(lines, window, LIST_COMMAND, theme);
+    DirectorMiniMenu.deliver(sender, lines);
   }
 
   @Director(name = "reload", description = "Reload persistent panel files", descriptionKey = "command.help.panel.reload")
@@ -169,24 +176,25 @@ public final class CommandGlossPanel {
     }
     List<PanelDefinition> boards = runtime().queryEffective(
         world.getUID(), location.getX(), location.getZ(), radius);
-    send(sender, GlossMessages.PANELS_NEAR_HEADER,
-        MessageArgs.builder().untrusted("radius", radius).untrusted("count", boards.size()).build());
     if (boards.isEmpty()) {
       send(sender, GlossMessages.PANELS_NEAR_EMPTY);
       return;
     }
-    GlossCommandPager.Window window = GlossCommandPager.window(boards.size(), page, GlossCommandPager.TEXT_PAGE_SIZE);
+    String command = NEAR_COMMAND + " radius=" + format(radius);
+    DirectorMiniMenu.ContentPage window = GlossCommandPager.window(boards.size(), page, GlossCommandPager.TEXT_PAGE_SIZE);
+    DirectorMiniMenu.Theme theme = GlossCommandService.menuTheme();
+    List<String> lines = new ArrayList<>();
+    GlossCommandPager.appendHeader(lines, command + " · " + boards.size(), window, theme);
     for (PanelDefinition board : boards.subList(window.startIndex(), window.endIndex())) {
       PanelTransform transform = board.transform();
       double distance = Math.hypot(transform.x() - location.getX(), transform.z() - location.getZ());
-      send(sender, GlossMessages.PANELS_NEAR_ENTRY,
-          MessageArgs.builder()
-              .untrusted("board", board.id())
-              .untrusted("distance", format(distance))
-              .untrusted("menu", board.rootMenuId())
-              .build());
+      lines.add(GlossCommandPager.entry(
+          board.id(),
+          "distance=" + format(distance) + " menu=" + board.rootMenuId(),
+          theme));
     }
-    GlossCommandPager.sendFooter(sender, window, NEAR_COMMAND + " radius=" + format(radius));
+    GlossCommandPager.appendFooter(lines, window, command, theme);
+    DirectorMiniMenu.deliver(sender, lines);
   }
 
   @Director(name = "info", description = "Show one panel's complete state", descriptionKey = "command.help.panel.info")
@@ -1366,14 +1374,6 @@ public final class CommandGlossPanel {
   private void send(CommandSender sender, TextKey key,
                     MessageArgs arguments) {
     sender.sendMessage(plugin().getLocalization().legacy(key, arguments));
-  }
-
-  private MessageArgs boardSummary(PanelDefinition board) {
-    return MessageArgs.builder()
-        .untrusted("board", board.id())
-        .untrusted("menu", board.rootMenuId())
-        .untrusted("revision", board.revision())
-        .build();
   }
 
   private PanelService service() {

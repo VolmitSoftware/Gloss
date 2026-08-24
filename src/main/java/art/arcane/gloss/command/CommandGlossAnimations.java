@@ -4,9 +4,10 @@ import art.arcane.gloss.Gloss;
 import art.arcane.gloss.locale.GlossMessages;
 import art.arcane.volmlib.util.director.annotations.Director;
 import art.arcane.volmlib.util.director.annotations.Param;
-import art.arcane.volmlib.util.localization.MessageArgument;
+import art.arcane.volmlib.util.director.help.DirectorMiniMenu;
 import org.bukkit.command.CommandSender;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Director(name = "animations", aliases = {"animation"}, descriptionKey = "command.help.animations", description = "Animation tools")
@@ -28,12 +29,15 @@ public class CommandGlossAnimations {
             return;
         }
 
-        GlossCommandPager.Window window = GlossCommandPager.window(names.size(), page, GlossCommandPager.TEXT_PAGE_SIZE);
-        GlossCommandMessages.send(sender, GlossMessages.ANIMATIONS_HEADER, MessageArgument.trusted("count", names.size()));
+        DirectorMiniMenu.ContentPage window = GlossCommandPager.window(names.size(), page, GlossCommandPager.TEXT_PAGE_SIZE);
+        DirectorMiniMenu.Theme theme = GlossCommandService.menuTheme();
+        List<String> lines = new ArrayList<>();
+        GlossCommandPager.appendHeader(lines, LIST_COMMAND + " · " + names.size(), window, theme);
         for (String name : names.subList(window.startIndex(), window.endIndex())) {
-            GlossCommandMessages.send(sender, GlossMessages.ANIMATIONS_ENTRY, MessageArgument.untrusted("name", name));
+            lines.add(GlossCommandPager.entry(name, null, theme));
         }
-        GlossCommandPager.sendFooter(sender, window, LIST_COMMAND);
+        GlossCommandPager.appendFooter(lines, window, LIST_COMMAND, theme);
+        DirectorMiniMenu.deliver(sender, lines);
     }
 
     @Director(name = "reset", sync = true, descriptionKey = "command.help.animations.reset", description = "Restore shipped animation defaults")

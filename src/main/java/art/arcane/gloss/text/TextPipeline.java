@@ -36,6 +36,7 @@ public final class TextPipeline implements TextRenderer {
     private final Map<String, Function<Player, String>> functions;
     private final Set<String> failedFunctions;
     private final Map<String, String> hexCache;
+    private final AtomicLong renderGeneration;
     private final ServerTickSampler serverTicks;
     private final TextExpressionRenderer expressions;
     private volatile UnaryOperator<String> emojiFilter;
@@ -46,6 +47,7 @@ public final class TextPipeline implements TextRenderer {
         this.functions = new ConcurrentHashMap<>();
         this.failedFunctions = ConcurrentHashMap.newKeySet();
         this.hexCache = new ConcurrentHashMap<>();
+        this.renderGeneration = new AtomicLong();
         this.serverTicks = new ServerTickSampler(plugin);
         this.expressions = new TextExpressionRenderer(plugin, serverTicks::tps);
     }
@@ -61,10 +63,12 @@ public final class TextPipeline implements TextRenderer {
         viewerEmojiFilter = null;
         serverTicks.disable();
         expressions.clear();
+        renderGeneration.incrementAndGet();
     }
 
     public void reload() {
         failedFunctions.clear();
+        renderGeneration.incrementAndGet();
     }
 
     @Override
@@ -127,6 +131,28 @@ public final class TextPipeline implements TextRenderer {
         return containsPair(raw, '%') || containsPair(raw, '|');
     }
 
+    public static boolean viewerSpecific(String raw) {
+        if (raw == null || raw.isEmpty()) {
+            return false;
+        }
+        if (containsPair(raw, '%') || TextExpressionRenderer.dependsOnViewer(raw)) {
+            return true;
+        }
+        int open = raw.indexOf('|');
+        while (open >= 0) {
+            int close = raw.indexOf('|', open + 1);
+            if (close < 0) {
+                return false;
+            }
+            String name = raw.substring(open + 1, close);
+            if (!name.startsWith("animation.")) {
+                return true;
+            }
+            open = raw.indexOf('|', close + 1);
+        }
+        return false;
+    }
+
     public static boolean containsExpression(String raw) {
         if (raw == null || raw.isEmpty()) {
             return false;
@@ -150,6 +176,10 @@ public final class TextPipeline implements TextRenderer {
             }
             open = raw.indexOf('|', close + 1);
         }
+        return TextExpressionRenderer.dependsOnTime(raw);
+    }
+
+    public static boolean timeDependent(String raw) {
         return TextExpressionRenderer.dependsOnTime(raw);
     }
 
@@ -234,6 +264,10 @@ public final class TextPipeline implements TextRenderer {
         return EMOJI_GENERATION.get();
     }
 
+    public long renderGeneration() {
+        return renderGeneration.get();
+    }
+
     private static boolean isEmojiTrigger(char value, long[] ascii, char[] extended) {
         if (value < 128) {
             return (ascii[value >>> 6] & (1L << (value & 63))) != 0L;
@@ -273,6 +307,7 @@ public final class TextPipeline implements TextRenderer {
 
         functions.put(name, resolver);
         failedFunctions.remove(name);
+        renderGeneration.incrementAndGet();
     }
 
     public boolean hasFunction(String name) {
@@ -287,14 +322,17 @@ public final class TextPipeline implements TextRenderer {
 
         functions.remove(name);
         failedFunctions.remove(name);
+        renderGeneration.incrementAndGet();
     }
 
     public void setEmojiFilter(UnaryOperator<String> filter) {
         emojiFilter = filter;
+        renderGeneration.incrementAndGet();
     }
 
     public void setViewerEmojiFilter(BiFunction<Player, String, String> filter) {
         viewerEmojiFilter = filter;
+        renderGeneration.incrementAndGet();
     }
 
     private boolean functionsEnabled() {

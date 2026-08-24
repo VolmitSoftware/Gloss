@@ -61,6 +61,9 @@ public final class DocumentRegistry<T> implements AutoCloseable {
     private final LongSupplier clock;
     private final Map<String, GlossDocument<T>> documents;
     private final Map<String, Long> pendingDeletions;
+    private final Map<String, String> pendingFailureFingerprints;
+    private final Map<String, String> reportedFailureFingerprints;
+    private final Set<String> failureRetryIds;
     private final Set<String> retryIds;
     private final Set<String> failedIds;
     private final Set<String> reconciliationLoaded;
@@ -94,6 +97,9 @@ public final class DocumentRegistry<T> implements AutoCloseable {
         this.clock = Objects.requireNonNull(clock, "clock");
         this.documents = new ConcurrentHashMap<>();
         this.pendingDeletions = new HashMap<>();
+        this.pendingFailureFingerprints = new HashMap<>();
+        this.reportedFailureFingerprints = new HashMap<>();
+        this.failureRetryIds = new HashSet<>();
         this.retryIds = new HashSet<>();
         this.failedIds = new HashSet<>();
         this.reconciliationLoaded = new HashSet<>();
@@ -180,6 +186,7 @@ public final class DocumentRegistry<T> implements AutoCloseable {
         Objects.requireNonNull(raw, "raw");
         Objects.requireNonNull(value, "value");
         invalidatePending(id);
+        clearFailure(id);
         reconciliationLoaded.remove(id);
         GlossDocument<T> document = GlossDocument.of(id, raw, value, revisionOf.applyAsLong(value));
         documents.put(id, document);
@@ -194,6 +201,7 @@ public final class DocumentRegistry<T> implements AutoCloseable {
             return false;
         }
         invalidatePending(id);
+        clearFailure(id);
         reconciliationLoaded.remove(id);
         pendingDeletions.remove(id);
         boolean workingRemoved = documents.remove(id) != null;
@@ -213,6 +221,9 @@ public final class DocumentRegistry<T> implements AutoCloseable {
         clearPending();
         retryIds.clear();
         failedIds.clear();
+        failureRetryIds.clear();
+        pendingFailureFingerprints.clear();
+        reportedFailureFingerprints.clear();
         pendingDeletions.clear();
         resetReconciliation();
         if (layout == Layout.FILE) {
@@ -223,7 +234,7 @@ public final class DocumentRegistry<T> implements AutoCloseable {
         for (File file : currentFiles()) {
             String id = idOf(file);
             present.add(id);
-            load(id, file);
+            load(id, file, false);
         }
         documents.keySet().retainAll(present);
         replaceFolderWatcher(new FolderWatcher(target));
@@ -270,6 +281,7 @@ public final class DocumentRegistry<T> implements AutoCloseable {
             reconcileContent(loaded);
         }
         reconcileRetries(loaded);
+        reconcileFailedLoads(loaded);
         applyMatureDeletions(removed);
         return stage(loaded, removed);
     }
@@ -382,7 +394,7 @@ public final class DocumentRegistry<T> implements AutoCloseable {
     private void acceptTouched(File file, List<String> loaded) {
         String id = idOf(file);
         pendingDeletions.remove(id);
-        if (ownWrite.test(file)) {
+        if (failedIds.contains(id) || ownWrite.test(file)) {
             return;
         }
         if (load(id, file) && !loaded.contains(id)) {
@@ -420,13 +432,14 @@ public final class DocumentRegistry<T> implements AutoCloseable {
 
     private void removeLoaded(String id, List<String> removed) {
         if (documents.remove(id) != null) {
+            clearFailure(id);
             removed.add(id);
         }
     }
 
     private void reloadSingle() {
         if (target.isFile()) {
-            load(baseName(target), target);
+            load(baseName(target), target, false);
         } else {
             documents.remove(baseName(target));
         }
@@ -441,6 +454,9 @@ public final class DocumentRegistry<T> implements AutoCloseable {
         clearPending();
         retryIds.clear();
         failedIds.clear();
+        failureRetryIds.clear();
+        pendingFailureFingerprints.clear();
+        reportedFailureFingerprints.clear();
         reconciliationLoaded.clear();
         pendingDeletions.clear();
         resetReconciliation();
@@ -478,13 +494,13 @@ public final class DocumentRegistry<T> implements AutoCloseable {
                 return stage(List.of(), removed);
             }
             pendingDeletions.remove(id);
-            if (!modified && !reconcileContent && !retryIds.contains(id)) {
+            if (!modified && !reconcileContent && !retryIds.contains(id) && !failureRetryIds.contains(id)) {
                 return stage(List.of(), List.of());
             }
             if (ownWrite.test(target)) {
                 return DocumentDelta.EMPTY;
             }
-            if (!load(id, target)) {
+            if (!load(id, target, true)) {
                 return stage(List.of(), List.of());
             }
             return stage(List.of(id), List.of());
@@ -569,6 +585,7 @@ public final class DocumentRegistry<T> implements AutoCloseable {
             committed.remove(id);
         }
         snapshot = Map.copyOf(committed);
+        recordHotload(delta.loaded().size() + delta.removed().size());
         clearPending();
     }
 
@@ -623,14 +640,21 @@ public final class DocumentRegistry<T> implements AutoCloseable {
      */
     @SuppressWarnings("removal")
     private boolean load(String id, File file) {
+        return load(id, file, true);
+    }
+
+    @SuppressWarnings("removal")
+    private boolean load(String id, File file, boolean stabilizeFailure) {
+        String raw = null;
         try {
             long size = Files.size(file.toPath());
             if (size > MAX_DOCUMENT_BYTES) {
                 throw new IllegalArgumentException("document exceeds " + MAX_DOCUMENT_BYTES + " bytes");
             }
-            String raw = Files.readString(file.toPath(), StandardCharsets.UTF_8);
+            raw = Files.readString(file.toPath(), StandardCharsets.UTF_8);
             GlossDocument<T> current = documents.get(id);
             if (current != null && current.raw().equals(raw)) {
+                clearFailure(id);
                 return false;
             }
             T value = parser.parse(id + EXTENSION, raw);
@@ -638,6 +662,7 @@ public final class DocumentRegistry<T> implements AutoCloseable {
                 throw new IllegalArgumentException("document must not be null");
             }
             documents.put(id, GlossDocument.of(id, raw, value, revisionOf.applyAsLong(value)));
+            clearFailure(id);
             return true;
         } catch (ThreadDeath fatal) {
             throw fatal;
@@ -648,6 +673,9 @@ public final class DocumentRegistry<T> implements AutoCloseable {
                 documents.remove(id);
             } else {
                 documents.put(id, committed);
+            }
+            if (stabilizeFailure && raw != null && deferFailure(id, raw)) {
+                return false;
             }
             Gloss.logExceptionStack(false, failure, "%s/%s%s: %s", kind, id, EXTENSION, detail(id, failure));
             return false;
@@ -696,8 +724,25 @@ public final class DocumentRegistry<T> implements AutoCloseable {
 
     private void reconcileRetries(List<String> loaded) {
         for (String id : List.copyOf(retryIds)) {
+            if (failedIds.contains(id)) {
+                continue;
+            }
             File file = fileForId(id);
             if (!file.isFile()) {
+                continue;
+            }
+            acceptTouched(file, loaded);
+        }
+    }
+
+    private void reconcileFailedLoads(List<String> loaded) {
+        for (String id : List.copyOf(failureRetryIds)) {
+            if (failedIds.contains(id)) {
+                continue;
+            }
+            File file = fileForId(id);
+            if (!file.isFile()) {
+                clearFailure(id);
                 continue;
             }
             acceptTouched(file, loaded);
@@ -816,5 +861,36 @@ public final class DocumentRegistry<T> implements AutoCloseable {
         }
         String prefix = id + EXTENSION + " ";
         return message.startsWith(prefix) ? message.substring(prefix.length()) : message;
+    }
+
+    private boolean deferFailure(String id, String raw) {
+        String fingerprint = DocumentHashes.sha256(raw);
+        if (fingerprint.equals(reportedFailureFingerprints.get(id))) {
+            pendingFailureFingerprints.remove(id);
+            failureRetryIds.remove(id);
+            return true;
+        }
+        if (!fingerprint.equals(pendingFailureFingerprints.get(id))) {
+            pendingFailureFingerprints.put(id, fingerprint);
+            failureRetryIds.add(id);
+            return true;
+        }
+        pendingFailureFingerprints.remove(id);
+        reportedFailureFingerprints.put(id, fingerprint);
+        failureRetryIds.remove(id);
+        return false;
+    }
+
+    private void clearFailure(String id) {
+        pendingFailureFingerprints.remove(id);
+        reportedFailureFingerprints.remove(id);
+        failureRetryIds.remove(id);
+    }
+
+    private void recordHotload(int changes) {
+        Gloss current = Gloss.instance;
+        if (current != null && current.watchdog() != null) {
+            current.watchdog().recordHotload(kind, changes);
+        }
     }
 }

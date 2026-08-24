@@ -116,6 +116,9 @@
         "failed": "&7[&bGloss&7]: &cLegacy hologram migration from &f{source}&c failed: {reason}"
       "config":
         "reloaded": "&2Konfiguracja \"{name}\" została przeładowana."
+      "hotload":
+        "singular": "&2Przeładowano {kinds} ({count} zmiana)."
+        "plural": "&2Przeładowano {kinds} ({count} zmian)."
       "preview_scale":
         "adjusting": "&7Rozmiar podglądu: &f{percent}% &8- &7przytrzymaj Skradanie + przewijaj, aby zmienić rozmiar; naciśnij Skradanie dwa razy, aby zapisać"
         "hidden": "&7Podgląd &cukryty &8- &7przewiń w górę, aby przywrócić"

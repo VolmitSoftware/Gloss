@@ -156,6 +156,18 @@ public class MenuMutationServiceTest {
     assertEquals("Finished", text(Files.readString(menu)));
   }
 
+  @Test
+  public void shutdownForceCancelsAfterTwoBoundedWaits() throws IOException {
+    NeverTerminatingTaskRunner runner = new NeverTerminatingTaskRunner();
+    MenuMutationService service = service(temp.newFolder("bounded-shutdown"), runner);
+
+    service.shutdown();
+
+    assertTrue(runner.shutdown);
+    assertTrue(runner.shutdownNow);
+    assertEquals(2, runner.awaitCalls);
+  }
+
   private static MenuMutationService service(File pluginData, StorageTaskRunner runner) {
     Logger logger = Logger.getLogger(MenuMutationServiceTest.class.getName());
     logger.setLevel(Level.OFF);
@@ -210,6 +222,34 @@ public class MenuMutationServiceTest {
       while (!tasks.isEmpty()) {
         runNext();
       }
+    }
+  }
+
+  private static final class NeverTerminatingTaskRunner implements StorageTaskRunner {
+    private boolean shutdown;
+    private boolean shutdownNow;
+    private int awaitCalls;
+
+    @Override
+    public StorageTaskHandle submit(Runnable task) {
+      return () -> {
+      };
+    }
+
+    @Override
+    public void shutdown() {
+      shutdown = true;
+    }
+
+    @Override
+    public void shutdownNow() {
+      shutdownNow = true;
+    }
+
+    @Override
+    public boolean awaitTermination(long timeout, TimeUnit unit) {
+      awaitCalls++;
+      return false;
     }
   }
 

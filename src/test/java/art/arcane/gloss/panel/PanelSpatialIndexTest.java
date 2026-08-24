@@ -76,6 +76,76 @@ public class PanelSpatialIndexTest {
   }
 
   @Test
+  public void batchUpsertPublishesAllMovesTogetherAndCandidateChecksMatchQueries() {
+    PanelDefinition first = board("first", WORLD_A, 0.0D, 0.0D);
+    PanelDefinition second = board("second", WORLD_A, 32.0D, 0.0D);
+    PanelSpatialIndex index = new PanelSpatialIndex();
+    index.replaceAll(List.of(first, second));
+    long before = index.generation();
+
+    PanelDefinition movedFirst = first.withTransform(
+        PanelTransform.at("example:world", WORLD_B, 64.0D, 64.0D, 0.0D, 0.0D));
+    PanelDefinition movedSecond = second.withTransform(
+        PanelTransform.at("example:world", WORLD_B, 96.0D, 64.0D, 0.0D, 0.0D));
+    index.upsertAll(List.of(movedFirst, movedSecond));
+
+    assertEquals(before + 1L, index.generation());
+    assertFalse(index.hasCandidate(WORLD_A, 0.0D, 0.0D, 128.0D));
+    assertTrue(index.hasCandidate(WORLD_B, 64.0D, 0.0D, 0.0D));
+    assertFalse(index.hasCandidate(WORLD_B, 80.0D, 16.1D, 1.0D));
+    assertEquals(List.of(movedFirst, movedSecond), index.query(WORLD_B, 80.0D, 0.0D, 32.0D));
+  }
+
+  @Test
+  public void spatialChangeHistoryInvalidatesOnlyIntersectingQueryWindows() {
+    PanelDefinition near = board("near", WORLD_A, 0.0D, 0.0D);
+    PanelDefinition far = board("far", WORLD_A, 4096.0D, 4096.0D);
+    PanelSpatialIndex index = new PanelSpatialIndex();
+    index.replaceAll(List.of(near, far));
+    PanelSpatialIndex.QuerySnapshot nearSnapshot = index.querySnapshot(WORLD_A, 0.0D, 0.0D, 64.0D);
+
+    PanelDefinition movedFar = far.withTransform(
+        PanelTransform.at("example:world", WORLD_A, 8192.0D, 64.0D, 8192.0D, 0.0D));
+    index.upsert(movedFar);
+    long farMoveGeneration = index.generation();
+
+    assertFalse(index.changedSince(nearSnapshot.generation(), farMoveGeneration,
+        WORLD_A, 0.0D, 0.0D, 64.0D));
+    assertTrue(index.changedSince(nearSnapshot.generation(), farMoveGeneration,
+        WORLD_A, 4096.0D, 4096.0D, 64.0D));
+    assertTrue(index.changedSince(nearSnapshot.generation(), farMoveGeneration,
+        WORLD_A, 8192.0D, 8192.0D, 64.0D));
+
+    PanelDefinition movedNear = near.withTransform(
+        PanelTransform.at("example:world", WORLD_A, 1.0D, 64.0D, 1.0D, 0.0D));
+    index.upsert(movedNear);
+    assertTrue(index.changedSince(farMoveGeneration, index.generation(),
+        WORLD_A, 0.0D, 0.0D, 64.0D));
+  }
+
+  @Test
+  public void fullReplacementAndExpiredHistoryInvalidateConservatively() {
+    PanelDefinition board = board("history", WORLD_A, 4096.0D, 4096.0D);
+    PanelSpatialIndex index = new PanelSpatialIndex();
+    index.replaceAll(List.of(board));
+    long beforeReplacement = index.generation();
+    index.replaceAll(List.of(board));
+    assertTrue(index.changedSince(beforeReplacement, index.generation(),
+        WORLD_A, 0.0D, 0.0D, 16.0D));
+
+    long beforeOverflow = index.generation();
+    PanelDefinition current = board;
+    for (int update = 0; update <= PanelSpatialIndex.CHANGE_HISTORY_SIZE; update++) {
+      double offset = (update & 1) == 0 ? 0.25D : 0.5D;
+      current = current.withTransform(
+          PanelTransform.at("example:world", WORLD_A, 4096.0D + offset, 64.0D, 4096.0D, 0.0D));
+      index.upsert(current);
+    }
+    assertTrue(index.changedSince(beforeOverflow, index.generation(),
+        WORLD_A, 0.0D, 0.0D, 16.0D));
+  }
+
+  @Test
   public void hugeFiniteRadiiScanExistingBucketsWithoutOverflow() {
     PanelDefinition distant = board("distant", WORLD_A, -32.1D, 48.1D);
     PanelDefinition origin = board("origin", WORLD_A, 0.0D, 0.0D);

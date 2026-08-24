@@ -116,6 +116,9 @@
         "failed": "&7[&bGloss&7]: &cLegacy hologram migration from &f{source}&c failed: {reason}"
       "config":
         "reloaded": "&2התצורה \"{name}\" נטענה מחדש."
+      "hotload":
+        "singular": "&2נטענו מחדש {kinds} ({count} שינוי)."
+        "plural": "&2נטענו מחדש {kinds} ({count} שינויים)."
       "preview_scale":
         "adjusting": "&7גודל תצוגה מקדימה: &f{percent}% &8- &7החזיקו התגנבות + גללו לשינוי; הקישו פעמיים על התגנבות לשמירה"
         "hidden": "&7התצוגה המקדימה &cמוסתרת &8- &7גללו למעלה כדי לשחזר"

@@ -12,6 +12,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.UnaryOperator;
@@ -31,6 +32,14 @@ class HologramAnimatorTest {
         @Override
         public void send(List<Player> viewers, int entityId, String legacyText, TextCodec codec) {
             sent.add(new Sent(List.copyOf(viewers), entityId, legacyText, codec));
+        }
+
+        private int recipientCount() {
+            int recipients = 0;
+            for (Sent packet : sent) {
+                recipients += packet.viewers().size();
+            }
+            return recipients;
         }
     }
 
@@ -138,15 +147,24 @@ class HologramAnimatorTest {
     }
 
     @Test
-    void offlineViewersAreSkipped() {
+    void workerConsumesOwnerCapturedAudienceWithoutReadingPlayerState() {
         RecordingSender sender = new RecordingSender();
         HologramAnimator animator = animator(config(true), sender);
         AnimationTemplate template = animator.compileTemplate(List.of("|animation.fast|"), IDENTITY_RENDERER);
-        Player offline = player(UUID.randomUUID(), false);
-        animator.publish("holo:test", HologramAnimator.SHARED_SUB, new HologramAnimator.Target(7, template, List.of(offline)));
+        AtomicInteger playerReads = new AtomicInteger();
+        Player captured = (Player) Proxy.newProxyInstance(
+            Player.class.getClassLoader(),
+            new Class<?>[]{Player.class},
+            (proxy, method, args) -> {
+                playerReads.incrementAndGet();
+                throw new AssertionError("animator worker read " + method.getName());
+            });
+        animator.publish("holo:test", HologramAnimator.SHARED_SUB,
+            new HologramAnimator.Target(7, template, List.of(captured)));
 
-        assertEquals(0, animator.pass(0L));
-        assertTrue(sender.sent.isEmpty());
+        assertEquals(1, animator.pass(0L));
+        assertEquals(0, playerReads.get());
+        assertEquals(List.of(captured), sender.sent.getFirst().viewers());
     }
 
     @Test
@@ -180,6 +198,130 @@ class HologramAnimatorTest {
         assertEquals(1, animator.pass(20L));
         assertEquals("A", sender.sent.get(0).text());
         assertEquals("C", sender.sent.get(1).text());
+    }
+
+    @Test
+    void packetBudgetIsSharedAcrossAnimatedDisplays() {
+        RecordingSender sender = new RecordingSender();
+        HologramAnimator animator = animator(config(true, 100), sender);
+        AnimationTemplate template = animator.compileTemplate(List.of("|animation.fast|"), IDENTITY_RENDERER);
+        Player first = player(UUID.randomUUID(), true);
+        Player second = player(UUID.randomUUID(), true);
+        animator.publish("holo:first", HologramAnimator.SHARED_SUB,
+            new HologramAnimator.Target(7, template, List.of(first, second)));
+        animator.publish("holo:second", HologramAnimator.SHARED_SUB,
+            new HologramAnimator.Target(8, template, List.of(first, second)));
+
+        assertEquals(2, animator.pass(0L));
+        assertEquals(0, animator.pass(20L));
+        assertEquals(2, animator.pass(50L));
+        assertEquals(4, sender.sent.size());
+    }
+
+    @Test
+    void packetBudgetCapsFirstPublishBurstAcrossManyTargets() {
+        RecordingSender sender = new RecordingSender();
+        HologramAnimator animator = animator(config(true, 100), sender);
+        AnimationTemplate template = animator.compileTemplate(List.of("|animation.fast|"), IDENTITY_RENDERER);
+        Player viewer = player(UUID.randomUUID(), true);
+        for (int target = 0; target < 250; target++) {
+            animator.publish("holo:" + target, HologramAnimator.SHARED_SUB,
+                new HologramAnimator.Target(target, template, List.of(viewer)));
+        }
+
+        assertEquals(100, animator.pass(0L));
+        assertEquals(100, sender.recipientCount());
+        assertEquals(0, animator.pass(999L));
+        assertEquals(100, sender.recipientCount());
+        assertEquals(100, animator.pass(1000L));
+        assertEquals(200, sender.recipientCount());
+        assertEquals(50, animator.pass(2000L));
+        assertEquals(250, sender.recipientCount());
+    }
+
+    @Test
+    void packetBudgetRotatesFairlyAcrossLargeTargets() {
+        RecordingSender sender = new RecordingSender();
+        HologramAnimator animator = animator(config(true, 100), sender);
+        AnimationTemplate template = animator.compileTemplate(List.of("|animation.fast|"), IDENTITY_RENDERER);
+        List<Player> first = new ArrayList<>(100);
+        List<Player> second = new ArrayList<>(100);
+        for (int viewer = 0; viewer < 100; viewer++) {
+            first.add(player(UUID.randomUUID(), true));
+            second.add(player(UUID.randomUUID(), true));
+        }
+        animator.publish("holo:first", HologramAnimator.SHARED_SUB,
+            new HologramAnimator.Target(7, template, first));
+        animator.publish("holo:second", HologramAnimator.SHARED_SUB,
+            new HologramAnimator.Target(8, template, second));
+
+        assertEquals(1, animator.pass(0L));
+        assertEquals(0, animator.pass(999L));
+        assertEquals(1, animator.pass(1000L));
+        assertEquals(200, sender.recipientCount());
+        assertTrue(sender.sent.stream().anyMatch(sent -> sent.entityId() == 7));
+        assertTrue(sender.sent.stream().anyMatch(sent -> sent.entityId() == 8));
+    }
+
+    @Test
+    void directTextUpdatesAreLatestWinsAndBudgeted() {
+        RecordingSender sender = new RecordingSender();
+        HologramAnimator animator = animator(config(true, 100), sender);
+        Player first = player(UUID.randomUUID(), true);
+        UUID firstId = UUID.randomUUID();
+        animator.sendText(first, firstId, 7, "old");
+        animator.sendText(first, firstId, 7, "new");
+        for (int viewer = 1; viewer < 150; viewer++) {
+            UUID viewerId = UUID.randomUUID();
+            animator.sendText(player(viewerId, true), viewerId, 7, "text-" + viewer);
+        }
+
+        assertEquals(150, animator.pendingTextUpdateCount());
+        assertEquals(100, animator.pass(0L));
+        assertEquals(100, sender.recipientCount());
+        assertEquals(0, animator.pass(999L));
+        assertEquals(50, animator.pass(1000L));
+        assertEquals(150, sender.recipientCount());
+        assertTrue(sender.sent.stream().anyMatch(sent -> sent.viewers().contains(first)
+            && sent.text().equals("new")));
+        assertTrue(sender.sent.stream().noneMatch(sent -> sent.text().equals("old")));
+    }
+
+    @Test
+    void packetBudgetSlicesOneAudienceLargerThanTheCeiling() {
+        RecordingSender sender = new RecordingSender();
+        HologramAnimator animator = animator(config(true, 100), sender);
+        AnimationTemplate template = animator.compileTemplate(List.of("|animation.fast|"), IDENTITY_RENDERER);
+        List<Player> viewers = new ArrayList<>(150);
+        for (int viewer = 0; viewer < 150; viewer++) {
+            viewers.add(player(UUID.randomUUID(), true));
+        }
+        animator.publish("holo:test", HologramAnimator.SHARED_SUB,
+            new HologramAnimator.Target(7, template, viewers));
+
+        assertEquals(1, animator.pass(0L));
+        assertEquals(100, sender.sent.get(0).viewers().size());
+        assertEquals(0, animator.pass(999L));
+        assertEquals(1, animator.pass(1000L));
+        assertEquals(50, sender.sent.get(1).viewers().size());
+        assertEquals(150, sender.recipientCount());
+    }
+
+    @Test
+    void replacingAnEntityResetsItsSendState() {
+        RecordingSender sender = new RecordingSender();
+        HologramAnimator animator = animator(config(true), sender);
+        AnimationTemplate template = animator.compileTemplate(List.of("|animation.fast|"), IDENTITY_RENDERER);
+        Player viewer = player(UUID.randomUUID(), true);
+        animator.publish("holo:test", HologramAnimator.SHARED_SUB,
+            new HologramAnimator.Target(7, template, List.of(viewer)));
+
+        assertEquals(1, animator.pass(0L));
+        animator.publish("holo:test", HologramAnimator.SHARED_SUB,
+            new HologramAnimator.Target(8, template, List.of(viewer)));
+
+        assertEquals(1, animator.pass(0L));
+        assertEquals(8, sender.sent.get(1).entityId());
     }
 
     @Test

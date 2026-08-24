@@ -4,6 +4,7 @@ import java.util.Iterator;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Consumer;
 import java.util.function.Predicate;
 
 final class DropNameTracker {
@@ -14,6 +15,10 @@ final class DropNameTracker {
 
     DropNameTracker(Predicate<UUID> alive) {
         this.alive = alive;
+    }
+
+    DropNameTracker() {
+        this(entityId -> true);
     }
 
     void track(UUID entityId) {
@@ -52,6 +57,25 @@ final class DropNameTracker {
             if (!alive.test(entityId)) {
                 active.remove();
             }
+        }
+    }
+
+    void inspect(int budget, Consumer<UUID> inspector) {
+        if (named.isEmpty()) {
+            cursor = null;
+            return;
+        }
+
+        Iterator<UUID> active = cursor;
+        if (active == null || !active.hasNext()) {
+            active = named.iterator();
+            cursor = active;
+        }
+
+        int remaining = budget;
+        while (remaining > 0 && active.hasNext()) {
+            remaining--;
+            inspector.accept(active.next());
         }
     }
 }

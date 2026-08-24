@@ -116,6 +116,9 @@
         "failed": "&7[&bGloss&7]: &cLegacy hologram migration from &f{source}&c failed: {reason}"
       "config":
         "reloaded": "&2Конфигурация \"{name}\" перезагружена."
+      "hotload":
+        "singular": "&2Горячая перезагрузка: {kinds} ({count} изменение)."
+        "plural": "&2Горячая перезагрузка: {kinds} ({count} изменений)."
       "preview_scale":
         "adjusting": "&7Размер предпросмотра: &f{percent}% &8- &7удерживайте Красться + прокручивайте для изменения; дважды нажмите Красться для сохранения"
         "hidden": "&7Предпросмотр &cскрыт &8- &7прокрутите вверх для восстановления"

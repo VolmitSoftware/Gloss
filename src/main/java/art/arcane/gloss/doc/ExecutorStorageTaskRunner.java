@@ -38,6 +38,11 @@ public final class ExecutorStorageTaskRunner implements StorageTaskRunner {
   }
 
   @Override
+  public void shutdownNow() {
+    executor.shutdownNow();
+  }
+
+  @Override
   public boolean awaitTermination(long timeout, TimeUnit unit) throws InterruptedException {
     return executor.awaitTermination(timeout, unit);
   }

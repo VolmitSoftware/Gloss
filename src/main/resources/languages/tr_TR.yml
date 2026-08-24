@@ -116,6 +116,9 @@
         "failed": "&7[&bGloss&7]: &cLegacy hologram migration from &f{source}&c failed: {reason}"
       "config":
         "reloaded": "&2\"{name}\" yapılandırması yeniden yüklendi."
+      "hotload":
+        "singular": "&2Canlı yeniden yüklendi: {kinds} ({count} değişiklik)."
+        "plural": "&2Canlı yeniden yüklendi: {kinds} ({count} değişiklik)."
       "preview_scale":
         "adjusting": "&7Önizleme boyutu: &f{percent}% &8- &7Eğil tuşunu basılı tut + boyut için kaydır; kaydetmek için Eğil tuşuna iki kez bas"
         "hidden": "&7Önizleme &cgizli &8- &7geri getirmek için yukarı kaydır"

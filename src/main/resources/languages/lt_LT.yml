@@ -116,6 +116,9 @@
         "failed": "&7[&bGloss&7]: &cLegacy hologram migration from &f{source}&c failed: {reason}"
       "config":
         "reloaded": "&2Konfigūracija \"{name}\" įkelta iš naujo."
+      "hotload":
+        "singular": "&2Karštai įkelta: {kinds} ({count} pakeitimas)."
+        "plural": "&2Karštai įkelta: {kinds} ({count} pakeitimai)."
       "preview_scale":
         "adjusting": "&7Peržiūros dydis: &f{percent}% &8- &7laikykite Pritūpti + slinkite dydžiui keisti; dukart paspauskite Pritūpti, kad išsaugotumėte"
         "hidden": "&7Peržiūra &cpaslėpta &8- &7slinkite aukštyn, kad atkurtumėte"

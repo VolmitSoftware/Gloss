@@ -198,16 +198,15 @@ public class CommandGlossHologram {
             return;
         }
 
-        GlossCommandPager.Window window = GlossCommandPager.window(holograms.size(), page, GlossCommandPager.TEXT_PAGE_SIZE);
+        DirectorMiniMenu.ContentPage window = GlossCommandPager.window(holograms.size(), page, GlossCommandPager.TEXT_PAGE_SIZE);
         DirectorMiniMenu.Theme theme = GlossCommandService.menuTheme();
         String hover = DirectorMiniMenu.escapeText(GlossLocalization.globalDirectorText(GlossMessages.HOLOGRAM_LIST_HOVER, MessageArgs.empty()));
         List<String> lines = new ArrayList<>();
-        lines.add(DirectorMiniMenu.banner(LIST_COMMAND, theme));
+        GlossCommandPager.appendHeader(lines, LIST_COMMAND, window, theme);
         for (AnchoredHologram hologram : holograms.subList(window.startIndex(), window.endIndex())) {
             lines.add(renderListEntry(hologram, theme, hover));
         }
         GlossCommandPager.appendFooter(lines, window, LIST_COMMAND, theme);
-        lines.add(DirectorMiniMenu.bar(theme));
         DirectorMiniMenu.deliver(sender, lines);
     }
 

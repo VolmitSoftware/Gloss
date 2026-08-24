@@ -404,6 +404,19 @@ public class PanelServiceTest {
     }
   }
 
+  @Test
+  public void shutdownForceCancelsAfterTwoBoundedWaits() throws IOException {
+    NeverTerminatingTaskRunner runner = new NeverTerminatingTaskRunner();
+    PanelService service = service(new PanelRepository(temp.newFolder("bounded-shutdown")), runner);
+    service.start();
+
+    service.shutdown();
+
+    assertTrue(runner.shutdown);
+    assertTrue(runner.shutdownNow);
+    assertEquals(2, runner.awaitCalls);
+  }
+
   private static PanelService service(PanelStore store, StorageTaskRunner taskRunner) {
     Logger logger = Logger.getLogger(PanelServiceTest.class.getName() + "." + UUID.randomUUID());
     logger.setLevel(Level.OFF);
@@ -471,8 +484,41 @@ public class PanelServiceTest {
     }
 
     @Override
+    public void shutdownNow() {
+      delegate.shutdownNow();
+    }
+
+    @Override
     public boolean awaitTermination(long timeout, TimeUnit unit) throws InterruptedException {
       return delegate.awaitTermination(timeout, unit);
+    }
+  }
+
+  private static final class NeverTerminatingTaskRunner implements StorageTaskRunner {
+    private boolean shutdown;
+    private boolean shutdownNow;
+    private int awaitCalls;
+
+    @Override
+    public StorageTaskHandle submit(Runnable task) {
+      return () -> {
+      };
+    }
+
+    @Override
+    public void shutdown() {
+      shutdown = true;
+    }
+
+    @Override
+    public void shutdownNow() {
+      shutdownNow = true;
+    }
+
+    @Override
+    public boolean awaitTermination(long timeout, TimeUnit unit) {
+      awaitCalls++;
+      return false;
     }
   }
 

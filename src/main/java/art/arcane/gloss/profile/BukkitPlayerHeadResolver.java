@@ -1,5 +1,7 @@
 package art.arcane.gloss.profile;
 
+import art.arcane.gloss.Gloss;
+import art.arcane.volmlib.util.scheduling.FoliaScheduler;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.profile.PlayerProfile;
@@ -9,6 +11,7 @@ import java.net.URL;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Resolves usernames through the server's own profile plumbing.
@@ -30,21 +33,50 @@ public final class BukkitPlayerHeadResolver implements PlayerHeadResolver {
 
   @Override
   public CompletableFuture<Optional<PlayerHeadProfile>> resolve(String name) {
-    PlayerProfile profile = seed(name);
+    Player online = Bukkit.getPlayerExact(name);
+    if (online != null) {
+      Gloss plugin = Gloss.instance;
+      if (plugin == null) {
+        return CompletableFuture.completedFuture(snapshot(online.getPlayerProfile()));
+      }
+      CompletableFuture<Optional<PlayerHeadProfile>> answer = new CompletableFuture<>();
+      AtomicBoolean fallbackStarted = new AtomicBoolean();
+      Runnable fallback = () -> {
+        if (!fallbackStarted.compareAndSet(false, true)) {
+          return;
+        }
+        if (!plugin.isEnabled()) {
+          answer.complete(Optional.empty());
+          return;
+        }
+        resolveRemote(name).whenComplete((resolved, failure) -> {
+          if (failure == null) {
+            answer.complete(resolved);
+          } else {
+            answer.completeExceptionally(failure);
+          }
+        });
+      };
+      Runnable capture = () -> {
+        try {
+          answer.complete(snapshot(online.getPlayerProfile()));
+        } catch (RuntimeException | LinkageError failure) {
+          fallback.run();
+        }
+      };
+      if (!FoliaScheduler.runEntity(plugin, online, capture, 0L, fallback)) {
+        fallback.run();
+      }
+      return answer.orTimeout(TIMEOUT_SECONDS, TimeUnit.SECONDS);
+    }
+    return resolveRemote(name);
+  }
+
+  private CompletableFuture<Optional<PlayerHeadProfile>> resolveRemote(String name) {
+    PlayerProfile profile = Bukkit.createPlayerProfile(name);
     return profile.update()
         .orTimeout(TIMEOUT_SECONDS, TimeUnit.SECONDS)
         .thenApply(BukkitPlayerHeadResolver::snapshot);
-  }
-
-  /**
-   * An online player already has an id, so the lookup starts from it and skips the name-to-id
-   * step. Everyone else starts from the name.
-   */
-  private static PlayerProfile seed(String name) {
-    Player online = Bukkit.getPlayerExact(name);
-    return online == null
-        ? Bukkit.createPlayerProfile(name)
-        : Bukkit.createPlayerProfile(online.getUniqueId(), online.getName());
   }
 
   /**

@@ -15,10 +15,12 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.HandlerList;
 import org.bukkit.event.Listener;
+import org.bukkit.event.player.PlayerChangedWorldEvent;
+import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.event.player.PlayerRespawnEvent;
 
 import java.io.File;
-import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
@@ -26,26 +28,43 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.IntConsumer;
+import java.util.function.IntSupplier;
+import java.util.logging.Level;
 
 public final class TablistService implements Listener {
     private static final String PLAYER_TOKEN = "$player";
     private static final String GROUP_TOKEN = "$group";
     private static final int ANIMATION_REFRESH_INTERVAL_TICKS = 1;
     private static final int VIEWER_DEPENDENT = TextPipeline.HAS_PLACEHOLDER | TextPipeline.HAS_FUNCTION;
+    private static final long HEADER_FOOTER_HEARTBEAT_NANOS = TimeUnit.SECONDS.toNanos(30L);
+    private static final int HEADER_FOOTER_HEARTBEAT_LIMIT_PER_CYCLE = 64;
+    static final int APPLY_FAST = 1;
+    static final int APPLY_FULL = 2;
 
     private final Gloss plugin;
     private final ShippedDefaults defaults;
     private final DocumentRegistry<TablistDoc> registry;
     private final Map<UUID, TabOverride> overrides;
     private final Map<UUID, String> appliedListNames;
-    private final Map<UUID, HeaderFooter> appliedHeaderFooters;
+    private final Map<UUID, AppliedHeaderFooter> appliedHeaderFooters;
     private final Map<UUID, ListNameSource> listNameSources;
+    private final Map<UUID, PlayerApplyQueue> playerApplyQueues;
+    private final Set<UUID> fastOverridePlayers;
+    private final Set<UUID> fastNamePlayers;
+    private final Set<UUID> fastPlayers;
+    private final FastDriverLifecycle fastDriverLifecycle;
     private final AtomicLong docGeneration;
+    private final AtomicLong driverEpoch;
     private volatile TablistDoc activeDoc;
     private volatile int driverTaskId;
     private volatile int driverIntervalTicks;
     private volatile HeaderFooterMemo headerFooterMemo;
+    private volatile boolean running;
 
     public TablistService(Gloss plugin) {
         this.plugin = plugin;
@@ -57,7 +76,13 @@ public final class TablistService implements Listener {
         this.appliedListNames = new ConcurrentHashMap<>();
         this.appliedHeaderFooters = new ConcurrentHashMap<>();
         this.listNameSources = new ConcurrentHashMap<>();
+        this.playerApplyQueues = new ConcurrentHashMap<>();
+        this.fastOverridePlayers = ConcurrentHashMap.newKeySet();
+        this.fastNamePlayers = ConcurrentHashMap.newKeySet();
+        this.fastPlayers = ConcurrentHashMap.newKeySet();
+        this.fastDriverLifecycle = new FastDriverLifecycle();
         this.docGeneration = new AtomicLong();
+        this.driverEpoch = new AtomicLong();
         this.activeDoc = TablistDoc.DEFAULTS;
         this.driverTaskId = -1;
         this.driverIntervalTicks = -1;
@@ -128,8 +153,17 @@ public final class TablistService implements Listener {
         plugin.watchdog().unregister(TablistDoc.KIND);
         registry.close();
         HandlerList.unregisterAll(this);
-        stopDriver();
-        overrides.clear();
+        synchronized (fastDriverLifecycle) {
+            stopDriverLocked();
+            overrides.clear();
+            fastOverridePlayers.clear();
+            fastNamePlayers.clear();
+            fastPlayers.clear();
+        }
+        for (PlayerApplyQueue queue : playerApplyQueues.values()) {
+            queue.retire();
+        }
+        playerApplyQueues.clear();
         resetAppliedHeaderFooters();
         resetAppliedListNames();
     }
@@ -142,6 +176,8 @@ public final class TablistService implements Listener {
         registry.reload();
         activeDoc = committedDoc();
         docGeneration.incrementAndGet();
+        clearFastNamePlayers();
+        startDriver();
         if (!plugin.cfg().tablist().enabled()) {
             resetAppliedHeaderFooters();
             resetAppliedListNames();
@@ -154,7 +190,6 @@ public final class TablistService implements Listener {
                 resetAppliedListNames();
             }
         }
-        startDriver();
     }
 
     public List<String> resetToDefault(String nameOrStar) {
@@ -178,25 +213,64 @@ public final class TablistService implements Listener {
     }
 
     public void setTab(Player player, String header, String footer) {
-        overrides.put(player.getUniqueId(), new TabOverride(header == null ? "" : header, footer == null ? "" : footer));
-        reconcileDriverInterval();
+        UUID uuid = player.getUniqueId();
+        TabOverride override = new TabOverride(header == null ? "" : header, footer == null ? "" : footer);
+        synchronized (fastDriverLifecycle) {
+            overrides.put(uuid, override);
+            if (requiresFastRefresh(override)) {
+                fastOverridePlayers.add(uuid);
+            } else {
+                fastOverridePlayers.remove(uuid);
+            }
+            refreshFastPlayerLocked(uuid);
+            reconcileFastDriverLocked();
+        }
         pushNow(player);
     }
 
     public void resetTab(Player player) {
-        overrides.remove(player.getUniqueId());
-        reconcileDriverInterval();
+        UUID uuid = player.getUniqueId();
+        synchronized (fastDriverLifecycle) {
+            overrides.remove(uuid);
+            fastOverridePlayers.remove(uuid);
+            refreshFastPlayerLocked(uuid);
+            reconcileFastDriverLocked();
+        }
         pushNow(player);
     }
 
     @EventHandler(priority = EventPriority.MONITOR)
     public void on(PlayerQuitEvent event) {
         UUID uuid = event.getPlayer().getUniqueId();
-        overrides.remove(uuid);
+        synchronized (fastDriverLifecycle) {
+            overrides.remove(uuid);
+            fastOverridePlayers.remove(uuid);
+            fastNamePlayers.remove(uuid);
+            fastPlayers.remove(uuid);
+            reconcileFastDriverLocked();
+        }
         appliedListNames.remove(uuid);
         appliedHeaderFooters.remove(uuid);
         listNameSources.remove(uuid);
-        reconcileDriverInterval();
+        PlayerApplyQueue queue = playerApplyQueues.remove(uuid);
+        if (queue != null) {
+            queue.retire();
+        }
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void on(PlayerJoinEvent event) {
+        invalidateAndPush(event.getPlayer());
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void on(PlayerRespawnEvent event) {
+        invalidateAndPush(event.getPlayer());
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void on(PlayerChangedWorldEvent event) {
+        invalidateAndPush(event.getPlayer());
     }
 
     private TablistDoc doc() {
@@ -222,6 +296,10 @@ public final class TablistService implements Listener {
     private void applyDelta(DocumentDelta delta) {
         GlossDocument<TablistDoc> document = registry.get(delta, TablistDoc.KIND);
         TablistDoc updated = document == null ? TablistDoc.DEFAULTS : document.value();
+        activeDoc = updated;
+        docGeneration.incrementAndGet();
+        clearFastNamePlayers();
+        reconcileDriverInterval();
         if (updated.useHeaderFooter()) {
             appliedHeaderFooters.clear();
         } else {
@@ -233,38 +311,60 @@ public final class TablistService implements Listener {
         } else {
             resetAppliedListNames();
         }
-        activeDoc = updated;
-        docGeneration.incrementAndGet();
-        reconcileDriverInterval();
     }
 
     private void startDriver() {
+        synchronized (fastDriverLifecycle) {
+            startDriverLocked();
+        }
+    }
+
+    private void startDriverLocked() {
         if (!plugin.cfg().tablist().enabled()) {
             return;
         }
+        if (driverTaskId != -1) {
+            reconcileFastDriverLocked();
+            return;
+        }
+        driverEpoch.incrementAndGet();
+        running = true;
         int intervalTicks = desiredDriverIntervalTicks();
         driverTaskId = plugin.scheduler().sr(this::tick, intervalTicks);
         driverIntervalTicks = intervalTicks;
+        reconcileFastDriverLocked();
     }
 
     private void stopDriver() {
+        synchronized (fastDriverLifecycle) {
+            stopDriverLocked();
+        }
+    }
+
+    private void stopDriverLocked() {
+        running = false;
+        driverEpoch.incrementAndGet();
         if (driverTaskId != -1) {
             plugin.scheduler().csr(driverTaskId);
             driverTaskId = -1;
         }
+        fastDriverLifecycle.stop(plugin.scheduler()::csr);
         driverIntervalTicks = -1;
     }
 
     private void reconcileDriverInterval() {
-        if (!plugin.cfg().tablist().enabled()) {
-            return;
+        synchronized (fastDriverLifecycle) {
+            if (!plugin.cfg().tablist().enabled()) {
+                return;
+            }
+            int intervalTicks = desiredDriverIntervalTicks();
+            if (driverTaskId != -1 && driverIntervalTicks == intervalTicks) {
+                reconcileFastDriverLocked();
+                return;
+            }
+            stopDriverLocked();
+            startDriverLocked();
         }
-        int intervalTicks = desiredDriverIntervalTicks();
-        if (driverTaskId != -1 && driverIntervalTicks == intervalTicks) {
-            return;
-        }
-        stopDriver();
-        startDriver();
     }
 
     private int desiredDriverIntervalTicks() {
@@ -272,34 +372,119 @@ public final class TablistService implements Listener {
         if (!plugin.cfg().text().functions()) {
             return configuredIntervalTicks;
         }
-        TablistDoc doc = doc();
-        int documentIntervalTicks = refreshIntervalTicks(doc, List.of(), configuredIntervalTicks);
-        if (documentIntervalTicks != configuredIntervalTicks || !doc.useHeaderFooter()) {
-            return documentIntervalTicks;
+        return refreshIntervalTicks(doc(), configuredIntervalTicks);
+    }
+
+    private void reconcileFastDriver() {
+        synchronized (fastDriverLifecycle) {
+            reconcileFastDriverLocked();
         }
-        for (TabOverride override : overrides.values()) {
-            if (TextPipeline.requiresFastRefresh(override.header())
-                || TextPipeline.requiresFastRefresh(override.footer())) {
-                return Math.min(configuredIntervalTicks, ANIMATION_REFRESH_INTERVAL_TICKS);
-            }
-        }
-        return configuredIntervalTicks;
+    }
+
+    private void reconcileFastDriverLocked() {
+        boolean required = running && fastDriverRequired(doc(), plugin.cfg().text().functions(),
+            !fastOverridePlayers.isEmpty(), !fastNamePlayers.isEmpty(), driverIntervalTicks);
+        fastDriverLifecycle.reconcile(required,
+            () -> plugin.scheduler().sr(this::tickFastPlayers, ANIMATION_REFRESH_INTERVAL_TICKS),
+            plugin.scheduler()::csr);
     }
 
     private void tick() {
+        long epoch = driverEpoch.get();
+        if (!isActiveEpoch(epoch)) {
+            return;
+        }
+        HeaderFooterHeartbeatCycle heartbeatCycle =
+            new HeaderFooterHeartbeatCycle(HEADER_FOOTER_HEARTBEAT_LIMIT_PER_CYCLE);
         for (Player player : Bukkit.getOnlinePlayers()) {
-            plugin.scheduler().runEntity(player, () -> apply(player));
+            requestApply(player, epoch, APPLY_FULL, heartbeatCycle);
+        }
+    }
+
+    private void tickFastPlayers() {
+        long epoch = driverEpoch.get();
+        if (!isActiveEpoch(epoch)) {
+            return;
+        }
+        for (UUID uuid : fastPlayers) {
+            Player player = Bukkit.getPlayer(uuid);
+            if (player == null) {
+                synchronized (fastDriverLifecycle) {
+                    fastOverridePlayers.remove(uuid);
+                    fastNamePlayers.remove(uuid);
+                    fastPlayers.remove(uuid);
+                }
+                continue;
+            }
+            requestApply(player, epoch, APPLY_FAST, null);
+        }
+        if (fastPlayers.isEmpty()) {
+            reconcileFastDriver();
         }
     }
 
     private void pushNow(Player player) {
-        if (!plugin.cfg().tablist().enabled()) {
+        long epoch = driverEpoch.get();
+        if (!isActiveEpoch(epoch)) {
             return;
         }
-        plugin.scheduler().runEntity(player, () -> apply(player));
+        requestApply(player, epoch, APPLY_FULL, null);
     }
 
-    private void apply(Player player) {
+    private void requestApply(Player player, long epoch, int mode,
+                              HeaderFooterHeartbeatCycle heartbeatCycle) {
+        UUID uuid = player.getUniqueId();
+        ApplyRequest request = new ApplyRequest(player, epoch, mode, heartbeatCycle);
+        PlayerApplyQueue queue;
+        while (true) {
+            queue = playerApplyQueues.computeIfAbsent(uuid, ignored -> new PlayerApplyQueue());
+            if (queue.offer(request)) {
+                break;
+            }
+            if (!queue.isRetired()) {
+                return;
+            }
+            playerApplyQueues.remove(uuid, queue);
+        }
+        PlayerApplyQueue scheduledQueue = queue;
+        Runnable drain = () -> drainPlayerApplyQueue(uuid, scheduledQueue);
+        AtomicBoolean retired = new AtomicBoolean();
+        Runnable retirement = () -> {
+            if (!retired.compareAndSet(false, true)) {
+                return;
+            }
+            scheduledQueue.retire();
+            playerApplyQueues.remove(uuid, scheduledQueue);
+        };
+        if (!FoliaScheduler.runEntity(plugin, player, drain, 0L, retirement)) {
+            retirement.run();
+        }
+    }
+
+    private void drainPlayerApplyQueue(UUID uuid, PlayerApplyQueue queue) {
+        ApplyRequest request;
+        while ((request = queue.next()) != null) {
+            try {
+                if (!isActiveEpoch(request.epoch())) {
+                    continue;
+                }
+                if (request.mode() == APPLY_FULL) {
+                    apply(request.player(), request.heartbeatCycle());
+                } else {
+                    applyFastPlayer(request.player());
+                }
+            } catch (Throwable failure) {
+                plugin.getLogger().log(Level.WARNING,
+                    "Tablist refresh failed for " + uuid, failure);
+            }
+        }
+    }
+
+    private boolean isActiveEpoch(long epoch) {
+        return running && epoch == driverEpoch.get() && plugin.cfg().tablist().enabled();
+    }
+
+    private void apply(Player player, HeaderFooterHeartbeatCycle heartbeatCycle) {
         if (!player.isOnline()) {
             return;
         }
@@ -317,17 +502,61 @@ public final class TablistService implements Listener {
                 footer = memo.footer() == null ? renderSafe(player, doc.footer()) : memo.footer();
             }
             HeaderFooter rendered = new HeaderFooter(header, footer);
-            if (!rendered.equals(appliedHeaderFooters.get(player.getUniqueId()))) {
-                appliedHeaderFooters.put(player.getUniqueId(), rendered);
+            UUID uuid = player.getUniqueId();
+            AppliedHeaderFooter previous = appliedHeaderFooters.get(uuid);
+            long nowNanos = System.nanoTime();
+            if (shouldSendHeaderFooter(rendered, previous, nowNanos, heartbeatCycle)) {
+                long nextHeartbeatNanos = nowNanos + HEADER_FOOTER_HEARTBEAT_NANOS;
+                if (previous == null) {
+                    nextHeartbeatNanos += initialHeartbeatOffsetNanos(uuid);
+                }
+                appliedHeaderFooters.put(uuid,
+                    new AppliedHeaderFooter(rendered, nextHeartbeatNanos));
                 player.setPlayerListHeaderFooter(header, footer);
             }
         }
         applyListName(player, doc);
     }
 
+    private void applyFastOverride(Player player) {
+        if (!player.isOnline() || !doc().useHeaderFooter()) {
+            return;
+        }
+        TabOverride override = overrides.get(player.getUniqueId());
+        if (override == null || !requiresFastRefresh(override)) {
+            return;
+        }
+        String header = renderSafe(player, override.header());
+        String footer = renderSafe(player, override.footer());
+        HeaderFooter rendered = new HeaderFooter(header, footer);
+        AppliedHeaderFooter previous = appliedHeaderFooters.get(player.getUniqueId());
+        if (previous != null && rendered.equals(previous.content())) {
+            return;
+        }
+        appliedHeaderFooters.put(player.getUniqueId(),
+            new AppliedHeaderFooter(rendered,
+                System.nanoTime() + HEADER_FOOTER_HEARTBEAT_NANOS));
+        player.setPlayerListHeaderFooter(header, footer);
+    }
+
+    private void applyFastPlayer(Player player) {
+        if (!player.isOnline()) {
+            return;
+        }
+        UUID uuid = player.getUniqueId();
+        TablistDoc doc = doc();
+        if (doc.useHeaderFooter() && fastOverridePlayers.contains(uuid)) {
+            applyFastOverride(player);
+        }
+        if (doc.groupListNames() && fastNamePlayers.contains(uuid)) {
+            applyListName(player, doc);
+        }
+    }
+
     private void applyListName(Player player, TablistDoc doc) {
         UUID uuid = player.getUniqueId();
         if (!doc.groupListNames()) {
+            setFastNamePlayer(uuid, false);
             listNameSources.remove(uuid);
             if (appliedListNames.remove(uuid) != null) {
                 player.setPlayerListName(null);
@@ -337,6 +566,7 @@ public final class TablistService implements Listener {
         String primaryGroup = plugin.groups().primaryGroupFor(player).orElse(null);
         ListNameChoice choice = chooseListName(player.isOp(), primaryGroup, doc.nameFormats());
         if (choice.template().isBlank()) {
+            setFastNamePlayer(uuid, false);
             listNameSources.remove(uuid);
             if (appliedListNames.remove(uuid) != null) {
                 player.setPlayerListName(null);
@@ -344,12 +574,15 @@ public final class TablistService implements Listener {
             return;
         }
         String substituted = substituteTokens(choice.template(), player.getName(), choice.groupName());
+        setFastNamePlayer(uuid, requiresFastNameRefresh(substituted, plugin.cfg().text().functions()));
         if ((TextPipeline.classify(substituted) & VIEWER_DEPENDENT) == 0) {
             // Viewer-independent: the render is a pure function of the substituted text plus the
             // emoji table, so an unchanged source guarantees an unchanged applied name.
             ListNameSource source = new ListNameSource(substituted, docGeneration.get(),
                 TextPipeline.emojiGeneration());
-            if (source.equals(listNameSources.get(uuid)) && appliedListNames.containsKey(uuid)) {
+            String applied = appliedListNames.get(uuid);
+            if (source.equals(listNameSources.get(uuid)) && applied != null
+                && !listNameNeedsApply(applied, applied, player.getPlayerListName())) {
                 return;
             }
             listNameSources.put(uuid, source);
@@ -358,7 +591,7 @@ public final class TablistService implements Listener {
         }
         String rendered = renderSafe(player, substituted);
         String previous = appliedListNames.get(uuid);
-        if (rendered.equals(previous)) {
+        if (!listNameNeedsApply(rendered, previous, player.getPlayerListName())) {
             return;
         }
         appliedListNames.put(uuid, rendered);
@@ -417,40 +650,110 @@ public final class TablistService implements Listener {
     }
 
     private void mutateOnEntityThread(Player player, Runnable action) {
-        if (plugin.scheduler().runEntity(player, action)) {
+        long epoch = driverEpoch.get();
+        Runnable guardedAction = () -> {
+            if (epoch == driverEpoch.get()) {
+                action.run();
+            }
+        };
+        if (plugin.scheduler().runEntity(player, guardedAction)) {
             return;
         }
         if (FoliaScheduler.isOwnedByCurrentRegion(player)) {
-            action.run();
+            guardedAction.run();
         }
     }
 
-    static int refreshIntervalTicks(TablistDoc doc, Collection<String> overrideText, int configuredIntervalTicks) {
-        if (usesAnimatedText(doc, overrideText)) {
+    private void invalidateAndPush(Player player) {
+        UUID uuid = player.getUniqueId();
+        appliedHeaderFooters.remove(uuid);
+        appliedListNames.remove(uuid);
+        listNameSources.remove(uuid);
+        pushNow(player);
+    }
+
+    static boolean shouldSendHeaderFooter(HeaderFooter rendered, AppliedHeaderFooter previous,
+                                          long nowNanos,
+                                          HeaderFooterHeartbeatCycle heartbeatCycle) {
+        if (previous == null || !rendered.equals(previous.content())) {
+            return true;
+        }
+        return nowNanos - previous.nextHeartbeatNanos() >= 0L
+            && heartbeatCycle != null
+            && heartbeatCycle.tryAcquire();
+    }
+
+    static boolean listNameNeedsApply(String rendered, String memoized, String serverValue) {
+        return !rendered.equals(memoized) || !rendered.equals(serverValue);
+    }
+
+    static long initialHeartbeatOffsetNanos(UUID uuid) {
+        long folded = uuid.getMostSignificantBits() ^ uuid.getLeastSignificantBits();
+        return Math.floorMod(folded, HEADER_FOOTER_HEARTBEAT_NANOS);
+    }
+
+    static int refreshIntervalTicks(TablistDoc doc, int configuredIntervalTicks) {
+        if (usesAnimatedHeaderFooter(doc)) {
             return Math.min(configuredIntervalTicks, ANIMATION_REFRESH_INTERVAL_TICKS);
         }
         return configuredIntervalTicks;
     }
 
-    private static boolean usesAnimatedText(TablistDoc doc, Collection<String> overrideText) {
-        if (doc.useHeaderFooter()
-            && (TextPipeline.requiresFastRefresh(doc.header())
-            || TextPipeline.requiresFastRefresh(doc.footer()) || containsAnimatedText(overrideText))) {
-            return true;
-        }
-        if (!doc.groupListNames()) {
+    static boolean fastDriverRequired(TablistDoc doc, boolean functionsEnabled,
+                                      boolean hasFastOverrides, boolean hasFastNames,
+                                      int driverIntervalTicks) {
+        if (!functionsEnabled || driverIntervalTicks <= ANIMATION_REFRESH_INTERVAL_TICKS) {
             return false;
         }
-        return containsAnimatedText(doc.nameFormats().values());
+        return (hasFastOverrides && doc.useHeaderFooter())
+            || (hasFastNames && doc.groupListNames());
     }
 
-    private static boolean containsAnimatedText(Collection<String> values) {
-        for (String value : values) {
-            if (TextPipeline.requiresFastRefresh(value)) {
-                return true;
+    static boolean requiresFastNameRefresh(String substituted, boolean functionsEnabled) {
+        return functionsEnabled && TextPipeline.requiresFastRefresh(substituted);
+    }
+
+    private static boolean usesAnimatedHeaderFooter(TablistDoc doc) {
+        return doc.useHeaderFooter()
+            && (TextPipeline.requiresFastRefresh(doc.header())
+            || TextPipeline.requiresFastRefresh(doc.footer()));
+    }
+
+    private static boolean requiresFastRefresh(TabOverride override) {
+        return TextPipeline.requiresFastRefresh(override.header())
+            || TextPipeline.requiresFastRefresh(override.footer());
+    }
+
+    private void setFastNamePlayer(UUID uuid, boolean fast) {
+        synchronized (fastDriverLifecycle) {
+            boolean changed = fast ? fastNamePlayers.add(uuid) : fastNamePlayers.remove(uuid);
+            if (!changed) {
+                return;
             }
+            refreshFastPlayerLocked(uuid);
+            reconcileFastDriverLocked();
         }
-        return false;
+    }
+
+    private void clearFastNamePlayers() {
+        synchronized (fastDriverLifecycle) {
+            fastNamePlayers.clear();
+            fastPlayers.clear();
+            if (doc().useHeaderFooter()) {
+                fastPlayers.addAll(fastOverridePlayers);
+            }
+            reconcileFastDriverLocked();
+        }
+    }
+
+    private void refreshFastPlayerLocked(UUID uuid) {
+        TablistDoc doc = doc();
+        if ((doc.useHeaderFooter() && fastOverridePlayers.contains(uuid))
+            || (doc.groupListNames() && fastNamePlayers.contains(uuid))) {
+            fastPlayers.add(uuid);
+        } else {
+            fastPlayers.remove(uuid);
+        }
     }
 
     public record ListNameChoice(String template, String groupName) {
@@ -459,12 +762,125 @@ public final class TablistService implements Listener {
     private record TabOverride(String header, String footer) {
     }
 
-    private record HeaderFooter(String header, String footer) {
+    record HeaderFooter(String header, String footer) {
+    }
+
+    record AppliedHeaderFooter(HeaderFooter content, long nextHeartbeatNanos) {
     }
 
     private record ListNameSource(String substituted, long docGeneration, long emojiGeneration) {
     }
 
     private record HeaderFooterMemo(long docGeneration, long emojiGeneration, String header, String footer) {
+    }
+
+    record ApplyRequest(Player player, long epoch, int mode,
+                        HeaderFooterHeartbeatCycle heartbeatCycle) {
+        ApplyRequest merge(ApplyRequest newer) {
+            if (newer.epoch != epoch) {
+                return newer.epoch > epoch ? newer : this;
+            }
+            if (newer.mode >= mode) {
+                return newer;
+            }
+            return this;
+        }
+    }
+
+    static final class PlayerApplyQueue {
+        private ApplyRequest pending;
+        private boolean scheduled;
+        private boolean retired;
+
+        synchronized boolean offer(ApplyRequest request) {
+            if (retired) {
+                return false;
+            }
+            pending = pending == null ? request : pending.merge(request);
+            if (scheduled) {
+                return false;
+            }
+            scheduled = true;
+            return true;
+        }
+
+        synchronized ApplyRequest next() {
+            if (pending != null) {
+                ApplyRequest next = pending;
+                pending = null;
+                return next;
+            }
+            scheduled = false;
+            return null;
+        }
+
+        synchronized void retire() {
+            retired = true;
+            pending = null;
+            scheduled = false;
+        }
+
+        synchronized boolean isRetired() {
+            return retired;
+        }
+    }
+
+    static final class HeaderFooterHeartbeatCycle {
+        private final AtomicInteger remaining;
+
+        HeaderFooterHeartbeatCycle(int limit) {
+            this.remaining = new AtomicInteger(Math.max(0, limit));
+        }
+
+        boolean tryAcquire() {
+            int current = remaining.get();
+            while (current > 0) {
+                if (remaining.compareAndSet(current, current - 1)) {
+                    return true;
+                }
+                current = remaining.get();
+            }
+            return false;
+        }
+
+        int remaining() {
+            return remaining.get();
+        }
+    }
+
+    static final class FastDriverLifecycle {
+        private int taskId = -1;
+        private boolean required;
+
+        synchronized void reconcile(boolean nextRequired, IntSupplier starter, IntConsumer canceller) {
+            required = nextRequired;
+            if (required && taskId == -1) {
+                taskId = starter.getAsInt();
+                return;
+            }
+            if (!required && taskId != -1) {
+                int cancelledTaskId = taskId;
+                taskId = -1;
+                canceller.accept(cancelledTaskId);
+            }
+        }
+
+        synchronized void stop(IntConsumer canceller) {
+            required = false;
+            if (taskId == -1) {
+                return;
+            }
+            int cancelledTaskId = taskId;
+            taskId = -1;
+            canceller.accept(cancelledTaskId);
+        }
+
+        synchronized int taskId() {
+            return taskId;
+        }
+
+        synchronized boolean required() {
+            return required;
+        }
     }
 }

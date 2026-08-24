@@ -66,10 +66,10 @@ public class CommandGlossMenu {
       return;
     }
 
-    GlossCommandPager.Window window = GlossCommandPager.window(menus.size(), page, GlossCommandPager.TEXT_PAGE_SIZE);
+    DirectorMiniMenu.ContentPage window = GlossCommandPager.window(menus.size(), page, GlossCommandPager.TEXT_PAGE_SIZE);
     DirectorMiniMenu.Theme theme = GlossCommandService.menuTheme();
     List<String> lines = new ArrayList<>();
-    lines.add(DirectorMiniMenu.banner(plugin.getLocalization().text(GlossMessages.MENU_LIST_HEADER), theme));
+    GlossCommandPager.appendHeader(lines, plugin.getLocalization().text(GlossMessages.MENU_LIST_HEADER), window, theme);
     for (String menu : menus.subList(window.startIndex(), window.endIndex())) {
       String hover = plugin.getLocalization().text(
           GlossMessages.MENU_LIST_ENTRY,
@@ -78,7 +78,6 @@ public class CommandGlossMenu {
       lines.add(menuEntryLine(menu, hover, theme));
     }
     GlossCommandPager.appendFooter(lines, window, LIST_COMMAND, theme);
-    lines.add(DirectorMiniMenu.bar(theme));
     DirectorMiniMenu.deliver(sender, lines);
   }
 

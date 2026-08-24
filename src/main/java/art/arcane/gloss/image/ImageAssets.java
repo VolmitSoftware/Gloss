@@ -140,6 +140,7 @@ public final class ImageAssets {
       if (Gloss.instance.getPanelRuntime() != null) {
         Gloss.instance.getPanelRuntime().refreshVisuals();
       }
+      Gloss.instance.watchdog().recordHotload(KIND, changed.size() + created.size() + deleted.size());
     });
     if (!scheduled) {
       throw new IllegalStateException("Image hot reload could not reach the server thread; "

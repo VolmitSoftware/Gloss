@@ -35,4 +35,15 @@ public class TextAnimationDemandTest {
         assertFalse(TextPipeline.requiresFastRefresh("{{ time.seconds"));
         assertFalse(TextPipeline.requiresFastRefresh("{{ time.seconds + }}"));
     }
+
+    @Test
+    public void viewerSpecificClassificationSeparatesGlobalAnimationFromPlayerText() {
+        assertFalse(TextPipeline.viewerSpecific("|animation.rainbow|"));
+        assertFalse(TextPipeline.viewerSpecific("{{ wave('LIVE', ['&a', '&b'], time.ticks) }}"));
+        assertFalse(TextPipeline.viewerSpecific("{{ fixed(server.tps, 1) }}"));
+        assertTrue(TextPipeline.viewerSpecific("%player_name%"));
+        assertTrue(TextPipeline.viewerSpecific("|custom.player.function|"));
+        assertTrue(TextPipeline.viewerSpecific("{{ player.name }}"));
+        assertTrue(TextPipeline.viewerSpecific("{{ papi('vault_prefix', '') }}"));
+    }
 }

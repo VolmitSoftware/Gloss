@@ -105,6 +105,31 @@ public final class TextExpressionRenderer {
         return false;
     }
 
+    static boolean dependsOnViewer(String input) {
+        if (input == null || input.isEmpty()) {
+            return false;
+        }
+        int open = input.indexOf("{{");
+        while (open >= 0) {
+            int close = input.indexOf("}}", open + 2);
+            if (close < 0) {
+                return true;
+            }
+            String source = input.substring(open + 2, close).trim();
+            if (!source.isEmpty() && source.length() <= SOURCE_LIMIT) {
+                try {
+                    if (dependsOnViewer(ExprParser.parse(source))) {
+                        return true;
+                    }
+                } catch (RuntimeException ignored) {
+                    return true;
+                }
+            }
+            open = input.indexOf("{{", close + 2);
+        }
+        return false;
+    }
+
     private static boolean dependsOnTime(Expr expression) {
         if (expression instanceof Expr.Var variable) {
             return variable.name().equals("time.ms")
@@ -131,9 +156,43 @@ public final class TextExpressionRenderer {
         return false;
     }
 
+    private static boolean dependsOnViewer(Expr expression) {
+        if (expression instanceof Expr.Var variable) {
+            return variable.name().startsWith("player.");
+        }
+        if (expression instanceof Expr.ListLiteral list) {
+            return containsViewerDependency(list.items());
+        }
+        if (expression instanceof Expr.Unary unary) {
+            return dependsOnViewer(unary.operand());
+        }
+        if (expression instanceof Expr.Binary binary) {
+            return dependsOnViewer(binary.left()) || dependsOnViewer(binary.right());
+        }
+        if (expression instanceof Expr.Ternary ternary) {
+            return dependsOnViewer(ternary.condition())
+                || dependsOnViewer(ternary.ifTrue())
+                || dependsOnViewer(ternary.ifFalse());
+        }
+        if (expression instanceof Expr.Call call) {
+            return call.name().equals("papi") || call.name().equals("papiNumber")
+                || containsViewerDependency(call.args());
+        }
+        return false;
+    }
+
     private static boolean containsTimeDependency(List<Expr> expressions) {
         for (Expr expression : expressions) {
             if (dependsOnTime(expression)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean containsViewerDependency(List<Expr> expressions) {
+        for (Expr expression : expressions) {
+            if (dependsOnViewer(expression)) {
                 return true;
             }
         }

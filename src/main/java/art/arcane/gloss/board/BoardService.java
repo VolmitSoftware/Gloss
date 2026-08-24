@@ -2,6 +2,7 @@ package art.arcane.gloss.board;
 
 import art.arcane.gloss.Gloss;
 import art.arcane.gloss.doc.DocumentDelta;
+import art.arcane.gloss.doc.ExecutorStorageTaskRunner;
 import art.arcane.gloss.doc.DocumentRegistry;
 import art.arcane.gloss.doc.DocumentReviser;
 import art.arcane.gloss.doc.DocumentStore;
@@ -26,7 +27,6 @@ import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 
 import java.io.File;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -60,6 +60,7 @@ public final class BoardService implements Listener {
     private final ShippedDefaults defaults;
     private final DocumentRegistry<BoardDoc> registry;
     private final DocumentStore<BoardDoc> store;
+    private final BoardStorageQueue storage;
     private final Map<String, GlossBoardMeta> metas;
     private final Map<UUID, String> selections;
     private final Set<UUID> sticky;
@@ -74,6 +75,9 @@ public final class BoardService implements Listener {
         this.staticRender = raw -> plugin.text().renderStatic(raw);
         File folder = new File(plugin.getDataFolder(), BoardDoc.KIND);
         this.store = new DocumentStore<>(BoardDoc.KIND, folder, REVISER);
+        this.storage = new BoardStorageQueue(store,
+            new ExecutorStorageTaskRunner(plugin.getClass().getClassLoader(), "Gloss-Board-Storage"),
+            plugin.getLogger());
         this.defaults = new ShippedDefaults(BoardDoc.KIND, folder, ShippedDocumentCatalog.BOARDS.names());
         this.registry = DocumentRegistry.folder(BoardDoc.KIND, folder, BoardDoc::parse, BoardDoc::revision,
             store::isOwnWrite);
@@ -131,6 +135,7 @@ public final class BoardService implements Listener {
         plugin.watchdog().unregister("boards");
         registry.close();
         stopManagers();
+        storage.shutdown();
         selections.clear();
         sticky.clear();
         metas.clear();
@@ -155,9 +160,14 @@ public final class BoardService implements Listener {
         selectAllAutomatically();
     }
 
-    public boolean createBoard(String id) {
-        String boardId = normalizeId(id);
-        if (boardId.isEmpty() || metas.containsKey(boardId)) {
+    public synchronized boolean createBoard(String id) {
+        String boardId;
+        try {
+            boardId = requireSafeId(normalizeId(id));
+        } catch (IllegalArgumentException failure) {
+            return false;
+        }
+        if (metas.containsKey(boardId)) {
             return false;
         }
         GlossBoardMeta meta = new GlossBoardMeta(boardId);
@@ -169,18 +179,19 @@ public final class BoardService implements Listener {
         return metas.get(normalizeId(id));
     }
 
-    public boolean deleteBoard(String id) {
-        String boardId = normalizeId(id);
+    public synchronized boolean deleteBoard(String id) {
+        String boardId;
+        try {
+            boardId = requireSafeId(normalizeId(id));
+        } catch (IllegalArgumentException failure) {
+            return false;
+        }
         GlossBoardMeta removed = metas.remove(boardId);
         if (removed == null) {
             return false;
         }
         boardSnapshot = null;
-        try {
-            store.delete(boardId);
-        } catch (IOException failure) {
-            Gloss.warn("Unable to delete board file " + boardId + ".json: " + failure.getMessage());
-        }
+        storage.delete(boardId);
         for (Player player : Bukkit.getOnlinePlayers()) {
             if (boardId.equals(selections.get(player.getUniqueId()))) {
                 sticky.remove(player.getUniqueId());
@@ -207,15 +218,16 @@ public final class BoardService implements Listener {
         return metas.size();
     }
 
-    public void saveBoard(GlossBoardMeta meta) {
+    public synchronized void saveBoard(GlossBoardMeta meta) {
         if (meta == null) {
             return;
         }
-        metas.put(meta.id(), meta);
+        String boardId = requireSafeId(meta.id());
+        metas.put(boardId, meta);
         boardSnapshot = null;
         reselectAll();
         BoardDoc doc = meta.toDoc(meta.nextRevision());
-        plugin.scheduler().a(() -> writeBoard(meta.id(), doc), 0);
+        storage.save(boardId, doc);
     }
 
     public List<String> resetToDefault(String nameOrStar) {
@@ -404,14 +416,6 @@ public final class BoardService implements Listener {
         boardSnapshot = null;
     }
 
-    private void writeBoard(String id, BoardDoc doc) {
-        try {
-            store.write(id, doc);
-        } catch (IOException failure) {
-            Gloss.warn("Unable to save board file " + id + ".json: " + failure.getMessage());
-        }
-    }
-
     private void pollRegistry() {
         DocumentDelta delta = registry.poll();
         if (delta.isEmpty()) {
@@ -443,8 +447,18 @@ public final class BoardService implements Listener {
         }
     }
 
-    private String normalizeId(String id) {
+    static String normalizeId(String id) {
         return id == null ? "" : id.trim().replace(" ", "-");
+    }
+
+    static String requireSafeId(String id) {
+        if (id == null || id.isBlank()) {
+            throw new IllegalArgumentException("board id may not be blank");
+        }
+        if (id.contains("/") || id.contains("\\") || id.contains("..")) {
+            throw new IllegalArgumentException("board id may not contain path characters: " + id);
+        }
+        return id;
     }
 
     private final class SelectionBoardProvider implements BoardProvider {

@@ -1,6 +1,7 @@
 package art.arcane.gloss.hologram;
 
 import art.arcane.gloss.Gloss;
+import art.arcane.gloss.animation.AnimationService;
 import art.arcane.gloss.api.AnchoredHologram;
 import art.arcane.gloss.api.TemporaryHologram;
 import art.arcane.gloss.doc.DocumentDelta;
@@ -25,7 +26,15 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.HandlerList;
 import org.bukkit.event.Listener;
+import org.bukkit.event.player.PlayerChangedWorldEvent;
+import org.bukkit.event.player.PlayerJoinEvent;
+import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.event.player.PlayerRespawnEvent;
+import org.bukkit.event.player.PlayerTeleportEvent;
+import org.bukkit.event.vehicle.VehicleEnterEvent;
+import org.bukkit.event.vehicle.VehicleExitEvent;
+import org.bukkit.event.vehicle.VehicleMoveEvent;
 import org.bukkit.event.world.EntitiesLoadEvent;
 import org.bukkit.persistence.PersistentDataType;
 
@@ -35,14 +44,18 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Queue;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 import java.util.logging.Level;
 
@@ -50,6 +63,20 @@ public final class HologramService {
     private static final String DISPLAY_TAG = "gloss_display";
     private static final int NO_TASK = -1;
     private static final int ANIMATION_REFRESH_INTERVAL_TICKS = 1;
+    private static final long LEASE_SWEEP_INTERVAL_NANOS = TimeUnit.SECONDS.toNanos(10L);
+    private static final int VIEWER_RECONCILE_BATCH = 32;
+    private static final int STARTUP_PURGE_BATCH = 32;
+
+    private enum FileMutationKind {
+        WRITE,
+        DELETE
+    }
+
+    private record FileMutation(String id, FileMutationKind kind, HologramDoc doc) {
+    }
+
+    private record ChunkPurge(World world, int chunkX, int chunkZ) {
+    }
 
     private static final DocumentReviser<HologramDoc> REVISER = new DocumentReviser<>() {
         @Override
@@ -70,14 +97,25 @@ public final class HologramService {
     private final Map<String, PersistentHologram> holograms;
     private final Set<TemporaryHologramDisplay> temporaries;
     private final Map<UUID, TextDisplay> leased;
+    private final HologramViewerIndex viewerIndex;
+    private final Set<PersistentHologram> persistentTicks;
+    private final Map<UUID, ViewerWorkQueue> viewerWorkQueues;
+    private final Map<String, FileMutation> pendingFileMutations;
+    private final Queue<ChunkPurge> startupChunkPurges;
     private final ExecutorService fileExecutor;
     private final HologramListener listener;
     private final AtomicBoolean driverReconcileQueued;
+    private final AtomicBoolean fileDrainQueued;
+    private final AtomicLong viewerWorkDispatches;
+    private final AtomicLong fileDrainSubmissions;
     private int driverTaskId;
+    private int fastDriverTaskId;
     private int driverIntervalTicks;
     private int temporaryTaskId;
+    private int viewerReconcileTaskId;
+    private int startupPurgeTaskId;
     private volatile boolean driverRunning;
-    private volatile HologramTick lastTick;
+    private volatile long nextLeaseSweepNanos;
 
     public HologramService(Gloss plugin) {
         this.plugin = plugin;
@@ -89,18 +127,30 @@ public final class HologramService {
         this.holograms = new ConcurrentHashMap<>();
         this.temporaries = ConcurrentHashMap.newKeySet();
         this.leased = new ConcurrentHashMap<>();
+        this.viewerIndex = new HologramViewerIndex();
+        this.persistentTicks = ConcurrentHashMap.newKeySet();
+        this.viewerWorkQueues = new ConcurrentHashMap<>();
+        this.pendingFileMutations = new ConcurrentHashMap<>();
+        this.startupChunkPurges = new ConcurrentLinkedQueue<>();
         this.fileExecutor = Executors.newSingleThreadExecutor(HologramService::createFileThread);
         this.listener = new HologramListener();
         this.driverReconcileQueued = new AtomicBoolean();
+        this.fileDrainQueued = new AtomicBoolean();
+        this.viewerWorkDispatches = new AtomicLong();
+        this.fileDrainSubmissions = new AtomicLong();
         this.driverTaskId = NO_TASK;
+        this.fastDriverTaskId = NO_TASK;
         this.driverIntervalTicks = NO_TASK;
         this.temporaryTaskId = NO_TASK;
+        this.viewerReconcileTaskId = NO_TASK;
+        this.startupPurgeTaskId = NO_TASK;
     }
 
     public void enable() {
         loadAll();
         plugin.watchdog().register("holograms", this::pollRegistry);
         Bukkit.getPluginManager().registerEvents(listener, plugin);
+        captureOnlineViewers();
         sweepLoadedChunks();
         startTasks();
         if (!holograms.isEmpty()) {
@@ -113,28 +163,26 @@ public final class HologramService {
         registry.close();
         stopTasks();
         HandlerList.unregisterAll(listener);
-        for (PersistentHologram hologram : holograms.values()) {
-            hologram.despawnAll();
-        }
-
-        for (TemporaryHologramDisplay temporary : temporaries) {
-            temporary.destroy();
-        }
-
+        List<PersistentHologram> retiring = new ArrayList<>(holograms.values());
+        holograms.clear();
+        retirePersistentHolograms(retiring, "disable");
+        retireTemporaryHolograms(new ArrayList<>(temporaries), "disable");
+        flushFileMutations();
         shutdownFileExecutor();
         temporaries.clear();
-        holograms.clear();
+        persistentTicks.clear();
         store.forgetAll();
         leased.clear();
+        viewerIndex.clear();
+        viewerWorkQueues.clear();
     }
 
     public void reload() {
         stopTasks();
-        for (PersistentHologram hologram : holograms.values()) {
-            hologram.despawnAll();
-        }
-
+        List<PersistentHologram> retiring = new ArrayList<>(holograms.values());
         holograms.clear();
+        retirePersistentHolograms(retiring, "reload");
+        flushFileMutations();
         loadAll();
         startTasks();
     }
@@ -165,19 +213,18 @@ public final class HologramService {
 
     public void delete(String id) {
         String safeId = requireSafeId(id);
-        PersistentHologram removed = holograms.remove(safeId);
+        PersistentHologram[] removedHolder = new PersistentHologram[1];
+        holograms.compute(safeId, (key, current) -> {
+            removedHolder[0] = current;
+            pendingFileMutations.put(key, new FileMutation(key, FileMutationKind.DELETE, null));
+            return null;
+        });
+        scheduleFileDrain();
+        PersistentHologram removed = removedHolder[0];
         if (removed != null) {
             removed.despawnAll();
             requestDriverIntervalReconcile();
         }
-
-        submitFileTask(() -> {
-            try {
-                store.delete(safeId);
-            } catch (IOException failure) {
-                Gloss.warn("Failed to delete hologram file " + safeId + ".json: " + failure.getMessage());
-            }
-        });
     }
 
     public List<AnchoredHologram> all() {
@@ -230,8 +277,32 @@ public final class HologramService {
         return plugin.cfg().holograms().temporaryUpdateIntervalTicks();
     }
 
+    int persistentUpdateIntervalTicks() {
+        return plugin.cfg().holograms().updateIntervalTicks();
+    }
+
     boolean highFrequencyAnimations() {
         return plugin.cfg().holograms().highFrequencyAnimations();
+    }
+
+    long animationGeneration() {
+        AnimationService animations = plugin.animations();
+        return animations == null ? 0L : animations.generation();
+    }
+
+    boolean animationFramesViewerSpecific(String raw) {
+        AnimationService animations = plugin.animations();
+        return animations != null && animations.framesViewerSpecific(raw);
+    }
+
+    boolean hasDynamicAnimationContent(List<String> lines) {
+        AnimationService animations = plugin.animations();
+        return animations == null || animations.hasDynamicAnimationContent(lines);
+    }
+
+    boolean hasFastDynamicAnimationContent(List<String> lines) {
+        AnimationService animations = plugin.animations();
+        return animations != null && animations.hasFastDynamicAnimationContent(lines);
     }
 
     boolean isActive(PersistentHologram hologram) {
@@ -284,43 +355,205 @@ public final class HologramService {
         }
     }
 
+    void runEntity(Entity entity, Runnable action, Runnable retired) {
+        Runnable retirement = once(retired);
+        if (!FoliaScheduler.runEntity(plugin, entity, action, 0L, retirement)) {
+            retirement.run();
+        }
+    }
+
+    void runViewerWork(Player player, UUID playerId, String key, Runnable work) {
+        runViewerWork(player, playerId, key, work, 0L);
+    }
+
+    void runViewerWork(Player player, UUID playerId, String key, Runnable work, long delayTicks) {
+        if (delayTicks > 0L) {
+            FoliaScheduler.runEntity(plugin, player,
+                () -> runViewerWork(player, playerId, key, work), delayTicks,
+                () -> prunePlayer(playerId));
+            return;
+        }
+        ViewerWorkQueue queue = viewerWorkQueues.computeIfAbsent(playerId,
+            ignored -> new ViewerWorkQueue());
+        queue.tasks.put(key, work);
+        if (!queue.scheduled.compareAndSet(false, true)) {
+            return;
+        }
+        viewerWorkDispatches.incrementAndGet();
+        Runnable drain = () -> drainViewerWork(playerId, queue);
+        Runnable retirement = once(() -> retireViewerWork(playerId, queue));
+        if (!FoliaScheduler.runEntity(plugin, player, drain, 0L, retirement)) {
+            retirement.run();
+        }
+    }
+
+    long viewerWorkDispatchCount() {
+        return viewerWorkDispatches.get();
+    }
+
+    private void drainViewerWork(UUID playerId, ViewerWorkQueue queue) {
+        while (true) {
+            List<Map.Entry<String, Runnable>> batch = new ArrayList<>(queue.tasks.entrySet());
+            for (Map.Entry<String, Runnable> entry : batch) {
+                if (!queue.tasks.remove(entry.getKey(), entry.getValue())) {
+                    continue;
+                }
+                try {
+                    entry.getValue().run();
+                } catch (Throwable failure) {
+                    plugin.getLogger().log(Level.WARNING,
+                        "Hologram viewer refresh failed for " + playerId, failure);
+                }
+            }
+            queue.scheduled.set(false);
+            if (queue.tasks.isEmpty() || !queue.scheduled.compareAndSet(false, true)) {
+                return;
+            }
+        }
+    }
+
+    private void retireViewerWork(UUID playerId, ViewerWorkQueue queue) {
+        queue.tasks.clear();
+        queue.scheduled.set(false);
+        viewerWorkQueues.remove(playerId, queue);
+    }
+
     void persist(PersistentHologram hologram) {
+        if (!isActive(hologram)) {
+            return;
+        }
         HologramDoc doc = hologram.toDoc(hologram.nextRevision());
         String id = hologram.id();
-        submitFileTask(() -> {
-            try {
-                store.write(id, doc);
-            } catch (IOException failure) {
-                plugin.getLogger().log(Level.WARNING, "Failed to save hologram " + id, failure);
+        FileMutation mutation = new FileMutation(id, FileMutationKind.WRITE, doc);
+        pendingFileMutations.compute(id, (key, current) -> {
+            if (!isActive(hologram)) {
+                return current;
             }
+            return mutation;
         });
+        if (pendingFileMutations.get(id) == mutation) {
+            scheduleFileDrain();
+        }
     }
 
     void persistentTextChanged() {
         requestDriverIntervalReconcile();
     }
 
-    private void submitFileTask(Runnable task) {
-        if (fileExecutor.isShutdown()) {
-            task.run();
+    private void scheduleFileDrain() {
+        if (!fileDrainQueued.compareAndSet(false, true)) {
             return;
         }
-
+        fileDrainSubmissions.incrementAndGet();
         try {
-            fileExecutor.execute(task);
+            fileExecutor.execute(this::drainFileMutations);
         } catch (RejectedExecutionException rejected) {
-            task.run();
+            drainFileMutations();
         }
+    }
+
+    private void drainFileMutations() {
+        try {
+            while (true) {
+                List<FileMutation> batch = new ArrayList<>(pendingFileMutations.values());
+                if (batch.isEmpty()) {
+                    return;
+                }
+                for (FileMutation mutation : batch) {
+                    if (pendingFileMutations.get(mutation.id()) != mutation) {
+                        continue;
+                    }
+                    applyFileMutation(mutation);
+                    pendingFileMutations.remove(mutation.id(), mutation);
+                }
+            }
+        } finally {
+            fileDrainQueued.set(false);
+            if (!pendingFileMutations.isEmpty()) {
+                scheduleFileDrain();
+            }
+        }
+    }
+
+    private void applyFileMutation(FileMutation mutation) {
+        try {
+            if (mutation.kind() == FileMutationKind.DELETE) {
+                store.delete(mutation.id());
+            } else {
+                store.write(mutation.id(), mutation.doc());
+            }
+        } catch (IOException failure) {
+            plugin.getLogger().log(Level.WARNING,
+                "Failed to " + (mutation.kind() == FileMutationKind.DELETE ? "delete" : "save")
+                    + " hologram " + mutation.id(), failure);
+        }
+    }
+
+    int pendingFileMutationCount() {
+        return pendingFileMutations.size();
+    }
+
+    long fileDrainSubmissionCount() {
+        return fileDrainSubmissions.get();
     }
 
     private void shutdownFileExecutor() {
         fileExecutor.shutdown();
         try {
-            if (!fileExecutor.awaitTermination(5L, TimeUnit.SECONDS)) {
-                Gloss.warn("Timed out waiting for hologram file writes to complete.");
+            if (fileExecutor.awaitTermination(5L, TimeUnit.SECONDS)) {
+                return;
+            }
+            fileExecutor.shutdownNow();
+            plugin.getLogger().log(Level.WARNING,
+                "Timed out waiting for hologram file writes; interrupted the IO worker with "
+                    + pendingFileMutations.size() + " coalesced mutation(s) still pending.");
+            if (!fileExecutor.awaitTermination(1L, TimeUnit.SECONDS)) {
+                plugin.getLogger().log(Level.SEVERE,
+                    "Gloss hologram IO worker did not stop after interruption; it is a daemon and may outlive cleanup.");
             }
         } catch (InterruptedException interrupted) {
+            fileExecutor.shutdownNow();
             Thread.currentThread().interrupt();
+        }
+    }
+
+    private void flushFileMutations() {
+        if (pendingFileMutations.isEmpty() && !fileDrainQueued.get()) {
+            return;
+        }
+        scheduleFileDrain();
+        CountDownLatch drained = new CountDownLatch(1);
+        try {
+            fileExecutor.execute(drained::countDown);
+            if (!drained.await(5L, TimeUnit.SECONDS)) {
+                Gloss.warn("Timed out waiting for pending hologram file writes before reload.");
+            }
+        } catch (RejectedExecutionException rejected) {
+            drainFileMutations();
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    private void retirePersistentHolograms(List<PersistentHologram> retiring, String operation) {
+        for (PersistentHologram hologram : retiring) {
+            try {
+                hologram.despawnAll();
+            } catch (Throwable failure) {
+                plugin.getLogger().log(Level.WARNING,
+                    "Failed to retire persistent hologram " + hologram.id() + " during " + operation, failure);
+            }
+        }
+    }
+
+    private void retireTemporaryHolograms(List<TemporaryHologramDisplay> retiring, String operation) {
+        for (TemporaryHologramDisplay temporary : retiring) {
+            try {
+                temporary.destroy();
+            } catch (Throwable failure) {
+                plugin.getLogger().log(Level.WARNING,
+                    "Failed to retire temporary hologram " + temporary.id() + " during " + operation, failure);
+            }
         }
     }
 
@@ -339,10 +572,11 @@ public final class HologramService {
 
     private void startTasks() {
         driverRunning = true;
-        int intervalTicks = desiredDriverIntervalTicks();
-        driverTaskId = plugin.scheduler().sr(this::driveHolograms, intervalTicks);
-        driverIntervalTicks = intervalTicks;
+        driverIntervalTicks = plugin.cfg().holograms().updateIntervalTicks();
+        driverTaskId = plugin.scheduler().sr(() -> driveHolograms(false), driverIntervalTicks);
+        reconcileFastDriver();
         temporaryTaskId = plugin.scheduler().sr(this::driveTemporaries, plugin.cfg().holograms().temporaryUpdateIntervalTicks());
+        viewerReconcileTaskId = plugin.scheduler().sr(this::reconcileViewers, 1);
     }
 
     private void stopTasks() {
@@ -352,43 +586,87 @@ public final class HologramService {
             plugin.scheduler().csr(driverTaskId);
             driverTaskId = NO_TASK;
         }
+        if (fastDriverTaskId != NO_TASK) {
+            plugin.scheduler().csr(fastDriverTaskId);
+            fastDriverTaskId = NO_TASK;
+        }
         driverIntervalTicks = NO_TASK;
         if (temporaryTaskId != NO_TASK) {
             plugin.scheduler().csr(temporaryTaskId);
             temporaryTaskId = NO_TASK;
         }
+        if (viewerReconcileTaskId != NO_TASK) {
+            plugin.scheduler().csr(viewerReconcileTaskId);
+            viewerReconcileTaskId = NO_TASK;
+        }
+        if (startupPurgeTaskId != NO_TASK) {
+            plugin.scheduler().csr(startupPurgeTaskId);
+            startupPurgeTaskId = NO_TASK;
+        }
+        startupChunkPurges.clear();
     }
 
-    private void driveHolograms() {
+    private void driveHolograms(boolean fast) {
         if (!plugin.cfg().holograms().enabled()) {
-            for (PersistentHologram hologram : holograms.values()) {
-                hologram.despawnAll();
+            if (!fast) {
+                for (PersistentHologram hologram : holograms.values()) {
+                    hologram.despawnAll();
+                }
+                sweepLeases();
             }
-
-            sweepLeases();
             return;
         }
 
-        HologramTick tick = new HologramTick();
+        HologramTick tick = new HologramTick(viewerIndex);
+        boolean partitioned = usesFastPartition();
         for (PersistentHologram hologram : holograms.values()) {
-            hologram.update(tick);
+            if (partitioned && hologram.requiresFastRefresh() != fast) {
+                continue;
+            }
+            schedulePersistentTick(hologram, tick);
         }
 
-        publishTick(tick);
-        sweepLeases();
+        if (!fast) {
+            sweepLeases();
+        }
     }
 
-    private int desiredDriverIntervalTicks() {
-        int configuredIntervalTicks = plugin.cfg().holograms().updateIntervalTicks();
-        if (!plugin.cfg().text().functions()) {
-            return configuredIntervalTicks;
+    private void schedulePersistentTick(PersistentHologram hologram, HologramTick tick) {
+        if (!driverRunning) {
+            return;
         }
-        for (PersistentHologram hologram : holograms.values()) {
-            if (hologram.requiresFastRefresh()) {
-                return Math.min(configuredIntervalTicks, ANIMATION_REFRESH_INTERVAL_TICKS);
+        if (!persistentTicks.add(hologram)) {
+            return;
+        }
+        PersistentHologram.TickAnchor tickAnchor = hologram.tickAnchor();
+        if (tickAnchor == null || tickAnchor.location().getWorld() == null) {
+            persistentTicks.remove(hologram);
+            hologram.despawnAll();
+            return;
+        }
+        if (!viewerIndex.anyNearby(tickAnchor.location(), viewRange())) {
+            persistentTicks.remove(hologram);
+            hologram.despawnAll();
+            return;
+        }
+        Runnable update = () -> {
+            try {
+                if (driverRunning && plugin.cfg().holograms().enabled() && isActive(hologram)
+                    && hologram.isCurrent(tickAnchor)) {
+                    hologram.update(tick, tickAnchor);
+                }
+            } finally {
+                persistentTicks.remove(hologram);
             }
+        };
+        if (!plugin.scheduler().runAt(tickAnchor.location(), update)) {
+            persistentTicks.remove(hologram);
         }
-        return configuredIntervalTicks;
+    }
+
+    private boolean usesFastPartition() {
+        return plugin.cfg().text().functions()
+            && driverIntervalTicks > ANIMATION_REFRESH_INTERVAL_TICKS;
     }
 
     private void requestDriverIntervalReconcile() {
@@ -407,15 +685,31 @@ public final class HologramService {
         if (!driverRunning) {
             return;
         }
-        int intervalTicks = desiredDriverIntervalTicks();
+        int intervalTicks = plugin.cfg().holograms().updateIntervalTicks();
         if (driverTaskId != NO_TASK && driverIntervalTicks == intervalTicks) {
+            reconcileFastDriver();
             return;
         }
         if (driverTaskId != NO_TASK) {
             plugin.scheduler().csr(driverTaskId);
         }
-        driverTaskId = plugin.scheduler().sr(this::driveHolograms, intervalTicks);
+        driverTaskId = plugin.scheduler().sr(() -> driveHolograms(false), intervalTicks);
         driverIntervalTicks = intervalTicks;
+        reconcileFastDriver();
+    }
+
+    private void reconcileFastDriver() {
+        boolean required = usesFastPartition() && holograms.values().stream()
+            .anyMatch(PersistentHologram::requiresFastRefresh);
+        if (required && fastDriverTaskId == NO_TASK) {
+            fastDriverTaskId = plugin.scheduler().sr(() -> driveHolograms(true),
+                ANIMATION_REFRESH_INTERVAL_TICKS);
+            return;
+        }
+        if (!required && fastDriverTaskId != NO_TASK) {
+            plugin.scheduler().csr(fastDriverTaskId);
+            fastDriverTaskId = NO_TASK;
+        }
     }
 
     static int refreshIntervalTicks(List<String> lines, int configuredIntervalTicks) {
@@ -429,71 +723,78 @@ public final class HologramService {
 
     private void driveTemporaries() {
         boolean enabled = plugin.cfg().holograms().enabled();
-        HologramTick tick = new HologramTick();
+        HologramTick tick = new HologramTick(viewerIndex);
         for (TemporaryHologramDisplay temporary : temporaries) {
-            temporary.drive(tick, enabled);
+            temporary.scheduleDrive(tick, enabled);
         }
-
-        publishTick(tick);
     }
 
-    /**
-     * Published only once the pass that filled it has finished. The map is lazily populated during
-     * the pass, so handing it out earlier would let a reader on another region thread walk a map
-     * that is still being written; a volatile write after the last mutation makes the snapshot
-     * safely readable and permanently immutable in practice.
-     */
-    private void publishTick(HologramTick tick) {
-        lastTick = tick;
-    }
-
-    /**
-     * Runs {@code action} for every player the last drive pass saw within {@code rangeSquared} of
-     * {@code anchor}, and reports whether that snapshot existed.
-     *
-     * <p>Callers that spawn a temporary at event rate would otherwise allocate a fresh
-     * {@code world.getPlayers()} list per event purely to answer a proximity question the drive pass
-     * already answered. Positions are at most one drive interval old. A false return means no pass
-     * has captured this world yet and the caller must do its own scan.
-     */
     public boolean forEachNearbyViewer(Location anchor, double rangeSquared, Consumer<Player> action) {
-        HologramTick tick = lastTick;
         World world = anchor.getWorld();
-        if (tick == null || world == null) {
+        if (world == null || rangeSquared < 0.0D || !Double.isFinite(rangeSquared)) {
             return false;
         }
-
-        List<HologramTick.Viewer> viewers = tick.captured(world);
-        if (viewers == null) {
-            return false;
-        }
-
-        double anchorX = anchor.getX();
-        double anchorY = anchor.getY();
-        double anchorZ = anchor.getZ();
-        for (HologramTick.Viewer viewer : viewers) {
-            double dx = viewer.x() - anchorX;
-            double dy = viewer.y() - anchorY;
-            double dz = viewer.z() - anchorZ;
-            if (dx * dx + dy * dy + dz * dz > rangeSquared) {
-                continue;
-            }
-
+        for (HologramTick.Viewer viewer : viewerIndex.nearby(anchor, Math.sqrt(rangeSquared))) {
             action.accept(viewer.player());
         }
-
         return true;
     }
 
+    private void captureOnlineViewers() {
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            captureViewer(player);
+        }
+    }
+
+    private void captureViewer(Player player) {
+        captureViewer(player, 0L);
+    }
+
+    private void captureViewer(Player player, long delayTicks) {
+        Runnable capture = () -> {
+            if (player.isOnline()) {
+                updateViewerLocation(player, player.getLocation());
+            }
+        };
+        FoliaScheduler.runEntity(plugin, player, capture, delayTicks,
+            () -> viewerIndex.remove(player.getUniqueId()));
+    }
+
+    private void updateViewerLocation(Player player, Location location) {
+        if (viewerIndex.update(player, location)) {
+            refreshPersonalizedTracking(player);
+        }
+    }
+
+    private void reconcileViewers() {
+        viewerIndex.reconcileBatch(VIEWER_RECONCILE_BATCH, this::captureViewer);
+    }
+
     private void sweepLeases() {
-        if (leased.isEmpty()) {
+        long now = System.nanoTime();
+        if (leased.isEmpty() || now < nextLeaseSweepNanos) {
             return;
         }
-
-        leased.values().removeIf(display -> !display.isValid());
+        nextLeaseSweepNanos = now + LEASE_SWEEP_INTERVAL_NANOS;
+        for (Map.Entry<UUID, TextDisplay> entry : leased.entrySet()) {
+            UUID displayId = entry.getKey();
+            TextDisplay display = entry.getValue();
+            Runnable inspect = () -> {
+                if (!display.isValid()) {
+                    leased.remove(displayId, display);
+                }
+            };
+            if (!plugin.scheduler().runEntity(display, inspect)) {
+                leased.remove(displayId, display);
+            }
+        }
     }
 
     void prunePlayer(UUID playerId) {
+        ViewerWorkQueue queue = viewerWorkQueues.remove(playerId);
+        if (queue != null) {
+            queue.tasks.clear();
+        }
         for (TemporaryHologramDisplay temporary : temporaries) {
             temporary.onPlayerQuit(playerId);
         }
@@ -561,12 +862,41 @@ public final class HologramService {
         holograms.put(id, new PersistentHologram(this, id, doc));
     }
 
-    private void sweepLoadedChunks() {
+    void sweepLoadedChunks() {
+        startupChunkPurges.clear();
         for (World world : Bukkit.getWorlds()) {
             for (Chunk chunk : world.getLoadedChunks()) {
-                scheduleChunkPurge(world, chunk.getX(), chunk.getZ());
+                startupChunkPurges.add(new ChunkPurge(world, chunk.getX(), chunk.getZ()));
             }
         }
+        if (!startupChunkPurges.isEmpty() && startupPurgeTaskId == NO_TASK) {
+            startupPurgeTaskId = plugin.scheduler().sr(this::drainStartupChunkPurges, 1);
+        }
+    }
+
+    void drainStartupChunkPurges() {
+        for (int scheduled = 0; scheduled < STARTUP_PURGE_BATCH; scheduled++) {
+            ChunkPurge purge = startupChunkPurges.poll();
+            if (purge == null) {
+                stopStartupChunkPurge();
+                return;
+            }
+            scheduleChunkPurge(purge.world(), purge.chunkX(), purge.chunkZ());
+        }
+        if (startupChunkPurges.isEmpty()) {
+            stopStartupChunkPurge();
+        }
+    }
+
+    private void stopStartupChunkPurge() {
+        if (startupPurgeTaskId != NO_TASK) {
+            plugin.scheduler().csr(startupPurgeTaskId);
+            startupPurgeTaskId = NO_TASK;
+        }
+    }
+
+    int startupChunkPurgeCount() {
+        return startupChunkPurges.size();
     }
 
     private void scheduleChunkPurge(World world, int chunkX, int chunkZ) {
@@ -606,6 +936,15 @@ public final class HologramService {
         return thread;
     }
 
+    private static Runnable once(Runnable action) {
+        AtomicBoolean executed = new AtomicBoolean();
+        return () -> {
+            if (executed.compareAndSet(false, true)) {
+                action.run();
+            }
+        };
+    }
+
     private static String requireSafeId(String id) {
         Objects.requireNonNull(id, "Hologram id may not be null.");
         if (id.isBlank()) {
@@ -618,6 +957,23 @@ public final class HologramService {
         return id;
     }
 
+    static final class ViewerWorkQueue {
+        private final Map<String, Runnable> tasks = new ConcurrentHashMap<>();
+        private final AtomicBoolean scheduled = new AtomicBoolean();
+
+        void put(String key, Runnable work) {
+            tasks.put(key, work);
+        }
+
+        int pendingCount() {
+            return tasks.size();
+        }
+
+        Runnable remove(String key) {
+            return tasks.remove(key);
+        }
+    }
+
     private final class HologramListener implements Listener {
         @EventHandler
         public void onEntitiesLoad(EntitiesLoadEvent event) {
@@ -628,7 +984,91 @@ public final class HologramService {
 
         @EventHandler(priority = EventPriority.MONITOR)
         public void onPlayerQuit(PlayerQuitEvent event) {
-            prunePlayer(event.getPlayer().getUniqueId());
+            UUID playerId = event.getPlayer().getUniqueId();
+            viewerIndex.remove(playerId);
+            prunePlayer(playerId);
+        }
+
+        @EventHandler(priority = EventPriority.MONITOR)
+        public void onPlayerJoin(PlayerJoinEvent event) {
+            viewerIndex.update(event.getPlayer(), event.getPlayer().getLocation());
+            reconcileViewerLifecycle(event.getPlayer());
+        }
+
+        @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+        public void onPlayerMove(PlayerMoveEvent event) {
+            if (!(event instanceof PlayerTeleportEvent) && event.getTo() != null) {
+                updateViewerLocation(event.getPlayer(), event.getTo());
+            }
+        }
+
+        @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+        public void onPlayerTeleport(PlayerTeleportEvent event) {
+            if (event.getTo() != null) {
+                viewerIndex.update(event.getPlayer(), event.getTo());
+                reconcileViewerLifecycle(event.getPlayer());
+            }
+        }
+
+        @EventHandler(priority = EventPriority.MONITOR)
+        public void onPlayerChangedWorld(PlayerChangedWorldEvent event) {
+            viewerIndex.update(event.getPlayer(), event.getPlayer().getLocation());
+            reconcileViewerLifecycle(event.getPlayer());
+        }
+
+        @EventHandler(priority = EventPriority.MONITOR)
+        public void onPlayerRespawn(PlayerRespawnEvent event) {
+            viewerIndex.update(event.getPlayer(), event.getRespawnLocation());
+            reconcileViewerLifecycle(event.getPlayer());
+        }
+
+        @EventHandler(priority = EventPriority.MONITOR)
+        public void onVehicleMove(VehicleMoveEvent event) {
+            reconcilePassengers(event.getVehicle().getPassengers());
+        }
+
+        @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+        public void onVehicleEnter(VehicleEnterEvent event) {
+            if (event.getEntered() instanceof Player player) {
+                captureViewer(player, 1L);
+            }
+        }
+
+        @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+        public void onVehicleExit(VehicleExitEvent event) {
+            if (event.getExited() instanceof Player player) {
+                captureViewer(player, 1L);
+            }
+        }
+    }
+
+    private void reconcilePassengers(List<Entity> passengers) {
+        for (Entity passenger : passengers) {
+            if (passenger instanceof Player player) {
+                captureViewer(player, 1L);
+            }
+            if (!passenger.getPassengers().isEmpty()) {
+                reconcilePassengers(passenger.getPassengers());
+            }
+        }
+    }
+
+    private void reconcileViewerLifecycle(Player player) {
+        for (TemporaryHologramDisplay temporary : temporaries) {
+            temporary.reconcileVisibilityFor(player);
+        }
+        invalidatePersonalizedTracking(player, true);
+    }
+
+    private void invalidatePersonalizedTracking(Player player, boolean clearClientText) {
+        for (PersistentHologram hologram : holograms.values()) {
+            hologram.invalidateTrackingFor(player, clearClientText);
+        }
+    }
+
+    private void refreshPersonalizedTracking(Player player) {
+        for (PersistentHologram hologram : holograms.values()) {
+            hologram.refreshTrackingFor(player);
         }
     }
 }

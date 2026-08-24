@@ -116,6 +116,9 @@
         "failed": "&7[&bGloss&7]: &cLegacy hologram migration from &f{source}&c failed: {reason}"
       "config":
         "reloaded": "&2Cấu hình \"{name}\" đã được tải lại."
+      "hotload":
+        "singular": "&2Đã tải lại nóng {kinds} ({count} thay đổi)."
+        "plural": "&2Đã tải lại nóng {kinds} ({count} thay đổi)."
       "preview_scale":
         "adjusting": "&7Kích thước xem trước: &f{percent}% &8- &7giữ Cúi + cuộn để đổi kích thước; nhấn Cúi hai lần để lưu"
         "hidden": "&7Xem trước đã &cẩn &8- &7cuộn lên để khôi phục"

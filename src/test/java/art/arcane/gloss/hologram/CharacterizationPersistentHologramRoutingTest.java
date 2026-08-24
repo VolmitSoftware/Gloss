@@ -9,9 +9,12 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -22,9 +25,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * Characterization pins for persistent-hologram routing and text assignment (STEP 1, Char-1).
  *
- * <p>Frozen contract for Lane A (A2 static-revision caching, A3 per-viewer split rendering,
- * A12 shared world snapshots). Pins assert which routing shape serves a line set (shared entity
- * vs one entity per in-range viewer), the rendered text each viewer ends up with, animator
+ * <p>Frozen contract for Lane A (A2 static-revision caching, A3 per-viewer packet rendering,
+ * A12 shared world snapshots). Pins assert which routing shape serves a line set, the rendered
+ * text each viewer ends up with, animator
  * publish/retract transitions, and the reposition epsilon — all invariant under the planned
  * caching work.</p>
  */
@@ -56,6 +59,17 @@ class CharacterizationPersistentHologramRoutingTest {
         return hologram;
     }
 
+    private Map<UUID, String> latestViewerText() {
+        harness.animator.pass(System.currentTimeMillis());
+        Map<UUID, String> latest = new HashMap<>();
+        for (CharacterizationHarness.Sent sent : harness.sender.sent) {
+            if (sent.viewers().size() == 1) {
+                latest.put(sent.viewers().getFirst().getUniqueId(), sent.text());
+            }
+        }
+        return latest;
+    }
+
     @Test
     void staticLinesShareOneDisplayForAllViewers() {
         PersistentHologram hologram = hologram("h-static", List.of("&aHello", "World"));
@@ -84,45 +98,31 @@ class CharacterizationPersistentHologramRoutingTest {
     }
 
     @Test
-    void placeholderLinesRouteToPrivatePerViewerDisplays() {
+    void placeholderLinesUseOneBlankEntityWithPerViewerMetadata() {
         harness.registerFunction("who", player -> player == null ? "console" : player.getName());
         PersistentHologram hologram = hologram("h-viewer", List.of("%score% |who|"));
         hologram.update();
+        harness.drainDelayed();
 
-        List<DisplayHandle> live = harness.liveSpawned(world);
-        assertEquals(2, live.size(), "each in-range viewer must get a private display");
-
-        Set<String> texts = new HashSet<>();
-        for (DisplayHandle display : live) {
-            assertEquals(Boolean.FALSE, display.visibleByDefault,
-                "per-viewer displays must spawn hidden by default");
-            texts.add(display.lastText());
-        }
-        assertEquals(Set.of("%score% Alice", "%score% Bob"), texts,
-            "per-viewer rendering must resolve viewer-dependent content per player");
-
-        for (DisplayHandle display : live) {
-            boolean aliceSees = Boolean.TRUE.equals(alice.perceivedVisibility(display));
-            boolean bobSees = Boolean.TRUE.equals(bob.perceivedVisibility(display));
-            assertTrue(aliceSees ^ bobSees, "each private display must be shown to exactly one viewer");
-            PlayerHandle owner = aliceSees ? alice : bob;
-            assertTrue(display.lastText().contains(owner.name),
-                "the display shown to a viewer must carry that viewer's rendering");
+        DisplayHandle display = harness.onlySpawned(world);
+        assertEquals("", display.lastText(), "the server entity base text must not expose personalized content");
+        assertNull(display.visibleByDefault);
+        assertEquals(Map.of(alice.uuid, "%score% Alice", bob.uuid, "%score% Bob"), latestViewerText(),
+            "one entity id must receive viewer-specific metadata on each player connection");
+        for (CharacterizationHarness.Sent sent : harness.sender.sent) {
+            assertEquals(display.entityId, sent.entityId(),
+                "every personalized recipient must target the shared server entity id");
         }
     }
 
     @Test
-    void inlinePlayerExpressionsRouteToPrivatePerViewerDisplays() {
+    void inlinePlayerExpressionsRouteToPerViewerMetadata() {
         PersistentHologram hologram = hologram("h-expression", List.of("Hello {{ player.name }}"));
         hologram.update();
+        harness.drainDelayed();
 
-        List<DisplayHandle> live = harness.liveSpawned(world);
-        assertEquals(2, live.size());
-        Set<String> texts = new HashSet<>();
-        for (DisplayHandle display : live) {
-            texts.add(display.lastText());
-        }
-        assertEquals(Set.of("Hello Alice", "Hello Bob"), texts);
+        assertEquals(1, harness.liveSpawned(world).size());
+        assertEquals(Set.of("Hello Alice", "Hello Bob"), new HashSet<>(latestViewerText().values()));
     }
 
     @Test
@@ -138,22 +138,50 @@ class CharacterizationPersistentHologramRoutingTest {
     }
 
     @Test
-    void viewerLeavingRangeDespawnsThePrivateDisplayAndReturnRespawns() {
+    void viewerLeavingRangeRetractsItsMetadataWhileTheSharedEntityRemains() {
         harness.registerFunction("who", player -> player == null ? "console" : player.getName());
         PersistentHologram hologram = hologram("h-range", List.of("%score% |who|"));
         hologram.update();
-        assertEquals(2, harness.liveSpawned(world).size());
+        harness.drainDelayed();
+        assertEquals(1, harness.liveSpawned(world).size());
+        latestViewerText();
 
         harness.moveTo(bob, world, 200.0D, 64.0D, 200.0D);
         hologram.update();
 
-        List<DisplayHandle> live = harness.liveSpawned(world);
-        assertEquals(1, live.size(), "leaving view range must despawn the private display");
-        assertTrue(live.get(0).lastText().contains("Alice"));
+        assertEquals(1, harness.liveSpawned(world).size());
+        assertEquals(1, hologram.activeViewerCount(), "leaving view range must retract viewer state");
+        assertEquals("", latestViewerText().get(bob.uuid),
+            "a viewer leaving range must have stale personalized metadata blanked");
+
+        int sends = harness.sender.sent.size();
+        harness.moveTo(bob, world, 2.0D, 64.0D, 2.0D);
+        hologram.update();
+        latestViewerText();
+        assertEquals(sends + 1, harness.sender.sent.size(),
+            "re-entering range must resend personalized metadata for the tracked entity");
+        assertEquals(1, harness.liveSpawned(world).size());
+    }
+
+    @Test
+    void blankBaseTextKeepsPersonalizedContentPrivateOnEveryServerApi() {
+        world.visibleByDefaultSupported = false;
+        harness.moveTo(bob, world, 200.0D, 64.0D, 200.0D);
+        PersistentHologram hologram = hologram("h-private-fallback",
+            List.of("Hello {{ player.name }}"));
+        hologram.update();
+        harness.drainDelayed();
+        DisplayHandle display = harness.onlySpawned(world);
+        assertEquals("", display.lastText(), "an unaddressed tracker can only receive blank server text");
+
+        PlayerHandle late = harness.join("Late", world, 300.0D, 64.0D, 300.0D);
+        hologram.invalidateTrackingFor(late.proxy, true);
+        assertTrue(!latestViewerText().containsKey(late.uuid));
 
         harness.moveTo(bob, world, 2.0D, 64.0D, 2.0D);
         hologram.update();
-        assertEquals(2, harness.liveSpawned(world).size(), "re-entering range must respawn the display");
+        assertEquals("Hello Bob", latestViewerText().get(bob.uuid),
+            "an approaching viewer receives only its own metadata text");
     }
 
     @Test
@@ -162,36 +190,30 @@ class CharacterizationPersistentHologramRoutingTest {
         harness.registerFunction("mood", player -> mood.get());
         PersistentHologram hologram = hologram("h-change", List.of("%s% |mood|"));
         hologram.update();
+        harness.drainDelayed();
 
-        List<DisplayHandle> live = harness.liveSpawned(world);
-        assertEquals(2, live.size());
-        for (DisplayHandle display : live) {
-            assertEquals("%s% happy", display.lastText());
-        }
-        int assignments = live.get(0).textHistory.size() + live.get(1).textHistory.size();
+        assertEquals(Set.of("%s% happy"), new HashSet<>(latestViewerText().values()));
+        int assignments = harness.sender.sent.size();
 
         hologram.update();
-        assertEquals(assignments, live.get(0).textHistory.size() + live.get(1).textHistory.size(),
-            "identical per-viewer renders must not reassign text");
+        assertEquals(assignments, harness.sender.sent.size(),
+            "identical per-viewer renders must not resend metadata");
 
         mood.set("grim");
         hologram.update();
-        for (DisplayHandle display : live) {
-            assertEquals("%s% grim", display.lastText(),
-                "changed renders must be reassigned to every viewer display");
-        }
+        assertEquals(Set.of("%s% grim"), new HashSet<>(latestViewerText().values()));
     }
 
     @Test
-    void animationLinePublishesOnePrivateTargetPerViewerAndRetractsWithTheLineSet() {
+    void viewerIndependentAnimationUsesOneSharedTargetAndRetractsWithTheLineSet() {
         PersistentHologram hologram = hologram("h-anim", List.of(CharacterizationHarness.FAST_CLIP_LINE));
         hologram.update();
 
         hologram.update();
-        assertEquals(2, harness.animator.targetCount(), "viewer-capable animation lines publish one target per viewer");
-        assertEquals(2, harness.animator.pass(0L));
+        assertEquals(1, harness.animator.targetCount(), "global animation lines publish one shared target");
+        assertEquals(1, harness.animator.pass(0L));
         for (CharacterizationHarness.Sent sent : harness.sender.sent) {
-            assertEquals(1, sent.viewers().size());
+            assertEquals(2, sent.viewers().size());
         }
 
         hologram.setLines(List.of("plain"));
@@ -205,6 +227,7 @@ class CharacterizationPersistentHologramRoutingTest {
     void perViewerAnimationSubsFollowTheirViewers() {
         PersistentHologram hologram = hologram("h-anim-viewer", List.of("%p% " + CharacterizationHarness.FAST_CLIP_LINE));
         hologram.update();
+        harness.drainDelayed();
 
         assertEquals(2, harness.animator.targetCount(),
             "a placeholder+animation line must publish one animator sub per in-range viewer");
@@ -222,6 +245,27 @@ class CharacterizationPersistentHologramRoutingTest {
     }
 
     @Test
+    void viewerDependentAnimationFramesRouteToPerViewerMetadata() {
+        harness.registerFunction("who", player -> player == null ? "console" : player.getName());
+        harness.configureAnimation("fast", List.of("|who|", "still |who|"));
+        PersistentHologram hologram = hologram("h-frame-viewer",
+            List.of(CharacterizationHarness.FAST_CLIP_LINE));
+
+        hologram.update();
+        harness.drainDelayed();
+
+        assertEquals(1, harness.liveSpawned(world).size(),
+            "viewer-dependent clip frames must share one blank server entity");
+        assertEquals(2, harness.animator.targetCount());
+        assertEquals(2, harness.animator.pass(0L));
+        Set<String> rendered = new HashSet<>();
+        for (CharacterizationHarness.Sent sent : harness.sender.sent) {
+            rendered.add(sent.text());
+        }
+        assertEquals(Set.of("Alice", "Bob"), rendered);
+    }
+
+    @Test
     void repositionHonorsTheEpsilonGate() {
         PersistentHologram hologram = hologram("h-move", List.of("hi"));
         hologram.update();
@@ -235,6 +279,23 @@ class CharacterizationPersistentHologramRoutingTest {
         hologram.update();
         assertEquals(1, display.teleports.size(), "real moves must reposition the display");
         assertEquals(5.5D, display.teleports.get(0).getX());
+    }
+
+    @Test
+    void staleScheduledAnchorCannotOverwriteANewerTeleport() {
+        PersistentHologram hologram = hologram("h-anchor-snapshot", List.of("hi"));
+        hologram.update();
+        DisplayHandle display = harness.onlySpawned(world);
+        PersistentHologram.TickAnchor stale = hologram.tickAnchor();
+
+        hologram.teleport(harness.at(world, 8.0D, 70.0D, 8.0D));
+        hologram.update(new HologramTick(), stale);
+        assertTrue(display.teleports.isEmpty(),
+            "a queued tick may not move an entity back to a superseded anchor");
+
+        hologram.update();
+        assertEquals(1, display.teleports.size());
+        assertEquals(8.0D, display.teleports.getFirst().getX());
     }
 
     @Test

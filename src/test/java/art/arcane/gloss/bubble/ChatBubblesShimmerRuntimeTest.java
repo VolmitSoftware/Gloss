@@ -4,6 +4,7 @@ import art.arcane.gloss.api.HologramPresentation;
 import art.arcane.gloss.api.HologramViewers;
 import art.arcane.gloss.api.TemporaryHologram;
 import org.bukkit.Location;
+import org.bukkit.entity.Entity;
 import org.bukkit.util.Vector;
 import org.junit.jupiter.api.Test;
 
@@ -128,11 +129,11 @@ class ChatBubblesShimmerRuntimeTest {
         }
 
         @Override
-        public void bindPosition(Supplier<Location> binder) {
+        public void bindPosition(Entity owner, Supplier<Location> binder) {
         }
 
         @Override
-        public void bindPresentation(Supplier<HologramPresentation> binder) {
+        public void bindPresentation(Entity owner, Supplier<HologramPresentation> binder) {
         }
 
         @Override

@@ -89,10 +89,10 @@ public final class GlossLocalization implements AutoCloseable {
     return manager.snapshot();
   }
 
-  public void update() {
+  public boolean update() {
     FileWatcher current = watcher;
     if (current == null) {
-      return;
+      return false;
     }
     boolean watcherChanged = current.checkModifiedEvents();
     long now = clock.getAsLong();
@@ -101,7 +101,7 @@ public final class GlossLocalization implements AutoCloseable {
       nextContentReconciliationNanos = now + CONTENT_RECONCILIATION_NANOS;
     }
     if (!watcherChanged && pendingAutomaticSnapshot == null && !reconciliationDue) {
-      return;
+      return false;
     }
     LanguageSnapshot snapshot;
     try {
@@ -111,19 +111,19 @@ public final class GlossLocalization implements AutoCloseable {
     }
     if (snapshot == null) {
       pendingAutomaticSnapshot = null;
-      return;
+      return false;
     }
     if (Objects.equals(snapshot.sha256(), observedHash)) {
       pendingAutomaticSnapshot = null;
-      return;
+      return false;
     }
     LanguageSnapshot pending = pendingAutomaticSnapshot;
     if (pending == null || !pending.sha256().equals(snapshot.sha256())) {
       pendingAutomaticSnapshot = snapshot;
-      return;
+      return false;
     }
     pendingAutomaticSnapshot = null;
-    reload(snapshot);
+    return reload(snapshot);
   }
 
   @Override

@@ -34,6 +34,7 @@ import java.util.logging.Logger;
 
 public final class PanelCreationService {
   private static final long SHUTDOWN_TIMEOUT_SECONDS = 30L;
+  private static final long FORCE_SHUTDOWN_TIMEOUT_SECONDS = 5L;
 
   private final Dependencies dependencies;
   private final ExecutorService executor;
@@ -61,16 +62,19 @@ public final class PanelCreationService {
     }
     executor.shutdown();
     boolean interrupted = false;
-    while (true) {
-      try {
-        if (executor.awaitTermination(SHUTDOWN_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
-          break;
-        }
+    try {
+      if (!executor.awaitTermination(SHUTDOWN_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
         dependencies.logger().warning(
-            "Still waiting for the active hologram creation transaction before shutdown.");
-      } catch (InterruptedException interruption) {
-        interrupted = true;
+            "Timed out draining hologram creation transactions; cancelling remaining work.");
+        executor.shutdownNow();
+        if (!executor.awaitTermination(FORCE_SHUTDOWN_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+          dependencies.logger().warning(
+              "Hologram creation transactions did not stop after forced cancellation.");
+        }
       }
+    } catch (InterruptedException interruption) {
+      interrupted = true;
+      executor.shutdownNow();
     }
     if (interrupted) {
       Thread.currentThread().interrupt();

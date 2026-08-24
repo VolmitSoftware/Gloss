@@ -4,6 +4,7 @@ import art.arcane.gloss.Gloss;
 import art.arcane.gloss.GlossConfig;
 import art.arcane.gloss.hologram.DisplayVisibility;
 import art.arcane.gloss.hologram.HologramMath;
+import art.arcane.gloss.service.AdmissionBudget;
 import art.arcane.volmlib.util.scheduling.FoliaScheduler;
 import org.bukkit.Color;
 import org.bukkit.Location;
@@ -49,6 +50,7 @@ final class RealDropService {
     private static final double SETTLED_CARRIER_POSITION_EPSILON = 1.0D / 512.0D;
     private static final int MAX_DYNAMIC_LIGHTS_PER_CHUNK = 8;
     private static final int DYNAMIC_LIGHT_UPDATE_TICKS = 4;
+    static final int MAX_ACTIVE_PRESENTATIONS = 2048;
 
     private final Gloss plugin;
     private final Supplier<GlossConfig.RealDrops> configSupplier;
@@ -60,6 +62,7 @@ final class RealDropService {
     private final Map<ChunkKey, Integer> chunkUsage;
     private final Map<LightKey, UUID> lightOwners;
     private final Map<ChunkKey, Integer> lightChunkUsage;
+    private final AdmissionBudget admissions;
 
     private volatile Set<String> disabledWorlds = Set.of();
     private volatile Set<String> materialBlacklist = Set.of();
@@ -79,6 +82,7 @@ final class RealDropService {
         this.chunkUsage = new ConcurrentHashMap<>();
         this.lightOwners = new ConcurrentHashMap<>();
         this.lightChunkUsage = new ConcurrentHashMap<>();
+        this.admissions = new AdmissionBudget(MAX_ACTIVE_PRESENTATIONS);
     }
 
     void enable() {
@@ -178,44 +182,66 @@ final class RealDropService {
         if (!item.isValid() || item.isDead()) {
             return;
         }
-        GlossConfig.RealDrops config = config();
-        ItemStack stack = item.getItemStack();
-        int visualCount = desiredVisualCount(stack, config);
-        boolean createLabel = config.labels().enabled() && !label.lines().isEmpty();
-        int reserved = visualCount + (createLabel ? 1 : 0);
-        ChunkKey chunkKey = chunkKey(item.getLocation());
-        if (!reserve(chunkKey, reserved, config.limits().maxVisualsPerChunk())) {
+        long createGeneration = generation;
+        if (!running) {
             healOwned(item);
             return;
         }
-
-        Boolean visibleByDefault = DisplayVisibility.isVisibleByDefault(item);
-        boolean restoreVisibility = visibleByDefault == null || visibleByDefault;
-        boolean restoreName = item.isCustomNameVisible();
-        State state = new State(
-            item, generation, chunkKey, reserved, restoreVisibility, restoreName, item.hasGravity());
-        state.modelKind = RealDropModel.modelKind(stack.getType());
-        state.lastPollDelayTicks = config.limits().updateIntervalTicks();
-        Quaternionf initialRotation = RealDropModel.baseRotation(state.modelKind);
-        if (item.isOnGround()) {
-            initialRotation.set(landingRotation(state, config));
+        AdmissionBudget.Lease admission = admissions.tryAcquire();
+        if (admission == null) {
+            healOwned(item);
+            return;
         }
-        state.animation = new RealDropAnimationState(
-            initialRotation, RealDropModel.spin(item.getUniqueId(), 0, config.motion()), item.isOnGround());
-        state.velocity = item.getVelocity();
-        state.lastVelocityY = state.velocity.getY();
-        state.lastItemX = item.getLocation().getX();
-        state.lastItemZ = item.getLocation().getZ();
-        state.onGround = item.isOnGround();
-        state.inWater = item.isInWater();
-        state.inLava = inLava(item);
-        refreshEnvironment(state, scriptPlan);
-        state.authoredSample = authoredAnimationSample(state);
-        applyAuthoredPhysics(state, state.authoredSample.physics());
-        updateAuthoredLight(state, state.authoredSample.lightLevel());
-        states.put(item.getUniqueId(), state);
-
+        ChunkKey reservedChunk = null;
+        int reserved = 0;
+        boolean chunkReserved = false;
+        State state = null;
         try {
+            GlossConfig.RealDrops config = config();
+            ItemStack stack = item.getItemStack();
+            int visualCount = desiredVisualCount(stack, config);
+            boolean createLabel = config.labels().enabled() && !label.lines().isEmpty();
+            reserved = visualCount + (createLabel ? 1 : 0);
+            reservedChunk = chunkKey(item.getLocation());
+            if (!reserve(reservedChunk, reserved, config.limits().maxVisualsPerChunk())) {
+                admission.close();
+                healOwned(item);
+                return;
+            }
+            chunkReserved = true;
+
+            Boolean visibleByDefault = DisplayVisibility.isVisibleByDefault(item);
+            boolean restoreVisibility = visibleByDefault == null || visibleByDefault;
+            boolean restoreName = item.isCustomNameVisible();
+            state = new State(
+                item, createGeneration, reservedChunk, reserved, restoreVisibility, restoreName,
+                item.hasGravity(), admission);
+            state.modelKind = RealDropModel.modelKind(stack.getType());
+            state.lastPollDelayTicks = config.limits().updateIntervalTicks();
+            Quaternionf initialRotation = RealDropModel.baseRotation(state.modelKind);
+            if (item.isOnGround()) {
+                initialRotation.set(landingRotation(state, config));
+            }
+            state.animation = new RealDropAnimationState(
+                initialRotation, RealDropModel.spin(item.getUniqueId(), 0, config.motion()), item.isOnGround());
+            state.velocity = item.getVelocity();
+            state.lastVelocityY = state.velocity.getY();
+            state.lastItemX = item.getLocation().getX();
+            state.lastItemZ = item.getLocation().getZ();
+            state.onGround = item.isOnGround();
+            state.inWater = item.isInWater();
+            state.inLava = inLava(item);
+            refreshEnvironment(state, scriptPlan);
+            state.authoredSample = authoredAnimationSample(state);
+            applyAuthoredPhysics(state, state.authoredSample.physics());
+            updateAuthoredLight(state, state.authoredSample.lightLevel());
+            states.put(item.getUniqueId(), state);
+            if (!presentationStillCurrent(running, generation, createGeneration, config.enabled())) {
+                state.closed = true;
+                teardownOwned(state);
+                return;
+            }
+
             for (int index = 0; index < visualCount; index++) {
                 state.visuals.add(spawnVisual(state, stack, index, visualCount, config));
             }
@@ -234,12 +260,32 @@ final class RealDropService {
             applyPose(state, state.animation.rotation(), state.onGround
                 ? config.landing().transitionTicks()
                 : config.limits().updateIntervalTicks());
+            if (!presentationStillCurrent(running, generation, createGeneration, config().enabled())) {
+                state.closed = true;
+                teardownOwned(state);
+                return;
+            }
             scheduleTick(state, config.limits().updateIntervalTicks());
-        } catch (RuntimeException failure) {
-            state.closed = true;
-            teardownOwned(state);
+        } catch (RuntimeException | Error failure) {
+            try {
+                if (state == null) {
+                    if (chunkReserved) {
+                        release(reservedChunk, reserved);
+                    }
+                    admission.close();
+                    healOwned(item);
+                } else {
+                    state.closed = true;
+                    teardownOwned(state);
+                }
+            } catch (RuntimeException | Error cleanupFailure) {
+                failure.addSuppressed(cleanupFailure);
+            }
             Gloss.logExceptionStack(false, failure,
                 "Could not create a real-drop presentation for item %s.", item.getUniqueId());
+            if (failure instanceof Error error) {
+                throw error;
+            }
         }
     }
 
@@ -812,7 +858,7 @@ final class RealDropService {
     private void removeAuthoredLight(State state) {
         LightKey key = state.lightBlock;
         ChunkKey chunk = state.lightChunk;
-        if (key == null || !lightOwners.remove(key, state.item.getUniqueId())) {
+        if (key == null || !lightOwners.remove(key, state.itemId)) {
             state.lightBlock = null;
             state.lightChunk = null;
             state.lightLevel = 0;
@@ -1078,12 +1124,14 @@ final class RealDropService {
     }
 
     private void teardownOwned(State state) {
-        if (state.destroyed) {
+        if (!state.destroyed.compareAndSet(false, true)) {
             return;
         }
-        state.destroyed = true;
         boolean current = states.remove(state.item.getUniqueId(), state);
         state.closed = true;
+        release(state.chunkKey, state.reserved);
+        state.reserved = 0;
+        state.admission.close();
         removeAuthoredLight(state);
         releaseAuthoredPhysics(state, false);
         restoreGravity(state);
@@ -1095,8 +1143,6 @@ final class RealDropService {
             removeEntity(state.label);
             state.label = null;
         }
-        release(state.chunkKey, state.reserved);
-        state.reserved = 0;
         if (current && state.item.isValid()) {
             DisplayVisibility.setVisibleByDefault(state.item, state.restoreVisibleByDefault);
             state.item.setCustomNameVisible(state.restoreNameVisible && state.item.getCustomName() != null);
@@ -1105,17 +1151,15 @@ final class RealDropService {
     }
 
     private void retire(State state) {
-        if (state.destroyed) {
+        if (!state.destroyed.compareAndSet(false, true)) {
             return;
         }
-        state.destroyed = true;
-        states.remove(state.item.getUniqueId(), state);
+        states.remove(state.itemId, state);
         state.closed = true;
-        removeAuthoredLight(state);
-        releaseAuthoredPhysics(state, false);
-        restoreGravity(state);
         release(state.chunkKey, state.reserved);
         state.reserved = 0;
+        state.admission.close();
+        removeAuthoredLight(state);
         for (Display display : state.visuals) {
             removeEntity(display);
         }
@@ -1251,6 +1295,15 @@ final class RealDropService {
             || Math.abs(z - lastZ) > epsilon;
     }
 
+    static boolean presentationStillCurrent(
+        boolean running,
+        long currentGeneration,
+        long createGeneration,
+        boolean enabled
+    ) {
+        return running && enabled && currentGeneration == createGeneration;
+    }
+
     private static Display carrier(State state) {
         Display carrier = carrierOrNull(state);
         if (carrier == null) {
@@ -1353,6 +1406,7 @@ final class RealDropService {
 
     private static final class State {
         private final Item item;
+        private final UUID itemId;
         private final long generation;
         private final List<Display> visuals;
         private final boolean restoreVisibleByDefault;
@@ -1363,6 +1417,8 @@ final class RealDropService {
         private final float[] appliedViewRange;
         private final int[] appliedLightLevel;
         private final Map<GlossConfig.RealDrops.AnimationTrigger, Long> eventTicks;
+        private final AdmissionBudget.Lease admission;
+        private final AtomicBoolean destroyed = new AtomicBoolean();
 
         private ChunkKey chunkKey;
         private TextDisplay label;
@@ -1402,18 +1458,20 @@ final class RealDropService {
         private LightKey lightBlock;
         private ChunkKey lightChunk;
         private int lightLevel;
-        private boolean closed;
-        private boolean destroyed;
+        private volatile boolean closed;
 
         private State(Item item, long generation, ChunkKey chunkKey, int reserved,
-                      boolean restoreVisibleByDefault, boolean restoreNameVisible, boolean restoreGravity) {
+                      boolean restoreVisibleByDefault, boolean restoreNameVisible, boolean restoreGravity,
+                      AdmissionBudget.Lease admission) {
             this.item = item;
+            this.itemId = item.getUniqueId();
             this.generation = generation;
             this.chunkKey = chunkKey;
             this.reserved = reserved;
             this.restoreVisibleByDefault = restoreVisibleByDefault;
             this.restoreGravity = restoreGravity;
             this.restoreNameVisible = restoreNameVisible;
+            this.admission = admission;
             this.visuals = new ArrayList<>();
             this.spawnNanos = System.nanoTime();
             this.random = RealDropScriptPlan.RealDropScriptContext.stableRandom(item.getUniqueId());

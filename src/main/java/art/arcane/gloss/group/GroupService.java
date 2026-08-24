@@ -1,6 +1,7 @@
 package art.arcane.gloss.group;
 
 import art.arcane.gloss.Gloss;
+import art.arcane.volmlib.util.scheduling.FoliaScheduler;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -116,13 +117,19 @@ public final class GroupService implements Listener {
         if (!refreshing.add(uuid)) {
             return;
         }
-        plugin.scheduler().a(() -> {
+        Runnable retired = () -> refreshing.remove(uuid);
+        Runnable refresh = () -> {
             try {
-                primaryGroupName(player);
+                if (player.isOnline()) {
+                    primaryGroupName(player);
+                }
             } finally {
-                refreshing.remove(uuid);
+                retired.run();
             }
-        }, 0);
+        };
+        if (!FoliaScheduler.runEntity(plugin, player, refresh, 0L, retired)) {
+            retired.run();
+        }
     }
 
     private void hookVault() {

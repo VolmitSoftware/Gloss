@@ -142,11 +142,17 @@ final class TextAnimationFunctions {
     requireStyle(name, base);
     requireStyle(name, highlight);
     int active = floorModStep(numArg(name, args, 3), text.length);
-    StringBuilder out = new StringBuilder(text.length * 4);
+    StringBuilder out = new StringBuilder(text.length + base.length() * 2 + highlight.length());
+    out.append(active == 0 ? highlight : base);
     for (int index = 0; index < text.length; index++) {
-      out.append(index == active ? highlight : base).appendCodePoint(text[index]);
+      out.appendCodePoint(text[index]);
+      if (index == active) {
+        out.append(base);
+      } else if (index + 1 == active) {
+        out.append(highlight);
+      }
     }
-    return out.append(base).toString();
+    return out.toString();
   }
 
   private static String scramble(String name, List<Object> args) {

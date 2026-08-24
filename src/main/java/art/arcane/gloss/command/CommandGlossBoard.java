@@ -230,16 +230,15 @@ public class CommandGlossBoard {
             return;
         }
 
-        GlossCommandPager.Window window = GlossCommandPager.window(boards.size(), page, GlossCommandPager.TEXT_PAGE_SIZE);
+        DirectorMiniMenu.ContentPage window = GlossCommandPager.window(boards.size(), page, GlossCommandPager.TEXT_PAGE_SIZE);
         DirectorMiniMenu.Theme theme = GlossCommandService.menuTheme();
         String hover = DirectorMiniMenu.escapeText(GlossLocalization.globalDirectorText(GlossMessages.BOARD_LIST_HOVER, MessageArgs.empty()));
         List<String> lines = new ArrayList<>();
-        lines.add(DirectorMiniMenu.banner(LIST_COMMAND, theme));
+        GlossCommandPager.appendHeader(lines, LIST_COMMAND, window, theme);
         for (GlossBoardMeta meta : boards.subList(window.startIndex(), window.endIndex())) {
             lines.add(renderListEntry(meta, theme, hover));
         }
         GlossCommandPager.appendFooter(lines, window, LIST_COMMAND, theme);
-        lines.add(DirectorMiniMenu.bar(theme));
         DirectorMiniMenu.deliver(sender, lines);
     }
 

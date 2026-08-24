@@ -4,7 +4,7 @@ main: ${main}
 folia-supported: true
 api-version: ${apiVersion}
 load: STARTUP
-description: Holograms, menus, panels, previews, scoreboards, tablist, emoji chat, chat bubbles and damage indicators.
+description: Holograms, menus, panels, previews, scoreboards, tablist, emoji chat, chat bubbles, damage indicators and display-backed drops.
 authors: [ VolmitSoftware ]
 website: VolmitSoftware.com
 dependencies:
@@ -128,7 +128,7 @@ permissions:
     description: Allows creating holograms.
     default: op
   gloss.holograms.edit:
-    description: Allows editing hologram lines.
+    description: Allows editing hologram lines and orientation.
     default: op
   gloss.holograms.delete:
     description: Allows deleting holograms.

@@ -2,6 +2,7 @@ package art.arcane.gloss.hologram;
 
 import art.arcane.gloss.api.HologramPresentation;
 import art.arcane.gloss.hologram.CharacterizationHarness.DisplayHandle;
+import art.arcane.gloss.hologram.CharacterizationHarness.PlayerHandle;
 import art.arcane.gloss.hologram.CharacterizationHarness.WorldState;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -24,12 +25,13 @@ class TemporaryHologramMotionTest {
 
     private CharacterizationHarness harness;
     private WorldState world;
+    private PlayerHandle owner;
 
     @BeforeEach
     void setUp() {
         harness = new CharacterizationHarness(dataFolder);
         world = harness.world("overworld");
-        harness.join("Alice", world, 1.0D, 64.0D, 1.0D);
+        owner = harness.join("Alice", world, 1.0D, 64.0D, 1.0D);
     }
 
     @AfterEach
@@ -113,19 +115,19 @@ class TemporaryHologramMotionTest {
         AtomicReference<HologramPresentation> presentation = new AtomicReference<>(
             new HologramPresentation(2.0D, 0.5D, 1.0D, 0.0D, 90.0D, 450.0D, 0.5D));
         TemporaryHologramDisplay temporary = temporary("t-presentation");
-        temporary.bindPresentation(presentation::get);
-        temporary.drive(true);
+        temporary.bindPresentation(owner.proxy, presentation::get);
+        harness.driveTemporary(temporary, true);
 
         DisplayHandle display = harness.onlySpawned(world);
         assertTrue(display.callLog.contains("setTransformation"));
         assertTrue(display.callLog.contains("setTextOpacity"));
         int callsAfterSpawn = display.callLog.size();
 
-        temporary.drive(true);
+        harness.driveTemporary(temporary, true);
         assertEquals(callsAfterSpawn, display.callLog.size());
 
         presentation.set(new HologramPresentation(0.5D, 0.5D, 0.5D, 30.0D, 60.0D, 90.0D, 0.25D));
-        temporary.drive(true);
+        harness.driveTemporary(temporary, true);
         assertTrue(display.callLog.size() > callsAfterSpawn);
     }
 }

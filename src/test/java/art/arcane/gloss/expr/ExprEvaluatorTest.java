@@ -462,6 +462,8 @@ public class ExprEvaluatorTest {
     Assert.assertEquals("&fBOOSTED", eval("flash('&6&lBOOSTED', '&fBOOSTED', 1)"));
     Assert.assertEquals("GLO  ", eval("wipe('GLOSS', 3)"));
     Assert.assertEquals("&7A&fB&7", eval("scanner('AB', '&7', '&f', 1)"));
+    Assert.assertEquals("&aG&7LOSS SCOREBOARD",
+        eval("scanner('GLOSS SCOREBOARD', '&7', '&a', 0)"));
     Assert.assertEquals("GLOSS", eval("scramble('GLOSS', 5)"));
     Assert.assertEquals("0500", eval("odometer(0, 999, 0.5, 4)"));
     Assert.assertEquals("&bA&aB&bC&a", eval("wave('ABC', ['&a', '&b'], 1)"));

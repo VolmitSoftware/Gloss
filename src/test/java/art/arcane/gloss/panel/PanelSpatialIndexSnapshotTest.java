@@ -5,6 +5,11 @@ import org.junit.Test;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -94,6 +99,53 @@ public class PanelSpatialIndexSnapshotTest {
     assertEquals(List.of(alpha, bravo, charlie), index.list());
     assertThrows(UnsupportedOperationException.class, () -> index.list().clear());
     assertEquals(3, index.size());
+  }
+
+  @Test
+  public void concurrentBatchMovesNeverPublishHalfAnUpdate() throws Exception {
+    PanelDefinition firstNear = board("first", 0.0D, 0.0D);
+    PanelDefinition secondNear = board("second", 1.0D, 0.0D);
+    PanelDefinition firstFar = firstNear.withTransform(
+        PanelTransform.at("example:world", WORLD, 4096.0D, 64.0D, 4096.0D, 0.0D));
+    PanelDefinition secondFar = secondNear.withTransform(
+        PanelTransform.at("example:world", WORLD, 4097.0D, 64.0D, 4096.0D, 0.0D));
+    PanelSpatialIndex index = new PanelSpatialIndex();
+    index.replaceAll(List.of(firstNear, secondNear));
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    CountDownLatch start = new CountDownLatch(1);
+    try {
+      Future<?> writer = executor.submit(() -> {
+        await(start);
+        for (int update = 0; update < 2_000; update++) {
+          index.upsertAll((update & 1) == 0
+              ? List.of(firstFar, secondFar)
+              : List.of(firstNear, secondNear));
+        }
+      });
+      Future<?> reader = executor.submit(() -> {
+        await(start);
+        for (int query = 0; query < 4_000; query++) {
+          int matches = index.query(WORLD, 0.0D, 0.0D, 8.0D).size();
+          if (matches != 0 && matches != 2) {
+            throw new AssertionError("observed a half-published batch with " + matches + " matches");
+          }
+        }
+      });
+      start.countDown();
+      writer.get(10L, TimeUnit.SECONDS);
+      reader.get(10L, TimeUnit.SECONDS);
+    } finally {
+      executor.shutdownNow();
+    }
+  }
+
+  private static void await(CountDownLatch latch) {
+    try {
+      latch.await();
+    } catch (InterruptedException interruption) {
+      Thread.currentThread().interrupt();
+      throw new AssertionError(interruption);
+    }
   }
 
   private static PanelDefinition board(String id, double x, double z) {

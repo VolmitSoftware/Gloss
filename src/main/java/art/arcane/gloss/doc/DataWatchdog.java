@@ -34,6 +34,8 @@ public final class DataWatchdog {
     private final Gloss plugin;
     private final List<Entry> entries;
     private final HotloadBatchGate batchGate;
+    private final HotloadBatch hotloadBatch;
+    private final HotloadFeedback hotloadFeedback;
     private final AtomicLong lifecycleGeneration;
     private volatile ExecutorService io;
     private int taskId;
@@ -49,6 +51,8 @@ public final class DataWatchdog {
         this.plugin = plugin;
         this.entries = new CopyOnWriteArrayList<>();
         this.batchGate = new HotloadBatchGate(AUTOMATIC_BATCH_COOLDOWN_NANOS, clock);
+        this.hotloadBatch = new HotloadBatch();
+        this.hotloadFeedback = new HotloadFeedback(plugin);
         this.lifecycleGeneration = new AtomicLong();
         this.taskId = NO_TASK;
     }
@@ -69,6 +73,7 @@ public final class DataWatchdog {
             return;
         }
         batchGate.cancel();
+        hotloadBatch.clear();
         lifecycleGeneration.incrementAndGet();
         io = Executors.newSingleThreadExecutor(runnable -> {
             Thread thread = new Thread(runnable, "Gloss-Watchdog-IO");
@@ -86,6 +91,7 @@ public final class DataWatchdog {
         taskId = NO_TASK;
         lifecycleGeneration.incrementAndGet();
         batchGate.cancel();
+        hotloadBatch.clear();
         ExecutorService current = io;
         io = null;
         if (current == null) {
@@ -113,6 +119,10 @@ public final class DataWatchdog {
 
     public void deferAutomaticPass() {
         batchGate.deferFromNow();
+    }
+
+    public void recordHotload(String kind, int changes) {
+        hotloadBatch.record(kind, changes);
     }
 
     private void pump() {
@@ -147,18 +157,30 @@ public final class DataWatchdog {
         if (generation != lifecycleGeneration.get()) {
             return;
         }
-        if (plugin != null && SchedulerUtils.runGlobal(plugin, () -> completePass(generation))) {
+        if (plugin != null && SchedulerUtils.runGlobal(plugin, () -> completePass(generation, true))) {
             return;
         }
-        completePass(generation);
+        completePass(generation, false);
     }
 
-    private void completePass(long generation) {
+    @SuppressWarnings("removal")
+    private void completePass(long generation, boolean deliverFeedback) {
         if (generation != lifecycleGeneration.get()) {
             return;
         }
-        batchGate.complete();
-        dispatchQueuedPass();
+        HotloadBatch.Snapshot hotloads = hotloadBatch.drain();
+        try {
+            if (deliverFeedback) {
+                hotloadFeedback.deliver(hotloads);
+            }
+        } catch (ThreadDeath fatal) {
+            throw fatal;
+        } catch (Throwable failure) {
+            Gloss.logExceptionStack(false, failure, "Hot reload feedback delivery failed.");
+        } finally {
+            batchGate.complete();
+            dispatchQueuedPass();
+        }
     }
 
     @SuppressWarnings("removal")

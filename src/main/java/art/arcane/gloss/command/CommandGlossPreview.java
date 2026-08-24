@@ -71,7 +71,8 @@ public class CommandGlossPreview {
       return;
     }
 
-    GlossCommandPager.Window window = GlossCommandPager.window(names.size(), page, GlossCommandPager.TEXT_PAGE_SIZE);
+    DirectorMiniMenu.ContentPage window = GlossCommandPager.window(names.size(), page, GlossCommandPager.TEXT_PAGE_SIZE);
+    lines.set(0, DirectorMiniMenu.banner(Gloss.instance.getLocalization().text(GlossMessages.PREVIEWS_LIST_HEADER), window, theme));
     for (String name : names.subList(window.startIndex(), window.endIndex())) {
       CompiledPreviewDocument document = registry.get(name);
       if (document == null) {
@@ -81,7 +82,6 @@ public class CommandGlossPreview {
     }
 
     GlossCommandPager.appendFooter(lines, window, LIST_COMMAND, theme);
-    lines.add(DirectorMiniMenu.bar(theme));
     DirectorMiniMenu.deliver(sender, lines);
   }
 

@@ -430,6 +430,8 @@ public final class GlossMessages {
     public static final TextKey IMPORT_BUSY = text("gloss.message.import.busy", "&7[&bGloss&7]: &cAnother legacy hologram migration is already running.");
     public static final TextKey IMPORT_FAILED = text("gloss.message.import.failed", "&7[&bGloss&7]: &cLegacy hologram migration from &f{source}&c failed: {reason}");
     public static final TextKey CONFIG_RELOADED = text("gloss.message.config.reloaded", "&2Config \"{name}\" reloaded.");
+    public static final TextKey HOTLOAD_SINGULAR = text("gloss.message.hotload.singular", "&2Hotloaded {kinds} ({count} change).");
+    public static final TextKey HOTLOAD_PLURAL = text("gloss.message.hotload.plural", "&2Hotloaded {kinds} ({count} changes).");
     public static final TextKey PREVIEW_SCALE_ADJUSTING = text("gloss.message.preview_scale.adjusting", "&7Preview size: &f{percent}% &8- &7hold sneak + scroll to resize, double-tap sneak to save");
     public static final TextKey PREVIEW_SCALE_HIDDEN = text("gloss.message.preview_scale.hidden", "&7Preview &chidden &8- &7scroll up to restore");
     public static final TextKey PREVIEW_SCALE_SIZE = text("gloss.message.preview_scale.size", "&7Preview size: &f{percent}%");

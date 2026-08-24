@@ -1,7 +1,10 @@
 package art.arcane.gloss.hologram;
 
 import art.arcane.gloss.hologram.CharacterizationHarness.DisplayHandle;
+import art.arcane.gloss.hologram.CharacterizationHarness.PlayerHandle;
 import art.arcane.gloss.hologram.CharacterizationHarness.WorldState;
+import org.bukkit.Location;
+import org.bukkit.entity.Player;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -13,6 +16,8 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -31,12 +36,13 @@ class CharacterizationTemporaryHologramLifecycleTest {
 
     private CharacterizationHarness harness;
     private WorldState world;
+    private PlayerHandle owner;
 
     @BeforeEach
     void setUp() {
         harness = new CharacterizationHarness(dataFolder);
         world = harness.world("overworld");
-        harness.join("Alice", world, 1.0D, 64.0D, 1.0D);
+        owner = harness.join("Alice", world, 1.0D, 64.0D, 1.0D);
     }
 
     @AfterEach
@@ -98,6 +104,9 @@ class CharacterizationTemporaryHologramLifecycleTest {
 
         assertEquals(assignments, display.textHistory.size(),
             "drives without line changes must not reassign text");
+        assertFalse(temporary.hasPublishedAnimation(),
+            "static drives must never enter the animator registry or trigger group scans");
+        assertEquals(0, harness.animator.targetCount());
     }
 
     @Test
@@ -117,6 +126,73 @@ class CharacterizationTemporaryHologramLifecycleTest {
         value.set("three");
         temporary.drive(true);
         assertEquals("three", display.lastText());
+    }
+
+    @Test
+    void animatedAudiencesShareOneOverBroadCellSnapshotPerDrive() {
+        TemporaryHologramDisplay firstTemporary = temporary("t-audience-cache-a",
+            List.of(CharacterizationHarness.FAST_CLIP_LINE));
+        TemporaryHologramDisplay secondTemporary = temporary("t-audience-cache-b",
+            List.of(CharacterizationHarness.FAST_CLIP_LINE));
+        firstTemporary.drive(true);
+        secondTemporary.drive(true);
+        HologramTick tick = new HologramTick();
+
+        firstTemporary.drive(tick, true);
+        secondTemporary.drive(tick, true);
+
+        assertEquals(1, tick.temporaryAudienceCellCount(),
+            "clustered temporary effects must reuse one viewer-index query for their cell");
+        Location firstLocation = firstTemporary.location();
+        Location secondLocation = secondTemporary.location();
+        assertSame(tick.temporaryPlayers(firstLocation.getWorld(), firstLocation, harness.service.viewRange()),
+            tick.temporaryPlayers(secondLocation.getWorld(), secondLocation, harness.service.viewRange()),
+            "an unfiltered audience must reuse the cell's immutable player list");
+    }
+
+    @Test
+    void cellAudienceReuseStillAppliesExactRangeAtEachAnchor() {
+        PlayerHandle boundary = harness.join("Boundary", world, 55.0D, 64.0D, 8.0D);
+        Location left = harness.at(world, 0.5D, 64.0D, 0.5D);
+        Location nearbyLeft = harness.at(world, 1.5D, 64.0D, 0.5D);
+        Location right = harness.at(world, 15.5D, 64.0D, 0.5D);
+        HologramTick tick = new HologramTick();
+
+        List<Player> leftAudience = tick.temporaryPlayers(
+            world.proxy, left, harness.service.viewRange());
+        List<Player> nearbyLeftAudience = tick.temporaryPlayers(
+            world.proxy, nearbyLeft, harness.service.viewRange());
+        List<Player> rightAudience = tick.temporaryPlayers(
+            world.proxy, right, harness.service.viewRange());
+
+        assertEquals(List.of(owner.proxy), leftAudience);
+        assertSame(leftAudience, nearbyLeftAudience,
+            "anchors whose boundary set is empty must share the cell's immutable guaranteed list");
+        assertTrue(rightAudience.contains(boundary.proxy),
+            "an edge viewer must be included only where its exact distance is in range");
+        assertEquals(1, tick.temporaryAudienceCellCount());
+    }
+
+    @Test
+    void whitelistFallbackScansTheRosterOnlyOnReset() {
+        world.visibleByDefaultSupported = false;
+        PlayerHandle bob = harness.join("Bob", world, 2.0D, 64.0D, 2.0D);
+        TemporaryHologramDisplay temporary = temporary("t-visibility-fallback", List.of("private"));
+        temporary.viewers().whitelist();
+        temporary.viewers().add(owner.uuid);
+
+        temporary.drive(true);
+        DisplayHandle display = harness.onlySpawned(world);
+        int resetQueries = harness.onlinePlayerQueries.get();
+        temporary.drive(true);
+        temporary.drive(true);
+        harness.reconcileViewers();
+        harness.reconcileViewers();
+
+        assertEquals(resetQueries, harness.onlinePlayerQueries.get(),
+            "fallback whitelist drives and periodic viewer reconciliation must not rescan every player");
+        assertFalse(bob.perceivedVisibility(display),
+            "a failed visible-by-default setter must hide every nonmember during initial reconciliation");
     }
 
     @Test
@@ -142,6 +218,31 @@ class CharacterizationTemporaryHologramLifecycleTest {
 
         assertEquals(0, harness.service.temporaryCount(), "expired temporary must self-destroy");
         assertTrue(harness.liveSpawned(world).isEmpty(), "expired temporary must never leave an entity behind");
+    }
+
+    @Test
+    void temporaryWaitsForAnEligibleNearbyViewerBeforeSpawning() {
+        harness.moveTo(owner, world, 500.0D, 64.0D, 500.0D);
+        TemporaryHologramDisplay temporary = temporary("t-audience-gate", List.of("private"));
+        temporary.viewers().whitelist();
+        temporary.viewers().add(owner.uuid);
+
+        temporary.drive(true);
+        assertTrue(harness.liveSpawned(world).isEmpty(),
+            "a temporary with no exact eligible audience must not spawn");
+
+        harness.moveTo(owner, world, 1.0D, 64.0D, 1.0D);
+        temporary.drive(true);
+        assertEquals(1, harness.liveSpawned(world).size(),
+            "the same temporary must spawn when an eligible viewer enters range");
+    }
+
+    @Test
+    void nullWorldIsRejectedBeforeTemporaryRegistration() {
+        assertThrows(NullPointerException.class,
+            () -> harness.service.createTemporary("t-null-world", new Location(null, 0.0D, 64.0D, 0.0D),
+                60_000L));
+        assertEquals(0, harness.service.temporaryCount());
     }
 
     @Test
@@ -182,15 +283,15 @@ class CharacterizationTemporaryHologramLifecycleTest {
         TemporaryHologramDisplay temporary = temporary("t-binder", List.of("hi"));
         temporary.drive(true);
 
-        temporary.bindPosition(() -> harness.at(world, 9.0D, 70.0D, 9.0D));
-        temporary.drive(true);
+        temporary.bindPosition(owner.proxy, () -> harness.at(world, 9.0D, 70.0D, 9.0D));
+        harness.driveTemporary(temporary, true);
         assertEquals(9.0D, temporary.location().getX());
         assertEquals(70.0D, temporary.location().getY());
 
-        temporary.bindPosition(() -> {
+        temporary.bindPosition(owner.proxy, () -> {
             throw new IllegalStateException("binder boom");
         });
-        temporary.drive(true);
+        harness.driveTemporary(temporary, true);
         assertEquals(9.0D, temporary.location().getX(), "failing binder must keep the last position");
         assertEquals(1, harness.service.temporaryCount(), "failing binder must not destroy the hologram");
     }

@@ -9,6 +9,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
@@ -16,6 +17,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BooleanSupplier;
+import java.util.logging.Handler;
+import java.util.logging.LogRecord;
+import java.util.logging.Logger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -150,6 +154,98 @@ class DocumentRegistryTest {
 
         awaitWatcherEvent(registry, watcher::eventSeen);
         assertEquals("one", registry.get("alpha").value());
+    }
+
+    @Test
+    void transientEmptySaveIsReplacedWithoutAWarning() throws Exception {
+        AtomicInteger parses = new AtomicInteger();
+        DocumentParser<String> parser = (fileName, raw) -> {
+            parses.incrementAndGet();
+            if (raw.isBlank()) {
+                throw new IllegalArgumentException(fileName + " document is empty");
+            }
+            return raw.trim();
+        };
+        write("alpha.json", "one");
+        DocumentRegistry<String> registry = DocumentRegistry.folder("test", folder, parser, value -> 1L,
+            file -> false, clock::get);
+        registry.reload();
+        TrackingFolderWatcher watcher = new TrackingFolderWatcher(folder);
+        registry.replaceFolderWatcher(watcher);
+        List<LogRecord> warnings = new ArrayList<>();
+        Handler handler = collectingHandler(warnings);
+        Logger logger = Logger.getLogger("Gloss");
+        logger.addHandler(handler);
+        try {
+            write("alpha.json", "");
+            awaitWatcherEvent(registry, watcher::eventSeen);
+
+            assertEquals(2, parses.get());
+            assertTrue(warnings.isEmpty());
+            assertEquals("one", registry.get("alpha").value());
+
+            write("alpha.json", "two");
+            DocumentDelta delta = awaitDelta(registry);
+
+            assertEquals("two", registry.get(delta, "alpha").value());
+            assertTrue(registry.acknowledge(delta));
+            assertTrue(warnings.isEmpty());
+        } finally {
+            logger.removeHandler(handler);
+        }
+    }
+
+    @Test
+    void unchangedInvalidSaveWarnsOnceAfterTheSecondObservation() throws Exception {
+        write("alpha.json", "one");
+        DocumentRegistry<String> registry = registry();
+        registry.reload();
+        TrackingFolderWatcher watcher = new TrackingFolderWatcher(folder);
+        registry.replaceFolderWatcher(watcher);
+        List<LogRecord> warnings = new ArrayList<>();
+        Handler handler = collectingHandler(warnings);
+        Logger logger = Logger.getLogger("Gloss");
+        logger.addHandler(handler);
+        try {
+            write("alpha.json", "bad edit");
+            awaitWatcherEvent(registry, watcher::eventSeen);
+
+            assertTrue(warnings.isEmpty());
+            assertTrue(registry.poll().isEmpty());
+            assertEquals(1, warnings.size());
+            assertTrue(registry.poll().isEmpty());
+            assertEquals(1, warnings.size());
+            assertEquals("one", registry.get("alpha").value());
+        } finally {
+            logger.removeHandler(handler);
+        }
+    }
+
+    @Test
+    void changingInvalidBytesRestartsTheStabilityCheck() throws Exception {
+        write("alpha.json", "one");
+        DocumentRegistry<String> registry = registry();
+        registry.reload();
+        TrackingFolderWatcher firstWatcher = new TrackingFolderWatcher(folder);
+        registry.replaceFolderWatcher(firstWatcher);
+        List<LogRecord> warnings = new ArrayList<>();
+        Handler handler = collectingHandler(warnings);
+        Logger logger = Logger.getLogger("Gloss");
+        logger.addHandler(handler);
+        try {
+            write("alpha.json", "bad first");
+            awaitWatcherEvent(registry, firstWatcher::eventSeen);
+            TrackingFolderWatcher secondWatcher = new TrackingFolderWatcher(folder);
+            registry.replaceFolderWatcher(secondWatcher);
+            write("alpha.json", "bad second");
+            awaitWatcherEvent(registry, secondWatcher::eventSeen);
+
+            assertTrue(warnings.isEmpty());
+            assertTrue(registry.poll().isEmpty());
+            assertEquals(1, warnings.size());
+        } finally {
+            logger.removeHandler(handler);
+        }
     }
 
     @Test
@@ -617,6 +713,25 @@ class DocumentRegistryTest {
             }
         }
         assertTrue(eventSeen.getAsBoolean());
+    }
+
+    private static Handler collectingHandler(List<LogRecord> records) {
+        return new Handler() {
+            @Override
+            public void publish(LogRecord record) {
+                if (record.getMessage() != null && record.getMessage().startsWith("test/alpha.json:")) {
+                    records.add(record);
+                }
+            }
+
+            @Override
+            public void flush() {
+            }
+
+            @Override
+            public void close() {
+            }
+        };
     }
 
     private static final class EventSilentFolderWatcher extends FolderWatcher {

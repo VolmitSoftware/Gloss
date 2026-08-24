@@ -9,6 +9,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -89,5 +90,51 @@ class HologramServiceHygieneTest {
         assertEquals(0, harness.service.temporaryCount(),
             "the drive pass must tolerate temporaries deregistering while it iterates");
         assertTrue(harness.liveSpawned(world).isEmpty());
+    }
+
+    @Test
+    void retiredEntityDriveReleasesLatchAndRetriesAtTheAnchor() {
+        TemporaryHologramDisplay temporary = harness.temporary("t-retired",
+            harness.at(world, 0.5D, 64.0D, 0.5D), 60_000L);
+        temporary.setLines(List.of("hi"));
+        temporary.drive(true);
+        DisplayHandle retired = harness.onlySpawned(world);
+        retired.removed = true;
+
+        harness.driveTemporary(temporary, true);
+        DisplayHandle replacement = harness.onlySpawned(world);
+        assertTrue(replacement != retired);
+
+        harness.driveTemporary(temporary, true);
+        assertEquals(1, harness.liveSpawned(world).size(),
+            "a retired entity callback must not leave the drive latch stuck");
+    }
+
+    @Test
+    void rejectedSchedulerRetirementContinuationRunsOnce() {
+        AtomicInteger continuations = new AtomicInteger();
+        Runnable retirement = TemporaryHologramDisplay.once(continuations::incrementAndGet);
+
+        retirement.run();
+        retirement.run();
+
+        assertEquals(1, continuations.get(),
+            "scheduler rejection and its false return must share one retirement continuation");
+    }
+
+    @Test
+    void viewerWorkQueueRetainsOnlyTheLatestRefreshPerHologram() {
+        HologramService.ViewerWorkQueue queue = new HologramService.ViewerWorkQueue();
+        AtomicInteger rendered = new AtomicInteger();
+
+        for (int refresh = 1; refresh <= 1_000; refresh++) {
+            int value = refresh;
+            queue.put("same-hologram", () -> rendered.set(value));
+        }
+
+        assertEquals(1, queue.pendingCount(),
+            "a lagging player region must retain one latest refresh per hologram");
+        queue.remove("same-hologram").run();
+        assertEquals(1_000, rendered.get());
     }
 }

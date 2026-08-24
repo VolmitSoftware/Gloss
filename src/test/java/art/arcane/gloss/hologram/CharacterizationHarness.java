@@ -4,6 +4,7 @@ import art.arcane.gloss.Gloss;
 import art.arcane.gloss.GlossConfig;
 import art.arcane.gloss.animation.AnimationClip;
 import art.arcane.gloss.animation.AnimationMode;
+import art.arcane.gloss.animation.AnimationService;
 import art.arcane.gloss.config.GlossConfigFile;
 import art.arcane.gloss.text.TextPipeline;
 import art.arcane.volmlib.util.scheduling.SchedulerRuntime;
@@ -15,6 +16,7 @@ import org.bukkit.World;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.TextDisplay;
+import org.bukkit.event.player.PlayerRespawnEvent;
 import org.bukkit.event.world.EntitiesLoadEvent;
 import org.bukkit.plugin.PluginDescriptionFile;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -31,7 +33,11 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -79,6 +85,7 @@ final class CharacterizationHarness implements AutoCloseable {
         final Map<String, Object> dataContainer = new ConcurrentHashMap<>();
         volatile String text;
         volatile Boolean visibleByDefault;
+        volatile boolean visibleByDefaultSupported = true;
         volatile boolean removed;
         TextDisplay proxy;
 
@@ -124,7 +131,9 @@ final class CharacterizationHarness implements AutoCloseable {
         final List<Player> players = new CopyOnWriteArrayList<>();
         final List<DisplayHandle> spawned = new CopyOnWriteArrayList<>();
         final List<Entity> chunkEntities = new CopyOnWriteArrayList<>();
+        final List<Chunk> loadedChunks = new CopyOnWriteArrayList<>();
         volatile boolean chunkLoaded = true;
+        volatile boolean visibleByDefaultSupported = true;
         World proxy;
         Chunk chunkProxy;
 
@@ -135,6 +144,7 @@ final class CharacterizationHarness implements AutoCloseable {
 
     final List<Throwable> schedulerErrors = new CopyOnWriteArrayList<>();
     final List<DelayedTask> delayedTasks = new CopyOnWriteArrayList<>();
+    final AtomicInteger onlinePlayerQueries = new AtomicInteger();
     final Map<String, WorldState> worlds = new LinkedHashMap<>();
     final List<PlayerHandle> online = new CopyOnWriteArrayList<>();
     final Map<UUID, DisplayHandle> displays = new ConcurrentHashMap<>();
@@ -142,8 +152,10 @@ final class CharacterizationHarness implements AutoCloseable {
     final Gloss gloss;
     final HologramService service;
     final HologramAnimator animator;
+    final AnimationService animations;
     final TextPipeline text;
     final File dataFolder;
+    final Map<String, AnimationClip> animationClips = new ConcurrentHashMap<>();
     volatile GlossConfig config;
 
     private final AtomicInteger entityIds = new AtomicInteger(1000);
@@ -174,15 +186,19 @@ final class CharacterizationHarness implements AutoCloseable {
                 }, message -> {
                 }, schedulerErrors::add);
 
-            Map<String, AnimationClip> clips = Map.of(
-                "animation.fast", new AnimationClip("fast", 100.0D, AnimationMode.ASCEND, List.of("A", "B", "C", "D")));
+            animationClips.put("animation.fast",
+                new AnimationClip("fast", 100.0D, AnimationMode.ASCEND, List.of("A", "B", "C", "D")));
             this.animator = new HologramAnimator(() -> config,
-                name -> clips.containsKey(name) || text.hasFunction(name), clips::get, sender);
+                name -> animationClips.containsKey(name) || text.hasFunction(name), animationClips::get, sender);
+            this.animations = new AnimationService(gloss);
 
             setDeclaredField(gloss, Gloss.class, "scheduler", scheduler);
             setDeclaredField(gloss, Gloss.class, "config", config);
             setDeclaredField(gloss, Gloss.class, "text", text);
             setDeclaredField(gloss, Gloss.class, "animator", animator);
+            setDeclaredField(gloss, Gloss.class, "animations", animations);
+
+            publishAnimationClips();
 
             this.service = new HologramService(gloss);
         } catch (Exception failure) {
@@ -232,6 +248,12 @@ final class CharacterizationHarness implements AutoCloseable {
         text.registerFunction(name, resolver);
     }
 
+    void configureAnimation(String id, List<String> frames) {
+        animationClips.put("animation." + id,
+            new AnimationClip(id, 100.0D, AnimationMode.ASCEND, frames));
+        publishAnimationClips();
+    }
+
     WorldState world(String name) {
         WorldState state = worlds.get(name);
         if (state != null) {
@@ -240,7 +262,7 @@ final class CharacterizationHarness implements AutoCloseable {
 
         WorldState created = new WorldState(name);
         created.proxy = worldProxy(created);
-        created.chunkProxy = chunkProxy(created);
+        created.chunkProxy = chunkProxy(created, 0, 0);
         worlds.put(name, created);
         return created;
     }
@@ -249,12 +271,20 @@ final class CharacterizationHarness implements AutoCloseable {
         return new Location(world.proxy, x, y, z);
     }
 
+    void loadChunks(WorldState world, int count) {
+        world.loadedChunks.clear();
+        for (int index = 0; index < count; index++) {
+            world.loadedChunks.add(chunkProxy(world, index, 0));
+        }
+    }
+
     PlayerHandle join(String name, WorldState world, double x, double y, double z) {
         PlayerHandle handle = new PlayerHandle(name);
         handle.proxy = playerProxy(handle);
         handle.location = new Location(world.proxy, x, y, z);
         world.players.add(handle.proxy);
         online.add(handle);
+        viewerIndex().update(handle.proxy, handle.location);
         return handle;
     }
 
@@ -265,6 +295,7 @@ final class CharacterizationHarness implements AutoCloseable {
             state.players.remove(handle.proxy);
         }
 
+        viewerIndex().remove(handle.uuid);
         service.prunePlayer(handle.uuid);
     }
 
@@ -277,6 +308,7 @@ final class CharacterizationHarness implements AutoCloseable {
             }
             world.players.add(handle.proxy);
         }
+        viewerIndex().update(handle.proxy, handle.location);
     }
 
     TemporaryHologramDisplay temporary(String id, Location at, long durationMs) {
@@ -345,12 +377,68 @@ final class CharacterizationHarness implements AutoCloseable {
         }
     }
 
+    void fireRespawn(PlayerHandle player, Location location) {
+        try {
+            Object listener = declaredField(service, HologramService.class, "listener");
+            Method handler = listener.getClass().getMethod("onPlayerRespawn", PlayerRespawnEvent.class);
+            handler.setAccessible(true);
+            handler.invoke(listener, new PlayerRespawnEvent(player.proxy, location, false));
+        } catch (ReflectiveOperationException failure) {
+            throw new IllegalStateException(failure);
+        }
+    }
+
+    List<HologramTick.Viewer> indexedViewers(Location anchor, double range) {
+        return viewerIndex().nearby(anchor, range);
+    }
+
+    void reconcileViewers() {
+        invokeService("reconcileViewers");
+    }
+
     void driveHolograms() {
-        invokeService("driveHolograms");
+        try {
+            setDeclaredField(service, HologramService.class, "driverRunning", true);
+            Method method = HologramService.class.getDeclaredMethod("driveHolograms", boolean.class);
+            method.setAccessible(true);
+            method.invoke(service, false);
+        } catch (ReflectiveOperationException failure) {
+            throw new IllegalStateException(failure);
+        }
     }
 
     void driveTemporaries() {
         invokeService("driveTemporaries");
+    }
+
+    void driveTemporary(TemporaryHologramDisplay temporary, boolean enabled) {
+        temporary.scheduleDrive(new HologramTick(viewerIndex()), enabled);
+    }
+
+    CountDownLatch blockFileExecutor() {
+        try {
+            ExecutorService executor = (ExecutorService) declaredField(service, HologramService.class,
+                "fileExecutor");
+            CountDownLatch started = new CountDownLatch(1);
+            CountDownLatch release = new CountDownLatch(1);
+            executor.execute(() -> {
+                started.countDown();
+                try {
+                    release.await();
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                }
+            });
+            if (!started.await(5L, TimeUnit.SECONDS)) {
+                throw new IllegalStateException("Hologram IO executor did not reach the test barrier");
+            }
+            return release;
+        } catch (InterruptedException failure) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException(failure);
+        } catch (ReflectiveOperationException failure) {
+            throw new IllegalStateException(failure);
+        }
     }
 
     void startTasks() {
@@ -435,6 +523,7 @@ final class CharacterizationHarness implements AutoCloseable {
         Logger serverLogger = Logger.getAnonymousLogger();
         InvocationHandler handler = (proxy, method, args) -> switch (method.getName()) {
             case "getOnlinePlayers" -> {
+                onlinePlayerQueries.incrementAndGet();
                 List<Player> roster = new ArrayList<>(online.size());
                 for (PlayerHandle handle : online) {
                     roster.add(handle.proxy);
@@ -480,9 +569,10 @@ final class CharacterizationHarness implements AutoCloseable {
             case "getMaxHeight" -> 320;
             case "getUID" -> UUID.nameUUIDFromBytes(state.name.getBytes());
             case "getChunkAt" -> state.chunkProxy;
-            case "getLoadedChunks" -> new Chunk[0];
+            case "getLoadedChunks" -> state.loadedChunks.toArray(new Chunk[0]);
             case "spawn" -> {
                 DisplayHandle display = new DisplayHandle(entityIds.getAndIncrement());
+                display.visibleByDefaultSupported = state.visibleByDefaultSupported;
                 display.proxy = displayProxy(display);
                 displays.put(display.uuid, display);
                 state.spawned.add(display);
@@ -499,9 +589,10 @@ final class CharacterizationHarness implements AutoCloseable {
             new Class<?>[]{World.class}, handler);
     }
 
-    private Chunk chunkProxy(WorldState state) {
+    private Chunk chunkProxy(WorldState state, int chunkX, int chunkZ) {
         InvocationHandler handler = (proxy, method, args) -> switch (method.getName()) {
-            case "getX", "getZ" -> 0;
+            case "getX" -> chunkX;
+            case "getZ" -> chunkZ;
             case "getWorld" -> state.proxy;
             case "getEntities" -> state.chunkEntities.toArray(new Entity[0]);
             case "isLoaded" -> state.chunkLoaded;
@@ -559,6 +650,9 @@ final class CharacterizationHarness implements AutoCloseable {
                 case "getPersistentDataContainer":
                     return dataContainer;
                 case "setVisibleByDefault":
+                    if (!handle.visibleByDefaultSupported) {
+                        throw new UnsupportedOperationException("visible-by-default unavailable");
+                    }
                     handle.visibleByDefault = (Boolean) args[0];
                     handle.callLog.add("setVisibleByDefault(" + args[0] + ")");
                     return null;
@@ -686,6 +780,29 @@ final class CharacterizationHarness implements AutoCloseable {
             method.invoke(service);
         } catch (ReflectiveOperationException failure) {
             throw new IllegalStateException(failure);
+        }
+    }
+
+    private HologramViewerIndex viewerIndex() {
+        try {
+            return (HologramViewerIndex) declaredField(service, HologramService.class, "viewerIndex");
+        } catch (ReflectiveOperationException failure) {
+            throw new IllegalStateException(failure);
+        }
+    }
+
+    private void publishAnimationClips() {
+        try {
+            Map<String, AnimationClip> byId = new LinkedHashMap<>();
+            for (AnimationClip clip : animationClips.values()) {
+                byId.put(clip.id(), clip);
+            }
+            setDeclaredField(animations, AnimationService.class, "clipsById", Map.copyOf(byId));
+            setDeclaredField(animations, AnimationService.class, "clips", List.copyOf(byId.values()));
+            Object generation = declaredField(animations, AnimationService.class, "generation");
+            ((AtomicLong) generation).incrementAndGet();
+        } catch (ReflectiveOperationException failure) {
+            throw new IllegalStateException("Failed to publish characterization animation clips", failure);
         }
     }
 

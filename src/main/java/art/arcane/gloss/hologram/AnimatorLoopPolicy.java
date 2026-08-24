@@ -30,11 +30,12 @@ public final class AnimatorLoopPolicy {
         return Math.max(floor, Math.min(current - 1L, recovered));
     }
 
-    public static long minSendIntervalMillis(int viewers, int packetBudget) {
-        if (viewers <= 0) {
+    public static long minSendIntervalMillis(long packetRecipients, int packetBudget) {
+        if (packetRecipients <= 0L) {
             return 0L;
         }
 
-        return (viewers * 1000L) / Math.max(1L, packetBudget);
+        long budget = Math.max(1L, packetBudget);
+        return (packetRecipients * 1000L) / budget;
     }
 }

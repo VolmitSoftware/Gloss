@@ -116,6 +116,9 @@
         "failed": "&7[&bGloss&7]: &cLegacy hologram migration from &f{source}&c failed: {reason}"
       "config":
         "reloaded": "&2설정 \"{name}\"을 다시 불러왔습니다."
+      "hotload":
+        "singular": "&2{kinds}을 핫 리로드했습니다(변경 {count}건)."
+        "plural": "&2{kinds}을 핫 리로드했습니다(변경 {count}건)."
       "preview_scale":
         "adjusting": "&7미리보기 크기: &f{percent}% &8- &7웅크리기 유지 + 스크롤로 조절, 웅크리기 두 번 누르기로 저장"
         "hidden": "&7미리보기 &c숨김 &8- &7위로 스크롤하여 복원"

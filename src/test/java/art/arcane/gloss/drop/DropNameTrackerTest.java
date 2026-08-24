@@ -117,6 +117,22 @@ class DropNameTrackerTest {
     }
 
     @Test
+    void ownerInspectionAdvancesInBoundedCohortsWithoutRemovingEntries() {
+        DropNameTracker tracker = new DropNameTracker();
+        Set<UUID> inspected = new HashSet<>();
+        for (int index = 0; index < 40; index++) {
+            tracker.track(UUID.randomUUID());
+        }
+
+        for (int pass = 0; pass < 5; pass++) {
+            tracker.inspect(8, inspected::add);
+        }
+
+        assertEquals(40, inspected.size());
+        assertEquals(40, tracker.size());
+    }
+
+    @Test
     void clearingResetsBothTheSetAndTheCursor() {
         DropNameTracker tracker = new DropNameTracker(id -> false);
         for (int index = 0; index < 10; index++) {

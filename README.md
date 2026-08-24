@@ -4,7 +4,7 @@
 
 # Gloss
 
-Server polish and display suite: holograms, scoreboards, tablist, emoji chat, chat bubbles and damage indicators — in one plugin.
+Server polish and display suite: holograms, menus, scoreboards, tablist, emoji chat, chat bubbles, damage indicators and display-backed drops — in one plugin.
 
 </div>
 
@@ -16,10 +16,14 @@ Server polish and display suite: holograms, scoreboards, tablist, emoji chat, ch
 - **Emoji** — `:emoji:` and trigger replacement in chat with tab completion and per-emoji permissions.
 - **Chat bubbles** — messages float above the speaker's head, stack, and fly away as they expire.
 - **Damage indicators** — floating damage and heal numbers with ballistic motion, measured from actual applied health deltas.
+- **Menus and previews** — packet-only holographic menus, persistent world panels and look-at container previews.
+- **Dropped items** — configurable labels plus optional display-backed block and item models while the native item remains authoritative.
 - **Animations** — frame-based text animations usable in any hologram, board or tablist line via `|animation.<id>|`.
 - **MOTD** — randomized, color-filtered server list MOTD.
 
 Rendered text supports bounded `{{ ... }}` expressions with native `player.*` and `server.*` values. PlaceholderAPI remains optional: `papi(...)` and `papiNumber(...)` use it when installed, while the standard player and server keys resolve from Gloss itself when it is absent.
+
+Container-preview discovery uses a fair, deduplicated queue capped at ten players per tick. Open previews keep entity-tick target tracking, while stationary viewers are added through a 100-tick fallback sweep.
 
 ## Requirements
 
@@ -52,11 +56,12 @@ plugins/Gloss/
 ├── language.yml                     always
 ├── tablist.json                     shipped default, while tablist is enabled
 ├── motd.json                        shipped default, while motd is enabled (off by default)
-├── boards/<id>.json                 shipped default, while boards are enabled
+├── boards/<id>.json                 2 shipped defaults, while boards are enabled
 ├── emoji/<id>.json                  shipped defaults, while emoji is enabled
-├── animations/<id>.json             shipped default, while animations are enabled
+├── animations/<id>.json             10 shipped defaults, while animations are enabled
 ├── bubbles/<id>.json                shipped default, while chat bubbles are enabled
-├── previews/<name>.json             shipped defaults, while container previews are enabled
+├── real-drops/default.json          shipped default, while real drops are enabled
+├── previews/<name>.json             14 shipped defaults, while container previews are enabled
 ├── holograms/<id>.json              on the first hologram
 ├── menus/<path>.json                on the first menu
 ├── images/<path>                    when an operator drops an image in
@@ -66,6 +71,6 @@ plugins/Gloss/
 └── import-backups/<timestamp>/      on a legacy data import that has something to migrate
 ```
 
-All data files hotload — edit them on disk and the change applies in game without a reload. Deleting
-a folder is safe: Gloss reads what is there and recreates only what it writes. `panels/` is the one
-exception to hotloading and reloads through `/gloss panel reload`.
+Configuration, localization and content documents hotload — edit them on disk and the change applies
+in game without a restart. Deleting a folder is safe: Gloss reads what is there and recreates only
+what it writes. `panels/` is the one exception and reloads through `/gloss panel reload`.

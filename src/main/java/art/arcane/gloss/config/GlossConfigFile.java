@@ -308,7 +308,7 @@ public final class GlossConfigFile {
         public int unknownCacheMinutes = 10;
 
         @ConfigDoc("Maximum cached profiles. The entries closest to expiry are dropped first; a lookup still in flight is never dropped. Clamped to 16..65536.")
-        public int maxCachedProfiles = 512;
+        public int maxCachedProfiles = 2048;
 
         @ConfigDoc("Block shown in place of a name that does not exist or could not be read. Anything that is not a real block falls back to minecraft:skeleton_skull.")
         public String unknownFallbackItem = "minecraft:skeleton_skull";

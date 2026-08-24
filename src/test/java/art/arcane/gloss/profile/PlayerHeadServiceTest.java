@@ -12,6 +12,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static org.junit.Assert.assertEquals;
@@ -292,6 +293,50 @@ public class PlayerHeadServiceTest {
   }
 
   @Test
+  public void aThousandNameBurstKeepsFallbacksPendingAndBoundsConcurrentResolution() {
+    FakeResolver resolver = new FakeResolver();
+    int cacheCeiling = 64;
+    PlayerHeadService service = new PlayerHeadService(
+        resolver, new AtomicLong()::get, HIT, MISS, cacheCeiling);
+    int names = 1000;
+
+    for (int index = 0; index < names; index++) {
+      assertTrue(service.lookup("player" + index).isPending());
+    }
+
+    assertEquals(PlayerHeadService.MAX_CONCURRENT_RESOLUTIONS, resolver.calls.size());
+    assertEquals(names, service.cachedCount());
+    assertTrue(resolver.peakPending.get() <= PlayerHeadService.MAX_CONCURRENT_RESOLUTIONS);
+
+    for (int index = 0; index < names; index++) {
+      resolver.completeNext();
+    }
+
+    assertEquals(names, resolver.calls.size());
+    assertEquals(0, resolver.pendingCount());
+    assertTrue(resolver.peakPending.get() <= PlayerHeadService.MAX_CONCURRENT_RESOLUTIONS);
+    assertTrue("cached=" + service.cachedCount(), service.cachedCount() <= cacheCeiling);
+  }
+
+  @Test
+  public void settlingAnOversizedInflightSetEvictsBackToTheCacheCeiling() {
+    FakeResolver resolver = new FakeResolver();
+    PlayerHeadService service = new PlayerHeadService(resolver, new AtomicLong()::get, HIT, MISS, 4);
+    int names = 32;
+
+    for (int index = 0; index < names; index++) {
+      service.lookup("player" + index);
+    }
+    assertEquals(names, service.cachedCount());
+
+    for (int index = 0; index < names; index++) {
+      resolver.completeNext();
+    }
+
+    assertTrue("cached=" + service.cachedCount(), service.cachedCount() <= 4);
+  }
+
+  @Test
   public void invalidateDropsEverythingSoAConfigFixTakesEffectAtOnce() {
     FakeResolver resolver = new FakeResolver();
     PlayerHeadService service = service(resolver, new AtomicLong());
@@ -334,12 +379,14 @@ public class PlayerHeadServiceTest {
   private static final class FakeResolver implements PlayerHeadResolver {
     private final List<String> calls = new CopyOnWriteArrayList<>();
     private final List<CompletableFuture<Optional<PlayerHeadProfile>>> pending = new CopyOnWriteArrayList<>();
+    private final AtomicInteger peakPending = new AtomicInteger();
 
     @Override
     public CompletableFuture<Optional<PlayerHeadProfile>> resolve(String name) {
       calls.add(name);
       CompletableFuture<Optional<PlayerHeadProfile>> future = new CompletableFuture<>();
       pending.add(future);
+      peakPending.accumulateAndGet(pendingCount(), Math::max);
       return future;
     }
 
@@ -349,6 +396,26 @@ public class PlayerHeadServiceTest {
 
     private void fail(String name, Throwable failure) {
       latest(name).completeExceptionally(failure);
+    }
+
+    private void completeNext() {
+      for (int index = 0; index < pending.size(); index++) {
+        CompletableFuture<Optional<PlayerHeadProfile>> future = pending.get(index);
+        if (future.complete(Optional.of(profile(calls.get(index))))) {
+          return;
+        }
+      }
+      throw new AssertionError("no pending player head lookup");
+    }
+
+    private int pendingCount() {
+      int count = 0;
+      for (CompletableFuture<Optional<PlayerHeadProfile>> future : pending) {
+        if (!future.isDone()) {
+          count++;
+        }
+      }
+      return count;
     }
 
     private CompletableFuture<Optional<PlayerHeadProfile>> latest(String name) {

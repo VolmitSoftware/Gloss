@@ -37,18 +37,17 @@ public class CommandGlossEmoji {
             return;
         }
 
-        GlossCommandPager.Window window = GlossCommandPager.window(enabled.size(), page, GlossCommandPager.EMOJI_PAGE_SIZE);
+        DirectorMiniMenu.ContentPage window = GlossCommandPager.window(enabled.size(), page, GlossCommandPager.EMOJI_PAGE_SIZE);
         DirectorMiniMenu.Theme theme = GlossCommandService.menuTheme();
         String hover = DirectorMiniMenu.escapeText(GlossLocalization.globalDirectorText(GlossMessages.EMOJI_HOVER, MessageArgs.empty()));
         List<String> lines = new ArrayList<>();
-        lines.add(DirectorMiniMenu.banner(LIST_COMMAND, theme));
+        GlossCommandPager.appendHeader(lines, LIST_COMMAND, window, theme);
         appendEmojiRows(lines, enabled, window, theme, hover);
         GlossCommandPager.appendFooter(lines, window, LIST_COMMAND, theme);
-        lines.add(DirectorMiniMenu.bar(theme));
         DirectorMiniMenu.deliver(sender, lines);
     }
 
-    private void appendEmojiRows(List<String> lines, List<EmojiEntry> enabled, GlossCommandPager.Window window,
+    private void appendEmojiRows(List<String> lines, List<EmojiEntry> enabled, DirectorMiniMenu.ContentPage window,
                                  DirectorMiniMenu.Theme theme, String hover) {
         StringBuilder row = new StringBuilder();
         int column = 0;

@@ -13,6 +13,9 @@ public interface StorageTaskRunner {
   default void shutdown() {
   }
 
+  default void shutdownNow() {
+  }
+
   default boolean awaitTermination(long timeout, TimeUnit unit) throws InterruptedException {
     return true;
   }

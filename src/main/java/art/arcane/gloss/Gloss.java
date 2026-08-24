@@ -196,6 +196,7 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
         instance = this;
         boolean success = true;
         String errorMessage = null;
+        Throwable startupFailure = null;
         try {
             scheduler = installSchedulerBridge();
             ImageIO.scanForPlugins();
@@ -259,7 +260,13 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
             enableService("item-providers", itemProviders::activateAll, itemProviders::shutdown);
             enableService("player-heads",
                 () -> playerHeads = PlayerHeadService.fromConfig(cfg().playerHeads()),
-                () -> playerHeads = null);
+                () -> {
+                    PlayerHeadService current = playerHeads;
+                    playerHeads = null;
+                    if (current != null) {
+                        current.invalidate();
+                    }
+                });
             containerProtection = new ContainerProtectionService(this);
             enableService("protection", containerProtection::activate, containerProtection::shutdown);
             sessionManager = new MenuSessionManager();
@@ -296,6 +303,7 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
             GlossAPIProvider.set(api);
         } catch (Throwable failure) {
             success = false;
+            startupFailure = failure;
             errorMessage = failure.getClass().getSimpleName()
                 + (failure.getMessage() == null ? "" : ": " + failure.getMessage());
             getLogger().log(Level.SEVERE, "Gloss failed to enable", failure);
@@ -307,6 +315,19 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
         if (!success || activeConfig == null || activeConfig.splashScreen()) {
             SplashScreen.print(this, success, errorMessage);
         }
+        if (startupFailure != null) {
+            throw propagateEnableFailure(startupFailure);
+        }
+    }
+
+    static RuntimeException propagateEnableFailure(Throwable failure) {
+        if (failure instanceof Error error) {
+            throw error;
+        }
+        if (failure instanceof RuntimeException runtimeFailure) {
+            return runtimeFailure;
+        }
+        return new IllegalStateException("Gloss failed to enable", failure);
     }
 
     @Override
@@ -352,7 +373,7 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
         applyReloadedConfig(cycleEveryService, null);
     }
 
-    private void applyReloadedConfig(
+    private boolean applyReloadedConfig(
         boolean cycleEveryService,
         GlossConfigLoader.ReloadSnapshot reloadSnapshot
     ) {
@@ -364,7 +385,7 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
         } catch (IOException failure) {
             logExceptionStack(false, failure,
                 "config.toml is invalid; keeping the last good configuration.");
-            return;
+            return false;
         }
         GlossConfig previous = config;
         GlossConfig next = GlossConfig.from(reloaded);
@@ -372,6 +393,7 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
         reloadServices(previous, next, cycleEveryService);
         applyMergedConfigHooks(previous, next);
         info("Reloaded in-place from disk.");
+        return true;
     }
 
     /**
@@ -488,7 +510,11 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
      * pass, which meant a menu folder that failed to poll took the locale reload down with it.
      */
     private void startLocaleWatcher() {
-        watchdog.register(LOCALE_WATCHDOG_ENTRY, localization::update);
+        watchdog.register(LOCALE_WATCHDOG_ENTRY, () -> {
+            if (localization.update()) {
+                watchdog.recordHotload("language.yml", 1);
+            }
+        });
     }
 
     private void stopLocaleWatcher() {
@@ -544,8 +570,9 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
         pendingConfigSnapshot = null;
         info("config.toml changed on disk; reloading.");
         if (SchedulerUtils.runGlobal(this, () -> {
-            if (reloadGeneration == configReloadGeneration.get()) {
-                applyReloadedConfig(false, snapshot);
+            if (reloadGeneration == configReloadGeneration.get()
+                && applyReloadedConfig(false, snapshot)) {
+                watchdog.recordHotload("config.toml", 1);
             }
         })) {
             return;
@@ -575,7 +602,15 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
         if (playerHeads != null && !previous.playerHeads().equals(next.playerHeads())) {
             // TTLs and the cache ceiling are baked into the service, and an operator who just fixed
             // a name or flipped resolution on should see it on the next refresh, not in six hours.
+            PlayerHeadService previousHeads = playerHeads;
             playerHeads = PlayerHeadService.fromConfig(next.playerHeads());
+            previousHeads.invalidate();
+            if (sessionManager != null) {
+                sessionManager.refreshVisuals();
+            }
+            if (panelRuntime != null) {
+                panelRuntime.refreshVisuals();
+            }
         }
         boolean customItemsChanged = previous.customItems().enabled() != next.customItems().enabled()
             || !previous.customItems().providers().equals(next.customItems().providers());

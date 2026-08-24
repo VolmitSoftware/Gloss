@@ -12,6 +12,7 @@ import art.arcane.gloss.locale.GlossMessages;
 import art.arcane.gloss.text.TextPipeline;
 import art.arcane.volmlib.util.format.Form;
 import art.arcane.volmlib.util.localization.MessageArgument;
+import art.arcane.volmlib.util.scheduling.FoliaScheduler;
 import art.arcane.volmlib.util.scheduling.SchedulerUtils;
 import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
@@ -38,7 +39,9 @@ import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataType;
 
 import java.io.File;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Deque;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -47,6 +50,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class DropNameService implements Listener {
     private static final int PRUNE_INTERVAL_TICKS = 40;
     private static final int PRUNE_BUDGET = 64;
+    private static final int REHYDRATE_CHUNK_BUDGET = 32;
     private static final int RENDER_MEMO_LIMIT = 256;
 
     private static final Map<Material, String> PRETTY_NAMES = new ConcurrentHashMap<>();
@@ -59,9 +63,12 @@ public final class DropNameService implements Listener {
     private final DocumentRegistry<RealDropSettingsDoc> realDropSettings;
     private final RealDropService realDrops;
     private final Map<String, String> renderedNames;
+    private final Map<UUID, Item> trackedItems;
+    private final Deque<LoadedChunk> rehydrateChunks;
     private volatile long renderedGeneration = -1L;
+    private volatile long rehydrateGeneration;
     private int pruneTaskId = -1;
-    private boolean listening;
+    private volatile boolean listening;
     private volatile RealDropSettingsDoc realDropDoc;
     private volatile GlossConfig.RealDrops activeRealDropConfig;
 
@@ -69,7 +76,7 @@ public final class DropNameService implements Listener {
         this.plugin = plugin;
         this.nameKey = new NamespacedKey(plugin, "drop_name");
         this.renderedNameKey = new NamespacedKey(plugin, "drop_name_value");
-        this.tracker = new DropNameTracker(DropNameService::stillPresent);
+        this.tracker = new DropNameTracker();
         this.realDropDefaults = new ShippedDefaults(RealDropSettingsDoc.KIND,
             new File(plugin.getDataFolder(), RealDropSettingsDoc.KIND),
             ShippedDocumentCatalog.REAL_DROPS.names());
@@ -78,6 +85,8 @@ public final class DropNameService implements Listener {
             RealDropSettingsDoc::parse, RealDropSettingsDoc::revision);
         this.realDrops = new RealDropService(plugin, this::realDropConfig);
         this.renderedNames = new ConcurrentHashMap<>();
+        this.trackedItems = new ConcurrentHashMap<>();
+        this.rehydrateChunks = new ArrayDeque<>();
         this.realDropDoc = RealDropSettingsDoc.DEFAULTS;
         this.activeRealDropConfig = RealDropSettingsDoc.DEFAULTS.toConfig(false);
     }
@@ -99,6 +108,7 @@ public final class DropNameService implements Listener {
     }
 
     public void disable() {
+        cancelRehydration();
         plugin.watchdog().unregister(RealDropSettingsDoc.KIND);
         realDropSettings.close();
         if (pruneTaskId != -1) {
@@ -110,6 +120,7 @@ public final class DropNameService implements Listener {
             listening = false;
         }
         tracker.clear();
+        trackedItems.clear();
         renderedNames.clear();
         realDrops.disable();
     }
@@ -119,11 +130,13 @@ public final class DropNameService implements Listener {
             enable();
             return;
         }
+        cancelRehydration();
         if (pruneTaskId != -1) {
             plugin.scheduler().csr(pruneTaskId);
             pruneTaskId = -1;
         }
         tracker.clear();
+        trackedItems.clear();
         renderedNames.clear();
         loadRealDropSettings();
         realDrops.disable();
@@ -178,7 +191,7 @@ public final class DropNameService implements Listener {
         if (item == null) {
             return;
         }
-        tracker.forget(item.getUniqueId());
+        forget(item.getUniqueId());
         realDrops.remove(item);
     }
 
@@ -244,13 +257,13 @@ public final class DropNameService implements Listener {
         boolean glossOwned = DropNameFormatter.ownsExistingName(marked, lastRendered, item.getCustomName());
         if (marked && !glossOwned) {
             clearNameOwnership(item);
-            tracker.forget(item.getUniqueId());
+            forget(item.getUniqueId());
         }
         if (!drops.enabled()) {
             if (glossOwned) {
                 item.setCustomName(null);
                 item.setCustomNameVisible(false);
-                tracker.forget(item.getUniqueId());
+                forget(item.getUniqueId());
             }
             clearNameOwnership(item);
             realDrops.present(item, RealDropService.Label.none());
@@ -280,7 +293,7 @@ public final class DropNameService implements Listener {
         }
         item.getPersistentDataContainer().set(nameKey, PersistentDataType.BOOLEAN, true);
         item.getPersistentDataContainer().set(renderedNameKey, PersistentDataType.STRING, rendered);
-        tracker.track(item.getUniqueId());
+        track(item);
 
         List<String> labelLines = verticalLabelLines(contents, suppliedFormats, drops, raw);
         List<String> renderedLines = new ArrayList<>(labelLines.size());
@@ -358,18 +371,43 @@ public final class DropNameService implements Listener {
     }
 
     private void rehydrateLoadedChunks() {
+        cancelRehydration();
         for (World world : Bukkit.getWorlds()) {
             for (Chunk chunk : world.getLoadedChunks()) {
-                int chunkX = chunk.getX();
-                int chunkZ = chunk.getZ();
-                Location anchor = new Location(
-                    world,
-                    (chunkX << 4) + 8,
-                    world.getMinHeight(),
-                    (chunkZ << 4) + 8);
-                plugin.scheduler().runAt(anchor, () -> rehydrateChunk(world, chunkX, chunkZ), 1);
+                rehydrateChunks.addLast(new LoadedChunk(world, chunk.getX(), chunk.getZ()));
             }
         }
+        if (rehydrateChunks.isEmpty()) {
+            return;
+        }
+        long generation = rehydrateGeneration;
+        plugin.scheduler().s(() -> drainRehydration(generation), 1);
+    }
+
+    private void drainRehydration(long generation) {
+        if (!listening || generation != rehydrateGeneration) {
+            return;
+        }
+        int remaining = REHYDRATE_CHUNK_BUDGET;
+        while (remaining-- > 0) {
+            LoadedChunk loaded = rehydrateChunks.pollFirst();
+            if (loaded == null) {
+                return;
+            }
+            Location anchor = new Location(
+                loaded.world(),
+                (loaded.chunkX() << 4) + 8,
+                loaded.world().getMinHeight(),
+                (loaded.chunkZ() << 4) + 8);
+            plugin.scheduler().runAt(anchor,
+                () -> rehydrateChunk(loaded.world(), loaded.chunkX(), loaded.chunkZ(), generation), 1);
+        }
+        plugin.scheduler().s(() -> drainRehydration(generation), 1);
+    }
+
+    private void cancelRehydration() {
+        rehydrateGeneration++;
+        rehydrateChunks.clear();
     }
 
     private GlossConfig.RealDrops realDropConfig() {
@@ -424,13 +462,14 @@ public final class DropNameService implements Listener {
         if (!listening) {
             return;
         }
+        cancelRehydration();
         realDrops.disable();
         realDrops.enable();
         rehydrateLoadedChunks();
     }
 
-    private void rehydrateChunk(World world, int chunkX, int chunkZ) {
-        if (!listening || !world.isChunkLoaded(chunkX, chunkZ)) {
+    private void rehydrateChunk(World world, int chunkX, int chunkZ, long generation) {
+        if (!listening || generation != rehydrateGeneration || !world.isChunkLoaded(chunkX, chunkZ)) {
             return;
         }
         for (Entity entity : world.getChunkAt(chunkX, chunkZ).getEntities()) {
@@ -489,14 +528,40 @@ public final class DropNameService implements Listener {
     }
 
     private void prunePass() {
-        tracker.prune(PRUNE_BUDGET);
+        tracker.inspect(PRUNE_BUDGET, this::inspectTrackedItem);
     }
 
-    private static boolean stillPresent(UUID entityId) {
-        Entity entity = Bukkit.getEntity(entityId);
-        return entity != null && entity.isValid();
+    private void inspectTrackedItem(UUID entityId) {
+        Item item = trackedItems.get(entityId);
+        if (item == null) {
+            tracker.forget(entityId);
+            return;
+        }
+        Runnable inspect = () -> {
+            if (!listening || !item.isValid() || item.isDead()) {
+                forget(entityId);
+            }
+        };
+        Runnable retired = () -> forget(entityId);
+        if (!FoliaScheduler.runEntity(plugin, item, inspect, 0L, retired)) {
+            retired.run();
+        }
+    }
+
+    private void track(Item item) {
+        UUID entityId = item.getUniqueId();
+        trackedItems.put(entityId, item);
+        tracker.track(entityId);
+    }
+
+    private void forget(UUID entityId) {
+        tracker.forget(entityId);
+        trackedItems.remove(entityId);
     }
 
     private record BundleFormats(String header, String entry, String more, int entryLimit) {
+    }
+
+    private record LoadedChunk(World world, int chunkX, int chunkZ) {
     }
 }

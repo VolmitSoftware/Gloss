@@ -6,10 +6,12 @@ import art.arcane.gloss.api.HologramViewers;
 import art.arcane.gloss.api.TemporaryHologram;
 import art.arcane.gloss.text.TextPipeline;
 import art.arcane.volmlib.util.math.M;
+import art.arcane.volmlib.util.scheduling.FoliaScheduler;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.entity.Display;
+import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.TextDisplay;
 import org.bukkit.util.Transformation;
@@ -44,6 +46,16 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
         }
     }
 
+    private record AnimationMemo(LineSet lines, long emojiGeneration, long renderGeneration,
+                                 long animationGeneration, AnimationTemplate template) {
+    }
+
+    private record PositionBinding(Entity owner, Supplier<Location> binder) {
+    }
+
+    private record PresentationBinding(Entity owner, Supplier<HologramPresentation> binder) {
+    }
+
     private final HologramService service;
     private final String id;
     private final String animatorGroup;
@@ -52,6 +64,8 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
     private final Object linesLock;
     private final Map<UUID, Boolean> appliedVisibility;
     private final AtomicBoolean destroyed;
+    private final AtomicBoolean driving;
+    private final AtomicBoolean animationPublished;
     private final AtomicBoolean spawning;
     private final AtomicBoolean textDirty;
     private final AtomicBoolean visibilityReset;
@@ -59,13 +73,15 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
     private volatile LineSet lineSet;
     private volatile Location position;
     private volatile Location appliedPosition;
-    private volatile Supplier<Location> binder;
-    private volatile Supplier<HologramPresentation> presentationBinder;
+    private volatile PositionBinding positionBinding;
+    private volatile PresentationBinding presentationBinding;
+    private volatile HologramPresentation boundPresentation;
     private volatile FrameComposer frameComposer;
     private volatile TextDisplay display;
     private volatile String rendered;
     private volatile HologramPresentation appliedPresentation;
     private volatile int appliedTeleportTicks;
+    private volatile AnimationMemo animationMemo;
 
     TemporaryHologramDisplay(HologramService service, String id, Location initial, long durationMs) {
         this.service = service;
@@ -77,12 +93,19 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
         this.lineSet = new LineSet(List.of(), 0, false);
         this.appliedVisibility = new ConcurrentHashMap<>();
         this.destroyed = new AtomicBoolean();
+        this.driving = new AtomicBoolean();
+        this.animationPublished = new AtomicBoolean();
         this.spawning = new AtomicBoolean();
         this.textDirty = new AtomicBoolean(true);
         this.visibilityReset = new AtomicBoolean();
         this.viewerList = new ViewerList();
         this.appliedTeleportTicks = NO_TELEPORT_DURATION;
-        this.position = Objects.requireNonNull(initial, "Temporary hologram requires a location.").clone();
+        Location startingPosition = Objects.requireNonNull(initial,
+            "Temporary hologram requires a location.").clone();
+        Objects.requireNonNull(startingPosition.getWorld(),
+            "Temporary hologram requires a loaded world.");
+        this.position = startingPosition;
+        this.boundPresentation = HologramPresentation.identity();
     }
 
     @Override
@@ -97,7 +120,10 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
 
     @Override
     public void teleport(Location location) {
-        position = Objects.requireNonNull(location, "Temporary hologram teleport requires a location.").clone();
+        Location destination = Objects.requireNonNull(location,
+            "Temporary hologram teleport requires a location.").clone();
+        Objects.requireNonNull(destination.getWorld(), "Temporary hologram teleport requires a loaded world.");
+        position = destination;
     }
 
     @Override
@@ -171,13 +197,15 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
     }
 
     @Override
-    public void bindPosition(Supplier<Location> binder) {
-        this.binder = binder;
+    public void bindPosition(Entity owner, Supplier<Location> binder) {
+        this.positionBinding = binder == null ? null : new PositionBinding(
+            Objects.requireNonNull(owner, "Position binding requires an owning entity."), binder);
     }
 
     @Override
-    public void bindPresentation(Supplier<HologramPresentation> binder) {
-        this.presentationBinder = binder;
+    public void bindPresentation(Entity owner, Supplier<HologramPresentation> binder) {
+        this.presentationBinding = binder == null ? null : new PresentationBinding(
+            Objects.requireNonNull(owner, "Presentation binding requires an owning entity."), binder);
     }
 
     @Override
@@ -197,7 +225,7 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
         }
 
         service.removeTemporary(this);
-        service.animator().removeGroup(animatorGroup);
+        retractAnimation();
         TextDisplay active = display;
         display = null;
         appliedVisibility.clear();
@@ -210,6 +238,131 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
         drive(new HologramTick(), enabled);
     }
 
+    void scheduleDrive(HologramTick tick, boolean enabled) {
+        if (!driving.compareAndSet(false, true)) {
+            return;
+        }
+        if (destroyed.get()) {
+            driving.set(false);
+            return;
+        }
+        if (remainingMs() <= 0L) {
+            try {
+                destroy();
+            } finally {
+                driving.set(false);
+            }
+            return;
+        }
+        sampleBindings(tick, enabled);
+    }
+
+    private void sampleBindings(HologramTick tick, boolean enabled) {
+        PositionBinding position = positionBinding;
+        PresentationBinding presentation = presentationBinding;
+        if (position == null && presentation == null) {
+            scheduleDisplayDrive(tick, enabled);
+            return;
+        }
+        if (position != null && presentation != null && position.owner() == presentation.owner()) {
+            Runnable sample = () -> {
+                samplePositionNow(position);
+                samplePresentationNow(presentation);
+                scheduleDisplayDrive(tick, enabled);
+            };
+            Runnable retirement = once(() -> scheduleDisplayDrive(tick, enabled));
+            if (!FoliaScheduler.runEntity(service.plugin(), position.owner(), sample, 0L, retirement)) {
+                retirement.run();
+            }
+            return;
+        }
+        samplePosition(position, presentation, tick, enabled);
+    }
+
+    private void samplePosition(PositionBinding binding, PresentationBinding presentation,
+                                HologramTick tick, boolean enabled) {
+        if (binding == null) {
+            samplePresentation(presentation, tick, enabled);
+            return;
+        }
+        Runnable sample = () -> {
+            samplePositionNow(binding);
+            samplePresentation(presentation, tick, enabled);
+        };
+        Runnable retirement = once(() -> samplePresentation(presentation, tick, enabled));
+        if (!FoliaScheduler.runEntity(service.plugin(), binding.owner(), sample, 0L, retirement)) {
+            retirement.run();
+        }
+    }
+
+    private void samplePresentation(PresentationBinding binding, HologramTick tick, boolean enabled) {
+        if (binding == null) {
+            scheduleDisplayDrive(tick, enabled);
+            return;
+        }
+        Runnable sample = () -> {
+            samplePresentationNow(binding);
+            scheduleDisplayDrive(tick, enabled);
+        };
+        Runnable retirement = once(() -> scheduleDisplayDrive(tick, enabled));
+        if (!FoliaScheduler.runEntity(service.plugin(), binding.owner(), sample, 0L, retirement)) {
+            retirement.run();
+        }
+    }
+
+    private void samplePositionNow(PositionBinding binding) {
+        Location bound = safeBind(binding.binder());
+        if (bound != null && bound.getWorld() != null) {
+            position = bound.clone();
+        }
+    }
+
+    private void samplePresentationNow(PresentationBinding binding) {
+        HologramPresentation presentation = safeBindPresentation(binding.binder());
+        if (presentation != null) {
+            boundPresentation = presentation;
+        }
+    }
+
+    private void scheduleDisplayDrive(HologramTick tick, boolean enabled) {
+        Runnable driveTask = () -> {
+            try {
+                drive(tick, enabled);
+            } finally {
+                driving.set(false);
+            }
+        };
+        TextDisplay active = display;
+        if (active != null) {
+            if (FoliaScheduler.isOwnedByCurrentRegion(active)) {
+                driveTask.run();
+                return;
+            }
+            Runnable retirement = once(() -> scheduleAfterRetirement(active, driveTask));
+            if (FoliaScheduler.runEntity(service.plugin(), active, driveTask, 0L, retirement)) {
+                return;
+            }
+            retirement.run();
+            return;
+        }
+        scheduleAtPosition(driveTask);
+    }
+
+    private void scheduleAfterRetirement(TextDisplay retired, Runnable driveTask) {
+        if (display == retired) {
+            display = null;
+            retractAnimation();
+            service.despawnEntity(retired, position);
+        }
+        scheduleAtPosition(driveTask);
+    }
+
+    private void scheduleAtPosition(Runnable driveTask) {
+        if (!service.plugin().scheduler().runAt(position.clone(), driveTask)) {
+            driving.set(false);
+        }
+    }
+
     void drive(HologramTick tick, boolean enabled) {
         if (destroyed.get()) {
             return;
@@ -219,7 +372,7 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
             return;
         }
         if (!enabled) {
-            service.animator().removeGroup(animatorGroup);
+            retractAnimation();
             TextDisplay active = display;
             if (active != null) {
                 display = null;
@@ -229,22 +382,7 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
             return;
         }
 
-        Supplier<Location> activeBinder = binder;
-        if (activeBinder != null) {
-            Location bound = safeBind(activeBinder);
-            if (bound != null && bound.getWorld() != null) {
-                position = bound.clone();
-            }
-        }
-
-        HologramPresentation presentation = HologramPresentation.identity();
-        Supplier<HologramPresentation> activePresentationBinder = presentationBinder;
-        if (activePresentationBinder != null) {
-            HologramPresentation boundPresentation = safeBindPresentation(activePresentationBinder);
-            if (boundPresentation != null) {
-                presentation = boundPresentation;
-            }
-        }
+        HologramPresentation presentation = boundPresentation;
 
         Location anchor = position;
         World world = anchor.getWorld();
@@ -254,10 +392,14 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
 
         TextDisplay active = display;
         if (active == null || !active.isValid()) {
-            service.animator().removeGroup(animatorGroup);
+            retractAnimation();
             if (active != null) {
                 display = null;
                 service.despawnEntity(active, anchor);
+            }
+
+            if (captureViewers(tick, world).isEmpty()) {
+                return;
             }
 
             spawn(world, anchor, presentation);
@@ -275,9 +417,6 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
     }
 
     private void spawn(World world, Location anchor, HologramPresentation presentation) {
-        if (!world.isChunkLoaded(anchor.getBlockX() >> 4, anchor.getBlockZ() >> 4)) {
-            return;
-        }
         if (!spawning.compareAndSet(false, true)) {
             return;
         }
@@ -286,10 +425,14 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
         LineSet snapshot = lineSet;
         String next = renderLines(snapshot);
         boolean whitelist = viewerList.isWhitelist();
+        AtomicBoolean defaultVisibilityApplied = new AtomicBoolean(!whitelist);
         int teleportTicks = desiredTeleportTicks();
         boolean scheduled = service.plugin().scheduler().runAt(anchor, () -> {
             try {
                 if (destroyed.get()) {
+                    return;
+                }
+                if (!world.isChunkLoaded(anchor.getBlockX() >> 4, anchor.getBlockZ() >> 4)) {
                     return;
                 }
 
@@ -302,7 +445,7 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
                     }
                     applyPresentationNow(spawned, presentation, teleportTicks, false);
                     if (whitelist) {
-                        DisplayVisibility.setVisibleByDefault(spawned, false);
+                        defaultVisibilityApplied.set(DisplayVisibility.setVisibleByDefault(spawned, false));
                     }
                     if (teleportTicks > 0) {
                         DisplayMotion.applyTeleportDuration(spawned, teleportTicks);
@@ -319,6 +462,9 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
                 appliedTeleportTicks = teleportTicks;
                 appliedPresentation = presentation;
                 appliedVisibility.clear();
+                if (viewerList.isWhitelist() == whitelist) {
+                    visibilityReset.set(whitelist && !defaultVisibilityApplied.get());
+                }
                 display = spawned;
                 applyVisibility(spawned);
             } catch (RuntimeException failure) {
@@ -400,16 +546,15 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
 
         LineSet snapshot = lineSet;
         if ((snapshot.flags() & TextPipeline.HAS_FUNCTION) != 0) {
-            AnimationTemplate template = service.animator().compileTemplate(snapshot.lines(),
-                line -> service.plugin().text().renderStatic(line));
+            AnimationTemplate template = animationTemplate(snapshot);
             if (template != null) {
-                service.animator().publish(animatorGroup, HologramAnimator.SHARED_SUB,
+                publishAnimation(HologramAnimator.SHARED_SUB,
                     new HologramAnimator.Target(active.getEntityId(), template, captureViewers(tick, world)));
                 return;
             }
         }
 
-        service.animator().removeGroup(animatorGroup);
+        retractAnimation();
         boolean dirty = textDirty.compareAndSet(true, false);
         if (!dirty && !hasDynamicText(snapshot)) {
             return;
@@ -435,13 +580,13 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
      */
     private void applyFrames(TextDisplay active, HologramTick tick, World world, FrameComposer frames) {
         if (service.highFrequencyAnimations()) {
-            service.animator().publish(animatorGroup, HologramAnimator.SHARED_SUB,
+            publishAnimation(HologramAnimator.SHARED_SUB,
                 new HologramAnimator.Target(active.getEntityId(), frames, captureViewers(tick, world),
                     TextCodec.LEGACY));
             return;
         }
 
-        service.animator().removeGroup(animatorGroup);
+        retractAnimation();
         textDirty.set(false);
         String next = frames.compose(M.ms());
         if (next.equals(rendered)) {
@@ -472,6 +617,42 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
         return false;
     }
 
+    private void publishAnimation(String sub, HologramAnimator.Target target) {
+        animationPublished.set(true);
+        service.animator().publish(animatorGroup, sub, target);
+    }
+
+    private void retractAnimation() {
+        if (animationPublished.compareAndSet(true, false)) {
+            service.animator().removeGroup(animatorGroup);
+        }
+    }
+
+    boolean hasPublishedAnimation() {
+        return animationPublished.get();
+    }
+
+    private AnimationTemplate animationTemplate(LineSet snapshot) {
+        long emojiGeneration = TextPipeline.emojiGeneration();
+        long renderGeneration = service.plugin().text().renderGeneration();
+        long animationGeneration = service.animationGeneration();
+        boolean dynamic = service.hasDynamicAnimationContent(snapshot.lines());
+        AnimationMemo cached = animationMemo;
+        if (!dynamic && cached != null && cached.lines() == snapshot
+            && cached.emojiGeneration() == emojiGeneration
+            && cached.renderGeneration() == renderGeneration
+            && cached.animationGeneration() == animationGeneration) {
+            return cached.template();
+        }
+        AnimationTemplate template = service.animator().compileTemplate(snapshot.lines(),
+            line -> service.plugin().text().renderStatic(line));
+        if (template != null && !dynamic) {
+            animationMemo = new AnimationMemo(snapshot, emojiGeneration, renderGeneration,
+                animationGeneration, template);
+        }
+        return template;
+    }
+
     private void applyVisibility(TextDisplay active) {
         boolean whitelist = viewerList.isWhitelist();
         Set<UUID> members = viewerList.members();
@@ -482,12 +663,7 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
             return;
         }
         if (whitelist) {
-            if (DisplayVisibility.canHideByDefault()) {
-                reconcileWhitelist(active, members);
-                return;
-            }
-
-            reconcileVisibility(active, true, members);
+            reconcileWhitelist(active, members);
             return;
         }
         if (members.isEmpty() && appliedVisibility.isEmpty()) {
@@ -575,6 +751,20 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
         }
     }
 
+    void reconcileVisibilityFor(Player player) {
+        TextDisplay active = display;
+        if (active == null || !player.isOnline()) {
+            return;
+        }
+        UUID viewerId = player.getUniqueId();
+        boolean whitelist = viewerList.isWhitelist();
+        boolean visible = whitelist == viewerList.members().contains(viewerId);
+        Boolean previous = appliedVisibility.put(viewerId, visible);
+        if (previous == null || previous != visible) {
+            dispatchVisibility(active, player, visible);
+        }
+    }
+
     private void dispatchVisibility(TextDisplay active, Player player, boolean visible) {
         service.plugin().scheduler().runEntity(player, () -> {
             if (!player.isOnline()) {
@@ -591,7 +781,10 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
     private List<Player> captureViewers(HologramTick tick, World world) {
         boolean whitelist = viewerList.isWhitelist();
         Set<UUID> members = viewerList.members();
-        List<HologramTick.Viewer> candidates = tick.viewers(world);
+        if (members.isEmpty()) {
+            return whitelist ? List.of() : tick.temporaryPlayers(world, position, service.viewRange());
+        }
+        List<HologramTick.Viewer> candidates = tick.temporaryViewers(world, position, service.viewRange());
         List<Player> viewers = new ArrayList<>(candidates.size());
         for (HologramTick.Viewer candidate : candidates) {
             if (whitelist == members.contains(candidate.id())) {
@@ -600,6 +793,15 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
         }
 
         return List.copyOf(viewers);
+    }
+
+    static Runnable once(Runnable action) {
+        AtomicBoolean executed = new AtomicBoolean();
+        return () -> {
+            if (executed.compareAndSet(false, true)) {
+                action.run();
+            }
+        };
     }
 
     private Location safeBind(Supplier<Location> binder) {
@@ -725,5 +927,6 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
         Set<UUID> members() {
             return members;
         }
+
     }
 }

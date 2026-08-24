@@ -10,6 +10,7 @@ import art.arcane.volmlib.util.director.DirectorParameterHandler;
 import art.arcane.volmlib.util.director.annotations.Director;
 import art.arcane.volmlib.util.director.annotations.Param;
 import art.arcane.volmlib.util.director.exceptions.DirectorParsingException;
+import art.arcane.volmlib.util.director.help.DirectorMiniMenu;
 import art.arcane.volmlib.util.localization.MessageArgs;
 import art.arcane.volmlib.util.scheduling.SchedulerUtils;
 import org.bukkit.command.CommandSender;
@@ -17,6 +18,7 @@ import org.bukkit.entity.Player;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Optional;
@@ -39,17 +41,23 @@ public final class CommandGlossSync {
       return;
     }
     List<EditorSyncSessionInfo> sessions = service().sessions();
-    send(sender, GlossMessages.SYNC_LIST_HEADER,
-        MessageArgs.builder().untrusted("count", sessions.size()).build());
     if (sessions.isEmpty()) {
       send(sender, GlossMessages.SYNC_LIST_EMPTY);
       return;
     }
-    GlossCommandPager.Window window = GlossCommandPager.window(sessions.size(), page, GlossCommandPager.TEXT_PAGE_SIZE);
+    DirectorMiniMenu.ContentPage window = GlossCommandPager.window(sessions.size(), page, GlossCommandPager.TEXT_PAGE_SIZE);
+    DirectorMiniMenu.Theme theme = GlossCommandService.menuTheme();
+    List<String> lines = new ArrayList<>();
+    GlossCommandPager.appendHeader(lines, LIST_COMMAND + " · " + sessions.size(), window, theme);
     for (EditorSyncSessionInfo session : sessions.subList(window.startIndex(), window.endIndex())) {
-      send(sender, GlossMessages.SYNC_LIST_ENTRY, infoArguments(session));
+      long seconds = Math.max(0L, Duration.between(Instant.now(), session.expiresAt()).toSeconds());
+      String details = session.kind().wireName() + "=" + session.subjectId()
+          + " expires=" + seconds + "s publication=" + session.lastPublicationRevision()
+          + " pending=" + (session.pendingStatus() == null ? "-" : session.pendingStatus());
+      lines.add(GlossCommandPager.entry(EditorSyncService.abbreviate(session.sessionId()), details, theme));
     }
-    GlossCommandPager.sendFooter(sender, window, LIST_COMMAND);
+    GlossCommandPager.appendFooter(lines, window, LIST_COMMAND, theme);
+    DirectorMiniMenu.deliver(sender, lines);
   }
 
   @Director(name = "status", description = "Show one editor sync session",

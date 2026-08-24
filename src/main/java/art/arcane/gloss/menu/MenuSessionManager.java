@@ -50,6 +50,7 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerRespawnEvent;
@@ -58,6 +59,10 @@ import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.util.RayTraceResult;
 import org.bukkit.util.Vector;
 
+import java.util.ArrayDeque;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -70,8 +75,13 @@ public final class MenuSessionManager {
    * previous fixed-step loop took.
    */
   private static final double OBSTRUCTION_START = 0.1D;
+  static final int PREVIEW_DISCOVERY_LIMIT_PER_TICK = 10;
+  static final int PREVIEW_FALLBACK_INTERVAL_TICKS = 100;
 
   private final Map<UUID, SessionHolder> holders = new ConcurrentHashMap<>();
+  private final Map<UUID, PreviewMiss> previewMisses = new ConcurrentHashMap<>();
+  private final PreviewDiscoveryQueue previewDiscoveryQueue = new PreviewDiscoveryQueue();
+  private final PreviewFallbackSweep previewFallbackSweep = new PreviewFallbackSweep();
 
   private final PlayerSnapshotStore<String> openMenus = new PlayerSnapshotStore<>();
 
@@ -81,6 +91,8 @@ public final class MenuSessionManager {
   private SchedulerUtils.TaskHandle debugHitbox, debugPos;
   private final SchedulerUtils.TaskHandle holderTask, previewTask;
   private final PacketListenerCommon entityInteractionListener;
+  private volatile boolean acceptingPreviewDiscovery = true;
+  private int previewFallbackPhase;
 
   public PlayerSnapshotStore<String> getOpenMenus() {
     return openMenus;
@@ -100,7 +112,12 @@ public final class MenuSessionManager {
       holders.values().forEach(holder -> {
         Player player = holder.player();
         Runnable tickTask = () -> {
-          if (holder.tick()) {
+          boolean previewActive = holder.hasPreview();
+          boolean disposable = holder.tick();
+          if (previewActive && player.isOnline()) {
+            managePreviewEvents(player, false);
+          }
+          if (disposable) {
             disposeIfIdle(holder);
           }
         };
@@ -115,6 +132,13 @@ public final class MenuSessionManager {
       if (holder == null) return;
       holder.inspectSession(s -> s == null ? null : handleMovement(s, e.getFrom(), e.getTo()));
     });
+    Events.listen(Gloss.instance, PlayerMoveEvent.class, EventPriority.MONITOR, e -> {
+      if (e instanceof PlayerTeleportEvent || e.isCancelled() || e.getTo() == null) return;
+      SessionHolder holder = holders.get(e.getPlayer().getUniqueId());
+      if (holder == null || !holder.hasPreview()) {
+        queuePreviewDiscovery(e.getPlayer(), false);
+      }
+    });
     Events.listen(Gloss.instance, PlayerDeathEvent.class, EventPriority.MONITOR, e -> {
       SessionHolder holder = holders.get(e.getEntity().getUniqueId());
       if (holder == null) return;
@@ -122,34 +146,47 @@ public final class MenuSessionManager {
     });
     Events.listen(Gloss.instance, PlayerRespawnEvent.class, EventPriority.MONITOR, e -> {
       SessionHolder holder = holders.get(e.getPlayer().getUniqueId());
-      if (holder == null) return;
-      holder.inspectSession(s -> {
-        if (s == null) return null;
-        if (!s.isValid(e.getRespawnLocation())) return HoloCloseReason.RESPAWN;
-        if (s.isFollowPlayer()) {
-          s.follow(e.getRespawnLocation());
-        } else {
-          s.move(e.getRespawnLocation());
-        }
-        return null;
-      });
+      if (holder != null) {
+        holder.inspectSession(s -> {
+          if (s == null) return null;
+          if (!s.isValid(e.getRespawnLocation())) return HoloCloseReason.RESPAWN;
+          if (s.isFollowPlayer()) {
+            s.follow(e.getRespawnLocation());
+          } else {
+            s.move(e.getRespawnLocation());
+          }
+          return null;
+        });
+      }
+      if (holder == null || !holder.hasPreview()) {
+        queuePreviewDiscovery(e.getPlayer(), false);
+      }
     });
     Events.listen(Gloss.instance, PlayerTeleportEvent.class, EventPriority.MONITOR, e -> {
       SessionHolder holder = holders.get(e.getPlayer().getUniqueId());
-      if (holder == null || e.getTo() == null) return;
-      holder.inspectSession(s -> {
-        if (s == null) return null;
-        if (!s.isValid(e.getTo()) || s.isCloseOnTeleport()) return HoloCloseReason.TELEPORT;
-        if (s.isFollowPlayer()) {
-          s.follow(e.getTo());
-        } else {
-          s.move(e.getTo());
-        }
-        return null;
-      });
+      if (holder != null && e.getTo() != null) {
+        holder.inspectSession(s -> {
+          if (s == null) return null;
+          if (!s.isValid(e.getTo()) || s.isCloseOnTeleport()) return HoloCloseReason.TELEPORT;
+          if (s.isFollowPlayer()) {
+            s.follow(e.getTo());
+          } else {
+            s.move(e.getTo());
+          }
+          return null;
+        });
+      }
+      if (!e.isCancelled() && e.getTo() != null && (holder == null || !holder.hasPreview())) {
+        queuePreviewDiscovery(e.getPlayer(), false);
+      }
+    });
+    Events.listen(Gloss.instance, PlayerJoinEvent.class, EventPriority.MONITOR, e -> {
+      queuePreviewDiscovery(e.getPlayer(), false);
     });
     Events.listen(Gloss.instance, PlayerQuitEvent.class, EventPriority.MONITOR, e -> {
       DisplayEntityManager.forget(e.getPlayer());
+      previewMisses.remove(e.getPlayer().getUniqueId());
+      previewDiscoveryQueue.remove(e.getPlayer().getUniqueId());
       SessionHolder holder = holders.remove(e.getPlayer().getUniqueId());
       if (holder == null) return;
       holder.close(HoloCloseReason.QUIT);
@@ -506,6 +543,7 @@ public final class MenuSessionManager {
   }
 
   public void destroyAll() {
+    acceptingPreviewDiscovery = false;
     if (PacketEvents.getAPI() != null
         && PacketEvents.getAPI().getEventManager() != null
         && entityInteractionListener != null) {
@@ -517,6 +555,9 @@ public final class MenuSessionManager {
     cancel(debugPos);
     holders.values().forEach(holder -> holder.close(HoloCloseReason.GLOSS_SHUTDOWN));
     holders.clear();
+    previewMisses.clear();
+    previewDiscoveryQueue.clear();
+    previewFallbackSweep.clear();
     openMenus.clear();
   }
 
@@ -554,8 +595,15 @@ public final class MenuSessionManager {
 
   public void closeAllPreviews() {
     holders.values().forEach(holder -> {
-      Runnable closeTask = holder::closePreview;
-      SchedulerUtils.runEntity(Gloss.instance, holder.player(), closeTask);
+      Player player = holder.player();
+      Runnable closeTask = () -> {
+        boolean previewActive = holder.hasPreview();
+        holder.closePreview();
+        if (previewActive && player.isOnline()) {
+          queuePreviewDiscovery(player, true);
+        }
+      };
+      SchedulerUtils.runEntity(Gloss.instance, player, closeTask);
     });
   }
 
@@ -633,30 +681,49 @@ public final class MenuSessionManager {
   private SchedulerUtils.TaskHandle listenToInventoryPreview() {
     return SchedulerUtils.scheduleSyncTask(Gloss.instance, 1L, () -> {
       if (!ContainerPreviewAccess.isEnabled()) {
+        previewMisses.clear();
+        previewDiscoveryQueue.clear();
+        previewFallbackSweep.clear();
+        previewFallbackPhase = 0;
         return;
       }
-      Bukkit.getOnlinePlayers().forEach(player -> {
-        Runnable previewTask = () -> managePreviewEvents(player);
-        if (!SchedulerUtils.runEntity(Gloss.instance, player, previewTask)) {
-          SessionHolder holder = holders.get(player.getUniqueId());
-          if (holder != null) {
-            holder.closePreview();
-          }
-        }
-      });
+      if (previewFallbackPhase == 0) {
+        previewFallbackSweep.begin(Bukkit.getOnlinePlayers());
+      }
+      previewFallbackSweep.drainBatch(player -> queuePreviewDiscovery(player, true));
+      previewDiscoveryQueue.drain(PREVIEW_DISCOVERY_LIMIT_PER_TICK, this::schedulePreviewDiscovery);
+      previewFallbackPhase++;
+      if (previewFallbackPhase >= PREVIEW_FALLBACK_INTERVAL_TICKS) {
+        previewFallbackPhase = 0;
+      }
     }, false);
   }
 
-  private void managePreviewEvents(Player p) {
+  void managePreviewEvents(Player p, boolean forceRescan) {
     try {
-      SessionHolder holder = holders.get(p.getUniqueId());
+      UUID playerId = p.getUniqueId();
+      SessionHolder holder = holders.get(playerId);
+      if (!ContainerPreviewAccess.isEnabled() || !p.isOnline()) {
+        previewMisses.remove(playerId);
+        if (holder != null) {
+          holder.closePreview();
+        }
+        return;
+      }
+
       Location eye = p.getEyeLocation();
-      if (holder != null && holder.stableAim(eye) instanceof PreviewTarget held && stillEligible(held)) {
+      PreviewMiss miss = previewMisses.get(playerId);
+      if (!forceRescan && miss != null && miss.matches(eye)) {
+        return;
+      }
+      if (!forceRescan && holder != null
+          && holder.stableAim(eye) instanceof PreviewTarget held && stillEligible(held)) {
         return;
       }
 
       PreviewTarget target = getLookedAtPreviewTarget(p, eye);
       if (target == null) {
+        previewMisses.put(playerId, PreviewMiss.at(eye));
         if (holder != null) {
           holder.recordAim(eye, null);
           holder.closePreview();
@@ -664,6 +731,7 @@ public final class MenuSessionManager {
         return;
       }
 
+      previewMisses.remove(playerId);
       if (holder == null) {
         holder = holder(p);
       }
@@ -683,6 +751,39 @@ public final class MenuSessionManager {
       });
     } catch (Exception ex) {
       Gloss.logExceptionStack(false, ex, "Failed to manage inventory preview for %s.", p.getName());
+    }
+  }
+
+  private void queuePreviewDiscovery(Player player, boolean forceRescan) {
+    if (!acceptingPreviewDiscovery || !ContainerPreviewAccess.isEnabled()) {
+      return;
+    }
+    previewDiscoveryQueue.offer(player, forceRescan);
+  }
+
+  private void schedulePreviewDiscovery(PreviewDiscovery discovery) {
+    Player player = discovery.player();
+    UUID playerId = discovery.playerId();
+    Runnable scan = () -> {
+      try {
+        if (previewDiscoveryQueue.isPending(discovery)) {
+          managePreviewEvents(player, discovery.forceRescan());
+        }
+      } finally {
+        previewDiscoveryQueue.complete(discovery);
+      }
+    };
+    Runnable retired = () -> {
+      previewDiscoveryQueue.discard(discovery);
+      previewMisses.remove(playerId);
+    };
+    try {
+      if (!FoliaScheduler.runEntity(Gloss.instance, player, scan, 1L, retired)) {
+        retired.run();
+      }
+    } catch (RuntimeException failure) {
+      retired.run();
+      Gloss.logExceptionStack(false, failure, "Failed to schedule preview discovery for %s.", player.getName());
     }
   }
 
@@ -956,6 +1057,188 @@ public final class MenuSessionManager {
       return entity != null
           && other.entity != null
           && entity.getUniqueId().equals(other.entity.getUniqueId());
+    }
+  }
+
+  private record PreviewMiss(World world, double x, double y, double z, float yaw, float pitch) {
+
+    private static PreviewMiss at(Location eye) {
+      return new PreviewMiss(eye.getWorld(), eye.getX(), eye.getY(), eye.getZ(), eye.getYaw(), eye.getPitch());
+    }
+
+    private boolean matches(Location eye) {
+      return eye.getWorld() == world && eye.getX() == x && eye.getY() == y && eye.getZ() == z
+          && eye.getYaw() == yaw && eye.getPitch() == pitch;
+    }
+  }
+
+  static final class PreviewDiscoveryQueue {
+    private final ArrayDeque<PreviewDiscovery> queued = new ArrayDeque<>();
+    private final Map<UUID, PreviewDiscovery> pending = new HashMap<>();
+
+    synchronized boolean offer(Player player, boolean forceRescan) {
+      UUID playerId = player.getUniqueId();
+      PreviewDiscovery existing = pending.get(playerId);
+      if (existing != null) {
+        if (existing.inFlight) {
+          existing.rerun = true;
+          existing.rerunForce |= forceRescan;
+        } else {
+          existing.forceRescan |= forceRescan;
+        }
+        return false;
+      }
+
+      PreviewDiscovery discovery = new PreviewDiscovery(player, playerId, forceRescan);
+      pending.put(playerId, discovery);
+      queued.addLast(discovery);
+      return true;
+    }
+
+    int drain(int limit, Consumer<PreviewDiscovery> action) {
+      if (limit <= 0) {
+        return 0;
+      }
+      int available = Math.min(limit, queuedSize());
+      int drained = 0;
+      while (drained < available) {
+        PreviewDiscovery discovery = claim();
+        if (discovery == null) {
+          break;
+        }
+        try {
+          action.accept(discovery);
+        } catch (RuntimeException | Error failure) {
+          discard(discovery);
+          throw failure;
+        }
+        drained++;
+      }
+      return drained;
+    }
+
+    synchronized void complete(PreviewDiscovery discovery) {
+      if (!discovery.inFlight || pending.get(discovery.playerId()) != discovery) {
+        return;
+      }
+      if (discovery.rerun) {
+        discovery.inFlight = false;
+        discovery.forceRescan = discovery.rerunForce;
+        discovery.rerun = false;
+        discovery.rerunForce = false;
+        queued.addLast(discovery);
+        return;
+      }
+      pending.remove(discovery.playerId());
+      discovery.inFlight = false;
+    }
+
+    synchronized void discard(PreviewDiscovery discovery) {
+      if (pending.get(discovery.playerId()) != discovery) {
+        return;
+      }
+      pending.remove(discovery.playerId());
+      queued.remove(discovery);
+      discovery.inFlight = false;
+    }
+
+    synchronized boolean remove(UUID playerId) {
+      PreviewDiscovery discovery = pending.remove(playerId);
+      if (discovery == null) {
+        return false;
+      }
+      queued.remove(discovery);
+      return true;
+    }
+
+    synchronized boolean isPending(PreviewDiscovery discovery) {
+      return pending.get(discovery.playerId()) == discovery;
+    }
+
+    synchronized int size() {
+      return pending.size();
+    }
+
+    synchronized void clear() {
+      pending.clear();
+      queued.clear();
+    }
+
+    private synchronized int queuedSize() {
+      return queued.size();
+    }
+
+    private synchronized PreviewDiscovery claim() {
+      while (!queued.isEmpty()) {
+        PreviewDiscovery discovery = queued.removeFirst();
+        if (pending.get(discovery.playerId()) != discovery) {
+          continue;
+        }
+        discovery.inFlight = true;
+        return discovery;
+      }
+      return null;
+    }
+  }
+
+  static final class PreviewDiscovery {
+    private final Player player;
+    private final UUID playerId;
+    private boolean forceRescan;
+    private boolean inFlight;
+    private boolean rerun;
+    private boolean rerunForce;
+
+    private PreviewDiscovery(Player player, UUID playerId, boolean forceRescan) {
+      this.player = player;
+      this.playerId = playerId;
+      this.forceRescan = forceRescan;
+    }
+
+    Player player() {
+      return player;
+    }
+
+    UUID playerId() {
+      return playerId;
+    }
+
+    boolean forceRescan() {
+      return forceRescan;
+    }
+  }
+
+  static final class PreviewFallbackSweep {
+    private List<Player> players = List.of();
+    private int cursor;
+    private int batchSize;
+
+    void begin(Collection<? extends Player> onlinePlayers) {
+      players = List.copyOf(onlinePlayers);
+      cursor = 0;
+      batchSize = players.isEmpty()
+          ? 0
+          : Math.ceilDiv(players.size(), PREVIEW_FALLBACK_INTERVAL_TICKS);
+    }
+
+    int drainBatch(Consumer<Player> action) {
+      int end = Math.min(players.size(), cursor + batchSize);
+      for (int index = cursor; index < end; index++) {
+        action.accept(players.get(index));
+      }
+      int drained = end - cursor;
+      cursor = end;
+      return drained;
+    }
+
+    int batchSize() {
+      return batchSize;
+    }
+
+    void clear() {
+      players = List.of();
+      cursor = 0;
+      batchSize = 0;
     }
   }
 }

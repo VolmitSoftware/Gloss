@@ -116,6 +116,9 @@
         "failed": "&7[&bGloss&7]: &cLegacy hologram migration from &f{source}&c failed: {reason}"
       "config":
         "reloaded": "&2Asetus \"{name}\" ladattiin uudelleen."
+      "hotload":
+        "singular": "&2Pikaladattiin {kinds} ({count} muutos)."
+        "plural": "&2Pikaladattiin {kinds} ({count} muutosta)."
       "preview_scale":
         "adjusting": "&7Esikatselun koko: &f{percent}% &8- &7pidä hiipiminen painettuna + vieritä muuttaaksesi; tallenna kaksoisnapauttamalla hiipimistä"
         "hidden": "&7Esikatselu &cpiilotettu &8- &7palauta vierittämällä ylöspäin"

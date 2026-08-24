@@ -27,13 +27,13 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 
 /**
  * The two zero-work paths of the panel driver: a server with no panels never reaches a viewer at
- * all, and a viewer that stays put reuses the candidate list it already has — but only while the
- * index it came from is still current, which is what keeps a moved panel from lingering on a
- * standing viewer's screen.
+ * all, and a viewer that stays put reuses the candidate list it already has until an index change
+ * intersects that viewer's query window.
  */
 public class PanelRuntimeTickBailTest {
   private static final UUID WORLD_UUID = UUID.fromString("00000000-0000-0000-0000-000000000601");
@@ -97,6 +97,9 @@ public class PanelRuntimeTickBailTest {
   public void aServerWithNoPanelsNeverReachesAViewer() throws Exception {
     assertTrue("nothing placed, nothing previewed, nobody viewing", idle());
 
+    viewerState(player(new AtomicReference<>(at(10.0D, 64.0D, 0.0D))));
+    assertTrue("an empty retained viewer is not active work", idle());
+
     PanelDefinition board = publishBoard();
     assertFalse("a placed panel is work", idle());
 
@@ -132,8 +135,26 @@ public class PanelRuntimeTickBailTest {
     runtime.boardUpdated(board, moved);
     tick(state);
 
-    assertEquals("the cached candidate list is keyed on the index generation, so a panel that "
-        + "moved away closes even for a viewer that never moved", 0, runtime.visibleBoardCount());
+    assertEquals("a panel that moved out of the cached query window closes even for a viewer that "
+        + "never moved", 0, runtime.visibleBoardCount());
+  }
+
+  @Test
+  public void aDistantPanelMoveDoesNotInvalidateAnUnrelatedViewerWindow() throws Exception {
+    publishBoard("near", 0.0D, 0.0D);
+    PanelDefinition far = publishBoard("far", 4000.0D, 4000.0D);
+    Object state = viewerState(player(new AtomicReference<>(at(10.0D, 64.0D, 0.0D))));
+    tick(state);
+    Object cachedBefore = CharacterizationSupport.getField(state, "cachedCandidates");
+
+    PanelDefinition movedFar = far.withTransform(
+        PanelTransform.at("example:world", WORLD_UUID, 8000.0D, 64.0D, 8000.0D, 0.0D));
+    runtime.boardUpdated(far, movedFar);
+    tick(state);
+
+    assertSame("a change outside the cached chunk window keeps the exact candidate snapshot",
+        cachedBefore, CharacterizationSupport.getField(state, "cachedCandidates"));
+    assertEquals(1, runtime.visibleBoardCount());
   }
 
   // ---------------------------------------------------------------------
@@ -145,8 +166,12 @@ public class PanelRuntimeTickBailTest {
   }
 
   private PanelDefinition publishBoard() {
-    CompletableFuture<PanelDefinition> created = service.create(PanelDefinition.create("bail-board", "bail",
-        PanelTransform.at("example:world", WORLD_UUID, 0.0D, 64.0D, 0.0D, 0.0D)));
+    return publishBoard("bail-board", 0.0D, 0.0D);
+  }
+
+  private PanelDefinition publishBoard(String id, double x, double z) {
+    CompletableFuture<PanelDefinition> created = service.create(PanelDefinition.create(id, "bail",
+        PanelTransform.at("example:world", WORLD_UUID, x, 64.0D, z, 0.0D)));
     runner.runAll();
     return created.join();
   }

@@ -37,16 +37,21 @@ import java.util.Map;
 import java.util.TreeMap;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.UnaryOperator;
 
 public final class ChatBubblesService implements Listener {
     private static final String SEND_PERMISSION = "gloss.bubbles.send";
     private static final String STATE_FILE_NAME = "bubble-styles.json";
     private static final int STYLE_PERSIST_DELAY_TICKS = 40;
+    static final int EXPIRY_SWEEP_INTERVAL_TICKS = 20;
+    private static final int MAX_BUBBLES_PER_SENDER = 4;
+    private static final int MAX_ACTIVE_BUBBLES = 2048;
     private static final byte[] LEGACY_DEFAULT = ("{\n"
         + "  \"schemaVersion\": 1,\n"
         + "  \"revision\": 1,\n"
@@ -179,14 +184,17 @@ public final class ChatBubblesService implements Listener {
     private final Gloss plugin;
     private final ShippedDefaults defaults;
     private final DocumentRegistry<BubbleStyleDoc> registry;
-    private final Map<UUID, SenderState> bubbles = new ConcurrentHashMap<>();
+    private final Object bubbleLifecycleLock = new Object();
+    private final ConcurrentMap<UUID, SenderState> bubbles = new ConcurrentHashMap<>();
     private final Map<UUID, String> playerStyles = new ConcurrentHashMap<>();
     private final AtomicBoolean persistScheduled = new AtomicBoolean();
     private final AtomicLong bubbleSequence = new AtomicLong();
+    private final AtomicInteger activeBubbles = new AtomicInteger();
     private final File stateFile;
 
     private volatile Map<String, GlossDocument<BubbleStyleDoc>> stylesSource;
     private volatile StyleSnapshot stylesDerived = new StyleSnapshot(Map.of(), Map.of());
+    private boolean acceptingBubbles;
     private boolean hookRegistered;
     private int driverTaskId = -1;
 
@@ -214,7 +222,13 @@ public final class ChatBubblesService implements Listener {
         plugin.watchdog().register(BubbleStyleDoc.KIND, this::pollRegistry);
         plugin.getServer().getPluginManager().registerEvents(this, plugin);
         if (!enabled) {
+            synchronized (bubbleLifecycleLock) {
+                acceptingBubbles = false;
+            }
             return;
+        }
+        synchronized (bubbleLifecycleLock) {
+            acceptingBubbles = true;
         }
         registerHook();
         startDriver();
@@ -257,6 +271,9 @@ public final class ChatBubblesService implements Listener {
             destroyAll();
             return;
         }
+        synchronized (bubbleLifecycleLock) {
+            acceptingBubbles = true;
+        }
         if (!hookRegistered) {
             registerHook();
         }
@@ -274,7 +291,7 @@ public final class ChatBubblesService implements Listener {
     public int activeCount() {
         int total = 0;
         for (SenderState state : bubbles.values()) {
-            total += state.live.size();
+            total += state.size();
         }
         return total;
     }
@@ -313,7 +330,10 @@ public final class ChatBubblesService implements Listener {
 
     @EventHandler(priority = EventPriority.MONITOR)
     public void onQuit(PlayerQuitEvent event) {
-        bubbles.remove(event.getPlayer().getUniqueId());
+        List<BubbleRecord> removed = drainSender(bubbles, event.getPlayer().getUniqueId());
+        for (BubbleRecord record : removed) {
+            retire(record);
+        }
     }
 
     private void registerHook() {
@@ -325,8 +345,7 @@ public final class ChatBubblesService implements Listener {
         if (driverTaskId != -1) {
             return;
         }
-        driverTaskId = plugin.scheduler().sr(this::drive,
-            Math.max(1, plugin.cfg().holograms().temporaryUpdateIntervalTicks()));
+        driverTaskId = plugin.scheduler().sr(this::drive, EXPIRY_SWEEP_INTERVAL_TICKS);
     }
 
     private void stopDriver() {
@@ -368,7 +387,7 @@ public final class ChatBubblesService implements Listener {
     private ResolvedStyle resolveStyle(Player sender) {
         StyleSnapshot snapshot = stylesSnapshot();
         String chosen = playerStyles.get(sender.getUniqueId());
-        String primaryGroup = plugin.groups().cachedPrimaryGroupFor(sender).orElse(null);
+        String primaryGroup = plugin.groups().primaryGroupFor(sender).orElse(null);
         String resolved = BubbleStyles.resolveStyleId(chosen, sender::hasPermission, snapshot.documents(),
             sender.getWorld().getName(), primaryGroup);
         ResolvedStyle style = resolved == null ? null : snapshot.resolved().get(resolved);
@@ -402,34 +421,78 @@ public final class ChatBubblesService implements Listener {
         EyePoint eyePoint = EyePoint.of(eye);
         Vector offset = style.offset();
         Location captured = eye.clone().add(offset.getX(), offset.getY(), offset.getZ());
-        long startedAtMs = M.ms();
-        long sequence = bubbleSequence.incrementAndGet();
-        String id = "chat-" + sender.getUniqueId() + "-" + startedAtMs + "-" + sequence;
-        TemporaryHologram hologram = plugin.holograms().createTemporary(id, captured.clone(), style.maxAliveMs());
-        GlossTelemetry.countBubbleSpawn();
-        if (style.hideOwn()) {
-            hologram.viewers().add(sender.getUniqueId());
+        UUID senderId = sender.getUniqueId();
+        synchronized (bubbleLifecycleLock) {
+            if (!acceptingBubbles) {
+                return;
+            }
+        }
+        if (!reserveBubble()) {
+            return;
         }
 
-        BubbleRecord record = new BubbleRecord(hologram, captured, offset, resolved.motion(), resolved.shimmer(),
-            style.followPlayer(), startedAtMs, style.maxAliveMs(), startedAtMs + style.maxAliveMs(), lines.size(),
-            seed(sender.getUniqueId(), startedAtMs, sequence), style.prefix(), message, style.wordWrapChars(), lines);
-        publishInitialText(record, startedAtMs);
-        SenderState state = bubbles.compute(sender.getUniqueId(), (uuid, existing) -> {
-            SenderState target = existing == null ? new SenderState() : existing;
-            target.lastEye = eyePoint;
-            target.add(record);
-            return target;
-        });
-        hologram.bindPosition(() -> bubblePosition(state, record));
-        hologram.bindPresentation(() -> bubblePresentation(state, record));
+        long startedAtMs = M.ms();
+        long sequence = bubbleSequence.incrementAndGet();
+        String id = "chat-" + senderId + "-" + startedAtMs + "-" + sequence;
+        TemporaryHologram hologram = null;
+        BubbleRecord record = null;
+        try {
+            hologram = plugin.holograms().createTemporary(id, captured.clone(), style.maxAliveMs());
+            if (style.hideOwn()) {
+                hologram.viewers().add(senderId);
+            }
+
+            record = new BubbleRecord(hologram, captured, offset, resolved.motion(), resolved.shimmer(),
+                style.followPlayer(), startedAtMs, style.maxAliveMs(), startedAtMs + style.maxAliveMs(), lines.size(),
+                seed(senderId, startedAtMs, sequence), style.prefix(), message, style.wordWrapChars(), lines);
+            publishInitialText(record, startedAtMs);
+            SenderPublication publication;
+            synchronized (bubbleLifecycleLock) {
+                publication = acceptingBubbles
+                    ? publishBubble(bubbles, senderId, eyePoint, record, MAX_BUBBLES_PER_SENDER)
+                    : null;
+            }
+            if (publication == null) {
+                retire(record);
+                return;
+            }
+            if (publication.retired() != null) {
+                retire(publication.retired());
+            }
+            SenderState state = publication.state();
+            BubbleRecord boundRecord = record;
+            hologram.bindPosition(sender, () -> bubblePosition(sender, state, boundRecord));
+            hologram.bindPresentation(sender, () -> bubblePresentation(state, boundRecord));
+        } catch (RuntimeException | Error failure) {
+            if (record != null) {
+                try {
+                    removeBubble(bubbles, senderId, record);
+                    retire(record);
+                } catch (RuntimeException | Error cleanupFailure) {
+                    failure.addSuppressed(cleanupFailure);
+                }
+            } else {
+                releaseBubble();
+                if (hologram != null) {
+                    try {
+                        hologram.destroy();
+                    } catch (RuntimeException | Error cleanupFailure) {
+                        failure.addSuppressed(cleanupFailure);
+                    }
+                }
+            }
+            throw failure;
+        }
+        GlossTelemetry.countBubbleSpawn();
     }
 
-    private Location bubblePosition(SenderState state, BubbleRecord record) {
+    private Location bubblePosition(Player sender, SenderState state, BubbleRecord record) {
+        EyePoint eye = record.followPlayer ? EyePoint.of(sender.getEyeLocation()) : null;
+        refreshOwnerState(state, record, eye, () -> refreshText(sender, record));
         BubbleFrame frame = sampleFrame(state, record);
         record.lastFrame = frame;
-        EyePoint eye = record.followPlayer ? state.lastEye : null;
-        Location base = eye == null ? record.captured.clone() : eye.toLocation(record.offset);
+        EyePoint currentEye = record.followPlayer ? state.lastEye : null;
+        Location base = currentEye == null ? record.captured.clone() : currentEye.toLocation(record.offset);
         BubbleMotionSample motion = frame.motion();
         return base.add(motion.translationX(), frame.stackY() + motion.translationY(), motion.translationZ());
     }
@@ -472,25 +535,17 @@ public final class ChatBubblesService implements Listener {
     private void drive() {
         long now = M.ms();
         for (Map.Entry<UUID, SenderState> entry : bubbles.entrySet()) {
-            SenderState state = entry.getValue();
-            sweepExpired(entry.getKey(), state, now);
-            Player sender = plugin.getServer().getPlayer(entry.getKey());
-            if (sender == null) {
-                continue;
-            }
-            FoliaScheduler.runEntity(plugin, sender, () -> refreshSender(sender, state));
+            sweepExpired(entry.getKey(), entry.getValue(), now);
         }
     }
 
-    private void refreshSender(Player sender, SenderState state) {
-        if (!sender.isOnline()) {
-            return;
+    static void refreshOwnerState(SenderState state, BubbleRecord record,
+                                  EyePoint eyePoint, Runnable dynamicPrefixRefresh) {
+        if (record.followPlayer) {
+            state.lastEye = eyePoint;
         }
-        if (state.followCount.get() > 0) {
-            state.lastEye = EyePoint.of(sender.getEyeLocation());
-        }
-        for (BubbleRecord record : state.live) {
-            refreshText(sender, record);
+        if (record.dynamicPrefix) {
+            dynamicPrefixRefresh.run();
         }
     }
 
@@ -522,28 +577,88 @@ public final class ChatBubblesService implements Listener {
     }
 
     private void untrack(UUID senderId, BubbleRecord record) {
-        bubbles.computeIfPresent(senderId, (uuid, state) -> {
-            state.remove(record);
-            return state.live.isEmpty() ? null : state;
-        });
+        if (removeBubble(bubbles, senderId, record)) {
+            retire(record);
+        }
+    }
+
+    private boolean reserveBubble() {
+        int active = activeBubbles.get();
+        while (active < MAX_ACTIVE_BUBBLES) {
+            if (activeBubbles.compareAndSet(active, active + 1)) {
+                return true;
+            }
+            active = activeBubbles.get();
+        }
+        return false;
+    }
+
+    private void retire(BubbleRecord record) {
+        if (!record.claimRetirement()) {
+            return;
+        }
+        releaseBubble();
+        if (record.hologram != null) {
+            record.hologram.destroy();
+        }
+    }
+
+    private void releaseBubble() {
+        activeBubbles.updateAndGet(active -> Math.max(0, active - 1));
     }
 
     private void destroyAll() {
-        int failures = 0;
-        for (SenderState state : bubbles.values()) {
-            for (BubbleRecord record : state.live) {
-                try {
-                    record.hologram.destroy();
-                } catch (Throwable failure) {
-                    failures++;
-                }
+        List<BubbleRecord> removed = new ArrayList<>();
+        synchronized (bubbleLifecycleLock) {
+            acceptingBubbles = false;
+            for (UUID senderId : List.copyOf(bubbles.keySet())) {
+                removed.addAll(drainSender(bubbles, senderId));
             }
-            state.live.clear();
+            bubbles.clear();
         }
-        bubbles.clear();
+        int failures = 0;
+        for (BubbleRecord record : removed) {
+            try {
+                retire(record);
+            } catch (Throwable failure) {
+                failures++;
+                Gloss.logExceptionStack(false, failure,
+                    "Failed to destroy a chat bubble during shutdown.");
+            }
+        }
         if (failures > 0) {
             Gloss.warn("Failed to destroy " + failures + " chat bubbles on shutdown.");
         }
+    }
+
+    static SenderPublication publishBubble(ConcurrentMap<UUID, SenderState> states, UUID senderId,
+                                             EyePoint eyePoint, BubbleRecord record, int limit) {
+        AtomicReference<SenderPublication> result = new AtomicReference<>();
+        states.compute(senderId, (ignored, existing) -> {
+            SenderState state = existing == null ? new SenderState() : existing;
+            BubbleRecord retired = state.addAtLimit(record, limit, eyePoint);
+            result.set(new SenderPublication(state, retired));
+            return state;
+        });
+        return result.get();
+    }
+
+    static boolean removeBubble(ConcurrentMap<UUID, SenderState> states, UUID senderId, BubbleRecord record) {
+        AtomicBoolean removed = new AtomicBoolean();
+        states.computeIfPresent(senderId, (ignored, state) -> {
+            removed.set(state.remove(record));
+            return state.isEmpty() ? null : state;
+        });
+        return removed.get();
+    }
+
+    static List<BubbleRecord> drainSender(ConcurrentMap<UUID, SenderState> states, UUID senderId) {
+        AtomicReference<List<BubbleRecord>> removed = new AtomicReference<>(List.of());
+        states.computeIfPresent(senderId, (ignored, state) -> {
+            removed.set(state.drain());
+            return null;
+        });
+        return removed.get();
     }
 
     private void loadPlayerStyles() {
@@ -616,33 +731,60 @@ public final class ChatBubblesService implements Listener {
 
     static final class SenderState {
         final List<BubbleRecord> live = new CopyOnWriteArrayList<>();
-        final AtomicInteger followCount = new AtomicInteger();
         volatile EyePoint lastEye;
 
-        void add(BubbleRecord record) {
+        synchronized void add(BubbleRecord record) {
             record.lineIndex = live.size();
             live.add(record);
-            if (record.followPlayer) {
-                followCount.incrementAndGet();
-            }
         }
 
-        void remove(BubbleRecord record) {
+        synchronized boolean remove(BubbleRecord record) {
             int index = live.indexOf(record);
             if (index < 0) {
-                return;
+                return false;
             }
             live.remove(index);
             for (int position = index; position < live.size(); position++) {
                 live.get(position).lineIndex = position;
             }
             record.lineIndex = 0;
-            if (record.followPlayer) {
-                followCount.decrementAndGet();
-            }
+            return true;
         }
 
-        int stackedLineCount(BubbleRecord record) {
+        synchronized BubbleRecord addAtLimit(BubbleRecord record, int limit, EyePoint eyePoint) {
+            BubbleRecord retired = removeOldestAtLimit(limit);
+            lastEye = eyePoint;
+            add(record);
+            return retired;
+        }
+
+        synchronized BubbleRecord removeOldestAtLimit(int limit) {
+            if (live.size() < limit) {
+                return null;
+            }
+            BubbleRecord oldest = live.getFirst();
+            remove(oldest);
+            return oldest;
+        }
+
+        synchronized List<BubbleRecord> drain() {
+            List<BubbleRecord> snapshot = List.copyOf(live);
+            live.clear();
+            for (BubbleRecord record : snapshot) {
+                record.lineIndex = 0;
+            }
+            return snapshot;
+        }
+
+        synchronized boolean isEmpty() {
+            return live.isEmpty();
+        }
+
+        synchronized int size() {
+            return live.size();
+        }
+
+        synchronized int stackedLineCount(BubbleRecord record) {
             int index = live.indexOf(record);
             if (index < 0) {
                 return 0;
@@ -670,6 +812,7 @@ public final class ChatBubblesService implements Listener {
         final String message;
         final int wrapChars;
         final boolean dynamicPrefix;
+        private final AtomicBoolean retired = new AtomicBoolean();
         volatile int lineIndex;
         volatile int lineCount;
         volatile List<String> renderedLines;
@@ -702,6 +845,10 @@ public final class ChatBubblesService implements Listener {
             this.shimmerVisibleCount = shimmer.visibleCount(this.renderedLines);
         }
 
+        boolean claimRetirement() {
+            return retired.compareAndSet(false, true);
+        }
+
         List<String> frameAt(long nowMs) {
             long ageMs = Math.max(0L, Math.min(durationMs, nowMs - startedAtMs));
             List<String> base = renderedLines;
@@ -722,6 +869,9 @@ public final class ChatBubblesService implements Listener {
     }
 
     record ShimmerFrame(long bandIndex, List<String> base, List<String> lines) {
+    }
+
+    record SenderPublication(SenderState state, BubbleRecord retired) {
     }
 
     private record StyleSnapshot(Map<String, BubbleStyleDoc> documents, Map<String, ResolvedStyle> resolved) {
