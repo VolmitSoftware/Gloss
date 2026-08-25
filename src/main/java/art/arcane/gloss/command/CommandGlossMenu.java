@@ -345,7 +345,7 @@ public class CommandGlossMenu {
     if (!MenuRowCommandSupport.checkPermission(sender, EDIT_PERMISSION)) {
       return;
     }
-    Gloss.instance.getMenuCatalog().create(menuId, art.arcane.gloss.config.menu.MenuBaselines.blankHologramSource())
+    Gloss.instance.getMenuCatalog().create(menuId, art.arcane.gloss.config.menu.MenuBaselines.defaultMenuSource())
         .whenComplete((document, failure) -> {
           if (failure != null) {
             MenuRowCommandSupport.reportFailure(sender, menuId, failure);

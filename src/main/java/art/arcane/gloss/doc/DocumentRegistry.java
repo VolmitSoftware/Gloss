@@ -63,6 +63,7 @@ public final class DocumentRegistry<T> implements AutoCloseable {
     private final Map<String, Long> pendingDeletions;
     private final Map<String, String> pendingFailureFingerprints;
     private final Map<String, String> reportedFailureFingerprints;
+    private final Map<String, String> ignoredSchemaFingerprints;
     private final Set<String> failureRetryIds;
     private final Set<String> retryIds;
     private final Set<String> failedIds;
@@ -99,6 +100,7 @@ public final class DocumentRegistry<T> implements AutoCloseable {
         this.pendingDeletions = new HashMap<>();
         this.pendingFailureFingerprints = new HashMap<>();
         this.reportedFailureFingerprints = new HashMap<>();
+        this.ignoredSchemaFingerprints = new HashMap<>();
         this.failureRetryIds = new HashSet<>();
         this.retryIds = new HashSet<>();
         this.failedIds = new HashSet<>();
@@ -187,6 +189,7 @@ public final class DocumentRegistry<T> implements AutoCloseable {
         Objects.requireNonNull(value, "value");
         invalidatePending(id);
         clearFailure(id);
+        ignoredSchemaFingerprints.remove(id);
         reconciliationLoaded.remove(id);
         GlossDocument<T> document = GlossDocument.of(id, raw, value, revisionOf.applyAsLong(value));
         documents.put(id, document);
@@ -202,6 +205,7 @@ public final class DocumentRegistry<T> implements AutoCloseable {
         }
         invalidatePending(id);
         clearFailure(id);
+        ignoredSchemaFingerprints.remove(id);
         reconciliationLoaded.remove(id);
         pendingDeletions.remove(id);
         boolean workingRemoved = documents.remove(id) != null;
@@ -224,6 +228,7 @@ public final class DocumentRegistry<T> implements AutoCloseable {
         failureRetryIds.clear();
         pendingFailureFingerprints.clear();
         reportedFailureFingerprints.clear();
+        ignoredSchemaFingerprints.clear();
         pendingDeletions.clear();
         resetReconciliation();
         if (layout == Layout.FILE) {
@@ -433,6 +438,7 @@ public final class DocumentRegistry<T> implements AutoCloseable {
     private void removeLoaded(String id, List<String> removed) {
         if (documents.remove(id) != null) {
             clearFailure(id);
+            ignoredSchemaFingerprints.remove(id);
             removed.add(id);
         }
     }
@@ -457,6 +463,7 @@ public final class DocumentRegistry<T> implements AutoCloseable {
         failureRetryIds.clear();
         pendingFailureFingerprints.clear();
         reportedFailureFingerprints.clear();
+        ignoredSchemaFingerprints.clear();
         reconciliationLoaded.clear();
         pendingDeletions.clear();
         resetReconciliation();
@@ -655,6 +662,12 @@ public final class DocumentRegistry<T> implements AutoCloseable {
             GlossDocument<T> current = documents.get(id);
             if (current != null && current.raw().equals(raw)) {
                 clearFailure(id);
+                ignoredSchemaFingerprints.remove(id);
+                return false;
+            }
+            String ignoredSchemaFingerprint = ignoredSchemaFingerprints.get(id);
+            if (ignoredSchemaFingerprint != null
+                && ignoredSchemaFingerprint.equals(DocumentHashes.sha256(raw))) {
                 return false;
             }
             T value = parser.parse(id + EXTENSION, raw);
@@ -663,6 +676,7 @@ public final class DocumentRegistry<T> implements AutoCloseable {
             }
             documents.put(id, GlossDocument.of(id, raw, value, revisionOf.applyAsLong(value)));
             clearFailure(id);
+            ignoredSchemaFingerprints.remove(id);
             return true;
         } catch (ThreadDeath fatal) {
             throw fatal;
@@ -673,6 +687,13 @@ public final class DocumentRegistry<T> implements AutoCloseable {
                 documents.remove(id);
             } else {
                 documents.put(id, committed);
+            }
+            if (DocumentEnvelope.isUnsupportedSchemaVersion(failure)) {
+                clearFailure(id);
+                if (raw != null) {
+                    ignoredSchemaFingerprints.put(id, DocumentHashes.sha256(raw));
+                }
+                return false;
             }
             if (stabilizeFailure && raw != null && deferFailure(id, raw)) {
                 return false;
@@ -750,7 +771,11 @@ public final class DocumentRegistry<T> implements AutoCloseable {
     }
 
     private void markDeleted(String id) {
-        if (id != null && documents.containsKey(id)) {
+        if (id == null) {
+            return;
+        }
+        ignoredSchemaFingerprints.remove(id);
+        if (documents.containsKey(id)) {
             pendingDeletions.putIfAbsent(id, clock.getAsLong());
         }
     }

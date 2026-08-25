@@ -158,6 +158,33 @@ public class PanelRepositoryTest {
   }
 
   @Test
+  public void unsupportedSchemaIsIgnoredAndRetainsTheLastGoodDefinition() throws IOException {
+    File pluginData = temp.newFolder("unsupported-schema");
+    PanelRepository repository = new PanelRepository(pluginData);
+    repository.load();
+    PanelDefinition created = repository.create(board("spawn/info", "example:world"));
+    Path file = repository.directory().resolve("spawn/info.json");
+    String unsupported = Files.readString(file, StandardCharsets.UTF_8)
+        .replace("\"schemaVersion\": 1", "\"schemaVersion\": 2");
+
+    Files.writeString(file, unsupported, StandardCharsets.UTF_8);
+    PanelLoadResult retained = repository.load();
+
+    assertEquals(0, retained.loaded());
+    assertEquals(1, retained.retained());
+    assertTrue(retained.failures().isEmpty());
+    assertEquals(created, repository.get(created.id()).orElseThrow());
+
+    PanelRepository coldStart = new PanelRepository(pluginData);
+    PanelLoadResult ignored = coldStart.load();
+
+    assertEquals(0, ignored.loaded());
+    assertEquals(0, ignored.retained());
+    assertTrue(ignored.failures().isEmpty());
+    assertTrue(coldStart.list().isEmpty());
+  }
+
+  @Test
   public void newlyDiscoveredFilesCannotClaimAnExistingBoardUuid() throws IOException {
     File pluginData = temp.newFolder("uuid-owner");
     PanelRepository repository = new PanelRepository(pluginData);

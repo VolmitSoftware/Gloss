@@ -1,5 +1,7 @@
 package art.arcane.gloss.panel;
 
+import art.arcane.gloss.doc.DocumentEnvelope;
+
 import java.util.Objects;
 import java.util.UUID;
 
@@ -10,9 +12,7 @@ public record PanelDefinition(int schemaVersion, String id, UUID uuid, long revi
   public static final long MAX_SAFE_REVISION = 9_007_199_254_740_991L;
 
   public PanelDefinition {
-    if (schemaVersion != CURRENT_SCHEMA_VERSION) {
-      throw new IllegalArgumentException("unsupported panel schemaVersion: " + schemaVersion);
-    }
+    DocumentEnvelope.requireSchemaVersion("panel", schemaVersion, CURRENT_SCHEMA_VERSION);
     id = PanelIds.canonicalize(id);
     uuid = Objects.requireNonNull(uuid, "uuid");
     if (revision < INITIAL_REVISION || revision > MAX_SAFE_REVISION) {

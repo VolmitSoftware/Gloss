@@ -7,7 +7,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 
 public final class MenuBaselines {
-  public static final String BLANK_HOLOGRAM_RESOURCE = "/baselines/menu-blank.json";
+  public static final String DEFAULT_MENU_RESOURCE = "/defaults/menus/default.json";
 
   private static final Gson GSON = new GsonBuilder()
       .disableHtmlEscaping()
@@ -17,8 +17,8 @@ public final class MenuBaselines {
   private MenuBaselines() {
   }
 
-  public static String blankHologramSource() {
-    return ShippedResources.readText(BLANK_HOLOGRAM_RESOURCE);
+  public static String defaultMenuSource() {
+    return ShippedResources.readText(DEFAULT_MENU_RESOURCE);
   }
 
   public static String simpleHologramSource(String menuId, String text) {

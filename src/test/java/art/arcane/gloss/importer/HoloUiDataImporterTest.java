@@ -71,8 +71,8 @@ class HoloUiDataImporterTest {
         Files.createDirectories(dataFolder);
         loader = new GlossConfigLoader(dataFolder.toFile());
 
-        write(source.resolve("menus/main.json"), resourceBytes("/baselines/menu-blank.json"));
-        write(source.resolve("menus/shop/weapons.json"), resourceBytes("/baselines/menu-blank.json"));
+        write(source.resolve("menus/main.json"), resourceBytes("/defaults/menus/default.json"));
+        write(source.resolve("menus/shop/weapons.json"), resourceBytes("/defaults/menus/default.json"));
         write(source.resolve("menus/readme.txt"), "not a menu".getBytes(StandardCharsets.UTF_8));
         write(source.resolve("menus/.hidden/secret.json"), "{}".getBytes(StandardCharsets.UTF_8));
         write(source.resolve("images/logo.png"), new byte[]{(byte) 0x89, 'P', 'N', 'G'});
@@ -101,7 +101,7 @@ class HoloUiDataImporterTest {
         HoloUiDataImporter.Result result = importer().run(config, false);
 
         assertTrue(result.sourcePresent());
-        assertArrayEquals(resourceBytes("/baselines/menu-blank.json"), Files.readAllBytes(dataFolder.resolve("menus/main.json")));
+        assertArrayEquals(resourceBytes("/defaults/menus/default.json"), Files.readAllBytes(dataFolder.resolve("menus/main.json")));
         assertTrue(Files.isRegularFile(dataFolder.resolve("menus/shop/weapons.json")));
         assertFalse(Files.exists(dataFolder.resolve("menus/readme.txt")));
         assertFalse(Files.exists(dataFolder.resolve("menus/.hidden")));
@@ -224,7 +224,7 @@ class HoloUiDataImporterTest {
 
         HoloUiDataImporter.Result rerun = importer.run(config, true);
 
-        assertArrayEquals(resourceBytes("/baselines/menu-blank.json"),
+        assertArrayEquals(resourceBytes("/defaults/menus/default.json"),
             Files.readAllBytes(dataFolder.resolve("menus/main.json")));
         assertEquals(HoloUiImportDisposition.COPIED, disposition(rerun, "menus/main.json"));
         assertEquals(before, snapshot(source));

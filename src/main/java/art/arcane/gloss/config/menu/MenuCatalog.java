@@ -7,6 +7,8 @@ import art.arcane.gloss.doc.DocumentRegistry;
 import art.arcane.gloss.doc.DocumentRevisionConflictException;
 import art.arcane.gloss.doc.DocumentTree;
 import art.arcane.gloss.doc.GlossDocument;
+import art.arcane.gloss.doc.ShippedDefaults;
+import art.arcane.gloss.doc.ShippedDocumentCatalog;
 import art.arcane.gloss.importer.LegacyHologramImportService;
 import art.arcane.gloss.locale.GlossMessages;
 import art.arcane.gloss.persistence.GlossPersistenceCoordinator;
@@ -48,10 +50,9 @@ import java.util.logging.Level;
  * already serving is not a change, which is what keeps an in-game edit from being applied twice when
  * the watcher reads that same edit back off disk.
  *
- * <p>Neither {@code menus/} nor any subdirectory of it is created here. Discovery tolerates a
- * missing root, the watcher reports the contents of a folder that appears later as creations, and
- * every write path creates the directory it needs, so an operator who never authors a menu never
- * grows the folder.
+ * <p>The enabled menu feature extracts one inert {@code default} menu when it is missing. Discovery
+ * still tolerates a missing root while menus are disabled, and every authored write path creates
+ * only the directory it needs.
  */
 public final class MenuCatalog {
   public static final String KIND = "menus";
@@ -63,6 +64,7 @@ public final class MenuCatalog {
   private static final long QUEUED_PUBLICATION_TIMEOUT_SECONDS = 30L;
 
   private final File menuDir;
+  private final ShippedDefaults defaults;
   private final DocumentRegistry<MenuDefinitionData> registry;
   private final MenuMutationService menuMutations;
   private final LegacyHologramImportService legacyImporter;
@@ -70,14 +72,28 @@ public final class MenuCatalog {
   private volatile boolean acceptingMenuMutations;
 
   public MenuCatalog(File configDir) {
+    this(configDir, menusEnabled());
+  }
+
+  MenuCatalog(File configDir, boolean extractDefaults) {
     this.menuDir = new File(configDir, KIND);
+    this.defaults = new ShippedDefaults(KIND, menuDir, ShippedDocumentCatalog.MENUS.names());
     this.registry = DocumentRegistry.folderTree(KIND, menuDir, MenuCatalog::parse,
         definition -> DocumentRegistry.UNVERSIONED);
     this.menuMutations = new MenuMutationService(Gloss.instance, configDir);
     this.legacyImporter = new LegacyHologramImportService(Gloss.instance, this, configDir);
     this.acceptingMenuMutations = true;
 
+    if (extractDefaults) {
+      defaults.extractMissing();
+    }
     registry.reload();
+  }
+
+  public void loadShippedDefaults(boolean enabled) {
+    if (enabled && !defaults.extractMissing().isEmpty()) {
+      registry.reload();
+    }
   }
 
   public void startWatching() {
@@ -445,5 +461,10 @@ public final class MenuCatalog {
         ? fileName.substring(0, fileName.length() - MENU_EXTENSION.length())
         : fileName;
     return MenuDocumentParser.parse(id, raw).definition();
+  }
+
+  private static boolean menusEnabled() {
+    Gloss plugin = Gloss.instance;
+    return plugin != null && plugin.cfg() != null && plugin.cfg().menus().enabled();
   }
 }

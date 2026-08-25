@@ -44,7 +44,7 @@ public final class SplashScreen {
             "",
             accent + "   Gloss, " + meta + "Server Polish & Display Suite " + ChatColor.LIGHT_PURPLE + "[" + releaseTrain + " RELEASE]",
             meta + "   Version: " + accent + pluginVersion,
-            meta + "   By: " + accent + "Volmit Software (Arcane Arts)" + meta + " | " + accent + "VolmitSoftware.com" + meta + " | Startup: " + statusColor + status,
+            meta + "   By: " + accent + "Volmit Software (Arcane Arts)" + meta + " | Web Editor: " + accent + "https://gloss.volmitsoftware.com" + meta + " | Startup: " + statusColor + status,
             meta + "   Server: " + accent + serverVersion + meta + " | MC Support: " + accent + SUPPORTED_MC_VERSION,
             meta + "   Java: " + accent + SplashScreenSupport.javaMajorVersion() + meta + " | Date: " + accent + startupDate
         };

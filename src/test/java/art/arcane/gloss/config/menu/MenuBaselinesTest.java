@@ -12,8 +12,8 @@ import static org.junit.Assert.assertTrue;
 
 public class MenuBaselinesTest {
   @Test
-  public void blankHologramParsesAsAUsableMenu() {
-    MenuDocument document = MenuDocumentParser.parse("sign", MenuBaselines.blankHologramSource());
+  public void defaultMenuParsesAsAUsableMenu() {
+    MenuDocument document = MenuDocumentParser.parse("sign", MenuBaselines.defaultMenuSource());
 
     assertEquals("sign", document.id());
     assertFalse(document.definition().isFollowPlayer());

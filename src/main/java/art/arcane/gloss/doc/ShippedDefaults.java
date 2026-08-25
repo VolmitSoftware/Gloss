@@ -5,12 +5,8 @@ import art.arcane.gloss.Gloss;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.logging.Level;
@@ -45,31 +41,6 @@ public final class ShippedDefaults {
 
     public List<String> resetToDefault(String nameOrStar) {
         return extract(normalize(nameOrStar), true);
-    }
-
-    public boolean replaceIfExact(String name, byte[] expected) {
-        Objects.requireNonNull(expected, "expected");
-        if (!names.contains(name)) {
-            return false;
-        }
-        Path file = new File(folder, name + EXTENSION).toPath();
-        if (!Files.isRegularFile(file)) {
-            return false;
-        }
-        try {
-            if (!matchesExact(file, expected)) {
-                return false;
-            }
-            byte[] replacement = readResource(name);
-            if (replacement == null) {
-                Gloss.log(Level.WARNING, "%s/%s%s: missing from the jar, not upgraded.", kind, name, EXTENSION);
-                return false;
-            }
-            return replaceAtomically(file, expected, replacement);
-        } catch (IOException failure) {
-            Gloss.logExceptionStack(false, failure, "%s/%s%s could not be upgraded.", kind, name, EXTENSION);
-            return false;
-        }
     }
 
     public static String normalize(String nameOrStar) {
@@ -112,51 +83,4 @@ public final class ShippedDefaults {
         return written;
     }
 
-    private byte[] readResource(String name) throws IOException {
-        try (InputStream stream = ShippedDefaults.class.getResourceAsStream(resourcePath(name))) {
-            return stream == null ? null : stream.readAllBytes();
-        }
-    }
-
-    /**
-     * Reports whether the file still holds the untouched shipped form, ignoring line-ending style.
-     *
-     * <p>The expected forms are Java string literals, so they always carry a bare line feed, while
-     * the file on disk carries whatever the checkout produced: a carriage return plus line feed on
-     * a Windows clone. A byte-exact comparison reads every such file as operator-edited and skips
-     * the upgrade. Only a carriage return that immediately precedes a line feed is folded away, so
-     * a genuine operator edit still counts as one.
-     */
-    private boolean matchesExact(Path file, byte[] expected) throws IOException {
-        return Arrays.equals(foldLineEndings(Files.readAllBytes(file)), foldLineEndings(expected));
-    }
-
-    private static byte[] foldLineEndings(byte[] content) {
-        byte[] folded = new byte[content.length];
-        int length = 0;
-        for (int index = 0; index < content.length; index++) {
-            if (content[index] == '\r' && index + 1 < content.length && content[index + 1] == '\n') {
-                continue;
-            }
-            folded[length++] = content[index];
-        }
-        return Arrays.copyOf(folded, length);
-    }
-
-    private boolean replaceAtomically(Path file, byte[] expected, byte[] content) throws IOException {
-        Path temporary = AtomicFiles.writeTemporary(file.getParent(), "." + file.getFileName(), content);
-        try {
-            if (!matchesExact(file, expected)) {
-                return false;
-            }
-            try {
-                Files.move(temporary, file, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
-            } catch (AtomicMoveNotSupportedException unsupported) {
-                Files.move(temporary, file, StandardCopyOption.REPLACE_EXISTING);
-            }
-            return true;
-        } finally {
-            Files.deleteIfExists(temporary);
-        }
-    }
 }

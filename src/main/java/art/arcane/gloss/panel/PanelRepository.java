@@ -1,6 +1,7 @@
 package art.arcane.gloss.panel;
 
 import art.arcane.gloss.doc.AtomicFiles;
+import art.arcane.gloss.doc.DocumentEnvelope;
 import art.arcane.gloss.doc.DocumentRevisionConflictException;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -107,7 +108,9 @@ public final class PanelRepository implements PanelStore {
         loadedBoards.put(id, definition);
         loaded++;
       } catch (IOException | RuntimeException failure) {
-        failures.put(relative, message(failure));
+        if (!DocumentEnvelope.isUnsupportedSchemaVersion(failure)) {
+          failures.put(relative, message(failure));
+        }
         PanelDefinition lastGood = previous.get(id);
         if (lastGood != null && loadedUuids.putIfAbsent(lastGood.uuid(), id) == null) {
           loadedBoards.put(id, lastGood);

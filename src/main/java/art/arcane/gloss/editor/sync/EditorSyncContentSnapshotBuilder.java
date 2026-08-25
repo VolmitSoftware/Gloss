@@ -1,5 +1,6 @@
 package art.arcane.gloss.editor.sync;
 
+import art.arcane.gloss.doc.DocumentEnvelope;
 import art.arcane.gloss.panel.PanelDefinition;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
@@ -20,6 +21,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
@@ -170,7 +172,7 @@ final class EditorSyncContentSnapshotBuilder {
         return List.of();
       }
       String id = kind == EditorSyncDocumentKind.MOTD ? "motd" : "tablist";
-      return List.of(readDocument(kind, id, target));
+      return readSupportedDocument(kind, id, target).map(List::of).orElseGet(List::of);
     }
     if (!Files.exists(target, LinkOption.NOFOLLOW_LINKS)) {
       return List.of();
@@ -205,10 +207,22 @@ final class EditorSyncContentSnapshotBuilder {
       String relative = target.relativize(file).toString()
           .replace(java.io.File.separatorChar, '/');
       String id = relative.substring(0, relative.length() - ".json".length());
-      documents.add(readDocument(kind, id, file));
+      readSupportedDocument(kind, id, file).ifPresent(documents::add);
     }
     documents.sort(Comparator.comparing(EditorSyncDocuments.Entry::id));
     return List.copyOf(documents);
+  }
+
+  private Optional<EditorSyncDocuments.Entry> readSupportedDocument(
+      EditorSyncDocumentKind kind, String id, Path file) {
+    try {
+      return Optional.of(readDocument(kind, id, file));
+    } catch (RuntimeException failure) {
+      if (DocumentEnvelope.isUnsupportedSchemaVersion(failure)) {
+        return Optional.empty();
+      }
+      throw failure;
+    }
   }
 
   private EditorSyncDocuments.Entry readDocument(EditorSyncDocumentKind kind, String id, Path file) {

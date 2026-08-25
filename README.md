@@ -64,7 +64,8 @@ plugins/Gloss/
 ├── real-drops/default.json          shipped default, while real drops are enabled
 ├── previews/<name>.json             14 shipped defaults, while container previews are enabled
 ├── holograms/<id>.json              on the first hologram
-├── menus/<path>.json                on the first menu
+├── menus/default.json               shipped starter menu, while menus are enabled
+├── menus/<path>.json                additional authored menus
 ├── images/<path>                    when an operator drops an image in
 ├── panels/<path>.json               on the first panel
 ├── editor-sync-transactions/        during an editor sync publication

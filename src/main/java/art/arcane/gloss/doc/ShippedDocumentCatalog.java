@@ -3,6 +3,9 @@ package art.arcane.gloss.doc;
 import art.arcane.gloss.animation.AnimationDoc;
 import art.arcane.gloss.board.BoardDoc;
 import art.arcane.gloss.bubble.BubbleStyleDoc;
+import art.arcane.gloss.config.MenuDefinitionData;
+import art.arcane.gloss.config.menu.MenuCatalog;
+import art.arcane.gloss.config.menu.MenuDocumentParser;
 import art.arcane.gloss.emoji.EmojiDoc;
 import art.arcane.gloss.drop.RealDropSettingsDoc;
 import art.arcane.gloss.indicator.DamageIndicatorSettingsDoc;
@@ -56,11 +59,15 @@ public final class ShippedDocumentCatalog {
         new Entry<>(DamageIndicatorSettingsDoc.KIND, List.of(DamageIndicatorSettingsDoc.DEFAULT_ID),
             DamageIndicatorSettingsDoc::parse);
 
+    public static final Entry<MenuDefinitionData> MENUS =
+        new Entry<>(MenuCatalog.KIND, List.of("default"), (fileName, raw) ->
+            MenuDocumentParser.parse(ShippedDefaults.normalize(fileName), raw).definition());
+
     private ShippedDocumentCatalog() {
     }
 
     public static List<Entry<?>> all() {
         return List.of(EMOJI, ANIMATIONS, BOARDS, BUBBLES, TABLIST, MOTD, REAL_DROPS,
-            DAMAGE_INDICATORS);
+            DAMAGE_INDICATORS, MENUS);
     }
 }

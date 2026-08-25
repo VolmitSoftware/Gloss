@@ -93,6 +93,77 @@ class DocumentRegistryTest {
     }
 
     @Test
+    void unsupportedSchemaOnReloadIsIgnoredWithoutAWarning() throws IOException {
+        write("alpha.json", "1:old");
+        DocumentRegistry<String> registry = schemaRegistry();
+        List<LogRecord> warnings = new ArrayList<>();
+        Handler handler = collectingHandler(warnings);
+        Logger logger = Logger.getLogger("Gloss");
+        logger.addHandler(handler);
+        try {
+            registry.reload();
+
+            assertTrue(registry.ids().isEmpty());
+            assertTrue(warnings.isEmpty());
+        } finally {
+            logger.removeHandler(handler);
+        }
+    }
+
+    @Test
+    void unsupportedSchemaHotloadKeepsLastGoodAndRecoversWithoutAWarning() throws Exception {
+        write("alpha.json", "2:one");
+        DocumentRegistry<String> registry = schemaRegistry();
+        registry.reload();
+        TrackingFolderWatcher unsupportedWatcher = new TrackingFolderWatcher(folder);
+        registry.replaceFolderWatcher(unsupportedWatcher);
+        List<LogRecord> warnings = new ArrayList<>();
+        Handler handler = collectingHandler(warnings);
+        Logger logger = Logger.getLogger("Gloss");
+        logger.addHandler(handler);
+        try {
+            write("alpha.json", "1:old");
+            awaitWatcherEvent(registry, unsupportedWatcher::eventSeen);
+
+            assertEquals("one", registry.get("alpha").value());
+            assertTrue(warnings.isEmpty());
+
+            TrackingFolderWatcher currentWatcher = new TrackingFolderWatcher(folder);
+            registry.replaceFolderWatcher(currentWatcher);
+            write("alpha.json", "2:two");
+            clock.addAndGet(TimeUnit.SECONDS.toNanos(12L));
+            DocumentDelta delta = awaitDelta(registry);
+
+            assertEquals("one", registry.get("alpha").value());
+            assertEquals("two", registry.get(delta, "alpha").value());
+            assertTrue(registry.acknowledge(delta));
+            assertEquals("two", registry.get("alpha").value());
+            assertTrue(warnings.isEmpty());
+        } finally {
+            logger.removeHandler(handler);
+        }
+    }
+
+    @Test
+    void currentSchemaValidationFailureStillReportsAWarning() throws IOException {
+        write("alpha.json", "2:");
+        DocumentRegistry<String> registry = schemaRegistry();
+        List<LogRecord> warnings = new ArrayList<>();
+        Handler handler = collectingHandler(warnings);
+        Logger logger = Logger.getLogger("Gloss");
+        logger.addHandler(handler);
+        try {
+            registry.reload();
+
+            assertTrue(registry.ids().isEmpty());
+            assertEquals(1, warnings.size());
+            assertTrue(warnings.getFirst().getMessage().contains("payload is missing"));
+        } finally {
+            logger.removeHandler(handler);
+        }
+    }
+
+    @Test
     void pollReportsChangedCreatedAndDeletedDocuments() throws Exception {
         write("alpha.json", "one");
         DocumentRegistry<String> registry = registry();
@@ -701,6 +772,19 @@ class DocumentRegistryTest {
         }
         assertFalse(delta.isEmpty());
         return delta;
+    }
+
+    private DocumentRegistry<String> schemaRegistry() {
+        DocumentParser<String> parser = (fileName, raw) -> {
+            String[] fields = raw.trim().split(":", 2);
+            int schemaVersion = Integer.parseInt(fields[0]);
+            DocumentEnvelope.requireSchemaVersion("test", schemaVersion, 2);
+            if (fields.length != 2 || fields[1].isBlank()) {
+                throw new IllegalArgumentException(fileName + " payload is missing");
+            }
+            return fields[1];
+        };
+        return DocumentRegistry.folder("test", folder, parser, value -> 1L, file -> false, clock::get);
     }
 
     private static void awaitWatcherEvent(DocumentRegistry<String> registry, BooleanSupplier eventSeen)

@@ -63,6 +63,19 @@ public class EditorSyncContentSnapshotBuilderTest {
   }
 
   @Test
+  public void unsupportedSchemasAreAbsentFromSubjectsAndWorkspaceSnapshots() throws Exception {
+    Path data = temp.newFolder("unsupported-schemas").toPath();
+    write(data.resolve("animations/old.json"), "{\"schemaVersion\":2,\"revision\":1}");
+    write(data.resolve("tablist.json"), "{\"schemaVersion\":1,\"revision\":1}");
+    EditorSyncContentSnapshotBuilder builder = new EditorSyncContentSnapshotBuilder(data);
+
+    assertTrue(builder.subjectIds(EditorSyncKind.ANIMATION).isEmpty());
+    assertTrue(builder.subjectIds(EditorSyncKind.TABLIST).isEmpty());
+    assertTrue(builder.open(EditorSyncKind.WORKSPACE, "workspace", 1024 * 1024)
+        .json().getAsJsonArray("documents").isEmpty());
+  }
+
+  @Test
   public void workspaceRoundTripsUnreferencedImagesAtGeneralDimensions() throws Exception {
     Path data = temp.newFolder("workspace-images").toPath();
     Path image = data.resolve("images/archive/unreferenced.png");

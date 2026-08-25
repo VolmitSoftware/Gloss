@@ -20,7 +20,6 @@ import art.arcane.gloss.hologram.HologramAnimator;
 import art.arcane.gloss.hologram.HologramService;
 import art.arcane.gloss.image.ImageAssets;
 import art.arcane.gloss.importer.HoloUiDataImporter;
-import art.arcane.gloss.importer.LegacyGlossDataImporter;
 import art.arcane.gloss.indicator.DamageIndicatorsService;
 import art.arcane.gloss.integrate.IntegrationBridgeService;
 import art.arcane.gloss.integration.ItemProviderRegistry;
@@ -92,6 +91,7 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
     private static final long FAILURE_LOG_THROTTLE_NANOS = TimeUnit.MINUTES.toNanos(1L);
     private static final ConcurrentMap<String, FailureLogThrottle> FAILURE_LOG_THROTTLES = new ConcurrentHashMap<>();
     private static final Logger FALLBACK_LOGGER = Logger.getLogger("Gloss");
+    private static final String LOG_DISCRIMINATOR = ComponentLog.discriminator("Gloss", "&#b47aff");
 
     public static Gloss instance;
 
@@ -170,7 +170,7 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
         if (!current.isLoggable(logLevel)) {
             return;
         }
-        ComponentLog.logLegacy(instance, FALLBACK_LOGGER, "[Gloss] ", logLevel,
+        ComponentLog.logLegacy(instance, FALLBACK_LOGGER, LOG_DISCRIMINATOR, logLevel,
             format(message, args), null);
     }
 
@@ -183,7 +183,7 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
         if (suppressed < 0L) {
             return;
         }
-        ComponentLog.logLegacy(instance, FALLBACK_LOGGER, "[Gloss] ", logLevel,
+        ComponentLog.logLegacy(instance, FALLBACK_LOGGER, LOG_DISCRIMINATOR, logLevel,
             withSuppressed(format(message, args), suppressed), null);
     }
 
@@ -203,7 +203,7 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
         if (!current.isLoggable(level)) {
             return;
         }
-        ComponentLog.logLegacy(instance, FALLBACK_LOGGER, "[Gloss] ", level,
+        ComponentLog.logLegacy(instance, FALLBACK_LOGGER, LOG_DISCRIMINATOR, level,
             format(message, args), failure);
     }
 
@@ -218,7 +218,7 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
         if (suppressed < 0L) {
             return;
         }
-        ComponentLog.logLegacy(instance, FALLBACK_LOGGER, "[Gloss] ", level,
+        ComponentLog.logLegacy(instance, FALLBACK_LOGGER, LOG_DISCRIMINATOR, level,
             withSuppressed(format(message, args), suppressed), failure);
     }
 
@@ -578,8 +578,8 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
      * The data importers run in exactly this slot: after gloss.toml is loaded (so the HoloUi
      * settings overlay lands in the in-memory boot config before {@link GlossConfig#from}
      * snapshots it) and before the DataWatchdog and every service constructs — MenuCatalog
-     * scans menus/ in its constructor and PanelService/registries scan on start, so imported and
-     * migrated files must already be in place. Importer failures never abort enable.
+     * scans menus/ in its constructor and PanelService/registries scan on start, so imported files
+     * must already be in place. Importer failures never abort enable.
      */
     private void runDataImporters(GlossConfigFile bootConfigFile) {
         try {
@@ -589,11 +589,6 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
             }
         } catch (RuntimeException failure) {
             logExceptionStack(false, failure, "HoloUi data import failed; continuing enable.");
-        }
-        try {
-            new LegacyGlossDataImporter(getDataFolder(), configLoader).run(bootConfigFile);
-        } catch (RuntimeException failure) {
-            logExceptionStack(false, failure, "Legacy Gloss data migration failed; continuing enable.");
         }
     }
 
@@ -696,6 +691,10 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
     }
 
     private void applyMergedConfigHooks(GlossConfig previous, GlossConfig next, boolean cycleEveryService) {
+        if (menuCatalog != null
+            && (cycleEveryService || !previous.menus().enabled() && next.menus().enabled())) {
+            menuCatalog.loadShippedDefaults(next.menus().enabled());
+        }
         if (localization != null) {
             if (!previous.language().equals(next.language())) {
                 localization.selectLocale(next.language());
