@@ -15,7 +15,7 @@ Server polish and display suite: holograms, menus, scoreboards, tablist, emoji c
 - **Tablist** — configurable header/footer and per-group player list names.
 - **Emoji** — `:emoji:` and trigger replacement in chat with tab completion and per-emoji permissions.
 - **Chat bubbles** — messages float above the speaker's head, stack, and fly away as they expire.
-- **Damage indicators** — floating damage and healing numbers measured from actual applied health deltas, with a hot-reloading JSON profile for formats, continuous ballistic motion, spin, scale, fade, limits and world filters.
+- **Damage indicators** — floating damage and healing numbers measured from actual applied health deltas, with exact Paper critical-hit conditions and a hot-reloading JSON profile for formats, continuous ballistic motion, spin, scale, fade, limits and per-viewer filters.
 - **Menus and previews** — packet-only holographic menus, persistent world panels and look-at container previews.
 - **Dropped items** — configurable labels plus optional display-backed block and item models while the native item remains authoritative.
 - **Animations** — frame-based text animations usable in any hologram, board or tablist line via `|animation.<id>|`.

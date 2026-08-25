@@ -65,6 +65,7 @@ public final class DamageIndicatorsService implements Listener {
         32, error -> Gloss.logExceptionStackThrottled(false,
             "damage-indicator-condition-" + error.path(), error.cause(),
             "Could not evaluate damage-indicator condition %s.", error.path()));
+    private final DamageIndicatorCriticality criticality;
 
     private volatile ActiveSettings activeSettings = ActiveSettings.defaults();
     private int driverTaskId = -1;
@@ -73,6 +74,7 @@ public final class DamageIndicatorsService implements Listener {
 
     public DamageIndicatorsService(Gloss plugin) {
         this.plugin = plugin;
+        criticality = DamageIndicatorCriticality.load();
         if (plugin == null) {
             defaults = null;
             settings = null;
@@ -136,7 +138,8 @@ public final class DamageIndicatorsService implements Listener {
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onDamage(EntityDamageEvent event) {
         ActiveSettings snapshot = activeSettings;
-        sample(event.getEntity(), snapshot, DamageIndicatorEventSnapshot.damage(event, plugin));
+        sample(event.getEntity(), snapshot,
+            DamageIndicatorEventSnapshot.damage(event, plugin, criticality));
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)

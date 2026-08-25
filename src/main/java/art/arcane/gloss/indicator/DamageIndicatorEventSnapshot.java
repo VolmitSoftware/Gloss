@@ -16,18 +16,27 @@ import java.util.Locale;
 import java.util.Map;
 
 record DamageIndicatorEventSnapshot(boolean damage, String cause, double reportedAmount,
+                                    boolean critical, boolean criticalKnown,
                                     String directSourceType, EntityState source) {
 
-    static DamageIndicatorEventSnapshot damage(EntityDamageEvent event, Gloss plugin) {
-        Entity directSource = event instanceof EntityDamageByEntityEvent byEntity
-            ? byEntity.getDamager() : null;
+    static DamageIndicatorEventSnapshot damage(EntityDamageEvent event, Gloss plugin,
+                                                DamageIndicatorCriticality criticality) {
+        EntityDamageByEntityEvent byEntity = event instanceof EntityDamageByEntityEvent damageByEntity
+            ? damageByEntity
+            : null;
+        Entity directSource = byEntity == null ? null : byEntity.getDamager();
         Entity ownedSource = directSource != null && FoliaScheduler.isOwnedByCurrentRegion(directSource)
             ? directSource
             : null;
+        DamageIndicatorCriticality.CriticalHit criticalHit = byEntity == null
+            ? new DamageIndicatorCriticality.CriticalHit(false, true)
+            : criticality.detect(byEntity);
         return new DamageIndicatorEventSnapshot(
             true,
             event.getCause().name().toLowerCase(Locale.ROOT),
             event.getFinalDamage(),
+            criticalHit.critical(),
+            criticalHit.known(),
             typeOf(ownedSource),
             EntityState.capture(ownedSource, plugin));
     }
@@ -37,6 +46,8 @@ record DamageIndicatorEventSnapshot(boolean damage, String cause, double reporte
             false,
             event.getRegainReason().name().toLowerCase(Locale.ROOT),
             event.getAmount(),
+            false,
+            true,
             "",
             EntityState.empty());
     }
@@ -49,6 +60,8 @@ record DamageIndicatorEventSnapshot(boolean damage, String cause, double reporte
         values.put("event.reportedAmount", reportedAmount);
         values.put("event.damage", damage);
         values.put("event.healing", !damage);
+        values.put("event.critical", critical);
+        values.put("event.criticalKnown", criticalKnown);
         values.put("event.directSourceType", directSourceType);
         EntityState.capture(subject, plugin).put(values, "subject.");
         source.put(values, "source.");

@@ -57,6 +57,24 @@ class DamageIndicatorConditionPlanTest {
     }
 
     @Test
+    void criticalVariantRequiresKnownCriticality() {
+        DamageIndicatorSettingsDoc.Style style = new DamageIndicatorSettingsDoc.Style(
+            "true",
+            presentation("base"),
+            List.of(new DamageIndicatorSettingsDoc.Variant(
+                "critical", 100, "event.criticalKnown && event.critical", presentation("critical"))));
+        DamageIndicatorConditionPlan plan = DamageIndicatorConditionPlan.compile(
+            document(style, new DamageIndicatorSettingsDoc.Audience("true")));
+
+        assertEquals("critical{amount}", plan.select(true, scope(Map.of(
+            "event.criticalKnown", true,
+            "event.critical", true)), SILENT).format());
+        assertEquals("base{amount}", plan.select(true, scope(Map.of(
+            "event.criticalKnown", false,
+            "event.critical", false)), SILENT).format());
+    }
+
+    @Test
     void audienceConditionMakesAnIndependentPerViewerDecision() {
         DamageIndicatorConditionPlan plan = DamageIndicatorConditionPlan.compile(document(
             new DamageIndicatorSettingsDoc.Style("true", presentation("base"), List.of()),
