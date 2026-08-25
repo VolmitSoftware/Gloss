@@ -7,13 +7,20 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class RealDropSettingsDocTest {
     @Test
+    void retiredV1DocumentIsRejected() {
+        assertThrows(IllegalArgumentException.class, () -> RealDropSettingsDoc.parse(
+            "default.json", "{\"schemaVersion\":1,\"revision\":1}"));
+    }
+
+    @Test
     void absentSectionsResolveToTheShippedWebEditableDefaults() {
         RealDropSettingsDoc parsed = RealDropSettingsDoc.parse("default.json", """
-            {"schemaVersion":1,"revision":1}
+            {"schemaVersion":2,"revision":1}
             """);
         GlossConfig.RealDrops config = parsed.toConfig(true);
 
@@ -35,8 +42,9 @@ class RealDropSettingsDocTest {
     void documentValuesClampAndNormalizeAtTheRuntimeBoundary() {
         RealDropSettingsDoc parsed = RealDropSettingsDoc.parse("default.json", """
             {
-              "schemaVersion": 1,
+              "schemaVersion": 2,
               "revision": 8,
+              "presentation": {
               "limits": {
                 "updateIntervalTicks": 0,
                 "settledPollIntervalTicks": 999,
@@ -83,6 +91,7 @@ class RealDropSettingsDocTest {
                 "disabledWorlds": [" world ", ""],
                 "materialBlacklist": [" stone ", ""],
                 "onlyPlayerDrops": true
+              }
               }
             }
             """);

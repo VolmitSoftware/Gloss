@@ -1,6 +1,8 @@
 package art.arcane.gloss.board;
 
 import art.arcane.gloss.Gloss;
+import art.arcane.gloss.condition.BoundedConditionErrorCallback;
+import art.arcane.gloss.condition.GlossConditionScope;
 import art.arcane.gloss.doc.DocumentDelta;
 import art.arcane.gloss.doc.ExecutorStorageTaskRunner;
 import art.arcane.gloss.doc.DocumentRegistry;
@@ -9,6 +11,7 @@ import art.arcane.gloss.doc.DocumentStore;
 import art.arcane.gloss.doc.GlossDocument;
 import art.arcane.gloss.doc.ShippedDefaults;
 import art.arcane.gloss.doc.ShippedDocumentCatalog;
+import art.arcane.gloss.expr.ExprScope;
 import art.arcane.volmlib.util.scheduling.SchedulerUtils;
 import art.arcane.gloss.text.TextPipeline;
 import art.arcane.volmlib.util.board.Board;
@@ -36,7 +39,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.Predicate;
 import java.util.function.UnaryOperator;
 import java.util.logging.Level;
 
@@ -63,11 +65,14 @@ public final class BoardService implements Listener {
     private final BoardStorageQueue storage;
     private final Map<String, GlossBoardMeta> metas;
     private final Map<UUID, String> selections;
+    private final Map<UUID, GlossBoardMeta.ActiveProfile> profiles;
     private final Set<UUID> sticky;
     private final UnaryOperator<String> staticRender;
+    private final BoundedConditionErrorCallback conditionErrors;
     private volatile BoardManager<Board> ordinaryManager;
     private volatile BoardManager<Board> animationManager;
     private volatile int ordinaryManagerIntervalTicks;
+    private volatile int selectionTaskId;
     private volatile List<GlossBoardMeta> boardSnapshot;
 
     public BoardService(Gloss plugin) {
@@ -83,33 +88,32 @@ public final class BoardService implements Listener {
             store::isOwnWrite);
         this.metas = new ConcurrentHashMap<>();
         this.selections = new ConcurrentHashMap<>();
+        this.profiles = new ConcurrentHashMap<>();
         this.sticky = ConcurrentHashMap.newKeySet();
+        this.conditionErrors = BoundedConditionErrorCallback.bounded(100, error ->
+            Gloss.logExceptionStackThrottled(false, "board-condition-" + error.path(), error.cause(),
+                "Board condition %s failed and was treated as false.", error.path()));
+        this.selectionTaskId = -1;
     }
 
-    public static String selectBoardId(String primaryGroup, List<GlossBoardMeta> boards,
-                                       Predicate<String> permissionTest) {
-        if (primaryGroup != null && !primaryGroup.isBlank()) {
-            for (GlossBoardMeta meta : boards) {
-                if (meta.groups().contains(primaryGroup) && permitted(meta, permissionTest)) {
-                    return meta.id();
-                }
-            }
-        }
-        for (GlossBoardMeta meta : boards) {
-            if (meta.permissionGated() && permissionTest.test(meta.permissionNode())) {
-                return meta.id();
-            }
-        }
-        for (GlossBoardMeta meta : boards) {
-            if (meta.primary() && permitted(meta, permissionTest)) {
-                return meta.id();
-            }
-        }
-        return null;
+    public static String selectBoardId(List<GlossBoardMeta> boards, ExprScope scope) {
+        return selectBoardId(boards, scope, BoundedConditionErrorCallback.silent());
     }
 
-    private static boolean permitted(GlossBoardMeta meta, Predicate<String> permissionTest) {
-        return !meta.permissionGated() || permissionTest.test(meta.permissionNode());
+    private static String selectBoardId(List<GlossBoardMeta> boards, ExprScope scope,
+                                        BoundedConditionErrorCallback errors) {
+        GlossBoardMeta selected = null;
+        for (GlossBoardMeta meta : boards) {
+            if (!meta.matchesSelection(scope, errors)) {
+                continue;
+            }
+            if (selected == null || meta.selection().priority() > selected.selection().priority()
+                || meta.selection().priority() == selected.selection().priority()
+                && meta.id().compareTo(selected.id()) < 0) {
+                selected = meta;
+            }
+        }
+        return selected == null ? null : selected.id();
     }
 
     /**
@@ -137,6 +141,7 @@ public final class BoardService implements Listener {
         stopManagers();
         storage.shutdown();
         selections.clear();
+        profiles.clear();
         sticky.clear();
         metas.clear();
         boardSnapshot = null;
@@ -246,12 +251,14 @@ public final class BoardService implements Listener {
         }
         sticky.add(player.getUniqueId());
         selections.put(player.getUniqueId(), normalized);
+        refreshProfile(player, metas.get(normalized));
         syncManager(player);
     }
 
     public void clearBoard(Player player) {
         sticky.add(player.getUniqueId());
         selections.remove(player.getUniqueId());
+        profiles.remove(player.getUniqueId());
         syncManager(player);
     }
 
@@ -278,6 +285,7 @@ public final class BoardService implements Listener {
     public void on(PlayerQuitEvent event) {
         UUID uuid = event.getPlayer().getUniqueId();
         selections.remove(uuid);
+        profiles.remove(uuid);
         sticky.remove(uuid);
         removeFromManagers(event.getPlayer());
     }
@@ -290,6 +298,7 @@ public final class BoardService implements Listener {
         animationManager = animationIntervalTicks == ordinaryIntervalTicks
             ? null
             : createManager(animationIntervalTicks, "animation");
+        selectionTaskId = plugin.scheduler().sr(this::selectAllAutomatically, ordinaryIntervalTicks);
     }
 
     private BoardManager<Board> createManager(int intervalTicks, String cadenceName) {
@@ -307,6 +316,10 @@ public final class BoardService implements Listener {
         BoardManager<Board> activeAnimationManager = animationManager;
         ordinaryManager = null;
         animationManager = null;
+        if (selectionTaskId != -1) {
+            plugin.scheduler().csr(selectionTaskId);
+            selectionTaskId = -1;
+        }
         if (activeOrdinaryManager != null) {
             activeOrdinaryManager.onDisable();
         }
@@ -316,12 +329,15 @@ public final class BoardService implements Listener {
     }
 
     private void selectAutomatically(Player player) {
-        String primaryGroup = plugin.groups().primaryGroupFor(player).orElse(null);
-        String chosen = selectBoardId(primaryGroup, boards(), player::hasPermission);
+        GlossConditionScope scope = GlossConditionScope.viewer(plugin, player);
+        String chosen = selectBoardId(boards(), scope, conditionErrors);
         if (chosen == null) {
             selections.remove(player.getUniqueId());
+            profiles.remove(player.getUniqueId());
         } else {
             selections.put(player.getUniqueId(), chosen);
+            GlossBoardMeta meta = metas.get(chosen);
+            profiles.put(player.getUniqueId(), meta.activeProfile(scope, conditionErrors));
         }
         syncManager(player);
     }
@@ -329,7 +345,10 @@ public final class BoardService implements Listener {
     private void selectAllAutomatically() {
         for (Player player : Bukkit.getOnlinePlayers()) {
             if (sticky.contains(player.getUniqueId())) {
-                syncManager(player);
+                plugin.scheduler().runEntity(player, () -> {
+                    refreshProfile(player, selectedMeta(player));
+                    syncManager(player);
+                });
                 continue;
             }
             plugin.scheduler().runEntity(player, () -> selectAutomatically(player));
@@ -343,6 +362,7 @@ public final class BoardService implements Listener {
         }
         plugin.scheduler().runEntity(player, () -> {
             GlossBoardMeta meta = selectedMeta(player);
+            refreshProfile(player, meta);
             BoardManager<Board> activeAnimationManager = animationManager;
             BoardManager<Board> target = meta != null && usesFastRefresh(meta)
                 && activeAnimationManager != null ? activeAnimationManager : activeOrdinaryManager;
@@ -388,10 +408,22 @@ public final class BoardService implements Listener {
         if (meta == null) {
             return false;
         }
-        if (TextPipeline.requiresFastRefresh(meta.title())) {
+        if (usesFastRefreshText(meta.presentation())) {
             return true;
         }
-        for (String line : meta.lines()) {
+        for (BoardDoc.Variant variant : meta.variants()) {
+            if (usesFastRefreshText(variant.presentation())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean usesFastRefreshText(BoardDoc.Presentation presentation) {
+        if (TextPipeline.requiresFastRefresh(presentation.title())) {
+            return true;
+        }
+        for (String line : presentation.lines()) {
             if (TextPipeline.requiresFastRefresh(line)) {
                 return true;
             }
@@ -402,6 +434,24 @@ public final class BoardService implements Listener {
     private GlossBoardMeta selectedMeta(Player player) {
         String boardId = selections.get(player.getUniqueId());
         return boardId == null ? null : metas.get(boardId);
+    }
+
+    private void refreshProfile(Player player, GlossBoardMeta meta) {
+        if (meta == null) {
+            profiles.remove(player.getUniqueId());
+            return;
+        }
+        GlossConditionScope scope = GlossConditionScope.viewer(plugin, player);
+        profiles.put(player.getUniqueId(), meta.activeProfile(scope, conditionErrors));
+    }
+
+    private GlossBoardMeta.ActiveProfile selectedProfile(Player player, GlossBoardMeta meta) {
+        GlossBoardMeta.ActiveProfile profile = profiles.get(player.getUniqueId());
+        if (profile != null) {
+            return profile;
+        }
+        refreshProfile(player, meta);
+        return profiles.get(player.getUniqueId());
     }
 
     private void loadAllBoards() {
@@ -468,7 +518,8 @@ public final class BoardService implements Listener {
             if (meta == null) {
                 return "";
             }
-            GlossBoardMeta.RenderPlan plan = plan(meta);
+            GlossBoardMeta.ActiveProfile profile = selectedProfile(player, meta);
+            GlossBoardMeta.RenderPlan plan = plan(meta, profile);
             String cached = plan.staticTitle();
             if (cached != null) {
                 return cached;
@@ -486,7 +537,8 @@ public final class BoardService implements Listener {
             if (meta == null) {
                 return List.of();
             }
-            GlossBoardMeta.RenderPlan plan = plan(meta);
+            GlossBoardMeta.ActiveProfile profile = selectedProfile(player, meta);
+            GlossBoardMeta.RenderPlan plan = plan(meta, profile);
             int count = plan.lineCount();
             List<String> rendered = new ArrayList<>(count);
             for (int index = 0; index < count; index++) {
@@ -504,11 +556,13 @@ public final class BoardService implements Listener {
         @Override
         public boolean hideScoreNumbers(Player player) {
             GlossBoardMeta meta = selectedMeta(player);
-            return meta != null && meta.hideNumbers();
+            GlossBoardMeta.ActiveProfile profile = meta == null ? null : selectedProfile(player, meta);
+            return profile != null && profile.presentation().hideNumbers();
         }
 
-        private GlossBoardMeta.RenderPlan plan(GlossBoardMeta meta) {
-            return meta.renderPlan(TextPipeline.emojiGeneration(), MAX_LINES, staticRender);
+        private GlossBoardMeta.RenderPlan plan(GlossBoardMeta meta, GlossBoardMeta.ActiveProfile profile) {
+            return meta.renderPlan(profile.id(), profile.presentation(), TextPipeline.emojiGeneration(),
+                MAX_LINES, staticRender);
         }
     }
 }

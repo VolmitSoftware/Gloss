@@ -4,6 +4,9 @@ import art.arcane.gloss.Gloss;
 import art.arcane.gloss.GlossConfig;
 import art.arcane.gloss.api.HologramPresentation;
 import art.arcane.gloss.api.TemporaryHologram;
+import art.arcane.gloss.condition.BoundedConditionErrorCallback;
+import art.arcane.gloss.condition.GlossConditionContext;
+import art.arcane.gloss.condition.GlossConditionScope;
 import art.arcane.gloss.doc.DocumentDelta;
 import art.arcane.gloss.doc.DocumentRegistry;
 import art.arcane.gloss.doc.GlossDocument;
@@ -28,7 +31,6 @@ import org.bukkit.event.entity.EntityRegainHealthEvent;
 import org.bukkit.event.player.PlayerChangedWorldEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
-import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerRespawnEvent;
 import org.bukkit.util.Vector;
 
@@ -41,32 +43,30 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.function.Consumer;
 
 public final class DamageIndicatorsService implements Listener {
-    private static final String SHOW_PERMISSION = "gloss.indicators.show";
     private static final long DEBOUNCE_MS = 150L;
     private static final long SAMPLE_DELAY_TICKS = 2L;
     private static final int DRIVER_INTERVAL_TICKS = 2;
-    static final int PERMISSION_REFRESHES_PER_DRIVER = 16;
     private static final long BUDGET_WINDOW_MS = 1000L;
-    private static final long PERMISSION_REFRESH_INTERVAL_MS = 5000L;
     static final int MAX_LIVE_INDICATORS = 2048;
 
     private final Gloss plugin;
     private final ShippedDefaults defaults;
     private final DocumentRegistry<DamageIndicatorSettingsDoc> settings;
     private final Map<UUID, Long> debounce = new ConcurrentHashMap<>();
-    private final Map<UUID, Player> permissionViewers = new ConcurrentHashMap<>();
-    private final IndicatorPermissionCache viewerPermissions = new IndicatorPermissionCache();
     private final SlidingWindowRateLimiter rateLimiter = new SlidingWindowRateLimiter();
     private final Map<String, LiveIndicator> live = new ConcurrentHashMap<>();
     private final AtomicLong sequence = new AtomicLong();
     private final AtomicLong lifecycleEpoch = new AtomicLong();
     private final IndicatorBudget budget = new IndicatorBudget(BUDGET_WINDOW_MS);
     private final AdmissionBudget admissions = new AdmissionBudget(MAX_LIVE_INDICATORS);
+    private final BoundedConditionErrorCallback conditionErrors = BoundedConditionErrorCallback.bounded(
+        32, error -> Gloss.logExceptionStackThrottled(false,
+            "damage-indicator-condition-" + error.path(), error.cause(),
+            "Could not evaluate damage-indicator condition %s.", error.path()));
 
-    private volatile DamageIndicatorSettingsDoc activeSettings = DamageIndicatorSettingsDoc.DEFAULTS;
+    private volatile ActiveSettings activeSettings = ActiveSettings.defaults();
     private int driverTaskId = -1;
     private volatile boolean started;
     private volatile boolean listening;
@@ -99,8 +99,6 @@ public final class DamageIndicatorsService implements Listener {
         unregister();
         destroyAll();
         debounce.clear();
-        permissionViewers.clear();
-        viewerPermissions.clear();
         if (started) {
             plugin.watchdog().unregister(DamageIndicatorSettingsDoc.KIND);
             settings.close();
@@ -137,40 +135,30 @@ public final class DamageIndicatorsService implements Listener {
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onDamage(EntityDamageEvent event) {
-        DamageIndicatorSettingsDoc snapshot = activeSettings;
-        if (snapshot.damage().enabled()) {
-            sample(event.getEntity(), snapshot);
-        }
+        ActiveSettings snapshot = activeSettings;
+        sample(event.getEntity(), snapshot, DamageIndicatorEventSnapshot.damage(event, plugin));
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onRegainHealth(EntityRegainHealthEvent event) {
-        DamageIndicatorSettingsDoc snapshot = activeSettings;
-        if (snapshot.healing().enabled()) {
-            sample(event.getEntity(), snapshot);
-        }
+        ActiveSettings snapshot = activeSettings;
+        sample(event.getEntity(), snapshot, DamageIndicatorEventSnapshot.healing(event));
     }
 
     @EventHandler(priority = EventPriority.MONITOR)
     public void onViewerJoin(PlayerJoinEvent event) {
-        trackViewer(event.getPlayer());
-    }
-
-    @EventHandler(priority = EventPriority.MONITOR)
-    public void onViewerQuit(PlayerQuitEvent event) {
-        UUID playerId = event.getPlayer().getUniqueId();
-        permissionViewers.remove(playerId);
-        viewerPermissions.remove(playerId);
+        Player viewer = event.getPlayer();
+        reevaluateViewer(viewer);
     }
 
     @EventHandler(priority = EventPriority.MONITOR)
     public void onViewerChangedWorld(PlayerChangedWorldEvent event) {
-        scheduleViewerPermissionRefresh(event.getPlayer());
+        reevaluateViewer(event.getPlayer());
     }
 
     @EventHandler(priority = EventPriority.MONITOR)
     public void onViewerRespawn(PlayerRespawnEvent event) {
-        scheduleViewerPermissionRefresh(event.getPlayer());
+        reevaluateViewer(event.getPlayer());
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
@@ -179,7 +167,7 @@ public final class DamageIndicatorsService implements Listener {
         if (destination == null || sameChunk(event.getFrom(), destination)) {
             return;
         }
-        cacheViewerPermission(event.getPlayer());
+        reevaluateViewer(event.getPlayer());
     }
 
     private void register() {
@@ -190,7 +178,6 @@ public final class DamageIndicatorsService implements Listener {
         plugin.getServer().getPluginManager().registerEvents(this, plugin);
         listening = true;
         driverTaskId = plugin.scheduler().ar(this::drive, DRIVER_INTERVAL_TICKS);
-        seedViewerPermissions();
     }
 
     private void unregister() {
@@ -210,16 +197,12 @@ public final class DamageIndicatorsService implements Listener {
         if (plugin.cfg().indicators().enabled()) {
             if (!listening) {
                 register();
-            } else {
-                seedViewerPermissions();
             }
             return;
         }
         unregister();
         destroyAll();
         debounce.clear();
-        permissionViewers.clear();
-        viewerPermissions.clear();
     }
 
     private void loadSettings() {
@@ -251,9 +234,9 @@ public final class DamageIndicatorsService implements Listener {
     }
 
     private void applySettings(DamageIndicatorSettingsDoc updated) {
-        DamageIndicatorSettingsDoc previous = activeSettings;
-        activeSettings = updated;
-        if (listening && !previous.equals(updated)) {
+        ActiveSettings previous = activeSettings;
+        activeSettings = new ActiveSettings(updated, DamageIndicatorConditionPlan.compile(updated));
+        if (listening && !previous.document().equals(updated)) {
             lifecycleEpoch.incrementAndGet();
             destroyAll();
         }
@@ -275,10 +258,10 @@ public final class DamageIndicatorsService implements Listener {
                 indicator.retire(true);
             }
         }
-        refreshViewerPermissionCohort();
     }
 
-    private void sample(Entity entity, DamageIndicatorSettingsDoc snapshot) {
+    private void sample(Entity entity, ActiveSettings snapshot,
+                        DamageIndicatorEventSnapshot eventSnapshot) {
         GlossConfig.Indicators cfg = plugin.cfg().indicators();
         if (!cfg.enabled()) {
             return;
@@ -286,14 +269,8 @@ public final class DamageIndicatorsService implements Listener {
         if (!(entity instanceof LivingEntity living)) {
             return;
         }
-        if (snapshot.filters().disabledWorlds().contains(living.getWorld().getName())) {
-            return;
-        }
-        if (permissionViewers.isEmpty()) {
-            return;
-        }
         long now = nowMs();
-        if (budget.saturated(now, snapshot.limits().maxPerSecond())) {
+        if (budget.saturated(now, snapshot.document().limits().maxPerSecond())) {
             return;
         }
         if (!claimDebounce(debounce, living.getUniqueId(), now, DEBOUNCE_MS)) {
@@ -301,7 +278,8 @@ public final class DamageIndicatorsService implements Listener {
         }
 
         double before = living.getHealth();
-        FoliaScheduler.runEntity(plugin, living, () -> compare(living, before, snapshot), SAMPLE_DELAY_TICKS);
+        FoliaScheduler.runEntity(plugin, living,
+            () -> compare(living, before, snapshot, eventSnapshot), SAMPLE_DELAY_TICKS);
     }
 
     static boolean claimDebounce(Map<UUID, Long> debounce, UUID entityId, long nowMs, long windowMs) {
@@ -315,35 +293,42 @@ public final class DamageIndicatorsService implements Listener {
         return debounce.replace(entityId, existing, nowMs + windowMs);
     }
 
-    private void compare(LivingEntity living, double before, DamageIndicatorSettingsDoc snapshot) {
+    private void compare(LivingEntity living, double before, ActiveSettings snapshot,
+                         DamageIndicatorEventSnapshot eventSnapshot) {
         if (!listening || !plugin.cfg().indicators().enabled() || snapshot != activeSettings) {
             return;
         }
         double after = living.getHealth();
-        double delta = after - before;
-        if (Math.abs(delta) <= snapshot.limits().minimumDelta()) {
+        double amount = eventSnapshot.damage() ? before - after : after - before;
+        DamageIndicatorSettingsDoc document = snapshot.document();
+        if (amount <= document.limits().minimumDelta()) {
             return;
         }
-        boolean damage = delta < 0.0D;
-        DamageIndicatorSettingsDoc.Style style = damage ? snapshot.damage() : snapshot.healing();
-        if (!style.enabled()) {
+        Map<String, Object> values = eventSnapshot.values(living, plugin, amount);
+        GlossConditionContext context = new GlossConditionContext(
+            null, living, null, living.getLocation(), values);
+        DamageIndicatorSettingsDoc.IndicatorPresentation presentation = snapshot.conditions().select(
+            eventSnapshot.damage(), new GlossConditionScope(plugin, context), conditionErrors);
+        if (presentation == null) {
             return;
         }
-        int limit = snapshot.limits().maxPerSecond();
+        int limit = document.limits().maxPerSecond();
         if (!rateLimiter.tryAcquire(limit)) {
             return;
         }
         budget.record(nowMs(), limit);
-        spawn(living, Math.abs(delta), damage, snapshot, style);
+        spawn(living, amount, eventSnapshot.damage(), snapshot, presentation, values);
     }
 
     private void spawn(LivingEntity target, double amount, boolean damage,
-                       DamageIndicatorSettingsDoc snapshot, DamageIndicatorSettingsDoc.Style style) {
+                       ActiveSettings snapshot,
+                       DamageIndicatorSettingsDoc.IndicatorPresentation presentation,
+                       Map<String, Object> eventValues) {
         long spawnEpoch = lifecycleEpoch.get();
         if (!listening) {
             return;
         }
-        DamageIndicatorSettingsDoc.Limits limits = snapshot.limits();
+        DamageIndicatorSettingsDoc.Limits limits = snapshot.document().limits();
         AdmissionBudget.Lease admission = admissions.tryAcquire(
             liveLimit(limits.maxPerSecond(), limits.lifetimeMs()));
         if (admission == null) {
@@ -355,44 +340,52 @@ public final class DamageIndicatorsService implements Listener {
         boolean retained = false;
         try {
             Location anchor = target.getLocation();
-            Vector offset = style.offset();
-            DamageIndicatorSettingsDoc.Motion motion = style.motion();
-            DamageIndicatorSettingsDoc.Presentation presentation = style.presentation();
+            Vector offset = presentation.offset();
+            DamageIndicatorSettingsDoc.Motion motion = presentation.motion();
+            DamageIndicatorSettingsDoc.Transform transform = presentation.transform();
             double angleRadians = ThreadLocalRandom.current().nextDouble(Math.PI * 2.0D);
             double lifetimeSeconds = limits.lifetimeMs() / 1000.0D;
             long startedNanos = System.nanoTime();
             DamageIndicatorTrajectory.Frame initialFrame = DamageIndicatorTrajectory.sample(
-                offset, motion, presentation, angleRadians, 0.0D, lifetimeSeconds);
+                offset, motion, transform, angleRadians, 0.0D, lifetimeSeconds);
             Location initial = offsetFrom(anchor, initialFrame.x(), initialFrame.y(), initialFrame.z());
             id = (damage ? "dmg-" : "heal-") + target.getUniqueId() + "-"
                 + M.ms() + "-" + sequence.incrementAndGet();
             hologram = plugin.holograms().createTemporary(id, initial, limits.lifetimeMs());
             String formatted = IndicatorTextFormat.format(amount, limits.decimals());
-            hologram.addLine(style.format().replace("{amount}", formatted));
-            hideFromUnpermitted(target, hologram);
+            hologram.addLine(presentation.format().replace("{amount}", formatted));
+            hologram.viewers().whitelist();
 
             hologram.bindPosition(target, () -> {
                 DamageIndicatorTrajectory.Frame frame = DamageIndicatorTrajectory.sample(
-                    offset, motion, presentation, angleRadians,
+                    offset, motion, transform, angleRadians,
                     elapsedSeconds(startedNanos), lifetimeSeconds);
                 return offsetFrom(anchor, frame.x(), frame.y(), frame.z());
             });
             hologram.bindPresentation(target, () -> {
                 DamageIndicatorTrajectory.Frame frame = DamageIndicatorTrajectory.sample(
-                    offset, motion, presentation, angleRadians,
+                    offset, motion, transform, angleRadians,
                     elapsedSeconds(startedNanos), lifetimeSeconds);
                 return new HologramPresentation(
                     frame.scale(), frame.scale(), frame.scale(),
                     0.0D, 0.0D, frame.spinDegrees(), frame.opacity());
             });
 
-            candidate = new LiveIndicator(hologram, nowMs() + limits.lifetimeMs(), admission);
+            candidate = new LiveIndicator(
+                hologram,
+                nowMs() + limits.lifetimeMs(),
+                admission,
+                snapshot.conditions(),
+                eventValues,
+                anchor,
+                plugin.cfg().holograms().viewRange());
             live.put(id, candidate);
             if (!spawnStillCurrent(
                 listening, lifecycleEpoch.get(), spawnEpoch, plugin.cfg().indicators().enabled())) {
                 return;
             }
             retained = true;
+            scheduleAudience(candidate);
             GlossTelemetry.countIndicatorSpawn();
         } catch (RuntimeException failure) {
             Gloss.logExceptionStackThrottled(false, "damage-indicator-create", failure,
@@ -412,18 +405,6 @@ public final class DamageIndicatorsService implements Listener {
         }
     }
 
-    private void hideFromUnpermitted(LivingEntity target, TemporaryHologram hologram) {
-        double range = plugin.cfg().holograms().viewRange();
-        double rangeSquared = range * range;
-        Location anchor = target.getLocation();
-        Consumer<Player> hide = viewer -> {
-            if (!viewerPermissions.allowed(viewer.getUniqueId())) {
-                hologram.viewers().add(viewer.getUniqueId());
-            }
-        };
-        plugin.holograms().forEachNearbyViewer(anchor, rangeSquared, hide);
-    }
-
     private void destroyAll() {
         int failures = 0;
         for (Map.Entry<String, LiveIndicator> entry : live.entrySet()) {
@@ -437,57 +418,24 @@ public final class DamageIndicatorsService implements Listener {
         }
     }
 
-    private void seedViewerPermissions() {
-        for (Player viewer : plugin.getServer().getOnlinePlayers()) {
-            UUID playerId = viewer.getUniqueId();
-            permissionViewers.put(playerId, viewer);
-            if (!viewerPermissions.track(playerId)) {
-                viewerPermissions.makeDue(playerId);
-            }
+    private void scheduleAudience(LiveIndicator indicator) {
+        plugin.holograms().forEachNearbyViewer(
+            indicator.anchor, indicator.rangeSquared, viewer -> {
+                FoliaScheduler.runEntity(plugin, viewer, () -> {
+                    if (listening && viewer.isOnline()) {
+                        indicator.updateViewer(viewer);
+                    }
+                });
+            });
+    }
+
+    private void reevaluateViewer(Player viewer) {
+        if (!listening || !viewer.isOnline()) {
+            return;
         }
-    }
-
-    private void trackViewer(Player viewer) {
-        UUID playerId = viewer.getUniqueId();
-        permissionViewers.put(playerId, viewer);
-        viewerPermissions.track(playerId);
-        scheduleViewerPermissionRefresh(viewer);
-    }
-
-    private void refreshViewerPermissionCohort() {
-        long now = nowMs();
-        for (int index = 0; index < PERMISSION_REFRESHES_PER_DRIVER; index++) {
-            UUID playerId = viewerPermissions.claimNextRefresh(now, PERMISSION_REFRESH_INTERVAL_MS);
-            if (playerId == null) {
-                return;
-            }
-            Player viewer = permissionViewers.get(playerId);
-            if (viewer != null) {
-                scheduleClaimedViewerPermissionRefresh(viewer);
-            }
+        for (LiveIndicator indicator : live.values()) {
+            indicator.updateViewer(viewer);
         }
-    }
-
-    private void scheduleViewerPermissionRefresh(Player viewer) {
-        UUID playerId = viewer.getUniqueId();
-        viewerPermissions.defer(playerId, nowMs(), PERMISSION_REFRESH_INTERVAL_MS);
-        scheduleClaimedViewerPermissionRefresh(viewer);
-    }
-
-    private void scheduleClaimedViewerPermissionRefresh(Player viewer) {
-        UUID playerId = viewer.getUniqueId();
-        boolean accepted = FoliaScheduler.runEntity(plugin, viewer, () -> {
-            if (listening && viewer.isOnline()) {
-                cacheViewerPermission(viewer);
-            }
-        });
-        if (!accepted) {
-            viewerPermissions.makeDue(playerId);
-        }
-    }
-
-    private void cacheViewerPermission(Player viewer) {
-        viewerPermissions.update(viewer.getUniqueId(), viewer.hasPermission(SHOW_PERMISSION));
     }
 
     private static boolean sameChunk(Location first, Location second) {
@@ -531,16 +479,58 @@ public final class DamageIndicatorsService implements Listener {
         return Math.max(0L, System.nanoTime() - startedNanos) / 1_000_000_000.0D;
     }
 
-    private static final class LiveIndicator {
+    private record ActiveSettings(DamageIndicatorSettingsDoc document,
+                                  DamageIndicatorConditionPlan conditions) {
+        private static ActiveSettings defaults() {
+            DamageIndicatorSettingsDoc document = DamageIndicatorSettingsDoc.DEFAULTS;
+            return new ActiveSettings(document, DamageIndicatorConditionPlan.compile(document));
+        }
+    }
+
+    private final class LiveIndicator {
         private final TemporaryHologram hologram;
         private final long expiresAtMs;
         private final AdmissionBudget.Lease admission;
+        private final DamageIndicatorConditionPlan conditions;
+        private final Map<String, Object> eventValues;
+        private final Location anchor;
+        private final double rangeSquared;
         private final AtomicBoolean retired = new AtomicBoolean();
 
-        private LiveIndicator(TemporaryHologram hologram, long expiresAtMs, AdmissionBudget.Lease admission) {
+        private LiveIndicator(TemporaryHologram hologram, long expiresAtMs,
+                              AdmissionBudget.Lease admission,
+                              DamageIndicatorConditionPlan conditions,
+                              Map<String, Object> eventValues,
+                              Location anchor,
+                              double viewRange) {
             this.hologram = hologram;
             this.expiresAtMs = expiresAtMs;
             this.admission = admission;
+            this.conditions = conditions;
+            this.eventValues = Map.copyOf(eventValues);
+            this.anchor = anchor.clone();
+            this.rangeSquared = viewRange * viewRange;
+        }
+
+        private void updateViewer(Player viewer) {
+            if (retired.get()) {
+                return;
+            }
+            Location viewerLocation = viewer.getLocation();
+            if (viewerLocation.getWorld() != anchor.getWorld()
+                || viewerLocation.distanceSquared(anchor) > rangeSquared) {
+                hologram.viewers().remove(viewer.getUniqueId());
+                return;
+            }
+            GlossConditionContext context = new GlossConditionContext(
+                viewer, null, null, viewer.getLocation(), eventValues);
+            boolean included = conditions.includesViewer(
+                new GlossConditionScope(plugin, context), conditionErrors);
+            if (included) {
+                hologram.viewers().add(viewer.getUniqueId());
+            } else {
+                hologram.viewers().remove(viewer.getUniqueId());
+            }
         }
 
         private boolean retire(boolean destroy) {

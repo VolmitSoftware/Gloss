@@ -1,36 +1,50 @@
 package art.arcane.gloss.bubble;
 
-import java.util.Locale;
+import art.arcane.gloss.condition.BoundedConditionErrorCallback;
+import art.arcane.gloss.condition.CompiledCondition;
+import art.arcane.gloss.condition.ConditionCompiler;
+import art.arcane.gloss.condition.ConditionSource;
+import art.arcane.gloss.expr.ExprScope;
+
+import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Predicate;
-import java.util.regex.Pattern;
 
 public final class BubbleStyles {
     public static final String DEFAULT_STYLE_ID = "default";
     public static final String STYLE_PERMISSION_PREFIX = "gloss.bubbles.style.";
 
-    private static final int PATTERN_CACHE_LIMIT = 256;
-    private static final Map<String, Pattern> PATTERN_CACHE = new ConcurrentHashMap<>();
-
     private BubbleStyles() {
     }
 
-    public static String resolveStyleId(String chosenId, Predicate<String> permissionTest,
-                                        Map<String, BubbleStyleDoc> styles, String worldName, String primaryGroup) {
+    static Map<String, CompiledStyle> compile(Map<String, BubbleStyleDoc> styles) {
+        Map<String, CompiledStyle> compiled = new HashMap<>(styles.size());
+        for (Map.Entry<String, BubbleStyleDoc> entry : styles.entrySet()) {
+            BubbleStyleDoc.Select select = entry.getValue().select();
+            CompiledCondition condition = select == null ? null : ConditionCompiler.compile(new ConditionSource(
+                "bubbles/" + entry.getKey() + ".select.when", select.when()));
+            compiled.put(entry.getKey(), new CompiledStyle(entry.getValue(), condition));
+        }
+        return Map.copyOf(compiled);
+    }
+
+    static String resolveStyleId(String chosenId, Predicate<String> permissionTest,
+                                 Map<String, CompiledStyle> styles, ExprScope scope,
+                                 BoundedConditionErrorCallback errors) {
         if (chosenId != null && styles.containsKey(chosenId)
             && permissionTest.test(STYLE_PERMISSION_PREFIX + chosenId)) {
             return chosenId;
         }
         String matched = null;
         int matchedPriority = Integer.MIN_VALUE;
-        for (Map.Entry<String, BubbleStyleDoc> entry : styles.entrySet()) {
-            BubbleStyleDoc.Select select = entry.getValue().select();
-            if (select == null || !matches(select, worldName, primaryGroup)) {
+        for (Map.Entry<String, CompiledStyle> entry : styles.entrySet()) {
+            BubbleStyleDoc.Select select = entry.getValue().document().select();
+            CompiledCondition condition = entry.getValue().condition();
+            if (select == null || condition == null || !condition.matches(scope, errors)) {
                 continue;
             }
             if (matched == null || select.priority() > matchedPriority
-                || (select.priority() == matchedPriority && entry.getKey().compareTo(matched) < 0)) {
+                || select.priority() == matchedPriority && entry.getKey().compareTo(matched) < 0) {
                 matched = entry.getKey();
                 matchedPriority = select.priority();
             }
@@ -41,67 +55,6 @@ public final class BubbleStyles {
         return styles.containsKey(DEFAULT_STYLE_ID) ? DEFAULT_STYLE_ID : null;
     }
 
-    public static boolean matches(BubbleStyleDoc.Select select, String worldName, String primaryGroup) {
-        if (!select.worlds().isEmpty()) {
-            if (worldName == null) {
-                return false;
-            }
-            boolean worldMatched = false;
-            for (String pattern : select.worlds()) {
-                if (globMatches(pattern, worldName)) {
-                    worldMatched = true;
-                    break;
-                }
-            }
-            if (!worldMatched) {
-                return false;
-            }
-        }
-        if (!select.groups().isEmpty()) {
-            return primaryGroup != null && select.groups().contains(primaryGroup.toLowerCase(Locale.ROOT));
-        }
-        return true;
-    }
-
-    public static boolean globMatches(String pattern, String value) {
-        return compileGlob(pattern).matcher(value).matches();
-    }
-
-    public static void clearPatternCache() {
-        PATTERN_CACHE.clear();
-    }
-
-    private static Pattern compileGlob(String pattern) {
-        Pattern cached = PATTERN_CACHE.get(pattern);
-        if (cached != null) {
-            return cached;
-        }
-        Pattern compiled = Pattern.compile(globRegex(pattern));
-        if (PATTERN_CACHE.size() < PATTERN_CACHE_LIMIT) {
-            Pattern raced = PATTERN_CACHE.putIfAbsent(pattern, compiled);
-            return raced == null ? compiled : raced;
-        }
-        return compiled;
-    }
-
-    private static String globRegex(String pattern) {
-        StringBuilder regex = new StringBuilder(pattern.length() + 8);
-        StringBuilder literal = new StringBuilder();
-        for (int i = 0; i < pattern.length(); i++) {
-            char current = pattern.charAt(i);
-            if (current == '*' || current == '?') {
-                if (literal.length() > 0) {
-                    regex.append(Pattern.quote(literal.toString()));
-                    literal.setLength(0);
-                }
-                regex.append(current == '*' ? ".*" : ".");
-                continue;
-            }
-            literal.append(current);
-        }
-        if (literal.length() > 0) {
-            regex.append(Pattern.quote(literal.toString()));
-        }
-        return regex.toString();
+    record CompiledStyle(BubbleStyleDoc document, CompiledCondition condition) {
     }
 }

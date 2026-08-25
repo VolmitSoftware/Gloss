@@ -14,36 +14,39 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class BoardDocTest {
     @Test
-    void parseReadsTheV2Shape() {
+    void parseReadsSelectionPresentationAndCompleteVariants() {
         String json = """
             {
-              "schemaVersion": 1,
+              "schemaVersion": 2,
               "revision": 4,
-              "title": "&6Board",
-              "lines": ["a", "b"],
-              "primary": true,
-              "hideNumbers": true,
-              "permission": "staff",
-              "groups": ["vip"]
+              "select": {"priority": 40, "when": "viewer.world == 'arena'"},
+              "presentation": {"title": "&6Board", "lines": ["a", "b"], "hideNumbers": true},
+              "variants": [{
+                "id": "critical",
+                "priority": 100,
+                "when": "viewer.health < 5",
+                "presentation": {"title": "&cDanger", "lines": ["heal"], "hideNumbers": false}
+              }]
             }
             """;
 
-        BoardDoc doc = BoardDoc.parse("legacy.json", json);
+        BoardDoc doc = BoardDoc.parse("arena.json", json);
 
-        assertEquals(1, doc.schemaVersion());
+        assertEquals(2, doc.schemaVersion());
         assertEquals(4L, doc.revision());
-        assertEquals("&6Board", doc.title());
-        assertEquals(List.of("a", "b"), doc.lines());
-        assertTrue(doc.primary());
-        assertTrue(doc.hideNumbers());
-        assertEquals("staff", doc.permission());
-        assertEquals(List.of("vip"), doc.groups());
+        assertEquals(new BoardDoc.Selection(40, "viewer.world == 'arena'"), doc.select());
+        assertEquals(new BoardDoc.Presentation("&6Board", List.of("a", "b"), true), doc.presentation());
+        assertEquals("critical", doc.variants().getFirst().id());
+        assertEquals("&cDanger", doc.variants().getFirst().presentation().title());
     }
 
     @Test
     void gsonRoundTripPreservesAllFields() {
-        BoardDoc original = new BoardDoc(1, 12L, "&d&lArena", List.of("one", "two"), false, true,
-            "vip", List.of("mods"));
+        BoardDoc original = new BoardDoc(2, 12L,
+            new BoardDoc.Selection(10, "hasPermission('viewer', 'gloss.staff')"),
+            new BoardDoc.Presentation("&d&lArena", List.of("one", "two"), true),
+            List.of(new BoardDoc.Variant("low-health", 50, "viewer.health < 5",
+                new BoardDoc.Presentation("&cWarning", List.of("heal"), false))));
 
         BoardDoc decoded = BoardDoc.parse("arena.json", BukkitJson.GSON.toJson(original));
 
@@ -51,68 +54,70 @@ class BoardDocTest {
     }
 
     @Test
-    void legacyShapeWithoutEnvelopeIsRejected() {
-        String legacy = "{\"title\":\"&6Board\",\"content\":[\"a\",\"b\"],\"primary\":false,\"permission\":\"staff\"}";
+    void retiredV1ShapeIsRejected() {
+        String legacy = "{\"schemaVersion\":1,\"revision\":1,\"title\":\"Board\"}";
 
-        IllegalArgumentException failure = assertThrows(IllegalArgumentException.class,
-            () -> BoardDoc.parse("legacy.json", legacy));
-
-        assertTrue(failure.getMessage().contains("schemaVersion"));
-    }
-
-    @Test
-    void wrongSchemaVersionIsRejected() {
-        assertThrows(IllegalArgumentException.class,
-            () -> new BoardDoc(2, 1L, "t", List.of(), false, false, "default", List.of()));
+        assertThrows(IllegalArgumentException.class, () -> BoardDoc.parse("legacy.json", legacy));
     }
 
     @Test
     void revisionBoundsAreEnforced() {
         assertThrows(IllegalArgumentException.class,
-            () -> new BoardDoc(1, 0L, "t", List.of(), false, false, "default", List.of()));
+            () -> new BoardDoc(2, 0L, null, null, null));
         assertThrows(IllegalArgumentException.class,
-            () -> new BoardDoc(1, DocumentEnvelope.MAX_SAFE_REVISION + 1L, "t", List.of(), false, false,
-                "default", List.of()));
+            () -> new BoardDoc(2, DocumentEnvelope.MAX_SAFE_REVISION + 1L, null, null, null));
     }
 
     @Test
-    void missingCollectionsDefaultToEmpty() {
-        BoardDoc doc = BoardDoc.parse("bare.json", "{\"schemaVersion\":1,\"revision\":1}");
+    void missingFieldsUseNonSelectingEmptyDefaults() {
+        BoardDoc doc = BoardDoc.parse("bare.json", "{\"schemaVersion\":2,\"revision\":1}");
 
-        assertEquals("", doc.title());
-        assertEquals(List.of(), doc.lines());
-        assertFalse(doc.primary());
-        assertFalse(doc.hideNumbers());
-        assertEquals(GlossBoardMeta.UNRESTRICTED_PERMISSION, doc.permission());
-        assertEquals(List.of(), doc.groups());
+        assertEquals(BoardDoc.Selection.NEVER, doc.select());
+        assertEquals(BoardDoc.Presentation.EMPTY, doc.presentation());
+        assertEquals(List.of(), doc.variants());
+        assertFalse(doc.presentation().hideNumbers());
     }
 
     @Test
-    void groupsAreNormalizedLowercaseTrimmedAndDeduplicated() {
-        BoardDoc doc = new BoardDoc(1, 1L, "t", List.of(), false, false, "default",
-            Arrays.asList(" VIP ", "vip", "", null, "Mods"));
-
-        assertEquals(List.of("vip", "mods"), doc.groups());
+    void malformedAndNonBooleanConditionsAreRejectedAtLoad() {
+        assertThrows(IllegalArgumentException.class,
+            () -> new BoardDoc.Selection(1, "viewer.health <"));
+        assertThrows(IllegalArgumentException.class,
+            () -> new BoardDoc.Selection(1, "5 + 2"));
     }
 
     @Test
-    void permissionNormalizesLikeTheMeta() {
-        assertEquals("default", new BoardDoc(1, 1L, "t", List.of(), false, false, "  ", List.of()).permission());
-        assertEquals("vip", new BoardDoc(1, 1L, "t", List.of(), false, false, " VIP ", List.of()).permission());
+    void variantIdsMustBeUniqueAndSafe() {
+        BoardDoc.Presentation presentation = BoardDoc.Presentation.EMPTY;
+        BoardDoc.Variant first = new BoardDoc.Variant("alert", 1, "true", presentation);
+        BoardDoc.Variant duplicate = new BoardDoc.Variant("alert", 2, "true", presentation);
+
+        assertThrows(IllegalArgumentException.class,
+            () -> new BoardDoc(2, 1L, BoardDoc.Selection.NEVER, presentation, List.of(first, duplicate)));
+        assertThrows(IllegalArgumentException.class,
+            () -> new BoardDoc.Variant("bad id", 1, "true", presentation));
+    }
+
+    @Test
+    void nullPresentationTextAndLinesNormalize() {
+        BoardDoc.Presentation presentation = new BoardDoc.Presentation(null, Arrays.asList("one", null), true);
+
+        assertEquals("", presentation.title());
+        assertEquals(List.of("one", ""), presentation.lines());
+        assertTrue(presentation.hideNumbers());
+        assertThrows(UnsupportedOperationException.class, () -> presentation.lines().add("three"));
     }
 
     @Test
     void withRevisionOnlyChangesTheRevision() {
-        BoardDoc doc = new BoardDoc(1, 1L, "t", List.of("x"), true, true, "vip", List.of("mods"));
+        BoardDoc doc = new BoardDoc(2, 1L, new BoardDoc.Selection(7, "true"),
+            new BoardDoc.Presentation("t", List.of("x"), true), List.of());
 
         BoardDoc bumped = doc.withRevision(2L);
 
         assertEquals(2L, bumped.revision());
-        assertEquals(doc.title(), bumped.title());
-        assertEquals(doc.lines(), bumped.lines());
-        assertEquals(doc.primary(), bumped.primary());
-        assertEquals(doc.hideNumbers(), bumped.hideNumbers());
-        assertEquals(doc.permission(), bumped.permission());
-        assertEquals(doc.groups(), bumped.groups());
+        assertEquals(doc.select(), bumped.select());
+        assertEquals(doc.presentation(), bumped.presentation());
+        assertEquals(doc.variants(), bumped.variants());
     }
 }

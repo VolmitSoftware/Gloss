@@ -5,6 +5,8 @@ import art.arcane.gloss.api.HologramPresentation;
 import art.arcane.gloss.api.TemporaryHologram;
 import art.arcane.gloss.bubble.BubbleMotionPlan.BubbleMotionContext;
 import art.arcane.gloss.bubble.BubbleMotionPlan.BubbleMotionSample;
+import art.arcane.gloss.condition.BoundedConditionErrorCallback;
+import art.arcane.gloss.condition.GlossConditionScope;
 import art.arcane.gloss.doc.DocumentDelta;
 import art.arcane.gloss.doc.DocumentRegistry;
 import art.arcane.gloss.doc.GlossDocument;
@@ -28,7 +30,6 @@ import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.util.Vector;
 
 import java.io.File;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -52,135 +53,6 @@ public final class ChatBubblesService implements Listener {
     static final int EXPIRY_SWEEP_INTERVAL_TICKS = 20;
     private static final int MAX_BUBBLES_PER_SENDER = 4;
     private static final int MAX_ACTIVE_BUBBLES = 2048;
-    private static final byte[] LEGACY_DEFAULT = ("{\n"
-        + "  \"schemaVersion\": 1,\n"
-        + "  \"revision\": 1,\n"
-        + "  \"prefix\": \"&7\",\n"
-        + "  \"offset\": [0.0, 1.0, 0.0],\n"
-        + "  \"wordWrapChars\": 32,\n"
-        + "  \"lineStaggerTicks\": 5,\n"
-        + "  \"maxAliveMs\": 5000,\n"
-        + "  \"flyAway\": true,\n"
-        + "  \"followPlayer\": true,\n"
-        + "  \"hideOwn\": true\n"
-        + "}\n").getBytes(StandardCharsets.UTF_8);
-    private static final byte[] PREVIOUS_SCHEMA_TWO_DEFAULT = ("{\n"
-        + "  \"schemaVersion\": 2,\n"
-        + "  \"revision\": 1,\n"
-        + "  \"prefix\": \"&7\",\n"
-        + "  \"offset\": [0.0, 1.0, 0.0],\n"
-        + "  \"wordWrapChars\": 32,\n"
-        + "  \"maxAliveMs\": 5000,\n"
-        + "  \"followPlayer\": true,\n"
-        + "  \"hideOwn\": true,\n"
-        + "  \"motion\": {\n"
-        + "    \"translation\": {\n"
-        + "      \"x\": \"0\",\n"
-        + "      \"y\": \"10 * pow(clamp((ageMs - lifetimeMs + 2000) / 2000, 0, 1), 16)\",\n"
-        + "      \"z\": \"0\"\n"
-        + "    },\n"
-        + "    \"scale\": {\n"
-        + "      \"x\": \"1\",\n"
-        + "      \"y\": \"1\",\n"
-        + "      \"z\": \"1\"\n"
-        + "    },\n"
-        + "    \"rotation\": {\n"
-        + "      \"x\": \"0\",\n"
-        + "      \"y\": \"0\",\n"
-        + "      \"z\": \"0\"\n"
-        + "    },\n"
-        + "    \"opacity\": \"1\"\n"
-        + "  },\n"
-        + "  \"shimmer\": {\n"
-        + "    \"spawn\": true,\n"
-        + "    \"flyAway\": true,\n"
-        + "    \"color\": \"#ffffff\",\n"
-        + "    \"width\": 3,\n"
-        + "    \"durationMs\": 700,\n"
-        + "    \"spawnDelayMs\": 0,\n"
-        + "    \"flyAwayLeadMs\": 700\n"
-        + "  }\n"
-        + "}\n").getBytes(StandardCharsets.UTF_8);
-    private static final byte[] PREVIOUS_HEIGHT_DEFAULT = new String(
-        PREVIOUS_SCHEMA_TWO_DEFAULT, StandardCharsets.UTF_8)
-        .replace("\"spawnDelayMs\": 0", "\"spawnDelayMs\": 400")
-        .getBytes(StandardCharsets.UTF_8);
-    private static final byte[] PREVIOUS_TWO_TONE_DEFAULT = ("{\n"
-        + "  \"schemaVersion\": 2,\n"
-        + "  \"revision\": 1,\n"
-        + "  \"prefix\": \"&7\",\n"
-        + "  \"offset\": [0.0, 1.0, 0.0],\n"
-        + "  \"wordWrapChars\": 32,\n"
-        + "  \"maxAliveMs\": 5000,\n"
-        + "  \"followPlayer\": true,\n"
-        + "  \"hideOwn\": true,\n"
-        + "  \"motion\": {\n"
-        + "    \"translation\": {\n"
-        + "      \"x\": \"0\",\n"
-        + "      \"y\": \"10 * pow(clamp((ageMs - lifetimeMs + 2000) / 2000, 0, 1), 16)\",\n"
-        + "      \"z\": \"0\"\n"
-        + "    },\n"
-        + "    \"scale\": {\n"
-        + "      \"x\": \"1\",\n"
-        + "      \"y\": \"1\",\n"
-        + "      \"z\": \"1\"\n"
-        + "    },\n"
-        + "    \"rotation\": {\n"
-        + "      \"x\": \"0\",\n"
-        + "      \"y\": \"0\",\n"
-        + "      \"z\": \"0\"\n"
-        + "    },\n"
-        + "    \"opacity\": \"1\"\n"
-        + "  },\n"
-        + "  \"shimmer\": {\n"
-        + "    \"spawn\": true,\n"
-        + "    \"flyAway\": false,\n"
-        + "    \"color\": \"#ffffff\",\n"
-        + "    \"edgeColor\": \"#aaaaaa\",\n"
-        + "    \"width\": 3,\n"
-        + "    \"durationMs\": 4233,\n"
-        + "    \"spawnDelayMs\": 0,\n"
-        + "    \"flyAwayLeadMs\": 700\n"
-        + "  }\n"
-        + "}\n").getBytes(StandardCharsets.UTF_8);
-    private static final byte[] PREVIOUS_LEGACY_CYCLE_DEFAULT = ("{\n"
-        + "  \"schemaVersion\": 2,\n"
-        + "  \"revision\": 1,\n"
-        + "  \"prefix\": \"&7\",\n"
-        + "  \"offset\": [0.0, 1.0, 0.0],\n"
-        + "  \"wordWrapChars\": 32,\n"
-        + "  \"maxAliveMs\": 5000,\n"
-        + "  \"followPlayer\": true,\n"
-        + "  \"hideOwn\": true,\n"
-        + "  \"motion\": {\n"
-        + "    \"translation\": {\n"
-        + "      \"x\": \"0\",\n"
-        + "      \"y\": \"10 * pow(clamp((ageMs - lifetimeMs + 2000) / 2000, 0, 1), 16)\",\n"
-        + "      \"z\": \"0\"\n"
-        + "    },\n"
-        + "    \"scale\": {\n"
-        + "      \"x\": \"1\",\n"
-        + "      \"y\": \"1\",\n"
-        + "      \"z\": \"1\"\n"
-        + "    },\n"
-        + "    \"rotation\": {\n"
-        + "      \"x\": \"0\",\n"
-        + "      \"y\": \"0\",\n"
-        + "      \"z\": \"0\"\n"
-        + "    },\n"
-        + "    \"opacity\": \"1\"\n"
-        + "  },\n"
-        + "  \"shimmer\": {\n"
-        + "    \"spawn\": true,\n"
-        + "    \"flyAway\": false,\n"
-        + "    \"color\": \"#ffffff\",\n"
-        + "    \"width\": 3,\n"
-        + "    \"durationMs\": 4233,\n"
-        + "    \"spawnDelayMs\": 0,\n"
-        + "    \"flyAwayLeadMs\": 700\n"
-        + "  }\n"
-        + "}\n").getBytes(StandardCharsets.UTF_8);
-
     private final Gloss plugin;
     private final ShippedDefaults defaults;
     private final DocumentRegistry<BubbleStyleDoc> registry;
@@ -191,6 +63,7 @@ public final class ChatBubblesService implements Listener {
     private final AtomicLong bubbleSequence = new AtomicLong();
     private final AtomicInteger activeBubbles = new AtomicInteger();
     private final File stateFile;
+    private final BoundedConditionErrorCallback conditionErrors;
 
     private volatile Map<String, GlossDocument<BubbleStyleDoc>> stylesSource;
     private volatile StyleSnapshot stylesDerived = new StyleSnapshot(Map.of(), Map.of());
@@ -205,6 +78,9 @@ public final class ChatBubblesService implements Listener {
         this.registry = DocumentRegistry.folder(BubbleStyleDoc.KIND, folder, BubbleStyleDoc::parse,
             BubbleStyleDoc::revision);
         this.stateFile = new File(plugin.getDataFolder(), STATE_FILE_NAME);
+        this.conditionErrors = BoundedConditionErrorCallback.bounded(100, error ->
+            Gloss.logExceptionStackThrottled(false, "bubble-condition-" + error.path(), error.cause(),
+                "Bubble condition %s failed and was treated as false.", error.path()));
     }
 
     /**
@@ -234,14 +110,6 @@ public final class ChatBubblesService implements Listener {
         startDriver();
     }
 
-    static boolean upgradeLegacyDefault(ShippedDefaults defaults) {
-        return defaults.replaceIfExact("default", LEGACY_DEFAULT)
-            || defaults.replaceIfExact("default", PREVIOUS_SCHEMA_TWO_DEFAULT)
-            || defaults.replaceIfExact("default", PREVIOUS_HEIGHT_DEFAULT)
-            || defaults.replaceIfExact("default", PREVIOUS_TWO_TONE_DEFAULT)
-            || defaults.replaceIfExact("default", PREVIOUS_LEGACY_CYCLE_DEFAULT);
-    }
-
     private void pollRegistry() {
         DocumentDelta delta = registry.poll();
         if (!delta.isEmpty()) {
@@ -265,7 +133,6 @@ public final class ChatBubblesService implements Listener {
             extractDefaults();
         }
         registry.reload();
-        BubbleStyles.clearPatternCache();
         if (!enabled) {
             stopDriver();
             destroyAll();
@@ -283,9 +150,6 @@ public final class ChatBubblesService implements Listener {
 
     private void extractDefaults() {
         defaults.extractMissing();
-        if (upgradeLegacyDefault(defaults)) {
-            Gloss.info("Upgraded the untouched bubble default to the current shipped style.");
-        }
     }
 
     public int activeCount() {
@@ -387,9 +251,9 @@ public final class ChatBubblesService implements Listener {
     private ResolvedStyle resolveStyle(Player sender) {
         StyleSnapshot snapshot = stylesSnapshot();
         String chosen = playerStyles.get(sender.getUniqueId());
-        String primaryGroup = plugin.groups().primaryGroupFor(sender).orElse(null);
-        String resolved = BubbleStyles.resolveStyleId(chosen, sender::hasPermission, snapshot.documents(),
-            sender.getWorld().getName(), primaryGroup);
+        GlossConditionScope scope = GlossConditionScope.subject(plugin, sender);
+        String resolved = BubbleStyles.resolveStyleId(chosen, sender::hasPermission, snapshot.selections(),
+            scope, conditionErrors);
         ResolvedStyle style = resolved == null ? null : snapshot.resolved().get(resolved);
         return style == null ? ResolvedStyle.DEFAULT : style;
     }
@@ -409,7 +273,7 @@ public final class ChatBubblesService implements Listener {
                 "bubble style '" + entry.getKey() + "' revision " + document.revision()),
                 BubbleShimmerPlan.compile(document.shimmer())));
         }
-        StyleSnapshot snapshot = new StyleSnapshot(Map.copyOf(derived), Map.copyOf(resolved));
+        StyleSnapshot snapshot = new StyleSnapshot(Map.copyOf(resolved), BubbleStyles.compile(derived));
         stylesDerived = snapshot;
         stylesSource = documents;
         return snapshot;
@@ -874,7 +738,8 @@ public final class ChatBubblesService implements Listener {
     record SenderPublication(SenderState state, BubbleRecord retired) {
     }
 
-    private record StyleSnapshot(Map<String, BubbleStyleDoc> documents, Map<String, ResolvedStyle> resolved) {
+    private record StyleSnapshot(Map<String, ResolvedStyle> resolved,
+                                 Map<String, BubbleStyles.CompiledStyle> selections) {
     }
 
     private record ResolvedStyle(BubbleStyleDoc document, BubbleMotionPlan motion, BubbleShimmerPlan shimmer) {

@@ -1,10 +1,6 @@
 package art.arcane.gloss.drop;
 
 import art.arcane.gloss.GlossConfig;
-import art.arcane.volmlib.util.bukkit.json.BukkitJson;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -14,7 +10,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -25,103 +20,9 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class RealDropDocumentScriptTest {
-    /**
-     * The exact shipped document as it stood before the physics and script blocks existed. Any
-     * operator file written against that format must keep parsing to the same runtime settings.
-     */
-    private static final String LEGACY_DOCUMENT = """
-        {
-          "schemaVersion": 1,
-          "revision": 1,
-          "limits": {
-            "updateIntervalTicks": 2,
-            "settledPollIntervalTicks": 20,
-            "maxVisualsPerStack": 3,
-            "maxVisualsPerChunk": 128,
-            "viewRange": 32.0,
-            "spread": 0.18
-          },
-          "scale": {
-            "defaultScale": 0.4,
-            "flatItems": 0.65,
-            "thinBlocks": 0.45
-          },
-          "motion": {
-            "tumble": true,
-            "speedMultiplier": 1.35,
-            "degreesPerSecondX": 160.0,
-            "degreesPerSecondY": 120.0,
-            "degreesPerSecondZ": 100.0,
-            "variance": 0.2,
-            "changeOnBounce": true,
-            "velocityInfluence": 0.35,
-            "submergedSpinMultiplier": 0.35,
-            "groundRollMultiplier": 1.0
-          },
-          "landing": {
-            "mode": "NATURAL",
-            "tiltDegrees": 10.0,
-            "randomYaw": true,
-            "transitionTicks": 4,
-            "faceAttraction": 0.55,
-            "movingFaceAttraction": 0.15,
-            "alignmentDegrees": 0.5,
-            "settleDelayTicks": 4
-          },
-          "labels": {
-            "enabled": true,
-            "yOffset": 0.55,
-            "scale": 0.85,
-            "viewRange": 32.0,
-            "billboard": "CENTER",
-            "seeThrough": true,
-            "shadow": true,
-            "background": true,
-            "backgroundRed": 0,
-            "backgroundGreen": 0,
-            "backgroundBlue": 0,
-            "backgroundAlpha": 80
-          },
-          "filters": {
-            "disabledWorlds": [],
-            "materialBlacklist": [
-              "BEDROCK",
-              "BARRIER"
-            ],
-            "onlyPlayerDrops": false
-          }
-        }
-        """;
-
-    @Test
-    void aDocumentWithNoScriptBlockRoundTripsEveryKeyItDeclaresUnchanged() {
-        RealDropSettingsDoc parsed = RealDropSettingsDoc.parse("default.json", LEGACY_DOCUMENT);
-
-        JsonObject original = JsonParser.parseString(LEGACY_DOCUMENT).getAsJsonObject();
-        JsonObject reserialized = JsonParser.parseString(BukkitJson.GSON.toJson(parsed)).getAsJsonObject();
-        for (Map.Entry<String, JsonElement> entry : original.entrySet()) {
-            assertEquals(entry.getValue(), reserialized.get(entry.getKey()),
-                "real-drops key '" + entry.getKey() + "' did not survive the round trip");
-        }
-    }
-
-    @Test
-    void aDocumentWithNoScriptBlockKeepsTheExactRuntimeSettingsItAlwaysHad() {
-        GlossConfig.RealDrops legacy = RealDropSettingsDoc.parse("default.json", LEGACY_DOCUMENT).toConfig(true);
-        GlossConfig.RealDrops bare = RealDropSettingsDoc
-            .parse("default.json", "{\"schemaVersion\":1,\"revision\":1}").toConfig(true);
-
-        assertEquals(bare.limits(), legacy.limits());
-        assertEquals(bare.scale(), legacy.scale());
-        assertEquals(bare.motion(), legacy.motion());
-        assertEquals(bare.landing(), legacy.landing());
-        assertEquals(bare.labels(), legacy.labels());
-        assertEquals(bare.filters(), legacy.filters());
-    }
-
     @Test
     void absentScriptAndPhysicsBlocksResolveToTheDisabledNeutralDefaults() {
-        RealDropSettingsDoc parsed = RealDropSettingsDoc.parse("default.json", LEGACY_DOCUMENT);
+        RealDropSettingsDoc parsed = RealDropSettingsDoc.parse("default.json", document("{}"));
         GlossConfig.RealDrops config = parsed.toConfig(true);
 
         assertFalse(config.physics().enabled());
@@ -153,10 +54,8 @@ class RealDropDocumentScriptTest {
 
     @Test
     void physicsValuesAreClampedAtTheDocumentBoundary() {
-        GlossConfig.RealDrops.Physics physics = RealDropSettingsDoc.parse("default.json", """
+        GlossConfig.RealDrops.Physics physics = RealDropSettingsDoc.parse("default.json", document("""
             {
-              "schemaVersion": 1,
-              "revision": 3,
               "physics": {
                 "enabled": true,
                 "gravityMultiplier": 99,
@@ -165,7 +64,7 @@ class RealDropDocumentScriptTest {
                 "waterDrag": 0.35
               }
             }
-            """).toConfig(true).physics();
+            """)).toConfig(true).physics();
 
         assertTrue(physics.enabled());
         assertEquals(4.0F, physics.gravityMultiplier());
@@ -176,10 +75,8 @@ class RealDropDocumentScriptTest {
 
     @Test
     void aScriptBlockParsesItsExpressionsAndKeepsVarDeclarationOrder() {
-        GlossConfig.RealDrops.Script script = RealDropSettingsDoc.parse("default.json", """
+        GlossConfig.RealDrops.Script script = RealDropSettingsDoc.parse("default.json", document("""
             {
-              "schemaVersion": 1,
-              "revision": 7,
               "script": {
                 "enabled": true,
                 "vars": {
@@ -194,7 +91,7 @@ class RealDropDocumentScriptTest {
                 "visible": "amount > 1"
               }
             }
-            """).toConfig(true).script();
+            """)).toConfig(true).script();
 
         assertTrue(script.enabled());
         assertEquals(List.of("zeta", "alpha", "middle"),
@@ -212,13 +109,11 @@ class RealDropDocumentScriptTest {
     @Test
     void aBrokenExpressionIsRefusedWithTheFileTheFieldAndThePosition() {
         IllegalArgumentException failure = assertThrows(IllegalArgumentException.class,
-            () -> RealDropSettingsDoc.parse("default.json", """
+            () -> RealDropSettingsDoc.parse("default.json", document("""
                 {
-                  "schemaVersion": 1,
-                  "revision": 2,
                   "script": { "enabled": true, "offset": { "y": "sin(t" } }
                 }
-                """));
+                """)));
 
         assertTrue(failure.getMessage().startsWith("default.json "), failure.getMessage());
         assertTrue(failure.getMessage().contains("script.offset.y"), failure.getMessage());
@@ -228,13 +123,11 @@ class RealDropDocumentScriptTest {
     @Test
     void aBrokenExpressionIsRefusedEvenWhileTheScriptIsDisabled() {
         IllegalArgumentException failure = assertThrows(IllegalArgumentException.class,
-            () -> RealDropSettingsDoc.parse("default.json", """
+            () -> RealDropSettingsDoc.parse("default.json", document("""
                 {
-                  "schemaVersion": 1,
-                  "revision": 2,
                   "script": { "enabled": false, "scale": { "x": "nonsense * 2" } }
                 }
-                """));
+                """)));
 
         assertTrue(failure.getMessage().contains("script.scale.x"), failure.getMessage());
         assertTrue(failure.getMessage().contains("unknown variable 'nonsense'"), failure.getMessage());
@@ -243,24 +136,20 @@ class RealDropDocumentScriptTest {
     @Test
     void anEmptyOrNamelessVariableIsRefused() {
         IllegalArgumentException blank = assertThrows(IllegalArgumentException.class,
-            () -> RealDropSettingsDoc.parse("default.json", """
+            () -> RealDropSettingsDoc.parse("default.json", document("""
                 {
-                  "schemaVersion": 1,
-                  "revision": 2,
                   "script": { "enabled": true, "vars": { "wobble": "   " } }
                 }
-                """));
+                """)));
         assertTrue(blank.getMessage().contains("script.vars.wobble must be a non-blank expression"),
             blank.getMessage());
 
         IllegalArgumentException nameless = assertThrows(IllegalArgumentException.class,
-            () -> RealDropSettingsDoc.parse("default.json", """
+            () -> RealDropSettingsDoc.parse("default.json", document("""
                 {
-                  "schemaVersion": 1,
-                  "revision": 2,
                   "script": { "enabled": true, "vars": { "  ": "1" } }
                 }
-                """));
+                """)));
         assertTrue(nameless.getMessage().contains("script.vars declares an entry with no name"),
             nameless.getMessage());
     }
@@ -274,11 +163,10 @@ class RealDropDocumentScriptTest {
             }
             vars.append("\"v").append(index).append("\": \"1\"");
         }
-        String document = "{\"schemaVersion\":1,\"revision\":2,\"script\":{\"enabled\":true,\"vars\":{"
-            + vars + "}}}";
+        String raw = document("{\"script\":{\"enabled\":true,\"vars\":{" + vars + "}}}");
 
         IllegalArgumentException failure = assertThrows(IllegalArgumentException.class,
-            () -> RealDropSettingsDoc.parse("default.json", document));
+            () -> RealDropSettingsDoc.parse("default.json", raw));
 
         assertTrue(failure.getMessage().contains("the limit is " + RealDropSettingsDoc.Script.MAX_VARS),
             failure.getMessage());
@@ -313,6 +201,11 @@ class RealDropDocumentScriptTest {
             }
         }
         return examples;
+    }
+
+    private static String document(String presentation) {
+        return "{\"schemaVersion\":2,\"revision\":1,\"presentation\":" + presentation
+            + ",\"variants\":[],\"audience\":{\"when\":\"true\"}}";
     }
 
     private static String shippedDefault() throws IOException {

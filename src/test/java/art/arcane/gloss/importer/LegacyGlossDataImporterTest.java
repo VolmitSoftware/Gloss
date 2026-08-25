@@ -1,7 +1,6 @@
 package art.arcane.gloss.importer;
 
 import art.arcane.gloss.animation.AnimationDoc;
-import art.arcane.gloss.board.BoardDoc;
 import art.arcane.gloss.bubble.BubbleStyleDoc;
 import art.arcane.gloss.config.GlossConfigFile;
 import art.arcane.gloss.config.GlossConfigLoader;
@@ -9,7 +8,6 @@ import art.arcane.gloss.doc.DocumentEnvelope;
 import art.arcane.gloss.emoji.EmojiDoc;
 import art.arcane.gloss.hologram.HologramDoc;
 import art.arcane.gloss.motd.MotdDoc;
-import art.arcane.gloss.tab.TablistDoc;
 import art.arcane.volmlib.util.bukkit.json.BukkitJson;
 import org.bukkit.util.Vector;
 import org.junit.jupiter.api.BeforeEach;
@@ -38,14 +36,6 @@ class LegacyGlossDataImporterTest {
           "y": 70.0,
           "z": -4.25,
           "lines": ["&aWelcome", "&7Second line"]
-        }
-        """;
-    private static final String LEGACY_BOARD = """
-        {
-          "title": "&6Main",
-          "content": ["&fLine one", "&7Line two"],
-          "primary": true,
-          "permission": "vip.board"
         }
         """;
     private static final String LEGACY_EMOJI_HEART = """
@@ -101,20 +91,6 @@ class LegacyGlossDataImporterTest {
     }
 
     @Test
-    void boardMigratesContentToLinesWithEmptyGroups() throws IOException {
-        write("boards/main.json", LEGACY_BOARD);
-        GlossConfigFile config = loader.loadForBoot();
-
-        LegacyGlossDataImporter.Result result = importer().run(config);
-
-        assertEquals(LegacyGlossDataImporter.Status.MIGRATED, status(result, "boards/main.json"));
-        BoardDoc expected = new BoardDoc(BoardDoc.CURRENT_SCHEMA_VERSION, DocumentEnvelope.INITIAL_REVISION,
-            "&6Main", List.of("&fLine one", "&7Line two"), true, false, "vip.board", List.of());
-        assertEquals(document(expected), read("boards/main.json"));
-        assertEquals(LEGACY_BOARD, backedUp(result, "boards/main.json"));
-    }
-
-    @Test
     void emojiMigratesAndClearsTheLegacyNoTriggerSentinel() throws IOException {
         write("emoji/heart.json", LEGACY_EMOJI_HEART);
         write("emoji/airplane.json", LEGACY_EMOJI_NO_TRIGGER);
@@ -158,61 +134,17 @@ class LegacyGlossDataImporterTest {
     @Test
     void secondRunIsIdempotentByConstruction() throws IOException {
         write("holograms/spawn.json", LEGACY_HOLOGRAM);
-        write("boards/main.json", LEGACY_BOARD);
         GlossConfigFile config = loader.loadForBoot();
         LegacyGlossDataImporter importer = importer();
         importer.run(config);
         String hologramAfterFirst = read("holograms/spawn.json");
-        String boardAfterFirst = read("boards/main.json");
 
         LegacyGlossDataImporter.Result rerun = importer.run(config);
 
         assertEquals(LegacyGlossDataImporter.Status.SKIPPED_ENVELOPE, status(rerun, "holograms/spawn.json"));
-        assertEquals(LegacyGlossDataImporter.Status.SKIPPED_ENVELOPE, status(rerun, "boards/main.json"));
         assertEquals(hologramAfterFirst, read("holograms/spawn.json"));
-        assertEquals(boardAfterFirst, read("boards/main.json"));
         assertEquals(0, rerun.count(LegacyGlossDataImporter.Status.MIGRATED));
         assertNull(rerun.backupPath());
-    }
-
-    @Test
-    void groupsAbsorbIntoTablistFormatsAndBoardGroupsThenMoveToTheBackup() throws IOException {
-        write("boards/main.json", LEGACY_BOARD);
-        write("groups/vip.yml", "tablist-name: \"&6[VIP] $player\"\ndefault-board: \"main\"\n");
-        write("groups/_op.yml", "tablist-name: \"&6$player\"\n");
-        GlossConfigFile config = loader.loadForBoot();
-
-        LegacyGlossDataImporter.Result result = importer().run(config);
-
-        assertEquals(LegacyGlossDataImporter.Status.ABSORBED, status(result, "groups/vip.yml"));
-        assertEquals(LegacyGlossDataImporter.Status.ABSORBED, status(result, "groups/_op.yml"));
-
-        TablistDoc tablist = TablistDoc.parse("tablist.json", read("tablist.json"));
-        assertEquals(2L, tablist.revision(), "tablist merge must bump the revision");
-        assertEquals("&6[VIP] $player", tablist.nameFormats().get("vip"));
-        assertEquals("&6$player", tablist.nameFormats().get("_op"));
-        assertEquals("$player", tablist.nameFormats().get("default"), "shipped formats must be preserved");
-        assertTrue(tablist.useHeaderFooter(), "shipped tablist fields must be preserved");
-
-        BoardDoc board = BoardDoc.parse("main.json", read("boards/main.json"));
-        assertEquals(List.of("vip"), board.groups());
-        assertEquals(2L, board.revision(), "board group append must bump the revision");
-
-        assertFalse(Files.exists(dataFolder.resolve("groups")), "groups/ must be fully absorbed");
-        assertNotNull(result.backupPath());
-        assertTrue(Files.isRegularFile(Path.of(result.backupPath()).resolve("groups/vip.yml")));
-    }
-
-    @Test
-    void groupWithMissingDefaultBoardIsNotedAndStillAbsorbed() throws IOException {
-        write("groups/vip.yml", "default-board: \"nosuchboard\"\n");
-        GlossConfigFile config = loader.loadForBoot();
-
-        LegacyGlossDataImporter.Result result = importer().run(config);
-
-        assertEquals(1, result.count(LegacyGlossDataImporter.Status.SKIPPED_NOTE));
-        assertEquals(LegacyGlossDataImporter.Status.ABSORBED, status(result, "groups/vip.yml"));
-        assertFalse(Files.exists(dataFolder.resolve("groups")));
     }
 
     @Test
@@ -269,13 +201,6 @@ class LegacyGlossDataImporterTest {
 
         String toml = read(GlossConfigLoader.FILE_NAME);
         assertTrue(toml.contains("stackDistance = 0.5"), "overlay must re-serialize gloss.toml");
-
-        TablistDoc tablist = TablistDoc.parse("tablist.json", read("tablist.json"));
-        assertFalse(tablist.useHeaderFooter());
-        assertEquals("&5Legacy Header", tablist.header());
-        assertEquals("&7Legacy Footer", tablist.footer());
-        assertFalse(tablist.groupListNames());
-        assertEquals(2L, tablist.revision());
 
         BubbleStyleDoc bubbles = BubbleStyleDoc.parse("default.json", read("bubbles/default.json"));
         assertEquals("&b", bubbles.prefix());

@@ -1,6 +1,8 @@
 package art.arcane.gloss.tab;
 
 import art.arcane.gloss.Gloss;
+import art.arcane.gloss.condition.BoundedConditionErrorCallback;
+import art.arcane.gloss.condition.GlossConditionScope;
 import art.arcane.gloss.doc.DocumentDelta;
 import art.arcane.gloss.doc.DocumentRegistry;
 import art.arcane.gloss.doc.GlossDocument;
@@ -23,7 +25,6 @@ import org.bukkit.event.player.PlayerRespawnEvent;
 import java.io.File;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -53,16 +54,18 @@ public final class TablistService implements Listener {
     private final Map<UUID, AppliedHeaderFooter> appliedHeaderFooters;
     private final Map<UUID, ListNameSource> listNameSources;
     private final Map<UUID, PlayerApplyQueue> playerApplyQueues;
+    private final Map<String, HeaderFooterMemo> headerFooterMemos;
     private final Set<UUID> fastOverridePlayers;
     private final Set<UUID> fastNamePlayers;
     private final Set<UUID> fastPlayers;
     private final FastDriverLifecycle fastDriverLifecycle;
     private final AtomicLong docGeneration;
     private final AtomicLong driverEpoch;
+    private final BoundedConditionErrorCallback conditionErrors;
     private volatile TablistDoc activeDoc;
+    private volatile TablistRuntime activeRuntime;
     private volatile int driverTaskId;
     private volatile int driverIntervalTicks;
-    private volatile HeaderFooterMemo headerFooterMemo;
     private volatile boolean running;
 
     public TablistService(Gloss plugin) {
@@ -76,13 +79,18 @@ public final class TablistService implements Listener {
         this.appliedHeaderFooters = new ConcurrentHashMap<>();
         this.listNameSources = new ConcurrentHashMap<>();
         this.playerApplyQueues = new ConcurrentHashMap<>();
+        this.headerFooterMemos = new ConcurrentHashMap<>();
         this.fastOverridePlayers = ConcurrentHashMap.newKeySet();
         this.fastNamePlayers = ConcurrentHashMap.newKeySet();
         this.fastPlayers = ConcurrentHashMap.newKeySet();
         this.fastDriverLifecycle = new FastDriverLifecycle();
         this.docGeneration = new AtomicLong();
         this.driverEpoch = new AtomicLong();
+        this.conditionErrors = BoundedConditionErrorCallback.bounded(100, error ->
+            Gloss.logExceptionStackThrottled(false, "tablist-condition-" + error.path(), error.cause(),
+                "Tablist condition %s failed and was treated as false.", error.path()));
         this.activeDoc = TablistDoc.DEFAULTS;
+        this.activeRuntime = TablistRuntime.compile(activeDoc);
         this.driverTaskId = -1;
         this.driverIntervalTicks = -1;
     }
@@ -115,23 +123,6 @@ public final class TablistService implements Listener {
         return out.toString();
     }
 
-    public static ListNameChoice chooseListName(boolean op, String primaryGroup, Map<String, String> nameFormats) {
-        if (op && nameFormats.containsKey(TablistDoc.OP_GROUP_KEY)) {
-            return new ListNameChoice(nameFormats.get(TablistDoc.OP_GROUP_KEY), TablistDoc.OP_GROUP_KEY);
-        }
-        if (primaryGroup != null && !primaryGroup.isBlank()) {
-            String groupKey = primaryGroup.trim().toLowerCase(Locale.ROOT);
-            if (nameFormats.containsKey(groupKey)) {
-                return new ListNameChoice(nameFormats.get(groupKey), primaryGroup);
-            }
-        }
-        if (nameFormats.containsKey(TablistDoc.DEFAULT_GROUP_KEY)) {
-            return new ListNameChoice(nameFormats.get(TablistDoc.DEFAULT_GROUP_KEY),
-                primaryGroup == null ? "" : primaryGroup);
-        }
-        return new ListNameChoice(TablistDoc.FALLBACK_FORMAT, primaryGroup == null ? "" : primaryGroup);
-    }
-
     /**
      * The shipped {@code tablist.json} is written only while the feature is on; with tablist off
      * {@link #doc()} runs on {@link TablistDoc#DEFAULTS} and nothing is materialised.
@@ -142,6 +133,8 @@ public final class TablistService implements Listener {
         }
         registry.reload();
         activeDoc = committedDoc();
+        activeRuntime = TablistRuntime.compile(activeDoc);
+        headerFooterMemos.clear();
         docGeneration.incrementAndGet();
         Bukkit.getPluginManager().registerEvents(this, plugin);
         plugin.watchdog().register(TablistDoc.KIND, this::pollRegistry);
@@ -174,6 +167,8 @@ public final class TablistService implements Listener {
         }
         registry.reload();
         activeDoc = committedDoc();
+        activeRuntime = TablistRuntime.compile(activeDoc);
+        headerFooterMemos.clear();
         docGeneration.incrementAndGet();
         clearFastNamePlayers();
         startDriver();
@@ -182,10 +177,10 @@ public final class TablistService implements Listener {
             resetAppliedListNames();
         } else {
             TablistDoc doc = doc();
-            if (!doc.useHeaderFooter()) {
+            if (!doc.headerFooter().enabled()) {
                 resetAppliedHeaderFooters();
             }
-            if (!doc.groupListNames()) {
+            if (!doc.listNames().enabled()) {
                 resetAppliedListNames();
             }
         }
@@ -297,15 +292,17 @@ public final class TablistService implements Listener {
         GlossDocument<TablistDoc> document = registry.get(delta, TablistDoc.KIND);
         TablistDoc updated = document == null ? TablistDoc.DEFAULTS : document.value();
         activeDoc = updated;
+        activeRuntime = TablistRuntime.compile(updated);
+        headerFooterMemos.clear();
         docGeneration.incrementAndGet();
         clearFastNamePlayers();
         reconcileDriverInterval();
-        if (updated.useHeaderFooter()) {
+        if (updated.headerFooter().enabled()) {
             appliedHeaderFooters.clear();
         } else {
             resetAppliedHeaderFooters();
         }
-        if (updated.groupListNames()) {
+        if (updated.listNames().enabled()) {
             appliedListNames.clear();
             listNameSources.clear();
         } else {
@@ -489,7 +486,7 @@ public final class TablistService implements Listener {
             return;
         }
         TablistDoc doc = doc();
-        if (doc.useHeaderFooter()) {
+        if (doc.headerFooter().enabled()) {
             TabOverride override = overrides.get(player.getUniqueId());
             String header;
             String footer;
@@ -497,9 +494,12 @@ public final class TablistService implements Listener {
                 header = renderSafe(player, override.header());
                 footer = renderSafe(player, override.footer());
             } else {
-                HeaderFooterMemo memo = headerFooterMemo();
-                header = memo.header() == null ? renderSafe(player, doc.header()) : memo.header();
-                footer = memo.footer() == null ? renderSafe(player, doc.footer()) : memo.footer();
+                GlossConditionScope scope = GlossConditionScope.viewer(plugin, player);
+                TablistRuntime.HeaderFooterProfile profile = activeRuntime.headerFooter(scope, conditionErrors);
+                TablistDoc.HeaderFooterPresentation presentation = profile.presentation();
+                HeaderFooterMemo memo = headerFooterMemo(profile);
+                header = memo.header() == null ? renderSafe(player, presentation.header()) : memo.header();
+                footer = memo.footer() == null ? renderSafe(player, presentation.footer()) : memo.footer();
             }
             HeaderFooter rendered = new HeaderFooter(header, footer);
             UUID uuid = player.getUniqueId();
@@ -519,7 +519,7 @@ public final class TablistService implements Listener {
     }
 
     private void applyFastOverride(Player player) {
-        if (!player.isOnline() || !doc().useHeaderFooter()) {
+        if (!player.isOnline() || !doc().headerFooter().enabled()) {
             return;
         }
         TabOverride override = overrides.get(player.getUniqueId());
@@ -545,17 +545,17 @@ public final class TablistService implements Listener {
         }
         UUID uuid = player.getUniqueId();
         TablistDoc doc = doc();
-        if (doc.useHeaderFooter() && fastOverridePlayers.contains(uuid)) {
+        if (doc.headerFooter().enabled() && fastOverridePlayers.contains(uuid)) {
             applyFastOverride(player);
         }
-        if (doc.groupListNames() && fastNamePlayers.contains(uuid)) {
+        if (doc.listNames().enabled() && fastNamePlayers.contains(uuid)) {
             applyListName(player, doc);
         }
     }
 
     private void applyListName(Player player, TablistDoc doc) {
         UUID uuid = player.getUniqueId();
-        if (!doc.groupListNames()) {
+        if (!doc.listNames().enabled()) {
             setFastNamePlayer(uuid, false);
             listNameSources.remove(uuid);
             if (appliedListNames.remove(uuid) != null) {
@@ -564,8 +564,10 @@ public final class TablistService implements Listener {
             return;
         }
         String primaryGroup = plugin.groups().primaryGroupFor(player).orElse(null);
-        ListNameChoice choice = chooseListName(player.isOp(), primaryGroup, doc.nameFormats());
-        if (choice.template().isBlank()) {
+        GlossConditionScope scope = GlossConditionScope.subject(plugin, player);
+        TablistRuntime.ListNameProfile profile = activeRuntime.listName(scope, conditionErrors);
+        String template = profile.presentation().format();
+        if (template.isBlank()) {
             setFastNamePlayer(uuid, false);
             listNameSources.remove(uuid);
             if (appliedListNames.remove(uuid) != null) {
@@ -573,7 +575,7 @@ public final class TablistService implements Listener {
             }
             return;
         }
-        String substituted = substituteTokens(choice.template(), player.getName(), choice.groupName());
+        String substituted = substituteTokens(template, player.getName(), primaryGroup);
         setFastNamePlayer(uuid, requiresFastNameRefresh(substituted, plugin.cfg().text().functions()));
         if ((TextPipeline.classify(substituted) & VIEWER_DEPENDENT) == 0) {
             // Viewer-independent: the render is a pure function of the substituted text plus the
@@ -602,17 +604,16 @@ public final class TablistService implements Listener {
      * Document header/footer rendered once per document revision. A template carrying a placeholder
      * or a text function stays per-viewer and is reported as {@code null} here.
      */
-    private HeaderFooterMemo headerFooterMemo() {
+    private HeaderFooterMemo headerFooterMemo(TablistRuntime.HeaderFooterProfile profile) {
         long generation = docGeneration.get();
         long emojiGeneration = TextPipeline.emojiGeneration();
-        HeaderFooterMemo current = headerFooterMemo;
+        HeaderFooterMemo current = headerFooterMemos.get(profile.id());
         if (current != null && current.docGeneration() == generation && current.emojiGeneration() == emojiGeneration) {
             return current;
         }
-        TablistDoc doc = doc();
         HeaderFooterMemo built = new HeaderFooterMemo(generation, emojiGeneration,
-            staticRender(doc.header()), staticRender(doc.footer()));
-        headerFooterMemo = built;
+            staticRender(profile.presentation().header()), staticRender(profile.presentation().footer()));
+        headerFooterMemos.put(profile.id(), built);
         return built;
     }
 
@@ -705,8 +706,8 @@ public final class TablistService implements Listener {
         if (!functionsEnabled || driverIntervalTicks <= ANIMATION_REFRESH_INTERVAL_TICKS) {
             return false;
         }
-        return (hasFastOverrides && doc.useHeaderFooter())
-            || (hasFastNames && doc.groupListNames());
+        return (hasFastOverrides && doc.headerFooter().enabled())
+            || (hasFastNames && doc.listNames().enabled());
     }
 
     static boolean requiresFastNameRefresh(String substituted, boolean functionsEnabled) {
@@ -714,9 +715,23 @@ public final class TablistService implements Listener {
     }
 
     private static boolean usesAnimatedHeaderFooter(TablistDoc doc) {
-        return doc.useHeaderFooter()
-            && (TextPipeline.requiresFastRefresh(doc.header())
-            || TextPipeline.requiresFastRefresh(doc.footer()));
+        if (!doc.headerFooter().enabled()) {
+            return false;
+        }
+        if (requiresFastRefresh(doc.headerFooter().presentation())) {
+            return true;
+        }
+        for (TablistDoc.HeaderFooterVariant variant : doc.headerFooter().variants()) {
+            if (requiresFastRefresh(variant.presentation())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean requiresFastRefresh(TablistDoc.HeaderFooterPresentation presentation) {
+        return TextPipeline.requiresFastRefresh(presentation.header())
+            || TextPipeline.requiresFastRefresh(presentation.footer());
     }
 
     private static boolean requiresFastRefresh(TabOverride override) {
@@ -739,7 +754,7 @@ public final class TablistService implements Listener {
         synchronized (fastDriverLifecycle) {
             fastNamePlayers.clear();
             fastPlayers.clear();
-            if (doc().useHeaderFooter()) {
+            if (doc().headerFooter().enabled()) {
                 fastPlayers.addAll(fastOverridePlayers);
             }
             reconcileFastDriverLocked();
@@ -748,15 +763,12 @@ public final class TablistService implements Listener {
 
     private void refreshFastPlayerLocked(UUID uuid) {
         TablistDoc doc = doc();
-        if ((doc.useHeaderFooter() && fastOverridePlayers.contains(uuid))
-            || (doc.groupListNames() && fastNamePlayers.contains(uuid))) {
+        if ((doc.headerFooter().enabled() && fastOverridePlayers.contains(uuid))
+            || (doc.listNames().enabled() && fastNamePlayers.contains(uuid))) {
             fastPlayers.add(uuid);
         } else {
             fastPlayers.remove(uuid);
         }
-    }
-
-    public record ListNameChoice(String template, String groupName) {
     }
 
     private record TabOverride(String header, String footer) {

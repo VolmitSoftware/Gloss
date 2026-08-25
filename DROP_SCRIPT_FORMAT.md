@@ -10,9 +10,8 @@ written for the editor implementation. The Java parser (`RealDropSettingsDoc`) a
   `description` the inspector renders)
 - Restore the shipped document with `/gloss drops reset` (permission `gloss.drops.reset`)
 
-Both blocks are additive and disabled by default. A document that omits them behaves exactly as it
-did before they existed; the runtime settings derived from `limits`, `scale`, `motion`, `landing`,
-`labels` and `filters` are unchanged, key for key.
+Both blocks are additive and disabled by default. They live inside each complete `presentation`,
+including the fallback presentation and every conditional variant.
 
 ---
 
@@ -20,33 +19,34 @@ did before they existed; the runtime settings derived from `limits`, `scale`, `m
 
 ```json
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "revision": 1,
-
-  "limits":   { "...": "unchanged" },
-  "scale":    { "...": "unchanged" },
-  "motion":   { "...": "unchanged" },
-  "landing":  { "...": "unchanged" },
-  "labels":   { "...": "unchanged" },
-  "filters":  { "...": "unchanged" },
-
-  "physics": {
-    "enabled": false,
-    "gravityMultiplier": 1.0,
-    "bounce": 0.0,
-    "waterBuoyancy": 0.0,
-    "waterDrag": 0.0
+  "presentation": {
+    "limits":   { "...": "unchanged" },
+    "scale":    { "...": "unchanged" },
+    "motion":   { "...": "unchanged" },
+    "landing":  { "...": "unchanged" },
+    "labels":   { "...": "unchanged" },
+    "filters":  { "...": "unchanged" },
+    "physics": {
+      "enabled": false,
+      "gravityMultiplier": 1.0,
+      "bounce": 0.0,
+      "waterBuoyancy": 0.0,
+      "waterDrag": 0.0
+    },
+    "script": {
+      "enabled": false,
+      "vars":     { "<name>": "<expression>" },
+      "offset":   { "x": "0", "y": "0", "z": "0" },
+      "rotation": { "x": "0", "y": "0", "z": "0" },
+      "scale":    { "x": "1", "y": "1", "z": "1" },
+      "glow":     "",
+      "visible":  "true"
+    }
   },
-
-  "script": {
-    "enabled": false,
-    "vars":     { "<name>": "<expression>" },
-    "offset":   { "x": "0", "y": "0", "z": "0" },
-    "rotation": { "x": "0", "y": "0", "z": "0" },
-    "scale":    { "x": "1", "y": "1", "z": "1" },
-    "glow":     "",
-    "visible":  "true"
-  }
+  "variants": [],
+  "audience": { "when": "true" }
 }
 ```
 
@@ -326,12 +326,16 @@ without also catching `TORCHFLOWER`.
 
 ```json
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "revision": 2,
-  "script": {
-    "enabled": true,
-    "glow": "materialIs('torch') || materialMatches('*_TORCH') ? #FFAA55 : 0"
-  }
+  "presentation": {
+    "script": {
+      "enabled": true,
+      "glow": "materialIs('torch') || materialMatches('*_TORCH') ? #FFAA55 : 0"
+    }
+  },
+  "variants": [],
+  "audience": { "when": "true" }
 }
 ```
 
@@ -340,18 +344,22 @@ sits slightly higher and a touch larger:
 
 ```json
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "revision": 3,
-  "script": {
-    "enabled": true,
-    "vars": {
-      "isTorch": "materialIs('torch') || materialMatches('*_TORCH') ? 1 : 0",
-      "isLit": "isTorch > 0 && blockLight > 8 ? 1 : 0"
-    },
-    "offset": { "y": "isTorch * 0.08" },
-    "scale":  { "x": "1 + isTorch * 0.15", "y": "1 + isTorch * 0.15", "z": "1 + isTorch * 0.15" },
-    "glow":   "isLit > 0 ? #FFCC66 : (isTorch > 0 ? #FFAA55 : 0)"
-  }
+  "presentation": {
+    "script": {
+      "enabled": true,
+      "vars": {
+        "isTorch": "materialIs('torch') || materialMatches('*_TORCH') ? 1 : 0",
+        "isLit": "isTorch > 0 && blockLight > 8 ? 1 : 0"
+      },
+      "offset": { "y": "isTorch * 0.08" },
+      "scale":  { "x": "1 + isTorch * 0.15", "y": "1 + isTorch * 0.15", "z": "1 + isTorch * 0.15" },
+      "glow":   "isLit > 0 ? #FFCC66 : (isTorch > 0 ? #FFAA55 : 0)"
+    }
+  },
+  "variants": [],
+  "audience": { "when": "true" }
 }
 ```
 
@@ -365,22 +373,26 @@ floating. The two halves are independent: `physics` lifts the item, `script` ani
 
 ```json
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "revision": 4,
-  "physics": {
-    "enabled": true,
-    "waterBuoyancy": 0.35,
-    "waterDrag": 0.12
-  },
-  "script": {
-    "enabled": true,
-    "vars": {
-      "wavePhase": "t * 2 + index * 1.2 + random * 6.283",
-      "bob": "inWater ? sin(wavePhase) * 0.09 : 0"
+  "presentation": {
+    "physics": {
+      "enabled": true,
+      "waterBuoyancy": 0.35,
+      "waterDrag": 0.12
     },
-    "offset":   { "y": "bob" },
-    "rotation": { "z": "inWater ? sin(wavePhase) * 6 : 0", "y": "inWater ? t * 20 : 0" }
-  }
+    "script": {
+      "enabled": true,
+      "vars": {
+        "wavePhase": "t * 2 + index * 1.2 + random * 6.283",
+        "bob": "inWater ? sin(wavePhase) * 0.09 : 0"
+      },
+      "offset":   { "y": "bob" },
+      "rotation": { "z": "inWater ? sin(wavePhase) * 6 : 0", "y": "inWater ? t * 20 : 0" }
+    }
+  },
+  "variants": [],
+  "audience": { "when": "true" }
 }
 ```
 
@@ -395,26 +407,30 @@ it has already taken so a long tumble visibly loses energy.
 
 ```json
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "revision": 5,
-  "physics": {
-    "enabled": true,
-    "bounce": 0.45
+  "presentation": {
+    "physics": {
+      "enabled": true,
+      "bounce": 0.45
+    },
+    "script": {
+      "enabled": true,
+      "vars": {
+        "energy": "clamp(1 - bounces * 0.08, 0.6, 1)",
+        "sinceBounce": "clamp(t - floor(t), 0, 1)",
+        "pop": "onGround ? 0 : (1 - smoothstep(0, 0.5, sinceBounce)) * 0.35"
+      },
+      "scale": {
+        "x": "energy * (1 + pop * 0.5)",
+        "y": "energy * (1 - pop)",
+        "z": "energy * (1 + pop * 0.5)"
+      },
+      "rotation": { "x": "pop * 25" }
+    }
   },
-  "script": {
-    "enabled": true,
-    "vars": {
-      "energy": "clamp(1 - bounces * 0.08, 0.6, 1)",
-      "sinceBounce": "clamp(t - floor(t), 0, 1)",
-      "pop": "onGround ? 0 : (1 - smoothstep(0, 0.5, sinceBounce)) * 0.35"
-    },
-    "scale": {
-      "x": "energy * (1 + pop * 0.5)",
-      "y": "energy * (1 - pop)",
-      "z": "energy * (1 + pop * 0.5)"
-    },
-    "rotation": { "x": "pop * 25" }
-  }
+  "variants": [],
+  "audience": { "when": "true" }
 }
 ```
 
@@ -426,8 +442,8 @@ wants a true bounce clock it has to come from a new runtime variable, not from a
 
 ## 8. Editor notes
 
-- Both blocks are optional in the JSON. Do not emit them unless the user has touched them, so
-  existing documents stay byte-identical when round-tripped through the editor.
+- Both blocks are optional inside a presentation. A conditional variant carries a complete
+  presentation instead of inheriting or merging fields from the fallback.
 - `vars` is an ordered map. Declaration order is semantically significant and must be preserved on
   read, on edit, and on write. Do not sort it.
 - Every clamp in section 1 is applied by the server after the document loads, so the editor can

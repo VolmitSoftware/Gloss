@@ -8,12 +8,13 @@ public final class DamageIndicatorTrajectory {
 
     public static Frame sample(DamageIndicatorSettingsDoc.Style style, double angleRadians,
                                double elapsedSeconds, double lifetimeSeconds) {
-        return sample(style.offset(), style.motion(), style.presentation(), angleRadians,
+        DamageIndicatorSettingsDoc.IndicatorPresentation presentation = style.presentation();
+        return sample(presentation.offset(), presentation.motion(), presentation.transform(), angleRadians,
             elapsedSeconds, lifetimeSeconds);
     }
 
     public static Frame sample(Vector offset, DamageIndicatorSettingsDoc.Motion motion,
-                               DamageIndicatorSettingsDoc.Presentation presentation,
+                               DamageIndicatorSettingsDoc.Transform presentation,
                                double angleRadians, double elapsedSeconds, double lifetimeSeconds) {
         double lifetime = Math.max(0.001D, lifetimeSeconds);
         double elapsed = Math.min(lifetime, Math.max(0.0D, elapsedSeconds));

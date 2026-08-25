@@ -1,5 +1,8 @@
 package art.arcane.gloss.bubble;
 
+import art.arcane.gloss.condition.BoundedConditionErrorCallback;
+import art.arcane.gloss.expr.ExprFunctions;
+import art.arcane.gloss.expr.ExprScope;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -7,119 +10,97 @@ import java.util.Map;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class BubbleStyleResolutionTest {
-    private static BubbleStyleDoc style(BubbleStyleDoc.Select select) {
-        return new BubbleStyleDoc(2, 1L, "&7", null, 32, 5000L, true, true,
-            BubbleStyleDoc.DEFAULTS.motion(), BubbleStyleDoc.DEFAULTS.shimmer(), select);
-    }
-
-    private static BubbleStyleDoc.Select select(List<String> worlds, List<String> groups, int priority) {
-        return new BubbleStyleDoc.Select(worlds, groups, priority);
-    }
-
     @Test
-    void permittedExplicitChoiceWinsOverEverything() {
-        Map<String, BubbleStyleDoc> styles = Map.of(
+    void permittedExplicitChoiceWinsOverConditionalStyles() {
+        Map<String, BubbleStyles.CompiledStyle> styles = compile(Map.of(
             "default", style(null),
             "fancy", style(null),
-            "auto", style(select(List.of(), List.of(), 100)));
+            "automatic", style(select(100, "true"))));
 
-        String chosen = BubbleStyles.resolveStyleId("fancy",
-            Set.of("gloss.bubbles.style.fancy")::contains, styles, "world", null);
+        String chosen = resolve("fancy", Set.of("gloss.bubbles.style.fancy"), styles, TestScope.EMPTY);
 
         assertEquals("fancy", chosen);
     }
 
     @Test
-    void unpermittedExplicitChoiceFallsThrough() {
-        Map<String, BubbleStyleDoc> styles = Map.of(
+    void deniedOrUnknownExplicitChoiceFallsThrough() {
+        Map<String, BubbleStyles.CompiledStyle> styles = compile(Map.of(
             "default", style(null),
-            "fancy", style(null));
+            "fancy", style(null)));
 
-        String chosen = BubbleStyles.resolveStyleId("fancy", node -> false, styles, "world", null);
-
-        assertEquals("default", chosen);
+        assertEquals("default", resolve("fancy", Set.of(), styles, TestScope.EMPTY));
+        assertEquals("default", resolve("missing", Set.of("gloss.bubbles.style.missing"), styles,
+            TestScope.EMPTY));
     }
 
     @Test
-    void unknownExplicitChoiceFallsThrough() {
-        Map<String, BubbleStyleDoc> styles = Map.of("default", style(null));
-
-        String chosen = BubbleStyles.resolveStyleId("gone", node -> true, styles, "world", null);
-
-        assertEquals("default", chosen);
-    }
-
-    @Test
-    void highestPrioritySelectMatchWins() {
-        Map<String, BubbleStyleDoc> styles = Map.of(
+    void highestPriorityConditionMatchWins() {
+        Map<String, BubbleStyles.CompiledStyle> styles = compile(Map.of(
             "default", style(null),
-            "low", style(select(List.of(), List.of(), 1)),
-            "high", style(select(List.of(), List.of(), 5)));
+            "world", style(select(10, "subject.world == 'world_nether'")),
+            "critical", style(select(100, "subject.health < 5")),
+            "staff", style(select(50, "hasPermission('subject', 'gloss.staff')"))));
+        TestScope scope = new TestScope(Map.of("subject.world", "world_nether", "subject.health", 4.0D),
+            Set.of("gloss.staff"));
 
-        String chosen = BubbleStyles.resolveStyleId(null, node -> false, styles, "world", null);
-
-        assertEquals("high", chosen);
+        assertEquals("critical", resolve(null, Set.of(), styles, scope));
     }
 
     @Test
-    void priorityTieBreaksLexicographically() {
-        Map<String, BubbleStyleDoc> styles = Map.of(
-            "beta", style(select(List.of(), List.of(), 3)),
-            "alpha", style(select(List.of(), List.of(), 3)));
-
-        String chosen = BubbleStyles.resolveStyleId(null, node -> false, styles, "world", null);
-
-        assertEquals("alpha", chosen);
-    }
-
-    @Test
-    void styleWithoutSelectIsNeverAutoMatched() {
-        Map<String, BubbleStyleDoc> styles = Map.of("fancy", style(null));
-
-        assertNull(BubbleStyles.resolveStyleId(null, node -> false, styles, "world", null));
-    }
-
-    @Test
-    void worldGlobsGateSelectMatching() {
-        Map<String, BubbleStyleDoc> styles = Map.of(
+    void equalPriorityUsesIdAndFalseConditionsUseDefault() {
+        Map<String, BubbleStyles.CompiledStyle> styles = compile(Map.of(
             "default", style(null),
-            "nether", style(select(List.of("*_nether"), List.of(), 5)));
+            "zeta", style(select(20, "subject.op")),
+            "alpha", style(select(20, "subject.op"))));
 
-        assertEquals("nether", BubbleStyles.resolveStyleId(null, node -> false, styles, "world_nether", null));
-        assertEquals("default", BubbleStyles.resolveStyleId(null, node -> false, styles, "world", null));
+        assertEquals("alpha", resolve(null, Set.of(), styles,
+            new TestScope(Map.of("subject.op", true), Set.of())));
+        assertEquals("default", resolve(null, Set.of(), styles,
+            new TestScope(Map.of("subject.op", false), Set.of())));
     }
 
     @Test
-    void groupsGateSelectMatching() {
-        Map<String, BubbleStyleDoc> styles = Map.of(
-            "default", style(null),
-            "staff", style(select(List.of(), List.of("staff"), 5)));
-
-        assertEquals("staff", BubbleStyles.resolveStyleId(null, node -> false, styles, "world", "Staff"));
-        assertEquals("default", BubbleStyles.resolveStyleId(null, node -> false, styles, "world", "builders"));
-        assertEquals("default", BubbleStyles.resolveStyleId(null, node -> false, styles, "world", null));
+    void styleWithoutSelectionIsNeverAutoMatchedAndMissingDefaultYieldsNull() {
+        assertNull(resolve(null, Set.of(), compile(Map.of("fancy", style(null))), TestScope.EMPTY));
+        assertNull(resolve(null, Set.of(), Map.of(), TestScope.EMPTY));
     }
 
-    @Test
-    void defaultStyleIsTheLastFallback() {
-        Map<String, BubbleStyleDoc> styles = Map.of("default", style(null));
-
-        assertEquals("default", BubbleStyles.resolveStyleId(null, node -> false, styles, "world", null));
-        assertNull(BubbleStyles.resolveStyleId(null, node -> false, Map.of(), "world", null));
+    private static Map<String, BubbleStyles.CompiledStyle> compile(Map<String, BubbleStyleDoc> styles) {
+        return BubbleStyles.compile(styles);
     }
 
-    @Test
-    void globMatchingSupportsStarAndQuestionMark() {
-        assertTrue(BubbleStyles.globMatches("world_*", "world_nether"));
-        assertTrue(BubbleStyles.globMatches("world", "world"));
-        assertTrue(BubbleStyles.globMatches("hub?", "hub1"));
-        assertFalse(BubbleStyles.globMatches("hub?", "hub12"));
-        assertFalse(BubbleStyles.globMatches("world_*", "lobby"));
-        assertFalse(BubbleStyles.globMatches("w.rld", "world"));
+    private static String resolve(String chosen, Set<String> permissions,
+                                  Map<String, BubbleStyles.CompiledStyle> styles, ExprScope scope) {
+        return BubbleStyles.resolveStyleId(chosen, permissions::contains, styles, scope,
+            BoundedConditionErrorCallback.silent());
+    }
+
+    private static BubbleStyleDoc style(BubbleStyleDoc.Select select) {
+        return new BubbleStyleDoc(3, 1L, "&7", null, 32, 5000L, true, true,
+            BubbleStyleDoc.DEFAULTS.motion(), BubbleStyleDoc.DEFAULTS.shimmer(), select);
+    }
+
+    private static BubbleStyleDoc.Select select(int priority, String when) {
+        return new BubbleStyleDoc.Select(priority, when);
+    }
+
+    private record TestScope(Map<String, Object> variables, Set<String> permissions) implements ExprScope {
+        private static final TestScope EMPTY = new TestScope(Map.of(), Set.of());
+
+        @Override
+        public Object variable(String dottedName) {
+            return variables.get(dottedName);
+        }
+
+        @Override
+        public Object call(String name, List<Object> args) {
+            if (name.equals("hasPermission")) {
+                return permissions.contains(args.get(1));
+            }
+            return ExprFunctions.call(name, args);
+        }
     }
 }

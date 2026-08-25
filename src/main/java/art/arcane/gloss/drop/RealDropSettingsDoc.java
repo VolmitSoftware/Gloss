@@ -6,37 +6,28 @@ import art.arcane.gloss.doc.DocumentParsers;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 
 public record RealDropSettingsDoc(
     int schemaVersion,
     long revision,
-    Limits limits,
-    Scale scale,
-    Motion motion,
-    Landing landing,
-    Labels labels,
-    Filters filters,
-    Physics physics,
-    Script script,
-    Animation animation
+    Presentation presentation,
+    List<Variant> variants,
+    Audience audience
 ) {
     public static final String KIND = "real-drops";
     public static final String DEFAULT_ID = "default";
-    public static final int CURRENT_SCHEMA_VERSION = 1;
+    public static final int CURRENT_SCHEMA_VERSION = 2;
 
     public static final RealDropSettingsDoc DEFAULTS = new RealDropSettingsDoc(
         CURRENT_SCHEMA_VERSION,
         DocumentEnvelope.INITIAL_REVISION,
-        null,
-        null,
-        null,
-        null,
-        null,
-        null,
         null,
         null,
         null);
@@ -44,17 +35,11 @@ public record RealDropSettingsDoc(
     public RealDropSettingsDoc {
         DocumentEnvelope.requireSchemaVersion(KIND, schemaVersion, CURRENT_SCHEMA_VERSION);
         DocumentEnvelope.requireRevision(KIND, revision);
-        limits = limits == null ? new Limits(null, null, null, null, null, null) : limits;
-        scale = scale == null ? new Scale(null, null, null) : scale;
-        motion = motion == null ? new Motion(
-            null, null, null, null, null, null, null, null, null, null) : motion;
-        landing = landing == null ? new Landing(null, null, null, null, null, null, null, null) : landing;
-        labels = labels == null ? new Labels(null, null, null, null, null, null, null, null,
-            null, null, null, null) : labels;
-        filters = filters == null ? new Filters(null, null, null) : filters;
-        physics = physics == null ? new Physics(null, null, null, null, null) : physics;
-        script = script == null ? new Script(null, null, null, null, null, null, null) : script;
-        animation = animation == null ? new Animation(null, null, null) : animation;
+        presentation = presentation == null ? new Presentation(
+            null, null, null, null, null, null, null, null, null) : presentation;
+        variants = variants == null ? List.of() : List.copyOf(variants);
+        validateVariants(variants);
+        audience = audience == null ? new Audience(null) : audience;
     }
 
     public static RealDropSettingsDoc parse(String fileName, String raw) {
@@ -62,64 +47,111 @@ public record RealDropSettingsDoc(
     }
 
     public GlossConfig.RealDrops toConfig(boolean enabled) {
-        return new GlossConfig.RealDrops(
-            enabled,
-            new GlossConfig.RealDrops.Limits(
-                limits.updateIntervalTicks(),
-                limits.settledPollIntervalTicks(),
-                limits.maxVisualsPerStack(),
-                limits.maxVisualsPerChunk(),
-                limits.viewRange().floatValue(),
-                limits.spread().floatValue()),
-            new GlossConfig.RealDrops.Scale(
-                scale.defaultScale().floatValue(),
-                scale.flatItems().floatValue(),
-                scale.thinBlocks().floatValue()),
-            new GlossConfig.RealDrops.Motion(
-                motion.tumble(),
-                motion.speedMultiplier().floatValue(),
-                motion.degreesPerSecondX().floatValue(),
-                motion.degreesPerSecondY().floatValue(),
-                motion.degreesPerSecondZ().floatValue(),
-                motion.variance().floatValue(),
-                motion.changeOnBounce(),
-                motion.velocityInfluence().floatValue(),
-                motion.submergedSpinMultiplier().floatValue(),
-                motion.groundRollMultiplier().floatValue()),
-            new GlossConfig.RealDrops.Landing(
-                landing.mode(),
-                landing.tiltDegrees().floatValue(),
-                landing.randomYaw(),
-                landing.transitionTicks(),
-                landing.faceAttraction().floatValue(),
-                landing.movingFaceAttraction().floatValue(),
-                landing.alignmentDegrees().floatValue(),
-                landing.settleDelayTicks()),
-            new GlossConfig.RealDrops.Labels(
-                labels.enabled(),
-                labels.yOffset().floatValue(),
-                labels.scale().floatValue(),
-                labels.viewRange().floatValue(),
-                labels.billboard(),
-                labels.seeThrough(),
-                labels.shadow(),
-                labels.background(),
-                labels.backgroundRed(),
-                labels.backgroundGreen(),
-                labels.backgroundBlue(),
-                labels.backgroundAlpha()),
-            new GlossConfig.RealDrops.Filters(
-                filters.disabledWorlds(),
-                filters.materialBlacklist(),
-                filters.onlyPlayerDrops()),
-            new GlossConfig.RealDrops.Physics(
-                physics.enabled(),
-                physics.gravityMultiplier().floatValue(),
-                physics.bounce().floatValue(),
-                physics.waterBuoyancy().floatValue(),
-                physics.waterDrag().floatValue()),
-            script.toConfig(),
-            animation.toConfig());
+        return presentation.toConfig(enabled);
+    }
+
+    public record Presentation(
+        Limits limits,
+        Scale scale,
+        Motion motion,
+        Landing landing,
+        Labels labels,
+        Filters filters,
+        Physics physics,
+        Script script,
+        Animation animation
+    ) {
+        public Presentation {
+            limits = limits == null ? new Limits(null, null, null, null, null, null) : limits;
+            scale = scale == null ? new Scale(null, null, null) : scale;
+            motion = motion == null ? new Motion(
+                null, null, null, null, null, null, null, null, null, null) : motion;
+            landing = landing == null ? new Landing(
+                null, null, null, null, null, null, null, null) : landing;
+            labels = labels == null ? new Labels(
+                null, null, null, null, null, null, null, null, null, null, null, null) : labels;
+            filters = filters == null ? new Filters(null, null, null) : filters;
+            physics = physics == null ? new Physics(null, null, null, null, null) : physics;
+            script = script == null ? new Script(null, null, null, null, null, null, null) : script;
+            animation = animation == null ? new Animation(null, null, null) : animation;
+        }
+
+        public GlossConfig.RealDrops toConfig(boolean enabled) {
+            return new GlossConfig.RealDrops(
+                enabled,
+                new GlossConfig.RealDrops.Limits(
+                    limits.updateIntervalTicks(),
+                    limits.settledPollIntervalTicks(),
+                    limits.maxVisualsPerStack(),
+                    limits.maxVisualsPerChunk(),
+                    limits.viewRange().floatValue(),
+                    limits.spread().floatValue()),
+                new GlossConfig.RealDrops.Scale(
+                    scale.defaultScale().floatValue(),
+                    scale.flatItems().floatValue(),
+                    scale.thinBlocks().floatValue()),
+                new GlossConfig.RealDrops.Motion(
+                    motion.tumble(),
+                    motion.speedMultiplier().floatValue(),
+                    motion.degreesPerSecondX().floatValue(),
+                    motion.degreesPerSecondY().floatValue(),
+                    motion.degreesPerSecondZ().floatValue(),
+                    motion.variance().floatValue(),
+                    motion.changeOnBounce(),
+                    motion.velocityInfluence().floatValue(),
+                    motion.submergedSpinMultiplier().floatValue(),
+                    motion.groundRollMultiplier().floatValue()),
+                new GlossConfig.RealDrops.Landing(
+                    landing.mode(),
+                    landing.tiltDegrees().floatValue(),
+                    landing.randomYaw(),
+                    landing.transitionTicks(),
+                    landing.faceAttraction().floatValue(),
+                    landing.movingFaceAttraction().floatValue(),
+                    landing.alignmentDegrees().floatValue(),
+                    landing.settleDelayTicks()),
+                new GlossConfig.RealDrops.Labels(
+                    labels.enabled(),
+                    labels.yOffset().floatValue(),
+                    labels.scale().floatValue(),
+                    labels.viewRange().floatValue(),
+                    labels.billboard(),
+                    labels.seeThrough(),
+                    labels.shadow(),
+                    labels.background(),
+                    labels.backgroundRed(),
+                    labels.backgroundGreen(),
+                    labels.backgroundBlue(),
+                    labels.backgroundAlpha()),
+                new GlossConfig.RealDrops.Filters(
+                    filters.disabledWorlds(),
+                    filters.materialBlacklist(),
+                    filters.onlyPlayerDrops()),
+                new GlossConfig.RealDrops.Physics(
+                    physics.enabled(),
+                    physics.gravityMultiplier().floatValue(),
+                    physics.bounce().floatValue(),
+                    physics.waterBuoyancy().floatValue(),
+                    physics.waterDrag().floatValue()),
+                script.toConfig(),
+                animation.toConfig());
+        }
+    }
+
+    public record Variant(String id, Integer priority, String when, Presentation presentation) {
+        public Variant {
+            id = normalizeId(id);
+            priority = clamp(priority, -10000, 10000, 0);
+            when = normalizeCondition(when, "variants." + id + ".when");
+            presentation = Objects.requireNonNull(
+                presentation, "real-drop variant presentation");
+        }
+    }
+
+    public record Audience(String when) {
+        public Audience {
+            when = normalizeCondition(when == null ? "true" : when, "audience.when");
+        }
     }
 
     public record Limits(
@@ -557,5 +589,40 @@ public record RealDropSettingsDoc(
             }
         }
         return List.copyOf(cleaned);
+    }
+
+    private static void validateVariants(List<Variant> variants) {
+        Set<String> ids = new HashSet<>(variants.size());
+        for (Variant variant : variants) {
+            if (variant == null) {
+                throw new IllegalArgumentException("real-drop variants may not contain null entries");
+            }
+            if (!ids.add(variant.id())) {
+                throw new IllegalArgumentException("duplicate real-drop variant id: " + variant.id());
+            }
+        }
+    }
+
+    private static String normalizeId(String id) {
+        String normalized = id == null ? "" : id.trim();
+        if (normalized.isEmpty()) {
+            throw new IllegalArgumentException("real-drop variant id may not be blank");
+        }
+        for (int index = 0; index < normalized.length(); index++) {
+            char character = normalized.charAt(index);
+            if (!Character.isLetterOrDigit(character)
+                && character != '-' && character != '_' && character != '.') {
+                throw new IllegalArgumentException("invalid real-drop variant id: " + normalized);
+            }
+        }
+        return normalized;
+    }
+
+    private static String normalizeCondition(String when, String path) {
+        String normalized = when == null ? "" : when.trim();
+        if (normalized.isEmpty()) {
+            throw new IllegalArgumentException(path + " may not be blank");
+        }
+        return normalized;
     }
 }

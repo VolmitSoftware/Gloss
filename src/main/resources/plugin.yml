@@ -88,7 +88,7 @@ permissions:
     description: Allows creating scoreboards.
     default: op
   gloss.boards.edit:
-    description: Allows editing scoreboards, primary boards, board permissions and restoring shipped boards.
+    description: Allows editing scoreboard presentations, selection conditions and restoring shipped boards.
     default: op
   gloss.boards.delete:
     description: Allows deleting scoreboards.

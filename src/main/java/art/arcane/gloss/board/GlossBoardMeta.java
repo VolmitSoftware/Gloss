@@ -1,57 +1,65 @@
 package art.arcane.gloss.board;
 
+import art.arcane.gloss.condition.BoundedConditionErrorCallback;
+import art.arcane.gloss.condition.CompiledCondition;
+import art.arcane.gloss.condition.ConditionCompiler;
+import art.arcane.gloss.condition.ConditionSource;
 import art.arcane.gloss.doc.DocumentEnvelope;
+import art.arcane.gloss.expr.ExprScope;
 import art.arcane.gloss.text.TextPipeline;
 
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.UnaryOperator;
 
 public final class GlossBoardMeta {
-    public static final String UNRESTRICTED_PERMISSION = "default";
-    public static final String PERMISSION_NODE_PREFIX = "gloss.board.";
-
     private final String id;
     private final CopyOnWriteArrayList<String> content;
     private final AtomicLong contentGeneration;
+    private final Map<String, RenderPlan> renderPlans;
     private volatile String title;
-    private volatile boolean primary;
     private volatile boolean hideNumbers;
-    private volatile String permission;
-    private volatile List<String> groups;
+    private volatile BoardDoc.Selection selection;
+    private volatile List<BoardDoc.Variant> variants;
+    private volatile CompiledCondition selectionCondition;
+    private volatile List<CompiledVariant> compiledVariants;
     private volatile long revision;
-    private volatile RenderPlan renderPlan;
 
     public GlossBoardMeta(String id) {
         this.id = id;
         this.content = new CopyOnWriteArrayList<>();
         this.contentGeneration = new AtomicLong();
+        this.renderPlans = new ConcurrentHashMap<>();
         this.title = id;
-        this.primary = false;
         this.hideNumbers = false;
-        this.permission = UNRESTRICTED_PERMISSION;
-        this.groups = List.of();
+        this.selection = BoardDoc.Selection.NEVER;
+        this.variants = List.of();
+        this.selectionCondition = compileSelection(this.selection);
+        this.compiledVariants = List.of();
         this.revision = 0L;
     }
 
     public static GlossBoardMeta fromDoc(String id, BoardDoc doc) {
         GlossBoardMeta meta = new GlossBoardMeta(id);
-        meta.setTitle(doc.title().isEmpty() ? id : doc.title());
-        for (String line : doc.lines()) {
+        BoardDoc.Presentation presentation = doc.presentation();
+        meta.setTitle(presentation.title().isEmpty() ? id : presentation.title());
+        for (String line : presentation.lines()) {
             meta.addLine(line);
         }
-        meta.setPrimary(doc.primary());
-        meta.setHideNumbers(doc.hideNumbers());
-        meta.setPermission(doc.permission());
-        meta.setGroups(doc.groups());
+        meta.setHideNumbers(presentation.hideNumbers());
+        meta.setSelection(doc.select().priority(), doc.select().when());
+        meta.setVariants(doc.variants());
         meta.revision = doc.revision();
         return meta;
     }
 
     public BoardDoc toDoc(long revision) {
-        return new BoardDoc(BoardDoc.CURRENT_SCHEMA_VERSION, revision, title, lines(), primary, hideNumbers,
-            permission, groups);
+        return new BoardDoc(BoardDoc.CURRENT_SCHEMA_VERSION, revision, selection, presentation(), variants);
     }
 
     public String id() {
@@ -64,7 +72,7 @@ public final class GlossBoardMeta {
 
     public void setTitle(String title) {
         this.title = title == null ? id : title;
-        contentGeneration.incrementAndGet();
+        contentChanged();
     }
 
     public List<String> lines() {
@@ -73,25 +81,17 @@ public final class GlossBoardMeta {
 
     public void addLine(String line) {
         content.add(line == null ? "" : line);
-        contentGeneration.incrementAndGet();
+        contentChanged();
     }
 
     public void setLine(int index, String line) {
         content.set(index, line == null ? "" : line);
-        contentGeneration.incrementAndGet();
+        contentChanged();
     }
 
     public void removeLine(int index) {
         content.remove(index);
-        contentGeneration.incrementAndGet();
-    }
-
-    public boolean primary() {
-        return primary;
-    }
-
-    public void setPrimary(boolean primary) {
-        this.primary = primary;
+        contentChanged();
     }
 
     public boolean hideNumbers() {
@@ -102,28 +102,37 @@ public final class GlossBoardMeta {
         this.hideNumbers = hideNumbers;
     }
 
-    public String permission() {
-        return permission;
+    public BoardDoc.Selection selection() {
+        return selection;
     }
 
-    public void setPermission(String permission) {
-        this.permission = BoardDoc.normalizePermission(permission);
+    public void setSelection(int priority, String when) {
+        BoardDoc.Selection next = new BoardDoc.Selection(priority, when);
+        selection = next;
+        selectionCondition = compileSelection(next);
     }
 
-    public boolean permissionGated() {
-        return !UNRESTRICTED_PERMISSION.equals(permission);
+    public List<BoardDoc.Variant> variants() {
+        return variants;
     }
 
-    public String permissionNode() {
-        return PERMISSION_NODE_PREFIX + permission;
+    public void setVariants(List<BoardDoc.Variant> variants) {
+        this.variants = variants == null ? List.of() : List.copyOf(variants);
+        this.compiledVariants = compileVariants(this.variants);
+        renderPlans.clear();
     }
 
-    public List<String> groups() {
-        return groups;
+    boolean matchesSelection(ExprScope scope, BoundedConditionErrorCallback errors) {
+        return selectionCondition.matches(scope, errors);
     }
 
-    public void setGroups(List<String> groups) {
-        this.groups = groups == null ? List.of() : List.copyOf(groups);
+    ActiveProfile activeProfile(ExprScope scope, BoundedConditionErrorCallback errors) {
+        for (CompiledVariant variant : compiledVariants) {
+            if (variant.condition().matches(scope, errors)) {
+                return new ActiveProfile(variant.variant().id(), variant.variant().presentation());
+            }
+        }
+        return new ActiveProfile("base", presentation());
     }
 
     public long revision() {
@@ -143,15 +152,50 @@ public final class GlossBoardMeta {
      * rebuilding it when either changed. Lines without placeholders and functions are
      * viewer-independent, so their rendered value is computed once and shared.
      */
-    RenderPlan renderPlan(long emojiGeneration, int maxLines, UnaryOperator<String> staticRender) {
-        RenderPlan current = renderPlan;
+    BoardDoc.Presentation presentation() {
+        return new BoardDoc.Presentation(title, lines(), hideNumbers);
+    }
+
+    RenderPlan renderPlan(String profileId, BoardDoc.Presentation presentation, long emojiGeneration,
+                          int maxLines, UnaryOperator<String> staticRender) {
+        RenderPlan current = renderPlans.get(profileId);
         long generation = contentGeneration.get();
         if (current != null && current.matches(generation, emojiGeneration)) {
             return current;
         }
-        RenderPlan built = RenderPlan.build(generation, emojiGeneration, title, content, maxLines, staticRender);
-        renderPlan = built;
+        RenderPlan built = RenderPlan.build(generation, emojiGeneration, presentation.title(),
+            presentation.lines(), maxLines, staticRender);
+        renderPlans.put(profileId, built);
         return built;
+    }
+
+    private void contentChanged() {
+        contentGeneration.incrementAndGet();
+        renderPlans.clear();
+    }
+
+    private CompiledCondition compileSelection(BoardDoc.Selection value) {
+        return ConditionCompiler.compile(new ConditionSource(
+            "boards/" + id + ".select.when", value.when()));
+    }
+
+    private List<CompiledVariant> compileVariants(List<BoardDoc.Variant> values) {
+        List<CompiledVariant> compiled = new ArrayList<>(values.size());
+        for (BoardDoc.Variant value : values) {
+            CompiledCondition condition = ConditionCompiler.compile(new ConditionSource(
+                "boards/" + id + ".variants." + value.id() + ".when", value.when()));
+            compiled.add(new CompiledVariant(value, condition));
+        }
+        compiled.sort(Comparator
+            .comparingInt((CompiledVariant value) -> value.variant().priority()).reversed()
+            .thenComparing(value -> value.variant().id()));
+        return List.copyOf(compiled);
+    }
+
+    record ActiveProfile(String id, BoardDoc.Presentation presentation) {
+    }
+
+    private record CompiledVariant(BoardDoc.Variant variant, CompiledCondition condition) {
     }
 
     /**

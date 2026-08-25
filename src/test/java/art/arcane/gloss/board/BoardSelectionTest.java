@@ -1,193 +1,119 @@
 package art.arcane.gloss.board;
 
+import art.arcane.gloss.condition.BoundedConditionErrorCallback;
+import art.arcane.gloss.expr.ExprFunctions;
+import art.arcane.gloss.expr.ExprScope;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
 class BoardSelectionTest {
-    private static GlossBoardMeta board(String id, boolean primary, String permission) {
+    @Test
+    void highestPriorityMatchingBoardWinsRegardlessOfInputOrder() {
+        List<GlossBoardMeta> boards = List.of(
+            board("ordinary", 10, "true"),
+            board("arena", 80, "viewer.world == 'arena'"),
+            board("staff", 50, "hasPermission('viewer', 'gloss.staff')")
+        );
+        TestScope scope = new TestScope(Map.of("viewer.world", "arena"), Set.of("gloss.staff"));
+
+        assertEquals("arena", BoardService.selectBoardId(boards, scope));
+    }
+
+    @Test
+    void equalPriorityUsesIdAsStableTieBreaker() {
+        List<GlossBoardMeta> boards = List.of(
+            board("zeta", 40, "true"),
+            board("alpha", 40, "true")
+        );
+
+        assertEquals("alpha", BoardService.selectBoardId(boards, TestScope.EMPTY));
+    }
+
+    @Test
+    void falseAndFailingSelectionsAreSkipped() {
+        List<GlossBoardMeta> boards = List.of(
+            board("false", 100, "false"),
+            board("missing", 90, "unknown.value == 1"),
+            board("match", 1, "viewer.health < 5")
+        );
+
+        assertEquals("match", BoardService.selectBoardId(boards,
+            new TestScope(Map.of("viewer.health", 4.0D), Set.of())));
+        assertNull(BoardService.selectBoardId(List.of(board("none", 1, "false")), TestScope.EMPTY));
+        assertNull(BoardService.selectBoardId(List.of(), TestScope.EMPTY));
+    }
+
+    @Test
+    void highestPriorityMatchingVariantWinsAndProfilesAreComplete() {
+        GlossBoardMeta meta = board("main", 1, "true");
+        meta.setTitle("Base");
+        meta.addLine("base-line");
+        meta.setVariants(List.of(
+            variant("staff", 20, "hasPermission('viewer', 'gloss.staff')", "Staff"),
+            variant("critical", 100, "viewer.health < 5", "Critical"),
+            variant("arena", 50, "viewer.world == 'arena'", "Arena")
+        ));
+        TestScope scope = new TestScope(Map.of("viewer.health", 4.0D, "viewer.world", "arena"),
+            Set.of("gloss.staff"));
+
+        GlossBoardMeta.ActiveProfile profile = meta.activeProfile(scope, BoundedConditionErrorCallback.silent());
+
+        assertEquals("critical", profile.id());
+        assertEquals("Critical", profile.presentation().title());
+        assertEquals(List.of("Critical-line"), profile.presentation().lines());
+    }
+
+    @Test
+    void variantTieUsesIdAndNoMatchUsesBasePresentation() {
+        GlossBoardMeta meta = board("main", 1, "true");
+        meta.setTitle("Base");
+        meta.setVariants(List.of(
+            variant("zeta", 20, "viewer.level > 10", "Zeta"),
+            variant("alpha", 20, "viewer.level > 10", "Alpha")
+        ));
+
+        GlossBoardMeta.ActiveProfile selected = meta.activeProfile(
+            new TestScope(Map.of("viewer.level", 12.0D), Set.of()), BoundedConditionErrorCallback.silent());
+        GlossBoardMeta.ActiveProfile base = meta.activeProfile(
+            new TestScope(Map.of("viewer.level", 2.0D), Set.of()), BoundedConditionErrorCallback.silent());
+
+        assertEquals("alpha", selected.id());
+        assertEquals("Alpha", selected.presentation().title());
+        assertEquals("base", base.id());
+        assertEquals("Base", base.presentation().title());
+    }
+
+    private static GlossBoardMeta board(String id, int priority, String when) {
         GlossBoardMeta meta = new GlossBoardMeta(id);
-        meta.setPrimary(primary);
-        meta.setPermission(permission);
+        meta.setSelection(priority, when);
         return meta;
     }
 
-    private static GlossBoardMeta board(String id, boolean primary, String permission, List<String> groups) {
-        GlossBoardMeta meta = board(id, primary, permission);
-        meta.setGroups(groups);
-        return meta;
+    private static BoardDoc.Variant variant(String id, int priority, String when, String title) {
+        return new BoardDoc.Variant(id, priority, when,
+            new BoardDoc.Presentation(title, List.of(title + "-line"), false));
     }
 
-    @Test
-    void firstGrantedGatedBoardWinsInOrder() {
-        List<GlossBoardMeta> boards = List.of(
-            board("first", false, "one"),
-            board("second", false, "two")
-        );
+    private record TestScope(Map<String, Object> variables, Set<String> permissions) implements ExprScope {
+        private static final TestScope EMPTY = new TestScope(Map.of(), Set.of());
 
-        String chosen = BoardService.selectBoardId(null, boards, node -> true);
+        @Override
+        public Object variable(String dottedName) {
+            return variables.get(dottedName);
+        }
 
-        assertEquals("first", chosen);
-    }
-
-    @Test
-    void grantedGatedBoardWinsOverPrimary() {
-        List<GlossBoardMeta> boards = List.of(
-            board("gated", false, "vip"),
-            board("main", true, "default")
-        );
-
-        String chosen = BoardService.selectBoardId(null, boards, Set.of("gloss.board.vip")::contains);
-
-        assertEquals("gated", chosen);
-    }
-
-    @Test
-    void ungatedBoardsAreNotChosenByPermissionPass() {
-        List<GlossBoardMeta> boards = List.of(
-            board("open", false, "default"),
-            board("main", true, "default")
-        );
-
-        String chosen = BoardService.selectBoardId(null, boards, node -> true);
-
-        assertEquals("main", chosen);
-    }
-
-    @Test
-    void deniedGatedBoardsFallThroughToPrimary() {
-        List<GlossBoardMeta> boards = List.of(
-            board("gated", false, "vip"),
-            board("main", true, "default")
-        );
-
-        String chosen = BoardService.selectBoardId(null, boards, node -> false);
-
-        assertEquals("main", chosen);
-    }
-
-    @Test
-    void firstPrimaryBoardWinsWhenNothingElseMatches() {
-        List<GlossBoardMeta> boards = List.of(
-            board("open", false, "default"),
-            board("primary-a", true, "default"),
-            board("primary-b", true, "default")
-        );
-
-        String chosen = BoardService.selectBoardId(null, boards, node -> false);
-
-        assertEquals("primary-a", chosen);
-    }
-
-    @Test
-    void noMatchYieldsNull() {
-        List<GlossBoardMeta> boards = List.of(
-            board("gated", false, "vip"),
-            board("open", false, "default")
-        );
-
-        String chosen = BoardService.selectBoardId(null, boards, node -> false);
-
-        assertNull(chosen);
-    }
-
-    @Test
-    void emptyBoardListYieldsNull() {
-        assertNull(BoardService.selectBoardId("anygroup", List.of(), node -> true));
-    }
-
-    @Test
-    void groupMatchedBoardWinsOverPermissionAndPrimary() {
-        List<GlossBoardMeta> boards = List.of(
-            board("gated", false, "vip"),
-            board("staff-board", false, "default", List.of("staff")),
-            board("main", true, "default")
-        );
-
-        String chosen = BoardService.selectBoardId("staff", boards, node -> true);
-
-        assertEquals("staff-board", chosen);
-    }
-
-    @Test
-    void unmatchedPrimaryGroupFallsThrough() {
-        List<GlossBoardMeta> boards = List.of(
-            board("staff-board", false, "default", List.of("staff")),
-            board("main", true, "default")
-        );
-
-        String chosen = BoardService.selectBoardId("builders", boards, node -> false);
-
-        assertEquals("main", chosen);
-    }
-
-    @Test
-    void nullOrBlankPrimaryGroupSkipsGroupMatching() {
-        List<GlossBoardMeta> boards = List.of(
-            board("staff-board", false, "default", List.of("staff")),
-            board("main", true, "default")
-        );
-
-        assertEquals("main", BoardService.selectBoardId(null, boards, node -> false));
-        assertEquals("main", BoardService.selectBoardId("  ", boards, node -> false));
-    }
-
-    @Test
-    void aGroupMatchedBoardTheViewerLacksPermissionForIsSkipped() {
-        List<GlossBoardMeta> boards = List.of(
-            board("staff-board", false, "vip", List.of("staff")),
-            board("staff-open", false, "default", List.of("staff")),
-            board("main", true, "default")
-        );
-
-        assertEquals("staff-open", BoardService.selectBoardId("staff", boards, node -> false));
-        assertEquals("staff-board", BoardService.selectBoardId("staff", boards, node -> true));
-    }
-
-    @Test
-    void aGroupMatchIsStillOnlyReachedThroughItsOwnPermission() {
-        List<GlossBoardMeta> boards = List.of(
-            board("staff-board", false, "vip", List.of("staff")),
-            board("main", true, "default")
-        );
-
-        assertEquals("main", BoardService.selectBoardId("staff", boards, node -> false));
-        assertEquals("staff-board",
-            BoardService.selectBoardId("staff", boards, Set.of("gloss.board.vip")::contains));
-    }
-
-    @Test
-    void aPrimaryBoardTheViewerLacksPermissionForIsSkipped() {
-        List<GlossBoardMeta> boards = List.of(
-            board("primary-gated", true, "vip"),
-            board("primary-open", true, "default")
-        );
-
-        assertEquals("primary-open", BoardService.selectBoardId(null, boards, node -> false));
-    }
-
-    @Test
-    void aGatedPrimaryBoardIsTheOnlyCandidateAndIsDeniedToAViewerWithoutIt() {
-        List<GlossBoardMeta> boards = List.of(board("primary-gated", true, "vip"));
-
-        assertNull(BoardService.selectBoardId(null, boards, node -> false));
-        assertEquals("primary-gated",
-            BoardService.selectBoardId(null, boards, Set.of("gloss.board.vip")::contains));
-    }
-
-    @Test
-    void firstGroupMatchedBoardWinsInOrder() {
-        List<GlossBoardMeta> boards = List.of(
-            board("first", false, "default", List.of("staff")),
-            board("second", false, "default", List.of("staff"))
-        );
-
-        String chosen = BoardService.selectBoardId("staff", boards, node -> false);
-
-        assertEquals("first", chosen);
+        @Override
+        public Object call(String name, List<Object> args) {
+            if (name.equals("hasPermission")) {
+                return permissions.contains(args.get(1));
+            }
+            return ExprFunctions.call(name, args);
+        }
     }
 }

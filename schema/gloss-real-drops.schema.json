@@ -6,13 +6,16 @@
   "type": "object",
   "required": [
     "schemaVersion",
-    "revision"
+    "revision",
+    "presentation",
+    "variants",
+    "audience"
   ],
   "properties": {
     "schemaVersion": {
-      "description": "Document format version. Must be exactly 1; any other value is rejected outright rather than migrated.",
+      "description": "Document format version. Must be exactly 2.",
       "type": "integer",
-      "const": 1
+      "const": 2
     },
     "revision": {
       "description": "Server-owned monotonic revision counter. Starts at 1 and increases every time the server rewrites the document; editors must send back the revision they read so a concurrent change is detected instead of silently overwritten.",
@@ -20,44 +23,105 @@
       "minimum": 1,
       "maximum": 9007199254740991
     },
-    "limits": {
-      "description": "Update cadence and per-chunk budget. These are the knobs that decide how much work the presentation costs; raising the visual counts multiplies the number of display entities on screen.",
-      "$ref": "#/$defs/limits"
+    "presentation": {
+      "description": "The complete fallback presentation used when no conditional variant matches.",
+      "$ref": "#/$defs/presentation"
     },
-    "scale": {
-      "description": "Base display size per model shape. Every dropped item falls into one of three shape families and takes the matching scale, which the script layer's scale block then multiplies.",
-      "$ref": "#/$defs/scale"
+    "variants": {
+      "description": "Complete conditional presentations. Gloss chooses the matching entry with the highest priority, then the lexicographically smallest id when priorities tie.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/variant"
+      }
     },
-    "motion": {
-      "description": "Mid-air tumble. Applies while the item is falling; once it lands the landing block takes over.",
-      "$ref": "#/$defs/motion"
-    },
-    "landing": {
-      "description": "The resting pose an item settles into once it touches the ground.",
-      "$ref": "#/$defs/landing"
-    },
-    "labels": {
-      "description": "The floating TextDisplay name drawn above a dropped stack.",
-      "$ref": "#/$defs/labels"
-    },
-    "filters": {
-      "description": "Which drops get a presentation at all. A filtered-out item keeps its ordinary vanilla appearance.",
-      "$ref": "#/$defs/filters"
-    },
-    "physics": {
-      "description": "Real changes to how the dropped Item entity moves, not just how it looks. Disabled by default. These knobs write to the entity's velocity and gravity flag, so they move the item's real position and its pickup hitbox with it. They only apply while the item has a Gloss presentation: a filtered-out or ineligible drop falls exactly as vanilla does.",
-      "$ref": "#/$defs/physics"
-    },
-    "script": {
-      "description": "The scripted presentation layer: expression strings compiled once when the document loads. Expressions without index are shared by the stack, and static settled plans are not reevaluated until their inputs change. Disabled by default, and additive - it composes on top of everything the scale, motion and landing blocks already computed rather than replacing it. Script results move the DISPLAY only; the item entity, its collision and its pickup radius stay where Minecraft put them. Use the physics block when the item itself must move.",
-      "$ref": "#/$defs/script"
-    },
-    "animation": {
-      "description": "Typed keyframe animation profiles selected by material. Clips are triggered by lifecycle events and physical phases, then compose scalar display, physics-gate, glow and temporary-light outputs. Disabled by default and independent of the advanced script layer.",
-      "$ref": "#/$defs/animation"
+    "audience": {
+      "description": "The per-viewer condition controlling who receives the shared real-drop models and label. A viewer who does not match receives the vanilla item instead.",
+      "$ref": "#/$defs/audience"
     }
   },
   "$defs": {
+    "presentation": {
+      "title": "Presentation",
+      "description": "A complete shared real-drop style selected once for the item.",
+      "type": "object",
+      "properties": {
+        "limits": {
+          "description": "Update cadence and per-chunk budget.",
+          "$ref": "#/$defs/limits"
+        },
+        "scale": {
+          "description": "Base display size per model shape.",
+          "$ref": "#/$defs/scale"
+        },
+        "motion": {
+          "description": "Mid-air tumble and supported ground roll.",
+          "$ref": "#/$defs/motion"
+        },
+        "landing": {
+          "description": "The resting pose an item settles into.",
+          "$ref": "#/$defs/landing"
+        },
+        "labels": {
+          "description": "The floating TextDisplay name drawn above a dropped stack.",
+          "$ref": "#/$defs/labels"
+        },
+        "filters": {
+          "description": "Which drops receive this presentation.",
+          "$ref": "#/$defs/filters"
+        },
+        "physics": {
+          "description": "Optional changes to the authoritative Item entity's movement.",
+          "$ref": "#/$defs/physics"
+        },
+        "script": {
+          "description": "The compiled expression layer composed over the base presentation.",
+          "$ref": "#/$defs/script"
+        },
+        "animation": {
+          "description": "Typed keyframe animation profiles selected by material.",
+          "$ref": "#/$defs/animation"
+        }
+      }
+    },
+    "variant": {
+      "title": "Conditional presentation variant",
+      "type": "object",
+      "required": ["id", "priority", "when", "presentation"],
+      "properties": {
+        "id": {
+          "description": "Stable tie-break identifier using letters, digits, dot, underscore, or hyphen.",
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._-]+$"
+        },
+        "priority": {
+          "description": "Selection priority, clamped to -10000 through 10000. Higher values win.",
+          "type": "integer",
+          "minimum": -10000,
+          "maximum": 10000
+        },
+        "when": {
+          "description": "Boolean condition evaluated against the immutable drop, source, event, world, server, time, and metric context.",
+          "type": "string",
+          "minLength": 1
+        },
+        "presentation": {
+          "description": "Complete shared presentation used when this variant wins.",
+          "$ref": "#/$defs/presentation"
+        }
+      }
+    },
+    "audience": {
+      "title": "Audience",
+      "type": "object",
+      "required": ["when"],
+      "properties": {
+        "when": {
+          "description": "Boolean condition evaluated separately on each viewer's owning thread. true grants the Gloss models and label; false leaves that viewer on the vanilla item.",
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
     "limits": {
       "title": "Limits",
       "type": "object",

@@ -39,7 +39,9 @@ class RealDropResetTest {
         ShippedDefaults defaults = defaults();
         defaults.extractMissing();
         File document = new File(folder, RealDropSettingsDoc.DEFAULT_ID + ".json");
-        Files.writeString(document.toPath(), "{\"schemaVersion\":1,\"revision\":9,\"limits\":{\"spread\":1}}");
+        Files.writeString(document.toPath(),
+            "{\"schemaVersion\":2,\"revision\":9,\"presentation\":{\"limits\":{\"spread\":1}},"
+                + "\"variants\":[],\"audience\":{\"when\":\"true\"}}");
 
         List<String> restored = defaults.resetToDefault(RealDropSettingsDoc.DEFAULT_ID);
 

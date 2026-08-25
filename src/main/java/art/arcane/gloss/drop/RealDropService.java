@@ -19,6 +19,7 @@ import org.bukkit.entity.Display;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Item;
 import org.bukkit.entity.ItemDisplay;
+import org.bukkit.entity.Player;
 import org.bukkit.entity.TextDisplay;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.persistence.PersistentDataType;
@@ -30,15 +31,12 @@ import org.joml.Vector3f;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.EnumMap;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.function.Supplier;
 
 final class RealDropService {
     private static final float DEG_TO_RAD = (float) (Math.PI / 180.0D);
@@ -53,7 +51,6 @@ final class RealDropService {
     static final int MAX_ACTIVE_PRESENTATIONS = 2048;
 
     private final Gloss plugin;
-    private final Supplier<GlossConfig.RealDrops> configSupplier;
     private final NamespacedKey markerKey;
     private final NamespacedKey ownerKey;
     private final NamespacedKey restoreNameKey;
@@ -64,16 +61,11 @@ final class RealDropService {
     private final Map<ChunkKey, Integer> lightChunkUsage;
     private final AdmissionBudget admissions;
 
-    private volatile Set<String> disabledWorlds = Set.of();
-    private volatile Set<String> materialBlacklist = Set.of();
     private volatile boolean running;
     private volatile long generation;
-    private volatile RealDropScriptPlan scriptPlan;
-    private volatile RealDropAnimationPlan authoredAnimationPlan;
 
-    RealDropService(Gloss plugin, Supplier<GlossConfig.RealDrops> configSupplier) {
+    RealDropService(Gloss plugin) {
         this.plugin = plugin;
-        this.configSupplier = configSupplier;
         this.markerKey = new NamespacedKey(plugin, "real_drop");
         this.ownerKey = new NamespacedKey(plugin, "real_drop_owner");
         this.restoreNameKey = new NamespacedKey(plugin, "real_drop_name_visible");
@@ -88,18 +80,11 @@ final class RealDropService {
     void enable() {
         generation++;
         running = true;
-        GlossConfig.RealDrops.Filters filters = config().filters();
-        disabledWorlds = normalized(filters.disabledWorlds(), false);
-        materialBlacklist = normalized(filters.materialBlacklist(), true);
-        scriptPlan = compileScript(config().script());
-        authoredAnimationPlan = RealDropAnimationPlan.compile(config().animation());
     }
 
     void disable() {
         running = false;
         generation++;
-        scriptPlan = null;
-        authoredAnimationPlan = null;
         List<State> snapshot = new ArrayList<>(states.values());
         for (State state : snapshot) {
             state.closed = true;
@@ -111,15 +96,15 @@ final class RealDropService {
         }
     }
 
-    void present(Item item, Label label) {
+    void present(Item item, Label label, RealDropConditionPlan.Selection selection) {
         if (item == null) {
             return;
         }
         if (!plugin.scheduler().isOwnedByCurrentRegion(item)) {
-            plugin.scheduler().runEntity(item, () -> presentOwned(item, label));
+            plugin.scheduler().runEntity(item, () -> presentOwned(item, label, selection));
             return;
         }
-        presentOwned(item, label);
+        presentOwned(item, label, selection);
     }
 
     void remove(Item item) {
@@ -147,13 +132,15 @@ final class RealDropService {
         return states.size();
     }
 
-    private void presentOwned(Item item, Label requestedLabel) {
+    private void presentOwned(Item item, Label requestedLabel,
+                              RealDropConditionPlan.Selection selection) {
         State existing = states.get(item.getUniqueId());
         if (existing == null) {
             healOwned(item);
         }
         Label label = effectiveLabel(item, requestedLabel);
-        if (!running || !config().enabled() || !eligible(item)) {
+        GlossConfig.RealDrops config = selection.style().config();
+        if (!running || !config.enabled() || selection.emptyAudience() || !eligible(item, config)) {
             if (existing != null) {
                 existing.closed = true;
                 teardownOwned(existing);
@@ -162,10 +149,13 @@ final class RealDropService {
             }
             return;
         }
-        if (existing != null && existing.generation == generation && !existing.closed) {
+        if (existing != null && existing.generation == generation && !existing.closed
+            && existing.selection.style() == selection.style()) {
+            existing.selection = selection;
             if (!presentationOwned(existing)) {
-                moveCarrier(existing, config().limits().updateIntervalTicks());
-                plugin.scheduler().runEntity(item, () -> presentOwned(item, requestedLabel), 1);
+                moveCarrier(existing, config.limits().updateIntervalTicks());
+                plugin.scheduler().runEntity(item,
+                    () -> presentOwned(item, requestedLabel, selection), 1);
                 return;
             }
             refreshOwned(existing, label);
@@ -175,10 +165,10 @@ final class RealDropService {
             existing.closed = true;
             teardownOwned(existing);
         }
-        createOwned(item, label);
+        createOwned(item, label, selection);
     }
 
-    private void createOwned(Item item, Label label) {
+    private void createOwned(Item item, Label label, RealDropConditionPlan.Selection selection) {
         if (!item.isValid() || item.isDead()) {
             return;
         }
@@ -197,7 +187,7 @@ final class RealDropService {
         boolean chunkReserved = false;
         State state = null;
         try {
-            GlossConfig.RealDrops config = config();
+            GlossConfig.RealDrops config = selection.style().config();
             ItemStack stack = item.getItemStack();
             int visualCount = desiredVisualCount(stack, config);
             boolean createLabel = config.labels().enabled() && !label.lines().isEmpty();
@@ -215,7 +205,7 @@ final class RealDropService {
             boolean restoreName = item.isCustomNameVisible();
             state = new State(
                 item, createGeneration, reservedChunk, reserved, restoreVisibility, restoreName,
-                item.hasGravity(), admission);
+                item.hasGravity(), admission, selection);
             state.modelKind = RealDropModel.modelKind(stack.getType());
             state.lastPollDelayTicks = config.limits().updateIntervalTicks();
             Quaternionf initialRotation = RealDropModel.baseRotation(state.modelKind);
@@ -231,7 +221,7 @@ final class RealDropService {
             state.onGround = item.isOnGround();
             state.inWater = item.isInWater();
             state.inLava = inLava(item);
-            refreshEnvironment(state, scriptPlan);
+            refreshEnvironment(state, selection.style().script());
             state.authoredSample = authoredAnimationSample(state);
             applyAuthoredPhysics(state, state.authoredSample.physics());
             updateAuthoredLight(state, state.authoredSample.lightLevel());
@@ -252,7 +242,8 @@ final class RealDropService {
             item.getPersistentDataContainer().set(markerKey, PersistentDataType.BOOLEAN, true);
             item.getPersistentDataContainer().set(restoreNameKey, PersistentDataType.BOOLEAN, restoreName);
             item.getPersistentDataContainer().set(restoreVisibilityKey, PersistentDataType.BOOLEAN, restoreVisibility);
-            DisplayVisibility.setVisibleByDefault(item, false);
+            DisplayVisibility.setVisibleByDefault(item,
+                selection.universalAudience() ? false : restoreVisibility);
             if (createLabel && restoreName) {
                 item.setCustomNameVisible(false);
             }
@@ -260,11 +251,12 @@ final class RealDropService {
             applyPose(state, state.animation.rotation(), state.onGround
                 ? config.landing().transitionTicks()
                 : config.limits().updateIntervalTicks());
-            if (!presentationStillCurrent(running, generation, createGeneration, config().enabled())) {
+            if (!presentationStillCurrent(running, generation, createGeneration, config.enabled())) {
                 state.closed = true;
                 teardownOwned(state);
                 return;
             }
+            reconcileAudience(state);
             scheduleTick(state, config.limits().updateIntervalTicks());
         } catch (RuntimeException | Error failure) {
             try {
@@ -314,6 +306,9 @@ final class RealDropService {
         display.setInterpolationDuration(config.limits().updateIntervalTicks());
         display.getPersistentDataContainer().set(ownerKey, PersistentDataType.STRING,
             state.item.getUniqueId().toString());
+        if (!state.selection.universalAudience()) {
+            DisplayVisibility.setVisibleByDefault(display, false);
+        }
         if (index > 0 && !carrier(state).addPassenger(display)) {
             display.remove();
             throw new IllegalStateException("Display carrier refused an additional dropped-item model");
@@ -344,6 +339,9 @@ final class RealDropService {
             new Quaternionf()));
         display.getPersistentDataContainer().set(ownerKey, PersistentDataType.STRING,
             state.item.getUniqueId().toString());
+        if (!state.selection.universalAudience()) {
+            DisplayVisibility.setVisibleByDefault(display, false);
+        }
         if (!carrier(state).addPassenger(display)) {
             display.remove();
             throw new IllegalStateException("Display carrier refused the dropped-item label");
@@ -357,9 +355,10 @@ final class RealDropService {
             return;
         }
         try {
-            GlossConfig.RealDrops config = config();
+            GlossConfig.RealDrops config = state.selection.style().config();
             refreshVisuals(state, config);
             refreshLabel(state, label, config);
+            reconcileAudience(state);
         } catch (RuntimeException failure) {
             failState(state, failure);
         }
@@ -476,18 +475,19 @@ final class RealDropService {
         if (state.closed || state.generation != generation || states.get(state.item.getUniqueId()) != state) {
             return;
         }
-        if (!running || !config().enabled() || !state.item.isValid() || state.item.isDead()) {
+        GlossConfig.RealDrops config = state.selection.style().config();
+        if (!running || !config.enabled() || !state.item.isValid() || state.item.isDead()) {
             state.closed = true;
             teardownOwned(state);
             return;
         }
-        if (!eligible(state.item)) {
+        if (!eligible(state.item, config)) {
             state.closed = true;
             teardownOwned(state);
             return;
         }
 
-        GlossConfig.RealDrops config = config();
+        RealDropScriptPlan scriptPlan = state.selection.style().script();
         int elapsedTicks = Math.max(1, state.lastPollDelayTicks);
         state.animationAgeTicks += elapsedTicks;
         RealDropAnimationPlan.AnimationSample sampledAnimation = authoredAnimationSample(state);
@@ -547,6 +547,7 @@ final class RealDropService {
             state.lastItemX = itemLocation.getX();
             state.lastItemZ = itemLocation.getZ();
             state.lastPollDelayTicks = pollDelayTicks;
+            reconcileAudience(state);
             scheduleTick(state, pollDelayTicks);
             return;
         }
@@ -567,6 +568,7 @@ final class RealDropService {
         state.lastItemX = itemLocation.getX();
         state.lastItemZ = itemLocation.getZ();
         state.lastPollDelayTicks = pollDelayTicks;
+        reconcileAudience(state);
         scheduleTick(state, pollDelayTicks);
     }
 
@@ -578,8 +580,8 @@ final class RealDropService {
     }
 
     private void applyPose(State state, Quaternionf rotation, int interpolationTicks) {
-        GlossConfig.RealDrops config = config();
-        RealDropScriptPlan plan = scriptPlan;
+        GlossConfig.RealDrops config = state.selection.style().config();
+        RealDropScriptPlan plan = state.selection.style().script();
         int count = state.visuals.size();
         RealDropScriptPlan.RealDropScriptSample sharedSample = plan != null && !plan.perModelRequired()
             ? sample(state, plan, 0, count)
@@ -675,21 +677,8 @@ final class RealDropService {
             new Quaternionf());
     }
 
-    private RealDropScriptPlan compileScript(GlossConfig.RealDrops.Script script) {
-        if (script == null || !script.enabled()) {
-            return null;
-        }
-        try {
-            return RealDropScriptPlan.compile(script);
-        } catch (RuntimeException failure) {
-            Gloss.logExceptionStack(false, failure,
-                "Real drop script is invalid and was ignored; the document's other settings still apply.");
-            return null;
-        }
-    }
-
     private RealDropAnimationPlan.AnimationSample authoredAnimationSample(State state) {
-        RealDropAnimationPlan plan = authoredAnimationPlan;
+        RealDropAnimationPlan plan = state.selection.style().animation();
         if (plan == null || !plan.enabled()) {
             return RealDropAnimationPlan.AnimationSample.neutral("");
         }
@@ -699,7 +688,7 @@ final class RealDropService {
     }
 
     private boolean authoredAnimationRequiresContinuousUpdates(State state) {
-        RealDropAnimationPlan plan = authoredAnimationPlan;
+        RealDropAnimationPlan plan = state.selection.style().animation();
         if (plan == null || !plan.enabled()) {
             return false;
         }
@@ -938,7 +927,8 @@ final class RealDropService {
     }
 
     private PresentationSample presentationSample(State state, int index, int count) {
-        return composePresentation(state.authoredSample, sample(state, scriptPlan, index, count));
+        return composePresentation(state.authoredSample,
+            sample(state, state.selection.style().script(), index, count));
     }
 
     private static PresentationSample composePresentation(
@@ -1115,6 +1105,79 @@ final class RealDropService {
         }
     }
 
+    private void reconcileAudience(State state) {
+        RealDropConditionPlan.Selection selection = state.selection;
+        if (selection.universalAudience() || state.closed) {
+            return;
+        }
+        GlossConfig.RealDrops config = selection.style().config();
+        double range = Math.max(config.limits().viewRange(), config.labels().viewRange());
+        List<Display> displays = visibleDisplays(state);
+        for (Entity nearby : state.item.getNearbyEntities(range, range, range)) {
+            if (!(nearby instanceof Player viewer)) {
+                continue;
+            }
+            state.audienceViewers.add(viewer.getUniqueId());
+            dispatchAudience(state, selection, viewer, displays);
+        }
+    }
+
+    private List<Display> visibleDisplays(State state) {
+        List<Display> displays = new ArrayList<>(state.visuals.size() + 1);
+        displays.addAll(state.visuals);
+        if (state.label != null) {
+            displays.add(state.label);
+        }
+        return List.copyOf(displays);
+    }
+
+    private void dispatchAudience(State state, RealDropConditionPlan.Selection selection,
+                                  Player viewer, List<Display> displays) {
+        plugin.scheduler().runEntity(viewer, () -> {
+            if (state.closed || !viewer.isOnline()) {
+                return;
+            }
+            boolean visible = selection.visibleTo(plugin, viewer);
+            if (visible) {
+                viewer.hideEntity(plugin, state.item);
+            } else if (state.restoreVisibleByDefault) {
+                viewer.showEntity(plugin, state.item);
+            } else {
+                viewer.hideEntity(plugin, state.item);
+            }
+            for (Display display : displays) {
+                if (visible) {
+                    viewer.showEntity(plugin, display);
+                } else {
+                    viewer.hideEntity(plugin, display);
+                }
+            }
+        });
+    }
+
+    private void restoreAudience(State state) {
+        if (state.selection.universalAudience() || state.audienceViewers.isEmpty()) {
+            return;
+        }
+        for (UUID viewerId : state.audienceViewers) {
+            Player viewer = plugin.getServer().getPlayer(viewerId);
+            if (viewer == null) {
+                continue;
+            }
+            plugin.scheduler().runEntity(viewer, () -> {
+                if (!viewer.isOnline()) {
+                    return;
+                }
+                if (state.restoreVisibleByDefault) {
+                    viewer.showEntity(plugin, state.item);
+                } else {
+                    viewer.hideEntity(plugin, state.item);
+                }
+            });
+        }
+        state.audienceViewers.clear();
+    }
+
     private void scheduleTeardown(State state) {
         boolean accepted = FoliaScheduler.runEntity(plugin, state.item,
             () -> teardownOwned(state), 0L, () -> retire(state));
@@ -1129,6 +1192,7 @@ final class RealDropService {
         }
         boolean current = states.remove(state.item.getUniqueId(), state);
         state.closed = true;
+        restoreAudience(state);
         release(state.chunkKey, state.reserved);
         state.reserved = 0;
         state.admission.close();
@@ -1156,6 +1220,7 @@ final class RealDropService {
         }
         states.remove(state.itemId, state);
         state.closed = true;
+        restoreAudience(state);
         release(state.chunkKey, state.reserved);
         state.reserved = 0;
         state.admission.close();
@@ -1198,22 +1263,19 @@ final class RealDropService {
         item.getPersistentDataContainer().remove(restoreVisibilityKey);
     }
 
-    private boolean eligible(Item item) {
+    private boolean eligible(Item item, GlossConfig.RealDrops config) {
         if (!item.isValid() || item.isDead()) {
             return false;
         }
-        if (disabledWorlds.contains(item.getWorld().getName().toLowerCase(Locale.ROOT))) {
+        if (containsIgnoreCase(config.filters().disabledWorlds(), item.getWorld().getName())) {
             return false;
         }
         Material material = item.getItemStack().getType();
-        if (material == Material.AIR || materialBlacklist.contains(material.name())) {
+        if (material == Material.AIR || containsIgnoreCase(
+            config.filters().materialBlacklist(), material.name())) {
             return false;
         }
-        return !config().filters().onlyPlayerDrops() || item.getThrower() != null;
-    }
-
-    private GlossConfig.RealDrops config() {
-        return configSupplier.get();
+        return !config.filters().onlyPlayerDrops() || item.getThrower() != null;
     }
 
     private Label effectiveLabel(Item item, Label requested) {
@@ -1374,16 +1436,13 @@ final class RealDropService {
         });
     }
 
-    private static Set<String> normalized(List<String> values, boolean uppercase) {
-        Set<String> normalized = new HashSet<>(values.size());
+    private static boolean containsIgnoreCase(List<String> values, String expected) {
         for (String value : values) {
-            if (value == null || value.isBlank()) {
-                continue;
+            if (value.equalsIgnoreCase(expected)) {
+                return true;
             }
-            String clean = value.trim();
-            normalized.add(uppercase ? clean.toUpperCase(Locale.ROOT) : clean.toLowerCase(Locale.ROOT));
         }
-        return Set.copyOf(normalized);
+        return false;
     }
 
     record Label(List<String> lines) {
@@ -1417,6 +1476,7 @@ final class RealDropService {
         private final float[] appliedViewRange;
         private final int[] appliedLightLevel;
         private final Map<GlossConfig.RealDrops.AnimationTrigger, Long> eventTicks;
+        private final Set<UUID> audienceViewers;
         private final AdmissionBudget.Lease admission;
         private final AtomicBoolean destroyed = new AtomicBoolean();
 
@@ -1458,11 +1518,12 @@ final class RealDropService {
         private LightKey lightBlock;
         private ChunkKey lightChunk;
         private int lightLevel;
+        private volatile RealDropConditionPlan.Selection selection;
         private volatile boolean closed;
 
         private State(Item item, long generation, ChunkKey chunkKey, int reserved,
                       boolean restoreVisibleByDefault, boolean restoreNameVisible, boolean restoreGravity,
-                      AdmissionBudget.Lease admission) {
+                      AdmissionBudget.Lease admission, RealDropConditionPlan.Selection selection) {
             this.item = item;
             this.itemId = item.getUniqueId();
             this.generation = generation;
@@ -1472,6 +1533,7 @@ final class RealDropService {
             this.restoreGravity = restoreGravity;
             this.restoreNameVisible = restoreNameVisible;
             this.admission = admission;
+            this.selection = selection;
             this.visuals = new ArrayList<>();
             this.spawnNanos = System.nanoTime();
             this.random = RealDropScriptPlan.RealDropScriptContext.stableRandom(item.getUniqueId());
@@ -1479,6 +1541,7 @@ final class RealDropService {
             this.appliedViewRange = new float[MAX_VISUALS];
             this.appliedLightLevel = new int[MAX_VISUALS];
             this.eventTicks = new EnumMap<>(GlossConfig.RealDrops.AnimationTrigger.class);
+            this.audienceViewers = ConcurrentHashMap.newKeySet();
             Arrays.fill(this.appliedViewRange, -1.0F);
             Arrays.fill(this.appliedLightLevel, -1);
             this.velocity = new Vector();

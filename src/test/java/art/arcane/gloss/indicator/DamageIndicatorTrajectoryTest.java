@@ -3,6 +3,8 @@ package art.arcane.gloss.indicator;
 import org.bukkit.util.Vector;
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class DamageIndicatorTrajectoryTest {
@@ -12,8 +14,8 @@ class DamageIndicatorTrajectoryTest {
     void sampleUsesClosedFormBallisticMotion() {
         DamageIndicatorSettingsDoc.Motion motion =
             new DamageIndicatorSettingsDoc.Motion(2.0D, 3.0D, -4.0D, 90.0D);
-        DamageIndicatorSettingsDoc.Presentation presentation =
-            new DamageIndicatorSettingsDoc.Presentation(1.0D, 2.0D, 0.5D);
+        DamageIndicatorSettingsDoc.Transform presentation =
+            new DamageIndicatorSettingsDoc.Transform(1.0D, 2.0D, 0.5D);
 
         DamageIndicatorTrajectory.Frame frame = DamageIndicatorTrajectory.sample(
             new Vector(1.0D, 2.0D, 3.0D), motion, presentation,
@@ -30,11 +32,13 @@ class DamageIndicatorTrajectoryTest {
     @Test
     void fadeIsLinearAfterItsConfiguredLifetimeFraction() {
         DamageIndicatorSettingsDoc.Style style = new DamageIndicatorSettingsDoc.Style(
-            true,
-            "{amount}",
-            new Vector(),
-            new DamageIndicatorSettingsDoc.Motion(0.0D, 0.0D, 0.0D, 0.0D),
-            new DamageIndicatorSettingsDoc.Presentation(1.0D, 1.0D, 0.5D));
+            "true",
+            new DamageIndicatorSettingsDoc.IndicatorPresentation(
+                "{amount}",
+                new Vector(),
+                new DamageIndicatorSettingsDoc.Motion(0.0D, 0.0D, 0.0D, 0.0D),
+                new DamageIndicatorSettingsDoc.Transform(1.0D, 1.0D, 0.5D)),
+            List.of());
 
         assertEquals(1.0D, DamageIndicatorTrajectory.sample(style, 0.0D, 1.0D, 2.0D).opacity(), EPSILON);
         assertEquals(0.5D, DamageIndicatorTrajectory.sample(style, 0.0D, 1.5D, 2.0D).opacity(), EPSILON);

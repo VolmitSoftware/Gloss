@@ -53,9 +53,4 @@ class IndicatorAdmissionTest {
         assertFalse(DamageIndicatorsService.spawnStillCurrent(true, 9L, 8L, true));
         assertFalse(DamageIndicatorsService.spawnStillCurrent(true, 8L, 8L, false));
     }
-
-    @Test
-    void periodicPermissionRefreshHasAFixedPerDriverBudget() {
-        assertEquals(16, DamageIndicatorsService.PERMISSION_REFRESHES_PER_DRIVER);
-    }
 }

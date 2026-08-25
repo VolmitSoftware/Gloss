@@ -49,7 +49,7 @@ class BoardStorageQueueTest {
 
         BoardDoc alpha = BoardDoc.parse("alpha.json", Files.readString(new File(folder, "alpha.json").toPath()));
         assertEquals(2L, alpha.revision());
-        assertEquals("second", alpha.title());
+        assertEquals("second", alpha.presentation().title());
         assertFalse(new File(folder, "beta.json").exists());
     }
 
@@ -76,8 +76,8 @@ class BoardStorageQueueTest {
     }
 
     private static BoardDoc document(long revision, String title) {
-        return new BoardDoc(BoardDoc.CURRENT_SCHEMA_VERSION, revision, title, List.of(), false, false,
-            GlossBoardMeta.UNRESTRICTED_PERMISSION, List.of());
+        return new BoardDoc(BoardDoc.CURRENT_SCHEMA_VERSION, revision, BoardDoc.Selection.NEVER,
+            new BoardDoc.Presentation(title, List.of(), false), List.of());
     }
 
     private static Logger logger() {

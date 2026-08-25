@@ -1,18 +1,18 @@
 package art.arcane.gloss.bubble;
 
+import art.arcane.gloss.condition.ConditionCompiler;
+import art.arcane.gloss.condition.ConditionSource;
 import art.arcane.gloss.doc.DocumentEnvelope;
 import art.arcane.gloss.doc.DocumentParsers;
 import org.bukkit.util.Vector;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Locale;
 
 public record BubbleStyleDoc(int schemaVersion, long revision, String prefix, Vector offset, int wordWrapChars,
                              long maxAliveMs, boolean followPlayer, boolean hideOwn, Motion motion,
                              Shimmer shimmer, Select select) {
     public static final String KIND = "bubbles";
-    public static final int CURRENT_SCHEMA_VERSION = 2;
+    public static final int CURRENT_SCHEMA_VERSION = 3;
     public static final String DEFAULT_TRANSLATION_Y =
         "10 * pow(clamp((ageMs - lifetimeMs + 2000) / 2000, 0, 1), 16)";
 
@@ -116,25 +116,13 @@ public record BubbleStyleDoc(int schemaVersion, long revision, String prefix, Ve
         }
     }
 
-    public record Select(List<String> worlds, List<String> groups, int priority) {
+    public record Select(int priority, String when) {
         public Select {
-            worlds = cleanStrings(worlds, false);
-            groups = cleanStrings(groups, true);
-        }
-
-        private static List<String> cleanStrings(List<String> values, boolean lowercase) {
-            if (values == null) {
-                return List.of();
+            when = when == null ? "" : when.trim();
+            if (when.isEmpty()) {
+                throw new IllegalArgumentException("Bubble style selection condition may not be blank.");
             }
-            List<String> cleaned = new ArrayList<>(values.size());
-            for (String value : values) {
-                if (value == null || value.isBlank()) {
-                    continue;
-                }
-                String normalized = value.trim();
-                cleaned.add(lowercase ? normalized.toLowerCase(Locale.ROOT) : normalized);
-            }
-            return List.copyOf(cleaned);
+            ConditionCompiler.compile(new ConditionSource("bubbles.select.when", when));
         }
     }
 }

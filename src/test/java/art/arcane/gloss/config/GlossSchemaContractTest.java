@@ -155,12 +155,32 @@ public class GlossSchemaContractTest {
   public void realDropsSchemaCoversEveryDocumentBlockTheParserAccepts() throws IOException {
     JsonObject properties = realDropsSchema().getAsJsonObject("properties");
 
-    assertEquals(
-        List.of("schemaVersion", "revision", "limits", "scale", "motion", "landing", "labels",
-            "filters", "physics", "script", "animation"),
+    assertEquals(List.of("schemaVersion", "revision", "presentation", "variants", "audience"),
         List.copyOf(properties.keySet()));
-    assertEquals(1, properties.getAsJsonObject("schemaVersion").get("const").getAsInt());
-    assertEquals(List.of("schemaVersion", "revision"), required(realDropsSchema()));
+    assertEquals(2, properties.getAsJsonObject("schemaVersion").get("const").getAsInt());
+    assertEquals(List.of("schemaVersion", "revision", "presentation", "variants", "audience"),
+        required(realDropsSchema()));
+    JsonObject presentation = realDropsSchema().getAsJsonObject("$defs")
+        .getAsJsonObject("presentation").getAsJsonObject("properties");
+    assertEquals(List.of("limits", "scale", "motion", "landing", "labels", "filters", "physics",
+        "script", "animation"), List.copyOf(presentation.keySet()));
+  }
+
+  @Test
+  public void damageIndicatorSchemaMatchesTheConditionalV2Document() throws IOException {
+    JsonObject schema = damageIndicatorSchema();
+    JsonObject properties = schema.getAsJsonObject("properties");
+    JsonObject definitions = schema.getAsJsonObject("$defs");
+
+    assertEquals(2, properties.getAsJsonObject("schemaVersion").get("const").getAsInt());
+    assertEquals(List.of("schemaVersion", "revision", "limits", "damage", "healing", "audience"),
+        required(schema));
+    assertEquals(List.of("when", "presentation", "variants"),
+        required(definitions.getAsJsonObject("style")));
+    assertEquals(List.of("id", "priority", "when", "presentation"),
+        required(definitions.getAsJsonObject("variant")));
+    assertEquals(List.of("format", "offset", "motion", "transform"),
+        required(definitions.getAsJsonObject("completePresentation")));
   }
 
   @Test
@@ -225,6 +245,12 @@ public class GlossSchemaContractTest {
 
   private static JsonObject realDropsSchema() throws IOException {
     Path path = Path.of(System.getProperty("user.dir"), "schema", "gloss-real-drops.schema.json");
+    return JsonParser.parseString(Files.readString(path)).getAsJsonObject();
+  }
+
+  private static JsonObject damageIndicatorSchema() throws IOException {
+    Path path = Path.of(System.getProperty("user.dir"), "schema",
+        "gloss-damage-indicators.schema.json");
     return JsonParser.parseString(Files.readString(path)).getAsJsonObject();
   }
 

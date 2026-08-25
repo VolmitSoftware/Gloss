@@ -106,8 +106,10 @@ class GlossBoardMetaRenderPlanTest {
     void anEmojiRegistryChangeRebuildsThePlan() {
         GlossBoardMeta meta = new GlossBoardMeta("stats");
         meta.addLine(":heart:");
-        GlossBoardMeta.RenderPlan first = meta.renderPlan(1L, MAX_LINES, staticRender);
-        GlossBoardMeta.RenderPlan second = meta.renderPlan(2L, MAX_LINES, staticRender);
+        GlossBoardMeta.RenderPlan first = meta.renderPlan(
+            "base", meta.presentation(), 1L, MAX_LINES, staticRender);
+        GlossBoardMeta.RenderPlan second = meta.renderPlan(
+            "base", meta.presentation(), 2L, MAX_LINES, staticRender);
 
         assertNotSame(first, second);
         assertEquals(2, rendered.size());
@@ -130,7 +132,8 @@ class GlossBoardMetaRenderPlanTest {
         GlossBoardMeta meta = new GlossBoardMeta("stats");
         meta.setTitle("&aabcdefghijklmnopqrstuvwxyz\uD840\uDC00tail");
 
-        GlossBoardMeta.RenderPlan plan = meta.renderPlan(0L, MAX_LINES, staticRender);
+        GlossBoardMeta.RenderPlan plan = meta.renderPlan(
+            "base", meta.presentation(), 0L, MAX_LINES, staticRender);
 
         assertEquals("&AABCDEFGHIJKLMNOPQRSTUVWXYZ\uD840\uDC00TAIL", plan.staticTitle());
     }
@@ -150,12 +153,13 @@ class GlossBoardMetaRenderPlanTest {
         GlossBoardMeta meta = new GlossBoardMeta("stats");
         meta.addLine("&7Online");
 
-        GlossBoardMeta.RenderPlan plan = meta.renderPlan(0L, MAX_LINES, raw -> null);
+        GlossBoardMeta.RenderPlan plan = meta.renderPlan(
+            "base", meta.presentation(), 0L, MAX_LINES, raw -> null);
 
         assertEquals("", plan.staticLine(0));
     }
 
     private GlossBoardMeta.RenderPlan plan(GlossBoardMeta meta) {
-        return meta.renderPlan(0L, MAX_LINES, staticRender);
+        return meta.renderPlan("base", meta.presentation(), 0L, MAX_LINES, staticRender);
     }
 }

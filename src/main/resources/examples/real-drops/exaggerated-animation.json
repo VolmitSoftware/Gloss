@@ -1,222 +1,399 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "revision": 1,
-  "limits": {
-    "updateIntervalTicks": 1,
-    "settledPollIntervalTicks": 20,
-    "maxVisualsPerStack": 3,
-    "maxVisualsPerChunk": 128,
-    "viewRange": 48.0,
-    "spread": 0.18
-  },
-  "scale": {
-    "defaultScale": 0.4,
-    "flatItems": 0.65,
-    "thinBlocks": 0.45
-  },
-  "motion": {
-    "tumble": true,
-    "speedMultiplier": 1.35,
-    "degreesPerSecondX": 160.0,
-    "degreesPerSecondY": 120.0,
-    "degreesPerSecondZ": 100.0,
-    "variance": 0.2,
-    "changeOnBounce": true,
-    "velocityInfluence": 0.35,
-    "submergedSpinMultiplier": 0.35,
-    "groundRollMultiplier": 1.0
-  },
-  "landing": {
-    "mode": "NATURAL",
-    "tiltDegrees": 10.0,
-    "randomYaw": true,
-    "transitionTicks": 4,
-    "faceAttraction": 0.55,
-    "movingFaceAttraction": 0.15,
-    "alignmentDegrees": 0.5,
-    "settleDelayTicks": 4
-  },
-  "labels": {
-    "enabled": true,
-    "yOffset": 0.55,
-    "scale": 0.85,
-    "viewRange": 48.0,
-    "billboard": "CENTER",
-    "seeThrough": true,
-    "shadow": true,
-    "background": true,
-    "backgroundRed": 0,
-    "backgroundGreen": 0,
-    "backgroundBlue": 0,
-    "backgroundAlpha": 80
-  },
-  "filters": {
-    "disabledWorlds": [],
-    "materialBlacklist": [],
-    "onlyPlayerDrops": false
-  },
-  "physics": {
-    "enabled": false,
-    "gravityMultiplier": 1.0,
-    "bounce": 0.0,
-    "waterBuoyancy": 0.0,
-    "waterDrag": 0.0
-  },
-  "script": {
-    "enabled": false,
-    "vars": {},
-    "offset": {"x": "0", "y": "0", "z": "0"},
-    "rotation": {"x": "0", "y": "0", "z": "0"},
-    "scale": {"x": "1", "y": "1", "z": "1"},
-    "glow": "",
-    "visible": "true"
-  },
-  "animation": {
-    "enabled": true,
-    "materialProperties": {
-      "lightSources": {
-        "TORCH": {"glow": 4294936576, "lightLevel": 14},
-        "SOUL_TORCH": {"glow": 4281597951, "lightLevel": 10},
-        "GLOWSTONE": {"glow": 4294963029, "lightLevel": 15}
-      }
+  "presentation": {
+    "limits": {
+      "updateIntervalTicks": 1,
+      "settledPollIntervalTicks": 20,
+      "maxVisualsPerStack": 3,
+      "maxVisualsPerChunk": 128,
+      "viewRange": 48.0,
+      "spread": 0.18
     },
-    "profiles": [
-      {
-        "id": "exaggerated-light-sources",
-        "priority": 100,
-        "materials": ["TORCH", "SOUL_TORCH", "GLOWSTONE"],
-        "clips": [
-          {
-            "trigger": "SPAWN",
-            "durationTicks": 60,
-            "loop": false,
-            "tracks": [
-              {
-                "target": "SCALE_X",
-                "blend": "MULTIPLY",
-                "keyframes": [
-                  {"tick": 0, "value": 4.0, "easing": "LINEAR"},
-                  {"tick": 6, "value": 0.15, "easing": "EASE_IN"},
-                  {"tick": 12, "value": 4.0, "easing": "BACK_OUT"},
-                  {"tick": 20, "value": 1.0, "easing": "EASE_OUT"}
-                ]
-              },
-              {
-                "target": "SCALE_Y",
-                "blend": "MULTIPLY",
-                "keyframes": [
-                  {"tick": 0, "value": 4.0, "easing": "LINEAR"},
-                  {"tick": 6, "value": 0.15, "easing": "EASE_IN"},
-                  {"tick": 12, "value": 4.0, "easing": "BACK_OUT"},
-                  {"tick": 20, "value": 1.0, "easing": "EASE_OUT"}
-                ]
-              },
-              {
-                "target": "SCALE_Z",
-                "blend": "MULTIPLY",
-                "keyframes": [
-                  {"tick": 0, "value": 4.0, "easing": "LINEAR"},
-                  {"tick": 6, "value": 0.15, "easing": "EASE_IN"},
-                  {"tick": 12, "value": 4.0, "easing": "BACK_OUT"},
-                  {"tick": 20, "value": 1.0, "easing": "EASE_OUT"}
-                ]
-              },
-              {
-                "target": "OFFSET_Y",
-                "blend": "ADD",
-                "keyframes": [
-                  {"tick": 0, "value": 0.0, "easing": "LINEAR"},
-                  {"tick": 8, "value": 2.0, "easing": "EASE_OUT"},
-                  {"tick": 36, "value": 2.0, "easing": "HOLD"},
-                  {"tick": 60, "value": 0.0, "easing": "EASE_IN"}
-                ]
-              },
-              {
-                "target": "PHYSICS",
-                "blend": "REPLACE",
-                "keyframes": [
-                  {"tick": 0, "value": 0.0, "easing": "HOLD"},
-                  {"tick": 36, "value": 0.0, "easing": "HOLD"},
-                  {"tick": 37, "value": 1.0, "easing": "LINEAR"}
-                ]
-              },
-              {
-                "target": "ROTATION_X",
-                "blend": "ADD",
-                "keyframes": [
-                  {"tick": 0, "value": 0.0, "easing": "LINEAR"},
-                  {"tick": 60, "value": 1080.0, "easing": "EASE_IN_OUT"}
-                ]
-              },
-              {
-                "target": "ROTATION_Y",
-                "blend": "ADD",
-                "keyframes": [
-                  {"tick": 0, "value": 0.0, "easing": "LINEAR"},
-                  {"tick": 60, "value": 1440.0, "easing": "EASE_IN_OUT"}
-                ]
-              },
-              {
-                "target": "GLOW",
-                "blend": "REPLACE",
-                "keyframes": [
-                  {"tick": 0, "value": 4294902015, "materialMap": "lightSources", "easing": "HOLD"},
-                  {"tick": 42, "value": 4294902015, "materialMap": "lightSources", "easing": "HOLD"},
-                  {"tick": 43, "value": 0, "easing": "HOLD"}
-                ]
-              },
-              {
-                "target": "LIGHT_LEVEL",
-                "blend": "REPLACE",
-                "keyframes": [
-                  {"tick": 0, "value": 12, "materialMap": "lightSources", "easing": "HOLD"},
-                  {"tick": 42, "value": 12, "materialMap": "lightSources", "easing": "HOLD"},
-                  {"tick": 43, "value": 0, "easing": "HOLD"}
-                ]
-              }
-            ]
-          },
-          {
-            "trigger": "AIRBORNE",
-            "durationTicks": 20,
-            "loop": true,
-            "tracks": [
-              {
-                "target": "ROTATION_Z",
-                "blend": "ADD",
-                "keyframes": [
-                  {"tick": 0, "value": 0.0, "easing": "LINEAR"},
-                  {"tick": 20, "value": 360.0, "easing": "LINEAR"}
-                ]
-              }
-            ]
-          }
-        ]
+    "scale": {
+      "defaultScale": 0.4,
+      "flatItems": 0.65,
+      "thinBlocks": 0.45
+    },
+    "motion": {
+      "tumble": true,
+      "speedMultiplier": 1.35,
+      "degreesPerSecondX": 160.0,
+      "degreesPerSecondY": 120.0,
+      "degreesPerSecondZ": 100.0,
+      "variance": 0.2,
+      "changeOnBounce": true,
+      "velocityInfluence": 0.35,
+      "submergedSpinMultiplier": 0.35,
+      "groundRollMultiplier": 1.0
+    },
+    "landing": {
+      "mode": "NATURAL",
+      "tiltDegrees": 10.0,
+      "randomYaw": true,
+      "transitionTicks": 4,
+      "faceAttraction": 0.55,
+      "movingFaceAttraction": 0.15,
+      "alignmentDegrees": 0.5,
+      "settleDelayTicks": 4
+    },
+    "labels": {
+      "enabled": true,
+      "yOffset": 0.55,
+      "scale": 0.85,
+      "viewRange": 48.0,
+      "billboard": "CENTER",
+      "seeThrough": true,
+      "shadow": true,
+      "background": true,
+      "backgroundRed": 0,
+      "backgroundGreen": 0,
+      "backgroundBlue": 0,
+      "backgroundAlpha": 80
+    },
+    "filters": {
+      "disabledWorlds": [],
+      "materialBlacklist": [],
+      "onlyPlayerDrops": false
+    },
+    "physics": {
+      "enabled": false,
+      "gravityMultiplier": 1.0,
+      "bounce": 0.0,
+      "waterBuoyancy": 0.0,
+      "waterDrag": 0.0
+    },
+    "script": {
+      "enabled": false,
+      "vars": {},
+      "offset": {
+        "x": "0",
+        "y": "0",
+        "z": "0"
       },
-      {
-        "id": "exaggerated-fallback",
-        "priority": 0,
-        "materials": ["*"],
-        "clips": [
-          {
-            "trigger": "SPAWN",
-            "durationTicks": 20,
-            "loop": false,
-            "tracks": [
-              {
-                "target": "SCALE_X",
-                "blend": "MULTIPLY",
-                "keyframes": [
-                  {"tick": 0, "value": 4.0, "easing": "LINEAR"},
-                  {"tick": 6, "value": 0.15, "easing": "EASE_IN"},
-                  {"tick": 12, "value": 4.0, "easing": "BACK_OUT"},
-                  {"tick": 20, "value": 1.0, "easing": "EASE_OUT"}
-                ]
-              }
-            ]
+      "rotation": {
+        "x": "0",
+        "y": "0",
+        "z": "0"
+      },
+      "scale": {
+        "x": "1",
+        "y": "1",
+        "z": "1"
+      },
+      "glow": "",
+      "visible": "true"
+    },
+    "animation": {
+      "enabled": true,
+      "materialProperties": {
+        "lightSources": {
+          "TORCH": {
+            "glow": 4294936576,
+            "lightLevel": 14
+          },
+          "SOUL_TORCH": {
+            "glow": 4281597951,
+            "lightLevel": 10
+          },
+          "GLOWSTONE": {
+            "glow": 4294963029,
+            "lightLevel": 15
           }
-        ]
-      }
-    ]
+        }
+      },
+      "profiles": [
+        {
+          "id": "exaggerated-light-sources",
+          "priority": 100,
+          "materials": [
+            "TORCH",
+            "SOUL_TORCH",
+            "GLOWSTONE"
+          ],
+          "clips": [
+            {
+              "trigger": "SPAWN",
+              "durationTicks": 60,
+              "loop": false,
+              "tracks": [
+                {
+                  "target": "SCALE_X",
+                  "blend": "MULTIPLY",
+                  "keyframes": [
+                    {
+                      "tick": 0,
+                      "value": 4.0,
+                      "easing": "LINEAR"
+                    },
+                    {
+                      "tick": 6,
+                      "value": 0.15,
+                      "easing": "EASE_IN"
+                    },
+                    {
+                      "tick": 12,
+                      "value": 4.0,
+                      "easing": "BACK_OUT"
+                    },
+                    {
+                      "tick": 20,
+                      "value": 1.0,
+                      "easing": "EASE_OUT"
+                    }
+                  ]
+                },
+                {
+                  "target": "SCALE_Y",
+                  "blend": "MULTIPLY",
+                  "keyframes": [
+                    {
+                      "tick": 0,
+                      "value": 4.0,
+                      "easing": "LINEAR"
+                    },
+                    {
+                      "tick": 6,
+                      "value": 0.15,
+                      "easing": "EASE_IN"
+                    },
+                    {
+                      "tick": 12,
+                      "value": 4.0,
+                      "easing": "BACK_OUT"
+                    },
+                    {
+                      "tick": 20,
+                      "value": 1.0,
+                      "easing": "EASE_OUT"
+                    }
+                  ]
+                },
+                {
+                  "target": "SCALE_Z",
+                  "blend": "MULTIPLY",
+                  "keyframes": [
+                    {
+                      "tick": 0,
+                      "value": 4.0,
+                      "easing": "LINEAR"
+                    },
+                    {
+                      "tick": 6,
+                      "value": 0.15,
+                      "easing": "EASE_IN"
+                    },
+                    {
+                      "tick": 12,
+                      "value": 4.0,
+                      "easing": "BACK_OUT"
+                    },
+                    {
+                      "tick": 20,
+                      "value": 1.0,
+                      "easing": "EASE_OUT"
+                    }
+                  ]
+                },
+                {
+                  "target": "OFFSET_Y",
+                  "blend": "ADD",
+                  "keyframes": [
+                    {
+                      "tick": 0,
+                      "value": 0.0,
+                      "easing": "LINEAR"
+                    },
+                    {
+                      "tick": 8,
+                      "value": 2.0,
+                      "easing": "EASE_OUT"
+                    },
+                    {
+                      "tick": 36,
+                      "value": 2.0,
+                      "easing": "HOLD"
+                    },
+                    {
+                      "tick": 60,
+                      "value": 0.0,
+                      "easing": "EASE_IN"
+                    }
+                  ]
+                },
+                {
+                  "target": "PHYSICS",
+                  "blend": "REPLACE",
+                  "keyframes": [
+                    {
+                      "tick": 0,
+                      "value": 0.0,
+                      "easing": "HOLD"
+                    },
+                    {
+                      "tick": 36,
+                      "value": 0.0,
+                      "easing": "HOLD"
+                    },
+                    {
+                      "tick": 37,
+                      "value": 1.0,
+                      "easing": "LINEAR"
+                    }
+                  ]
+                },
+                {
+                  "target": "ROTATION_X",
+                  "blend": "ADD",
+                  "keyframes": [
+                    {
+                      "tick": 0,
+                      "value": 0.0,
+                      "easing": "LINEAR"
+                    },
+                    {
+                      "tick": 60,
+                      "value": 1080.0,
+                      "easing": "EASE_IN_OUT"
+                    }
+                  ]
+                },
+                {
+                  "target": "ROTATION_Y",
+                  "blend": "ADD",
+                  "keyframes": [
+                    {
+                      "tick": 0,
+                      "value": 0.0,
+                      "easing": "LINEAR"
+                    },
+                    {
+                      "tick": 60,
+                      "value": 1440.0,
+                      "easing": "EASE_IN_OUT"
+                    }
+                  ]
+                },
+                {
+                  "target": "GLOW",
+                  "blend": "REPLACE",
+                  "keyframes": [
+                    {
+                      "tick": 0,
+                      "value": 4294902015,
+                      "materialMap": "lightSources",
+                      "easing": "HOLD"
+                    },
+                    {
+                      "tick": 42,
+                      "value": 4294902015,
+                      "materialMap": "lightSources",
+                      "easing": "HOLD"
+                    },
+                    {
+                      "tick": 43,
+                      "value": 0,
+                      "easing": "HOLD"
+                    }
+                  ]
+                },
+                {
+                  "target": "LIGHT_LEVEL",
+                  "blend": "REPLACE",
+                  "keyframes": [
+                    {
+                      "tick": 0,
+                      "value": 12,
+                      "materialMap": "lightSources",
+                      "easing": "HOLD"
+                    },
+                    {
+                      "tick": 42,
+                      "value": 12,
+                      "materialMap": "lightSources",
+                      "easing": "HOLD"
+                    },
+                    {
+                      "tick": 43,
+                      "value": 0,
+                      "easing": "HOLD"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "trigger": "AIRBORNE",
+              "durationTicks": 20,
+              "loop": true,
+              "tracks": [
+                {
+                  "target": "ROTATION_Z",
+                  "blend": "ADD",
+                  "keyframes": [
+                    {
+                      "tick": 0,
+                      "value": 0.0,
+                      "easing": "LINEAR"
+                    },
+                    {
+                      "tick": 20,
+                      "value": 360.0,
+                      "easing": "LINEAR"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "exaggerated-fallback",
+          "priority": 0,
+          "materials": [
+            "*"
+          ],
+          "clips": [
+            {
+              "trigger": "SPAWN",
+              "durationTicks": 20,
+              "loop": false,
+              "tracks": [
+                {
+                  "target": "SCALE_X",
+                  "blend": "MULTIPLY",
+                  "keyframes": [
+                    {
+                      "tick": 0,
+                      "value": 4.0,
+                      "easing": "LINEAR"
+                    },
+                    {
+                      "tick": 6,
+                      "value": 0.15,
+                      "easing": "EASE_IN"
+                    },
+                    {
+                      "tick": 12,
+                      "value": 4.0,
+                      "easing": "BACK_OUT"
+                    },
+                    {
+                      "tick": 20,
+                      "value": 1.0,
+                      "easing": "EASE_OUT"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "variants": [],
+  "audience": {
+    "when": "true"
   }
 }

@@ -1,89 +1,95 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "revision": 1,
-  "limits": {
-    "updateIntervalTicks": 2,
-    "settledPollIntervalTicks": 20,
-    "maxVisualsPerStack": 3,
-    "maxVisualsPerChunk": 128,
-    "viewRange": 32.0,
-    "spread": 0.18
-  },
-  "scale": {
-    "defaultScale": 0.4,
-    "flatItems": 0.65,
-    "thinBlocks": 0.45
-  },
-  "motion": {
-    "tumble": true,
-    "speedMultiplier": 1.35,
-    "degreesPerSecondX": 160.0,
-    "degreesPerSecondY": 120.0,
-    "degreesPerSecondZ": 100.0,
-    "variance": 0.2,
-    "changeOnBounce": true,
-    "velocityInfluence": 0.35,
-    "submergedSpinMultiplier": 0.35,
-    "groundRollMultiplier": 1.0
-  },
-  "landing": {
-    "mode": "NATURAL",
-    "tiltDegrees": 10.0,
-    "randomYaw": true,
-    "transitionTicks": 4,
-    "faceAttraction": 0.55,
-    "movingFaceAttraction": 0.15,
-    "alignmentDegrees": 0.5,
-    "settleDelayTicks": 4
-  },
-  "labels": {
-    "enabled": true,
-    "yOffset": 0.55,
-    "scale": 0.85,
-    "viewRange": 32.0,
-    "billboard": "CENTER",
-    "seeThrough": true,
-    "shadow": true,
-    "background": true,
-    "backgroundRed": 0,
-    "backgroundGreen": 0,
-    "backgroundBlue": 0,
-    "backgroundAlpha": 80
-  },
-  "filters": {
-    "disabledWorlds": [],
-    "materialBlacklist": [
-      "BEDROCK",
-      "BARRIER"
-    ],
-    "onlyPlayerDrops": false
-  },
-  "physics": {
-    "enabled": false,
-    "gravityMultiplier": 1.0,
-    "bounce": 0.0,
-    "waterBuoyancy": 0.0,
-    "waterDrag": 0.0
-  },
-  "script": {
-    "enabled": false,
-    "vars": {},
-    "offset": {
-      "x": "0",
-      "y": "0",
-      "z": "0"
-    },
-    "rotation": {
-      "x": "0",
-      "y": "0",
-      "z": "0"
+  "presentation": {
+    "limits": {
+      "updateIntervalTicks": 2,
+      "settledPollIntervalTicks": 20,
+      "maxVisualsPerStack": 3,
+      "maxVisualsPerChunk": 128,
+      "viewRange": 32.0,
+      "spread": 0.18
     },
     "scale": {
-      "x": "1",
-      "y": "1",
-      "z": "1"
+      "defaultScale": 0.4,
+      "flatItems": 0.65,
+      "thinBlocks": 0.45
     },
-    "glow": "",
-    "visible": "true"
+    "motion": {
+      "tumble": true,
+      "speedMultiplier": 1.35,
+      "degreesPerSecondX": 160.0,
+      "degreesPerSecondY": 120.0,
+      "degreesPerSecondZ": 100.0,
+      "variance": 0.2,
+      "changeOnBounce": true,
+      "velocityInfluence": 0.35,
+      "submergedSpinMultiplier": 0.35,
+      "groundRollMultiplier": 1.0
+    },
+    "landing": {
+      "mode": "NATURAL",
+      "tiltDegrees": 10.0,
+      "randomYaw": true,
+      "transitionTicks": 4,
+      "faceAttraction": 0.55,
+      "movingFaceAttraction": 0.15,
+      "alignmentDegrees": 0.5,
+      "settleDelayTicks": 4
+    },
+    "labels": {
+      "enabled": true,
+      "yOffset": 0.55,
+      "scale": 0.85,
+      "viewRange": 32.0,
+      "billboard": "CENTER",
+      "seeThrough": true,
+      "shadow": true,
+      "background": true,
+      "backgroundRed": 0,
+      "backgroundGreen": 0,
+      "backgroundBlue": 0,
+      "backgroundAlpha": 80
+    },
+    "filters": {
+      "disabledWorlds": [],
+      "materialBlacklist": [
+        "BEDROCK",
+        "BARRIER"
+      ],
+      "onlyPlayerDrops": false
+    },
+    "physics": {
+      "enabled": false,
+      "gravityMultiplier": 1.0,
+      "bounce": 0.0,
+      "waterBuoyancy": 0.0,
+      "waterDrag": 0.0
+    },
+    "script": {
+      "enabled": false,
+      "vars": {},
+      "offset": {
+        "x": "0",
+        "y": "0",
+        "z": "0"
+      },
+      "rotation": {
+        "x": "0",
+        "y": "0",
+        "z": "0"
+      },
+      "scale": {
+        "x": "1",
+        "y": "1",
+        "z": "1"
+      },
+      "glow": "",
+      "visible": "true"
+    }
+  },
+  "variants": [],
+  "audience": {
+    "when": "true"
   }
 }

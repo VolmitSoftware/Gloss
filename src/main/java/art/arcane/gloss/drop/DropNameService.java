@@ -2,6 +2,7 @@ package art.arcane.gloss.drop;
 
 import art.arcane.gloss.Gloss;
 import art.arcane.gloss.GlossConfig;
+import art.arcane.gloss.condition.BoundedConditionErrorCallback;
 import art.arcane.gloss.doc.DocumentDelta;
 import art.arcane.gloss.doc.DocumentRegistry;
 import art.arcane.gloss.doc.GlossDocument;
@@ -70,7 +71,7 @@ public final class DropNameService implements Listener {
     private int pruneTaskId = -1;
     private volatile boolean listening;
     private volatile RealDropSettingsDoc realDropDoc;
-    private volatile GlossConfig.RealDrops activeRealDropConfig;
+    private volatile RealDropConditionPlan realDropPlan;
 
     public DropNameService(Gloss plugin) {
         this.plugin = plugin;
@@ -83,12 +84,12 @@ public final class DropNameService implements Listener {
         this.realDropSettings = DocumentRegistry.folder(RealDropSettingsDoc.KIND,
             new File(plugin.getDataFolder(), RealDropSettingsDoc.KIND),
             RealDropSettingsDoc::parse, RealDropSettingsDoc::revision);
-        this.realDrops = new RealDropService(plugin, this::realDropConfig);
+        this.realDrops = new RealDropService(plugin);
         this.renderedNames = new ConcurrentHashMap<>();
         this.trackedItems = new ConcurrentHashMap<>();
         this.rehydrateChunks = new ArrayDeque<>();
         this.realDropDoc = RealDropSettingsDoc.DEFAULTS;
-        this.activeRealDropConfig = RealDropSettingsDoc.DEFAULTS.toConfig(false);
+        this.realDropPlan = compileRealDropPlan(realDropDoc, false);
     }
 
     public void enable() {
@@ -169,7 +170,7 @@ public final class DropNameService implements Listener {
         if (!listening || item == null) {
             return;
         }
-        plugin.scheduler().runEntity(item, () -> refreshOnOwner(item));
+        plugin.scheduler().runEntity(item, () -> refreshOnOwner(item, "refresh"));
     }
 
     public void refresh(Item item, String bundleHeaderFormat, String bundleEntryFormat,
@@ -184,7 +185,7 @@ public final class DropNameService implements Listener {
             bundleEntryFormat,
             bundleMoreFormat,
             Math.max(1, Math.min(bundleEntryLimit, 10)));
-        plugin.scheduler().runEntity(item, () -> refreshOnOwner(item, formats));
+        plugin.scheduler().runEntity(item, () -> refreshOnOwner(item, formats, "refresh"));
     }
 
     public void remove(Item item) {
@@ -198,7 +199,7 @@ public final class DropNameService implements Listener {
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onItemSpawn(ItemSpawnEvent event) {
         Item item = event.getEntity();
-        plugin.scheduler().runEntity(item, () -> refreshOnOwner(item), 1);
+        plugin.scheduler().runEntity(item, () -> refreshOnOwner(item, "spawn"), 1);
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
@@ -207,8 +208,9 @@ public final class DropNameService implements Listener {
         Item target = event.getTarget();
         remove(source);
         ItemStack targetStack = target.getItemStack();
-        applyName(target, targetStack, targetStack.getAmount() + source.getItemStack().getAmount(), null);
-        plugin.scheduler().runEntity(target, () -> refreshOnOwner(target), 1);
+        applyName(target, targetStack, targetStack.getAmount() + source.getItemStack().getAmount(), null,
+            "merge");
+        plugin.scheduler().runEntity(target, () -> refreshOnOwner(target, "merge"), 1);
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
@@ -223,20 +225,20 @@ public final class DropNameService implements Listener {
             remove(item);
             return;
         }
-        plugin.scheduler().runEntity(item, () -> refreshOrRemoveOnOwner(item), 1);
+        plugin.scheduler().runEntity(item, () -> refreshOrRemoveOnOwner(item, "pickup"), 1);
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onInventoryPickup(InventoryPickupItemEvent event) {
         Item item = event.getItem();
-        plugin.scheduler().runEntity(item, () -> refreshOrRemoveOnOwner(item), 1);
+        plugin.scheduler().runEntity(item, () -> refreshOrRemoveOnOwner(item, "inventory-pickup"), 1);
     }
 
     @EventHandler(priority = EventPriority.MONITOR)
     public void onEntitiesLoad(EntitiesLoadEvent event) {
         for (Entity entity : event.getEntities()) {
             if (entity instanceof Item item) {
-                plugin.scheduler().runEntity(item, () -> refreshOnOwner(item));
+                plugin.scheduler().runEntity(item, () -> refreshOnOwner(item, "load"));
             }
         }
     }
@@ -250,7 +252,10 @@ public final class DropNameService implements Listener {
         }
     }
 
-    private void applyName(Item item, ItemStack stack, int count, BundleFormats suppliedFormats) {
+    private void applyName(Item item, ItemStack stack, int count, BundleFormats suppliedFormats,
+                           String eventType) {
+        RealDropConditionSnapshot snapshot = RealDropConditionSnapshot.capture(item, eventType);
+        RealDropConditionPlan.Selection presentation = realDropPlan.select(plugin, item, snapshot);
         GlossConfig.Drops drops = plugin.cfg().drops();
         boolean marked = item.getPersistentDataContainer().has(nameKey, PersistentDataType.BOOLEAN);
         String lastRendered = item.getPersistentDataContainer().get(renderedNameKey, PersistentDataType.STRING);
@@ -266,7 +271,7 @@ public final class DropNameService implements Listener {
                 forget(item.getUniqueId());
             }
             clearNameOwnership(item);
-            realDrops.present(item, RealDropService.Label.none());
+            realDrops.present(item, RealDropService.Label.none(), presentation);
             return;
         }
 
@@ -275,7 +280,7 @@ public final class DropNameService implements Listener {
             RealDropService.Label preserved = item.isCustomNameVisible()
                 ? RealDropService.Label.single(item.getCustomName())
                 : RealDropService.Label.none();
-            realDrops.present(item, preserved);
+            realDrops.present(item, preserved, presentation);
             return;
         }
 
@@ -300,7 +305,7 @@ public final class DropNameService implements Listener {
         for (String line : labelLines) {
             renderedLines.add(renderName(line));
         }
-        realDrops.present(item, new RealDropService.Label(renderedLines));
+        realDrops.present(item, new RealDropService.Label(renderedLines), presentation);
     }
 
     private List<String> verticalLabelLines(List<DropNameFormatter.BundleContent> contents,
@@ -345,29 +350,29 @@ public final class DropNameService implements Listener {
         return rendered;
     }
 
-    private void refreshOnOwner(Item item) {
+    private void refreshOnOwner(Item item, String eventType) {
         GlossConfig.Drops drops = plugin.cfg().drops();
         refreshOnOwner(item, new BundleFormats(
             drops.bundleHeaderFormat(),
             drops.bundleEntryFormat(),
             drops.bundleMoreFormat(),
-            drops.bundleEntryLimit()));
+            drops.bundleEntryLimit()), eventType);
     }
 
-    private void refreshOnOwner(Item item, BundleFormats formats) {
+    private void refreshOnOwner(Item item, BundleFormats formats, String eventType) {
         if (!listening || !item.isValid() || item.isDead()) {
             return;
         }
         ItemStack stack = item.getItemStack();
-        applyName(item, stack, stack.getAmount(), formats);
+        applyName(item, stack, stack.getAmount(), formats, eventType);
     }
 
-    private void refreshOrRemoveOnOwner(Item item) {
+    private void refreshOrRemoveOnOwner(Item item, String eventType) {
         if (!item.isValid() || item.isDead()) {
             remove(item);
             return;
         }
-        refreshOnOwner(item);
+        refreshOnOwner(item, eventType);
     }
 
     private void rehydrateLoadedChunks() {
@@ -410,10 +415,6 @@ public final class DropNameService implements Listener {
         rehydrateChunks.clear();
     }
 
-    private GlossConfig.RealDrops realDropConfig() {
-        return activeRealDropConfig;
-    }
-
     private void loadRealDropSettings() {
         if (plugin.cfg().realDrops().enabled()) {
             realDropDefaults.extractMissing();
@@ -442,20 +443,20 @@ public final class DropNameService implements Listener {
 
     private void applyRealDropSettings(RealDropSettingsDoc updated) {
         RealDropSettingsDoc previousDoc = realDropDoc;
-        GlossConfig.RealDrops previousConfig = activeRealDropConfig;
+        RealDropConditionPlan previousPlan = realDropPlan;
         realDropDoc = updated;
-        refreshRealDropConfig();
         try {
+            refreshRealDropConfig();
             reloadPresentations();
         } catch (RuntimeException | Error failure) {
             realDropDoc = previousDoc;
-            activeRealDropConfig = previousConfig;
+            realDropPlan = previousPlan;
             throw failure;
         }
     }
 
     private void refreshRealDropConfig() {
-        activeRealDropConfig = realDropDoc.toConfig(plugin.cfg().realDrops().enabled());
+        realDropPlan = compileRealDropPlan(realDropDoc, plugin.cfg().realDrops().enabled());
     }
 
     private void reloadPresentations() {
@@ -474,9 +475,16 @@ public final class DropNameService implements Listener {
         }
         for (Entity entity : world.getChunkAt(chunkX, chunkZ).getEntities()) {
             if (entity instanceof Item item) {
-                refreshOnOwner(item);
+                refreshOnOwner(item, "rehydrate");
             }
         }
+    }
+
+    private static RealDropConditionPlan compileRealDropPlan(RealDropSettingsDoc document,
+                                                             boolean enabled) {
+        BoundedConditionErrorCallback errors = BoundedConditionErrorCallback.bounded(8, error ->
+            Gloss.warn("Real-drop condition %s failed closed: %s", error.path(), error.message()));
+        return RealDropConditionPlan.compile(document, enabled, errors);
     }
 
     private static String typeLabel(GlossConfig.Drops drops, ItemStack stack) {

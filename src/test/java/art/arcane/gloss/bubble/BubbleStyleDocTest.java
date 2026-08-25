@@ -15,10 +15,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class BubbleStyleDocTest {
     @Test
-    void parseReadsTheSchemaTwoShape() {
+    void parseReadsTheSchemaThreeShape() {
         String json = """
             {
-              "schemaVersion": 2,
+              "schemaVersion": 3,
               "revision": 4,
               "prefix": "&b",
               "offset": [0.5, 1.25, -0.5],
@@ -42,16 +42,15 @@ class BubbleStyleDocTest {
                 "flyAwayLeadMs": 1100
               },
               "select": {
-                "worlds": ["world_*"],
-                "groups": ["Staff"],
-                "priority": 7
+                "priority": 7,
+                "when": "matchesGlob(subject.world, 'world_*') && inGroup('subject', 'staff')"
               }
             }
             """;
 
         BubbleStyleDoc doc = BubbleStyleDoc.parse("staff.json", json);
 
-        assertEquals(2, doc.schemaVersion());
+        assertEquals(3, doc.schemaVersion());
         assertEquals(4L, doc.revision());
         assertEquals("&b", doc.prefix());
         assertEquals(new Vector(0.5D, 1.25D, -0.5D), doc.offset());
@@ -68,16 +67,16 @@ class BubbleStyleDocTest {
         assertEquals(900L, doc.shimmer().durationMs());
         assertEquals(50L, doc.shimmer().spawnDelayMs());
         assertEquals(1100L, doc.shimmer().flyAwayLeadMs());
-        assertEquals(List.of("world_*"), doc.select().worlds());
-        assertEquals(List.of("staff"), doc.select().groups());
         assertEquals(7, doc.select().priority());
+        assertEquals("matchesGlob(subject.world, 'world_*') && inGroup('subject', 'staff')",
+            doc.select().when());
     }
 
     @Test
     void motionAndSelectUseDefaultsWhenAbsent() {
         String json = """
             {
-              "schemaVersion": 2,
+              "schemaVersion": 3,
               "revision": 1,
               "prefix": "&7",
               "offset": [0.0, 1.0, 0.0],
@@ -100,9 +99,9 @@ class BubbleStyleDocTest {
             new BubbleStyleDoc.Axis("t", "2 * t", "-t"),
             new BubbleStyleDoc.Axis("1", "1", "1"),
             new BubbleStyleDoc.Axis("0", "0", "90 * t"), "1 - t");
-        BubbleStyleDoc original = new BubbleStyleDoc(2, 9L, "&d", new Vector(0.0D, 2.0D, 0.0D), 40, 6000L,
+        BubbleStyleDoc original = new BubbleStyleDoc(3, 9L, "&d", new Vector(0.0D, 2.0D, 0.0D), 40, 6000L,
             false, true, motion, BubbleStyleDoc.DEFAULTS.shimmer(),
-            new BubbleStyleDoc.Select(List.of("hub"), List.of("vip"), 3));
+            new BubbleStyleDoc.Select(3, "subject.world == 'hub' && inGroup('subject', 'vip')"));
 
         BubbleStyleDoc decoded = BubbleStyleDoc.parse("vip.json", BukkitJson.GSON.toJson(original));
 
@@ -112,7 +111,7 @@ class BubbleStyleDocTest {
     @Test
     void oldSchemaAndShapeWithoutEnvelopeAreRejected() {
         assertThrows(IllegalArgumentException.class,
-            () -> BubbleStyleDoc.parse("default.json", "{\"schemaVersion\":1,\"revision\":1}"));
+            () -> BubbleStyleDoc.parse("default.json", "{\"schemaVersion\":2,\"revision\":1}"));
         IllegalArgumentException failure = assertThrows(IllegalArgumentException.class,
             () -> BubbleStyleDoc.parse("default.json", "{\"prefix\":\"&7\",\"wordWrapChars\":32}"));
         assertTrue(failure.getMessage().contains("schemaVersion"));
@@ -121,15 +120,15 @@ class BubbleStyleDocTest {
     @Test
     void revisionBoundsAreEnforced() {
         assertThrows(IllegalArgumentException.class,
-            () -> new BubbleStyleDoc(2, 0L, "&7", null, 32, 5000L, true, true, null, null, null));
+            () -> new BubbleStyleDoc(3, 0L, "&7", null, 32, 5000L, true, true, null, null, null));
         assertThrows(IllegalArgumentException.class,
-            () -> new BubbleStyleDoc(2, DocumentEnvelope.MAX_SAFE_REVISION + 1L, "&7", null, 32, 5000L,
+            () -> new BubbleStyleDoc(3, DocumentEnvelope.MAX_SAFE_REVISION + 1L, "&7", null, 32, 5000L,
                 true, true, null, null, null));
     }
 
     @Test
     void outOfRangeValuesClamp() {
-        BubbleStyleDoc doc = new BubbleStyleDoc(2, 1L, null, null, 1000, 10L, true, true, null, null, null);
+        BubbleStyleDoc doc = new BubbleStyleDoc(3, 1L, null, null, 1000, 10L, true, true, null, null, null);
 
         assertEquals("&7", doc.prefix());
         assertEquals(new Vector(0.0D, 0.3D, 0.0D), doc.offset());
@@ -151,7 +150,7 @@ class BubbleStyleDocTest {
     void shimmerPartialShapeUsesDefaultsAndClampsBoundedValues() {
         BubbleStyleDoc parsed = BubbleStyleDoc.parse("default.json", """
             {
-              "schemaVersion": 2,
+              "schemaVersion": 3,
               "revision": 1,
               "shimmer": {
                 "color": "#ABCDEF",
@@ -176,15 +175,16 @@ class BubbleStyleDocTest {
     void malformedShimmerColorIsRejectedAtLoad() {
         assertThrows(IllegalArgumentException.class,
             () -> BubbleStyleDoc.parse("default.json", """
-                {"schemaVersion":2,"revision":1,"shimmer":{"color":"white"}}
+                {"schemaVersion":3,"revision":1,"shimmer":{"color":"white"}}
                 """));
     }
 
     @Test
-    void selectNormalizesBlankAndCase() {
-        BubbleStyleDoc.Select select = new BubbleStyleDoc.Select(List.of(" world ", ""), List.of(" VIP ", " "), 1);
+    void selectTrimsAndValidatesTheCondition() {
+        BubbleStyleDoc.Select select = new BubbleStyleDoc.Select(1, " subject.world == 'world' ");
 
-        assertEquals(List.of("world"), select.worlds());
-        assertEquals(List.of("vip"), select.groups());
+        assertEquals("subject.world == 'world'", select.when());
+        assertThrows(IllegalArgumentException.class, () -> new BubbleStyleDoc.Select(1, "subject.health <"));
+        assertThrows(IllegalArgumentException.class, () -> new BubbleStyleDoc.Select(1, " "));
     }
 }

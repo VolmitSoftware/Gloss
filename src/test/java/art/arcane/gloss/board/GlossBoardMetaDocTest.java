@@ -5,81 +5,51 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class GlossBoardMetaDocTest {
     @Test
-    void docRoundTripPreservesAllFields() {
+    void docRoundTripPreservesTheConditionalContract() {
         GlossBoardMeta meta = new GlossBoardMeta("arena");
         meta.setTitle("&d&lArena");
         meta.addLine("&7Line one");
-        meta.addLine("&7Line two");
-        meta.setPrimary(true);
         meta.setHideNumbers(true);
-        meta.setPermission("vip");
-        meta.setGroups(List.of("admins", "mods"));
+        meta.setSelection(30, "viewer.world == 'arena'");
+        meta.setVariants(List.of(new BoardDoc.Variant("critical", 100, "viewer.health < 5",
+            new BoardDoc.Presentation("&cDanger", List.of("heal"), false))));
 
         BoardDoc doc = meta.toDoc(7L);
         GlossBoardMeta restored = GlossBoardMeta.fromDoc("arena", doc);
 
         assertEquals("arena", restored.id());
         assertEquals("&d&lArena", restored.title());
-        assertEquals(List.of("&7Line one", "&7Line two"), restored.lines());
-        assertTrue(restored.primary());
+        assertEquals(List.of("&7Line one"), restored.lines());
         assertTrue(restored.hideNumbers());
-        assertEquals("vip", restored.permission());
-        assertEquals(List.of("admins", "mods"), restored.groups());
+        assertEquals(new BoardDoc.Selection(30, "viewer.world == 'arena'"), restored.selection());
+        assertEquals(meta.variants(), restored.variants());
         assertEquals(7L, restored.revision());
     }
 
     @Test
     void fromDocWithBlankTitleFallsBackToTheId() {
-        BoardDoc doc = new BoardDoc(1, 1L, "", List.of(), false, false, null, null);
+        BoardDoc doc = new BoardDoc(2, 1L, BoardDoc.Selection.NEVER,
+            new BoardDoc.Presentation("", List.of(), false), List.of());
 
         GlossBoardMeta meta = GlossBoardMeta.fromDoc("bare", doc);
 
-        assertEquals("bare", meta.id());
         assertEquals("bare", meta.title());
-        assertEquals(List.of(), meta.lines());
-        assertFalse(meta.primary());
-        assertFalse(meta.hideNumbers());
-        assertEquals(GlossBoardMeta.UNRESTRICTED_PERMISSION, meta.permission());
-        assertEquals(List.of(), meta.groups());
-        assertFalse(meta.permissionGated());
+        assertEquals(BoardDoc.Selection.NEVER, meta.selection());
     }
 
     @Test
-    void defaultPermissionIsUnrestricted() {
-        GlossBoardMeta meta = new GlossBoardMeta("plain");
-
-        assertEquals("default", meta.permission());
-        assertFalse(meta.permissionGated());
-        assertEquals("gloss.board.default", meta.permissionNode());
-    }
-
-    @Test
-    void permissionValueMapsToBoardNode() {
+    void selectionSetterWritesTheRawCondition() {
         GlossBoardMeta meta = new GlossBoardMeta("gated");
-        meta.setPermission(" VIP ");
 
-        assertEquals("vip", meta.permission());
-        assertTrue(meta.permissionGated());
-        assertEquals("gloss.board.vip", meta.permissionNode());
-    }
+        meta.setSelection(42, "hasPermission('viewer', 'gloss.board.vip')");
 
-    @Test
-    void blankOrNullPermissionNormalizesToDefault() {
-        GlossBoardMeta meta = new GlossBoardMeta("gated");
-        meta.setPermission("vip");
-
-        meta.setPermission(null);
-        assertEquals(GlossBoardMeta.UNRESTRICTED_PERMISSION, meta.permission());
-
-        meta.setPermission("   ");
-        assertEquals(GlossBoardMeta.UNRESTRICTED_PERMISSION, meta.permission());
-        assertFalse(meta.permissionGated());
+        assertEquals(42, meta.selection().priority());
+        assertEquals("hasPermission('viewer', 'gloss.board.vip')", meta.selection().when());
     }
 
     @Test

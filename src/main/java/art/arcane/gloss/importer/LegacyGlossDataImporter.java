@@ -2,7 +2,6 @@ package art.arcane.gloss.importer;
 
 import art.arcane.gloss.Gloss;
 import art.arcane.gloss.animation.AnimationDoc;
-import art.arcane.gloss.board.BoardDoc;
 import art.arcane.gloss.bubble.BubbleStyleDoc;
 import art.arcane.gloss.config.GlossConfigFile;
 import art.arcane.gloss.config.GlossConfigLoader;
@@ -11,7 +10,6 @@ import art.arcane.gloss.doc.DocumentEnvelope;
 import art.arcane.gloss.emoji.EmojiDoc;
 import art.arcane.gloss.hologram.HologramDoc;
 import art.arcane.gloss.motd.MotdDoc;
-import art.arcane.gloss.tab.TablistDoc;
 import art.arcane.volmlib.util.bukkit.json.BukkitJson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
@@ -39,24 +37,20 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.Function;
-import java.util.function.UnaryOperator;
 import java.util.logging.Level;
 import java.util.stream.Stream;
 
 /**
- * In-place migration of pre-merger Gloss v1-shape data inside the CURRENT data folder to the v2
+ * In-place migration of supported pre-merger Gloss data inside the current data folder to current
  * document envelopes. A file without {@code schemaVersion} is legacy; its original bytes are
  * backed up to {@code import-backups/<timestamp>/<kind>/<file>} before the rewrite, which makes
  * the run idempotent by construction — files that already carry the envelope are skipped.
  *
  * <p>Kinds: {@code holograms/} ({id,world,x,y,z,lines} → anchor envelope, embedded id dropped),
- * {@code boards/} ({title,content,primary,permission} → content becomes lines, groups added),
  * {@code emoji/} ({trigger,emoji,enabled} → envelope, the {@code <uses :id:>} sentinel becomes an
  * empty trigger), {@code animations/} ({target-framerate,animation-type,frames} → lowercased
- * mode + frameIntervalMs), {@code groups/*.yml} (tablist-name merges into tablist.json
- * nameFormats, default-board appends the group onto its board's groups; the folder is fully
- * absorbed and MOVES into the backup), and a legacy {@code config.yml} (mechanics overlay onto
- * gloss.toml, content keys into their documents, then renamed {@code config.yml.imported}).
+ * mode + frameIntervalMs), and a legacy {@code config.yml} (mechanics overlay onto gloss.toml,
+ * then renamed {@code config.yml.imported}).
  */
 public final class LegacyGlossDataImporter {
     public static final String BACKUP_DIRECTORY_NAME = "import-backups";
@@ -65,7 +59,6 @@ public final class LegacyGlossDataImporter {
 
     private static final DateTimeFormatter BACKUP_TIMESTAMP = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss");
     private static final String JSON_EXTENSION = ".json";
-    private static final String YML_EXTENSION = ".yml";
     private static final String LEGACY_NO_TRIGGER = "<uses :id:>";
 
     public enum Status {
@@ -114,10 +107,8 @@ public final class LegacyGlossDataImporter {
         backupRoot = null;
         List<Entry> entries = new ArrayList<>();
         migrateKind(HologramDoc.KIND, LegacyGlossDataImporter::convertHologram, entries);
-        migrateKind(BoardDoc.KIND, LegacyGlossDataImporter::convertBoard, entries);
         migrateKind(EmojiDoc.KIND, LegacyGlossDataImporter::convertEmoji, entries);
         migrateKind(AnimationDoc.KIND, LegacyGlossDataImporter::convertAnimation, entries);
-        absorbGroups(entries);
         overlayLegacyConfig(config, entries);
         logReport(entries);
         return new Result(entries, backupRoot == null ? null : backupRoot.toString());
@@ -167,14 +158,6 @@ public final class LegacyGlossDataImporter {
             HologramDoc.DEFAULT_SCALE, HologramDoc.DEFAULT_BILLBOARD, 0.0D, 0.0D);
     }
 
-    private static BoardDoc convertBoard(JsonObject legacy) {
-        String title = optString(legacy, "title", legacy.get("_fileName").getAsString());
-        boolean primary = legacy.has("primary") && legacy.get("primary").getAsBoolean();
-        String permission = optString(legacy, "permission", "");
-        return new BoardDoc(BoardDoc.CURRENT_SCHEMA_VERSION, DocumentEnvelope.INITIAL_REVISION,
-            title, stringList(legacy.getAsJsonArray("content")), primary, false, permission, List.of());
-    }
-
     private static EmojiDoc convertEmoji(JsonObject legacy) {
         String trigger = optString(legacy, "trigger", "");
         if (LEGACY_NO_TRIGGER.equals(trigger)) {
@@ -193,85 +176,6 @@ public final class LegacyGlossDataImporter {
             mode, frameIntervalMs, stringList(legacy.getAsJsonArray("frames")));
     }
 
-    private void absorbGroups(List<Entry> entries) {
-        File groupsDir = new File(dataFolder, "groups");
-        File[] files = groupsDir.listFiles(file -> file.isFile()
-            && file.getName().toLowerCase(Locale.ROOT).endsWith(YML_EXTENSION)
-            && !file.getName().startsWith("."));
-        if (files == null) {
-            return;
-        }
-        Arrays.sort(files, Comparator.comparing(File::getName));
-        boolean clean = true;
-        Map<String, String> nameFormats = new LinkedHashMap<>();
-        for (File file : files) {
-            String path = "groups/" + file.getName();
-            String group = baseName(file).toLowerCase(Locale.ROOT);
-            try {
-                YamlConfiguration yaml = new YamlConfiguration();
-                yaml.load(file);
-                String tablistName = yaml.getString("tablist-name");
-                if (tablistName != null && !tablistName.isBlank()) {
-                    nameFormats.put(group, tablistName);
-                }
-                String defaultBoard = yaml.getString("default-board");
-                if (defaultBoard != null && !defaultBoard.isBlank()
-                    && !appendBoardGroup(defaultBoard.trim().toLowerCase(Locale.ROOT), group, path, entries)) {
-                    clean = false;
-                }
-                entries.add(Entry.of("groups", path, Status.ABSORBED));
-            } catch (IOException | InvalidConfigurationException | RuntimeException failure) {
-                clean = false;
-                entries.add(new Entry("groups", path, Status.ERROR, detail(failure)));
-            }
-        }
-        if (!nameFormats.isEmpty()) {
-            try {
-                mergeTablist(existing -> new TablistDoc(existing.schemaVersion(), existing.revision(),
-                    existing.useHeaderFooter(), existing.header(), existing.footer(), existing.groupListNames(),
-                    mergedFormats(existing.nameFormats(), nameFormats)));
-            } catch (IOException | RuntimeException failure) {
-                clean = false;
-                entries.add(new Entry("groups", TablistDoc.KIND + JSON_EXTENSION, Status.ERROR, detail(failure)));
-            }
-        }
-        if (clean) {
-            try {
-                Path target = backupDirectory().resolve("groups");
-                Files.move(groupsDir.toPath(), target);
-            } catch (IOException failure) {
-                discardEmptyBackupDirectory();
-                entries.add(new Entry("groups", "groups/", Status.ERROR, detail(failure)));
-            }
-        }
-    }
-
-    private boolean appendBoardGroup(String boardId, String group, String sourcePath, List<Entry> entries) {
-        File boardFile = new File(new File(dataFolder, BoardDoc.KIND), boardId + JSON_EXTENSION);
-        if (!boardFile.isFile()) {
-            entries.add(new Entry("groups", BoardDoc.KIND + "/" + boardId + JSON_EXTENSION, Status.SKIPPED_NOTE,
-                sourcePath + " names default-board '" + boardId + "' but no such board document exists"));
-            return true;
-        }
-        try {
-            BoardDoc board = BoardDoc.parse(boardFile.getName(),
-                Files.readString(boardFile.toPath(), StandardCharsets.UTF_8));
-            if (board.groups().contains(group)) {
-                return true;
-            }
-            List<String> groups = new ArrayList<>(board.groups());
-            groups.add(group);
-            BoardDoc updated = new BoardDoc(board.schemaVersion(), board.revision() + 1L, board.title(),
-                board.lines(), board.primary(), board.hideNumbers(), board.permission(), groups);
-            writeDocument(boardFile.toPath(), updated);
-            return true;
-        } catch (IOException | RuntimeException failure) {
-            entries.add(new Entry("groups", BoardDoc.KIND + "/" + boardId + JSON_EXTENSION,
-                Status.ERROR, detail(failure)));
-            return false;
-        }
-    }
-
     private void overlayLegacyConfig(GlossConfigFile config, List<Entry> entries) {
         File legacyConfig = new File(dataFolder, LEGACY_CONFIG_FILE_NAME);
         if (!legacyConfig.isFile()) {
@@ -285,7 +189,6 @@ public final class LegacyGlossDataImporter {
             return;
         }
         overlayMechanics(yaml, config, entries);
-        overlayTablistContent(yaml, entries);
         overlayBubbleContent(yaml, entries);
         overlayMotdContent(yaml, entries);
         try {
@@ -340,27 +243,6 @@ public final class LegacyGlossDataImporter {
         }
         apply.run();
         entries.add(Entry.of("config", LEGACY_CONFIG_FILE_NAME + ":" + key, Status.OVERLAID));
-    }
-
-    private void overlayTablistContent(YamlConfiguration yaml, List<Entry> entries) {
-        boolean present = yaml.contains("tablist.use-header-footers") || yaml.contains("tablist.header")
-            || yaml.contains("tablist.footer") || yaml.contains("tablist.group-list-names");
-        if (!present) {
-            return;
-        }
-        try {
-            mergeTablist(existing -> new TablistDoc(existing.schemaVersion(), existing.revision(),
-                yaml.contains("tablist.use-header-footers")
-                    ? yaml.getBoolean("tablist.use-header-footers") : existing.useHeaderFooter(),
-                yaml.contains("tablist.header") ? yaml.getString("tablist.header") : existing.header(),
-                yaml.contains("tablist.footer") ? yaml.getString("tablist.footer") : existing.footer(),
-                yaml.contains("tablist.group-list-names")
-                    ? yaml.getBoolean("tablist.group-list-names") : existing.groupListNames(),
-                existing.nameFormats()));
-            entries.add(Entry.of("config", LEGACY_CONFIG_FILE_NAME + ":tablist", Status.OVERLAID));
-        } catch (IOException | RuntimeException failure) {
-            entries.add(new Entry("config", TablistDoc.KIND + JSON_EXTENSION, Status.ERROR, detail(failure)));
-        }
     }
 
     private void overlayBubbleContent(YamlConfiguration yaml, List<Entry> entries) {
@@ -442,26 +324,6 @@ public final class LegacyGlossDataImporter {
         } catch (IOException | RuntimeException failure) {
             entries.add(new Entry("config", MotdDoc.KIND + JSON_EXTENSION, Status.ERROR, detail(failure)));
         }
-    }
-
-    private void mergeTablist(UnaryOperator<TablistDoc> mutation) throws IOException {
-        File tablistFile = new File(dataFolder, TablistDoc.KIND + JSON_EXTENSION);
-        TablistDoc existing = tablistFile.isFile()
-            ? TablistDoc.parse(tablistFile.getName(), Files.readString(tablistFile.toPath(), StandardCharsets.UTF_8))
-            : TablistDoc.parse(TablistDoc.KIND + JSON_EXTENSION, new String(
-                readResource("/defaults/" + TablistDoc.KIND + "/" + TablistDoc.KIND + JSON_EXTENSION),
-                StandardCharsets.UTF_8));
-        TablistDoc mutated = mutation.apply(existing);
-        TablistDoc bumped = new TablistDoc(mutated.schemaVersion(), existing.revision() + 1L,
-            mutated.useHeaderFooter(), mutated.header(), mutated.footer(), mutated.groupListNames(),
-            mutated.nameFormats());
-        writeDocument(tablistFile.toPath(), bumped);
-    }
-
-    private static Map<String, String> mergedFormats(Map<String, String> existing, Map<String, String> absorbed) {
-        Map<String, String> merged = new LinkedHashMap<>(existing);
-        merged.putAll(absorbed);
-        return merged;
     }
 
     private void backup(String kind, File file) throws IOException {

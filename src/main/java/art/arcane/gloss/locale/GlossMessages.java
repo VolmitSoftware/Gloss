@@ -77,12 +77,10 @@ public final class GlossMessages {
     public static final TextKey HELP_BOARD_SHOW = text("command.help.board.show", "Show a scoreboard to yourself");
     public static final TextKey HELP_BOARD_SHOW_ID = text("command.help.board.show.id", "Board id");
     public static final TextKey HELP_BOARD_HIDE = text("command.help.board.hide", "Hide your scoreboard");
-    public static final TextKey HELP_BOARD_PRIMARY = text("command.help.board.primary", "Mark a scoreboard as the primary default board");
-    public static final TextKey HELP_BOARD_PRIMARY_ID = text("command.help.board.primary.id", "Board id");
-    public static final TextKey HELP_BOARD_PRIMARY_ENABLED = text("command.help.board.primary.enabled", "true to mark primary, false to unmark");
-    public static final TextKey HELP_BOARD_PERMISSION = text("command.help.board.permission", "Set the permission required to see a scoreboard");
-    public static final TextKey HELP_BOARD_PERMISSION_ID = text("command.help.board.permission.id", "Board id");
-    public static final TextKey HELP_BOARD_PERMISSION_NODE = text("command.help.board.permission.node", "Permission node; use default to clear");
+    public static final TextKey HELP_BOARD_SELECT = text("command.help.board.select", "Set automatic scoreboard selection");
+    public static final TextKey HELP_BOARD_SELECT_ID = text("command.help.board.select.id", "Board id");
+    public static final TextKey HELP_BOARD_SELECT_PRIORITY = text("command.help.board.select.priority", "Selection priority");
+    public static final TextKey HELP_BOARD_SELECT_WHEN = text("command.help.board.select.when", "Boolean condition; quote expressions containing spaces");
     public static final TextKey HELP_BOARD_LIST = text("command.help.board.list", "List scoreboards");
     public static final TextKey HELP_BOARD_INFO = text("command.help.board.info", "Show a scoreboard's title, lines and settings");
     public static final TextKey HELP_BOARD_INFO_ID = text("command.help.board.info.id", "Board id");
@@ -266,16 +264,13 @@ public final class GlossMessages {
     public static final TextKey BOARD_LINE_OUT_OF_RANGE = text("command.board.line_out_of_range", PREFIX + "&cLine {line} is out of range; &f{id}&c has {count} lines.");
     public static final TextKey BOARD_SHOWN = text("command.board.shown", PREFIX + "&aShowing board &f{id}&a.");
     public static final TextKey BOARD_HIDDEN = text("command.board.hidden", PREFIX + "&aYour scoreboard is hidden.");
-    public static final TextKey BOARD_PRIMARY_SET = text("command.board.primary_set", PREFIX + "&aBoard &f{id}&a primary: &f{enabled}&a.");
-    public static final TextKey BOARD_PERMISSION_SET = text("command.board.permission_set", PREFIX + "&aBoard &f{id}&a permission: &f{node}&a.");
-    public static final TextKey BOARD_PERMISSION_CLEARED = text("command.board.permission_cleared", PREFIX + "&aBoard &f{id}&a permission cleared.");
+    public static final TextKey BOARD_SELECT_SET = text("command.board.select_set", PREFIX + "&aBoard &f{id}&a selection priority set to &f{priority}&a.");
+    public static final TextKey BOARD_SELECT_INVALID = text("command.board.select_invalid", PREFIX + "&cInvalid board condition: &f{error}&c.");
     public static final TextKey BOARD_LIST_EMPTY = text("command.board.list_empty", PREFIX + "&7No boards exist yet.");
     public static final TextKey BOARD_LIST_HOVER = text("command.board.list.hover", "Click for details");
-    public static final TextKey BOARD_LIST_PRIMARY = text("command.board.list.primary", "primary");
     public static final TextKey BOARD_INFO_HEADER = text("command.board.info.header", PREFIX + "&d{id} &7titled &f{title}");
-    public static final TextKey BOARD_INFO_META = text("command.board.info.meta", "&7Primary: &f{primary} &8| &7Permission: &f{permission}");
+    public static final TextKey BOARD_INFO_META = text("command.board.info.meta", "&7Priority: &f{priority} &8| &7When: &f{when} &8| &7Variants: &f{variants}");
     public static final TextKey BOARD_INFO_LINE = text("command.board.info.line", " &8{line}. &f{text}");
-    public static final TextKey BOARD_PERMISSION_NONE = text("command.board.info.permission_none", "default");
 
     public static final TextKey EMOJI_EMPTY = text("command.emoji.empty", PREFIX + "&7No emoji are enabled.");
     public static final TextKey EMOJI_HOVER = text("command.emoji.hover", "Click to insert into chat");

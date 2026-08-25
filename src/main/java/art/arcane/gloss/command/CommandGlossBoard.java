@@ -18,7 +18,6 @@ import java.util.List;
 
 @Director(name = "board", aliases = {"boards", "sb", "bd"}, descriptionKey = "command.help.board", description = "Create and manage scoreboards")
 public class CommandGlossBoard {
-    private static final String CLEAR_PERMISSION_TOKEN = "default";
     private static final String DEFAULT_LINE = "&7A fresh Gloss board";
     private static final String LIST_COMMAND = "/gloss board list";
 
@@ -167,10 +166,11 @@ public class CommandGlossBoard {
         GlossCommandMessages.send(player, GlossMessages.BOARD_HIDDEN);
     }
 
-    @Director(name = "primary", sync = true, descriptionKey = "command.help.board.primary", description = "Mark a scoreboard as the primary default board")
-    public void primary(@Param(name = "sender", contextual = true) CommandSender sender,
-                        @Param(name = "id", descriptionKey = "command.help.board.primary.id", description = "Board id") String id,
-                        @Param(name = "enabled", defaultValue = "true", descriptionKey = "command.help.board.primary.enabled", description = "true to mark primary, false to unmark") boolean enabled) {
+    @Director(name = "select", sync = true, descriptionKey = "command.help.board.select", description = "Set automatic scoreboard selection")
+    public void select(@Param(name = "sender", contextual = true) CommandSender sender,
+                       @Param(name = "id", descriptionKey = "command.help.board.select.id", description = "Board id") String id,
+                       @Param(name = "priority", descriptionKey = "command.help.board.select.priority", description = "Selection priority") int priority,
+                       @Param(name = "when", descriptionKey = "command.help.board.select.when", description = "Boolean condition; quote expressions containing spaces") String when) {
         if (GlossCommandMessages.denied(sender, "gloss.boards.edit")) {
             return;
         }
@@ -179,37 +179,17 @@ public class CommandGlossBoard {
             return;
         }
 
-        meta.setPrimary(enabled);
+        try {
+            meta.setSelection(priority, when);
+        } catch (IllegalArgumentException failure) {
+            GlossCommandMessages.send(sender, GlossMessages.BOARD_SELECT_INVALID,
+                MessageArgument.untrusted("error", failure.getMessage()));
+            return;
+        }
         plugin.boards().saveBoard(meta);
-        GlossCommandMessages.send(sender, GlossMessages.BOARD_PRIMARY_SET,
-                MessageArgument.untrusted("id", id),
-                MessageArgument.trusted("enabled", enabled));
-    }
-
-    @Director(name = "permission", sync = true, descriptionKey = "command.help.board.permission", description = "Set the permission required to see a scoreboard")
-    public void permission(@Param(name = "sender", contextual = true) CommandSender sender,
-                           @Param(name = "id", descriptionKey = "command.help.board.permission.id", description = "Board id") String id,
-                           @Param(name = "node", descriptionKey = "command.help.board.permission.node", description = "Permission node; use default to clear") String node) {
-        if (GlossCommandMessages.denied(sender, "gloss.boards.edit")) {
-            return;
-        }
-        GlossBoardMeta meta = find(sender, id);
-        if (meta == null) {
-            return;
-        }
-
-        if (CLEAR_PERMISSION_TOKEN.equalsIgnoreCase(node)) {
-            meta.setPermission("");
-            plugin.boards().saveBoard(meta);
-            GlossCommandMessages.send(sender, GlossMessages.BOARD_PERMISSION_CLEARED, MessageArgument.untrusted("id", id));
-            return;
-        }
-
-        meta.setPermission(node);
-        plugin.boards().saveBoard(meta);
-        GlossCommandMessages.send(sender, GlossMessages.BOARD_PERMISSION_SET,
-                MessageArgument.untrusted("id", id),
-                MessageArgument.untrusted("node", node));
+        GlossCommandMessages.send(sender, GlossMessages.BOARD_SELECT_SET,
+            MessageArgument.untrusted("id", id),
+            MessageArgument.trusted("priority", priority));
     }
 
     @Director(name = "reset", sync = true, descriptionKey = "command.help.board.reset", description = "Restore shipped scoreboard defaults")
@@ -250,15 +230,13 @@ public class CommandGlossBoard {
             return;
         }
 
-        String permission = meta.permission() == null || meta.permission().isBlank()
-                ? GlossLocalization.globalText(GlossMessages.BOARD_PERMISSION_NONE)
-                : meta.permission();
         GlossCommandMessages.send(sender, GlossMessages.BOARD_INFO_HEADER,
                 MessageArgument.untrusted("id", id),
                 MessageArgument.trusted("title", meta.title()));
         GlossCommandMessages.send(sender, GlossMessages.BOARD_INFO_META,
-                MessageArgument.trusted("primary", meta.primary()),
-                MessageArgument.untrusted("permission", permission));
+                MessageArgument.trusted("priority", meta.selection().priority()),
+                MessageArgument.untrusted("when", meta.selection().when()),
+                MessageArgument.trusted("variants", meta.variants().size()));
         List<String> lines = meta.lines();
         for (int index = 0; index < lines.size(); index++) {
             GlossCommandMessages.send(sender, GlossMessages.BOARD_INFO_LINE,
@@ -298,11 +276,6 @@ public class CommandGlossBoard {
                 .append(display).append("</gradient>")
                 .append("</click></hover> <").append(theme.description()).append(">").append(title)
                 .append("</").append(theme.description()).append(">");
-        if (meta.primary()) {
-            String marker = DirectorMiniMenu.escapeText(GlossLocalization.globalDirectorText(GlossMessages.BOARD_LIST_PRIMARY, MessageArgs.empty()));
-            entry.append(" <").append(theme.optional()).append(">(").append(marker).append(")</")
-                    .append(theme.optional()).append(">");
-        }
         return entry.toString();
     }
 

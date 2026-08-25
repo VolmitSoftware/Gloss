@@ -1,11 +1,14 @@
 package art.arcane.gloss.indicator;
 
+import art.arcane.gloss.condition.ConditionCompiler;
+import art.arcane.gloss.condition.ConditionSource;
 import art.arcane.gloss.doc.DocumentEnvelope;
 import art.arcane.gloss.doc.DocumentParsers;
 import org.bukkit.util.Vector;
 
-import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 public record DamageIndicatorSettingsDoc(
     int schemaVersion,
@@ -13,26 +16,30 @@ public record DamageIndicatorSettingsDoc(
     Limits limits,
     Style damage,
     Style healing,
-    Filters filters
+    Audience audience
 ) {
     public static final String KIND = "damage-indicators";
     public static final String DEFAULT_ID = "default";
-    public static final int CURRENT_SCHEMA_VERSION = 1;
+    public static final int CURRENT_SCHEMA_VERSION = 2;
 
+    private static final String DEFAULT_AUDIENCE_PERMISSION = "gloss.indicators.show";
     private static final Limits DEFAULT_LIMITS = new Limits(null, null, null, null);
-    private static final Style DEFAULT_DAMAGE = new Style(
-        true,
+    private static final IndicatorPresentation DEFAULT_DAMAGE_PRESENTATION = new IndicatorPresentation(
         "&c&l{amount}",
         new Vector(0.0D, 0.7D, 0.0D),
         new Motion(0.8D, 1.3D, -0.93D, 0.0D),
-        new Presentation(1.0D, 0.82D, 0.68D));
-    private static final Style DEFAULT_HEALING = new Style(
-        true,
+        new Transform(1.0D, 0.82D, 0.68D));
+    private static final IndicatorPresentation DEFAULT_HEALING_PRESENTATION = new IndicatorPresentation(
         "&a&l{amount}",
         new Vector(0.0D, -0.1D, 0.0D),
         new Motion(0.45D, 0.65D, 0.05D, 0.0D),
-        new Presentation(1.0D, 1.1D, 0.62D));
-    private static final Filters DEFAULT_FILTERS = new Filters(null);
+        new Transform(1.0D, 1.1D, 0.62D));
+    private static final Style DEFAULT_DAMAGE = new Style(
+        "true", DEFAULT_DAMAGE_PRESENTATION, List.of());
+    private static final Style DEFAULT_HEALING = new Style(
+        "true", DEFAULT_HEALING_PRESENTATION, List.of());
+    private static final Audience DEFAULT_AUDIENCE = new Audience(
+        "hasPermission('viewer', '" + DEFAULT_AUDIENCE_PERMISSION + "')");
 
     public static final DamageIndicatorSettingsDoc DEFAULTS = new DamageIndicatorSettingsDoc(
         CURRENT_SCHEMA_VERSION,
@@ -40,7 +47,7 @@ public record DamageIndicatorSettingsDoc(
         DEFAULT_LIMITS,
         DEFAULT_DAMAGE,
         DEFAULT_HEALING,
-        DEFAULT_FILTERS);
+        DEFAULT_AUDIENCE);
 
     public DamageIndicatorSettingsDoc {
         DocumentEnvelope.requireSchemaVersion(KIND, schemaVersion, CURRENT_SCHEMA_VERSION);
@@ -48,7 +55,12 @@ public record DamageIndicatorSettingsDoc(
         limits = limits == null ? DEFAULT_LIMITS : limits;
         damage = resolveStyle(damage, DEFAULT_DAMAGE);
         healing = resolveStyle(healing, DEFAULT_HEALING);
-        filters = filters == null ? DEFAULT_FILTERS : filters;
+        audience = audience == null ? DEFAULT_AUDIENCE : resolveAudience(audience);
+        validateCondition("damage.when", damage.when());
+        validateVariants("damage.variants", damage.variants());
+        validateCondition("healing.when", healing.when());
+        validateVariants("healing.variants", healing.variants());
+        validateCondition("audience.when", audience.when());
     }
 
     public static DamageIndicatorSettingsDoc parse(String fileName, String raw) {
@@ -64,9 +76,27 @@ public record DamageIndicatorSettingsDoc(
         }
     }
 
-    public record Style(Boolean enabled, String format, Vector offset, Motion motion,
-                        Presentation presentation) {
+    public record Style(String when, IndicatorPresentation presentation, List<Variant> variants) {
         public Style {
+            when = normalizeCondition(when);
+            variants = variants == null ? List.of() : List.copyOf(variants);
+        }
+    }
+
+    public record Variant(String id, int priority, String when, IndicatorPresentation presentation) {
+        public Variant {
+            id = requireId(id);
+            when = requireCondition(when);
+            if (presentation == null || !presentation.complete()) {
+                throw new IllegalArgumentException(
+                    "damage-indicator variant presentation must be complete");
+            }
+        }
+    }
+
+    public record IndicatorPresentation(String format, Vector offset, Motion motion,
+                                        Transform transform) {
+        public IndicatorPresentation {
             if (format != null && !format.contains("{amount}")) {
                 throw new IllegalArgumentException(
                     "damage-indicator format must contain the {amount} token");
@@ -76,7 +106,12 @@ public record DamageIndicatorSettingsDoc(
 
         @Override
         public Vector offset() {
-            return offset.clone();
+            return offset == null ? null : offset.clone();
+        }
+
+        private boolean complete() {
+            return format != null && offset != null && motion != null && motion.complete()
+                && transform != null && transform.complete();
         }
     }
 
@@ -88,32 +123,28 @@ public record DamageIndicatorSettingsDoc(
             verticalAcceleration = clampNullable(verticalAcceleration, -32.0D, 32.0D);
             spinDegreesPerSecond = clampNullable(spinDegreesPerSecond, -1440.0D, 1440.0D);
         }
+
+        private boolean complete() {
+            return horizontalSpeed != null && verticalSpeed != null
+                && verticalAcceleration != null && spinDegreesPerSecond != null;
+        }
     }
 
-    public record Presentation(Double startScale, Double endScale, Double fadeStartFraction) {
-        public Presentation {
+    public record Transform(Double startScale, Double endScale, Double fadeStartFraction) {
+        public Transform {
             startScale = clampNullable(startScale, 0.0D, 16.0D);
             endScale = clampNullable(endScale, 0.0D, 16.0D);
             fadeStartFraction = clampNullable(fadeStartFraction, 0.0D, 1.0D);
         }
+
+        private boolean complete() {
+            return startScale != null && endScale != null && fadeStartFraction != null;
+        }
     }
 
-    public record Filters(List<String> disabledWorlds) {
-        public Filters {
-            if (disabledWorlds == null) {
-                disabledWorlds = List.of();
-            } else {
-                List<String> cleaned = new ArrayList<>(disabledWorlds.size());
-                for (String world : disabledWorlds) {
-                    if (world != null && !world.isBlank()) {
-                        String normalized = world.trim();
-                        if (!cleaned.contains(normalized)) {
-                            cleaned.add(normalized);
-                        }
-                    }
-                }
-                disabledWorlds = List.copyOf(cleaned);
-            }
+    public record Audience(String when) {
+        public Audience {
+            when = normalizeCondition(when);
         }
     }
 
@@ -121,14 +152,28 @@ public record DamageIndicatorSettingsDoc(
         if (source == null) {
             return defaults;
         }
-        Motion motion = resolveMotion(source.motion, defaults.motion);
-        Presentation presentation = resolvePresentation(source.presentation, defaults.presentation);
         return new Style(
-            source.enabled == null ? defaults.enabled : source.enabled,
-            source.format == null ? defaults.format : source.format,
-            source.offset == null ? defaults.offset : source.offset,
+            source.when() == null ? defaults.when() : source.when(),
+            resolvePresentation(source.presentation(), defaults.presentation()),
+            source.variants());
+    }
+
+    private static Audience resolveAudience(Audience source) {
+        return new Audience(source.when() == null ? DEFAULT_AUDIENCE.when() : source.when());
+    }
+
+    private static IndicatorPresentation resolvePresentation(
+        IndicatorPresentation source, IndicatorPresentation defaults) {
+        if (source == null) {
+            return defaults;
+        }
+        Motion motion = resolveMotion(source.motion(), defaults.motion());
+        Transform transform = resolveTransform(source.transform(), defaults.transform());
+        return new IndicatorPresentation(
+            source.format() == null ? defaults.format() : source.format(),
+            source.offset() == null ? defaults.offset() : source.offset(),
             motion,
-            presentation);
+            transform);
     }
 
     private static Motion resolveMotion(Motion source, Motion defaults) {
@@ -136,20 +181,67 @@ public record DamageIndicatorSettingsDoc(
             return defaults;
         }
         return new Motion(
-            source.horizontalSpeed == null ? defaults.horizontalSpeed : source.horizontalSpeed,
-            source.verticalSpeed == null ? defaults.verticalSpeed : source.verticalSpeed,
-            source.verticalAcceleration == null ? defaults.verticalAcceleration : source.verticalAcceleration,
-            source.spinDegreesPerSecond == null ? defaults.spinDegreesPerSecond : source.spinDegreesPerSecond);
+            source.horizontalSpeed() == null ? defaults.horizontalSpeed() : source.horizontalSpeed(),
+            source.verticalSpeed() == null ? defaults.verticalSpeed() : source.verticalSpeed(),
+            source.verticalAcceleration() == null
+                ? defaults.verticalAcceleration() : source.verticalAcceleration(),
+            source.spinDegreesPerSecond() == null
+                ? defaults.spinDegreesPerSecond() : source.spinDegreesPerSecond());
     }
 
-    private static Presentation resolvePresentation(Presentation source, Presentation defaults) {
+    private static Transform resolveTransform(Transform source, Transform defaults) {
         if (source == null) {
             return defaults;
         }
-        return new Presentation(
-            source.startScale == null ? defaults.startScale : source.startScale,
-            source.endScale == null ? defaults.endScale : source.endScale,
-            source.fadeStartFraction == null ? defaults.fadeStartFraction : source.fadeStartFraction);
+        return new Transform(
+            source.startScale() == null ? defaults.startScale() : source.startScale(),
+            source.endScale() == null ? defaults.endScale() : source.endScale(),
+            source.fadeStartFraction() == null
+                ? defaults.fadeStartFraction() : source.fadeStartFraction());
+    }
+
+    private static void validateVariants(String path, List<Variant> variants) {
+        Set<String> ids = new HashSet<String>(variants.size());
+        for (int index = 0; index < variants.size(); index++) {
+            Variant variant = variants.get(index);
+            if (variant == null) {
+                throw new IllegalArgumentException(path + " must not contain null entries");
+            }
+            if (!ids.add(variant.id())) {
+                throw new IllegalArgumentException(path + " contains duplicate id: " + variant.id());
+            }
+            validateCondition(path + "[" + index + "].when", variant.when());
+        }
+    }
+
+    private static void validateCondition(String path, String expression) {
+        ConditionCompiler.compile(new ConditionSource(KIND + "/default.json." + path, expression));
+    }
+
+    private static String normalizeCondition(String value) {
+        return value == null ? null : requireCondition(value);
+    }
+
+    private static String requireCondition(String value) {
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException("damage-indicator condition must not be blank");
+        }
+        return value.trim();
+    }
+
+    private static String requireId(String value) {
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException("damage-indicator variant id must not be blank");
+        }
+        String id = value.trim();
+        for (int index = 0; index < id.length(); index++) {
+            char character = id.charAt(index);
+            if (!Character.isLetterOrDigit(character)
+                && character != '-' && character != '_' && character != '.') {
+                throw new IllegalArgumentException("invalid damage-indicator variant id: " + id);
+            }
+        }
+        return id;
     }
 
     private static int clamp(Integer value, int minimum, int maximum, int fallback) {
