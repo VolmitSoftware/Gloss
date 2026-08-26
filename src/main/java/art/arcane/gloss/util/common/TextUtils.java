@@ -9,6 +9,7 @@ import org.bukkit.ChatColor;
 
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 public final class TextUtils {
@@ -51,6 +52,40 @@ public final class TextUtils {
     return builder.toString();
   }
 
+  public static String joinLegacyLines(List<String> lines) {
+    if (lines == null || lines.isEmpty()) {
+      return "";
+    }
+    return String.join(ChatColor.RESET + "\n", lines);
+  }
+
+  public static String scopeLegacyLines(String text) {
+    if (text == null || text.isEmpty()) {
+      return text == null ? "" : text;
+    }
+    StringBuilder output = null;
+    for (int index = 0; index < text.length(); index++) {
+      char value = text.charAt(index);
+      if (value != '\n' && value != '\r' && value != '\u2028' && value != '\u2029') {
+        if (output != null) {
+          output.append(value);
+        }
+        continue;
+      }
+      if (output == null) {
+        output = new StringBuilder(text.length() + 8);
+        output.append(text, 0, index);
+      }
+      output.append(value);
+      if (value == '\r' && index + 1 < text.length() && text.charAt(index + 1) == '\n') {
+        output.append('\n');
+        index++;
+      }
+      output.append(ChatColor.RESET);
+    }
+    return output == null ? text : output.toString();
+  }
+
   static String translateLegacy(String text) {
     if (text == null || text.isEmpty()) {
       return "";
@@ -89,7 +124,7 @@ public final class TextUtils {
         || Character.toLowerCase(text.charAt(offset + 1)) != 'x') {
       return null;
     }
-    StringBuilder hex = new StringBuilder(8).append("<#");
+    StringBuilder hex = new StringBuilder(15).append("<reset><#");
     for (int index = offset + 2; index < offset + 14; index += 2) {
       char lead = text.charAt(index);
       char digit = text.charAt(index + 1);
@@ -103,22 +138,22 @@ public final class TextUtils {
 
   private static Map<Character, String> legacyTags() {
     Map<Character, String> tags = new HashMap<>();
-    tags.put('0', "<black>");
-    tags.put('1', "<dark_blue>");
-    tags.put('2', "<dark_green>");
-    tags.put('3', "<dark_aqua>");
-    tags.put('4', "<dark_red>");
-    tags.put('5', "<dark_purple>");
-    tags.put('6', "<gold>");
-    tags.put('7', "<gray>");
-    tags.put('8', "<dark_gray>");
-    tags.put('9', "<blue>");
-    tags.put('a', "<green>");
-    tags.put('b', "<aqua>");
-    tags.put('c', "<red>");
-    tags.put('d', "<light_purple>");
-    tags.put('e', "<yellow>");
-    tags.put('f', "<white>");
+    tags.put('0', "<reset><black>");
+    tags.put('1', "<reset><dark_blue>");
+    tags.put('2', "<reset><dark_green>");
+    tags.put('3', "<reset><dark_aqua>");
+    tags.put('4', "<reset><dark_red>");
+    tags.put('5', "<reset><dark_purple>");
+    tags.put('6', "<reset><gold>");
+    tags.put('7', "<reset><gray>");
+    tags.put('8', "<reset><dark_gray>");
+    tags.put('9', "<reset><blue>");
+    tags.put('a', "<reset><green>");
+    tags.put('b', "<reset><aqua>");
+    tags.put('c', "<reset><red>");
+    tags.put('d', "<reset><light_purple>");
+    tags.put('e', "<reset><yellow>");
+    tags.put('f', "<reset><white>");
     tags.put('k', "<obfuscated>");
     tags.put('l', "<bold>");
     tags.put('m', "<strikethrough>");

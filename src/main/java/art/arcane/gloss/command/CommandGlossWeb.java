@@ -1,6 +1,7 @@
 package art.arcane.gloss.command;
 
 import art.arcane.gloss.Gloss;
+import art.arcane.gloss.editor.sync.EditorSyncConfigurationException;
 import art.arcane.gloss.editor.sync.EditorSyncKind;
 import art.arcane.gloss.editor.sync.EditorSyncOpenResult;
 import art.arcane.gloss.editor.sync.EditorSyncService;
@@ -121,9 +122,15 @@ public final class CommandGlossWeb {
       return;
     }
     Throwable cause = rootCause(failure);
-    Gloss.logExceptionStack(false, cause,
-        "Unable to create a web editor session for %s \"%s\".", kind, subjectId);
+    if (shouldLogOpenFailure(cause)) {
+      Gloss.logExceptionStack(false, cause,
+          "Unable to create a web editor session for %s \"%s\".", kind, subjectId);
+    }
     sendOpenFailure(sender, kind, subjectId, cause);
+  }
+
+  static boolean shouldLogOpenFailure(Throwable failure) {
+    return !(failure instanceof EditorSyncConfigurationException);
   }
 
   private void sendOpenFailure(CommandSender sender, String kind, String subjectId, Throwable failure) {

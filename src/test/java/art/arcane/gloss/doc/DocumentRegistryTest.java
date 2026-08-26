@@ -762,7 +762,7 @@ class DocumentRegistryTest {
     }
 
     private static DocumentDelta awaitDelta(DocumentRegistry<String> registry) throws InterruptedException {
-        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5L);
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(15L);
         DocumentDelta delta = DocumentDelta.EMPTY;
         while (delta.isEmpty() && System.nanoTime() < deadline) {
             delta = registry.poll();

@@ -9,7 +9,9 @@ import art.arcane.gloss.doc.DocumentRegistry;
 import art.arcane.gloss.doc.DocumentReviser;
 import art.arcane.gloss.doc.DocumentStore;
 import art.arcane.gloss.doc.GlossDocument;
+import art.arcane.gloss.text.TextDisplayLayout;
 import art.arcane.gloss.text.TextPipeline;
+import art.arcane.gloss.util.common.TextUtils;
 import art.arcane.volmlib.util.entity.StackExclusion;
 import art.arcane.volmlib.util.scheduling.FoliaScheduler;
 import art.arcane.volmlib.util.scheduling.SchedulerUtils;
@@ -317,6 +319,7 @@ public final class HologramService {
         display.setPersistent(false);
         display.setBillboard(billboard);
         display.setViewRange(HologramMath.viewRangeMultiplier(plugin.cfg().holograms().viewRange()));
+        display.setLineWidth(TextDisplayLayout.FULL_WIDTH);
         display.setSeeThrough(seeThrough);
         display.setShadowed(false);
         display.addScoreboardTag(DISPLAY_TAG);
@@ -576,16 +579,11 @@ public final class HologramService {
     }
 
     String renderStaticLines(List<String> lines) {
-        StringBuilder builder = new StringBuilder();
-        for (int index = 0; index < lines.size(); index++) {
-            if (index > 0) {
-                builder.append('\n');
-            }
-
-            builder.append(plugin.text().renderStatic(lines.get(index)));
+        List<String> rendered = new ArrayList<>(lines.size());
+        for (String line : lines) {
+            rendered.add(plugin.text().renderStatic(line));
         }
-
-        return builder.toString();
+        return TextUtils.joinLegacyLines(rendered);
     }
 
     private void startTasks() {

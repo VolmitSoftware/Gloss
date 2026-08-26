@@ -37,4 +37,10 @@ class RealDropCarrierMotionTest {
             12.0D, 64.0D, -3.0D,
             12.0D, 64.0D, -3.0D));
     }
+
+    @Test
+    void regionizedDisplaysStayDetachedFromTheMovingCarrier() {
+        assertFalse(RealDropService.usesPassengerCarrier(true));
+        assertTrue(RealDropService.usesPassengerCarrier(false));
+    }
 }

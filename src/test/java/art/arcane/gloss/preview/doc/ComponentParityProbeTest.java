@@ -130,9 +130,9 @@ public class ComponentParityProbeTest {
   // ---------------------------------------------------------------------
 
   /**
-   * Pinned so nobody reaches for either of these when writing a three-run label. Leaving all tags
-   * open nests the third run inside the second; closing all of them flattens the runs but keeps
-   * MiniMessage's empty root, which {@code compact()} will not fold away with more than one child.
+   * Pinned so nobody reaches for either of these when writing a three-run label. Legacy colors
+   * reset earlier decorations, while explicitly closing every tag keeps MiniMessage's empty root;
+   * {@code compact()} will not fold that root away with more than one child.
    */
   @Test
   public void allOpenAndAllClosedTagsBothMissTheThreeRunShape() {
@@ -142,8 +142,8 @@ public class ComponentParityProbeTest {
 
     String allOpen = serialize(TextUtils.parse("&eFuel 15s&8  •  &aXP +1.5"));
     assertEquals(
-        "{\"color\":\"yellow\",\"extra\":[{\"color\":\"dark_gray\",\"extra\":"
-            + "[{\"color\":\"green\",\"text\":\"XP +1.5\"}],\"text\":\"  •  \"}],\"text\":\"Fuel 15s\"}",
+        "{\"extra\":[{\"color\":\"yellow\",\"text\":\"Fuel 15s\"},{\"color\":\"dark_gray\",\"text\":\"  •  \"},"
+            + "{\"color\":\"green\",\"text\":\"XP +1.5\"}],\"text\":\"\"}",
         allOpen
     );
     assertNotEquals(programmatic, allOpen);

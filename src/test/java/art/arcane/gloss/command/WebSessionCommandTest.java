@@ -1,6 +1,8 @@
 package art.arcane.gloss.command;
 
+import art.arcane.gloss.editor.sync.EditorSyncConfigurationException;
 import art.arcane.gloss.editor.sync.EditorSyncKind;
+import art.arcane.gloss.editor.sync.EditorSyncRelayException;
 import art.arcane.gloss.editor.sync.EditorSyncSessionInfo;
 import org.junit.Test;
 
@@ -8,6 +10,7 @@ import java.time.Instant;
 import java.util.List;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
@@ -31,6 +34,14 @@ public class WebSessionCommandTest {
 
     assertThrows(IllegalArgumentException.class, () ->
         CommandGlossWebSessions.resolveSessionId("abcdefghijkl", List.of(first, second)));
+  }
+
+  @Test
+  public void expectedConfigurationRefusalsDoNotPrintExceptionStacks() {
+    assertFalse(CommandGlossWeb.shouldLogOpenFailure(
+        new EditorSyncConfigurationException("missing token")));
+    assertTrue(CommandGlossWeb.shouldLogOpenFailure(
+        new EditorSyncRelayException("relay failed")));
   }
 
   private static EditorSyncSessionInfo session(String id) {

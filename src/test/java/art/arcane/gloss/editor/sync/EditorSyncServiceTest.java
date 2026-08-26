@@ -159,7 +159,7 @@ public class EditorSyncServiceTest {
   }
 
   @Test
-  public void officialRelayWithoutCreateTokenFallsBackBeforeNetworkOrSnapshotWork() {
+  public void officialRelayWithoutCreateTokenRefusesBeforeNetworkOrSnapshotWork() {
     TestSettings settings = new TestSettings(true);
     settings.endpoint = GlossConfigFile.EDITOR_SYNC_ENDPOINT_DEFAULT;
     ControlledRelay relay = new ControlledRelay();
@@ -169,7 +169,9 @@ public class EditorSyncServiceTest {
     CompletionException failure = assertThrows(CompletionException.class,
         () -> service.open(EditorSyncKind.MENU, "fixture").join());
 
-    assertTrue(failure.getCause().getMessage().contains("editorSyncCreateToken"));
+    assertTrue(failure.getCause() instanceof EditorSyncConfigurationException);
+    assertEquals("the official editor sync relay requires [editor.sync] createToken",
+        failure.getCause().getMessage());
     assertEquals(0, relay.creates.get());
   }
 

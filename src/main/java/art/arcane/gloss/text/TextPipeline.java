@@ -3,6 +3,7 @@ package art.arcane.gloss.text;
 import art.arcane.gloss.Gloss;
 import art.arcane.gloss.GlossConfig;
 import art.arcane.gloss.expr.ExprScope;
+import art.arcane.gloss.util.common.TextUtils;
 import art.arcane.volmlib.util.bukkit.Placeholders;
 import art.arcane.volmlib.util.format.ColorFormatter;
 import org.bukkit.entity.Player;
@@ -84,7 +85,7 @@ public final class TextPipeline implements TextRenderer {
             out = Placeholders.setPlaceholders(viewer, out);
         }
         out = applyEmoji(viewer, out);
-        return applyColors(out);
+        return TextUtils.scopeLegacyLines(applyColors(out));
     }
 
     @Override

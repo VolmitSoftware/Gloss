@@ -62,7 +62,7 @@ class CharacterizationTemporaryHologramLifecycleTest {
         temporary.drive(true);
 
         DisplayHandle display = harness.onlySpawned(world);
-        assertEquals("§aHi\nTwo", display.lastText(),
+        assertEquals("§aHi§r\nTwo", display.lastText(),
             "spawn must render color codes and join lines with newlines");
         assertEquals(1, harness.service.temporaryCount());
         assertEquals(1, harness.service.activeEntityCount());
@@ -76,15 +76,15 @@ class CharacterizationTemporaryHologramLifecycleTest {
 
         temporary.setLine(0, "&bBye");
         temporary.drive(true);
-        assertEquals("§bBye\nTwo", display.lastText());
+        assertEquals("§bBye§r\nTwo", display.lastText());
 
         temporary.addLine("Three");
         temporary.drive(true);
-        assertEquals("§bBye\nTwo\nThree", display.lastText());
+        assertEquals("§bBye§r\nTwo§r\nThree", display.lastText());
 
         temporary.removeLine(1);
         temporary.drive(true);
-        assertEquals("§bBye\nThree", display.lastText());
+        assertEquals("§bBye§r\nThree", display.lastText());
 
         temporary.clearLines();
         temporary.drive(true);

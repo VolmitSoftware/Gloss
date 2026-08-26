@@ -29,7 +29,7 @@ public class VariableCatalogSyncTest {
    * Pure string and animation functions intended for authored JSON documents.
    */
   private static final Set<String> DOCUMENT_PURE_FUNCTIONS = Set.of(
-      "plain", "readable", "marquee", "timeline", "typewriter", "flash", "wipe", "scanner",
+      "plain", "readable", "align", "marquee", "timeline", "typewriter", "flash", "wipe", "scanner",
       "scramble", "odometer", "wave");
 
   private static final Set<String> KNOWN_TYPES = Set.of("number", "string", "boolean");

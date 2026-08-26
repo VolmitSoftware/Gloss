@@ -1,15 +1,19 @@
 package art.arcane.gloss.util.common;
 
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.TextComponent;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextColor;
 import net.kyori.adventure.text.format.TextDecoration;
 import org.junit.Test;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotEquals;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 public class TextUtilsFormattingTest {
@@ -91,9 +95,43 @@ public class TextUtilsFormattingTest {
   }
 
   @Test
+  public void legacyColorEndsObfuscation() {
+    Component parsed = TextUtils.parse("&kA&fB");
+    TextComponent second = componentWithContent(parsed, "B");
+
+    assertNotNull(second);
+    assertNotEquals(TextDecoration.State.TRUE, second.decoration(TextDecoration.OBFUSCATED));
+  }
+
+  @Test
+  public void logicalLineBoundaryEndsObfuscation() {
+    String joined = TextUtils.joinLegacyLines(List.of("§kA", "B"));
+
+    assertEquals("<obfuscated>A<reset>\nB", TextUtils.translateLegacy(joined));
+  }
+
+  @Test
+  public void embeddedLineBreaksStartFreshLegacyScopes() {
+    assertEquals("§kA\n§rB\r\n§rC", TextUtils.scopeLegacyLines("§kA\nB\r\nC"));
+  }
+
+  @Test
   public void miniMessageTagsAndUnknownAmpersandsAreLeftAlone() {
     assertEquals("Play", TextUtils.content(TextUtils.parse("<gold><bold>Play")));
     assertEquals("Tom & Jerry", TextUtils.content(TextUtils.parse("Tom & Jerry")));
     assertEquals("&", TextUtils.content(TextUtils.parse("&")));
+  }
+
+  private static TextComponent componentWithContent(Component component, String content) {
+    if (component instanceof TextComponent text && text.content().equals(content)) {
+      return text;
+    }
+    for (Component child : component.children()) {
+      TextComponent found = componentWithContent(child, content);
+      if (found != null) {
+        return found;
+      }
+    }
+    return null;
   }
 }

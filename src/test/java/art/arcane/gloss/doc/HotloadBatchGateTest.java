@@ -25,7 +25,7 @@ class HotloadBatchGateTest {
     }
 
     @Test
-    void burstDuringBatchBecomesOneTrailingBatchAtCooldownBoundary() {
+    void burstDuringBatchBecomesOneImmediateTrailingBatch() {
         AtomicLong clock = new AtomicLong();
         HotloadBatchGate gate = new HotloadBatchGate(COOLDOWN_NANOS, clock::get);
 
@@ -36,9 +36,6 @@ class HotloadBatchGateTest {
         gate.request();
         gate.complete();
 
-        clock.set(COOLDOWN_NANOS - 1L);
-        assertFalse(gate.tryStart());
-        clock.set(COOLDOWN_NANOS);
         assertTrue(gate.tryStart());
         gate.complete();
 
@@ -46,20 +43,15 @@ class HotloadBatchGateTest {
     }
 
     @Test
-    void cooldownBeginsAfterTheRunningApplyBatchCompletes() {
+    void completedIdleBatchDoesNotThrottleTheNextRequest() {
         AtomicLong clock = new AtomicLong();
         HotloadBatchGate gate = new HotloadBatchGate(COOLDOWN_NANOS, clock::get);
 
         gate.request();
         assertTrue(gate.tryStart());
-        gate.request();
-        clock.set(TimeUnit.SECONDS.toNanos(10L));
-        assertFalse(gate.tryStart());
         gate.complete();
-
-        clock.addAndGet(COOLDOWN_NANOS - 1L);
-        assertFalse(gate.tryStart());
         clock.incrementAndGet();
+        gate.request();
         assertTrue(gate.tryStart());
     }
 

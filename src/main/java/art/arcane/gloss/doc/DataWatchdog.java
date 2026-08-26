@@ -22,9 +22,8 @@ import java.util.function.LongSupplier;
  * apply phase talks to Bukkit hop it themselves — {@code HologramService}, {@code MenuCatalog},
  * {@code ImageAssets}, {@code PreviewDocumentRegistry} and the {@code config} entry all schedule their apply onto the
  * global (or owning region) context and keep only the stat/read/parse off-thread. The scheduler may
- * request work at the configured interval, but automatic batches start only after a three-second
- * cooldown from the preceding batch. Requests arriving during a scan or its queued apply phase
- * collapse into one trailing pass that reads the latest state.
+ * request work at the configured interval. Requests arriving during a scan or its queued apply
+ * phase collapse into one trailing pass that reads the latest state.
  */
 public final class DataWatchdog {
     private static final int NO_TASK = -1;

@@ -251,6 +251,7 @@ Shared with every other Gloss expression surface (holograms, bubbles, container 
 | `fixed(x, digits)` | string | `digits` must be a whole number 0-20. |
 | `plain(text)` | string | Strips legacy `&x` colour codes. |
 | `readable(text)` | string | `IRON_ORE` becomes `"Iron Ore"`. |
+| `align(text, width, mode)` | string | Pads visible character cells with `left`, `center`/`middle`, or `right`; longer text is never truncated. |
 
 Only `glow` has any use for the string- and colour-returning functions; `offset`, `rotation` and
 `scale` must produce numbers and `visible` must produce a boolean.

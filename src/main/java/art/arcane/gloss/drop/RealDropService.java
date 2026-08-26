@@ -5,6 +5,7 @@ import art.arcane.gloss.GlossConfig;
 import art.arcane.gloss.hologram.DisplayVisibility;
 import art.arcane.gloss.hologram.HologramMath;
 import art.arcane.gloss.service.AdmissionBudget;
+import art.arcane.gloss.text.TextDisplayLayout;
 import art.arcane.volmlib.util.scheduling.FoliaScheduler;
 import org.bukkit.Color;
 import org.bukkit.Location;
@@ -60,6 +61,7 @@ final class RealDropService {
     private final Map<LightKey, UUID> lightOwners;
     private final Map<ChunkKey, Integer> lightChunkUsage;
     private final AdmissionBudget admissions;
+    private final boolean detachedRegionizedDisplays;
 
     private volatile boolean running;
     private volatile long generation;
@@ -75,6 +77,7 @@ final class RealDropService {
         this.lightOwners = new ConcurrentHashMap<>();
         this.lightChunkUsage = new ConcurrentHashMap<>();
         this.admissions = new AdmissionBudget(MAX_ACTIVE_PRESENTATIONS);
+        this.detachedRegionizedDisplays = plugin.scheduler().isFoliaThreading();
     }
 
     void enable() {
@@ -309,7 +312,8 @@ final class RealDropService {
         if (!state.selection.universalAudience()) {
             DisplayVisibility.setVisibleByDefault(display, false);
         }
-        if (index > 0 && !carrier(state).addPassenger(display)) {
+        if (index > 0 && usesPassengerCarrier(detachedRegionizedDisplays)
+            && !carrier(state).addPassenger(display)) {
             display.remove();
             throw new IllegalStateException("Display carrier refused an additional dropped-item model");
         }
@@ -326,7 +330,7 @@ final class RealDropService {
         display.setSeeThrough(labels.seeThrough());
         display.setShadowed(labels.shadow());
         display.setViewRange(HologramMath.viewRangeMultiplier(labels.viewRange()));
-        display.setLineWidth(1000);
+        display.setLineWidth(TextDisplayLayout.FULL_WIDTH);
         display.setTextOpacity((byte) -1);
         display.setBackgroundColor(labels.background()
             ? Color.fromARGB(labels.backgroundAlpha(), labels.backgroundRed(), labels.backgroundGreen(), labels.backgroundBlue())
@@ -342,7 +346,7 @@ final class RealDropService {
         if (!state.selection.universalAudience()) {
             DisplayVisibility.setVisibleByDefault(display, false);
         }
-        if (!carrier(state).addPassenger(display)) {
+        if (usesPassengerCarrier(detachedRegionizedDisplays) && !carrier(state).addPassenger(display)) {
             display.remove();
             throw new IllegalStateException("Display carrier refused the dropped-item label");
         }
@@ -422,7 +426,8 @@ final class RealDropService {
         for (int index = 0; index < count; index++) {
             state.visuals.add(spawnVisual(state, stack, index, count, config));
         }
-        if (state.label != null && state.label.isValid()
+        if (usesPassengerCarrier(detachedRegionizedDisplays)
+            && state.label != null && state.label.isValid()
             && !carrier(state).addPassenger(state.label)) {
             throw new IllegalStateException("Display carrier refused the dropped-item label after model replacement");
         }
@@ -1315,7 +1320,19 @@ final class RealDropService {
 
     private boolean presentationOwned(State state) {
         Display carrier = carrierOrNull(state);
-        return carrier != null && plugin.scheduler().isOwnedByCurrentRegion(carrier);
+        if (carrier == null || !plugin.scheduler().isOwnedByCurrentRegion(carrier)) {
+            return false;
+        }
+        if (!detachedRegionizedDisplays) {
+            return true;
+        }
+        for (Display display : state.visuals) {
+            if (display.isValid() && !plugin.scheduler().isOwnedByCurrentRegion(display)) {
+                return false;
+            }
+        }
+        return state.label == null || !state.label.isValid()
+            || plugin.scheduler().isOwnedByCurrentRegion(state.label);
     }
 
     private void moveCarrier(State state, int interpolationTicks) {
@@ -1334,12 +1351,26 @@ final class RealDropService {
         state.lastCarrierY = destination.getY();
         state.lastCarrierZ = destination.getZ();
         int duration = Math.max(0, Math.min(interpolationTicks, 59));
-        plugin.scheduler().runEntity(carrier, () -> {
-            if (!carrier.isValid()) {
+        if (detachedRegionizedDisplays) {
+            for (Display display : state.visuals) {
+                moveDisplay(display, destination, duration);
+            }
+            moveDisplay(state.label, destination, duration);
+            return;
+        }
+        moveDisplay(carrier, destination, duration);
+    }
+
+    private void moveDisplay(Display display, Location destination, int duration) {
+        if (display == null) {
+            return;
+        }
+        plugin.scheduler().runEntity(display, () -> {
+            if (!display.isValid()) {
                 return;
             }
-            carrier.setTeleportDuration(duration);
-            plugin.scheduler().teleport(carrier, destination);
+            display.setTeleportDuration(duration);
+            plugin.scheduler().teleport(display, destination);
         });
     }
 
@@ -1355,6 +1386,10 @@ final class RealDropService {
         return Math.abs(x - lastX) > epsilon
             || Math.abs(y - lastY) > epsilon
             || Math.abs(z - lastZ) > epsilon;
+    }
+
+    static boolean usesPassengerCarrier(boolean detachedRegionizedDisplays) {
+        return !detachedRegionizedDisplays;
     }
 
     static boolean presentationStillCurrent(

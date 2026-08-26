@@ -2,6 +2,7 @@ package art.arcane.gloss.motd;
 
 import art.arcane.gloss.doc.DocumentEnvelope;
 import art.arcane.gloss.doc.DocumentParsers;
+import art.arcane.gloss.util.common.TextUtils;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -40,7 +41,7 @@ public record MotdDoc(int schemaVersion, long revision, List<MotdEntry> entries)
         }
 
         public String joined() {
-            return String.join("\n", lines);
+            return TextUtils.joinLegacyLines(lines);
         }
     }
 }

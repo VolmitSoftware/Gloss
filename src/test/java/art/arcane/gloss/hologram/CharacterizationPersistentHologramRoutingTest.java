@@ -76,7 +76,7 @@ class CharacterizationPersistentHologramRoutingTest {
         hologram.update();
 
         DisplayHandle display = harness.onlySpawned(world);
-        assertEquals("§aHello\nWorld", display.lastText(),
+        assertEquals("§aHello§r\nWorld", display.lastText(),
             "static lines must render once through the static pipeline");
         assertNull(display.visibleByDefault, "the shared display must stay visible to everyone");
 
@@ -93,7 +93,7 @@ class CharacterizationPersistentHologramRoutingTest {
         PersistentHologram hologram = hologram("h-literal-markers", List.of("100% ready", "A | B"));
         hologram.update();
 
-        assertEquals("100% ready\nA | B", harness.onlySpawned(world).lastText());
+        assertEquals("100% ready§r\nA | B", harness.onlySpawned(world).lastText());
         assertEquals(1, harness.liveSpawned(world).size());
     }
 

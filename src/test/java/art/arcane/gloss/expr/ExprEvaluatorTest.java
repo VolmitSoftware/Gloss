@@ -450,6 +450,23 @@ public class ExprEvaluatorTest {
   }
 
   @Test
+  public void alignPadsFormattedTextByVisibleCodePoints() {
+    Assert.assertEquals("&kGLOSS     ", eval("align('&kGLOSS', 10, 'left')"));
+    Assert.assertEquals("  [FF00FF]GLOSS   ", eval("align('[FF00FF]GLOSS', 10, 'center')"));
+    Assert.assertEquals("     G😀", eval("align('G😀', 7, 'right')"));
+    Assert.assertEquals("  GLOSS   ", eval("align('GLOSS', 10, 'middle')"));
+    Assert.assertEquals("FULL WIDTH", eval("align('FULL WIDTH', 4, 'center')"));
+  }
+
+  @Test
+  public void alignRejectsInvalidModeAndWidth() {
+    assertEvalMessage("align('x', 0, 'left')",
+        "align argument 2 must be a whole number in [1, 16384]");
+    assertEvalMessage("align('x', 10, 'diagonal')",
+        "align argument 3 must be 'left', 'center', 'middle', or 'right'");
+  }
+
+  @Test
   public void textAnimationFunctionsTransformCallerContent() {
     Assert.assertEquals("LOSS ", eval("marquee('GLOSS', 5, 1)"));
     Assert.assertEquals("    G", eval("marquee('GLOSS', 5, 6)"));

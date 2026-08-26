@@ -4,6 +4,7 @@ import art.arcane.gloss.Gloss;
 import art.arcane.gloss.api.AnchoredHologram;
 import art.arcane.gloss.doc.DocumentEnvelope;
 import art.arcane.gloss.text.TextPipeline;
+import art.arcane.gloss.util.common.TextUtils;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.World;
@@ -756,17 +757,13 @@ final class PersistentHologram implements AnchoredHologram {
         String[] segments = staticSegments(snapshot);
         List<String> values = snapshot.lines();
         TextPipeline text = service.plugin().text();
-        StringBuilder builder = new StringBuilder();
+        List<String> rendered = new ArrayList<>(values.size());
         for (int index = 0; index < values.size(); index++) {
-            if (index > 0) {
-                builder.append('\n');
-            }
-
             String cached = segments[index];
-            builder.append(cached != null ? cached : text.render(player, values.get(index)));
+            rendered.add(cached != null ? cached : text.render(player, values.get(index)));
         }
 
-        return builder.toString();
+        return TextUtils.joinLegacyLines(rendered);
     }
 
     private String[] staticSegments(LineSet snapshot) {

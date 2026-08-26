@@ -50,8 +50,8 @@ class TextUtilsLegacyTest {
 
     @Test
     void markedTextStillTranslates() {
-        assertEquals("<red>Danger", TextUtils.translateLegacy("&cDanger"));
-        assertEquals("<#ff8800>Warm", TextUtils.translateLegacy("§x§f§f§8§8§0§0Warm"));
+        assertEquals("<reset><red>Danger", TextUtils.translateLegacy("&cDanger"));
+        assertEquals("<reset><#ff8800>Warm", TextUtils.translateLegacy("§x§f§f§8§8§0§0Warm"));
         assertEquals("&z stays", TextUtils.translateLegacy("&z stays"));
     }
 }

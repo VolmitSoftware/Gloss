@@ -31,7 +31,7 @@ class MotdDocTest {
         assertEquals(3L, doc.revision());
         assertEquals(2, doc.entries().size());
         assertEquals(List.of("&dA glossy server"), doc.entries().get(0).lines());
-        assertEquals("&dLine one\n&7Line two", doc.entries().get(1).joined());
+        assertEquals("&dLine one§r\n&7Line two", doc.entries().get(1).joined());
     }
 
     @Test

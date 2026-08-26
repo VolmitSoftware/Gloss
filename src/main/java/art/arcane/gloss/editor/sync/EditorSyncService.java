@@ -308,8 +308,8 @@ public final class EditorSyncService {
     String endpoint = settings.endpoint();
     String createToken = settings.createToken();
     if (GlossConfigFile.EDITOR_SYNC_ENDPOINT_DEFAULT.equals(endpoint) && createToken.isBlank()) {
-      return CompletableFuture.failedFuture(new IllegalStateException(
-          "the official editor sync relay requires editorSyncCreateToken"));
+      return CompletableFuture.failedFuture(new EditorSyncConfigurationException(
+          "the official editor sync relay requires [editor.sync] createToken"));
     }
     return startTracked(() ->
         CompletableFuture.supplyAsync(() -> {

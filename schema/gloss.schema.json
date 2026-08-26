@@ -303,7 +303,7 @@
           "type": "integer",
           "minimum": 1,
           "maximum": 16384,
-          "default": 2000
+          "default": 16384
         },
         "blockLight": {
           "type": [

@@ -7,10 +7,9 @@ final class HotloadBatchGate {
     private final long cooldownNanos;
     private final LongSupplier clock;
 
-    private boolean completed;
     private boolean inFlight;
     private boolean queued;
-    private long lastCompletedNanos;
+    private long deferredUntilNanos;
 
     HotloadBatchGate(long cooldownNanos, LongSupplier clock) {
         if (cooldownNanos <= 0L) {
@@ -28,8 +27,7 @@ final class HotloadBatchGate {
         if (inFlight || !queued) {
             return false;
         }
-        long now = clock.getAsLong();
-        if (completed && now - lastCompletedNanos < cooldownNanos) {
+        if (clock.getAsLong() < deferredUntilNanos) {
             return false;
         }
         queued = false;
@@ -42,13 +40,10 @@ final class HotloadBatchGate {
             return;
         }
         inFlight = false;
-        completed = true;
-        lastCompletedNanos = clock.getAsLong();
     }
 
     synchronized void deferFromNow() {
-        completed = true;
-        lastCompletedNanos = clock.getAsLong();
+        deferredUntilNanos = saturatingAdd(clock.getAsLong(), cooldownNanos);
     }
 
     synchronized void retry() {
@@ -62,5 +57,10 @@ final class HotloadBatchGate {
     synchronized void cancel() {
         inFlight = false;
         queued = false;
+        deferredUntilNanos = 0L;
+    }
+
+    private static long saturatingAdd(long value, long increment) {
+        return value > Long.MAX_VALUE - increment ? Long.MAX_VALUE : value + increment;
     }
 }

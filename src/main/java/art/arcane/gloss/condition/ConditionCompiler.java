@@ -257,6 +257,8 @@ public final class ConditionCompiler {
         case "fixed" -> fixedType(call.name(), arguments, ValueType.STRING,
             ValueKind.NUMBER, ValueKind.NUMBER);
         case "plain", "readable" -> fixedType(call.name(), arguments, ValueType.STRING, ValueKind.STRING);
+        case "align" -> fixedType(call.name(), arguments, ValueType.STRING,
+            ValueKind.STRING, ValueKind.NUMBER, ValueKind.STRING);
         case "marquee", "typewriter", "flash" -> animationThreeType(call.name(), arguments);
         case "timeline" -> fixedType(call.name(), arguments, ValueType.STRING, ValueKind.LIST, ValueKind.NUMBER);
         case "wipe", "scramble" -> fixedType(call.name(), arguments, ValueType.STRING,

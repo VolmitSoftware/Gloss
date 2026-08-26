@@ -85,7 +85,7 @@ class HologramRenderCacheTest {
         hologram.update();
 
         assertEquals(afterSpawn, renders.size(), "unchanged static lines must not re-enter the pipeline");
-        assertEquals("§aOne\n§bTwo", harness.onlySpawned(world).lastText());
+        assertEquals("§aOne§r\n§bTwo", harness.onlySpawned(world).lastText());
     }
 
     @Test
@@ -97,7 +97,7 @@ class HologramRenderCacheTest {
         hologram.setLine(0, "&cChanged");
         hologram.update();
 
-        assertEquals("§cChanged\n§bTwo", display.lastText());
+        assertEquals("§cChanged§r\n§bTwo", display.lastText());
     }
 
     @Test

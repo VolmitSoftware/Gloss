@@ -57,6 +57,7 @@ public final class ExprFunctions {
       case "fixed" -> fixed(name, args);
       case "plain" -> plain(name, args);
       case "readable" -> readable(name, args);
+      case "align" -> align(name, args);
       default -> TextAnimationFunctions.call(name, args);
     };
   }
@@ -65,7 +66,7 @@ public final class ExprFunctions {
     return switch (name) {
       case "clamp", "lerp", "min", "max", "floor", "ceil", "round", "abs", "mod", "pow",
           "smoothstep", "sin", "cos", "rgb", "argb", "alpha", "mix", "palette", "select",
-          "number", "bar", "hex", "str", "fixed", "plain", "readable" -> true;
+          "number", "bar", "hex", "str", "fixed", "plain", "readable", "align" -> true;
       default -> TextAnimationFunctions.isSupported(name);
     };
   }
@@ -326,6 +327,78 @@ public final class ExprFunctions {
       out.append(word.isEmpty() ? word : Character.toUpperCase(word.charAt(0)) + word.substring(1));
     }
     return out.toString();
+  }
+
+  private static String align(String name, List<Object> args) {
+    requireCount(name, args, 3);
+    String value = strArg(name, args, 0);
+    double widthValue = numArg(name, args, 1);
+    if (widthValue != Math.rint(widthValue) || widthValue < 1 || widthValue > 16384) {
+      throw new ExprException(name + " argument 2 must be a whole number in [1, 16384]", NO_POSITION);
+    }
+    String mode = strArg(name, args, 2).toLowerCase(Locale.ENGLISH);
+    int visible = visibleCodePoints(value);
+    int remaining = Math.max(0, (int) widthValue - visible);
+    int leading = switch (mode) {
+      case "left" -> 0;
+      case "center", "middle" -> remaining / 2;
+      case "right" -> remaining;
+      default -> throw new ExprException(
+          name + " argument 3 must be 'left', 'center', 'middle', or 'right'", NO_POSITION);
+    };
+    return " ".repeat(leading) + value + " ".repeat(remaining - leading);
+  }
+
+  private static int visibleCodePoints(String value) {
+    int visible = 0;
+    for (int index = 0; index < value.length();) {
+      int formattingLength = formattingLength(value, index);
+      if (formattingLength > 0) {
+        index += formattingLength;
+        continue;
+      }
+      int codePoint = value.codePointAt(index);
+      visible++;
+      index += Character.charCount(codePoint);
+    }
+    return visible;
+  }
+
+  private static int formattingLength(String value, int index) {
+    char marker = value.charAt(index);
+    if ((marker == '&' || marker == '§') && index + 1 < value.length()) {
+      char code = Character.toLowerCase(value.charAt(index + 1));
+      if ("0123456789abcdefklmnor".indexOf(code) >= 0) {
+        return 2;
+      }
+      if ((code == 'x' || value.charAt(index + 1) == '#') && index + 8 <= value.length()
+          && hex(value, index + 2, 6)) {
+        return 8;
+      }
+      if (code == 'x' && index + 14 <= value.length()) {
+        for (int offset = 2; offset < 14; offset += 2) {
+          if (value.charAt(index + offset) != marker
+              || Character.digit(value.charAt(index + offset + 1), 16) < 0) {
+            return 0;
+          }
+        }
+        return 14;
+      }
+    }
+    if (marker == '[' && index + 8 <= value.length() && value.charAt(index + 7) == ']'
+        && hex(value, index + 1, 6)) {
+      return 8;
+    }
+    return 0;
+  }
+
+  private static boolean hex(String value, int offset, int length) {
+    for (int index = offset; index < offset + length; index++) {
+      if (Character.digit(value.charAt(index), 16) < 0) {
+        return false;
+      }
+    }
+    return true;
   }
 
   // ---------------------------------------------------------------------

@@ -1,5 +1,7 @@
 package art.arcane.gloss.config.icon;
 
+import art.arcane.gloss.text.TextDisplayLayout;
+
 public record IconDisplayStyle(
     IconBillboard billboard,
     Boolean shadow,
@@ -27,7 +29,7 @@ public record IconDisplayStyle(
       IconTextAlignment.CENTER,
       IconArgbColor.TRANSPARENT,
       255,
-      2000,
+      TextDisplayLayout.FULL_WIDTH,
       null,
       null,
       1F,
@@ -48,7 +50,7 @@ public record IconDisplayStyle(
     textAlignment = textAlignment == null ? IconTextAlignment.CENTER : textAlignment;
     backgroundArgb = backgroundArgb == null ? IconArgbColor.TRANSPARENT : backgroundArgb;
     textOpacity = textOpacity == null ? 255 : requireRange(textOpacity, 0, 255, "textOpacity");
-    lineWidth = lineWidth == null ? 2000 : requireRange(lineWidth, 1, 16384, "lineWidth");
+    lineWidth = lineWidth == null ? TextDisplayLayout.FULL_WIDTH : requireRange(lineWidth, 1, 16384, "lineWidth");
     if ((blockLight == null) != (skyLight == null)) {
       throw new IllegalArgumentException("blockLight and skyLight must be supplied together");
     }

@@ -1,6 +1,7 @@
 package art.arcane.gloss.util.common;
 
 import art.arcane.gloss.Gloss;
+import art.arcane.gloss.text.TextDisplayLayout;
 import com.github.retrooper.packetevents.protocol.entity.data.EntityData;
 import com.github.retrooper.packetevents.protocol.entity.data.EntityDataTypes;
 import com.github.retrooper.packetevents.protocol.entity.type.EntityType;
@@ -74,7 +75,7 @@ public class DisplayEntity {
   private float height = 0f;
   private int glowColorOverride = -1;
   private Component text = Component.empty();
-  private int lineWidth = 200;
+  private int lineWidth = TextDisplayLayout.FULL_WIDTH;
   private int backgroundColor = 0;
   private byte textOpacity = (byte) 0xFF;
   private byte textFlags = 0;
@@ -556,7 +557,7 @@ public class DisplayEntity {
           .billboard(billboard)
           .shadow(0f, 0f)
           .textOpacity(textOpacity)
-          .lineWidth(2000)
+          .lineWidth(TextDisplayLayout.FULL_WIDTH)
           .backgroundColor(backgroundColor)
           .textFlags(textFlags)
           .scale(scaleX, scaleY, scaleZ)

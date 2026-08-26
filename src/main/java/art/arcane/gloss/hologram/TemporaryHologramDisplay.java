@@ -5,6 +5,8 @@ import art.arcane.gloss.api.HologramPresentation;
 import art.arcane.gloss.api.HologramViewers;
 import art.arcane.gloss.api.TemporaryHologram;
 import art.arcane.gloss.text.TextPipeline;
+import art.arcane.gloss.text.TextDisplayLayout;
+import art.arcane.gloss.util.common.TextUtils;
 import art.arcane.volmlib.util.math.M;
 import art.arcane.volmlib.util.scheduling.FoliaScheduler;
 import org.bukkit.Bukkit;
@@ -33,7 +35,7 @@ import java.util.function.Supplier;
 final class TemporaryHologramDisplay implements TemporaryHologram {
     private static final double POSITION_EPSILON_SQUARED = 1.0E-6D;
     private static final int NO_TELEPORT_DURATION = -1;
-    private static final int RENDERED_LINE_WIDTH = 2000;
+    private static final int RENDERED_LINE_WIDTH = TextDisplayLayout.FULL_WIDTH;
 
     private record LineSet(List<String> lines, int flags, boolean rendered) {
         static LineSet of(List<String> lines) {
@@ -829,7 +831,7 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
     }
 
     private String renderLines(LineSet lines) {
-        return lines.rendered() ? String.join("\n", lines.lines()) : service.renderStaticLines(lines.lines());
+        return lines.rendered() ? TextUtils.joinLegacyLines(lines.lines()) : service.renderStaticLines(lines.lines());
     }
 
     private boolean replaceLine(int index, String line) {
