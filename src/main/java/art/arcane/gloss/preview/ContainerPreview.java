@@ -2,7 +2,12 @@ package art.arcane.gloss.preview;
 
 import art.arcane.gloss.Gloss;
 import art.arcane.gloss.GlossConfig;
+import art.arcane.gloss.api.ParticleLayer;
 import art.arcane.gloss.menu.DisplayEntityManager;
+import art.arcane.gloss.particle.ParticleFrame;
+import art.arcane.gloss.particle.ParticleRect;
+import art.arcane.gloss.particle.ParticleText;
+import art.arcane.gloss.particle.ParticleTextLayout;
 import art.arcane.gloss.preview.doc.CompiledPreviewDocument;
 import art.arcane.gloss.preview.doc.PreviewDocumentRegistry;
 import art.arcane.gloss.preview.doc.PreviewStateContext;
@@ -68,6 +73,7 @@ public final class ContainerPreview {
   private final Entity entity;
   private final Vector targetCenter;
   private final List<PreviewElement> elements;
+  private final List<ParticleLayer> particleLayers;
   private final boolean showsContents;
   private final List<Rendered> rendered = new ArrayList<>();
 
@@ -99,12 +105,14 @@ public final class ContainerPreview {
   private double poseScale;
 
   private ContainerPreview(Player player, Block block, Entity entity, Vector targetCenter,
-                           List<PreviewElement> elements, boolean showsContents) {
+                           List<PreviewElement> elements, List<ParticleLayer> particleLayers,
+                           boolean showsContents) {
     this.player = player;
     this.block = block;
     this.entity = entity;
     this.targetCenter = targetCenter;
     this.elements = elements;
+    this.particleLayers = particleLayers;
     this.showsContents = showsContents;
     for (PreviewElement element : elements) {
       Rendered r = new Rendered(element);
@@ -127,7 +135,7 @@ public final class ContainerPreview {
       return null;
     }
     Vector center = block.getLocation().toVector().add(new Vector(0.5, 0.5, 0.5));
-    return new ContainerPreview(player, block, null, center, elements, true);
+    return new ContainerPreview(player, block, null, center, elements, resolved.doc().particleLayers(), true);
   }
 
   public static ContainerPreview forEnderChest(Block block, Player player, Vector center) {
@@ -144,7 +152,7 @@ public final class ContainerPreview {
     if (elements.isEmpty()) {
       return null;
     }
-    return new ContainerPreview(player, block, null, center, elements, true);
+    return new ContainerPreview(player, block, null, center, elements, resolved.doc().particleLayers(), true);
   }
 
   public static ContainerPreview forEntity(Entity entity, Player player) {
@@ -161,7 +169,7 @@ public final class ContainerPreview {
       return null;
     }
     Vector center = entity.getLocation().toVector().add(new Vector(0, Math.max(0.35, entity.getHeight() * 0.5), 0));
-    return new ContainerPreview(player, null, entity, center, elements, true);
+    return new ContainerPreview(player, null, entity, center, elements, resolved.doc().particleLayers(), true);
   }
 
   public static ContainerPreview locked(Block block, Player player) {
@@ -170,7 +178,7 @@ public final class ContainerPreview {
       return null;
     }
     Vector center = block.getLocation().toVector().add(new Vector(0.5D, 0.5D, 0.5D));
-    return new ContainerPreview(player, block, null, center, elements, false);
+    return new ContainerPreview(player, block, null, center, elements, lockedParticleLayers(), false);
   }
 
   public static ContainerPreview locked(Entity entity, Player player) {
@@ -179,7 +187,7 @@ public final class ContainerPreview {
       return null;
     }
     Vector center = entity.getLocation().toVector().add(new Vector(0, Math.max(0.35D, entity.getHeight() * 0.5D), 0));
-    return new ContainerPreview(player, null, entity, center, elements, false);
+    return new ContainerPreview(player, null, entity, center, elements, lockedParticleLayers(), false);
   }
 
   private static List<PreviewElement> lockedElements(Player player) {
@@ -188,6 +196,14 @@ public final class ContainerPreview {
         ? null
         : registry.special(PreviewDocumentRegistry.SPECIAL_LOCKED);
     return resolved == null ? List.of() : resolved.doc().build(PreviewStateContext.forViewer(player, resolved.vars()));
+  }
+
+  private static List<ParticleLayer> lockedParticleLayers() {
+    PreviewDocumentRegistry registry = registry();
+    CompiledPreviewDocument.Resolved resolved = registry == null
+        ? null
+        : registry.special(PreviewDocumentRegistry.SPECIAL_LOCKED);
+    return resolved == null ? List.of() : resolved.doc().particleLayers();
   }
 
   /** Null before the plugin has enabled, which is the one window a preview can be requested in. */
@@ -252,6 +268,7 @@ public final class ContainerPreview {
     if (!visualsShown) {
       return true;
     }
+    emitParticles();
     boolean scaleDirty = Math.abs(scaleTarget - appliedScale) > appliedScale * SCALE_EPSILON;
     if (scaleDirty) {
       appliedScale = scaleTarget;
@@ -271,6 +288,125 @@ public final class ContainerPreview {
       PacketUtils.send(player, teleports);
     }
     return true;
+  }
+
+  private void emitParticles() {
+    if (particleLayers.isEmpty() || anchor == null || eye == null) {
+      return;
+    }
+    Vector back = anchor.toVector().subtract(eye.toVector());
+    if (back.lengthSquared() < 1.0E-12D) {
+      back = new Vector(0.0D, 0.0D, 1.0D);
+    }
+    ParticleFrame frame = new ParticleFrame(anchor, right, up, back);
+    long tick = System.currentTimeMillis() / 50L;
+    for (ParticleLayer layer : particleLayers) {
+      List<ParticleRect> targets = previewTargets(layer);
+      if (!layer.target().scope().equals("local") && targets.isEmpty()) {
+        continue;
+      }
+      Gloss.instance.particles().emit(player, frame, layer, targets, tick);
+    }
+  }
+
+  private List<ParticleRect> previewTargets(ParticleLayer layer) {
+    String scope = layer.target().scope();
+    if (scope.equals("projection")) {
+      ParticleRect bounds = projectionBounds();
+      return bounds == null ? List.of() : List.of(bounds);
+    }
+    List<ParticleRect> targets = new ArrayList<>();
+    for (int index = 0; index < elements.size(); index++) {
+      PreviewElement element = elements.get(index);
+      if (scope.equals("component")) {
+        if (layer.target().component().equals("element-" + index)) {
+          targets.add(elementBounds(element));
+        }
+        continue;
+      }
+      if (!(element instanceof PreviewElement.Label label)) {
+        continue;
+      }
+      ParticleText.Rendered renderedText = label.particleText().get();
+      List<ParticleRect> labelTargets = labelTargets(layer, renderedText);
+      double x = label.x() * pixel();
+      double y = label.y() * pixel();
+      double z = label.z() * pixel();
+      for (ParticleRect target : labelTargets) {
+        targets.add(new ParticleRect(target.centerX() + x, target.centerY() + y,
+            target.centerZ() + z, target.width(), target.height(), target.depth()));
+      }
+    }
+    return List.copyOf(targets);
+  }
+
+  private List<ParticleRect> labelTargets(ParticleLayer layer, ParticleText.Rendered renderedText) {
+    String scope = layer.target().scope();
+    if (scope.equals("label") || scope.equals("text")) {
+      return List.of(ParticleTextLayout.textBounds(renderedText.text(), baseTextScale()));
+    }
+    if (scope.equals("line")) {
+      List<ParticleRect> lines = ParticleTextLayout.lineBounds(renderedText.text(), baseTextScale());
+      int index = layer.target().line() - 1;
+      return index < lines.size() ? List.of(lines.get(index)) : List.of();
+    }
+    if (scope.equals("span")) {
+      boolean perLetter = layer.geometry().type().equals("letterBounds")
+          || layer.geometry().type().equals("glyphOutline")
+          || layer.geometry().type().equals("glyphFill");
+      return ParticleTextLayout.bounds(renderedText, layer.target().name(), baseTextScale(), perLetter);
+    }
+    return List.of();
+  }
+
+  private ParticleRect projectionBounds() {
+    if (elements.isEmpty()) {
+      return null;
+    }
+    ParticleRect first = elementBounds(elements.getFirst());
+    double minimumX = first.centerX() - first.width() / 2.0D;
+    double maximumX = first.centerX() + first.width() / 2.0D;
+    double minimumY = first.centerY() - first.height() / 2.0D;
+    double maximumY = first.centerY() + first.height() / 2.0D;
+    double minimumZ = first.centerZ() - first.depth() / 2.0D;
+    double maximumZ = first.centerZ() + first.depth() / 2.0D;
+    for (int index = 1; index < elements.size(); index++) {
+      ParticleRect bounds = elementBounds(elements.get(index));
+      minimumX = Math.min(minimumX, bounds.centerX() - bounds.width() / 2.0D);
+      maximumX = Math.max(maximumX, bounds.centerX() + bounds.width() / 2.0D);
+      minimumY = Math.min(minimumY, bounds.centerY() - bounds.height() / 2.0D);
+      maximumY = Math.max(maximumY, bounds.centerY() + bounds.height() / 2.0D);
+      minimumZ = Math.min(minimumZ, bounds.centerZ() - bounds.depth() / 2.0D);
+      maximumZ = Math.max(maximumZ, bounds.centerZ() + bounds.depth() / 2.0D);
+    }
+    return new ParticleRect((minimumX + maximumX) / 2.0D, (minimumY + maximumY) / 2.0D,
+        (minimumZ + maximumZ) / 2.0D, maximumX - minimumX, maximumY - minimumY,
+        maximumZ - minimumZ);
+  }
+
+  private ParticleRect elementBounds(PreviewElement element) {
+    double unit = pixel();
+    double width;
+    double height;
+    if (element instanceof PreviewElement.Panel panel) {
+      width = panel.width() * unit;
+      height = panel.height() * unit;
+    } else if (element instanceof PreviewElement.Cell cell) {
+      width = cell.size() * unit;
+      height = cell.size() * unit;
+    } else if (element instanceof PreviewElement.Slot slot) {
+      width = slot.size() * unit;
+      height = slot.size() * unit;
+    } else if (element instanceof PreviewElement.Label label) {
+      ParticleRect text = ParticleTextLayout.textBounds(label.particleText().get().text(), baseTextScale());
+      width = text.width();
+      height = text.height();
+    } else {
+      width = unit;
+      height = unit;
+    }
+    return new ParticleRect(element.x() * unit, element.y() * unit, element.z() * unit,
+        width, height, unit);
   }
 
   public void refreshVisuals() {

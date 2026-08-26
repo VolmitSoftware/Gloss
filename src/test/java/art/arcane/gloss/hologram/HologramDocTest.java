@@ -18,7 +18,7 @@ class HologramDocTest {
     void parseReadsTheCurrentShapeWithVectorAnchor() {
         String json = """
             {
-              "schemaVersion": 1,
+              "schemaVersion": 2,
               "revision": 6,
               "anchor": {
                 "world": "world_nether",
@@ -44,10 +44,38 @@ class HologramDocTest {
     }
 
     @Test
+    void particleLayerVectorsParseFromTheCanonicalArrayShape() {
+        HologramDoc doc = HologramDoc.parse("particles.json", """
+            {
+              "schemaVersion": 2,
+              "revision": 1,
+              "anchor": {"world": "world", "position": [0.0, 64.0, 0.0]},
+              "lines": ["line"],
+              "scale": 1.0,
+              "particleLayers": [{
+                "id": "underline",
+                "target": {"scope": "local"},
+                "geometry": {
+                  "type": "line",
+                  "from": [-1.0, -0.2, 0.0],
+                  "to": [1.0, -0.2, 0.0]
+                },
+                "placement": {"layer": "behind", "depth": 0.05, "offset": [0.1, 0.2, 0.3]},
+                "particle": {"key": "minecraft:soul"}
+              }]
+            }
+            """);
+
+        assertEquals(new Vector(-1.0D, -0.2D, 0.0D), doc.particleLayers().getFirst().geometry().from());
+        assertEquals(new Vector(1.0D, -0.2D, 0.0D), doc.particleLayers().getFirst().geometry().to());
+        assertEquals(new Vector(0.1D, 0.2D, 0.3D), doc.particleLayers().getFirst().placement().offset());
+    }
+
+    @Test
     void gsonRoundTripPreservesAllFields() {
         HologramDoc original = new HologramDoc(HologramDoc.CURRENT_SCHEMA_VERSION, 3L,
             new HologramDoc.Anchor("world", new Vector(0.0D, -32.5D, 1000000.125D)),
-            List.of("plain", "", "&x&f&f&0&0&f&fhex"), false, 3.75D, "FIXED", -135.5D, 12.25D);
+            List.of("plain", "", "&x&f&f&0&0&f&fhex"), false, 3.75D, "FIXED", -135.5D, 12.25D, List.of());
 
         HologramDoc decoded = HologramDoc.parse("arena.json", BukkitJson.GSON.toJson(original));
 
@@ -63,7 +91,7 @@ class HologramDocTest {
     void serializedAnchorPositionIsAnArrayTriple() {
         HologramDoc doc = new HologramDoc(HologramDoc.CURRENT_SCHEMA_VERSION, 1L,
             new HologramDoc.Anchor("world", new Vector(1.0D, 2.0D, 3.0D)), List.of("x"), true,
-            HologramDoc.DEFAULT_SCALE, HologramDoc.DEFAULT_BILLBOARD, 0.0D, 0.0D);
+            HologramDoc.DEFAULT_SCALE, HologramDoc.DEFAULT_BILLBOARD, 0.0D, 0.0D, List.of());
 
         String json = BukkitJson.GSON.toJson(doc);
 
@@ -84,7 +112,7 @@ class HologramDocTest {
     void missingAnchorIsRejected() {
         assertThrows(NullPointerException.class, () -> new HologramDoc(HologramDoc.CURRENT_SCHEMA_VERSION,
             1L, null, List.of("x"), true, HologramDoc.DEFAULT_SCALE,
-            HologramDoc.DEFAULT_BILLBOARD, 0.0D, 0.0D));
+            HologramDoc.DEFAULT_BILLBOARD, 0.0D, 0.0D, List.of()));
         assertThrows(RuntimeException.class,
             () -> HologramDoc.parse("bare.json", "{\"schemaVersion\":1,\"revision\":1,\"scale\":1,\"lines\":[]}"));
     }
@@ -111,18 +139,18 @@ class HologramDocTest {
         HologramDoc.Anchor anchor = new HologramDoc.Anchor("world", new Vector(0, 0, 0));
         assertThrows(IllegalArgumentException.class, () -> new HologramDoc(HologramDoc.CURRENT_SCHEMA_VERSION,
             0L, anchor, List.of(), true, HologramDoc.DEFAULT_SCALE,
-            HologramDoc.DEFAULT_BILLBOARD, 0.0D, 0.0D));
+            HologramDoc.DEFAULT_BILLBOARD, 0.0D, 0.0D, List.of()));
         assertThrows(IllegalArgumentException.class,
             () -> new HologramDoc(HologramDoc.CURRENT_SCHEMA_VERSION,
                 DocumentEnvelope.MAX_SAFE_REVISION + 1L, anchor, List.of(), true,
-                HologramDoc.DEFAULT_SCALE, HologramDoc.DEFAULT_BILLBOARD, 0.0D, 0.0D));
+                HologramDoc.DEFAULT_SCALE, HologramDoc.DEFAULT_BILLBOARD, 0.0D, 0.0D, List.of()));
     }
 
     @Test
     void linesAreImmutableCopies() {
         HologramDoc doc = new HologramDoc(HologramDoc.CURRENT_SCHEMA_VERSION, 1L,
             new HologramDoc.Anchor("world", new Vector(0, 0, 0)), List.of("one"), true,
-            HologramDoc.DEFAULT_SCALE, HologramDoc.DEFAULT_BILLBOARD, 0.0D, 0.0D);
+            HologramDoc.DEFAULT_SCALE, HologramDoc.DEFAULT_BILLBOARD, 0.0D, 0.0D, List.of());
 
         assertThrows(UnsupportedOperationException.class, () -> doc.lines().add("two"));
     }
@@ -131,7 +159,7 @@ class HologramDocTest {
     void withRevisionOnlyChangesTheRevision() {
         HologramDoc doc = new HologramDoc(HologramDoc.CURRENT_SCHEMA_VERSION, 1L,
             new HologramDoc.Anchor("world", new Vector(1, 2, 3)), List.of("x"), false,
-            4.0D, "HORIZONTAL", 45.0D, -30.0D);
+            4.0D, "HORIZONTAL", 45.0D, -30.0D, List.of());
 
         HologramDoc bumped = doc.withRevision(2L);
 
@@ -149,7 +177,7 @@ class HologramDocTest {
     void orientationDefaultsReproduceTodaysCenterBillboard() {
         String json = """
             {
-              "schemaVersion": 1,
+              "schemaVersion": 2,
               "revision": 1,
               "anchor": {"world": "world", "position": [0.0, 0.0, 0.0]},
               "lines": ["&dNew hologram"],
@@ -170,15 +198,15 @@ class HologramDocTest {
         HologramDoc.Anchor anchor = new HologramDoc.Anchor("world", new Vector(0, 0, 0));
 
         assertEquals("VERTICAL", new HologramDoc(HologramDoc.CURRENT_SCHEMA_VERSION, 1L, anchor,
-            List.of("x"), true, HologramDoc.DEFAULT_SCALE, "vertical", 0.0D, 0.0D)
+            List.of("x"), true, HologramDoc.DEFAULT_SCALE, "vertical", 0.0D, 0.0D, List.of())
             .billboard());
         assertEquals("FIXED", new HologramDoc(HologramDoc.CURRENT_SCHEMA_VERSION, 1L, anchor,
-            List.of("x"), true, HologramDoc.DEFAULT_SCALE, "  Fixed  ", 0.0D, 0.0D)
+            List.of("x"), true, HologramDoc.DEFAULT_SCALE, "  Fixed  ", 0.0D, 0.0D, List.of())
             .billboard());
 
         IllegalArgumentException failure = assertThrows(IllegalArgumentException.class,
             () -> new HologramDoc(HologramDoc.CURRENT_SCHEMA_VERSION, 1L, anchor, List.of("x"), true,
-                HologramDoc.DEFAULT_SCALE, "SPIN", 0.0D, 0.0D));
+                HologramDoc.DEFAULT_SCALE, "SPIN", 0.0D, 0.0D, List.of()));
 
         assertTrue(failure.getMessage().contains("CENTER, FIXED, HORIZONTAL, VERTICAL"));
         assertTrue(failure.getMessage().contains("SPIN"));
@@ -189,30 +217,30 @@ class HologramDocTest {
         HologramDoc.Anchor anchor = new HologramDoc.Anchor("world", new Vector(0, 0, 0));
 
         assertEquals(-180.0D, new HologramDoc(HologramDoc.CURRENT_SCHEMA_VERSION, 1L, anchor,
-            List.of("x"), true, HologramDoc.DEFAULT_SCALE, "FIXED", -180.0D, 90.0D).yaw());
+            List.of("x"), true, HologramDoc.DEFAULT_SCALE, "FIXED", -180.0D, 90.0D, List.of()).yaw());
         assertEquals(90.0D, new HologramDoc(HologramDoc.CURRENT_SCHEMA_VERSION, 1L, anchor,
-            List.of("x"), true, HologramDoc.DEFAULT_SCALE, "FIXED", -180.0D, 90.0D).pitch());
+            List.of("x"), true, HologramDoc.DEFAULT_SCALE, "FIXED", -180.0D, 90.0D, List.of()).pitch());
 
         IllegalArgumentException yawFailure = assertThrows(IllegalArgumentException.class,
             () -> new HologramDoc(HologramDoc.CURRENT_SCHEMA_VERSION, 1L, anchor, List.of("x"), true,
-                HologramDoc.DEFAULT_SCALE, "FIXED", 181.0D, 0.0D));
+                HologramDoc.DEFAULT_SCALE, "FIXED", 181.0D, 0.0D, List.of()));
         assertTrue(yawFailure.getMessage().contains("yaw"));
 
         IllegalArgumentException pitchFailure = assertThrows(IllegalArgumentException.class,
             () -> new HologramDoc(HologramDoc.CURRENT_SCHEMA_VERSION, 1L, anchor, List.of("x"), true,
-                HologramDoc.DEFAULT_SCALE, "FIXED", 0.0D, -90.5D));
+                HologramDoc.DEFAULT_SCALE, "FIXED", 0.0D, -90.5D, List.of()));
         assertTrue(pitchFailure.getMessage().contains("pitch"));
 
         assertThrows(IllegalArgumentException.class,
             () -> new HologramDoc(HologramDoc.CURRENT_SCHEMA_VERSION, 1L, anchor, List.of("x"), true,
-                HologramDoc.DEFAULT_SCALE, "FIXED", Double.NaN, 0.0D));
+                HologramDoc.DEFAULT_SCALE, "FIXED", Double.NaN, 0.0D, List.of()));
     }
 
     @Test
     void aDocumentWithoutOrientationKeysIsTheSameDocumentAsOneSpellingTheDefaultsOut() {
         String bare = """
             {
-              "schemaVersion": 1,
+              "schemaVersion": 2,
               "revision": 4,
               "anchor": {"world": "world", "position": [1.0, 2.0, 3.0]},
               "lines": ["&dNew hologram"],
@@ -222,7 +250,7 @@ class HologramDocTest {
             """;
         String spelled = """
             {
-              "schemaVersion": 1,
+              "schemaVersion": 2,
               "revision": 4,
               "anchor": {"world": "world", "position": [1.0, 2.0, 3.0]},
               "lines": ["&dNew hologram"],
@@ -267,7 +295,7 @@ class HologramDocTest {
         HologramDoc.Anchor anchor = new HologramDoc.Anchor("world", new Vector(0, 0, 0));
         String missingScale = """
             {
-              "schemaVersion": 1,
+              "schemaVersion": 2,
               "revision": 1,
               "anchor": {"world": "world", "position": [0.0, 0.0, 0.0]},
               "lines": ["x"]
@@ -276,16 +304,16 @@ class HologramDocTest {
 
         assertEquals(HologramDoc.MIN_SCALE, new HologramDoc(HologramDoc.CURRENT_SCHEMA_VERSION, 1L,
             anchor, List.of("x"), true, HologramDoc.MIN_SCALE,
-            HologramDoc.DEFAULT_BILLBOARD, 0.0D, 0.0D).scale());
+            HologramDoc.DEFAULT_BILLBOARD, 0.0D, 0.0D, List.of()).scale());
         assertEquals(HologramDoc.MAX_SCALE, new HologramDoc(HologramDoc.CURRENT_SCHEMA_VERSION, 1L,
             anchor, List.of("x"), true, HologramDoc.MAX_SCALE,
-            HologramDoc.DEFAULT_BILLBOARD, 0.0D, 0.0D).scale());
+            HologramDoc.DEFAULT_BILLBOARD, 0.0D, 0.0D, List.of()).scale());
         assertThrows(IllegalArgumentException.class,
             () -> new HologramDoc(HologramDoc.CURRENT_SCHEMA_VERSION, 1L, anchor, List.of("x"), true,
-                0.0D, HologramDoc.DEFAULT_BILLBOARD, 0.0D, 0.0D));
+                0.0D, HologramDoc.DEFAULT_BILLBOARD, 0.0D, 0.0D, List.of()));
         assertThrows(IllegalArgumentException.class,
             () -> new HologramDoc(HologramDoc.CURRENT_SCHEMA_VERSION, 1L, anchor, List.of("x"), true,
-                Double.NaN, HologramDoc.DEFAULT_BILLBOARD, 0.0D, 0.0D));
+                Double.NaN, HologramDoc.DEFAULT_BILLBOARD, 0.0D, 0.0D, List.of()));
         assertThrows(IllegalArgumentException.class,
             () -> HologramDoc.parse("missing-scale.json", missingScale));
     }

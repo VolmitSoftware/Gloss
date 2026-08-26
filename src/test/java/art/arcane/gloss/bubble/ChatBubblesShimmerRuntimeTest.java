@@ -2,7 +2,10 @@ package art.arcane.gloss.bubble;
 
 import art.arcane.gloss.api.HologramPresentation;
 import art.arcane.gloss.api.HologramViewers;
+import art.arcane.gloss.api.ParticleLayer;
+import art.arcane.gloss.api.ParticleTextSpan;
 import art.arcane.gloss.api.TemporaryHologram;
+import art.arcane.gloss.particle.ParticleText;
 import org.bukkit.Location;
 import org.bukkit.entity.Entity;
 import org.bukkit.util.Vector;
@@ -28,7 +31,7 @@ class ChatBubblesShimmerRuntimeTest {
         return new ChatBubblesService.BubbleRecord(hologram, null, new Vector(),
             BubbleMotionPlan.compile(BubbleStyleDoc.DEFAULTS.motion()), BubbleShimmerPlan.compile(shimmer),
             false, BORN_AT_MS, LIFETIME_MS, BORN_AT_MS + LIFETIME_MS, 1, 0.5D, "&7", "message", 32,
-            List.of("§7abcdefgh"));
+            List.of("§7abcdefgh"), new ParticleText.Rendered("§7abcdefgh", List.of()));
     }
 
     @Test
@@ -114,6 +117,10 @@ class ChatBubblesShimmerRuntimeTest {
         }
 
         @Override
+        public void setRenderedParticleText(String text, List<ParticleTextSpan> spans) {
+        }
+
+        @Override
         public void bindRenderedFrames(LongFunction<List<String>> frames) {
             this.frames = frames;
         }
@@ -126,6 +133,15 @@ class ChatBubblesShimmerRuntimeTest {
         @Override
         public void clearLines() {
             lines = List.of();
+        }
+
+        @Override
+        public List<ParticleLayer> particleLayers() {
+            return List.of();
+        }
+
+        @Override
+        public void setParticleLayers(List<ParticleLayer> particleLayers) {
         }
 
         @Override

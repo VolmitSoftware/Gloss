@@ -1,5 +1,6 @@
 package art.arcane.gloss.bubble;
 
+import art.arcane.gloss.api.ParticleLayer;
 import art.arcane.gloss.condition.ConditionCompiler;
 import art.arcane.gloss.condition.ConditionSource;
 import art.arcane.gloss.doc.DocumentEnvelope;
@@ -7,12 +8,13 @@ import art.arcane.gloss.doc.DocumentParsers;
 import org.bukkit.util.Vector;
 
 import java.util.Locale;
+import java.util.List;
 
 public record BubbleStyleDoc(int schemaVersion, long revision, String prefix, Vector offset, int wordWrapChars,
                              long maxAliveMs, boolean followPlayer, boolean hideOwn, Motion motion,
-                             Shimmer shimmer, Select select) {
+                             Shimmer shimmer, Select select, List<ParticleLayer> particleLayers) {
     public static final String KIND = "bubbles";
-    public static final int CURRENT_SCHEMA_VERSION = 3;
+    public static final int CURRENT_SCHEMA_VERSION = 4;
     public static final String DEFAULT_TRANSLATION_Y =
         "10 * pow(clamp((ageMs - lifetimeMs + 2000) / 2000, 0, 1), 16)";
 
@@ -26,7 +28,7 @@ public record BubbleStyleDoc(int schemaVersion, long revision, String prefix, Ve
 
     public static final BubbleStyleDoc DEFAULTS = new BubbleStyleDoc(CURRENT_SCHEMA_VERSION,
         DocumentEnvelope.INITIAL_REVISION, "&7", new Vector(0.0D, 0.3D, 0.0D), 32, 5000L,
-        true, true, DEFAULT_MOTION, DEFAULT_SHIMMER, null);
+        true, true, DEFAULT_MOTION, DEFAULT_SHIMMER, null, List.of());
 
     public BubbleStyleDoc {
         DocumentEnvelope.requireSchemaVersion(KIND, schemaVersion, CURRENT_SCHEMA_VERSION);
@@ -37,6 +39,7 @@ public record BubbleStyleDoc(int schemaVersion, long revision, String prefix, Ve
         maxAliveMs = Math.max(500L, Math.min(60000L, maxAliveMs));
         motion = motion == null ? DEFAULT_MOTION : motion;
         shimmer = shimmer == null ? DEFAULT_SHIMMER : shimmer;
+        particleLayers = ParticleLayer.copyLayers(particleLayers, "bubble style");
     }
 
     public static BubbleStyleDoc parse(String fileName, String raw) {

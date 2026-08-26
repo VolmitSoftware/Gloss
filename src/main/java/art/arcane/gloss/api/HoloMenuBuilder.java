@@ -14,6 +14,7 @@ public final class HoloMenuBuilder {
   private boolean closeOnDeath = true;
   private boolean closeOnTeleport = true;
   private final List<HoloComponent> components = new ArrayList<>();
+  private final List<ParticleLayer> particleLayers = new ArrayList<>();
 
   public HoloMenuBuilder id(String id) {
     this.id = id;
@@ -57,8 +58,13 @@ public final class HoloMenuBuilder {
     return this;
   }
 
+  public HoloMenuBuilder particleLayer(ParticleLayer particleLayer) {
+    this.particleLayers.add(particleLayer);
+    return this;
+  }
+
   public HoloMenu build() {
     return new HoloMenu(id, offsetX, offsetY, offsetZ, lockPosition, followPlayer, maxDistance,
-        closeOnDeath, closeOnTeleport, components);
+        closeOnDeath, closeOnTeleport, components, particleLayers);
   }
 }

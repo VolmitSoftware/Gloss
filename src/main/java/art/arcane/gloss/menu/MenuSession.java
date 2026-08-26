@@ -10,6 +10,12 @@ import art.arcane.gloss.menu.action.ActionContext;
 import art.arcane.gloss.menu.action.SessionActionContext;
 import art.arcane.gloss.menu.components.ClickableComponent;
 import art.arcane.gloss.menu.components.MenuComponent;
+import art.arcane.gloss.particle.ParticleFrame;
+import art.arcane.gloss.api.ParticleLayer;
+import art.arcane.gloss.particle.ParticleRect;
+import art.arcane.gloss.particle.ParticleText;
+import art.arcane.gloss.particle.ParticleTextLayout;
+import art.arcane.gloss.util.common.math.CollisionPlane;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
 import org.bukkit.util.Vector;
@@ -17,6 +23,7 @@ import org.bukkit.util.Vector;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.logging.Level;
@@ -30,6 +37,7 @@ public class MenuSession {
   private final double maxDistance;
   private final double offsetDistance;
   private final List<MenuComponent<?>> components;
+  private final List<ParticleLayer> particleLayers;
   private final boolean readsEyePose;
 
   private final Map<String, MenuComponent<?>> componentsById;
@@ -66,6 +74,7 @@ public class MenuSession {
       }
     }
     this.components = List.copyOf(new ArrayList<>(uniqueComponents.values()));
+    this.particleLayers = data.getParticleLayers();
     this.componentsById = uniqueComponents;
     boolean eyeReader = false;
     for (MenuComponent<?> component : this.components) {
@@ -190,6 +199,7 @@ public class MenuSession {
     for (MenuComponent<?> component : components) {
       component.tick(eyeOrigin, eyeDirection);
     }
+    emitParticleLayers();
   }
 
   public void open() {
@@ -222,5 +232,129 @@ public class MenuSession {
     return centerPoint.getWorld() != null
         && Objects.equals(loc.getWorld(), centerPoint.getWorld())
         && centerPoint.distanceSquared(loc) <= maxDistance * maxDistance + offsetDistance;
+  }
+
+  private void emitParticleLayers() {
+    if (particleLayers.isEmpty() || !Gloss.instance.cfg().particles().enabled()) {
+      return;
+    }
+    long tick = System.currentTimeMillis() / 50L;
+    for (ParticleLayer layer : particleLayers) {
+      emitParticleLayer(layer, tick);
+    }
+  }
+
+  private void emitParticleLayer(ParticleLayer layer, long tick) {
+    String scope = layer.target().scope();
+    if (scope.equals("projection")) {
+      ProjectionGeometry projection = projectionGeometry();
+      if (projection != null) {
+        Gloss.instance.particles().emit(player, projection.frame(), layer,
+            List.of(projection.bounds()), tick);
+      }
+      return;
+    }
+    if (scope.equals("local")) {
+      CollisionPlane plane = transform.createPlane(transform.menuOrigin().toVector(), 0.0F, 0.0F);
+      Gloss.instance.particles().emit(player, frame(plane), layer, List.of(), tick);
+      return;
+    }
+    for (MenuComponent<?> component : components) {
+      if (layer.target().component() != null
+          && !layer.target().component().equals(component.getId().toLowerCase(Locale.ROOT))) {
+        continue;
+      }
+      CollisionPlane plane = component.particlePlane();
+      if (plane == null) {
+        continue;
+      }
+      List<ParticleRect> targets = componentTargets(component, plane, layer);
+      if (!targets.isEmpty()) {
+        Gloss.instance.particles().emit(player, frame(plane), layer, targets, tick);
+      }
+    }
+  }
+
+  private List<ParticleRect> componentTargets(MenuComponent<?> component, CollisionPlane plane,
+                                               ParticleLayer layer) {
+    String scope = layer.target().scope();
+    if (scope.equals("component")) {
+      return List.of(ParticleRect.plane(plane.getWidth(), plane.getHeight()));
+    }
+    ParticleText.Rendered rendered = component.particleText();
+    if (rendered == null) {
+      return List.of();
+    }
+    if (scope.equals("text")) {
+      return List.of(ParticleTextLayout.textBounds(rendered.text(), transform.scale()));
+    }
+    if (scope.equals("line")) {
+      List<ParticleRect> lines = ParticleTextLayout.lineBounds(rendered.text(), transform.scale());
+      int index = layer.target().line() - 1;
+      return index < lines.size() ? List.of(lines.get(index)) : List.of();
+    }
+    if (scope.equals("span")) {
+      boolean perLetter = layer.geometry().type().equals("letterBounds")
+          || layer.geometry().type().equals("glyphOutline")
+          || layer.geometry().type().equals("glyphFill");
+      return ParticleTextLayout.bounds(rendered, layer.target().name(), transform.scale(), perLetter);
+    }
+    return List.of();
+  }
+
+  private ProjectionGeometry projectionGeometry() {
+    CollisionPlane basis = null;
+    List<CollisionPlane> planes = new ArrayList<>();
+    for (MenuComponent<?> component : components) {
+      CollisionPlane plane = component.particlePlane();
+      if (plane != null) {
+        planes.add(plane);
+        if (basis == null) {
+          basis = plane;
+        }
+      }
+    }
+    if (basis == null) {
+      return null;
+    }
+    double minimumX = Double.POSITIVE_INFINITY;
+    double minimumY = Double.POSITIVE_INFINITY;
+    double minimumZ = Double.POSITIVE_INFINITY;
+    double maximumX = Double.NEGATIVE_INFINITY;
+    double maximumY = Double.NEGATIVE_INFINITY;
+    double maximumZ = Double.NEGATIVE_INFINITY;
+    Vector origin = basis.getCenter();
+    Vector right = basis.getRight().clone().normalize();
+    Vector up = basis.getUp().clone().normalize();
+    Vector back = basis.getNormal().clone().normalize().multiply(-1.0D);
+    for (CollisionPlane plane : planes) {
+      Vector relative = plane.getCenter().clone().subtract(origin);
+      double centerX = relative.dot(right);
+      double centerY = relative.dot(up);
+      double centerZ = relative.dot(back);
+      minimumX = Math.min(minimumX, centerX - plane.getWidth() / 2.0D);
+      maximumX = Math.max(maximumX, centerX + plane.getWidth() / 2.0D);
+      minimumY = Math.min(minimumY, centerY - plane.getHeight() / 2.0D);
+      maximumY = Math.max(maximumY, centerY + plane.getHeight() / 2.0D);
+      minimumZ = Math.min(minimumZ, centerZ);
+      maximumZ = Math.max(maximumZ, centerZ);
+    }
+    ParticleRect bounds = new ParticleRect(
+        (minimumX + maximumX) / 2.0D,
+        (minimumY + maximumY) / 2.0D,
+        (minimumZ + maximumZ) / 2.0D,
+        maximumX - minimumX,
+        maximumY - minimumY,
+        maximumZ - minimumZ);
+    return new ProjectionGeometry(new ParticleFrame(origin.toLocation(transform.anchor().getWorld()), right, up, back), bounds);
+  }
+
+  private ParticleFrame frame(CollisionPlane plane) {
+    Vector back = plane.getNormal().clone().normalize().multiply(-1.0D);
+    return new ParticleFrame(plane.getCenter().toLocation(transform.anchor().getWorld()),
+        plane.getRight(), plane.getUp(), back);
+  }
+
+  private record ProjectionGeometry(ParticleFrame frame, ParticleRect bounds) {
   }
 }

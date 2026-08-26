@@ -3,6 +3,11 @@ package art.arcane.gloss.hologram;
 import art.arcane.gloss.Gloss;
 import art.arcane.gloss.api.AnchoredHologram;
 import art.arcane.gloss.doc.DocumentEnvelope;
+import art.arcane.gloss.api.ParticleLayer;
+import art.arcane.gloss.particle.ParticleFrame;
+import art.arcane.gloss.particle.ParticleRect;
+import art.arcane.gloss.particle.ParticleText;
+import art.arcane.gloss.particle.ParticleTextLayout;
 import art.arcane.gloss.text.TextPipeline;
 import art.arcane.gloss.util.common.TextUtils;
 import org.bukkit.Bukkit;
@@ -76,6 +81,7 @@ final class PersistentHologram implements AnchoredHologram {
     private volatile String billboard;
     private volatile double yaw;
     private volatile double pitch;
+    private volatile List<ParticleLayer> particleLayers;
     private volatile long revision;
     private volatile AppliedAnchor appliedAnchor;
     private volatile TextDisplay sharedDisplay;
@@ -106,6 +112,7 @@ final class PersistentHologram implements AnchoredHologram {
         this.billboard = HologramDoc.DEFAULT_BILLBOARD;
         this.yaw = 0.0D;
         this.pitch = 0.0D;
+        this.particleLayers = List.of();
     }
 
     PersistentHologram(HologramService service, String id, HologramDoc doc) {
@@ -205,6 +212,18 @@ final class PersistentHologram implements AnchoredHologram {
     }
 
     @Override
+    public List<ParticleLayer> particleLayers() {
+        return particleLayers;
+    }
+
+    @Override
+    public void setParticleLayers(List<ParticleLayer> particleLayers) {
+        this.particleLayers = ParticleLayer.copyLayers(particleLayers, "hologram");
+        service.persist(this);
+        service.requestDriverIntervalReconcile();
+    }
+
+    @Override
     public String billboard() {
         return billboard;
     }
@@ -258,6 +277,7 @@ final class PersistentHologram implements AnchoredHologram {
         billboard = doc.billboard();
         yaw = doc.yaw();
         pitch = doc.pitch();
+        particleLayers = doc.particleLayers();
         revision = doc.revision();
         synchronized (linesLock) {
             publishLines(doc.lines());
@@ -277,7 +297,7 @@ final class PersistentHologram implements AnchoredHologram {
         AnchorState anchor = anchorState;
         return new HologramDoc(HologramDoc.CURRENT_SCHEMA_VERSION, revision,
             new HologramDoc.Anchor(anchor.worldName(), new Vector(anchor.x(), anchor.y(), anchor.z())), lineSet.lines(), seeThrough,
-            scale, billboard, yaw, pitch);
+            scale, billboard, yaw, pitch, particleLayers);
     }
 
     long nextRevision() {
@@ -372,6 +392,7 @@ final class PersistentHologram implements AnchoredHologram {
         } else {
             updateShared(world, tickAnchor, anchor, snapshot, viewers);
         }
+        emitParticles(anchor, snapshot, viewers);
     }
 
     TickAnchor tickAnchor() {
@@ -521,7 +542,7 @@ final class PersistentHologram implements AnchoredHologram {
             return cached.template();
         }
         AnimationTemplate template = service.animator().compileTemplate(snapshot.lines(),
-            line -> service.plugin().text().renderStatic(line));
+                line -> service.plugin().text().renderParticleText(null, line).text());
         if (template != null && !dynamic) {
             sharedAnimationCache = new SharedAnimation(snapshot.generation(), emojiGeneration,
                 renderGeneration, animationGeneration, template);
@@ -546,7 +567,81 @@ final class PersistentHologram implements AnchoredHologram {
     }
 
     boolean requiresFastRefresh() {
-        return lineSet.fastRefresh();
+        return lineSet.fastRefresh() || !particleLayers.isEmpty();
+    }
+
+    private void emitParticles(Location anchor, LineSet snapshot, List<HologramTick.Viewer> viewers) {
+        if (particleLayers.isEmpty() || sharedDisplay == null || viewers.isEmpty()) {
+            return;
+        }
+        List<String> authored = snapshot.lines();
+        for (HologramTick.Viewer viewer : viewers) {
+            Player player = viewer.player();
+            UUID playerId = viewer.id();
+            service.runViewerWork(player, playerId, id + "#particles",
+                () -> emitParticlesFor(player, anchor, authored));
+        }
+    }
+
+    private void emitParticlesFor(Player viewer, Location anchor, List<String> authored) {
+        if (!viewer.isOnline() || particleLayers.isEmpty()) {
+            return;
+        }
+        String source = String.join("\n", authored);
+        ParticleText.Rendered rendered = service.plugin().text().renderParticleText(viewer, source);
+        ParticleFrame frame = particleFrame(viewer, anchor);
+        long tick = System.currentTimeMillis() / 50L;
+        for (ParticleLayer layer : particleLayers) {
+            List<ParticleRect> targets = particleTargets(layer, rendered);
+            if (!layer.target().scope().equals("local") && targets.isEmpty()) {
+                continue;
+            }
+            service.plugin().particles().emit(viewer, frame, layer, targets, tick);
+        }
+    }
+
+    private List<ParticleRect> particleTargets(ParticleLayer layer, ParticleText.Rendered rendered) {
+        String scope = layer.target().scope();
+        if (scope.equals("projection") || scope.equals("text")) {
+            return List.of(ParticleTextLayout.textBounds(rendered.text(), scale));
+        }
+        if (scope.equals("line")) {
+            List<ParticleRect> lines = ParticleTextLayout.lineBounds(rendered.text(), scale);
+            int index = layer.target().line() - 1;
+            return index < lines.size() ? List.of(lines.get(index)) : List.of();
+        }
+        if (scope.equals("span")) {
+            boolean perLetter = layer.geometry().type().equals("letterBounds")
+                || layer.geometry().type().equals("glyphOutline")
+                || layer.geometry().type().equals("glyphFill");
+            return ParticleTextLayout.bounds(rendered, layer.target().name(), scale, perLetter);
+        }
+        if (scope.equals("local")) {
+            return List.of();
+        }
+        return List.of();
+    }
+
+    private ParticleFrame particleFrame(Player viewer, Location anchor) {
+        Vector front;
+        if (billboard.equals("FIXED")) {
+            front = anchor.getDirection().multiply(-1.0D);
+        } else {
+            front = viewer.getEyeLocation().toVector().subtract(anchor.toVector());
+            if (billboard.equals("VERTICAL")) {
+                front.setY(0.0D);
+            }
+            if (front.lengthSquared() < 1.0E-12D) {
+                front = new Vector(0.0D, 0.0D, 1.0D);
+            }
+            front.normalize();
+        }
+        Vector referenceUp = Math.abs(front.getY()) > 0.999D
+            ? new Vector(0.0D, 0.0D, 1.0D)
+            : new Vector(0.0D, 1.0D, 0.0D);
+        Vector right = front.clone().crossProduct(referenceUp).normalize();
+        Vector up = right.clone().crossProduct(front).normalize();
+        return new ParticleFrame(anchor, right, up, front.clone().multiply(-1.0D));
     }
 
     private void spawnDisplay(World world, TickAnchor tickAnchor, Location anchor, LineSet snapshot,
@@ -713,7 +808,7 @@ final class PersistentHologram implements AnchoredHologram {
             long renderGeneration = service.plugin().text().renderGeneration();
             long animationGeneration = service.animationGeneration();
             AnimationTemplate template = service.animator().compileTemplate(snapshot.lines(),
-                line -> service.plugin().text().render(player, line));
+                line -> service.plugin().text().renderParticleText(player, line).text());
             if (template != null) {
                 long intervalMs = viewerRefreshIntervalMs(snapshot);
                 viewerAnimations.put(viewerId, new ViewerAnimation(snapshot.generation(),

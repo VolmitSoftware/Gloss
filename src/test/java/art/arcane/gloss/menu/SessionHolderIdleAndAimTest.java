@@ -156,10 +156,10 @@ public class SessionHolderIdleAndAimTest {
 
   private static ContainerPreview emptyPreview(Player viewer) throws ReflectiveOperationException {
     Constructor<ContainerPreview> constructor = ContainerPreview.class.getDeclaredConstructor(
-        Player.class, Block.class, Entity.class, Vector.class, List.class, boolean.class);
+        Player.class, Block.class, Entity.class, Vector.class, List.class, List.class, boolean.class);
     constructor.setAccessible(true);
     return constructor.newInstance(viewer, null, null, new Vector(0.5D, 65.5D, 0.5D),
-        List.<PreviewElement>of(), false);
+        List.<PreviewElement>of(), List.of(), false);
   }
 
   private static Player player(AtomicBoolean online, AtomicReference<Location> eye) {

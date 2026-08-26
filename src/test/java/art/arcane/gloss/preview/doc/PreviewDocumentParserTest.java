@@ -1,5 +1,6 @@
 package art.arcane.gloss.preview.doc;
 
+import art.arcane.gloss.api.ParticleLayer;
 import art.arcane.gloss.preview.doc.CompiledPreviewDocument.CardTemplate;
 import art.arcane.gloss.preview.doc.CompiledPreviewDocument.CompiledExpr;
 import art.arcane.gloss.preview.doc.CompiledPreviewDocument.CompiledMatch;
@@ -45,6 +46,30 @@ public class PreviewDocumentParserTest {
     assertNull(doc.card());
     assertTrue(doc.variants().isEmpty());
     assertTrue(doc.vars().isEmpty());
+  }
+
+  @Test
+  public void particleLayerVectorsUseTheSharedArrayContract() {
+    CompiledPreviewDocument doc = parse("particles.json", """
+        {
+          "particleLayers": [{
+            "id": "underline",
+            "target": {"scope": "local"},
+            "geometry": {
+              "type": "line",
+              "from": [-1.0, -0.2, 0.0],
+              "to": [1.0, -0.2, 0.0]
+            },
+            "placement": {"layer": "behind", "depth": 0.05, "offset": [0.1, 0.2, 0.3]},
+            "particle": {"key": "minecraft:soul"}
+          }]
+        }
+        """);
+
+    ParticleLayer layer = doc.particleLayers().getFirst();
+    assertEquals(-1.0D, layer.geometry().from().getX(), EPSILON);
+    assertEquals(1.0D, layer.geometry().to().getX(), EPSILON);
+    assertEquals(0.3D, layer.placement().offset().getZ(), EPSILON);
   }
 
   @Test

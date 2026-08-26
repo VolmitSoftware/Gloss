@@ -24,7 +24,7 @@ public class MenuSessionComponentDeduplicationTest {
         component("duplicate", "first"),
         component("duplicate", "second"),
         component("unique", "third")
-    ));
+    ), List.of());
     menu.setId("test");
 
     Player player = player();

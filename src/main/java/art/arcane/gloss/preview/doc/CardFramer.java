@@ -1,6 +1,8 @@
 package art.arcane.gloss.preview.doc;
 
+import art.arcane.gloss.particle.ParticleText;
 import art.arcane.gloss.preview.PreviewElement;
+import art.arcane.gloss.util.common.TextUtils;
 import net.kyori.adventure.text.Component;
 
 import java.util.ArrayList;
@@ -113,7 +115,8 @@ public final class CardFramer {
     }
     int titleBarCenterY = (panelTop + titleBarBottom) / 2;
     styled.add(new PreviewElement.Panel(0, titleBarCenterY, Z_TITLE_BAR, panelWidth, TITLE_BAR_HEIGHT, titleBarColor));
-    styled.add(new PreviewElement.Label(0, titleBarCenterY, Z_LABEL, title, 0));
+    styled.add(new PreviewElement.Label(0, titleBarCenterY, Z_LABEL, title,
+        () -> new ParticleText.Rendered(TextUtils.content(title.get()), List.of()), 0));
     styled.addAll(content);
     return styled;
   }

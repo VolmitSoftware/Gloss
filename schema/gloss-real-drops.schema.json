@@ -13,9 +13,9 @@
   ],
   "properties": {
     "schemaVersion": {
-      "description": "Document format version. Must be exactly 2.",
+      "description": "Document format version. Must be exactly 3.",
       "type": "integer",
-      "const": 2
+      "const": 3
     },
     "revision": {
       "description": "Server-owned monotonic revision counter. Starts at 1 and increases every time the server rewrites the document; editors must send back the revision they read so a concurrent change is detected instead of silently overwritten.",
@@ -80,7 +80,83 @@
         "animation": {
           "description": "Typed keyframe animation profiles selected by material.",
           "$ref": "#/$defs/animation"
+        },
+        "particleLayers": {
+          "description": "Viewer-targeted particles attached to the drop model, label, marked spans, or local geometry.",
+          "type": "array",
+          "maxItems": 64,
+          "items": {"$ref": "#/$defs/particleLayer"}
         }
+      }
+    },
+    "vector3": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": {"type": "number"}
+    },
+    "particleLayer": {
+      "type": "object",
+      "required": ["id", "target", "geometry", "particle"],
+      "properties": {
+        "id": {"description": "Stable layer id unique within this presentation.", "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$"},
+        "target": {
+          "description": "Rendered surface or marked text span that supplies geometry bounds.",
+          "type": "object",
+          "required": ["scope"],
+          "properties": {
+            "scope": {"enum": ["projection", "component", "text", "line", "span", "label", "model", "local"]},
+            "name": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$"},
+            "component": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$"},
+            "line": {"type": "integer", "minimum": 1}
+          }
+        },
+        "geometry": {
+          "description": "Point, path, outline, plane, box, or per-letter sampling geometry.",
+          "type": "object",
+          "required": ["type"],
+          "properties": {
+            "type": {"enum": ["point", "line", "polyline", "outline", "filledPlane", "cuboid", "letterBounds", "glyphOutline", "glyphFill"]},
+            "from": {"$ref": "#/$defs/vector3"},
+            "to": {"$ref": "#/$defs/vector3"},
+            "points": {"type": "array", "items": {"$ref": "#/$defs/vector3"}},
+            "width": {"type": "number", "minimum": 0, "maximum": 128},
+            "height": {"type": "number", "minimum": 0, "maximum": 128},
+            "depth": {"type": "number", "minimum": 0, "maximum": 128},
+            "padding": {"type": "number", "minimum": 0, "maximum": 16},
+            "spacing": {"type": "number", "minimum": 0.02, "maximum": 16}
+          }
+        },
+        "placement": {
+          "description": "Depth side and local offset relative to the render plane.",
+          "type": "object",
+          "properties": {
+            "layer": {"enum": ["behind", "front", "center"]},
+            "depth": {"type": "number", "minimum": 0, "maximum": 16},
+            "offset": {"$ref": "#/$defs/vector3"}
+          }
+        },
+        "particle": {
+          "description": "Namespaced Bukkit particle and optional dust color and size.",
+          "type": "object",
+          "required": ["key"],
+          "properties": {
+            "key": {"type": "string", "pattern": "^[a-z0-9_.-]+:[a-z0-9_./-]+$"},
+            "color": {"type": "string", "pattern": "^#[0-9A-Fa-f]{6}$"},
+            "size": {"type": "number", "minimum": 0.01, "maximum": 4}
+          }
+        },
+        "emission": {
+          "description": "Cadence and temporal pattern applied to sampled geometry points.",
+          "type": "object",
+          "properties": {
+            "intervalTicks": {"type": "integer", "minimum": 1, "maximum": 200},
+            "pattern": {"enum": ["steady", "chase", "pulse", "twinkle", "scan", "corners"]},
+            "periodTicks": {"type": "integer", "minimum": 1, "maximum": 72000},
+            "seed": {"type": "integer"}
+          }
+        },
+        "priority": {"description": "Higher-priority layers consume the bounded particle budget first.", "type": "integer", "minimum": -1000, "maximum": 1000}
       }
     },
     "variant": {

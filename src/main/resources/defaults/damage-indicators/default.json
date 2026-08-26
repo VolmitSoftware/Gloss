@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "revision": 1,
   "limits": {
     "maxPerSecond": 40,
@@ -22,7 +22,8 @@
         "startScale": 1.0,
         "endScale": 0.82,
         "fadeStartFraction": 0.68
-      }
+      },
+      "particleLayers": []
     },
     "variants": []
   },
@@ -41,7 +42,8 @@
         "startScale": 1.0,
         "endScale": 1.1,
         "fadeStartFraction": 0.62
-      }
+      },
+      "particleLayers": []
     },
     "variants": []
   },

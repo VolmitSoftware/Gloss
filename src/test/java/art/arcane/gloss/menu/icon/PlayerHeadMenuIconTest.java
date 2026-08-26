@@ -227,7 +227,7 @@ public class PlayerHeadMenuIconTest {
     GlossConfig.PlayerHeads heads = defaults.playerHeads();
     return new GlossConfig(
         defaults.language(), defaults.metrics(), defaults.splashScreen(),
-        defaults.holograms(), defaults.boards(), defaults.tablist(), defaults.emoji(), defaults.animations(),
+        defaults.holograms(), defaults.particles(), defaults.boards(), defaults.tablist(), defaults.emoji(), defaults.animations(),
         defaults.chat(), defaults.text(), defaults.bubbles(), defaults.indicators(), defaults.drops(),
         defaults.realDrops(), defaults.motd(), defaults.groups(), defaults.hotload(), defaults.commands(),
         defaults.menus(), defaults.panels(), defaults.previews(),

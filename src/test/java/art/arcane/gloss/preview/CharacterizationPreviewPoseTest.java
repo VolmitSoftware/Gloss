@@ -124,10 +124,10 @@ public class CharacterizationPreviewPoseTest {
   private static ContainerPreview preview(AtomicReference<Location> pose)
       throws ReflectiveOperationException {
     Constructor<ContainerPreview> constructor = ContainerPreview.class.getDeclaredConstructor(
-        Player.class, Block.class, Entity.class, Vector.class, List.class, boolean.class);
+        Player.class, Block.class, Entity.class, Vector.class, List.class, List.class, boolean.class);
     constructor.setAccessible(true);
     return constructor.newInstance(player(pose), null, null, TARGET_CENTER,
-        List.<PreviewElement>of(), true);
+        List.<PreviewElement>of(), List.of(), true);
   }
 
   private static Location pose(double x, double y, double z, float yaw, float pitch) {

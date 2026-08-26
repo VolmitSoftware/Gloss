@@ -1,11 +1,13 @@
 package art.arcane.gloss.preview.doc;
 
 import art.arcane.gloss.Gloss;
+import art.arcane.gloss.api.ParticleLayer;
 import art.arcane.gloss.expr.Expr;
 import art.arcane.gloss.expr.ExprEvaluator;
 import art.arcane.gloss.expr.ExprException;
 import art.arcane.gloss.expr.ExprParser;
 import art.arcane.gloss.expr.ExprScope;
+import art.arcane.gloss.particle.ParticleText;
 import art.arcane.gloss.preview.doc.CompiledPreviewDocument.CardTemplate;
 import art.arcane.gloss.preview.doc.CompiledPreviewDocument.CompiledExpr;
 import art.arcane.gloss.preview.doc.CompiledPreviewDocument.CompiledMatch;
@@ -14,8 +16,8 @@ import art.arcane.gloss.preview.doc.CompiledPreviewDocument.ElementTemplate;
 import art.arcane.gloss.preview.doc.CompiledPreviewDocument.ElementType;
 import art.arcane.gloss.preview.doc.CompiledPreviewDocument.RepeatTemplate;
 import art.arcane.gloss.text.TextExpressionRenderer;
+import art.arcane.volmlib.util.bukkit.json.BukkitJson;
 import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonParseException;
 import com.google.gson.JsonPrimitive;
@@ -43,7 +45,7 @@ import java.util.regex.Pattern;
  */
 public final class PreviewDocumentParser {
 
-  private static final Gson GSON = new GsonBuilder().create();
+  private static final Gson GSON = BukkitJson.GSON;
 
   private static final Set<String> SPECIAL_VALUES = Set.of("enderChest", "locked", "anyInventoryHolder");
   private static final Set<String> ELEMENT_TYPES = Set.of("panel", "cell", "slot", "label");
@@ -127,9 +129,16 @@ public final class PreviewDocumentParser {
     CardTemplate card = compileCard(doc.card);
     List<ElementTemplate> elements = compileElements(doc.elements);
     checkTotalTemplateCount(elements);
+    List<ParticleLayer> particleLayers;
+    try {
+      particleLayers = ParticleLayer.copyLayers(doc.particleLayers, "container preview " + documentName);
+    } catch (IllegalArgumentException failure) {
+      throw fail("particleLayers", failure.getMessage(), failure);
+    }
 
     int priority = doc.match != null && doc.match.priority != null ? doc.match.priority : 0;
-    return new CompiledPreviewDocument(documentName, priority, match, variants, vars, card, elements);
+    return new CompiledPreviewDocument(documentName, priority, match, variants, vars, card, elements,
+        particleLayers);
   }
 
   // ---------------------------------------------------------------------
@@ -369,7 +378,7 @@ public final class PreviewDocumentParser {
         if (def.text == null) {
           throw fail(path + ".text", "required for type label", null);
         }
-        text = compileExpr(def.text, path + ".text", scope);
+        text = compileParticleTextExpr(def.text, path + ".text", scope);
         background = compileNumericField(def.background, path + ".background", 0.0, scope);
       }
     }
@@ -491,6 +500,36 @@ public final class PreviewDocumentParser {
     Expr expr = parseExprSource(source, path);
     validateVariables(expr, path, scope);
     return fold(expr, path);
+  }
+
+  private CompiledExpr compileParticleTextExpr(String source, String path, Set<String> scope) {
+    try {
+      Expr expr = markParticleTextLiterals(parseExprSource(source, path));
+      validateVariables(expr, path, scope);
+      return fold(expr, path);
+    } catch (IllegalArgumentException failure) {
+      throw fail(path, failure.getMessage(), failure);
+    }
+  }
+
+  private Expr markParticleTextLiterals(Expr expr) {
+    return switch (expr) {
+      case Expr.Num number -> number;
+      case Expr.Str string -> new Expr.Str(ParticleText.parse(string.value()).marked());
+      case Expr.Bool bool -> bool;
+      case Expr.ListLiteral list -> new Expr.ListLiteral(list.items().stream()
+          .map(this::markParticleTextLiterals)
+          .toList());
+      case Expr.Var variable -> variable;
+      case Expr.Unary unary -> new Expr.Unary(unary.op(), markParticleTextLiterals(unary.operand()));
+      case Expr.Binary binary -> new Expr.Binary(binary.op(), markParticleTextLiterals(binary.left()),
+          markParticleTextLiterals(binary.right()));
+      case Expr.Ternary ternary -> new Expr.Ternary(markParticleTextLiterals(ternary.condition()),
+          markParticleTextLiterals(ternary.ifTrue()), markParticleTextLiterals(ternary.ifFalse()));
+      case Expr.Call call -> new Expr.Call(call.name(), call.args().stream()
+          .map(this::markParticleTextLiterals)
+          .toList());
+    };
   }
 
   private Expr parseExprSource(String source, String path) {

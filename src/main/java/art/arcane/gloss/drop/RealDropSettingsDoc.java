@@ -1,6 +1,7 @@
 package art.arcane.gloss.drop;
 
 import art.arcane.gloss.GlossConfig;
+import art.arcane.gloss.api.ParticleLayer;
 import art.arcane.gloss.doc.DocumentEnvelope;
 import art.arcane.gloss.doc.DocumentParsers;
 
@@ -23,7 +24,7 @@ public record RealDropSettingsDoc(
 ) {
     public static final String KIND = "real-drops";
     public static final String DEFAULT_ID = "default";
-    public static final int CURRENT_SCHEMA_VERSION = 2;
+    public static final int CURRENT_SCHEMA_VERSION = 3;
 
     public static final RealDropSettingsDoc DEFAULTS = new RealDropSettingsDoc(
         CURRENT_SCHEMA_VERSION,
@@ -36,7 +37,7 @@ public record RealDropSettingsDoc(
         DocumentEnvelope.requireSchemaVersion(KIND, schemaVersion, CURRENT_SCHEMA_VERSION);
         DocumentEnvelope.requireRevision(KIND, revision);
         presentation = presentation == null ? new Presentation(
-            null, null, null, null, null, null, null, null, null) : presentation;
+            null, null, null, null, null, null, null, null, null, null) : presentation;
         variants = variants == null ? List.of() : List.copyOf(variants);
         validateVariants(variants);
         audience = audience == null ? new Audience(null) : audience;
@@ -59,7 +60,8 @@ public record RealDropSettingsDoc(
         Filters filters,
         Physics physics,
         Script script,
-        Animation animation
+        Animation animation,
+        List<ParticleLayer> particleLayers
     ) {
         public Presentation {
             limits = limits == null ? new Limits(null, null, null, null, null, null) : limits;
@@ -74,6 +76,7 @@ public record RealDropSettingsDoc(
             physics = physics == null ? new Physics(null, null, null, null, null) : physics;
             script = script == null ? new Script(null, null, null, null, null, null, null) : script;
             animation = animation == null ? new Animation(null, null, null) : animation;
+            particleLayers = ParticleLayer.copyLayers(particleLayers, "real-drop presentation");
         }
 
         public GlossConfig.RealDrops toConfig(boolean enabled) {
@@ -134,7 +137,8 @@ public record RealDropSettingsDoc(
                     physics.waterBuoyancy().floatValue(),
                     physics.waterDrag().floatValue()),
                 script.toConfig(),
-                animation.toConfig());
+                animation.toConfig(),
+                particleLayers);
         }
     }
 

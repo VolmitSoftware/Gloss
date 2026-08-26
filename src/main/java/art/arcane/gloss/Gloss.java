@@ -30,6 +30,7 @@ import art.arcane.gloss.menu.MenuSessionManager;
 import art.arcane.gloss.motd.MotdService;
 import art.arcane.gloss.panel.PanelRuntimeManager;
 import art.arcane.gloss.panel.PanelService;
+import art.arcane.gloss.particle.ParticleService;
 import art.arcane.gloss.persistence.GlossPersistenceCoordinator;
 import art.arcane.gloss.persistence.GlossProjectTransaction;
 import art.arcane.gloss.preview.PreviewScaleService;
@@ -109,6 +110,7 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
     private AnimationService animations;
     private EmojiService emoji;
     private HologramAnimator animator;
+    private ParticleService particles;
     private HologramService holograms;
     private BoardService boards;
     private GroupService groups;
@@ -269,6 +271,7 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
             animations = new AnimationService(this);
             emoji = new EmojiService(this);
             animator = new HologramAnimator(this);
+            particles = new ParticleService(this);
             holograms = new HologramService(this);
             boards = new BoardService(this);
             groups = new GroupService(this);
@@ -285,6 +288,8 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
             enableService("animations", animations::enable, animations::disable);
             enableService("emoji", emoji::enable, emoji::disable);
             enableService("hologram-animator", animator::start, animator::stop);
+            enableService("particles", () -> {
+            }, particles::clear);
             enableService("holograms", holograms::enable, holograms::disable);
             enableService("boards", boards::enable, boards::disable);
             enableService("groups", groups::enable, groups::disable);
@@ -785,6 +790,10 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
 
     public HologramAnimator animator() {
         return animator;
+    }
+
+    public ParticleService particles() {
+        return particles;
     }
 
     public HologramService holograms() {

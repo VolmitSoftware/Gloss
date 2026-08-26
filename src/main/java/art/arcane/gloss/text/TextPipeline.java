@@ -3,6 +3,7 @@ package art.arcane.gloss.text;
 import art.arcane.gloss.Gloss;
 import art.arcane.gloss.GlossConfig;
 import art.arcane.gloss.expr.ExprScope;
+import art.arcane.gloss.particle.ParticleText;
 import art.arcane.gloss.util.common.TextUtils;
 import art.arcane.volmlib.util.bukkit.Placeholders;
 import art.arcane.volmlib.util.format.ColorFormatter;
@@ -70,6 +71,14 @@ public final class TextPipeline implements TextRenderer {
 
     @Override
     public String render(Player viewer, String raw) {
+        return renderMarked(viewer, raw);
+    }
+
+    public ParticleText.Rendered renderParticleText(Player viewer, String raw) {
+        return ParticleText.render(raw, marked -> renderMarked(viewer, marked));
+    }
+
+    private String renderMarked(Player viewer, String raw) {
         if (raw == null || raw.isEmpty()) {
             return "";
         }

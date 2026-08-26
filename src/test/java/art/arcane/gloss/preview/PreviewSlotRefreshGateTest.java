@@ -114,10 +114,10 @@ public class PreviewSlotRefreshGateTest {
 
   private static ContainerPreview preview(PreviewElement element) throws ReflectiveOperationException {
     Constructor<ContainerPreview> constructor = ContainerPreview.class.getDeclaredConstructor(
-        Player.class, Block.class, Entity.class, Vector.class, List.class, boolean.class);
+        Player.class, Block.class, Entity.class, Vector.class, List.class, List.class, boolean.class);
     constructor.setAccessible(true);
     return constructor.newInstance(viewer(), null, null, new Vector(0.5D, 65.5D, 0.5D),
-        List.of(element), true);
+        List.of(element), List.of(), true);
   }
 
   private static Player viewer() {

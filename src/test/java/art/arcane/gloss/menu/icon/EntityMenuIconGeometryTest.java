@@ -55,6 +55,7 @@ public class EntityMenuIconGeometryTest {
         null,
         false,
         false,
+        List.of(),
         List.of()
     );
     MenuSession session = new MenuSession(

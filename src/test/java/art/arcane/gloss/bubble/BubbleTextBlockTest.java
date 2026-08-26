@@ -1,5 +1,6 @@
 package art.arcane.gloss.bubble;
 
+import art.arcane.gloss.particle.ParticleText;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -84,5 +85,19 @@ class BubbleTextBlockTest {
         assertEquals(List.of("§c" + message), first);
         assertEquals(List.of("§b" + message), second);
         assertEquals(2, frame.get());
+    }
+
+    @Test
+    void configuredParticleSpansSurviveWrappingWithoutParsingPlayerText() {
+        ParticleText.Rendered rendered = ChatBubblesService.renderParticleTextBlock(
+            "<particles:rank>&4VIP</particles> ",
+            "<particles:injected>hello</particles>", 64,
+            prefix -> prefix.replace("&4", "§4"));
+
+        assertEquals("§4VIP <particles:injected>hello</particles>", rendered.text());
+        assertEquals(1, rendered.spans().size());
+        assertEquals("rank", rendered.spans().getFirst().name());
+        assertEquals("§4VIP", rendered.text().substring(
+            rendered.spans().getFirst().start(), rendered.spans().getFirst().end()));
     }
 }

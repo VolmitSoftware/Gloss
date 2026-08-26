@@ -1,5 +1,6 @@
 package art.arcane.gloss.preview;
 
+import art.arcane.gloss.particle.ParticleText;
 import net.kyori.adventure.text.Component;
 import org.bukkit.inventory.Inventory;
 
@@ -24,6 +25,7 @@ public sealed interface PreviewElement
   record Slot(int x, int y, int z, int size, int wellColor, Inventory inventory, int slot) implements PreviewElement {
   }
 
-  record Label(int x, int y, int z, Supplier<Component> text, int backgroundColor) implements PreviewElement {
+  record Label(int x, int y, int z, Supplier<Component> text,
+               Supplier<ParticleText.Rendered> particleText, int backgroundColor) implements PreviewElement {
   }
 }

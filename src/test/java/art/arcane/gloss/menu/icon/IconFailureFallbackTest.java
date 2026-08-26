@@ -92,7 +92,8 @@ public class IconFailureFallbackTest {
         8D,
         false,
         false,
-        List.<MenuComponentData>of()
+        List.<MenuComponentData>of(),
+        List.of()
     );
     data.setId("icon-test");
     Player player = (Player) Proxy.newProxyInstance(Player.class.getClassLoader(), new Class<?>[]{Player.class},

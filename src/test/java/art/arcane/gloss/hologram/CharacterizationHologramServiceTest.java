@@ -119,8 +119,8 @@ class CharacterizationHologramServiceTest {
         for (CharacterizationHarness.DelayedTask delayed : harness.delayedTasks) {
             delays.add(delayed.delayTicks());
         }
-        assertEquals(List.of(10L, 2L, 1L), delays,
-            "the persistent, temporary, and bounded viewer reconciliation drivers must re-arm");
+        assertEquals(List.of(10L, 2L, 1L, 1L), delays,
+            "the persistent, temporary, particle, and bounded viewer reconciliation drivers must re-arm");
 
         harness.stopTasks();
         harness.drainDelayed();

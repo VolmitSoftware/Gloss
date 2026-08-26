@@ -107,7 +107,7 @@ class DamageIndicatorConditionPlanTest {
             name + "{amount}",
             new Vector(),
             new DamageIndicatorSettingsDoc.Motion(0.0D, 0.0D, 0.0D, 0.0D),
-            new DamageIndicatorSettingsDoc.Transform(1.0D, 1.0D, 1.0D));
+            new DamageIndicatorSettingsDoc.Transform(1.0D, 1.0D, 1.0D), List.of());
     }
 
     private static ExprScope scope(Map<String, Object> values) {

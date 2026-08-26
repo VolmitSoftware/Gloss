@@ -20,7 +20,7 @@ class RealDropSettingsDocTest {
     @Test
     void absentSectionsResolveToTheShippedWebEditableDefaults() {
         RealDropSettingsDoc parsed = RealDropSettingsDoc.parse("default.json", """
-            {"schemaVersion":2,"revision":1}
+            {"schemaVersion":3,"revision":1}
             """);
         GlossConfig.RealDrops config = parsed.toConfig(true);
 
@@ -42,7 +42,7 @@ class RealDropSettingsDocTest {
     void documentValuesClampAndNormalizeAtTheRuntimeBoundary() {
         RealDropSettingsDoc parsed = RealDropSettingsDoc.parse("default.json", """
             {
-              "schemaVersion": 2,
+              "schemaVersion": 3,
               "revision": 8,
               "presentation": {
               "limits": {

@@ -19,6 +19,7 @@ import art.arcane.gloss.menu.DisplayEntityManager;
 import art.arcane.gloss.menu.MenuSession;
 import art.arcane.gloss.menu.MenuTransform;
 import art.arcane.gloss.menu.components.MenuComponent;
+import art.arcane.gloss.particle.ParticleText;
 import art.arcane.gloss.util.common.DisplayEntity;
 import art.arcane.gloss.util.common.math.CollisionPlane;
 import com.github.retrooper.packetevents.util.Vector3f;
@@ -152,6 +153,10 @@ public abstract class MenuIcon<D extends MenuIconData> {
 
   public long geometryRevision() {
     return geometryRevision;
+  }
+
+  public ParticleText.Rendered particleText() {
+    return null;
   }
 
   protected void markGeometryChanged() {

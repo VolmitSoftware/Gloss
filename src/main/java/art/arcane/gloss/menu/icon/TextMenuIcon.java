@@ -7,6 +7,7 @@ import art.arcane.gloss.exceptions.MenuIconException;
 import art.arcane.gloss.menu.DisplayEntityManager;
 import art.arcane.gloss.menu.MenuSession;
 import art.arcane.gloss.text.TextPipeline;
+import art.arcane.gloss.particle.ParticleText;
 import art.arcane.gloss.util.common.TextUtils;
 import art.arcane.gloss.util.common.math.CollisionPlane;
 import net.kyori.adventure.text.Component;
@@ -98,6 +99,11 @@ public class TextMenuIcon extends MenuIcon<TextIconData> {
     DisplayEntityManager.changeName(this.displayEntities.get(index), c);
   }
 
+  @Override
+  public ParticleText.Rendered particleText() {
+    return ParticleText.render(sourceText, text -> TextPipeline.menuText(session.getPlayer(), text));
+  }
+
   public boolean updateText(String text) {
     sourceText = text;
     dynamicSource = TextPipeline.viewerDependent(sourceText);
@@ -148,7 +154,7 @@ public class TextMenuIcon extends MenuIcon<TextIconData> {
     List<String> sources = new ArrayList<>(lines.length);
     int cached = Math.min(parsedFrom.size(), components.size());
     for (int index = 0; index < lines.length; index++) {
-      String piped = TextPipeline.menuText(player, lines[index]);
+      String piped = ParticleText.render(lines[index], value -> TextPipeline.menuText(player, value)).text();
       sources.add(piped);
       if (index < cached && piped.equals(parsedFrom.get(index))) {
         rendered.add(components.get(index));

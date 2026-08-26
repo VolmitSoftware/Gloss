@@ -22,4 +22,8 @@ public interface Hologram {
     void removeLine(int index);
 
     void clearLines();
+
+    List<ParticleLayer> particleLayers();
+
+    void setParticleLayers(List<ParticleLayer> particleLayers);
 }

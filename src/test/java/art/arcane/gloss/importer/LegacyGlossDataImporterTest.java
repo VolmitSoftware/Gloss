@@ -84,7 +84,7 @@ class LegacyGlossDataImporterTest {
         HologramDoc expected = new HologramDoc(HologramDoc.CURRENT_SCHEMA_VERSION, DocumentEnvelope.INITIAL_REVISION,
             new HologramDoc.Anchor("world", new Vector(10.5D, 70.0D, -4.25D)),
             List.of("&aWelcome", "&7Second line"), true,
-            HologramDoc.DEFAULT_SCALE, HologramDoc.DEFAULT_BILLBOARD, 0.0D, 0.0D);
+            HologramDoc.DEFAULT_SCALE, HologramDoc.DEFAULT_BILLBOARD, 0.0D, 0.0D, List.of());
         assertEquals(document(expected), read("holograms/spawn.json"));
         assertFalse(read("holograms/spawn.json").contains("\"id\""));
         assertEquals(LEGACY_HOLOGRAM, backedUp(result, "holograms/spawn.json"));
@@ -226,7 +226,7 @@ class LegacyGlossDataImporterTest {
     void customizedBubbleStyleBlocksConfigYmlBubbleContent() throws IOException {
         write("bubbles/default.json", document(new BubbleStyleDoc(BubbleStyleDoc.CURRENT_SCHEMA_VERSION, 5L,
             "&d", new Vector(0.0D, 2.0D, 0.0D), 48, 9000L, true, false,
-            BubbleStyleDoc.DEFAULTS.motion(), BubbleStyleDoc.DEFAULTS.shimmer(), null)));
+            BubbleStyleDoc.DEFAULTS.motion(), BubbleStyleDoc.DEFAULTS.shimmer(), null, List.of())));
         write("config.yml", """
             chat-bubbles:
               message:

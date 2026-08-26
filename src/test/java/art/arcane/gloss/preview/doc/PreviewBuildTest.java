@@ -571,6 +571,43 @@ public class PreviewBuildTest {
     assertEquals(TextUtils.parse("&cdanger"), label(elements.get(0)).text().get());
   }
 
+  @Test
+  public void authoredLabelLiteralsPreserveParticleSpansAcrossLiveExpressions() {
+    CompiledPreviewDocument doc = parse("particle-label.json", """
+        {
+          "elements": [
+            { "type": "label", "text": "'<particles:green-word>&4GREEN</particles> ' + count(0)" }
+          ]
+        }
+        """);
+
+    List<PreviewElement> elements = doc.build(
+        PreviewStateContext.forInventory(PreviewFakes.inventory(1).build(), null, Map.of()));
+    PreviewElement.Label label = label(elements.get(0));
+
+    assertEquals("&4GREEN 0", label.particleText().get().text());
+    assertEquals(1, label.particleText().get().spans().size());
+    assertEquals("green-word", label.particleText().get().spans().get(0).name());
+    assertEquals(0, label.particleText().get().spans().get(0).start());
+    assertEquals(7, label.particleText().get().spans().get(0).end());
+  }
+
+  @Test
+  public void evaluatedLabelValuesCannotCreateParticleSpans() {
+    CompiledPreviewDocument doc = parse("dynamic-particle-label.json", """
+        {
+          "match": { "vars": { "injected": "<particles:green-word>GREEN</particles>" } },
+          "elements": [ { "type": "label", "text": "vars.injected" } ]
+        }
+        """);
+
+    List<PreviewElement> elements = doc.build(PreviewStateContext.statics(doc.vars()));
+    PreviewElement.Label label = label(elements.get(0));
+
+    assertEquals("<particles:green-word>GREEN</particles>", label.particleText().get().text());
+    assertTrue(label.particleText().get().spans().isEmpty());
+  }
+
   // ---------------------------------------------------------------------
   // Matchers and vars
   // ---------------------------------------------------------------------

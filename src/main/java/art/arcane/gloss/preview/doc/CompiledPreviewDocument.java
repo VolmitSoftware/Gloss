@@ -1,10 +1,12 @@
 package art.arcane.gloss.preview.doc;
 
 import art.arcane.gloss.Gloss;
+import art.arcane.gloss.api.ParticleLayer;
 import art.arcane.gloss.expr.Expr;
 import art.arcane.gloss.expr.ExprEvaluator;
 import art.arcane.gloss.expr.ExprScope;
 import art.arcane.gloss.preview.PreviewElement;
+import art.arcane.gloss.particle.ParticleText;
 import art.arcane.gloss.text.TextPipeline;
 import art.arcane.gloss.util.common.TextUtils;
 import net.kyori.adventure.text.Component;
@@ -74,6 +76,7 @@ public final class CompiledPreviewDocument {
   private final Map<String, Object> vars;
   private final CardTemplate card;
   private final List<ElementTemplate> elements;
+  private final List<ParticleLayer> particleLayers;
 
   CompiledPreviewDocument(
       String name,
@@ -82,7 +85,8 @@ public final class CompiledPreviewDocument {
       List<CompiledVariant> variants,
       Map<String, Object> vars,
       CardTemplate card,
-      List<ElementTemplate> elements
+      List<ElementTemplate> elements,
+      List<ParticleLayer> particleLayers
   ) {
     this.name = name;
     this.priority = priority;
@@ -91,6 +95,7 @@ public final class CompiledPreviewDocument {
     this.vars = vars;
     this.card = card;
     this.elements = elements;
+    this.particleLayers = particleLayers;
   }
 
   /** The name the document was parsed under (typically its file name); used for logging. */
@@ -123,6 +128,10 @@ public final class CompiledPreviewDocument {
 
   List<ElementTemplate> elements() {
     return elements;
+  }
+
+  public List<ParticleLayer> particleLayers() {
+    return particleLayers;
   }
 
   // ---------------------------------------------------------------------
@@ -374,6 +383,7 @@ public final class CompiledPreviewDocument {
       case LABEL -> out.add(new PreviewElement.Label(
           x, y, z,
           labelText(template.text(), scope, sink),
+          labelParticleText(template.text(), scope, sink),
           color(template.background(), scope)));
     }
   }
@@ -463,12 +473,31 @@ public final class CompiledPreviewDocument {
     return () -> renderText(expr, scope, sink);
   }
 
+  private Supplier<ParticleText.Rendered> labelParticleText(CompiledExpr field, ExprScope scope,
+                                                             Consumer<String> sink) {
+    if (field.isConstant()) {
+      ParticleText.Rendered folded = renderParticleText(field.expr(), scope, sink);
+      return () -> folded;
+    }
+    Expr expr = field.expr();
+    return () -> renderParticleText(expr, scope, sink);
+  }
+
   private Component renderText(Expr expr, ExprScope scope, Consumer<String> sink) {
     try {
-      return TextUtils.parse(TextPipeline.emojiText(ExprEvaluator.string(expr, scope)));
+      return TextUtils.parse(renderParticleText(expr, scope, sink).text());
     } catch (RuntimeException failure) {
       reportError(sink, "label text: " + failure.getMessage());
       return Component.empty();
+    }
+  }
+
+  private ParticleText.Rendered renderParticleText(Expr expr, ExprScope scope, Consumer<String> sink) {
+    try {
+      return ParticleText.renderMarked(ExprEvaluator.string(expr, scope), TextPipeline::emojiText);
+    } catch (RuntimeException failure) {
+      reportError(sink, "label particle text: " + failure.getMessage());
+      return new ParticleText.Rendered("", List.of());
     }
   }
 

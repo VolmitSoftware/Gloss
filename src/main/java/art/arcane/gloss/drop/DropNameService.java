@@ -2,6 +2,7 @@ package art.arcane.gloss.drop;
 
 import art.arcane.gloss.Gloss;
 import art.arcane.gloss.GlossConfig;
+import art.arcane.gloss.api.ParticleLayer;
 import art.arcane.gloss.condition.BoundedConditionErrorCallback;
 import art.arcane.gloss.doc.DocumentDelta;
 import art.arcane.gloss.doc.DocumentRegistry;
@@ -10,6 +11,10 @@ import art.arcane.gloss.doc.ShippedDefaults;
 import art.arcane.gloss.doc.ShippedDocumentCatalog;
 import art.arcane.gloss.locale.GlossLocalization;
 import art.arcane.gloss.locale.GlossMessages;
+import art.arcane.gloss.particle.ParticleFrame;
+import art.arcane.gloss.particle.ParticleRect;
+import art.arcane.gloss.particle.ParticleText;
+import art.arcane.gloss.particle.ParticleTextLayout;
 import art.arcane.gloss.text.TextPipeline;
 import art.arcane.volmlib.util.format.Form;
 import art.arcane.volmlib.util.localization.MessageArgument;
@@ -23,6 +28,7 @@ import org.bukkit.NamespacedKey;
 import org.bukkit.World;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Item;
+import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.HandlerList;
@@ -38,6 +44,7 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.BundleMeta;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataType;
+import org.bukkit.util.Vector;
 
 import java.io.File;
 import java.util.ArrayDeque;
@@ -65,10 +72,12 @@ public final class DropNameService implements Listener {
     private final RealDropService realDrops;
     private final Map<String, String> renderedNames;
     private final Map<UUID, Item> trackedItems;
+    private final Map<UUID, NativeParticleLabel> nativeParticleLabels;
     private final Deque<LoadedChunk> rehydrateChunks;
     private volatile long renderedGeneration = -1L;
     private volatile long rehydrateGeneration;
     private int pruneTaskId = -1;
+    private int particleTaskId = -1;
     private volatile boolean listening;
     private volatile RealDropSettingsDoc realDropDoc;
     private volatile RealDropConditionPlan realDropPlan;
@@ -87,6 +96,7 @@ public final class DropNameService implements Listener {
         this.realDrops = new RealDropService(plugin);
         this.renderedNames = new ConcurrentHashMap<>();
         this.trackedItems = new ConcurrentHashMap<>();
+        this.nativeParticleLabels = new ConcurrentHashMap<>();
         this.rehydrateChunks = new ArrayDeque<>();
         this.realDropDoc = RealDropSettingsDoc.DEFAULTS;
         this.realDropPlan = compileRealDropPlan(realDropDoc, false);
@@ -105,6 +115,9 @@ public final class DropNameService implements Listener {
         if (plugin.cfg().drops().enabled()) {
             pruneTaskId = plugin.scheduler().sr(this::prunePass, PRUNE_INTERVAL_TICKS);
         }
+        if (plugin.cfg().particles().enabled()) {
+            particleTaskId = plugin.scheduler().sr(this::driveNativeParticles, 1);
+        }
         rehydrateLoadedChunks();
     }
 
@@ -116,12 +129,17 @@ public final class DropNameService implements Listener {
             plugin.scheduler().csr(pruneTaskId);
             pruneTaskId = -1;
         }
+        if (particleTaskId != -1) {
+            plugin.scheduler().csr(particleTaskId);
+            particleTaskId = -1;
+        }
         if (listening) {
             HandlerList.unregisterAll(this);
             listening = false;
         }
         tracker.clear();
         trackedItems.clear();
+        nativeParticleLabels.clear();
         renderedNames.clear();
         realDrops.disable();
     }
@@ -136,14 +154,22 @@ public final class DropNameService implements Listener {
             plugin.scheduler().csr(pruneTaskId);
             pruneTaskId = -1;
         }
+        if (particleTaskId != -1) {
+            plugin.scheduler().csr(particleTaskId);
+            particleTaskId = -1;
+        }
         tracker.clear();
         trackedItems.clear();
+        nativeParticleLabels.clear();
         renderedNames.clear();
         loadRealDropSettings();
         realDrops.disable();
         realDrops.enable();
         if (plugin.cfg().drops().enabled()) {
             pruneTaskId = plugin.scheduler().sr(this::prunePass, PRUNE_INTERVAL_TICKS);
+        }
+        if (plugin.cfg().particles().enabled()) {
+            particleTaskId = plugin.scheduler().sr(this::driveNativeParticles, 1);
         }
         rehydrateLoadedChunks();
     }
@@ -193,6 +219,7 @@ public final class DropNameService implements Listener {
             return;
         }
         forget(item.getUniqueId());
+        nativeParticleLabels.remove(item.getUniqueId());
         realDrops.remove(item);
     }
 
@@ -271,6 +298,7 @@ public final class DropNameService implements Listener {
                 forget(item.getUniqueId());
             }
             clearNameOwnership(item);
+            nativeParticleLabels.remove(item.getUniqueId());
             realDrops.present(item, RealDropService.Label.none(), presentation);
             return;
         }
@@ -278,8 +306,9 @@ public final class DropNameService implements Listener {
         if (DropNameFormatter.preservesExistingName(
             drops.preserveCustomNames(), item.getCustomName() != null, glossOwned)) {
             RealDropService.Label preserved = item.isCustomNameVisible()
-                ? RealDropService.Label.single(item.getCustomName())
+                ? RealDropService.Label.rendered(item.getCustomName())
                 : RealDropService.Label.none();
+            trackNativeParticles(item, preserved, presentation);
             realDrops.present(item, preserved, presentation);
             return;
         }
@@ -305,7 +334,9 @@ public final class DropNameService implements Listener {
         for (String line : labelLines) {
             renderedLines.add(renderName(line));
         }
-        realDrops.present(item, new RealDropService.Label(renderedLines), presentation);
+        RealDropService.Label label = new RealDropService.Label(labelLines, renderedLines);
+        trackNativeParticles(item, label, presentation);
+        realDrops.present(item, label, presentation);
     }
 
     private List<String> verticalLabelLines(List<DropNameFormatter.BundleContent> contents,
@@ -334,7 +365,7 @@ public final class DropNameService implements Listener {
 
         int flags = TextPipeline.classify(raw);
         if ((flags & (TextPipeline.HAS_FUNCTION | TextPipeline.HAS_PLACEHOLDER)) != 0) {
-            return plugin.text().renderStatic(raw);
+            return plugin.text().renderParticleText(null, raw).text();
         }
 
         String cached = renderedNames.get(raw);
@@ -342,7 +373,7 @@ public final class DropNameService implements Listener {
             return cached;
         }
 
-        String rendered = plugin.text().renderStatic(raw);
+        String rendered = plugin.text().renderParticleText(null, raw).text();
         if (renderedNames.size() < RENDER_MEMO_LIMIT) {
             String raced = renderedNames.putIfAbsent(raw, rendered);
             return raced == null ? rendered : raced;
@@ -416,7 +447,7 @@ public final class DropNameService implements Listener {
     }
 
     private void loadRealDropSettings() {
-        if (plugin.cfg().realDrops().enabled()) {
+        if (plugin.cfg().realDrops().enabled() || plugin.cfg().particles().enabled()) {
             realDropDefaults.extractMissing();
         }
         realDropSettings.reload();
@@ -539,6 +570,116 @@ public final class DropNameService implements Listener {
         tracker.inspect(PRUNE_BUDGET, this::inspectTrackedItem);
     }
 
+    private void trackNativeParticles(Item item, RealDropService.Label label,
+                                      RealDropConditionPlan.Selection selection) {
+        GlossConfig.RealDrops config = selection.style().config();
+        UUID itemId = item.getUniqueId();
+        if (config.enabled() || config.particleLayers().isEmpty() || label.lines().isEmpty()
+            || selection.emptyAudience()) {
+            nativeParticleLabels.remove(itemId);
+            return;
+        }
+        nativeParticleLabels.put(itemId, new NativeParticleLabel(
+            item, selection, label.authoredText(), label.text()));
+    }
+
+    private void driveNativeParticles() {
+        if (!listening || nativeParticleLabels.isEmpty()) {
+            return;
+        }
+        long tick = System.currentTimeMillis() / 50L;
+        for (NativeParticleLabel state : nativeParticleLabels.values()) {
+            if (!emitsOnTick(state.selection().style().config().particleLayers(), tick)) {
+                continue;
+            }
+            Item item = state.item();
+            FoliaScheduler.runEntity(plugin, item, () -> emitNativeParticlesOwned(state, tick), 0L,
+                () -> nativeParticleLabels.remove(item.getUniqueId(), state));
+        }
+    }
+
+    private static boolean emitsOnTick(List<ParticleLayer> layers, long tick) {
+        for (ParticleLayer layer : layers) {
+            if (tick % layer.emission().intervalTicks() == 0L) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void emitNativeParticlesOwned(NativeParticleLabel state, long tick) {
+        Item item = state.item();
+        if (!listening || !item.isValid() || item.isDead()
+            || nativeParticleLabels.get(item.getUniqueId()) != state) {
+            nativeParticleLabels.remove(item.getUniqueId(), state);
+            return;
+        }
+        GlossConfig.RealDrops config = state.selection().style().config();
+        double range = Math.max(config.labels().viewRange(), plugin.cfg().particles().viewRange());
+        Location origin = item.getLocation().clone().add(0.0D, config.labels().yOffset(), 0.0D);
+        for (Entity nearby : item.getNearbyEntities(range, range, range)) {
+            if (nearby instanceof Player viewer) {
+                plugin.scheduler().runEntity(viewer,
+                    () -> emitNativeParticlesForViewer(state, viewer, origin, tick));
+            }
+        }
+    }
+
+    private void emitNativeParticlesForViewer(NativeParticleLabel state, Player viewer,
+                                               Location origin, long tick) {
+        if (!viewer.isOnline() || !state.selection().visibleTo(plugin, viewer)) {
+            return;
+        }
+        ParticleText.Rendered rendered = state.authored().isEmpty()
+            ? new ParticleText.Rendered(state.rendered(), List.of())
+            : plugin.text().renderParticleText(viewer, state.authored());
+        ParticleFrame frame = nativeLabelFrame(viewer, origin);
+        for (ParticleLayer layer : state.selection().style().config().particleLayers()) {
+            List<ParticleRect> targets = nativeLabelTargets(layer, rendered);
+            if (!layer.target().scope().equals("local") && targets.isEmpty()) {
+                continue;
+            }
+            plugin.particles().emit(viewer, frame, layer, targets, tick);
+        }
+    }
+
+    private static List<ParticleRect> nativeLabelTargets(ParticleLayer layer,
+                                                          ParticleText.Rendered rendered) {
+        String scope = layer.target().scope();
+        if (scope.equals("projection") || scope.equals("label") || scope.equals("text")) {
+            return List.of(ParticleTextLayout.textBounds(rendered.text(), 1.0D));
+        }
+        if (scope.equals("model")) {
+            return List.of(new ParticleRect(0.0D, -0.4D, 0.0D, 0.5D, 0.5D, 0.5D));
+        }
+        if (scope.equals("line")) {
+            List<ParticleRect> lines = ParticleTextLayout.lineBounds(rendered.text(), 1.0D);
+            int index = layer.target().line() - 1;
+            return index < lines.size() ? List.of(lines.get(index)) : List.of();
+        }
+        if (scope.equals("span")) {
+            boolean perLetter = layer.geometry().type().equals("letterBounds")
+                || layer.geometry().type().equals("glyphOutline")
+                || layer.geometry().type().equals("glyphFill");
+            return ParticleTextLayout.bounds(rendered, layer.target().name(), 1.0D, perLetter);
+        }
+        return List.of();
+    }
+
+    private static ParticleFrame nativeLabelFrame(Player viewer, Location origin) {
+        Vector front = viewer.getEyeLocation().toVector().subtract(origin.toVector());
+        if (front.lengthSquared() < 1.0E-12D) {
+            front = new Vector(0.0D, 0.0D, 1.0D);
+        }
+        front.normalize();
+        Vector referenceUp = Math.abs(front.getY()) > 0.999D
+            ? new Vector(0.0D, 0.0D, 1.0D)
+            : new Vector(0.0D, 1.0D, 0.0D);
+        Vector right = front.clone().crossProduct(referenceUp).normalize();
+        Vector up = right.clone().crossProduct(front).normalize();
+        return new ParticleFrame(origin, right, up, front.clone().multiply(-1.0D));
+    }
+
     private void inspectTrackedItem(UUID entityId) {
         Item item = trackedItems.get(entityId);
         if (item == null) {
@@ -565,11 +706,16 @@ public final class DropNameService implements Listener {
     private void forget(UUID entityId) {
         tracker.forget(entityId);
         trackedItems.remove(entityId);
+        nativeParticleLabels.remove(entityId);
     }
 
     private record BundleFormats(String header, String entry, String more, int entryLimit) {
     }
 
     private record LoadedChunk(World world, int chunkX, int chunkZ) {
+    }
+
+    private record NativeParticleLabel(Item item, RealDropConditionPlan.Selection selection,
+                                       String authored, String rendered) {
     }
 }

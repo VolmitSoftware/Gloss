@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "revision": 1,
   "presentation": {
     "limits": {
@@ -86,7 +86,8 @@
       },
       "glow": "",
       "visible": "true"
-    }
+    },
+    "particleLayers": []
   },
   "variants": [],
   "audience": {

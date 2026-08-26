@@ -9,6 +9,7 @@ import art.arcane.gloss.doc.DocumentRegistry;
 import art.arcane.gloss.doc.DocumentReviser;
 import art.arcane.gloss.doc.DocumentStore;
 import art.arcane.gloss.doc.GlossDocument;
+import art.arcane.gloss.particle.ParticleService;
 import art.arcane.gloss.text.TextDisplayLayout;
 import art.arcane.gloss.text.TextPipeline;
 import art.arcane.gloss.util.common.TextUtils;
@@ -114,6 +115,7 @@ public final class HologramService {
     private int fastDriverTaskId;
     private int driverIntervalTicks;
     private int temporaryTaskId;
+    private int temporaryParticleTaskId;
     private int viewerReconcileTaskId;
     private int startupPurgeTaskId;
     private volatile boolean driverRunning;
@@ -144,6 +146,7 @@ public final class HologramService {
         this.fastDriverTaskId = NO_TASK;
         this.driverIntervalTicks = NO_TASK;
         this.temporaryTaskId = NO_TASK;
+        this.temporaryParticleTaskId = NO_TASK;
         this.viewerReconcileTaskId = NO_TASK;
         this.startupPurgeTaskId = NO_TASK;
     }
@@ -581,7 +584,7 @@ public final class HologramService {
     String renderStaticLines(List<String> lines) {
         List<String> rendered = new ArrayList<>(lines.size());
         for (String line : lines) {
-            rendered.add(plugin.text().renderStatic(line));
+            rendered.add(plugin.text().renderParticleText(null, line).text());
         }
         return TextUtils.joinLegacyLines(rendered);
     }
@@ -592,6 +595,7 @@ public final class HologramService {
         driverTaskId = plugin.scheduler().sr(() -> driveHolograms(false), driverIntervalTicks);
         reconcileFastDriver();
         temporaryTaskId = plugin.scheduler().sr(this::driveTemporaries, plugin.cfg().holograms().temporaryUpdateIntervalTicks());
+        temporaryParticleTaskId = plugin.scheduler().sr(this::driveTemporaryParticles, 1);
         viewerReconcileTaskId = plugin.scheduler().sr(this::reconcileViewers, 1);
     }
 
@@ -610,6 +614,10 @@ public final class HologramService {
         if (temporaryTaskId != NO_TASK) {
             plugin.scheduler().csr(temporaryTaskId);
             temporaryTaskId = NO_TASK;
+        }
+        if (temporaryParticleTaskId != NO_TASK) {
+            plugin.scheduler().csr(temporaryParticleTaskId);
+            temporaryParticleTaskId = NO_TASK;
         }
         if (viewerReconcileTaskId != NO_TASK) {
             plugin.scheduler().csr(viewerReconcileTaskId);
@@ -681,11 +689,11 @@ public final class HologramService {
     }
 
     private boolean usesFastPartition() {
-        return plugin.cfg().text().functions()
+        return (plugin.cfg().text().functions() || plugin.cfg().particles().enabled())
             && driverIntervalTicks > ANIMATION_REFRESH_INTERVAL_TICKS;
     }
 
-    private void requestDriverIntervalReconcile() {
+    void requestDriverIntervalReconcile() {
         if (!driverRunning || !plugin.isEnabled() || !driverReconcileQueued.compareAndSet(false, true)) {
             return;
         }
@@ -742,6 +750,16 @@ public final class HologramService {
         HologramTick tick = new HologramTick(viewerIndex);
         for (TemporaryHologramDisplay temporary : temporaries) {
             temporary.scheduleDrive(tick, enabled);
+        }
+    }
+
+    private void driveTemporaryParticles() {
+        if (!plugin.cfg().particles().enabled()) {
+            return;
+        }
+        HologramTick tick = new HologramTick(viewerIndex);
+        for (TemporaryHologramDisplay temporary : temporaries) {
+            temporary.emitParticles(tick);
         }
     }
 
@@ -817,6 +835,10 @@ public final class HologramService {
 
         for (PersistentHologram hologram : holograms.values()) {
             hologram.onPlayerQuit(playerId);
+        }
+        ParticleService particleService = plugin.particles();
+        if (particleService != null) {
+            particleService.prune(playerId);
         }
     }
 

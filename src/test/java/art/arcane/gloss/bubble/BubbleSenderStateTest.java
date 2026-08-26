@@ -2,6 +2,7 @@ package art.arcane.gloss.bubble;
 
 import art.arcane.gloss.bubble.ChatBubblesService.BubbleRecord;
 import art.arcane.gloss.bubble.ChatBubblesService.SenderState;
+import art.arcane.gloss.particle.ParticleText;
 import org.bukkit.util.Vector;
 import org.junit.jupiter.api.Test;
 
@@ -34,7 +35,7 @@ class BubbleSenderStateTest {
         return new BubbleRecord(null, null, new Vector(), BubbleMotionPlan.compile(BubbleStyleDoc.DEFAULTS.motion()),
             BubbleShimmerPlan.compile(BubbleStyleDoc.DEFAULTS.shimmer()), followPlayer, 0L, 5000L, expiresAtMs,
             lineCount, 0.5D, prefix, "message", 32,
-            List.of("message"));
+            List.of("message"), new ParticleText.Rendered("message", List.of()));
     }
 
     private static int indexOfViaScan(SenderState state, BubbleRecord record) {

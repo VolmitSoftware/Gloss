@@ -7,6 +7,7 @@ import art.arcane.gloss.preview.doc.PreviewFakes;
 import org.bukkit.GameMode;
 import org.bukkit.Material;
 import org.bukkit.block.Block;
+import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
@@ -106,10 +107,11 @@ public class CharacterizationPadlockCardTest {
   private static ContainerPreview barePreview(Player viewer, boolean showsContents)
       throws ReflectiveOperationException {
     Constructor<ContainerPreview> constructor = ContainerPreview.class.getDeclaredConstructor(
-        Player.class, Block.class, org.bukkit.entity.Entity.class, Vector.class, List.class, boolean.class);
+        Player.class, Block.class, Entity.class, Vector.class, List.class, List.class,
+        boolean.class);
     constructor.setAccessible(true);
     return constructor.newInstance(viewer, null, null, new Vector(0.5D, 0.5D, 0.5D),
-        List.<PreviewElement>of(), showsContents);
+        List.<PreviewElement>of(), List.of(), showsContents);
   }
 
   /** A chest block that also answers {@code getLocation()}, which {@code locked(..)} anchors on. */

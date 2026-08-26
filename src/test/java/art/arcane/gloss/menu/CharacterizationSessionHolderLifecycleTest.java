@@ -148,10 +148,10 @@ public class CharacterizationSessionHolderLifecycleTest {
   private static ContainerPreview emptyPreview(Player viewer, boolean showsContents)
       throws ReflectiveOperationException {
     Constructor<ContainerPreview> constructor = ContainerPreview.class.getDeclaredConstructor(
-        Player.class, Block.class, Entity.class, Vector.class, List.class, boolean.class);
+        Player.class, Block.class, Entity.class, Vector.class, List.class, List.class, boolean.class);
     constructor.setAccessible(true);
     return constructor.newInstance(viewer, null, null, new Vector(0.5D, 65.5D, 0.5D),
-        List.<PreviewElement>of(), showsContents);
+        List.<PreviewElement>of(), List.of(), showsContents);
   }
 
   private static Player player(AtomicBoolean online, boolean permitted) {

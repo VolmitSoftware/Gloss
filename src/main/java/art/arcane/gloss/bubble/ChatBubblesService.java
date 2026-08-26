@@ -2,6 +2,7 @@ package art.arcane.gloss.bubble;
 
 import art.arcane.gloss.Gloss;
 import art.arcane.gloss.api.HologramPresentation;
+import art.arcane.gloss.api.ParticleTextSpan;
 import art.arcane.gloss.api.TemporaryHologram;
 import art.arcane.gloss.bubble.BubbleMotionPlan.BubbleMotionContext;
 import art.arcane.gloss.bubble.BubbleMotionPlan.BubbleMotionSample;
@@ -13,6 +14,7 @@ import art.arcane.gloss.doc.GlossDocument;
 import art.arcane.gloss.doc.ShippedDefaults;
 import art.arcane.gloss.doc.ShippedDocumentCatalog;
 import art.arcane.gloss.service.GlossTelemetry;
+import art.arcane.gloss.particle.ParticleText;
 import art.arcane.gloss.text.TextPipeline;
 import art.arcane.volmlib.util.math.M;
 import art.arcane.volmlib.util.scheduling.FoliaScheduler;
@@ -241,10 +243,11 @@ public final class ChatBubblesService implements Listener {
 
         ResolvedStyle resolved = resolveStyle(sender);
         BubbleStyleDoc style = resolved.document();
-        List<String> lines = renderTextBlock(style.prefix(), message, style.wordWrapChars(),
-            prefix -> plugin.text().render(sender, prefix));
+        ParticleText.Rendered particleText = renderParticleTextBlock(style.prefix(), message,
+            style.wordWrapChars(), prefix -> plugin.text().render(sender, prefix));
+        List<String> lines = List.of(particleText.text().split("\n", -1));
         if (!lines.isEmpty()) {
-            spawn(sender, resolved, message, lines);
+            spawn(sender, resolved, message, lines, particleText);
         }
     }
 
@@ -279,7 +282,8 @@ public final class ChatBubblesService implements Listener {
         return snapshot;
     }
 
-    private void spawn(Player sender, ResolvedStyle resolved, String message, List<String> lines) {
+    private void spawn(Player sender, ResolvedStyle resolved, String message, List<String> lines,
+                       ParticleText.Rendered particleText) {
         BubbleStyleDoc style = resolved.document();
         Location eye = sender.getEyeLocation();
         EyePoint eyePoint = EyePoint.of(eye);
@@ -302,13 +306,15 @@ public final class ChatBubblesService implements Listener {
         BubbleRecord record = null;
         try {
             hologram = plugin.holograms().createTemporary(id, captured.clone(), style.maxAliveMs());
+            hologram.setParticleLayers(style.particleLayers());
             if (style.hideOwn()) {
                 hologram.viewers().add(senderId);
             }
 
             record = new BubbleRecord(hologram, captured, offset, resolved.motion(), resolved.shimmer(),
                 style.followPlayer(), startedAtMs, style.maxAliveMs(), startedAtMs + style.maxAliveMs(), lines.size(),
-                seed(senderId, startedAtMs, sequence), style.prefix(), message, style.wordWrapChars(), lines);
+                seed(senderId, startedAtMs, sequence), style.prefix(), message, style.wordWrapChars(), lines,
+                particleText);
             publishInitialText(record, startedAtMs);
             SenderPublication publication;
             synchronized (bubbleLifecycleLock) {
@@ -396,6 +402,12 @@ public final class ChatBubblesService implements Listener {
         return BubbleTextBlock.wrap(renderer.apply(prefix), message, wrapChars);
     }
 
+    static ParticleText.Rendered renderParticleTextBlock(String prefix, String message, int wrapChars,
+                                                          UnaryOperator<String> renderer) {
+        return ParticleText.render(prefix, marked -> String.join("\n",
+            renderTextBlock(marked, message, wrapChars, renderer)));
+    }
+
     private void drive() {
         long now = M.ms();
         for (Map.Entry<UUID, SenderState> entry : bubbles.entrySet()) {
@@ -417,19 +429,31 @@ public final class ChatBubblesService implements Listener {
         if (!record.dynamicPrefix) {
             return;
         }
-        List<String> lines = renderTextBlock(record.prefix, record.message, record.wrapChars,
-            prefix -> plugin.text().render(sender, prefix));
+        ParticleText.Rendered particleText = renderParticleTextBlock(record.prefix, record.message,
+            record.wrapChars, prefix -> plugin.text().render(sender, prefix));
+        List<String> lines = List.of(particleText.text().split("\n", -1));
         if (lines.isEmpty() || lines.equals(record.renderedLines)) {
             return;
         }
         record.renderedLines = List.copyOf(lines);
+        record.particleText = particleText;
         record.lineCount = lines.size();
         record.hologram.setRenderedLines(record.frameAt(M.ms()));
+        publishParticleText(record);
     }
 
     static void publishInitialText(BubbleRecord record, long nowMs) {
         record.hologram.setRenderedLines(record.frameAt(nowMs));
+        publishParticleText(record);
         record.hologram.bindRenderedFrames(record::frameAt);
+    }
+
+    private static void publishParticleText(BubbleRecord record) {
+        List<ParticleTextSpan> spans = new ArrayList<>(record.particleText.spans().size());
+        for (ParticleText.Span span : record.particleText.spans()) {
+            spans.add(new ParticleTextSpan(span.name(), span.start(), span.end()));
+        }
+        record.hologram.setRenderedParticleText(record.particleText.text(), spans);
     }
 
     private void sweepExpired(UUID senderId, SenderState state, long now) {
@@ -680,6 +704,7 @@ public final class ChatBubblesService implements Listener {
         volatile int lineIndex;
         volatile int lineCount;
         volatile List<String> renderedLines;
+        volatile ParticleText.Rendered particleText;
         volatile List<String> shimmerBase;
         volatile int shimmerVisibleCount;
         volatile ShimmerFrame shimmerFrame;
@@ -688,7 +713,7 @@ public final class ChatBubblesService implements Listener {
         BubbleRecord(TemporaryHologram hologram, Location captured, Vector offset, BubbleMotionPlan motion,
                      BubbleShimmerPlan shimmer, boolean followPlayer, long startedAtMs, long durationMs,
                      long expiresAtMs, int lineCount, double seed, String prefix, String message, int wrapChars,
-                     List<String> renderedLines) {
+                     List<String> renderedLines, ParticleText.Rendered particleText) {
             this.hologram = hologram;
             this.captured = captured;
             this.offset = offset.clone();
@@ -705,6 +730,7 @@ public final class ChatBubblesService implements Listener {
             this.wrapChars = wrapChars;
             this.dynamicPrefix = TextPipeline.viewerDependent(prefix);
             this.renderedLines = List.copyOf(renderedLines);
+            this.particleText = particleText;
             this.shimmerBase = this.renderedLines;
             this.shimmerVisibleCount = shimmer.visibleCount(this.renderedLines);
         }

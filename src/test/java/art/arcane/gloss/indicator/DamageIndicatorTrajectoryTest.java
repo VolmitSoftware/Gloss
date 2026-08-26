@@ -37,7 +37,7 @@ class DamageIndicatorTrajectoryTest {
                 "{amount}",
                 new Vector(),
                 new DamageIndicatorSettingsDoc.Motion(0.0D, 0.0D, 0.0D, 0.0D),
-                new DamageIndicatorSettingsDoc.Transform(1.0D, 1.0D, 0.5D)),
+                new DamageIndicatorSettingsDoc.Transform(1.0D, 1.0D, 0.5D), List.of()),
             List.of());
 
         assertEquals(1.0D, DamageIndicatorTrajectory.sample(style, 0.0D, 1.0D, 2.0D).opacity(), EPSILON);

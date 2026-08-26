@@ -10,6 +10,8 @@ import java.util.function.Supplier;
 public interface TemporaryHologram extends Hologram {
     void setRenderedLines(List<String> lines);
 
+    void setRenderedParticleText(String text, List<ParticleTextSpan> spans);
+
     /**
      * Drives this hologram's text from an async packet loop instead of the tick scheduler. The
      * binder is asked for the already rendered lines at a wall clock instant and may be called far

@@ -1,6 +1,7 @@
 package art.arcane.gloss.preview;
 
 import art.arcane.gloss.menu.CharacterizationSupport;
+import art.arcane.gloss.particle.ParticleText;
 import art.arcane.gloss.preview.doc.PreviewFakes;
 import net.kyori.adventure.text.Component;
 import org.bukkit.GameMode;
@@ -123,7 +124,7 @@ public class CharacterizationPreviewRefreshTest {
     return new PreviewElement.Label(0, 0, 0, () -> {
       reads.incrementAndGet();
       return Component.text("count " + reads.get());
-    }, 0);
+    }, () -> new ParticleText.Rendered("count " + reads.get(), List.of()), 0);
   }
 
   private static ItemStack pendingItem(ContainerPreview preview) throws ReflectiveOperationException {
@@ -141,10 +142,10 @@ public class CharacterizationPreviewRefreshTest {
   private static ContainerPreview preview(List<PreviewElement> elements, boolean showsContents)
       throws ReflectiveOperationException {
     Constructor<ContainerPreview> constructor = ContainerPreview.class.getDeclaredConstructor(
-        Player.class, Block.class, Entity.class, Vector.class, List.class, boolean.class);
+        Player.class, Block.class, Entity.class, Vector.class, List.class, List.class, boolean.class);
     constructor.setAccessible(true);
     return constructor.newInstance(viewer(), null, null, new Vector(0.5D, 65.5D, 0.5D),
-        elements, showsContents);
+        elements, List.of(), showsContents);
   }
 
   private static Player viewer() {

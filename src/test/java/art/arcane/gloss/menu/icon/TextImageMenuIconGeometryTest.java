@@ -36,7 +36,8 @@ public class TextImageMenuIconGeometryTest {
         8D,
         false,
         false,
-        List.<MenuComponentData>of()
+        List.<MenuComponentData>of(),
+        List.of()
     );
     definition.setId("image-geometry");
     MenuSession session = new MenuSession(

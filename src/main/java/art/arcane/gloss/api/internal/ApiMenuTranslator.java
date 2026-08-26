@@ -44,7 +44,8 @@ public final class ApiMenuTranslator {
         menu.maxDistance(),
         menu.closeOnDeath(),
         menu.closeOnTeleport(),
-        List.copyOf(components));
+        List.copyOf(components),
+        menu.particleLayers());
     definition.setId(menu.id());
     return definition;
   }

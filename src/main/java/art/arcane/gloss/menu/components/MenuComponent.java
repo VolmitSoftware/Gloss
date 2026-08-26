@@ -7,6 +7,8 @@ import art.arcane.gloss.config.components.ComponentData;
 import art.arcane.gloss.menu.MenuSession;
 import art.arcane.gloss.menu.icon.MenuIcon;
 import art.arcane.gloss.menu.icon.TextMenuIcon;
+import art.arcane.gloss.particle.ParticleText;
+import art.arcane.gloss.util.common.math.CollisionPlane;
 import org.bukkit.Location;
 import org.bukkit.util.Vector;
 
@@ -44,6 +46,19 @@ public abstract class MenuComponent<T extends ComponentData> {
 
   public boolean isOpen() {
     return open;
+  }
+
+  public CollisionPlane particlePlane() {
+    if (!open || currentIcon == null) {
+      return null;
+    }
+    CollisionPlane plane = currentIcon.createBoundingBox(location);
+    currentIcon.orientHitbox(plane, session.getPlayer().getEyeLocation().toVector());
+    return plane;
+  }
+
+  public ParticleText.Rendered particleText() {
+    return currentIcon == null ? null : currentIcon.particleText();
   }
 
   /**

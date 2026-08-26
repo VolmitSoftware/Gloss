@@ -204,7 +204,7 @@ class RealDropDocumentScriptTest {
     }
 
     private static String document(String presentation) {
-        return "{\"schemaVersion\":2,\"revision\":1,\"presentation\":" + presentation
+        return "{\"schemaVersion\":3,\"revision\":1,\"presentation\":" + presentation
             + ",\"variants\":[],\"audience\":{\"when\":\"true\"}}";
     }
 

@@ -355,6 +355,7 @@ public final class DamageIndicatorsService implements Listener {
             id = (damage ? "dmg-" : "heal-") + target.getUniqueId() + "-"
                 + M.ms() + "-" + sequence.incrementAndGet();
             hologram = plugin.holograms().createTemporary(id, initial, limits.lifetimeMs());
+            hologram.setParticleLayers(presentation.particleLayers());
             String formatted = IndicatorTextFormat.format(amount, limits.decimals());
             hologram.addLine(presentation.format().replace("{amount}", formatted));
             hologram.viewers().whitelist();

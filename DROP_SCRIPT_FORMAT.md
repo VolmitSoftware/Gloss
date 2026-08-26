@@ -19,7 +19,7 @@ including the fallback presentation and every conditional variant.
 
 ```json
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "revision": 1,
   "presentation": {
     "limits":   { "...": "unchanged" },
@@ -327,7 +327,7 @@ without also catching `TORCHFLOWER`.
 
 ```json
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "revision": 2,
   "presentation": {
     "script": {
@@ -345,7 +345,7 @@ sits slightly higher and a touch larger:
 
 ```json
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "revision": 3,
   "presentation": {
     "script": {
@@ -374,7 +374,7 @@ floating. The two halves are independent: `physics` lifts the item, `script` ani
 
 ```json
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "revision": 4,
   "presentation": {
     "physics": {
@@ -408,7 +408,7 @@ it has already taken so a long tumble visibly loses energy.
 
 ```json
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "revision": 5,
   "presentation": {
     "physics": {

@@ -53,7 +53,7 @@ public class EditorSyncDocumentsTest {
     EditorSyncDocumentKind kind = EditorSyncDocumentKind.DAMAGE_INDICATORS;
     Path dataDirectory = Path.of("build", "sync-contract");
     EditorSyncDocumentKind.ParsedDocument parsed = kind.parse("default", """
-        {"schemaVersion":2,"revision":7,"damage":{},"healing":{}}
+        {"schemaVersion":3,"revision":7,"damage":{},"healing":{}}
         """);
 
     assertEquals("damage-indicators", kind.wireName());

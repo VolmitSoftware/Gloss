@@ -1,5 +1,6 @@
 package art.arcane.gloss.preview.doc;
 
+import art.arcane.gloss.api.ParticleLayer;
 import com.google.gson.JsonElement;
 
 import java.util.List;
@@ -18,6 +19,7 @@ final class PreviewDocument {
   List<VariantDef> variants;
   CardDef card;
   List<ElementDef> elements;
+  List<ParticleLayer> particleLayers;
 }
 
 /**

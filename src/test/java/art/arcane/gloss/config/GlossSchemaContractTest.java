@@ -157,22 +157,22 @@ public class GlossSchemaContractTest {
 
     assertEquals(List.of("schemaVersion", "revision", "presentation", "variants", "audience"),
         List.copyOf(properties.keySet()));
-    assertEquals(2, properties.getAsJsonObject("schemaVersion").get("const").getAsInt());
+    assertEquals(3, properties.getAsJsonObject("schemaVersion").get("const").getAsInt());
     assertEquals(List.of("schemaVersion", "revision", "presentation", "variants", "audience"),
         required(realDropsSchema()));
     JsonObject presentation = realDropsSchema().getAsJsonObject("$defs")
         .getAsJsonObject("presentation").getAsJsonObject("properties");
     assertEquals(List.of("limits", "scale", "motion", "landing", "labels", "filters", "physics",
-        "script", "animation"), List.copyOf(presentation.keySet()));
+        "script", "animation", "particleLayers"), List.copyOf(presentation.keySet()));
   }
 
   @Test
-  public void damageIndicatorSchemaMatchesTheConditionalV2Document() throws IOException {
+  public void damageIndicatorSchemaMatchesTheConditionalV3Document() throws IOException {
     JsonObject schema = damageIndicatorSchema();
     JsonObject properties = schema.getAsJsonObject("properties");
     JsonObject definitions = schema.getAsJsonObject("$defs");
 
-    assertEquals(2, properties.getAsJsonObject("schemaVersion").get("const").getAsInt());
+    assertEquals(3, properties.getAsJsonObject("schemaVersion").get("const").getAsInt());
     assertEquals(List.of("schemaVersion", "revision", "limits", "damage", "healing", "audience"),
         required(schema));
     assertEquals(List.of("when", "presentation", "variants"),

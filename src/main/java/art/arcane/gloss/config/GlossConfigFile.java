@@ -36,6 +36,8 @@ public final class GlossConfigFile {
     public Hotload hotload = new Hotload();
     @ConfigDoc("Persistent and temporary hologram rendering, visibility and animation limits.")
     public Holograms holograms = new Holograms();
+    @ConfigDoc("Viewer-targeted particles attached to in-world Gloss renders.")
+    public Particles particles = new Particles();
     @ConfigDoc("Scoreboard sidebar refresh settings.")
     public Boards boards = new Boards();
     @ConfigDoc("Tablist refresh settings; authored header, footer and name formats live in tablist.json.")
@@ -108,6 +110,9 @@ public final class GlossConfigFile {
 
         @ConfigDoc("Enables the custom server list MOTD.")
         public boolean motd = false;
+
+        @ConfigDoc("Enables particle layers attached to in-world renders.")
+        public boolean particles = true;
     }
 
     public static final class Hotload {
@@ -146,6 +151,20 @@ public final class GlossConfigFile {
         @ConfigDoc("Animation text packets per second allowed across each animated display's audience; large audiences degrade frame rate proportionally. Clamped to 100..1000000.")
         public int animationPacketBudget = 20000;
 
+    }
+
+    public static final class Particles {
+        @ConfigDoc("Maximum distance in blocks at which particle layers emit. Clamped to 4..128.")
+        public double viewRange = 48.0D;
+
+        @ConfigDoc("Particle samples admitted for one viewer in one tick. Clamped to 1..4096.")
+        public int samplesPerViewerPerTick = 128;
+
+        @ConfigDoc("Particle samples admitted server-wide in one tick. Clamped to 16..65536.")
+        public int samplesPerTick = 4096;
+
+        @ConfigDoc("Maximum local geometry samples cached or generated for one layer. Clamped to 4..4096.")
+        public int maxCachedSamplesPerLayer = 512;
     }
 
     public static final class Boards {
@@ -325,6 +344,9 @@ public final class GlossConfigFile {
         if (holograms == null) {
             holograms = new Holograms();
         }
+        if (particles == null) {
+            particles = new Particles();
+        }
         if (boards == null) {
             boards = new Boards();
         }
@@ -384,6 +406,11 @@ public final class GlossConfigFile {
         holograms.temporaryUpdateIntervalTicks = clampInt(holograms.temporaryUpdateIntervalTicks, 1, 20);
         holograms.maxAnimationFps = clampInt(holograms.maxAnimationFps, 1, 240);
         holograms.animationPacketBudget = clampInt(holograms.animationPacketBudget, 100, 1_000_000);
+
+        particles.viewRange = clampDouble(particles.viewRange, 4.0D, 128.0D, 48.0D);
+        particles.samplesPerViewerPerTick = clampInt(particles.samplesPerViewerPerTick, 1, 4096);
+        particles.samplesPerTick = clampInt(particles.samplesPerTick, 16, 65536);
+        particles.maxCachedSamplesPerLayer = clampInt(particles.maxCachedSamplesPerLayer, 4, 4096);
 
         boards.updateIntervalTicks = clampInt(boards.updateIntervalTicks, 1, 200);
 

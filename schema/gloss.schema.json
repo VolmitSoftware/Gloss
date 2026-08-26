@@ -33,6 +33,12 @@
       "description": "Defines whether the menu closes when the player teleports. Defaults to false. A teleport that leaves the menu's world or its range closes the menu regardless.",
       "type": "boolean"
     },
+    "particleLayers": {
+      "description": "Viewer-targeted particle effects attached to this in-world menu projection.",
+      "type": "array",
+      "maxItems": 64,
+      "items": {"$ref": "#/$defs/particleLayer"}
+    },
     "components": {
       "description": "A list of menu components present in this menu.",
       "type": "array",
@@ -42,6 +48,65 @@
     }
   },
   "$defs": {
+    "particleLayer": {
+      "type": "object",
+      "required": ["id", "target", "geometry", "particle"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$"},
+        "target": {
+          "type": "object",
+          "required": ["scope"],
+          "properties": {
+            "scope": {"enum": ["projection", "component", "text", "line", "span", "label", "model", "local"]},
+            "name": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$"},
+            "component": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$"},
+            "line": {"type": "integer", "minimum": 1}
+          }
+        },
+        "geometry": {
+          "type": "object",
+          "required": ["type"],
+          "properties": {
+            "type": {"enum": ["point", "line", "polyline", "outline", "filledPlane", "cuboid", "letterBounds", "glyphOutline", "glyphFill"]},
+            "from": {"$ref": "#/$defs/vector3"},
+            "to": {"$ref": "#/$defs/vector3"},
+            "points": {"type": "array", "items": {"$ref": "#/$defs/vector3"}},
+            "width": {"type": "number", "minimum": 0, "maximum": 128},
+            "height": {"type": "number", "minimum": 0, "maximum": 128},
+            "depth": {"type": "number", "minimum": 0, "maximum": 128},
+            "padding": {"type": "number", "minimum": 0, "maximum": 16},
+            "spacing": {"type": "number", "minimum": 0.02, "maximum": 16}
+          }
+        },
+        "placement": {
+          "type": "object",
+          "properties": {
+            "layer": {"enum": ["behind", "front", "center"]},
+            "depth": {"type": "number", "minimum": 0, "maximum": 16},
+            "offset": {"$ref": "#/$defs/vector3"}
+          }
+        },
+        "particle": {
+          "type": "object",
+          "required": ["key"],
+          "properties": {
+            "key": {"type": "string", "pattern": "^[a-z0-9_.-]+:[a-z0-9_./-]+$"},
+            "color": {"type": "string", "pattern": "^#[0-9A-Fa-f]{6}$"},
+            "size": {"type": "number", "minimum": 0.01, "maximum": 4}
+          }
+        },
+        "emission": {
+          "type": "object",
+          "properties": {
+            "intervalTicks": {"type": "integer", "minimum": 1, "maximum": 200},
+            "pattern": {"enum": ["steady", "chase", "pulse", "twinkle", "scan", "corners"]},
+            "periodTicks": {"type": "integer", "minimum": 1, "maximum": 72000},
+            "seed": {"type": "integer"}
+          }
+        },
+        "priority": {"type": "integer", "minimum": -1000, "maximum": 1000}
+      }
+    },
     "vector3": {
       "title": "3D Vector",
       "description": "Represents a 3D floating-point vector.",

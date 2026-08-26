@@ -155,7 +155,7 @@ public final class LegacyGlossDataImporter {
         HologramDoc.Anchor anchor = new HologramDoc.Anchor(legacy.get("world").getAsString(), position);
         return new HologramDoc(HologramDoc.CURRENT_SCHEMA_VERSION, DocumentEnvelope.INITIAL_REVISION,
             anchor, stringList(legacy.getAsJsonArray("lines")), true,
-            HologramDoc.DEFAULT_SCALE, HologramDoc.DEFAULT_BILLBOARD, 0.0D, 0.0D);
+            HologramDoc.DEFAULT_SCALE, HologramDoc.DEFAULT_BILLBOARD, 0.0D, 0.0D, List.of());
     }
 
     private static EmojiDoc convertEmoji(JsonObject legacy) {
@@ -282,7 +282,8 @@ public final class LegacyGlossDataImporter {
                 yaml.getBoolean("chat-bubbles.hide-own-messages", base.hideOwn()),
                 motion,
                 base.shimmer(),
-                base.select());
+                base.select(),
+                base.particleLayers());
             writeDocument(styleFile.toPath(), updated);
             entries.add(Entry.of("config", LEGACY_CONFIG_FILE_NAME + ":chat-bubbles", Status.OVERLAID));
         } catch (IOException | RuntimeException failure) {

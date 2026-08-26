@@ -1,5 +1,6 @@
 package art.arcane.gloss;
 
+import art.arcane.gloss.api.ParticleLayer;
 import art.arcane.gloss.config.GlossConfigFile;
 import art.arcane.gloss.drop.RealDropSettingsDoc;
 
@@ -12,6 +13,7 @@ public record GlossConfig(
     boolean metrics,
     boolean splashScreen,
     Holograms holograms,
+    Particles particles,
     Boards boards,
     Tablist tablist,
     Emoji emoji,
@@ -48,6 +50,15 @@ public record GlossConfig(
         boolean highFrequencyAnimations,
         int maxAnimationFps,
         int animationPacketBudget
+    ) {
+    }
+
+    public record Particles(
+        boolean enabled,
+        double viewRange,
+        int samplesPerViewerPerTick,
+        int samplesPerTick,
+        int maxCachedSamplesPerLayer
     ) {
     }
 
@@ -119,7 +130,8 @@ public record GlossConfig(
         Filters filters,
         Physics physics,
         Script script,
-        RealDropAnimation animation
+        RealDropAnimation animation,
+        List<ParticleLayer> particleLayers
     ) {
         public record Limits(
             int updateIntervalTicks,
@@ -399,6 +411,13 @@ public record GlossConfig(
                 source.holograms.highFrequencyAnimations,
                 source.holograms.maxAnimationFps,
                 source.holograms.animationPacketBudget
+            ),
+            new Particles(
+                source.features.particles,
+                source.particles.viewRange,
+                source.particles.samplesPerViewerPerTick,
+                source.particles.samplesPerTick,
+                source.particles.maxCachedSamplesPerLayer
             ),
             new Boards(
                 source.features.boards,

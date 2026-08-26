@@ -4,6 +4,12 @@ import art.arcane.gloss.Gloss;
 import art.arcane.gloss.api.HologramPresentation;
 import art.arcane.gloss.api.HologramViewers;
 import art.arcane.gloss.api.TemporaryHologram;
+import art.arcane.gloss.api.ParticleLayer;
+import art.arcane.gloss.api.ParticleTextSpan;
+import art.arcane.gloss.particle.ParticleFrame;
+import art.arcane.gloss.particle.ParticleRect;
+import art.arcane.gloss.particle.ParticleText;
+import art.arcane.gloss.particle.ParticleTextLayout;
 import art.arcane.gloss.text.TextPipeline;
 import art.arcane.gloss.text.TextDisplayLayout;
 import art.arcane.gloss.util.common.TextUtils;
@@ -17,6 +23,7 @@ import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.TextDisplay;
 import org.bukkit.util.Transformation;
+import org.bukkit.util.Vector;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
 
@@ -72,6 +79,7 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
     private final AtomicBoolean visibilityReset;
     private final ViewerList viewerList;
     private volatile LineSet lineSet;
+    private volatile ParticleText.Rendered renderedParticleText;
     private volatile Location position;
     private volatile Location appliedPosition;
     private volatile PositionBinding positionBinding;
@@ -83,6 +91,7 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
     private volatile HologramPresentation appliedPresentation;
     private volatile int appliedTeleportTicks;
     private volatile AnimationMemo animationMemo;
+    private volatile List<ParticleLayer> particleLayers;
 
     TemporaryHologramDisplay(HologramService service, String id, Location initial, long durationMs) {
         this.service = service;
@@ -107,6 +116,7 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
             "Temporary hologram requires a loaded world.");
         this.position = startingPosition;
         this.boundPresentation = HologramPresentation.identity();
+        this.particleLayers = List.of();
     }
 
     @Override
@@ -168,12 +178,30 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
     @Override
     public void setRenderedLines(List<String> lines) {
         Objects.requireNonNull(lines, "Rendered hologram lines may not be null.");
+        renderedParticleText = null;
         LineSet next = LineSet.rendered(List.copyOf(lines));
         synchronized (linesLock) {
             this.lineSet = next;
         }
 
         textDirty.set(true);
+    }
+
+    @Override
+    public void setRenderedParticleText(String text, List<ParticleTextSpan> spans) {
+        String rendered = text == null ? "" : text;
+        List<ParticleText.Span> converted = new ArrayList<>(spans == null ? 0 : spans.size());
+        if (spans != null) {
+            for (ParticleTextSpan span : spans) {
+                ParticleTextSpan value = Objects.requireNonNull(span,
+                    "rendered particle spans must not contain null entries");
+                if (value.end() > rendered.length()) {
+                    throw new IllegalArgumentException("rendered particle span exceeds the rendered text length");
+                }
+                converted.add(new ParticleText.Span(value.name(), value.start(), value.end()));
+            }
+        }
+        renderedParticleText = new ParticleText.Rendered(rendered, converted);
     }
 
     @Override
@@ -190,6 +218,16 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
         }
 
         textDirty.set(true);
+    }
+
+    @Override
+    public List<ParticleLayer> particleLayers() {
+        return particleLayers;
+    }
+
+    @Override
+    public void setParticleLayers(List<ParticleLayer> particleLayers) {
+        this.particleLayers = ParticleLayer.copyLayers(particleLayers, "temporary hologram");
     }
 
     @Override
@@ -411,6 +449,88 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
         applyPresentation(active, presentation);
         applyText(active, tick, world);
         applyVisibility(active);
+    }
+
+    void emitParticles(HologramTick tick) {
+        if (destroyed.get() || display == null || particleLayers.isEmpty()) {
+            return;
+        }
+        World world = position.getWorld();
+        if (world != null) {
+            emitParticles(tick, world, boundPresentation);
+        }
+    }
+
+    private void emitParticles(HologramTick tick, World world, HologramPresentation presentation) {
+        if (particleLayers.isEmpty()) {
+            return;
+        }
+        List<Player> viewers = captureViewers(tick, world);
+        LineSet snapshot = lineSet;
+        Location anchor = position.clone();
+        for (Player viewer : viewers) {
+            UUID viewerId = viewer.getUniqueId();
+            service.runViewerWork(viewer, viewerId, animatorGroup + "#particles",
+                () -> emitParticlesFor(viewer, anchor, snapshot, presentation));
+        }
+    }
+
+    private void emitParticlesFor(Player viewer, Location anchor, LineSet snapshot,
+                                  HologramPresentation presentation) {
+        if (!viewer.isOnline() || destroyed.get() || particleLayers.isEmpty()) {
+            return;
+        }
+        ParticleText.Rendered override = renderedParticleText;
+        ParticleText.Rendered particleText = snapshot.rendered()
+            ? override == null
+                ? new ParticleText.Rendered(TextUtils.joinLegacyLines(snapshot.lines()), List.of())
+                : override
+            : service.plugin().text().renderParticleText(viewer, String.join("\n", snapshot.lines()));
+        ParticleFrame frame = particleFrame(viewer, anchor, presentation);
+        long tick = System.currentTimeMillis() / 50L;
+        double scale = Math.max(presentation.scaleX(), presentation.scaleY());
+        for (ParticleLayer layer : particleLayers) {
+            List<ParticleRect> targets = particleTargets(layer, particleText, scale);
+            if (!layer.target().scope().equals("local") && targets.isEmpty()) {
+                continue;
+            }
+            service.plugin().particles().emit(viewer, frame, layer, targets, tick);
+        }
+    }
+
+    private List<ParticleRect> particleTargets(ParticleLayer layer, ParticleText.Rendered rendered,
+                                                double scale) {
+        String scope = layer.target().scope();
+        if (scope.equals("projection") || scope.equals("text")) {
+            return List.of(ParticleTextLayout.textBounds(rendered.text(), scale));
+        }
+        if (scope.equals("line")) {
+            List<ParticleRect> lines = ParticleTextLayout.lineBounds(rendered.text(), scale);
+            int index = layer.target().line() - 1;
+            return index < lines.size() ? List.of(lines.get(index)) : List.of();
+        }
+        if (scope.equals("span")) {
+            boolean perLetter = layer.geometry().type().equals("letterBounds")
+                || layer.geometry().type().equals("glyphOutline")
+                || layer.geometry().type().equals("glyphFill");
+            return ParticleTextLayout.bounds(rendered, layer.target().name(), scale, perLetter);
+        }
+        return List.of();
+    }
+
+    private ParticleFrame particleFrame(Player viewer, Location anchor,
+                                        HologramPresentation presentation) {
+        Vector front = viewer.getEyeLocation().toVector().subtract(anchor.toVector());
+        if (front.lengthSquared() < 1.0E-12D) {
+            front = new Vector(0.0D, 0.0D, 1.0D);
+        }
+        front.normalize();
+        Vector referenceUp = Math.abs(front.getY()) > 0.999D
+            ? new Vector(0.0D, 0.0D, 1.0D)
+            : new Vector(0.0D, 1.0D, 0.0D);
+        Vector right = front.clone().crossProduct(referenceUp).normalize();
+        Vector up = right.clone().crossProduct(front).normalize();
+        return new ParticleFrame(anchor, right, up, front.clone().multiply(-1.0D));
     }
 
     void onPlayerQuit(UUID playerId) {
@@ -651,7 +771,7 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
             return cached.template();
         }
         AnimationTemplate template = service.animator().compileTemplate(snapshot.lines(),
-            line -> service.plugin().text().renderStatic(line));
+            line -> service.plugin().text().renderParticleText(null, line).text());
         if (template != null && !dynamic) {
             animationMemo = new AnimationMemo(snapshot, emojiGeneration, renderGeneration,
                 animationGeneration, template);

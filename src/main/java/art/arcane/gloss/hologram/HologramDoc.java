@@ -2,6 +2,7 @@ package art.arcane.gloss.hologram;
 
 import art.arcane.gloss.doc.DocumentEnvelope;
 import art.arcane.gloss.doc.DocumentParsers;
+import art.arcane.gloss.api.ParticleLayer;
 import org.bukkit.util.Vector;
 
 import java.util.ArrayList;
@@ -10,9 +11,10 @@ import java.util.Locale;
 import java.util.Objects;
 
 public record HologramDoc(int schemaVersion, long revision, Anchor anchor, List<String> lines,
-                          Boolean seeThrough, double scale, String billboard, Double yaw, Double pitch) {
+                          Boolean seeThrough, double scale, String billboard, Double yaw, Double pitch,
+                          List<ParticleLayer> particleLayers) {
     public static final String KIND = "holograms";
-    public static final int CURRENT_SCHEMA_VERSION = 1;
+    public static final int CURRENT_SCHEMA_VERSION = 2;
     public static final double DEFAULT_SCALE = 1.0D;
     public static final double MIN_SCALE = 0.05D;
     public static final double MAX_SCALE = 16.0D;
@@ -45,10 +47,12 @@ public record HologramDoc(int schemaVersion, long revision, Anchor anchor, List<
         billboard = requireBillboard(billboard);
         yaw = requireAngle("yaw", yaw, MAX_YAW_DEGREES);
         pitch = requireAngle("pitch", pitch, MAX_PITCH_DEGREES);
+        particleLayers = ParticleLayer.copyLayers(particleLayers, "hologram");
     }
 
     public HologramDoc withRevision(long revision) {
-        return new HologramDoc(schemaVersion, revision, anchor, lines, seeThrough, scale, billboard, yaw, pitch);
+        return new HologramDoc(schemaVersion, revision, anchor, lines, seeThrough, scale, billboard, yaw, pitch,
+            particleLayers);
     }
 
     public static HologramDoc parse(String fileName, String raw) {
