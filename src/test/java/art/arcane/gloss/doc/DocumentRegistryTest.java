@@ -122,7 +122,7 @@ class DocumentRegistryTest {
         Logger logger = Logger.getLogger("Gloss");
         logger.addHandler(handler);
         try {
-            write("alpha.json", "1:old");
+            write("alpha.json", "1:unsupported");
             awaitWatcherEvent(registry, unsupportedWatcher::eventSeen);
 
             assertEquals("one", registry.get("alpha").value());
