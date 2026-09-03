@@ -1,5 +1,7 @@
 "locale": "ru_RU"
 "messages":
+  "command.help.debugdump": "Создать диагностический отчёт и при желании загрузить его"
+  "command.help.debugdump_upload": "Загрузить отчёт на mclo.gs"
   "director":
     "help":
       "navigation":
@@ -523,3 +525,4 @@
   "command.import.legacy.done": "&8[&dGloss&8] &aПеренос устаревших данных завершён: перенесено &f{migrated}&a, поглощено &f{absorbed}&a, ключей конфигурации &f{overlaid}&a, ошибок &f{errors}&a."
   "command.import.config_unreadable": "&8[&dGloss&8] &cНе удалось загрузить gloss.toml: &f{reason}"
   "command.reload.done": "&8[&dGloss&8] &aКонфигурация и службы Gloss перезагружены."
+  "command.help.language": "Выберите свой язык или язык сервера по умолчанию"

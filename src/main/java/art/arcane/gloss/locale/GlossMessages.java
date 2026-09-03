@@ -16,6 +16,8 @@ public final class GlossMessages {
 
     private static final List<MessageKey> KEYS = new ArrayList<>();
 
+    public static final TextKey DEBUG_DUMP_DESCRIPTION = text("command.help.debugdump", "Create and optionally upload a diagnostic report");
+    public static final TextKey DEBUG_DUMP_UPLOAD = text("command.help.debugdump_upload", "Upload the report to mclo.gs");
     public static final TextKey HELP_ROOT = text("command.help.root", "Gloss command root");
     public static final TextKey HELP_HOLOGRAM = text("command.help.hologram", "Create and manage holograms");
     public static final TextKey HELP_HOLOGRAM_CREATE = text("command.help.hologram.create", "Create a hologram at your location");
@@ -105,6 +107,7 @@ public final class GlossMessages {
     public static final TextKey HELP_INDICATORS = text("command.help.indicators", "Damage and healing indicator tools");
     public static final TextKey HELP_INDICATORS_RESET = text("command.help.indicators.reset", "Restore the shipped damage-indicator settings document");
     public static final TextKey HELP_ARG_RESET_NAME = text("command.help.arg.reset_name", "Name to reset, or * for every shipped default");
+    public static final TextKey HELP_LANGUAGE = text("command.help.language", "Choose your language or the server default");
     public static final TextKey HELP_STATUS = text("command.help.status", "Show terse runtime counts");
     public static final TextKey HELP_RELOAD = text("command.help.reload", "Reload Gloss configuration and services");
 

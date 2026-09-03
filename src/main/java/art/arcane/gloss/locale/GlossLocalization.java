@@ -3,6 +3,14 @@ package art.arcane.gloss.locale;
 import art.arcane.gloss.Gloss;
 import art.arcane.gloss.doc.DocumentHashes;
 import art.arcane.volmlib.util.director.DirectorTextResolver;
+import art.arcane.volmlib.util.localization.PluginLanguageService;
+import art.arcane.volmlib.util.localization.PluginLanguageEditor;
+import art.arcane.volmlib.util.localization.LanguageFileEditor;
+import art.arcane.volmlib.util.localization.MessageValue;
+import art.arcane.volmlib.util.localization.TextValue;
+import art.arcane.volmlib.util.localization.PluralValue;
+import art.arcane.volmlib.util.localization.LanguageAudience;
+import art.arcane.volmlib.util.localization.RemoteLanguageCatalog;
 import art.arcane.volmlib.util.format.ColorFormatter;
 import art.arcane.volmlib.util.io.FileWatcher;
 import art.arcane.volmlib.util.localization.LocaleOverlay;
@@ -24,13 +32,16 @@ import art.arcane.volmlib.util.localization.VolmitLocales;
 import art.arcane.volmlib.util.plugin.ComponentMessenger;
 import art.arcane.volmlib.util.plugin.ComponentText;
 import org.bukkit.command.CommandSender;
+import org.bukkit.entity.Player;
 import org.bukkit.configuration.ConfigurationSection;
+import org.bukkit.configuration.InvalidConfigurationException;
 import org.bukkit.configuration.file.YamlConfiguration;
 
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
+import java.net.URI;
+import java.nio.file.Path;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
@@ -55,6 +66,8 @@ public final class GlossLocalization implements AutoCloseable {
   private static final char YAML_PATH_SEPARATOR = '/';
 
   private final File languageFile;
+  private final File dataFolder;
+  private volatile PluginLanguageService languages;
   private final Logger logger;
   private final LocalizationManager manager;
   private final LongSupplier clock;
@@ -70,6 +83,7 @@ public final class GlossLocalization implements AutoCloseable {
   }
 
   GlossLocalization(File dataFolder, Logger logger, String configuredLocale, LongSupplier clock) {
+    this.dataFolder = dataFolder;
     this.languageFile = new File(dataFolder, "language.yml");
     this.logger = logger;
     this.clock = Objects.requireNonNull(clock, "clock");
@@ -90,8 +104,41 @@ public final class GlossLocalization implements AutoCloseable {
     return languageFile;
   }
 
+  public PluginLanguageService enableLanguages(Gloss plugin) {
+    languages = new PluginLanguageService(new PluginLanguageService.Options(
+        dataFolder.toPath().resolve("language-preferences.properties"),
+        VolmitLocales::all,
+        () -> configuredLocale,
+        manager::snapshot,
+        this::loadSelectedSnapshot,
+        (locale, prepared) -> plugin.selectLanguage(locale, prepared),
+        logger));
+    return languages;
+  }
+
+  public void reloadConfigured(String locale) {
+    PluginLanguageService service = languages;
+    if (service != null) {
+      service.invalidate();
+      service.selectDefault(locale).exceptionally(failure -> {
+        logger.log(Level.SEVERE, "Could not load Gloss language " + locale, failure);
+        return null;
+      });
+    }
+  }
+
+  public synchronized void install(String locale, LocalizationSnapshot snapshot) {
+    manager.install(snapshot);
+    configuredLocale = locale;
+    activeLocale = locale;
+  }
+
   LocalizationSnapshot snapshot() {
-    return manager.snapshot();
+    PluginLanguageService service = languages;
+    if (service == null) {
+      return manager.snapshot();
+    }
+    return service.snapshot();
   }
 
   public boolean update() {
@@ -133,6 +180,11 @@ public final class GlossLocalization implements AutoCloseable {
 
   @Override
   public synchronized void close() {
+    PluginLanguageService service = languages;
+    languages = null;
+    if (service != null) {
+      service.close();
+    }
     FileWatcher previous = watcher;
     watcher = null;
     if (previous != null) {
@@ -173,6 +225,9 @@ public final class GlossLocalization implements AutoCloseable {
       return false;
     }
 
+    if (languages != null) {
+      languages.invalidate();
+    }
     activeLocale = result.current().overlays().isEmpty()
         ? CATALOG.englishLocale()
         : result.current().overlays().get(0).locale();
@@ -222,7 +277,7 @@ public final class GlossLocalization implements AutoCloseable {
   }
 
   public String text(TextKey key, MessageArgs arguments) {
-    return render(manager.snapshot().resolve(key, arguments), false);
+    return render(snapshot().resolve(key, arguments), false);
   }
 
   public String legacy(TextKey key) {
@@ -230,7 +285,7 @@ public final class GlossLocalization implements AutoCloseable {
   }
 
   public String legacy(TextKey key, MessageArgs arguments) {
-    return render(manager.snapshot().resolve(key, arguments), true);
+    return render(snapshot().resolve(key, arguments), true);
   }
 
   public ComponentText component(TextKey key) {
@@ -238,7 +293,7 @@ public final class GlossLocalization implements AutoCloseable {
   }
 
   public ComponentText component(TextKey key, MessageArgs arguments) {
-    return renderComponent(manager.snapshot().resolve(key, arguments));
+    return renderComponent(snapshot().resolve(key, arguments));
   }
 
   public void send(CommandSender sender, TextKey key) {
@@ -246,7 +301,8 @@ public final class GlossLocalization implements AutoCloseable {
   }
 
   public void send(CommandSender sender, TextKey key, MessageArgs arguments) {
-    ComponentMessenger.send(sender, component(key, arguments));
+    LanguageAudience.run(sender instanceof Player player ? player.getUniqueId() : null,
+        () -> ComponentMessenger.send(sender, component(key, arguments)));
   }
 
   public DirectorTextResolver directorResolver() {
@@ -306,7 +362,8 @@ public final class GlossLocalization implements AutoCloseable {
   }
 
   public static void sendGlobal(CommandSender sender, TextKey key, MessageArgs arguments) {
-    ComponentMessenger.send(sender, globalComponent(key, arguments));
+    LanguageAudience.run(sender instanceof Player player ? player.getUniqueId() : null,
+        () -> ComponentMessenger.send(sender, globalComponent(key, arguments)));
   }
 
   public static String globalDirectorText(TextKey key, MessageArgs arguments) {
@@ -328,17 +385,94 @@ public final class GlossLocalization implements AutoCloseable {
     return GlossLocalization::globalDirectorText;
   }
 
+  public PluginLanguageEditor.Options editorOptions() {
+    return new PluginLanguageEditor.Options(this::loadSelectedSnapshot, this::saveEditor);
+  }
+
+  private synchronized LocalizationSnapshot saveEditor(PluginLanguageEditor.Edit edit) throws Exception {
+    LocalizationCandidate base = loadBaseCandidate(Files.readString(languageFile.toPath()), edit.locale());
+    Path path = overridePath(edit.locale());
+    LocalizationSnapshot prepared = LanguageFileEditor.update(path, raw -> {
+      YamlConfiguration yaml = new YamlConfiguration();
+      yaml.options().pathSeparator(YAML_PATH_SEPARATOR);
+      try {
+          yaml.loadFromString(raw);
+      } catch (InvalidConfigurationException exception) {
+          throw new IOException("Could not parse language overrides: " + path, exception);
+      }
+      LocalizationSnapshot current = withOverride(base, parseEditorOverlay(yaml, edit.locale()));
+      MessageKey key = CATALOG.key(edit.key());
+      if (key == null || !current.value(key).equals(edit.expected())) {
+        throw new IOException("Language message changed while it was being edited: " + edit.key());
+      }
+      yaml.set("locale", edit.locale());
+      String messagePath = "messages/" + edit.key();
+      yaml.set(messagePath, null);
+      MessageValue value = edit.value();
+      if (value instanceof TextValue text) {
+        yaml.set(messagePath, text.template());
+      } else if (value instanceof PluralValue plural) {
+        yaml.createSection(messagePath, plural.forms());
+      } else {
+        throw new IllegalArgumentException("Unsupported language message shape: " + edit.key());
+      }
+      LocalizationSnapshot updated = withOverride(base, parseEditorOverlay(yaml, edit.locale()));
+      return new LanguageFileEditor.Prepared<>(yaml.saveToString(), updated);
+    });
+    if (configuredLocale.equals(edit.locale())) {
+      manager.install(prepared);
+    }
+    return prepared;
+  }
+
+  private Path overridePath(String locale) {
+    if (!locale.matches("[A-Za-z0-9_-]{2,32}")) {
+      throw new IllegalArgumentException("Invalid language locale: " + locale);
+    }
+    return dataFolder.toPath().resolve("languages/overrides").resolve(locale + ".yml");
+  }
+
+  private LocaleOverlay parseEditorOverlay(YamlConfiguration yaml, String locale) {
+    if (yaml.contains("locale") && !locale.equals(yaml.getString("locale"))) {
+      throw new IllegalArgumentException("Language override must declare locale: " + locale);
+    }
+    LocaleOverlay.Builder overlay = LocaleOverlay.builder(overridePath(locale).toString(), locale);
+    ConfigurationSection messages = yaml.getConfigurationSection("messages");
+    if (messages != null) {
+      appendMessages(messages, overlay);
+    }
+    return overlay.build();
+  }
+
+  private LocalizationSnapshot withOverride(LocalizationCandidate base, LocaleOverlay override) {
+    List<LocaleOverlay> overlays = new ArrayList<>(base.overlays().size() + 1);
+    overlays.add(override);
+    overlays.addAll(base.overlays());
+    return LocalizationSnapshot.create(new LocalizationCandidate(CATALOG, overlays, PluralSelector.oneOther()));
+  }
+
   private LocalizationCandidate loadCandidate(String rawContent, String selectedLocale) throws Exception {
+    LocalizationCandidate base = loadBaseCandidate(rawContent, selectedLocale);
+    Path path = overridePath(selectedLocale);
+    if (!Files.exists(path)) {
+      return base;
+    }
+    if (!Files.isRegularFile(path) || Files.size(path) > MAX_LANGUAGE_BYTES) {
+      throw new IOException("Language override is not a regular file within the size limit: " + path);
+    }
+    YamlConfiguration yaml = new YamlConfiguration();
+    yaml.options().pathSeparator(YAML_PATH_SEPARATOR);
+    yaml.loadFromString(Files.readString(path));
+    List<LocaleOverlay> overlays = new ArrayList<>(base.overlays().size() + 1);
+    overlays.add(parseEditorOverlay(yaml, selectedLocale));
+    overlays.addAll(base.overlays());
+    return new LocalizationCandidate(CATALOG, overlays, PluralSelector.oneOther());
+  }
+
+  private LocalizationCandidate loadBaseCandidate(String rawContent, String selectedLocale) throws Exception {
     YamlConfiguration yaml = new YamlConfiguration();
     yaml.options().pathSeparator(YAML_PATH_SEPARATOR);
     yaml.loadFromString(rawContent);
-    if (yaml.contains("locale")) {
-      throw new IllegalArgumentException(
-          "language.yml no longer selects the locale; remove its top-level locale key (or delete language.yml, losing its "
-              + "overrides, and restart Gloss to regenerate it), set language in plugins/Gloss/gloss.toml, then run "
-              + "/gloss reload. This version does not migrate the obsolete locale key"
-      );
-    }
     LocaleOverlay.Builder overlay = LocaleOverlay.builder(languageFile.getPath(), selectedLocale);
     ConfigurationSection messages = yaml.getConfigurationSection("messages");
     if (messages != null) {
@@ -347,43 +481,56 @@ public final class GlossLocalization implements AutoCloseable {
 
     List<LocaleOverlay> overlays = new ArrayList<>();
     overlays.add(overlay.build());
-    LocaleOverlay bundled = loadBundledOverlay(selectedLocale);
+    LocaleOverlay bundled = loadLanguageOverlay(selectedLocale);
     if (bundled != null) {
       overlays.add(bundled);
     }
     return new LocalizationCandidate(CATALOG, overlays, PluralSelector.oneOther());
   }
 
-  private LocaleOverlay loadBundledOverlay(String locale) throws Exception {
+  private LocaleOverlay loadLanguageOverlay(String locale) throws Exception {
     if (VolmitLocales.ENGLISH.equals(locale)) {
       return null;
     }
-
-    String resourcePath = "/languages/" + locale + ".yml";
-    InputStream input = GlossLocalization.class.getResourceAsStream(resourcePath);
-    if (input == null) {
-      if (VolmitLocales.isBundled(locale)) {
-        throw new IllegalArgumentException("Missing bundled language resource: " + resourcePath);
-      }
-      return null;
+    if (!locale.matches("[A-Za-z0-9_-]{2,32}")) {
+      throw new IllegalArgumentException("Invalid language locale: " + locale);
     }
-
-    try (InputStream stream = input; InputStreamReader reader = new InputStreamReader(stream, StandardCharsets.UTF_8)) {
-      YamlConfiguration yaml = new YamlConfiguration();
-      yaml.options().pathSeparator(YAML_PATH_SEPARATOR);
-      yaml.load(reader);
-      String declaredLocale = yaml.getString("locale");
-      if (!locale.equals(declaredLocale)) {
-        throw new IllegalArgumentException(resourcePath + " must declare locale: " + locale);
-      }
-
-      LocaleOverlay.Builder overlay = LocaleOverlay.builder(resourcePath, locale);
-      ConfigurationSection messages = yaml.getConfigurationSection("messages");
-      if (messages != null) {
-        appendMessages(messages, overlay);
-      }
-      return overlay.build();
+    Path file = dataFolder.toPath().resolve("languages").resolve(locale + ".yml");
+    if (!Files.isRegularFile(file) && VolmitLocales.isBundled(locale)) {
+      throw new IOException("Language file is not installed: " + locale);
     }
+    return Files.isRegularFile(file) ? parseLanguageOverlay(Files.readString(file), file.toString(), locale) : null;
+  }
+
+  LocalizationSnapshot loadSelectedSnapshot(String locale) throws Exception {
+    Path file = dataFolder.toPath().resolve("languages").resolve(locale + ".yml");
+    if (!VolmitLocales.ENGLISH.equals(locale) && !Files.isRegularFile(file) && VolmitLocales.isBundled(locale)) {
+      try (RemoteLanguageCatalog remote = RemoteLanguageCatalog.load(new RemoteLanguageCatalog.Options(
+          "Gloss",
+          URI.create("https://raw.githubusercontent.com/VolmitSoftware/Gloss/"),
+          "src/main/resources/languages", ".yml", "gloss-language-source.properties",
+          dataFolder.toPath().resolve(".language-cache"), GlossLocalization.class.getClassLoader()))) {
+        remote.readOrInstall(locale, file, (selected, content) ->
+            LocalizationSnapshot.create(new LocalizationCandidate(CATALOG,
+                List.of(parseLanguageOverlay(content, file.toString(), selected)), PluralSelector.oneOther())));
+      }
+    }
+    return LocalizationSnapshot.create(loadCandidate(Files.readString(languageFile.toPath()), locale));
+  }
+
+  private LocaleOverlay parseLanguageOverlay(String content, String source, String locale) throws Exception {
+    YamlConfiguration yaml = new YamlConfiguration();
+    yaml.options().pathSeparator(YAML_PATH_SEPARATOR);
+    yaml.loadFromString(content);
+    if (!locale.equals(yaml.getString("locale"))) {
+      throw new IllegalArgumentException(source + " must declare locale: " + locale);
+    }
+    LocaleOverlay.Builder overlay = LocaleOverlay.builder(source, locale);
+    ConfigurationSection messages = yaml.getConfigurationSection("messages");
+    if (messages != null) {
+      appendMessages(messages, overlay);
+    }
+    return overlay.build();
   }
 
   private void appendMessages(ConfigurationSection messages, LocaleOverlay.Builder overlay) {
@@ -431,7 +578,7 @@ public final class GlossLocalization implements AutoCloseable {
       YamlConfiguration yaml = new YamlConfiguration();
       yaml.options().header(
           "Gloss message overrides. Set the active language with the leading language key in gloss.toml.\n"
-              + "Add only the message keys you want to replace below messages; bundled translations and English fill the rest."
+              + "Add only the message keys you want to replace below messages; downloaded translations and English fill the rest."
       );
       yaml.createSection("messages");
       yaml.save(languageFile);

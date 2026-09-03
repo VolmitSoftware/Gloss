@@ -1,5 +1,7 @@
 "locale": "vi_VI"
 "messages":
+  "command.help.debugdump": "Tạo báo cáo chẩn đoán và tải lên nếu muốn"
+  "command.help.debugdump_upload": "Tải báo cáo lên mclo.gs"
   "director":
     "help":
       "navigation":
@@ -523,3 +525,4 @@
   "command.import.legacy.done": "&8[&dGloss&8] &aDi chuyển dữ liệu cũ hoàn tất: &f{migrated}&a đã di chuyển, &f{absorbed}&a đã hấp thụ, &f{overlaid}&a khóa cấu hình, &f{errors}&a lỗi."
   "command.import.config_unreadable": "&8[&dGloss&8] &cKhông thể tải gloss.toml: &f{reason}"
   "command.reload.done": "&8[&dGloss&8] &aĐã tải lại cấu hình và dịch vụ của Gloss."
+  "command.help.language": "Chọn ngôn ngữ của bạn hoặc ngôn ngữ mặc định của máy chủ"

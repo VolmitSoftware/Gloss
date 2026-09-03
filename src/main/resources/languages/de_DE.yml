@@ -1,5 +1,7 @@
 "locale": "de_DE"
 "messages":
+  "command.help.debugdump": "Einen Diagnosebericht erstellen und optional hochladen"
+  "command.help.debugdump_upload": "Den Bericht zu mclo.gs hochladen"
   "director":
     "help":
       "navigation":
@@ -523,3 +525,4 @@
   "command.import.legacy.done": "&8[&dGloss&8] &aLegacy-Migration abgeschlossen: &f{migrated}&a migriert, &f{absorbed}&a übernommen, &f{overlaid}&a Konfigurationsschlüssel, &f{errors}&a Fehler."
   "command.import.config_unreadable": "&8[&dGloss&8] &cgloss.toml konnte nicht geladen werden: &f{reason}"
   "command.reload.done": "&8[&dGloss&8] &aGloss-Konfiguration und -Dienste neu geladen."
+  "command.help.language": "Wähle deine Sprache oder die Standardsprache des Servers"

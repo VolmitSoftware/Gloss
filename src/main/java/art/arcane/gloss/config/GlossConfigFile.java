@@ -21,7 +21,7 @@ public final class GlossConfigFile {
     public static final String BUNDLE_MORE_FORMAT_DEFAULT = "&8+{remaining} more";
     public static final String EDITOR_SYNC_ENDPOINT_DEFAULT = "https://sync.gloss.volmitsoftware.com/v3";
 
-    @ConfigDoc("Server-wide locale used for in-game text. Blank values fall back to en_US; language.yml only overrides individual messages.")
+    @ConfigDoc("Default language for players without an override. Missing official translations download when selected; language.yml overrides individual messages. Blank values use en_US.")
     public String language = VolmitLocales.ENGLISH;
 
     @ConfigDoc("Sends anonymous bStats usage metrics.")

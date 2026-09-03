@@ -1,5 +1,6 @@
 package art.arcane.gloss;
 
+import art.arcane.volmlib.util.diagnostics.BukkitDebugDump;
 import art.arcane.gloss.animation.AnimationService;
 import art.arcane.gloss.api.GlossAPIProvider;
 import art.arcane.gloss.api.internal.GlossApiServiceImpl;
@@ -26,6 +27,8 @@ import art.arcane.gloss.integration.ItemProviderRegistry;
 import art.arcane.gloss.profile.PlayerHeadService;
 import art.arcane.gloss.integration.protection.ContainerProtectionService;
 import art.arcane.gloss.locale.GlossLocalization;
+import art.arcane.volmlib.util.localization.BukkitLanguageSwitcher;
+import art.arcane.volmlib.util.localization.LocalizationSnapshot;
 import art.arcane.gloss.menu.MenuSessionManager;
 import art.arcane.gloss.motd.MotdService;
 import art.arcane.gloss.panel.PanelRuntimeManager;
@@ -106,6 +109,8 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
     private volatile long nextConfigReconciliationNanos;
     private DataWatchdog watchdog;
     private volatile GlossConfig config;
+    private BukkitLanguageSwitcher languageSwitcher;
+    private BukkitDebugDump debugDump;
     private TextPipeline text;
     private AnimationService animations;
     private EmojiService emoji;
@@ -304,6 +309,18 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
             enableService("hud", () -> {
             }, hudBar::shutdown);
             localization = new GlossLocalization(getDataFolder(), getLogger(), config.language());
+            enableService("diagnostic-reports", () -> debugDump = BukkitDebugDump.create(this), () -> {
+                if (debugDump != null) {
+                    debugDump.close();
+                    debugDump = null;
+                }
+            });
+            languageSwitcher = BukkitLanguageSwitcher.register(this, localization.enableLanguages(this),
+                    new BukkitLanguageSwitcher.Options("gloss", "gloss.admin",
+                            GlossCommandService.menuTheme(), localization.directorResolver(), localization.editorOptions()));
+            if (!config.language().equals(localization.activeLocale())) {
+                localization.reloadConfigured(config.language());
+            }
             persistenceCoordinator = new GlossPersistenceCoordinator();
             projectTransaction = new GlossProjectTransaction(getDataFolder().toPath());
             try {
@@ -630,7 +647,27 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
         });
     }
 
+    public BukkitDebugDump debugDump() {
+        return debugDump;
+    }
+
+    public BukkitLanguageSwitcher languageSwitcher() {
+        return languageSwitcher;
+    }
+
+    public synchronized void selectLanguage(String locale, LocalizationSnapshot snapshot) throws IOException {
+        GlossConfigFile updated = configLoader.loadForReload();
+        updated.language = locale;
+        configLoader.save(updated);
+        config = config.withLanguage(locale);
+        localization.install(locale, snapshot);
+    }
+
     private void stopLocaleWatcher() {
+        if (languageSwitcher != null) {
+            languageSwitcher.close();
+            languageSwitcher = null;
+        }
         watchdog.unregister(LOCALE_WATCHDOG_ENTRY);
         if (localization != null) {
             localization.close();
@@ -702,9 +739,9 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
         }
         if (localization != null) {
             if (!previous.language().equals(next.language())) {
-                localization.selectLocale(next.language());
+                localization.reloadConfigured(next.language());
             } else if (cycleEveryService) {
-                localization.reload();
+                localization.reloadConfigured(next.language());
             }
         }
         if (previous.metrics() != next.metrics()) {

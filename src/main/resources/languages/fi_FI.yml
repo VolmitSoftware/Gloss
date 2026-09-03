@@ -1,5 +1,7 @@
 "locale": "fi_FI"
 "messages":
+  "command.help.debugdump": "Luo diagnostiikkaraportti ja lähetä se halutessasi"
+  "command.help.debugdump_upload": "Lähetä raportti mclo.gs-palveluun"
   "director":
     "help":
       "navigation":
@@ -523,3 +525,4 @@
   "command.import.legacy.done": "&8[&dGloss&8] &aVanhan datan siirto valmis: &f{migrated}&a siirretty, &f{absorbed}&a sulautettu, &f{overlaid}&a asetusavainta, &f{errors}&a virhettä."
   "command.import.config_unreadable": "&8[&dGloss&8] &cTiedostoa gloss.toml ei voitu ladata: &f{reason}"
   "command.reload.done": "&8[&dGloss&8] &aGloss-asetukset ja -palvelut ladattu uudelleen."
+  "command.help.language": "Valitse oma kielesi tai palvelimen oletuskieli"

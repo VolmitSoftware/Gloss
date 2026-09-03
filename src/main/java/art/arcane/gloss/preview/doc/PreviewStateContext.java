@@ -7,6 +7,7 @@ import art.arcane.gloss.expr.ExprException;
 import art.arcane.gloss.expr.ExprFunctions;
 import art.arcane.gloss.expr.ExprScope;
 import art.arcane.gloss.locale.GlossLocalization;
+import art.arcane.volmlib.util.localization.LanguageAudience;
 import art.arcane.gloss.locale.GlossMessages;
 import art.arcane.gloss.text.TextPipeline;
 import art.arcane.volmlib.util.localization.MessageArgs;
@@ -312,7 +313,8 @@ public final class PreviewStateContext implements ExprScope {
     }
     try {
       TextKey resolved = messageKey(key);
-      return GlossLocalization.globalText(resolved, langArguments(resolved, args));
+      return LanguageAudience.call(player == null ? null : player.getUniqueId(),
+          () -> GlossLocalization.globalText(resolved, langArguments(resolved, args)));
     } catch (IllegalArgumentException invalid) {
       throw new ExprException("lang: " + invalid.getMessage(), NO_POSITION);
     }

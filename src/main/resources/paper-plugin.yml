@@ -86,10 +86,18 @@ dependencies:
       required: false
       join-classpath: true
 permissions:
+  gloss.debugdump:
+    description: Allows creating and optionally uploading diagnostic reports.
+    default: op
+  gloss.language.self:
+    description: Allows choosing your own language for this plugin.
+    default: true
   gloss.*:
     description: Gives access to all Gloss permissions.
     default: op
     children:
+      gloss.debugdump: true
+      gloss.language.self: true
       gloss.admin: true
       gloss.holograms: true
       gloss.boards: true

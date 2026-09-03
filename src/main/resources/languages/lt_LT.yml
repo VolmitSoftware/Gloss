@@ -1,5 +1,7 @@
 "locale": "lt_LT"
 "messages":
+  "command.help.debugdump": "Sukurti diagnostikos ataskaitą ir pasirinktinai ją įkelti"
+  "command.help.debugdump_upload": "Įkelti ataskaitą į mclo.gs"
   "director":
     "help":
       "navigation":
@@ -523,3 +525,4 @@
   "command.import.legacy.done": "&8[&dGloss&8] &aSenų duomenų perkėlimas baigtas: perkelta &f{migrated}&a, įtraukta &f{absorbed}&a, konfigūracijos raktų &f{overlaid}&a, klaidų &f{errors}&a."
   "command.import.config_unreadable": "&8[&dGloss&8] &cNepavyko įkelti gloss.toml: &f{reason}"
   "command.reload.done": "&8[&dGloss&8] &aGloss konfigūracija ir paslaugos įkeltos iš naujo."
+  "command.help.language": "Pasirinkite savo arba numatytąją serverio kalbą"

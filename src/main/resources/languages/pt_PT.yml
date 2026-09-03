@@ -1,5 +1,7 @@
 "locale": "pt_PT"
 "messages":
+  "command.help.debugdump": "Criar um relatório de diagnóstico e carregá-lo opcionalmente"
+  "command.help.debugdump_upload": "Carregar o relatório para mclo.gs"
   "director":
     "help":
       "navigation":
@@ -523,3 +525,4 @@
   "command.import.legacy.done": "&8[&dGloss&8] &aMigração legada concluída: &f{migrated}&a migrados, &f{absorbed}&a absorvidos, &f{overlaid}&a chaves de configuração, &f{errors}&a erros."
   "command.import.config_unreadable": "&8[&dGloss&8] &cNão foi possível carregar o gloss.toml: &f{reason}"
   "command.reload.done": "&8[&dGloss&8] &aConfiguração e serviços do Gloss recarregados."
+  "command.help.language": "Escolhe o teu idioma ou o idioma predefinido do servidor"

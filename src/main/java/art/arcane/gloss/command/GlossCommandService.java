@@ -6,6 +6,7 @@ import art.arcane.gloss.locale.GlossLocalization;
 import art.arcane.gloss.locale.GlossMessages;
 import art.arcane.volmlib.util.director.DirectorEngineOptions;
 import art.arcane.volmlib.util.director.compat.BukkitDirectorContext;
+import art.arcane.volmlib.util.localization.LanguageAudience;
 import art.arcane.volmlib.util.director.compat.DirectorEngineFactory;
 import art.arcane.volmlib.util.director.context.DirectorContextRegistry;
 import art.arcane.volmlib.util.director.help.DirectorMiniMenu;
@@ -117,7 +118,7 @@ public final class GlossCommandService implements CommandExecutor, TabCompleter,
         this.theme = DirectorThemes.forProduct(DirectorProduct.GLOSS);
     }
 
-    static DirectorMiniMenu.Theme menuTheme() {
+    public static DirectorMiniMenu.Theme menuTheme() {
         return MENU_THEME;
     }
 
@@ -156,11 +157,21 @@ public final class GlossCommandService implements CommandExecutor, TabCompleter,
     }
 
     public boolean executeCommand(CommandSender sender, String commandName, String label, String[] args) {
+        if (ROOT_COMMAND.equals(commandName) && args.length > 0 && "language".equalsIgnoreCase(args[0])) {
+            plugin.languageSwitcher().command(sender, Arrays.copyOfRange(args, 1, args.length));
+            return true;
+        }
+        return LanguageAudience.call(sender instanceof Player player ? player.getUniqueId() : null,
+            () -> executeOwned(sender, commandName, label, args));
+    }
+
+    private boolean executeOwned(CommandSender sender, String commandName, String label, String[] args) {
         String[] routed = routedArgs(commandName, args, false);
         if (isScopedPositionalRoot(routed)) {
             routed = normalizePositionalArgs(routed);
         }
-        if (!hasBaseCommandAccess(sender)) {
+        if (!(routed.length > 0 && routed[0].equalsIgnoreCase("debugdump"))
+            && !hasBaseCommandAccess(sender)) {
             GlossLocalization.sendGlobal(sender, GlossMessages.COMMAND_NO_PERMISSION_USE);
             playFailureChime(sender);
             return true;
@@ -189,8 +200,26 @@ public final class GlossCommandService implements CommandExecutor, TabCompleter,
     }
 
     public List<String> tabComplete(CommandSender sender, String commandName, String[] args) {
+        args = args == null ? new String[0] : args;
+        if (ROOT_COMMAND.equals(commandName) && args.length > 1 && "language".equalsIgnoreCase(args[0])) {
+            return plugin.languageSwitcher().complete(sender, Arrays.copyOfRange(args, 1, args.length));
+        }
+        if (ROOT_COMMAND.equals(commandName) && args.length > 1 && "debugdump".equalsIgnoreCase(args[0])) {
+            return sender.hasPermission("gloss.debugdump") ? runDirectorTab(sender, commandName, args) : List.of();
+        }
         if (!hasBaseCommandAccess(sender)) {
-            return List.of();
+            List<String> suggestions = new ArrayList<>(2);
+            if (ROOT_COMMAND.equals(commandName) && args.length == 1 && sender != null) {
+                String prefix = args[0].toLowerCase(Locale.ROOT);
+                if ("language".startsWith(prefix) && sender.hasPermission("volmit.language.self")
+                        && sender.hasPermission("gloss.language.self")) {
+                    suggestions.add("language");
+                }
+                if ("debugdump".startsWith(prefix) && sender.hasPermission("gloss.debugdump")) {
+                    suggestions.add("debugdump");
+                }
+            }
+            return List.copyOf(suggestions);
         }
         String[] routed = routedArgs(commandName, args, true);
         boolean scoped = isScopedPositionalRoot(routed);

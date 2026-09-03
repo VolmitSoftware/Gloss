@@ -1,5 +1,7 @@
 "locale": "nl_NL"
 "messages":
+  "command.help.debugdump": "Maak een diagnostisch rapport en upload het desgewenst"
+  "command.help.debugdump_upload": "Upload het rapport naar mclo.gs"
   "director":
     "help":
       "navigation":
@@ -523,3 +525,4 @@
   "command.import.legacy.done": "&8[&dGloss&8] &aMigratie van verouderde gegevens voltooid: &f{migrated}&a gemigreerd, &f{absorbed}&a opgenomen, &f{overlaid}&a configuratiesleutels, &f{errors}&a fouten."
   "command.import.config_unreadable": "&8[&dGloss&8] &cgloss.toml kon niet worden geladen: &f{reason}"
   "command.reload.done": "&8[&dGloss&8] &aGloss-configuratie en -services opnieuw geladen."
+  "command.help.language": "Kies je taal of de standaardtaal van de server"

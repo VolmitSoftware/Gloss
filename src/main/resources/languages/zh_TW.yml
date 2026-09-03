@@ -1,5 +1,7 @@
 "locale": "zh_TW"
 "messages":
+  "command.help.debugdump": "建立診斷報告並選擇是否上傳"
+  "command.help.debugdump_upload": "將報告上傳至 mclo.gs"
   "director":
     "help":
       "navigation":
@@ -523,3 +525,4 @@
   "command.import.legacy.done": "&8[&dGloss&8] &a舊版遷移完成: 已遷移 &f{migrated}&a 個、併入 &f{absorbed}&a 個、&f{overlaid}&a 個設定鍵、&f{errors}&a 個錯誤。"
   "command.import.config_unreadable": "&8[&dGloss&8] &c無法載入 gloss.toml: &f{reason}"
   "command.reload.done": "&8[&dGloss&8] &a已重新載入 Gloss 設定與服務。"
+  "command.help.language": "選擇你的語言或伺服器預設語言"

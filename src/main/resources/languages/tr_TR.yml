@@ -1,5 +1,7 @@
 "locale": "tr_TR"
 "messages":
+  "command.help.debugdump": "Tanılama raporu oluştur ve isteğe bağlı olarak yükle"
+  "command.help.debugdump_upload": "Raporu mclo.gs üzerine yükle"
   "director":
     "help":
       "navigation":
@@ -523,3 +525,4 @@
   "command.import.legacy.done": "&8[&dGloss&8] &aEski veri taşıma tamamlandı: &f{migrated}&a taşındı, &f{absorbed}&a birleştirildi, &f{overlaid}&a yapılandırma anahtarı, &f{errors}&a hata."
   "command.import.config_unreadable": "&8[&dGloss&8] &cgloss.toml yüklenemedi: &f{reason}"
   "command.reload.done": "&8[&dGloss&8] &aGloss yapılandırması ve hizmetleri yeniden yüklendi."
+  "command.help.language": "Kendi dilinizi veya sunucunun varsayılan dilini seçin"

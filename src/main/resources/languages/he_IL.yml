@@ -1,5 +1,7 @@
 "locale": "he_IL"
 "messages":
+  "command.help.debugdump": "יצירת דוח אבחון והעלאתו לפי בחירה"
+  "command.help.debugdump_upload": "העלאת הדוח אל mclo.gs"
   "director":
     "help":
       "navigation":
@@ -523,3 +525,4 @@
   "command.import.legacy.done": "&8[&dGloss&8] &aההעברה מדור קודם הסתיימה: &f{migrated}&a הועברו, &f{absorbed}&a נקלטו, &f{overlaid}&a מפתחות תצורה, &f{errors}&a שגיאות."
   "command.import.config_unreadable": "&8[&dGloss&8] &cלא ניתן לטעון את gloss.toml: &f{reason}"
   "command.reload.done": "&8[&dGloss&8] &aהתצורה והשירותים של Gloss נטענו מחדש."
+  "command.help.language": "בחירת השפה שלך או שפת ברירת המחדל של השרת"

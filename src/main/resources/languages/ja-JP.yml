@@ -1,5 +1,7 @@
 "locale": "ja-JP"
 "messages":
+  "command.help.debugdump": "診断レポートを作成し、必要に応じてアップロードする"
+  "command.help.debugdump_upload": "レポートを mclo.gs にアップロードする"
   "director":
     "help":
       "navigation":
@@ -523,3 +525,4 @@
   "command.import.legacy.done": "&8[&dGloss&8] &aレガシー移行が完了しました: 移行 &f{migrated}&a 件、吸収 &f{absorbed}&a 件、設定キー &f{overlaid}&a 件、エラー &f{errors}&a 件。"
   "command.import.config_unreadable": "&8[&dGloss&8] &cgloss.toml を読み込めませんでした: &f{reason}"
   "command.reload.done": "&8[&dGloss&8] &aGlossの設定とサービスを再読み込みしました。"
+  "command.help.language": "自分の言語またはサーバーの既定言語を選択"

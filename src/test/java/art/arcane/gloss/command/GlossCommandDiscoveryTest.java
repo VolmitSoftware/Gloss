@@ -6,8 +6,10 @@ import art.arcane.volmlib.util.director.runtime.DirectorInvocation;
 import art.arcane.volmlib.util.director.runtime.DirectorRuntimeNode;
 import art.arcane.volmlib.util.director.runtime.DirectorRuntimeParameter;
 import art.arcane.volmlib.util.director.runtime.DirectorSender;
+import org.bukkit.entity.Player;
 import org.junit.Test;
 
+import java.lang.reflect.Proxy;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -18,6 +20,43 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 public class GlossCommandDiscoveryTest {
+  @Test
+  public void diagnosticCompletionUsesItsDedicatedPermissionWithoutBaseAccess() {
+    GlossCommandService service = new GlossCommandService(null);
+
+    assertEquals(List.of("debugdump"), service.tabComplete(
+        languagePlayer(Set.of("gloss.debugdump")), "gloss", new String[]{"debug"}));
+    assertEquals(List.of(), service.tabComplete(
+        languagePlayer(Set.of()), "gloss", new String[]{"debug"}));
+    assertEquals(List.of(), service.tabComplete(
+        languagePlayer(Set.of("gloss.debugdump")), "hologram", new String[]{"debug"}));
+  }
+
+  @Test
+  public void publicLanguageCompletionRequiresBothSelfPermissions() {
+    GlossCommandService service = new GlossCommandService(null);
+
+    assertEquals(List.of("language"), service.tabComplete(
+        languagePlayer(Set.of("volmit.language.self", "gloss.language.self")), "gloss", new String[]{"lang"}));
+    assertEquals(List.of(), service.tabComplete(
+        languagePlayer(Set.of("volmit.language.self")), "gloss", new String[]{"lang"}));
+    assertEquals(List.of(), service.tabComplete(
+        languagePlayer(Set.of("gloss.language.self")), "gloss", new String[]{"lang"}));
+  }
+
+  private static Player languagePlayer(Set<String> permissions) {
+    return (Player) Proxy.newProxyInstance(
+        GlossCommandDiscoveryTest.class.getClassLoader(),
+        new Class<?>[]{Player.class},
+        (proxy, method, arguments) -> switch (method.getName()) {
+          case "hasPermission" -> permissions.contains(String.valueOf(arguments[0]));
+          case "equals" -> proxy == arguments[0];
+          case "hashCode" -> System.identityHashCode(proxy);
+          case "toString" -> "LanguagePlayer";
+          default -> throw new UnsupportedOperationException(method.getName());
+        });
+  }
+
   @Test
   public void rootCompletionShowsTheCanonicalSingularWorkflow() {
     DirectorRuntimeEngine engine = engine();

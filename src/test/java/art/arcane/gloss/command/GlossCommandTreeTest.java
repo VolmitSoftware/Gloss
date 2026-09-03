@@ -19,6 +19,7 @@ import java.util.Set;
 
 class GlossCommandTreeTest {
     private static final List<List<String>> EXPECTED_PATHS = List.of(
+            List.of("debugdump"),
             List.of("hologram"),
             List.of("hologram", "create"),
             List.of("hologram", "delete"),
@@ -225,8 +226,8 @@ class GlossCommandTreeTest {
         DirectorMiniMenu.DirectorHelpPage submenu = DirectorMiniMenu.resolveHelp(
                 engine, List.of("panel")).orElseThrow();
 
-        Assertions.assertEquals(17, root.entries().size());
-        Assertions.assertEquals(19, DirectorMiniMenu.render(
+        Assertions.assertEquals(19, root.entries().size());
+        Assertions.assertEquals(21, DirectorMiniMenu.render(
                 root, GlossCommandService.menuTheme(), GlossLocalization.globalDirectorResolver()).size());
         Assertions.assertEquals(DirectorMiniMenu.MAX_ENTRIES_PER_PAGE, submenu.entries().size());
         Assertions.assertEquals(DirectorMiniMenu.MAX_ENTRIES_PER_PAGE + 3, DirectorMiniMenu.render(

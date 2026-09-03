@@ -58,6 +58,19 @@ public class CommandGloss {
         }
     }
 
+    @Director(name = "debugdump", sync = true, description = "Create and optionally upload a diagnostic report", descriptionKey = "command.help.debugdump")
+    public void debugdump(
+        @Param(name = "upload", defaultValue = "true", description = "Upload the report to mclo.gs", descriptionKey = "command.help.debugdump_upload") boolean upload,
+        @Param(name = "sender", contextual = true) CommandSender sender
+    ) {
+        plugin.debugDump().request(sender, upload);
+    }
+
+    @Director(name = "language", sync = true, descriptionKey = "command.help.language", description = "Choose your language or the server default")
+    public void language(@Param(name = "sender", contextual = true) CommandSender sender) {
+        plugin.languageSwitcher().open(sender);
+    }
+
     @Director(name = "status", descriptionKey = "command.help.status", description = "Show terse runtime counts")
     public void status(@Param(name = "sender", contextual = true) CommandSender sender) {
         if (GlossCommandMessages.denied(sender, "gloss.admin")) {

@@ -1,4 +1,5 @@
 import org.gradle.api.tasks.Copy
+import org.gradle.api.tasks.WriteProperties
 import org.gradle.api.tasks.compile.JavaCompile
 import org.gradle.jvm.toolchain.JavaLanguageVersion
 
@@ -19,6 +20,14 @@ String volmLibCoordinate = providers.gradleProperty('volmLibCoordinate')
     .get()
 String authTokenProperty = providers.gradleProperty('authToken').orNull
 String jitpackAuthToken = authTokenProperty ?: providers.gradleProperty('jitpackAuthToken').orNull
+List<String> languageLocales = fileTree('src/main/resources/languages') {
+    include('*.yml')
+}.files.collect { File source -> source.name.substring(0, source.name.length() - 4) }.sort()
+def languageSourceManifestTask = tasks.register('generateLanguageSourceManifest', WriteProperties) {
+    destinationFile.set(layout.buildDirectory.file('generated/language-source/gloss-language-source.properties'))
+    property('revision', '6d1e9299598d4ef166ae87b35e48393b0ef8d3c1')
+    property('locales', languageLocales.join(','))
+}
 
 def shadowJarTask = tasks.named('shadowJar', com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar)
 tasks.named('slimJar').get()
@@ -90,6 +99,8 @@ slimJar {
 }
 
 tasks.named('processResources').configure {
+    exclude('languages/**')
+    from(languageSourceManifestTask)
     def pluginProperties = [
         name      : rootProject.name,
         version   : project.version,
@@ -275,4 +286,25 @@ if (!JavaVersion.current().isCompatibleWith(JavaVersion.VERSION_25)) {
     System.err.println('=========================================================================================================')
     System.err.println()
     System.exit(69)
+}
+
+
+tasks.register('verifyLanguagePackaging') {
+    dependsOn(shadowJarTask)
+    inputs.file(shadowJarTask.flatMap { it.archiveFile })
+    doLast {
+        File artifact = shadowJarTask.get().archiveFile.get().asFile
+        new java.util.jar.JarFile(artifact).withCloseable { java.util.jar.JarFile archive ->
+            List<String> translations = archive.entries().findAll { java.util.jar.JarEntry entry ->
+                !entry.directory && entry.name.startsWith('languages/')
+            }.collect { java.util.jar.JarEntry entry -> entry.name }
+            if (!translations.isEmpty()) {
+                throw new GradleException("Runtime jar contains translation resources: ${translations}")
+            }
+        }
+    }
+}
+
+tasks.named('check').configure {
+    dependsOn(tasks.named('verifyLanguagePackaging'))
 }

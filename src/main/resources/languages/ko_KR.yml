@@ -1,5 +1,7 @@
 "locale": "ko_KR"
 "messages":
+  "command.help.debugdump": "진단 보고서를 생성하고 선택적으로 업로드"
+  "command.help.debugdump_upload": "보고서를 mclo.gs에 업로드"
   "director":
     "help":
       "navigation":
@@ -523,3 +525,4 @@
   "command.import.legacy.done": "&8[&dGloss&8] &a레거시 마이그레이션 완료: 마이그레이션 &f{migrated}&a개, 흡수 &f{absorbed}&a개, 설정 키 &f{overlaid}&a개, 오류 &f{errors}&a개."
   "command.import.config_unreadable": "&8[&dGloss&8] &cgloss.toml을 불러올 수 없습니다: &f{reason}"
   "command.reload.done": "&8[&dGloss&8] &aGloss 설정 및 서비스를 다시 불러왔습니다."
+  "command.help.language": "개인 언어 또는 서버 기본 언어 선택"

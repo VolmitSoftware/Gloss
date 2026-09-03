@@ -39,6 +39,13 @@ public record GlossConfig(
 ) {
     private static final GlossConfig DEFAULTS = defaults();
 
+    public GlossConfig withLanguage(String locale) {
+        return new GlossConfig(locale, metrics, splashScreen, holograms, particles, boards, tablist,
+            emoji, animations, chat, text, bubbles, indicators, drops, realDrops, motd, groups,
+            hotload, commands, menus, panels, previews, editorSync, debug, customItems, playerHeads, integration);
+    }
+
+
     public record Holograms(
         boolean enabled,
         double stackDistance,
