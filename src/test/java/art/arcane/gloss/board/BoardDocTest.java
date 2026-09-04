@@ -1,5 +1,7 @@
 package art.arcane.gloss.board;
 
+import art.arcane.gloss.condition.ShowCondition;
+
 import art.arcane.gloss.doc.DocumentEnvelope;
 import art.arcane.volmlib.util.bukkit.json.BukkitJson;
 import org.junit.jupiter.api.Test;
@@ -42,7 +44,7 @@ class BoardDocTest {
 
     @Test
     void gsonRoundTripPreservesAllFields() {
-        BoardDoc original = new BoardDoc(2, 12L,
+        BoardDoc original = new BoardDoc(2, 12L, ShowCondition.of("world.time > 12000"),
             new BoardDoc.Selection(10, "hasPermission('viewer', 'gloss.staff')"),
             new BoardDoc.Presentation("&d&lArena", List.of("one", "two"), true),
             List.of(new BoardDoc.Variant("low-health", 50, "viewer.health < 5",
@@ -63,9 +65,9 @@ class BoardDocTest {
     @Test
     void revisionBoundsAreEnforced() {
         assertThrows(IllegalArgumentException.class,
-            () -> new BoardDoc(2, 0L, null, null, null));
+            () -> new BoardDoc(2, 0L, ShowCondition.ALWAYS, null, null, null));
         assertThrows(IllegalArgumentException.class,
-            () -> new BoardDoc(2, DocumentEnvelope.MAX_SAFE_REVISION + 1L, null, null, null));
+            () -> new BoardDoc(2, DocumentEnvelope.MAX_SAFE_REVISION + 1L, ShowCondition.ALWAYS, null, null, null));
     }
 
     @Test
@@ -73,6 +75,7 @@ class BoardDocTest {
         BoardDoc doc = BoardDoc.parse("bare.json", "{\"schemaVersion\":2,\"revision\":1}");
 
         assertEquals(BoardDoc.Selection.NEVER, doc.select());
+        assertTrue(doc.show().isAlwaysVisible());
         assertEquals(BoardDoc.Presentation.EMPTY, doc.presentation());
         assertEquals(List.of(), doc.variants());
         assertFalse(doc.presentation().hideNumbers());
@@ -93,7 +96,7 @@ class BoardDocTest {
         BoardDoc.Variant duplicate = new BoardDoc.Variant("alert", 2, "true", presentation);
 
         assertThrows(IllegalArgumentException.class,
-            () -> new BoardDoc(2, 1L, BoardDoc.Selection.NEVER, presentation, List.of(first, duplicate)));
+            () -> new BoardDoc(2, 1L, ShowCondition.ALWAYS, BoardDoc.Selection.NEVER, presentation, List.of(first, duplicate)));
         assertThrows(IllegalArgumentException.class,
             () -> new BoardDoc.Variant("bad id", 1, "true", presentation));
     }
@@ -110,7 +113,7 @@ class BoardDocTest {
 
     @Test
     void withRevisionOnlyChangesTheRevision() {
-        BoardDoc doc = new BoardDoc(2, 1L, new BoardDoc.Selection(7, "true"),
+        BoardDoc doc = new BoardDoc(2, 1L, ShowCondition.ALWAYS, new BoardDoc.Selection(7, "true"),
             new BoardDoc.Presentation("t", List.of("x"), true), List.of());
 
         BoardDoc bumped = doc.withRevision(2L);

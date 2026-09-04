@@ -3,7 +3,10 @@ package art.arcane.gloss.drop;
 import art.arcane.gloss.Gloss;
 import art.arcane.gloss.GlossConfig;
 import art.arcane.gloss.api.ParticleLayer;
+import art.arcane.gloss.api.TemporaryHologram;
 import art.arcane.gloss.condition.BoundedConditionErrorCallback;
+import art.arcane.gloss.condition.GlossConditionScope;
+import art.arcane.gloss.condition.ShowCondition;
 import art.arcane.gloss.doc.DocumentDelta;
 import art.arcane.gloss.doc.DocumentRegistry;
 import art.arcane.gloss.doc.GlossDocument;
@@ -73,6 +76,7 @@ public final class DropNameService implements Listener {
     private final Map<String, String> renderedNames;
     private final Map<UUID, Item> trackedItems;
     private final Map<UUID, NativeParticleLabel> nativeParticleLabels;
+    private final Map<UUID, ConditionalLabel> conditionalLabels = new ConcurrentHashMap<>();
     private final Deque<LoadedChunk> rehydrateChunks;
     private volatile long renderedGeneration = -1L;
     private volatile long rehydrateGeneration;
@@ -139,6 +143,7 @@ public final class DropNameService implements Listener {
         }
         tracker.clear();
         trackedItems.clear();
+        clearConditionalLabels();
         nativeParticleLabels.clear();
         renderedNames.clear();
         realDrops.disable();
@@ -160,6 +165,7 @@ public final class DropNameService implements Listener {
         }
         tracker.clear();
         trackedItems.clear();
+        clearConditionalLabels();
         nativeParticleLabels.clear();
         renderedNames.clear();
         loadRealDropSettings();
@@ -336,7 +342,63 @@ public final class DropNameService implements Listener {
         }
         RealDropService.Label label = new RealDropService.Label(labelLines, renderedLines);
         trackNativeParticles(item, label, presentation);
-        realDrops.present(item, label, presentation);
+        if (!drops.show().isAlwaysVisible()) {
+            item.setCustomNameVisible(false);
+        }
+        realDrops.present(item, drops.show().isAlwaysVisible() ? label : RealDropService.Label.none(), presentation);
+        applyConditionalLabel(item, label, presentation);
+    }
+
+    private void applyConditionalLabel(Item item, RealDropService.Label label,
+                                       RealDropConditionPlan.Selection selection) {
+        UUID itemId = item.getUniqueId();
+        ShowCondition show = plugin.cfg().drops().show();
+        if (show.isAlwaysVisible()) {
+            removeConditionalLabel(itemId);
+            return;
+        }
+        item.setCustomNameVisible(false);
+        nativeParticleLabels.remove(itemId);
+        if (!show.isDynamic() || label.lines().isEmpty()) {
+            removeConditionalLabel(itemId);
+            return;
+        }
+        ConditionalLabel current = conditionalLabels.get(itemId);
+        if (current == null) {
+            TemporaryHologram hologram = plugin.holograms().createTemporary(
+                "drop-label-" + itemId, item.getLocation(), Long.MAX_VALUE);
+            current = new ConditionalLabel(hologram, selection);
+            conditionalLabels.put(itemId, current);
+            ConditionalLabel bound = current;
+            plugin.holograms().setViewerCondition(hologram,
+                viewer -> plugin.cfg().drops().show().matches(
+                    new GlossConditionScope(plugin, bound.selection.snapshot().viewerContext(viewer)))
+                    && (!bound.selection.style().config().enabled() || bound.selection.visibleTo(plugin, viewer)));
+            hologram.bindPosition(item, () -> {
+                if (!listening || !item.isValid() || item.isDead()) {
+                    forget(itemId);
+                    return null;
+                }
+                bound.selection = bound.selection.refreshSnapshot(item);
+                return item.getLocation().add(0.0D, bound.selection.style().config().labels().yOffset(), 0.0D);
+            });
+        }
+        current.selection = selection;
+        current.hologram.setRenderedLines(label.lines());
+        current.hologram.setParticleLayers(selection.style().config().particleLayers());
+    }
+
+    private void removeConditionalLabel(UUID itemId) {
+        ConditionalLabel label = conditionalLabels.remove(itemId);
+        if (label != null) {
+            label.hologram.destroy();
+        }
+    }
+
+    private void clearConditionalLabels() {
+        for (UUID itemId : conditionalLabels.keySet()) {
+            removeConditionalLabel(itemId);
+        }
     }
 
     private List<String> verticalLabelLines(List<DropNameFormatter.BundleContent> contents,
@@ -447,7 +509,7 @@ public final class DropNameService implements Listener {
     }
 
     private void loadRealDropSettings() {
-        if (plugin.cfg().realDrops().enabled() || plugin.cfg().particles().enabled()) {
+        if (plugin.cfg().drops().enabled() || plugin.cfg().realDrops().enabled() || plugin.cfg().particles().enabled()) {
             realDropDefaults.extractMissing();
         }
         realDropSettings.reload();
@@ -495,6 +557,7 @@ public final class DropNameService implements Listener {
             return;
         }
         cancelRehydration();
+        clearConditionalLabels();
         realDrops.disable();
         realDrops.enable();
         rehydrateLoadedChunks();
@@ -615,6 +678,9 @@ public final class DropNameService implements Listener {
             return;
         }
         GlossConfig.RealDrops config = state.selection().style().config();
+        if (!plugin.cfg().drops().show().isAlwaysVisible()) {
+            return;
+        }
         double range = Math.max(config.labels().viewRange(), plugin.cfg().particles().viewRange());
         Location origin = item.getLocation().clone().add(0.0D, config.labels().yOffset(), 0.0D);
         for (Entity nearby : item.getNearbyEntities(range, range, range)) {
@@ -707,6 +773,17 @@ public final class DropNameService implements Listener {
         tracker.forget(entityId);
         trackedItems.remove(entityId);
         nativeParticleLabels.remove(entityId);
+        removeConditionalLabel(entityId);
+    }
+
+    private static final class ConditionalLabel {
+        private final TemporaryHologram hologram;
+        private volatile RealDropConditionPlan.Selection selection;
+
+        private ConditionalLabel(TemporaryHologram hologram, RealDropConditionPlan.Selection selection) {
+            this.hologram = hologram;
+            this.selection = selection;
+        }
     }
 
     private record BundleFormats(String header, String entry, String more, int entryLimit) {

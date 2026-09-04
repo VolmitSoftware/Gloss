@@ -1,5 +1,6 @@
 package art.arcane.gloss.animation;
 
+import art.arcane.gloss.condition.ShowCondition;
 import art.arcane.gloss.doc.DocumentEnvelope;
 import art.arcane.gloss.doc.DocumentParsers;
 
@@ -7,13 +8,14 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
-public record AnimationDoc(int schemaVersion, long revision, String mode, long frameIntervalMs, List<String> frames) {
+public record AnimationDoc(int schemaVersion, long revision, String mode, long frameIntervalMs, List<String> frames, ShowCondition show) {
     public static final String KIND = "animations";
     public static final int CURRENT_SCHEMA_VERSION = 1;
     public static final long MIN_FRAME_INTERVAL_MS = 1L;
     public static final long MAX_FRAME_INTERVAL_MS = 60_000L;
 
     public AnimationDoc {
+        show = show == null ? ShowCondition.ALWAYS : show;
         DocumentEnvelope.requireSchemaVersion(KIND, schemaVersion, CURRENT_SCHEMA_VERSION);
         DocumentEnvelope.requireRevision(KIND, revision);
         mode = requireMode(mode);

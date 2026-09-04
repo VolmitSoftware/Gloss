@@ -418,6 +418,9 @@ public final class MenuSessionManager {
     String ownerName = handle == null ? null : handle.owner().name();
 
     ClickableComponent<?> component = snapshot.component();
+    if (!component.isInteractable()) {
+      return;
+    }
     if (!ApiEvents.fireClick(player, snapshot.menuId(), component.getId(), ownerName, trigger)) {
       return;
     }

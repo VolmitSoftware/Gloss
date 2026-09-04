@@ -120,7 +120,7 @@ public class PanelServiceTest {
         created.schemaVersion(), created.id(), created.uuid(), created.revision() + 1L,
         created.rootMenuId(),
         PanelTransform.at("example:world", WORLD_UUID, 12.0D, 72.0D, -6.0D, 45.0D),
-        created.follow(), created.visibility());
+        created.follow(), created.visibility(), created.show());
     Path boardFile = pluginData.toPath().resolve("panels/spawn/live.json");
     Files.writeString(boardFile, GSON.toJson(edited) + System.lineSeparator());
 

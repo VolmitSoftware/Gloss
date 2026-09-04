@@ -2,6 +2,7 @@ package art.arcane.gloss.drop;
 
 import art.arcane.gloss.GlossConfig;
 import art.arcane.gloss.api.ParticleLayer;
+import art.arcane.gloss.condition.ShowCondition;
 import art.arcane.gloss.doc.DocumentEnvelope;
 import art.arcane.gloss.doc.DocumentParsers;
 
@@ -20,7 +21,8 @@ public record RealDropSettingsDoc(
     long revision,
     Presentation presentation,
     List<Variant> variants,
-    Audience audience
+    Audience audience,
+    ShowCondition show
 ) {
     public static final String KIND = "real-drops";
     public static final String DEFAULT_ID = "default";
@@ -31,7 +33,8 @@ public record RealDropSettingsDoc(
         DocumentEnvelope.INITIAL_REVISION,
         null,
         null,
-        null);
+        null,
+        ShowCondition.ALWAYS);
 
     public RealDropSettingsDoc {
         DocumentEnvelope.requireSchemaVersion(KIND, schemaVersion, CURRENT_SCHEMA_VERSION);
@@ -41,6 +44,7 @@ public record RealDropSettingsDoc(
         variants = variants == null ? List.of() : List.copyOf(variants);
         validateVariants(variants);
         audience = audience == null ? new Audience(null) : audience;
+        show = show == null ? ShowCondition.ALWAYS : show;
     }
 
     public static RealDropSettingsDoc parse(String fileName, String raw) {

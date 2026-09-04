@@ -502,6 +502,10 @@ final class RealDropService {
             return;
         }
 
+        if (!state.selection.universalAudience()) {
+            state.selection = state.selection.refreshSnapshot(state.item);
+        }
+
         RealDropScriptPlan scriptPlan = state.selection.style().script();
         int elapsedTicks = Math.max(1, state.lastPollDelayTicks);
         state.animationAgeTicks += elapsedTicks;

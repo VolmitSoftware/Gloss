@@ -1,6 +1,7 @@
 package art.arcane.gloss.preview.doc;
 
 import art.arcane.gloss.api.ParticleLayer;
+import art.arcane.gloss.condition.ShowCondition;
 import com.google.gson.JsonElement;
 
 import java.util.List;
@@ -15,6 +16,7 @@ import java.util.Map;
  * the exact per-field rules.
  */
 final class PreviewDocument {
+  ShowCondition show = ShowCondition.ALWAYS;
   MatchDef match;
   List<VariantDef> variants;
   CardDef card;
@@ -41,6 +43,7 @@ final class VariantDef extends MatchDef {
 }
 
 final class CardDef {
+  ShowCondition show = ShowCondition.ALWAYS;
   // JsonElement rather than the brief sketch's plain Boolean: framed accepts a JSON boolean
   // constant OR an expression string, same as element `visible` below.
   JsonElement framed;
@@ -50,6 +53,7 @@ final class CardDef {
 }
 
 final class ElementDef {
+  ShowCondition show = ShowCondition.ALWAYS;
   String type;
   JsonElement x;
   JsonElement y;

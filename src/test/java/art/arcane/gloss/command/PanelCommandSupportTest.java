@@ -1,5 +1,6 @@
 package art.arcane.gloss.command;
 
+import art.arcane.gloss.condition.ShowCondition;
 import art.arcane.gloss.panel.PanelDefinition;
 import art.arcane.gloss.panel.PanelFollowMode;
 import art.arcane.gloss.panel.PanelFollowRotation;
@@ -103,7 +104,7 @@ public class PanelCommandSupportTest {
   @Test
   public void copyCreatesFreshIdentityAtTheInitialRevision() {
     PanelDefinition source = PanelDefinition.create("source", "main", transform(
-        1D, 2D, 3D, 4D, 5D, 6D, 1D));
+        1D, 2D, 3D, 4D, 5D, 6D, 1D)).withShow(ShowCondition.of("world.time < 12000"));
 
     PanelDefinition copy = PanelCommandSupport.copy(source, "folder/copy");
 
@@ -111,6 +112,7 @@ public class PanelCommandSupportTest {
     assertNotEquals(source.uuid(), copy.uuid());
     assertEquals(PanelDefinition.INITIAL_REVISION, copy.revision());
     assertEquals(source.transform(), copy.transform());
+    assertEquals(source.show(), copy.show());
   }
 
   private static PanelTransform transform(double x, double y, double z, double yaw,

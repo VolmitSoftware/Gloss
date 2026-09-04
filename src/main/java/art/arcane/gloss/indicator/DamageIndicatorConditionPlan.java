@@ -4,6 +4,7 @@ import art.arcane.gloss.condition.BoundedConditionErrorCallback;
 import art.arcane.gloss.condition.CompiledCondition;
 import art.arcane.gloss.condition.ConditionCompiler;
 import art.arcane.gloss.condition.ConditionSource;
+import art.arcane.gloss.condition.ShowCondition;
 import art.arcane.gloss.expr.ExprScope;
 
 import java.util.ArrayList;
@@ -19,28 +20,35 @@ final class DamageIndicatorConditionPlan {
     private final CompiledStyle damage;
     private final CompiledStyle healing;
     private final CompiledCondition audience;
+    private final ShowCondition show;
 
     private DamageIndicatorConditionPlan(CompiledStyle damage, CompiledStyle healing,
-                                         CompiledCondition audience) {
+                                         CompiledCondition audience, ShowCondition show) {
         this.damage = damage;
         this.healing = healing;
         this.audience = audience;
+        this.show = show;
     }
 
     static DamageIndicatorConditionPlan compile(DamageIndicatorSettingsDoc document) {
         return new DamageIndicatorConditionPlan(
             compileStyle("damage", document.damage()),
             compileStyle("healing", document.healing()),
-            compile("audience.when", document.audience().when()));
+            compile("audience.when", document.audience().when()), document.show());
     }
 
     DamageIndicatorSettingsDoc.IndicatorPresentation select(
         boolean damageEvent, ExprScope scope, BoundedConditionErrorCallback errors) {
-        return (damageEvent ? damage : healing).select(scope, errors);
+        return !show.isDynamic() && !show.isAlwaysVisible()
+            ? null : (damageEvent ? damage : healing).select(scope, errors);
     }
 
     boolean includesViewer(ExprScope scope, BoundedConditionErrorCallback errors) {
-        return audience.matches(scope, errors);
+        return show.matches(scope, errors) && audience.matches(scope, errors);
+    }
+
+    boolean dynamicShow() {
+        return show.isDynamic();
     }
 
     private static CompiledStyle compileStyle(String name, DamageIndicatorSettingsDoc.Style style) {

@@ -108,6 +108,9 @@ public final class PanelViewSession implements MenuNavigator {
     }
     definition = requiredDefinition;
     effectiveTransform = requiredTransform;
+    if (session != null) {
+      session.setParentShow(definition.show());
+    }
     if (transformChanged) {
       applyTransform();
     }
@@ -152,7 +155,7 @@ public final class PanelViewSession implements MenuNavigator {
   }
 
   public void dispatchClick(ClickableComponent<?> component, HoloClickTrigger trigger) {
-    if (closed || session == null || component == null || !component.isOpen()) {
+    if (closed || session == null || component == null || !component.isInteractable()) {
       return;
     }
     if (ApiEvents.fireClick(viewer, currentMenuId, component.getId(), null, trigger)) {
@@ -214,6 +217,7 @@ public final class PanelViewSession implements MenuNavigator {
         viewer,
         MenuSessionOptions.positioned(transform, this, (float) effectiveTransform.scale())
     );
+    replacement.setParentShow(definition.show());
     try {
       replacement.open();
     } catch (RuntimeException | Error failure) {

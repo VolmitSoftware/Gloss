@@ -1,5 +1,6 @@
 package art.arcane.gloss.panel;
 
+import art.arcane.gloss.condition.ShowCondition;
 import org.junit.Test;
 
 import java.nio.charset.StandardCharsets;
@@ -170,7 +171,7 @@ public class PanelSpatialIndexTest {
   public void invalidQueriesAndDuplicateIdentitySetsAreRejectedAtomically() {
     PanelDefinition original = board("original", WORLD_A, 0.0D, 0.0D);
     PanelDefinition duplicateId = new PanelDefinition(original.schemaVersion(), original.id(), UUID.randomUUID(),
-        original.revision(), original.rootMenuId(), original.transform(), original.follow(), original.visibility());
+        original.revision(), original.rootMenuId(), original.transform(), original.follow(), original.visibility(), original.show());
     PanelSpatialIndex index = new PanelSpatialIndex();
     index.replaceAll(List.of(original));
 
@@ -189,6 +190,6 @@ public class PanelSpatialIndexTest {
     return new PanelDefinition(PanelDefinition.CURRENT_SCHEMA_VERSION, id,
         UUID.nameUUIDFromBytes(id.getBytes(StandardCharsets.UTF_8)),
         PanelDefinition.INITIAL_REVISION, "menu", PanelTransform.at("example:world", worldUuid, x, 64.0D, z, 0.0D),
-        PanelFollow.none(), PanelVisibility.publicAccess());
+        PanelFollow.none(), PanelVisibility.publicAccess(), ShowCondition.ALWAYS);
   }
 }

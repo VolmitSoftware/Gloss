@@ -1,5 +1,6 @@
 package art.arcane.gloss.config.icon;
 
+import art.arcane.gloss.condition.ShowCondition;
 import art.arcane.gloss.config.MenuComponentData;
 import art.arcane.gloss.config.MenuDefinitionData;
 import art.arcane.gloss.exceptions.MenuIconException;
@@ -114,7 +115,7 @@ public class IconDisplayStyleTest {
 
   private static MenuSession session() {
     MenuDefinitionData data = new MenuDefinitionData(
-        new Vector(), false, false, 8D, false, false, List.<MenuComponentData>of(), List.of()
+        new Vector(), false, false, 8D, false, false, List.<MenuComponentData>of(), List.of(), ShowCondition.ALWAYS
     );
     data.setId("style-test");
     Player player = (Player) Proxy.newProxyInstance(

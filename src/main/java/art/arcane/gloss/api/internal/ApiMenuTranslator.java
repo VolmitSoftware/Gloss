@@ -1,5 +1,6 @@
 package art.arcane.gloss.api.internal;
 
+import art.arcane.gloss.condition.ShowCondition;
 import art.arcane.gloss.api.HoloClickHandler;
 import art.arcane.gloss.api.HoloComponent;
 import art.arcane.gloss.api.HoloIcon;
@@ -34,7 +35,7 @@ public final class ApiMenuTranslator {
     for (HoloComponent component : menu.components()) {
       components.add(new MenuComponentData(component.id(),
           new Vector(component.offsetX(), component.offsetY(), component.offsetZ()),
-          componentData(component)));
+          componentData(component), ShowCondition.ALWAYS));
     }
 
     MenuDefinitionData definition = new MenuDefinitionData(
@@ -45,7 +46,7 @@ public final class ApiMenuTranslator {
         menu.closeOnDeath(),
         menu.closeOnTeleport(),
         List.copyOf(components),
-        menu.particleLayers());
+        menu.particleLayers(), ShowCondition.ALWAYS);
     definition.setId(menu.id());
     return definition;
   }

@@ -1,5 +1,6 @@
 package art.arcane.gloss.menu.icon;
 
+import art.arcane.gloss.condition.ShowCondition;
 import art.arcane.gloss.api.HoloClickTrigger;
 import art.arcane.gloss.config.MenuComponentData;
 import art.arcane.gloss.config.MenuDefinitionData;
@@ -100,7 +101,8 @@ public class CharacterizationHitboxOrientationTest {
     AtomicReference<Location> playerAt = new AtomicReference<>(new Location(null, 0.0D, 65.0D, 0.0D));
     MenuDefinitionData data = new MenuDefinitionData(new Vector(0.0D, 0.0D, 2.0D), false, false,
         8.0D, false, false,
-        List.of(new MenuComponentData("probe", new Vector(), new ProbeClickableData())), List.of());
+        List.of(new MenuComponentData("probe", new Vector(), new ProbeClickableData(), ShowCondition.ALWAYS)),
+        List.of(), ShowCondition.ALWAYS);
     data.setId("hitbox-probe");
     Player player = player(playerAt);
     MenuSession session = new MenuSession(data, player, MenuSessionOptions.personal(data, player, null));

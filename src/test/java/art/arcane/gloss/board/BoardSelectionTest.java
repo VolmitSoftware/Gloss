@@ -1,6 +1,7 @@
 package art.arcane.gloss.board;
 
 import art.arcane.gloss.condition.BoundedConditionErrorCallback;
+import art.arcane.gloss.condition.ShowCondition;
 import art.arcane.gloss.expr.ExprFunctions;
 import art.arcane.gloss.expr.ExprScope;
 import org.junit.jupiter.api.Test;
@@ -13,6 +14,24 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
 class BoardSelectionTest {
+    @Test
+    void hiddenBoardsYieldToVisibleBoardsAndReturnWhenTheirConditionChanges() {
+        GlossBoardMeta main = board("main", 100, "true");
+        main.setShow(ShowCondition.of("world.name == 'survival' && world.time > 12000"));
+        GlossBoardMeta fallback = board("fallback", 1, "true");
+        List<GlossBoardMeta> boards = List.of(main, fallback);
+
+        assertEquals("fallback", BoardService.selectBoardId(boards,
+            new TestScope(Map.of("world.name", "survival", "world.time", 1000.0D), Set.of())));
+        assertEquals("main", BoardService.selectBoardId(boards,
+            new TestScope(Map.of("world.name", "survival", "world.time", 13000.0D), Set.of())));
+        assertEquals("fallback", BoardService.selectBoardId(boards,
+            new TestScope(Map.of("world.name", "lobby", "world.time", 13000.0D), Set.of())));
+        fallback.setShow(ShowCondition.NEVER);
+        main.setShow(ShowCondition.NEVER);
+        assertNull(BoardService.selectBoardId(boards, TestScope.EMPTY));
+    }
+
     @Test
     void highestPriorityMatchingBoardWinsRegardlessOfInputOrder() {
         List<GlossBoardMeta> boards = List.of(

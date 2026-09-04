@@ -3,6 +3,9 @@ package art.arcane.gloss.preview;
 import art.arcane.gloss.menu.CharacterizationSupport;
 import art.arcane.gloss.particle.ParticleText;
 import art.arcane.gloss.preview.doc.PreviewFakes;
+import art.arcane.gloss.preview.doc.CompiledPreviewDocument;
+import art.arcane.gloss.preview.doc.PreviewDocumentParser;
+import art.arcane.gloss.preview.doc.PreviewStateContext;
 import net.kyori.adventure.text.Component;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
@@ -20,6 +23,7 @@ import org.junit.Test;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -27,6 +31,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 
 /**
@@ -55,6 +60,115 @@ public class CharacterizationPreviewRefreshTest {
   @After
   public void restoreScaleFactors() throws ReflectiveOperationException {
     scaleFactors().remove(VIEWER);
+  }
+
+  @Test
+  public void hiddenDocumentRefreshesAndReturnsWithItsCard() throws ReflectiveOperationException {
+    CompiledPreviewDocument document = PreviewDocumentParser.parse("show.json", """
+        {"show":"burnTime > 0","card":{"title":"'Title'"},
+         "elements":[{"type":"label","text":"'Body'"}]}
+        """);
+    PreviewFakes.FurnaceFake furnace = PreviewFakes.furnace().burnTime(0).gameTime(0);
+    PreviewStateContext context = PreviewStateContext.forBlock(furnace.build(), null, Map.of());
+    ContainerPreview preview = preview(document.build(context), true);
+    trackVisibility(preview, document, context);
+    preview.open();
+    assertTrue(preview.tick());
+    assertEquals(0, rendered(preview).size());
+
+    furnace.burnTime(20).gameTime(1);
+    advanceRefresh(preview);
+    assertEquals(5, rendered(preview).size());
+    Object unchanged = rendered(preview);
+    furnace.burnTime(10).gameTime(2);
+    advanceRefresh(preview);
+    assertSame(unchanged, rendered(preview));
+
+    furnace.burnTime(0).gameTime(3);
+    advanceRefresh(preview);
+    assertEquals(0, rendered(preview).size());
+    furnace.burnTime(20).gameTime(4);
+    advanceRefresh(preview);
+    assertEquals(5, rendered(preview).size());
+    preview.close();
+  }
+
+  @Test
+  public void cardShowRebuildsChromeWithoutRemovingContent() throws ReflectiveOperationException {
+    CompiledPreviewDocument document = PreviewDocumentParser.parse("card-show.json", """
+        {"card":{"show":"burnTime > 0","title":"'Title'"},
+         "elements":[{"type":"label","text":"'Body'"}]}
+        """);
+    PreviewFakes.FurnaceFake furnace = PreviewFakes.furnace().burnTime(20).gameTime(0);
+    PreviewStateContext context = PreviewStateContext.forBlock(furnace.build(), null, Map.of());
+    ContainerPreview preview = preview(document.build(context), true);
+    trackVisibility(preview, document, context);
+    preview.open();
+    assertTrue(preview.tick());
+    assertEquals(5, rendered(preview).size());
+    furnace.burnTime(0).gameTime(1);
+    advanceRefresh(preview);
+    assertEquals(1, rendered(preview).size());
+    furnace.burnTime(20).gameTime(2);
+    advanceRefresh(preview);
+    assertEquals(5, rendered(preview).size());
+    preview.close();
+  }
+
+  @Test
+  public void lockedPreviewChecksShowEveryFourTicks() throws ReflectiveOperationException {
+    CompiledPreviewDocument document = PreviewDocumentParser.parse("locked-show.json", """
+        {"show":"burnTime > 0","elements":[{"type":"label","text":"'Locked'"}]}
+        """);
+    PreviewFakes.FurnaceFake furnace = PreviewFakes.furnace().burnTime(0).gameTime(0);
+    PreviewStateContext context = PreviewStateContext.forBlock(furnace.build(), null, Map.of());
+    ContainerPreview preview = preview(document.build(context), false);
+    trackVisibility(preview, document, context);
+    preview.open();
+    assertTrue(preview.tick());
+    furnace.burnTime(20).gameTime(1);
+    advanceRefresh(preview);
+    assertEquals(1, rendered(preview).size());
+    preview.close();
+  }
+
+  @Test
+  public void elementShowRemovesAndRestoresSlots() throws ReflectiveOperationException {
+    CompiledPreviewDocument document = PreviewDocumentParser.parse("slot-show.json", """
+        {"elements":[{"type":"slot","size":18,"index":0,"show":"burnTime > 0"}]}
+        """);
+    PreviewFakes.FurnaceFake furnace = PreviewFakes.furnace().burnTime(20).gameTime(0);
+    PreviewStateContext context = PreviewStateContext.forBlock(furnace.build(), null, Map.of());
+    ContainerPreview preview = preview(document.build(context), true);
+    trackVisibility(preview, document, context);
+    preview.open();
+    assertTrue(preview.tick());
+    assertEquals(1, rendered(preview).size());
+    furnace.burnTime(0).gameTime(1);
+    advanceRefresh(preview);
+    assertEquals(0, rendered(preview).size());
+    furnace.burnTime(20).gameTime(2);
+    advanceRefresh(preview);
+    assertEquals(1, rendered(preview).size());
+    preview.close();
+  }
+
+  private static void trackVisibility(ContainerPreview preview, CompiledPreviewDocument document,
+                                      PreviewStateContext context) throws ReflectiveOperationException {
+    Method method = ContainerPreview.class.getDeclaredMethod("trackVisibility", CompiledPreviewDocument.class,
+        PreviewStateContext.class);
+    method.setAccessible(true);
+    method.invoke(preview, document, context);
+  }
+
+  private static List<?> rendered(ContainerPreview preview) throws ReflectiveOperationException {
+    return (List<?>) CharacterizationSupport.getField(preview, "rendered");
+  }
+
+  private static void advanceRefresh(ContainerPreview preview) {
+    for (int tick = 0; tick < 4; tick++) {
+      assertTrue(preview.tick());
+    }
   }
 
   @Test

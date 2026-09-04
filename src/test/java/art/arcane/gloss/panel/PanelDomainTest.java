@@ -1,16 +1,43 @@
 package art.arcane.gloss.panel;
 
+import art.arcane.gloss.condition.ShowCondition;
+import com.google.gson.Gson;
+import com.google.gson.JsonObject;
 import org.junit.Test;
 
 import java.util.UUID;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotEquals;
+import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertThrows;
 
 public class PanelDomainTest {
   private static final UUID WORLD_UUID = UUID.fromString("00000000-0000-0000-0000-000000000101");
   private static final UUID PLAYER_UUID = UUID.fromString("00000000-0000-0000-0000-000000000201");
+
+  @Test
+  public void showDefaultsToTrueAndSurvivesPanelEdits() {
+    PanelDefinition panel = PanelDefinition.create("show-test", "root",
+        PanelTransform.at("example:world", WORLD_UUID, 1D, 2D, 3D, 0D));
+    Gson gson = new Gson();
+    JsonObject document = gson.toJsonTree(panel).getAsJsonObject();
+    document.remove("show");
+    assertSame(ShowCondition.ALWAYS, gson.fromJson(document, PanelDefinition.class).show());
+    document.add("show", null);
+    assertSame(ShowCondition.ALWAYS, gson.fromJson(document, PanelDefinition.class).show());
+
+    ShowCondition condition = ShowCondition.of("{{world.time < 12000}}");
+    PanelDefinition conditional = panel.withShow(condition);
+    PanelDefinition edited = conditional.withRootMenu("next")
+        .withTransform(panel.transform())
+        .withFollow(PanelFollow.none())
+        .withVisibility(PanelVisibility.hidden())
+        .withRevision(panel.revision() + 1L);
+    assertSame(condition, edited.show());
+    assertEquals(PanelVisibilityMode.HIDDEN, edited.visibility().mode());
+    assertEquals(edited, gson.fromJson(gson.toJson(edited), PanelDefinition.class));
+  }
 
   @Test
   public void nestedIdsAreCanonicalAndPortable() {
@@ -109,10 +136,10 @@ public class PanelDomainTest {
 
     assertThrows(IllegalArgumentException.class,
         () -> new PanelDefinition(0, "boards/main", first.uuid(), 1L, "Shop", transform,
-            PanelFollow.none(), PanelVisibility.publicAccess()));
+            PanelFollow.none(), PanelVisibility.publicAccess(), ShowCondition.ALWAYS));
     assertThrows(IllegalArgumentException.class,
         () -> new PanelDefinition(1, "boards/main", first.uuid(), 0L, "Shop", transform,
-            PanelFollow.none(), PanelVisibility.publicAccess()));
+            PanelFollow.none(), PanelVisibility.publicAccess(), ShowCondition.ALWAYS));
   }
 
   @Test
@@ -122,7 +149,7 @@ public class PanelDomainTest {
     assertEquals("unsupported panel schemaVersion: 0",
         assertThrows(IllegalArgumentException.class,
             () -> new PanelDefinition(0, "panels/main", UUID.randomUUID(), 1L, "Shop", transform,
-                PanelFollow.none(), PanelVisibility.publicAccess())).getMessage());
+                PanelFollow.none(), PanelVisibility.publicAccess(), ShowCondition.ALWAYS)).getMessage());
     assertEquals("hidden panels cannot declare interactPermission",
         assertThrows(IllegalArgumentException.class,
             () -> new PanelVisibility(PanelVisibilityMode.HIDDEN, null, "gloss.panel.use",

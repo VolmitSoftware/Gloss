@@ -487,35 +487,43 @@ public final class TablistService implements Listener {
         }
         TablistDoc doc = doc();
         if (doc.headerFooter().enabled()) {
-            TabOverride override = overrides.get(player.getUniqueId());
-            String header;
-            String footer;
-            if (override != null) {
+            applyHeaderFooter(player, heartbeatCycle);
+        }
+        applyListName(player, doc);
+    }
+
+    private void applyHeaderFooter(Player player, HeaderFooterHeartbeatCycle heartbeatCycle) {
+        GlossConditionScope scope = GlossConditionScope.viewer(plugin, player);
+        TablistRuntime runtime = activeRuntime;
+        TabOverride override = overrides.get(player.getUniqueId());
+        String header = "";
+        String footer = "";
+        if (override != null) {
+            if (runtime.headerFooterVisible(scope, conditionErrors)) {
                 header = renderSafe(player, override.header());
                 footer = renderSafe(player, override.footer());
-            } else {
-                GlossConditionScope scope = GlossConditionScope.viewer(plugin, player);
-                TablistRuntime.HeaderFooterProfile profile = activeRuntime.headerFooter(scope, conditionErrors);
+            }
+        } else {
+            TablistRuntime.HeaderFooterProfile profile = runtime.headerFooter(scope, conditionErrors);
+            if (profile != null) {
                 TablistDoc.HeaderFooterPresentation presentation = profile.presentation();
                 HeaderFooterMemo memo = headerFooterMemo(profile);
                 header = memo.header() == null ? renderSafe(player, presentation.header()) : memo.header();
                 footer = memo.footer() == null ? renderSafe(player, presentation.footer()) : memo.footer();
             }
-            HeaderFooter rendered = new HeaderFooter(header, footer);
-            UUID uuid = player.getUniqueId();
-            AppliedHeaderFooter previous = appliedHeaderFooters.get(uuid);
-            long nowNanos = System.nanoTime();
-            if (shouldSendHeaderFooter(rendered, previous, nowNanos, heartbeatCycle)) {
-                long nextHeartbeatNanos = nowNanos + HEADER_FOOTER_HEARTBEAT_NANOS;
-                if (previous == null) {
-                    nextHeartbeatNanos += initialHeartbeatOffsetNanos(uuid);
-                }
-                appliedHeaderFooters.put(uuid,
-                    new AppliedHeaderFooter(rendered, nextHeartbeatNanos));
-                player.setPlayerListHeaderFooter(header, footer);
-            }
         }
-        applyListName(player, doc);
+        HeaderFooter rendered = new HeaderFooter(header, footer);
+        UUID uuid = player.getUniqueId();
+        AppliedHeaderFooter previous = appliedHeaderFooters.get(uuid);
+        long nowNanos = System.nanoTime();
+        if (shouldSendHeaderFooter(rendered, previous, nowNanos, heartbeatCycle)) {
+            long nextHeartbeatNanos = nowNanos + HEADER_FOOTER_HEARTBEAT_NANOS;
+            if (previous == null) {
+                nextHeartbeatNanos += initialHeartbeatOffsetNanos(uuid);
+            }
+            appliedHeaderFooters.put(uuid, new AppliedHeaderFooter(rendered, nextHeartbeatNanos));
+            player.setPlayerListHeaderFooter(header, footer);
+        }
     }
 
     private void applyFastOverride(Player player) {
@@ -526,17 +534,7 @@ public final class TablistService implements Listener {
         if (override == null || !requiresFastRefresh(override)) {
             return;
         }
-        String header = renderSafe(player, override.header());
-        String footer = renderSafe(player, override.footer());
-        HeaderFooter rendered = new HeaderFooter(header, footer);
-        AppliedHeaderFooter previous = appliedHeaderFooters.get(player.getUniqueId());
-        if (previous != null && rendered.equals(previous.content())) {
-            return;
-        }
-        appliedHeaderFooters.put(player.getUniqueId(),
-            new AppliedHeaderFooter(rendered,
-                System.nanoTime() + HEADER_FOOTER_HEARTBEAT_NANOS));
-        player.setPlayerListHeaderFooter(header, footer);
+        applyHeaderFooter(player, null);
     }
 
     private void applyFastPlayer(Player player) {
@@ -563,9 +561,17 @@ public final class TablistService implements Listener {
             }
             return;
         }
-        String primaryGroup = plugin.groups().primaryGroupFor(player).orElse(null);
-        GlossConditionScope scope = GlossConditionScope.subject(plugin, player);
+        GlossConditionScope scope = GlossConditionScope.viewer(plugin, player);
         TablistRuntime.ListNameProfile profile = activeRuntime.listName(scope, conditionErrors);
+        if (profile == null) {
+            setFastNamePlayer(uuid, false);
+            listNameSources.remove(uuid);
+            appliedListNames.remove(uuid);
+            if (!player.getName().equals(player.getPlayerListName())) {
+                player.setPlayerListName(null);
+            }
+            return;
+        }
         String template = profile.presentation().format();
         if (template.isBlank()) {
             setFastNamePlayer(uuid, false);
@@ -575,6 +581,7 @@ public final class TablistService implements Listener {
             }
             return;
         }
+        String primaryGroup = plugin.groups().primaryGroupFor(player).orElse(null);
         String substituted = substituteTokens(template, player.getName(), primaryGroup);
         setFastNamePlayer(uuid, requiresFastNameRefresh(substituted, plugin.cfg().text().functions()));
         if ((TextPipeline.classify(substituted) & VIEWER_DEPENDENT) == 0) {

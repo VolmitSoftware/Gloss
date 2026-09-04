@@ -1,5 +1,7 @@
 package art.arcane.gloss.emoji;
 
+import art.arcane.gloss.condition.ShowCondition;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Predicate;
@@ -9,6 +11,7 @@ public final class EmojiReplacer {
     private final String[] tokens;
     private final String[] triggers;
     private final String[] values;
+    private final ShowCondition[] conditions;
     private final boolean hasAnyTrigger;
     private final long[] triggerFirstAscii;
     private final char[] triggerFirstExtended;
@@ -16,7 +19,7 @@ public final class EmojiReplacer {
     public EmojiReplacer(List<EmojiEntry> entries) {
         List<EmojiEntry> active = new ArrayList<>(entries.size());
         for (EmojiEntry entry : entries) {
-            if (entry.enabled()) {
+            if (entry.enabled() && (entry.show().isAlwaysVisible() || entry.show().isDynamic())) {
                 active.add(entry);
             }
         }
@@ -26,6 +29,7 @@ public final class EmojiReplacer {
         this.tokens = new String[count];
         this.triggers = new String[count];
         this.values = new String[count];
+        this.conditions = new ShowCondition[count];
         long[] ascii = new long[2];
         StringBuilder extended = new StringBuilder();
         boolean anyTrigger = false;
@@ -35,6 +39,7 @@ public final class EmojiReplacer {
             tokens[i] = entry.token();
             triggers[i] = entry.hasTrigger() ? entry.trigger() : null;
             values[i] = entry.emoji();
+            conditions[i] = entry.show();
             if (triggers[i] != null) {
                 anyTrigger = true;
                 char first = triggers[i].charAt(0);
@@ -55,6 +60,10 @@ public final class EmojiReplacer {
     }
 
     public String apply(String message, Predicate<String> idAllowed) {
+        return apply(message, idAllowed, ShowCondition::isAlwaysVisible);
+    }
+
+    public String apply(String message, Predicate<String> idAllowed, Predicate<ShowCondition> visible) {
         if (message == null || message.isEmpty() || ids.length == 0) {
             return message == null ? "" : message;
         }
@@ -70,7 +79,7 @@ public final class EmojiReplacer {
             if (!hasToken && !hasTrigger) {
                 continue;
             }
-            if (idAllowed != null && !idAllowed.test(ids[i])) {
+            if ((idAllowed != null && !idAllowed.test(ids[i])) || !visible.test(conditions[i])) {
                 continue;
             }
 

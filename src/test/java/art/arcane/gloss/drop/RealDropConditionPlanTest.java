@@ -50,7 +50,7 @@ class RealDropConditionPlanTest {
             1L,
             RealDropSettingsDoc.DEFAULTS.presentation(),
             List.of(variant("same", 1, "true"), variant("same", 2, "false")),
-            new RealDropSettingsDoc.Audience("true")));
+            new RealDropSettingsDoc.Audience("true"), null));
     }
 
     private static RealDropConditionPlan plan(List<RealDropSettingsDoc.Variant> variants) {
@@ -59,7 +59,7 @@ class RealDropConditionPlanTest {
             1L,
             RealDropSettingsDoc.DEFAULTS.presentation(),
             variants,
-            new RealDropSettingsDoc.Audience("true"));
+            new RealDropSettingsDoc.Audience("true"), null);
         return RealDropConditionPlan.compile(
             document, true, BoundedConditionErrorCallback.silent());
     }

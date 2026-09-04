@@ -108,6 +108,7 @@ final class CharacterizationHarness implements AutoCloseable {
         final Map<UUID, Integer> hideCalls = new ConcurrentHashMap<>();
         volatile boolean online = true;
         volatile Location location;
+        volatile Runnable locationRead = () -> {};
         Player proxy;
 
         PlayerHandle(String name) {
@@ -693,7 +694,10 @@ final class CharacterizationHarness implements AutoCloseable {
             case "isOnline" -> handle.online;
             case "isValid" -> handle.online;
             case "hasPermission" -> true;
-            case "getLocation" -> handle.location.clone();
+            case "getLocation" -> {
+                handle.locationRead.run();
+                yield handle.location.clone();
+            }
             case "getWorld" -> handle.location.getWorld();
             case "showEntity" -> {
                 UUID target = ((Entity) args[1]).getUniqueId();

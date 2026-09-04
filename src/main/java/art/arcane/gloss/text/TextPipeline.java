@@ -11,6 +11,7 @@ import org.bukkit.entity.Player;
 
 import java.util.Collection;
 import java.util.Map;
+import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -31,6 +32,7 @@ public final class TextPipeline implements TextRenderer {
 
     private static volatile long[] emojiTriggerAscii = new long[2];
     private static volatile char[] emojiTriggerExtended = new char[0];
+    private static volatile List<String> conditionalEmojiTokens = List.of();
 
     private final Gloss plugin;
     private final Map<String, Function<Player, String>> functions;
@@ -131,7 +133,7 @@ public final class TextPipeline implements TextRenderer {
         if (raw == null || raw.isEmpty()) {
             return false;
         }
-        if (containsExpression(raw)) {
+        if (containsExpression(raw) || hasConditionalEmoji(raw)) {
             return true;
         }
         return containsPair(raw, '%') || containsPair(raw, '|');
@@ -141,7 +143,7 @@ public final class TextPipeline implements TextRenderer {
         if (raw == null || raw.isEmpty()) {
             return false;
         }
-        if (containsPair(raw, '%') || TextExpressionRenderer.dependsOnViewer(raw)) {
+        if (containsPair(raw, '%') || TextExpressionRenderer.dependsOnViewer(raw) || hasConditionalEmoji(raw)) {
             return true;
         }
         int open = raw.indexOf('|');
@@ -182,11 +184,11 @@ public final class TextPipeline implements TextRenderer {
             }
             open = raw.indexOf('|', close + 1);
         }
-        return TextExpressionRenderer.dependsOnTime(raw);
+        return TextExpressionRenderer.dependsOnTime(raw) || hasConditionalEmoji(raw);
     }
 
     public static boolean timeDependent(String raw) {
-        return TextExpressionRenderer.dependsOnTime(raw);
+        return TextExpressionRenderer.dependsOnTime(raw) || hasConditionalEmoji(raw);
     }
 
     private static boolean containsPair(String raw, char marker) {
@@ -211,7 +213,7 @@ public final class TextPipeline implements TextRenderer {
 
         long[] triggerAscii = emojiTriggerAscii;
         char[] triggerExtended = emojiTriggerExtended;
-        int flags = 0;
+        int flags = hasConditionalEmoji(raw) ? HAS_FUNCTION | HAS_PLACEHOLDER : 0;
         int colons = 0;
         int length = raw.length();
         for (int i = 0; i < length; i++) {
@@ -238,6 +240,23 @@ public final class TextPipeline implements TextRenderer {
             }
         }
         return flags;
+    }
+
+    public static void publishConditionalEmojiTokens(Collection<String> tokens) {
+        conditionalEmojiTokens = List.copyOf(tokens);
+        EMOJI_GENERATION.incrementAndGet();
+    }
+
+    private static boolean hasConditionalEmoji(String raw) {
+        if (raw == null || raw.isEmpty()) {
+            return false;
+        }
+        for (String token : conditionalEmojiTokens) {
+            if (raw.contains(token)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public static void publishEmojiTriggers(Collection<String> triggers) {

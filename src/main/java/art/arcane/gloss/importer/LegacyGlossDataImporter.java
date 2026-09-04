@@ -1,5 +1,7 @@
 package art.arcane.gloss.importer;
 
+
+import art.arcane.gloss.condition.ShowCondition;
 import art.arcane.gloss.Gloss;
 import art.arcane.gloss.animation.AnimationDoc;
 import art.arcane.gloss.bubble.BubbleStyleDoc;
@@ -155,7 +157,7 @@ public final class LegacyGlossDataImporter {
         HologramDoc.Anchor anchor = new HologramDoc.Anchor(legacy.get("world").getAsString(), position);
         return new HologramDoc(HologramDoc.CURRENT_SCHEMA_VERSION, DocumentEnvelope.INITIAL_REVISION,
             anchor, stringList(legacy.getAsJsonArray("lines")), true,
-            HologramDoc.DEFAULT_SCALE, HologramDoc.DEFAULT_BILLBOARD, 0.0D, 0.0D, List.of());
+            HologramDoc.DEFAULT_SCALE, HologramDoc.DEFAULT_BILLBOARD, 0.0D, 0.0D, List.of(), ShowCondition.ALWAYS);
     }
 
     private static EmojiDoc convertEmoji(JsonObject legacy) {
@@ -165,7 +167,7 @@ public final class LegacyGlossDataImporter {
         }
         boolean enabled = !legacy.has("enabled") || legacy.get("enabled").getAsBoolean();
         return new EmojiDoc(EmojiDoc.CURRENT_SCHEMA_VERSION, DocumentEnvelope.INITIAL_REVISION,
-            trigger, legacy.get("emoji").getAsString(), enabled);
+            trigger, legacy.get("emoji").getAsString(), enabled, ShowCondition.ALWAYS);
     }
 
     private static AnimationDoc convertAnimation(JsonObject legacy) {
@@ -173,7 +175,7 @@ public final class LegacyGlossDataImporter {
         String mode = legacy.get("animation-type").getAsString().toLowerCase(Locale.ROOT);
         long frameIntervalMs = Math.round(1000.0D / framerate);
         return new AnimationDoc(AnimationDoc.CURRENT_SCHEMA_VERSION, DocumentEnvelope.INITIAL_REVISION,
-            mode, frameIntervalMs, stringList(legacy.getAsJsonArray("frames")));
+            mode, frameIntervalMs, stringList(legacy.getAsJsonArray("frames")), ShowCondition.ALWAYS);
     }
 
     private void overlayLegacyConfig(GlossConfigFile config, List<Entry> entries) {
@@ -283,7 +285,7 @@ public final class LegacyGlossDataImporter {
                 motion,
                 base.shimmer(),
                 base.select(),
-                base.particleLayers());
+                base.particleLayers(), base.show());
             writeDocument(styleFile.toPath(), updated);
             entries.add(Entry.of("config", LEGACY_CONFIG_FILE_NAME + ":chat-bubbles", Status.OVERLAID));
         } catch (IOException | RuntimeException failure) {
@@ -318,7 +320,7 @@ public final class LegacyGlossDataImporter {
             if (motdEntries.isEmpty()) {
                 return;
             }
-            MotdDoc updated = new MotdDoc(MotdDoc.CURRENT_SCHEMA_VERSION, DocumentEnvelope.INITIAL_REVISION,
+            MotdDoc updated = new MotdDoc(MotdDoc.CURRENT_SCHEMA_VERSION, DocumentEnvelope.INITIAL_REVISION, ShowCondition.ALWAYS,
                 motdEntries);
             writeDocument(motdFile.toPath(), updated);
             entries.add(Entry.of("config", LEGACY_CONFIG_FILE_NAME + ":motd.texts", Status.OVERLAID));

@@ -4,6 +4,7 @@ import art.arcane.gloss.condition.BoundedConditionErrorCallback;
 import art.arcane.gloss.condition.CompiledCondition;
 import art.arcane.gloss.condition.ConditionCompiler;
 import art.arcane.gloss.condition.ConditionSource;
+import art.arcane.gloss.condition.ShowCondition;
 import art.arcane.gloss.doc.DocumentEnvelope;
 import art.arcane.gloss.expr.ExprScope;
 import art.arcane.gloss.text.TextPipeline;
@@ -24,6 +25,7 @@ public final class GlossBoardMeta {
     private final Map<String, RenderPlan> renderPlans;
     private volatile String title;
     private volatile boolean hideNumbers;
+    private volatile ShowCondition show = ShowCondition.ALWAYS;
     private volatile BoardDoc.Selection selection;
     private volatile List<BoardDoc.Variant> variants;
     private volatile CompiledCondition selectionCondition;
@@ -52,6 +54,7 @@ public final class GlossBoardMeta {
             meta.addLine(line);
         }
         meta.setHideNumbers(presentation.hideNumbers());
+        meta.setShow(doc.show());
         meta.setSelection(doc.select().priority(), doc.select().when());
         meta.setVariants(doc.variants());
         meta.revision = doc.revision();
@@ -59,7 +62,7 @@ public final class GlossBoardMeta {
     }
 
     public BoardDoc toDoc(long revision) {
-        return new BoardDoc(BoardDoc.CURRENT_SCHEMA_VERSION, revision, selection, presentation(), variants);
+        return new BoardDoc(BoardDoc.CURRENT_SCHEMA_VERSION, revision, show, selection, presentation(), variants);
     }
 
     public String id() {
@@ -106,6 +109,14 @@ public final class GlossBoardMeta {
         return selection;
     }
 
+    public ShowCondition show() {
+        return show;
+    }
+
+    public void setShow(ShowCondition show) {
+        this.show = show == null ? ShowCondition.ALWAYS : show;
+    }
+
     public void setSelection(int priority, String when) {
         BoardDoc.Selection next = new BoardDoc.Selection(priority, when);
         selection = next;
@@ -123,7 +134,7 @@ public final class GlossBoardMeta {
     }
 
     boolean matchesSelection(ExprScope scope, BoundedConditionErrorCallback errors) {
-        return selectionCondition.matches(scope, errors);
+        return show.matches(scope, errors) && selectionCondition.matches(scope, errors);
     }
 
     ActiveProfile activeProfile(ExprScope scope, BoundedConditionErrorCallback errors) {

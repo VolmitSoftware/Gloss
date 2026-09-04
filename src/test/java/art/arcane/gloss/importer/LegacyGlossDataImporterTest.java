@@ -1,5 +1,7 @@
 package art.arcane.gloss.importer;
 
+
+import art.arcane.gloss.condition.ShowCondition;
 import art.arcane.gloss.animation.AnimationDoc;
 import art.arcane.gloss.bubble.BubbleStyleDoc;
 import art.arcane.gloss.config.GlossConfigFile;
@@ -84,7 +86,7 @@ class LegacyGlossDataImporterTest {
         HologramDoc expected = new HologramDoc(HologramDoc.CURRENT_SCHEMA_VERSION, DocumentEnvelope.INITIAL_REVISION,
             new HologramDoc.Anchor("world", new Vector(10.5D, 70.0D, -4.25D)),
             List.of("&aWelcome", "&7Second line"), true,
-            HologramDoc.DEFAULT_SCALE, HologramDoc.DEFAULT_BILLBOARD, 0.0D, 0.0D, List.of());
+            HologramDoc.DEFAULT_SCALE, HologramDoc.DEFAULT_BILLBOARD, 0.0D, 0.0D, List.of(), ShowCondition.ALWAYS);
         assertEquals(document(expected), read("holograms/spawn.json"));
         assertFalse(read("holograms/spawn.json").contains("\"id\""));
         assertEquals(LEGACY_HOLOGRAM, backedUp(result, "holograms/spawn.json"));
@@ -100,9 +102,9 @@ class LegacyGlossDataImporterTest {
 
         assertEquals(LegacyGlossDataImporter.Status.MIGRATED, status(result, "emoji/heart.json"));
         assertEquals(document(new EmojiDoc(EmojiDoc.CURRENT_SCHEMA_VERSION, DocumentEnvelope.INITIAL_REVISION,
-            "<3", "U+2764;", true)), read("emoji/heart.json"));
+            "<3", "U+2764;", true, ShowCondition.ALWAYS)), read("emoji/heart.json"));
         assertEquals(document(new EmojiDoc(EmojiDoc.CURRENT_SCHEMA_VERSION, DocumentEnvelope.INITIAL_REVISION,
-            "", "U+2708;", true)), read("emoji/airplane.json"));
+            "", "U+2708;", true, ShowCondition.ALWAYS)), read("emoji/airplane.json"));
     }
 
     @Test
@@ -114,13 +116,13 @@ class LegacyGlossDataImporterTest {
 
         assertEquals(LegacyGlossDataImporter.Status.MIGRATED, status(result, "animations/title.json"));
         AnimationDoc expected = new AnimationDoc(AnimationDoc.CURRENT_SCHEMA_VERSION,
-            DocumentEnvelope.INITIAL_REVISION, "ascend", 500L, List.of("&cOne", "&6Two"));
+            DocumentEnvelope.INITIAL_REVISION, "ascend", 500L, List.of("&cOne", "&6Two"), ShowCondition.ALWAYS);
         assertEquals(document(expected), read("animations/title.json"));
     }
 
     @Test
     void envelopePresentFilesSkipUntouched() throws IOException {
-        String modern = document(new EmojiDoc(EmojiDoc.CURRENT_SCHEMA_VERSION, 7L, ":)", "U+263A;", true));
+        String modern = document(new EmojiDoc(EmojiDoc.CURRENT_SCHEMA_VERSION, 7L, ":)", "U+263A;", true, ShowCondition.ALWAYS));
         write("emoji/modern.json", modern);
         GlossConfigFile config = loader.loadForBoot();
 
@@ -226,7 +228,7 @@ class LegacyGlossDataImporterTest {
     void customizedBubbleStyleBlocksConfigYmlBubbleContent() throws IOException {
         write("bubbles/default.json", document(new BubbleStyleDoc(BubbleStyleDoc.CURRENT_SCHEMA_VERSION, 5L,
             "&d", new Vector(0.0D, 2.0D, 0.0D), 48, 9000L, true, false,
-            BubbleStyleDoc.DEFAULTS.motion(), BubbleStyleDoc.DEFAULTS.shimmer(), null, List.of())));
+            BubbleStyleDoc.DEFAULTS.motion(), BubbleStyleDoc.DEFAULTS.shimmer(), null, List.of(), ShowCondition.ALWAYS)));
         write("config.yml", """
             chat-bubbles:
               message:
@@ -247,7 +249,7 @@ class LegacyGlossDataImporterTest {
 
     @Test
     void customizedMotdBlocksConfigYmlMotdTexts() throws IOException {
-        write("motd.json", document(new MotdDoc(MotdDoc.CURRENT_SCHEMA_VERSION, 4L,
+        write("motd.json", document(new MotdDoc(MotdDoc.CURRENT_SCHEMA_VERSION, 4L, ShowCondition.ALWAYS,
             List.of(new MotdDoc.MotdEntry(List.of("&bOperator MOTD"))))));
         write("config.yml", """
             motd:

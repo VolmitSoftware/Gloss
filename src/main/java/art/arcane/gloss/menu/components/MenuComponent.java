@@ -1,6 +1,8 @@
 package art.arcane.gloss.menu.components;
 
 import art.arcane.gloss.api.HoloIcon;
+import art.arcane.gloss.Gloss;
+import art.arcane.gloss.condition.ShowCondition;
 import art.arcane.gloss.api.internal.ApiMenuTranslator;
 import art.arcane.gloss.config.MenuComponentData;
 import art.arcane.gloss.config.components.ComponentData;
@@ -23,6 +25,8 @@ public abstract class MenuComponent<T extends ComponentData> {
   protected Location location;
   protected MenuIcon<?> currentIcon;
   private long observedGeometryRevision;
+  private final ShowCondition show;
+  private HoloIcon pendingIcon;
 
   protected boolean open = false;
 
@@ -32,6 +36,7 @@ public abstract class MenuComponent<T extends ComponentData> {
     this.id = data.id();
     this.offset = data.offset().clone();
     this.data = (T) data.data();
+    this.show = data.show();
 
     this.location = session.getTransform().componentPosition(offset);
   }
@@ -46,6 +51,20 @@ public abstract class MenuComponent<T extends ComponentData> {
 
   public boolean isOpen() {
     return open;
+  }
+
+  public boolean isInteractable() {
+    return open && session.isShown() && show.matches(Gloss.instance, session.getPlayer());
+  }
+
+  public void refreshVisibility(boolean parentShown) {
+    if (parentShown && show.matches(Gloss.instance, session.getPlayer())) {
+      if (!open) {
+        open();
+      }
+    } else if (open) {
+      hide();
+    }
   }
 
   public CollisionPlane particlePlane() {
@@ -87,9 +106,16 @@ public abstract class MenuComponent<T extends ComponentData> {
   protected abstract void onClose();
 
   public void open() {
-    if (open) return;
+    if (open || !session.isShown() || !show.matches(Gloss.instance, session.getPlayer())) {
+      return;
+    }
     applyTransform();
-    this.currentIcon = createIcon();
+    if (pendingIcon != null) {
+      this.currentIcon = MenuIcon.createIcon(session, location, ApiMenuTranslator.iconData(pendingIcon), this);
+      pendingIcon = null;
+    } else if (currentIcon == null) {
+      this.currentIcon = createIcon();
+    }
     this.currentIcon.spawn();
     this.observedGeometryRevision = currentIcon.geometryRevision();
     onOpen();
@@ -97,15 +123,19 @@ public abstract class MenuComponent<T extends ComponentData> {
   }
 
   public void close() {
-    open = false;
-    if (this.currentIcon != null)
-      this.currentIcon.remove();
-    onClose();
+    hide();
+    currentIcon = null;
+    pendingIcon = null;
   }
 
   public boolean applyIcon(HoloIcon icon) {
-    if (!open || currentIcon == null)
+    if (!open) {
+      pendingIcon = icon;
+      return true;
+    }
+    if (currentIcon == null) {
       return false;
+    }
 
     if (icon instanceof HoloIcon.Text text
         && currentIcon instanceof TextMenuIcon textIcon
@@ -140,6 +170,14 @@ public abstract class MenuComponent<T extends ComponentData> {
     this.location = session.getTransform().componentPosition(offset);
     if (this.currentIcon != null)
       this.currentIcon.applyTransform(location);
+  }
+
+  private void hide() {
+    open = false;
+    if (currentIcon != null) {
+      currentIcon.remove();
+    }
+    onClose();
   }
 
   private void refreshDynamicGeometry() {

@@ -62,7 +62,7 @@ public class PanelEditSessionTest {
     PanelEditSession session = new PanelEditSession(base, base.transform());
     PanelDefinition changedIdentity = new PanelDefinition(
         base.schemaVersion(), "other", base.uuid(), base.revision(), base.rootMenuId(),
-        base.transform(), base.follow(), base.visibility());
+        base.transform(), base.follow(), base.visibility(), base.show());
 
     assertThrows(IllegalArgumentException.class,
         () -> session.stage(session.snapshot(), changedIdentity, base.transform()));

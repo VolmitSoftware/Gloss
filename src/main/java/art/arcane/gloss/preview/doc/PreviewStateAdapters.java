@@ -76,7 +76,7 @@ final class PreviewStateAdapters {
 
   static Map<String, Set<String>> catalog() {
     Map<String, Set<String>> catalog = new LinkedHashMap<>();
-    catalog.put(GROUP_UNIVERSAL, names("time", "blockType", "customName"));
+    catalog.put(GROUP_UNIVERSAL, names("time", "world.name", "world.time", "blockType", "customName"));
     catalog.put(CATEGORY_INVENTORY, names("inventory.size", "inventory.occupied"));
     catalog.put(CATEGORY_FURNACE, names(
         "cookTime", "cookTimeTotal", "burnTime", "fuelSeconds", "bankedXp", "lit", "surge.active", "surge.gain"));

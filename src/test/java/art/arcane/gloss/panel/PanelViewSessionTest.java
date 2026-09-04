@@ -1,5 +1,6 @@
 package art.arcane.gloss.panel;
 
+import art.arcane.gloss.condition.ShowCondition;
 import art.arcane.gloss.config.MenuComponentData;
 import art.arcane.gloss.config.MenuDefinitionData;
 import art.arcane.gloss.config.components.ComponentData;
@@ -50,6 +51,36 @@ public class PanelViewSessionTest {
   @AfterClass
   public static void restoreServer() throws ReflectiveOperationException {
     serverField().set(null, previousServer);
+  }
+
+  @Test
+  public void showChangesPreserveTheCurrentMenuAndNavigationHistory() {
+    PanelDefinition initial = PanelDefinition.create("board", "root", transform(1D))
+        .withShow(ShowCondition.of("false"));
+    PanelViewSession view = view(initial, new AtomicInteger());
+
+    assertEquals(NavigationResult.APPLIED, view.open());
+    assertFalse(view.session().isShown());
+    assertEquals(NavigationResult.APPLIED, view.navigate(push("alpha")));
+    MenuSession hiddenSession = view.session();
+    PanelDefinition visible = initial.withShow(ShowCondition.ALWAYS);
+
+    assertEquals(NavigationResult.APPLIED, view.update(visible, visible.transform()));
+    view.tick();
+    assertSame(hiddenSession, view.session());
+    assertEquals("alpha", view.currentMenuId());
+    assertTrue(view.session().isShown());
+
+    assertEquals(NavigationResult.APPLIED, view.update(initial, initial.transform()));
+    view.tick();
+    assertSame(hiddenSession, view.session());
+    assertFalse(view.session().isShown());
+
+    view.update(visible, visible.transform());
+    view.tick();
+    assertEquals(NavigationResult.APPLIED, view.navigate(request(NavigationMode.BACK)));
+    assertEquals("root", view.currentMenuId());
+    view.close();
   }
 
   @Test
@@ -258,7 +289,7 @@ public class PanelViewSessionTest {
 
   private static MenuDefinitionData menu(String id) {
     MenuDefinitionData menu = new MenuDefinitionData(
-        new Vector(), false, false, 8D, false, false, List.<MenuComponentData>of(), List.of());
+        new Vector(), false, false, 8D, false, false, List.<MenuComponentData>of(), List.of(), ShowCondition.ALWAYS);
     menu.setId(id);
     return menu;
   }
@@ -275,8 +306,8 @@ public class PanelViewSessionTest {
         8D,
         false,
         false,
-        List.of(new MenuComponentData("probe", new Vector(), componentData)),
-        List.of()
+        List.of(new MenuComponentData("probe", new Vector(), componentData, ShowCondition.ALWAYS)),
+        List.of(), ShowCondition.ALWAYS
     );
     menu.setId(id);
     return menu;

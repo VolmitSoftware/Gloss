@@ -6,6 +6,7 @@ import art.arcane.gloss.preview.doc.PreviewDocumentRegistry;
 import art.arcane.gloss.preview.doc.PreviewFakes;
 import org.bukkit.GameMode;
 import org.bukkit.Material;
+import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
@@ -116,10 +117,12 @@ public class CharacterizationPadlockCardTest {
 
   /** A chest block that also answers {@code getLocation()}, which {@code locked(..)} anchors on. */
   private static Block chestBlock() {
+    World world = PreviewFakes.chest(27).world();
     return (Block) CharacterizationSupport.proxy(new Class<?>[]{Block.class},
         (proxy, method, args) -> switch (method.getName()) {
           case "getType" -> Material.CHEST;
-          case "getLocation" -> new org.bukkit.Location(null, 10.0D, 64.0D, 10.0D);
+          case "getWorld" -> world;
+          case "getLocation" -> new org.bukkit.Location(world, 10.0D, 64.0D, 10.0D);
           case "getX" -> 10;
           case "getY" -> 64;
           case "getZ" -> 10;

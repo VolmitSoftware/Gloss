@@ -7,6 +7,7 @@ import art.arcane.gloss.condition.CompiledCondition;
 import art.arcane.gloss.condition.ConditionCompiler;
 import art.arcane.gloss.condition.ConditionSource;
 import art.arcane.gloss.condition.GlossConditionScope;
+import art.arcane.gloss.condition.ShowCondition;
 import art.arcane.gloss.expr.ExprScope;
 import org.bukkit.entity.Item;
 import org.bukkit.entity.Player;
@@ -23,17 +24,21 @@ final class RealDropConditionPlan {
     private final ResolvedStyle base;
     private final List<ConditionalStyle> variants;
     private final CompiledCondition audience;
+    private final ShowCondition show;
     private final boolean universalAudience;
     private final boolean emptyAudience;
     private final BoundedConditionErrorCallback errors;
 
     private RealDropConditionPlan(ResolvedStyle base, List<ConditionalStyle> variants,
-                                  CompiledCondition audience, BoundedConditionErrorCallback errors) {
+                                  CompiledCondition audience, ShowCondition show,
+                                  BoundedConditionErrorCallback errors) {
         this.base = base;
         this.variants = variants;
         this.audience = audience;
-        this.universalAudience = audience.source().expression().equals("true");
-        this.emptyAudience = audience.source().expression().equals("false");
+        this.show = show;
+        this.universalAudience = show.isAlwaysVisible() && audience.source().expression().equals("true");
+        this.emptyAudience = !show.isDynamic() && !show.isAlwaysVisible()
+            || audience.source().expression().equals("false");
         this.errors = errors;
     }
 
@@ -54,12 +59,12 @@ final class RealDropConditionPlan {
             .thenComparing(ConditionalStyle::id));
         CompiledCondition audience = ConditionCompiler.compile(new ConditionSource(
             "real-drops/default.json $.audience.when", document.audience().when()));
-        return new RealDropConditionPlan(base, List.copyOf(variants), audience, errors);
+        return new RealDropConditionPlan(base, List.copyOf(variants), audience, document.show(), errors);
     }
 
     Selection select(Gloss plugin, Item item, RealDropConditionSnapshot snapshot) {
         ExprScope scope = new GlossConditionScope(plugin, snapshot.itemContext(item));
-        return new Selection(select(scope), audience, universalAudience, emptyAudience, snapshot, errors);
+        return new Selection(select(scope), audience, universalAudience, emptyAudience, snapshot, errors, show);
     }
 
     ResolvedStyle select(ExprScope scope) {
@@ -83,7 +88,7 @@ final class RealDropConditionPlan {
 
     record Selection(ResolvedStyle style, CompiledCondition audience, boolean universalAudience,
                      boolean emptyAudience, RealDropConditionSnapshot snapshot,
-                     BoundedConditionErrorCallback errors) {
+                     BoundedConditionErrorCallback errors, ShowCondition show) {
 
         Selection {
             Objects.requireNonNull(style);
@@ -99,8 +104,13 @@ final class RealDropConditionPlan {
             if (emptyAudience) {
                 return false;
             }
-            return audience.matches(
-                new GlossConditionScope(plugin, snapshot.viewerContext(viewer)), errors);
+            ExprScope scope = new GlossConditionScope(plugin, snapshot.viewerContext(viewer));
+            return show.matches(scope, errors) && audience.matches(scope, errors);
+        }
+
+        Selection refreshSnapshot(Item item) {
+            return new Selection(style, audience, universalAudience, emptyAudience,
+                RealDropConditionSnapshot.capture(item, (String) snapshot.values().get("event.type")), errors, show);
         }
     }
 

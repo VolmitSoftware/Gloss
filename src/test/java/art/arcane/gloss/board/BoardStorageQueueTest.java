@@ -1,5 +1,7 @@
 package art.arcane.gloss.board;
 
+import art.arcane.gloss.condition.ShowCondition;
+
 import art.arcane.gloss.doc.DocumentReviser;
 import art.arcane.gloss.doc.DocumentStore;
 import art.arcane.gloss.doc.ExecutorStorageTaskRunner;
@@ -76,7 +78,7 @@ class BoardStorageQueueTest {
     }
 
     private static BoardDoc document(long revision, String title) {
-        return new BoardDoc(BoardDoc.CURRENT_SCHEMA_VERSION, revision, BoardDoc.Selection.NEVER,
+        return new BoardDoc(BoardDoc.CURRENT_SCHEMA_VERSION, revision, ShowCondition.ALWAYS, BoardDoc.Selection.NEVER,
             new BoardDoc.Presentation(title, List.of(), false), List.of());
     }
 

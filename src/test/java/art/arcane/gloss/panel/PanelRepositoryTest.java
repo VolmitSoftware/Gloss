@@ -1,5 +1,6 @@
 package art.arcane.gloss.panel;
 
+import art.arcane.gloss.condition.ShowCondition;
 import art.arcane.gloss.doc.DocumentRevisionConflictException;
 import art.arcane.gloss.persistence.GlossProjectTransaction;
 import org.junit.Assume;
@@ -248,13 +249,13 @@ public class PanelRepositoryTest {
 
     assertThrows(IllegalArgumentException.class, () -> repository.update(created.id(), created.revision(), board ->
         new PanelDefinition(board.schemaVersion(), "spawn/other", board.uuid(), board.revision(), board.rootMenuId(),
-            board.transform(), board.follow(), board.visibility())));
+            board.transform(), board.follow(), board.visibility(), board.show())));
     assertThrows(IllegalArgumentException.class, () -> repository.update(created.id(), created.revision(), board ->
         new PanelDefinition(board.schemaVersion(), board.id(), UUID.randomUUID(), board.revision(), board.rootMenuId(),
-            board.transform(), board.follow(), board.visibility())));
+            board.transform(), board.follow(), board.visibility(), board.show())));
     assertThrows(IllegalArgumentException.class, () -> repository.update(created.id(), created.revision(), board ->
         new PanelDefinition(board.schemaVersion(), board.id(), board.uuid(), board.revision() + 1L, board.rootMenuId(),
-            board.transform(), board.follow(), board.visibility())));
+            board.transform(), board.follow(), board.visibility(), board.show())));
     assertEquals(created, repository.get(created.id()).orElseThrow());
   }
 
@@ -308,7 +309,8 @@ public class PanelRepositoryTest {
     File pluginData = temp.newFolder("rename");
     PanelRepository repository = new PanelRepository(pluginData);
     repository.load();
-    PanelDefinition created = repository.create(board("spawn/main", "example:world"));
+    PanelDefinition created = repository.create(board("spawn/main", "example:world")
+        .withShow(ShowCondition.of("world.time < 12000")));
 
     PanelDefinition renamed = repository.rename(created.id(), "lobbies/primary", created.revision());
 
@@ -317,6 +319,7 @@ public class PanelRepositoryTest {
     assertEquals(created.revision() + 1L, renamed.revision());
     assertEquals(created.rootMenuId(), renamed.rootMenuId());
     assertEquals(created.transform(), renamed.transform());
+    assertEquals(created.show(), renamed.show());
     assertFalse(repository.get(created.id()).isPresent());
     assertEquals(renamed, repository.get(renamed.id()).orElseThrow());
     assertFalse(repository.directory().resolve("spawn/main.json").toFile().exists());

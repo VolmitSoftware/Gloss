@@ -105,7 +105,8 @@ public final class PreviewStateContext implements ExprScope {
       Player player,
       Inventory inventory,
       String category,
-      Map<String, Object> vars
+      Map<String, Object> vars,
+      World world
   ) {
     this.block = block;
     this.entity = entity;
@@ -116,7 +117,7 @@ public final class PreviewStateContext implements ExprScope {
     this.flow = PreviewStateAdapters.tracksTimeFlow(category)
         ? new TimeFlowTracker(PreviewStateAdapters.countsDown(category))
         : null;
-    this.world = block != null ? block.getWorld() : entity != null ? entity.getWorld() : null;
+    this.world = world;
     Gloss active = Gloss.instance;
     TextPipeline text = active == null ? null : active.text();
     this.standardScope = text == null ? null : text.expressionScope(player);
@@ -125,29 +126,35 @@ public final class PreviewStateContext implements ExprScope {
   public static PreviewStateContext forBlock(Block block, Player player, Map<String, Object> vars) {
     Objects.requireNonNull(block, "block");
     PreviewStateAdapters.Selection selection = PreviewStateAdapters.selectBlock(block, player);
-    return new PreviewStateContext(block, null, player, selection.inventory(), selection.category(), vars);
+    return new PreviewStateContext(block, null, player, selection.inventory(), selection.category(), vars, block.getWorld());
   }
 
   public static PreviewStateContext forEntity(Entity entity, Player player, Map<String, Object> vars) {
     Objects.requireNonNull(entity, "entity");
     PreviewStateAdapters.Selection selection = PreviewStateAdapters.selectEntity(entity);
-    return new PreviewStateContext(null, entity, player, selection.inventory(), selection.category(), vars);
+    return new PreviewStateContext(null, entity, player, selection.inventory(), selection.category(), vars, entity.getWorld());
   }
 
   /** Inventory-only target, e.g. a viewer's ender chest. */
   public static PreviewStateContext forInventory(Inventory inventory, Player player, Map<String, Object> vars) {
     Objects.requireNonNull(inventory, "inventory");
-    return new PreviewStateContext(null, null, player, inventory, PreviewStateAdapters.CATEGORY_INVENTORY, vars);
+    return new PreviewStateContext(null, null, player, inventory, PreviewStateAdapters.CATEGORY_INVENTORY, vars, null);
   }
 
   /** Target-less viewerless context for document validation and console diagnostics. */
   public static PreviewStateContext statics(Map<String, Object> vars) {
-    return new PreviewStateContext(null, null, null, null, PreviewStateAdapters.CATEGORY_STATIC, vars);
+    return new PreviewStateContext(null, null, null, null, PreviewStateAdapters.CATEGORY_STATIC, vars, null);
   }
 
   public static PreviewStateContext forViewer(Player player, Map<String, Object> vars) {
     Objects.requireNonNull(player, "player");
-    return new PreviewStateContext(null, null, player, null, PreviewStateAdapters.CATEGORY_STATIC, vars);
+    return new PreviewStateContext(null, null, player, null, PreviewStateAdapters.CATEGORY_STATIC, vars, null);
+  }
+
+  public static PreviewStateContext forWorld(World world, Player player, Inventory inventory, Map<String, Object> vars) {
+    return new PreviewStateContext(null, null, player, inventory,
+        inventory == null ? PreviewStateAdapters.CATEGORY_STATIC : PreviewStateAdapters.CATEGORY_INVENTORY,
+        vars, Objects.requireNonNull(world, "world"));
   }
 
   /** The previewed inventory, or null when the target has none; Slot elements require non-null. */
@@ -202,6 +209,8 @@ public final class PreviewStateContext implements ExprScope {
       return cached.values();
     }
     Map<String, Object> values = new HashMap<>(SNAPSHOT_CAPACITY);
+    values.put("world.name", world == null ? "" : world.getName());
+    values.put("world.time", world == null ? 0.0D : (double) world.getTime());
     PreviewStateAdapters.sample(category, block, entity, inventory, flow, tick, values);
     List<PreviewStateProvider> providers = PreviewStateProviders.all();
     if (!providers.isEmpty()) {

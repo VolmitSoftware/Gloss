@@ -2,6 +2,7 @@ package art.arcane.gloss.board;
 
 import art.arcane.gloss.condition.ConditionCompiler;
 import art.arcane.gloss.condition.ConditionSource;
+import art.arcane.gloss.condition.ShowCondition;
 import art.arcane.gloss.doc.DocumentEnvelope;
 import art.arcane.gloss.doc.DocumentParsers;
 
@@ -10,7 +11,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-public record BoardDoc(int schemaVersion, long revision, Selection select, Presentation presentation,
+public record BoardDoc(int schemaVersion, long revision, ShowCondition show, Selection select, Presentation presentation,
                        List<Variant> variants) {
     public static final String KIND = "boards";
     public static final int CURRENT_SCHEMA_VERSION = 2;
@@ -18,13 +19,14 @@ public record BoardDoc(int schemaVersion, long revision, Selection select, Prese
     public BoardDoc {
         DocumentEnvelope.requireSchemaVersion(KIND, schemaVersion, CURRENT_SCHEMA_VERSION);
         DocumentEnvelope.requireRevision(KIND, revision);
+        show = show == null ? ShowCondition.ALWAYS : show;
         select = select == null ? Selection.NEVER : select;
         presentation = presentation == null ? Presentation.EMPTY : presentation;
         variants = copyVariants(variants);
     }
 
     public BoardDoc withRevision(long revision) {
-        return new BoardDoc(schemaVersion, revision, select, presentation, variants);
+        return new BoardDoc(schemaVersion, revision, show, select, presentation, variants);
     }
 
     public static BoardDoc parse(String fileName, String raw) {

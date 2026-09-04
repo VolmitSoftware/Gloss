@@ -84,7 +84,7 @@ public class EditorSyncServiceTest {
         PanelTransform.at("minecraft:overworld", worldUuid, 1.0D, 2.0D, 3.0D, 0.0D));
     captured = new PanelDefinition(captured.schemaVersion(), captured.id(), boardUuid,
         captured.revision(), captured.rootMenuId(), captured.transform(), captured.follow(),
-        captured.visibility());
+        captured.visibility(), captured.show());
     byte[] source = (GSON.toJson(captured) + System.lineSeparator())
         .getBytes(StandardCharsets.UTF_8);
     Files.write(boardFile, source);

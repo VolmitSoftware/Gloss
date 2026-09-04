@@ -243,6 +243,9 @@ public final class ChatBubblesService implements Listener {
 
         ResolvedStyle resolved = resolveStyle(sender);
         BubbleStyleDoc style = resolved.document();
+        if (!style.show().isDynamic() && !style.show().isAlwaysVisible()) {
+            return;
+        }
         ParticleText.Rendered particleText = renderParticleTextBlock(style.prefix(), message,
             style.wordWrapChars(), prefix -> plugin.text().render(sender, prefix));
         List<String> lines = List.of(particleText.text().split("\n", -1));
@@ -306,6 +309,9 @@ public final class ChatBubblesService implements Listener {
         BubbleRecord record = null;
         try {
             hologram = plugin.holograms().createTemporary(id, captured.clone(), style.maxAliveMs());
+            if (!style.show().isAlwaysVisible()) {
+                plugin.holograms().setViewerCondition(hologram, viewer -> style.show().matches(plugin, viewer));
+            }
             hologram.setParticleLayers(style.particleLayers());
             if (style.hideOwn()) {
                 hologram.viewers().add(senderId);

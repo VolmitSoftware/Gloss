@@ -389,6 +389,7 @@ public class PreviewStateContextTest {
     register(provider("inventory", Map.of("size", 999, "occupied", 999)));
     register(provider("surge", Map.of("active", Boolean.TRUE, "gain", 99)));
     register(provider("vars", Map.of("accent", 1)));
+    register(provider("world", Map.of("name", "spoofed", "time", 999)));
     PreviewFakes.FurnaceFake fake = PreviewFakes.furnace().burnTime(0).gameTime(4L);
     PreviewStateContext context = PreviewStateContext.forBlock(fake.build(), null, Map.of("accent", 7.0D));
 
@@ -397,6 +398,8 @@ public class PreviewStateContextTest {
     assertEquals(Boolean.FALSE, context.variable("surge.active"));
     assertEquals(0.0D, number(context, "surge.gain"), EPSILON);
     assertEquals(7.0D, number(context, "vars.accent"), EPSILON);
+    assertEquals("fake", context.variable("world.name"));
+    assertEquals(0.0D, number(context, "world.time"), EPSILON);
   }
 
   @Test
@@ -404,6 +407,7 @@ public class PreviewStateContextTest {
     assertTrue(PreviewStateAdapters.isReservedNamespace("inventory"));
     assertTrue(PreviewStateAdapters.isReservedNamespace("surge"));
     assertTrue(PreviewStateAdapters.isReservedNamespace("vars"));
+    assertTrue(PreviewStateAdapters.isReservedNamespace("world"));
     assertTrue(PreviewStateAdapters.isReservedNamespace("cookTime"));
     assertTrue(PreviewStateAdapters.isReservedNamespace("blockType"));
     assertTrue(PreviewStateAdapters.isReservedNamespace("surge.active"));
@@ -748,7 +752,7 @@ public class PreviewStateContextTest {
         Set.of("universal", "inventory", "furnace", "brewing", "beehive", "cauldron", "jukebox", "poweredMinecart"),
         catalog.keySet()
     );
-    assertEquals(names("time", "blockType", "customName"), catalog.get("universal"));
+    assertEquals(names("time", "world.name", "world.time", "blockType", "customName"), catalog.get("universal"));
     assertEquals(names("inventory.size", "inventory.occupied"), catalog.get("inventory"));
     assertEquals(
         names("cookTime", "cookTimeTotal", "burnTime", "fuelSeconds", "bankedXp", "lit", "surge.active", "surge.gain"),

@@ -99,7 +99,7 @@ class DamageIndicatorConditionPlanTest {
             null,
             damage,
             null,
-            audience);
+            audience, null);
     }
 
     private static DamageIndicatorSettingsDoc.IndicatorPresentation presentation(String name) {

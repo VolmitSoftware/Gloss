@@ -1,6 +1,7 @@
 package art.arcane.gloss;
 
 import art.arcane.gloss.api.ParticleLayer;
+import art.arcane.gloss.condition.ShowCondition;
 import art.arcane.gloss.config.GlossConfigFile;
 import art.arcane.gloss.drop.RealDropSettingsDoc;
 
@@ -123,8 +124,12 @@ public record GlossConfig(
         String bundleEntryFormat,
         String bundleMoreFormat,
         boolean preserveCustomNames,
-        boolean useItemDisplayNames
+        boolean useItemDisplayNames,
+        ShowCondition show
     ) {
+        public Drops {
+            show = show == null ? ShowCondition.ALWAYS : show;
+        }
     }
 
     public record RealDrops(
@@ -466,7 +471,8 @@ public record GlossConfig(
                 source.drops.bundleEntryFormat,
                 source.drops.bundleMoreFormat,
                 source.drops.preserveCustomNames,
-                source.drops.useItemDisplayNames
+                source.drops.useItemDisplayNames,
+                ShowCondition.of(source.drops.show == null ? "true" : source.drops.show)
             ),
             RealDropSettingsDoc.DEFAULTS.toConfig(source.features.realDrops),
             new Motd(

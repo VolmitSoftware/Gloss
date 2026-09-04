@@ -1,7 +1,15 @@
 package art.arcane.gloss.menu;
 
+import art.arcane.gloss.Gloss;
+import art.arcane.gloss.api.HoloClickTrigger;
+import art.arcane.gloss.api.HoloCloseReason;
+import art.arcane.gloss.config.MenuDefinitionData;
+import art.arcane.gloss.config.menu.MenuDocumentParser;
+import art.arcane.gloss.menu.components.ButtonComponent;
+import art.arcane.gloss.text.TextPipeline;
 import art.arcane.gloss.util.common.DisplayEntity;
 import art.arcane.gloss.util.common.DisplayEntity.MetadataIndex;
+import art.arcane.volmlib.util.bukkit.papi.PlayerSnapshotStore;
 import com.github.retrooper.packetevents.PacketEvents;
 import com.github.retrooper.packetevents.PacketEventsAPI;
 import com.github.retrooper.packetevents.injector.ChannelInjector;
@@ -20,9 +28,13 @@ import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEn
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityHeadLook;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityTeleport;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerTeams;
+import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerSpawnEntity;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Location;
+import org.bukkit.Server;
+import org.bukkit.World;
 import org.bukkit.entity.Player;
+import org.bukkit.util.Vector;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
@@ -31,10 +43,16 @@ import org.junit.Test;
 import java.lang.reflect.Proxy;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 /**
@@ -75,6 +93,131 @@ public class DisplayEntityManagerPacketShapeTest {
   // ---------------------------------------------------------------------
   // Index mapping
   // ---------------------------------------------------------------------
+
+  @Test
+  public void hiddenMenusAndComponentsDespawnAndRejectActionsUntilShownAgain() throws ReflectiveOperationException {
+    for (String gate : List.of("menu", "component")) {
+      assertShowLifecycle(gate);
+    }
+  }
+
+  private static void assertShowLifecycle(String gate) throws ReflectiveOperationException {
+    AtomicLong time = new AtomicLong(18000L);
+    UUID worldId = UUID.randomUUID();
+    World world = (World) CharacterizationSupport.proxy(new Class<?>[]{World.class},
+        (proxy, method, args) -> switch (method.getName()) {
+          case "getName" -> "world";
+          case "getUID" -> worldId;
+          case "getTime" -> time.get();
+          default -> CharacterizationSupport.identity(proxy, method, args);
+        });
+    Server server = CharacterizationSupport.server(Map.of(worldId, world));
+    Object previousServer = CharacterizationSupport.installServer(server);
+    Gloss plugin = CharacterizationSupport.bareGloss(server);
+    Gloss previousPlugin = CharacterizationSupport.installGloss(plugin);
+    CharacterizationSupport.setField(plugin, "text", new TextPipeline(plugin));
+    List<String> commands = new ArrayList<>();
+    AtomicReference<Location> eye = new AtomicReference<>(new Location(world, 0D, 64D, 0D));
+    UUID playerId = UUID.randomUUID();
+    Player player = (Player) CharacterizationSupport.proxy(new Class<?>[]{Player.class},
+        (proxy, method, args) -> switch (method.getName()) {
+          case "getUniqueId" -> playerId;
+          case "getName" -> "show-viewer";
+          case "getWorld" -> world;
+          case "getLocation" -> new Location(world, 0D, 64D, 0D);
+          case "getEyeLocation" -> eye.get().clone();
+          case "isOnline" -> true;
+          case "performCommand" -> {
+            commands.add((String) args[0]);
+            yield true;
+          }
+          default -> CharacterizationSupport.identity(proxy, method, args);
+        });
+    SessionHolder holder = new SessionHolder(player, new PlayerSnapshotStore<>());
+    int initialEntities = DisplayEntityManager.totalCount();
+    int initialVisible = DisplayEntityManager.visibleCount();
+    SENT.clear();
+    try {
+      String condition = "\"show\": \"{{world.time < 12000}}\",";
+      MenuDefinitionData menu = MenuDocumentParser.parse("show-packets", """
+          {
+            %s
+            "offset": [0, 0, 3],
+            "particleLayers": [],
+            "components": [{
+              %s
+              "id": "button",
+              "offset": [0, 0, 0],
+              "data": {
+                "type": "button",
+                "icon": {"type": "text", "text": "MENU_SHOW_PROBE"},
+                "actions": [{"type": "command", "command": "show-confirmed"}]
+              }
+            }]
+          }
+          """.formatted(gate.equals("menu") ? condition : "",
+          gate.equals("component") ? condition : "")).definition();
+      holder.openSession(menu, null);
+      MenuSession session = (MenuSession) CharacterizationSupport.getField(holder, "session");
+      ButtonComponent button = (ButtonComponent) session.getComponents().getFirst();
+      holder.tick();
+      assertFalse(holder.isIdle());
+      assertEquals(initialEntities, DisplayEntityManager.totalCount());
+      assertEquals(initialVisible, DisplayEntityManager.visibleCount());
+      assertEquals(0L, SENT.stream().filter(WrapperPlayServerSpawnEntity.class::isInstance).count());
+      assertNull(holder.snapshotClick(eye.get()));
+      button.onClick(HoloClickTrigger.RIGHT_CLICK);
+      assertTrue(commands.isEmpty());
+
+      time.set(6000L);
+      holder.tick();
+      assertEquals(initialEntities + 1, DisplayEntityManager.totalCount());
+      assertEquals(initialVisible + 1, DisplayEntityManager.visibleCount());
+      assertEquals(1L, SENT.stream().filter(WrapperPlayServerSpawnEntity.class::isInstance).count());
+      Vector center = button.particlePlane().getCenter();
+      eye.set(new Location(world, center.getX(), center.getY(), 0D));
+      SessionHolder.ClickSnapshot click = holder.snapshotClick(eye.get());
+      assertNotNull(click);
+      click.component().onClick(HoloClickTrigger.RIGHT_CLICK);
+      assertEquals(List.of("show-confirmed"), commands);
+
+      SENT.clear();
+      time.set(18000L);
+      assertNull(holder.snapshotClick(eye.get()));
+      click.component().onClick(HoloClickTrigger.RIGHT_CLICK);
+      assertEquals(1, commands.size());
+      holder.tick();
+      assertFalse(holder.isIdle());
+      assertEquals(initialEntities, DisplayEntityManager.totalCount());
+      assertEquals(initialVisible, DisplayEntityManager.visibleCount());
+      assertEquals(1L, SENT.stream().filter(WrapperPlayServerDestroyEntities.class::isInstance).count());
+      assertEquals(0L, SENT.stream().filter(WrapperPlayServerSpawnEntity.class::isInstance).count());
+      button.onClick(HoloClickTrigger.RIGHT_CLICK);
+      assertEquals(1, commands.size());
+
+      SENT.clear();
+      holder.tick();
+      assertTrue(SENT.isEmpty());
+      time.set(6000L);
+      holder.tick();
+      assertEquals(initialEntities + 1, DisplayEntityManager.totalCount());
+      assertEquals(initialVisible + 1, DisplayEntityManager.visibleCount());
+      assertEquals(1L, SENT.stream().filter(WrapperPlayServerSpawnEntity.class::isInstance).count());
+      SessionHolder.ClickSnapshot reopenedClick = holder.snapshotClick(eye.get());
+      assertNotNull(reopenedClick);
+      reopenedClick.component().onClick(HoloClickTrigger.RIGHT_CLICK);
+      assertEquals(List.of("show-confirmed", "show-confirmed"), commands);
+    } finally {
+      try {
+        holder.close(HoloCloseReason.GLOSS_SHUTDOWN);
+      } finally {
+        CharacterizationSupport.restoreGloss(previousPlugin);
+        CharacterizationSupport.restoreServer(previousServer);
+      }
+    }
+    assertEquals(initialEntities, DisplayEntityManager.totalCount());
+    assertEquals(initialVisible, DisplayEntityManager.visibleCount());
+  }
 
   @Test
   public void theScaleIndexCarriesTheScale() {

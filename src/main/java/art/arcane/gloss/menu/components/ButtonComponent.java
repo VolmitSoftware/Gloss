@@ -29,6 +29,9 @@ public class ButtonComponent extends ClickableComponent<ButtonComponentData> {
 
   @Override
   public void onClick(HoloClickTrigger trigger) {
+    if (!isInteractable()) {
+      return;
+    }
     MenuAction.execute(actions, session.actionContext(getId(), trigger));
   }
 }

@@ -1,5 +1,7 @@
 package art.arcane.gloss.board;
 
+import art.arcane.gloss.condition.ShowCondition;
+
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -15,6 +17,7 @@ class GlossBoardMetaDocTest {
         meta.setTitle("&d&lArena");
         meta.addLine("&7Line one");
         meta.setHideNumbers(true);
+        meta.setShow(ShowCondition.of("world.time > 12000"));
         meta.setSelection(30, "viewer.world == 'arena'");
         meta.setVariants(List.of(new BoardDoc.Variant("critical", 100, "viewer.health < 5",
             new BoardDoc.Presentation("&cDanger", List.of("heal"), false))));
@@ -28,12 +31,13 @@ class GlossBoardMetaDocTest {
         assertTrue(restored.hideNumbers());
         assertEquals(new BoardDoc.Selection(30, "viewer.world == 'arena'"), restored.selection());
         assertEquals(meta.variants(), restored.variants());
+        assertEquals(meta.show(), restored.show());
         assertEquals(7L, restored.revision());
     }
 
     @Test
     void fromDocWithBlankTitleFallsBackToTheId() {
-        BoardDoc doc = new BoardDoc(2, 1L, BoardDoc.Selection.NEVER,
+        BoardDoc doc = new BoardDoc(2, 1L, ShowCondition.ALWAYS, BoardDoc.Selection.NEVER,
             new BoardDoc.Presentation("", List.of(), false), List.of());
 
         GlossBoardMeta meta = GlossBoardMeta.fromDoc("bare", doc);

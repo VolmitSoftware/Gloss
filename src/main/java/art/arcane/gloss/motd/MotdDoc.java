@@ -1,5 +1,6 @@
 package art.arcane.gloss.motd;
 
+import art.arcane.gloss.condition.ShowCondition;
 import art.arcane.gloss.doc.DocumentEnvelope;
 import art.arcane.gloss.doc.DocumentParsers;
 import art.arcane.gloss.util.common.TextUtils;
@@ -7,15 +8,16 @@ import art.arcane.gloss.util.common.TextUtils;
 import java.util.ArrayList;
 import java.util.List;
 
-public record MotdDoc(int schemaVersion, long revision, List<MotdEntry> entries) {
+public record MotdDoc(int schemaVersion, long revision, ShowCondition show, List<MotdEntry> entries) {
     public static final String KIND = "motd";
     public static final int CURRENT_SCHEMA_VERSION = 1;
     public static final int MAX_LINES_PER_ENTRY = 2;
 
-    public static final MotdDoc DEFAULTS = new MotdDoc(CURRENT_SCHEMA_VERSION, DocumentEnvelope.INITIAL_REVISION,
+    public static final MotdDoc DEFAULTS = new MotdDoc(CURRENT_SCHEMA_VERSION, DocumentEnvelope.INITIAL_REVISION, ShowCondition.ALWAYS,
         List.of(new MotdEntry(List.of("&dA glossy server"))));
 
     public MotdDoc {
+        show = show == null ? ShowCondition.ALWAYS : show;
         DocumentEnvelope.requireSchemaVersion(KIND, schemaVersion, CURRENT_SCHEMA_VERSION);
         DocumentEnvelope.requireRevision(KIND, revision);
         if (entries == null || entries.isEmpty()) {

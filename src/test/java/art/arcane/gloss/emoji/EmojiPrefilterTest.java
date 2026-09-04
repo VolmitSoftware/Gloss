@@ -1,5 +1,6 @@
 package art.arcane.gloss.emoji;
 
+import art.arcane.gloss.condition.ShowCondition;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -16,10 +17,10 @@ import static org.junit.jupiter.api.Assertions.assertSame;
  */
 class EmojiPrefilterTest {
     private static final List<EmojiEntry> ENTRIES = List.of(
-        new EmojiEntry("heart", "<3", "❤", true),
-        new EmojiEntry("star", "", "✳", true),
-        new EmojiEntry("shrug", "☹x", "🤷", true),
-        new EmojiEntry("off", ":(", "X", false)
+        new EmojiEntry("heart", "<3", "❤", true, ShowCondition.ALWAYS),
+        new EmojiEntry("star", "", "✳", true, ShowCondition.ALWAYS),
+        new EmojiEntry("shrug", "☹x", "🤷", true, ShowCondition.ALWAYS),
+        new EmojiEntry("off", ":(", "X", false, ShowCondition.ALWAYS)
     );
 
     private static final List<String> CORPUS = List.of(
@@ -78,7 +79,7 @@ class EmojiPrefilterTest {
 
     @Test
     void aReplacerWithoutTriggersGatesOnTheColonAlone() {
-        EmojiReplacer tokensOnly = new EmojiReplacer(List.of(new EmojiEntry("star", "", "✳", true)));
+        EmojiReplacer tokensOnly = new EmojiReplacer(List.of(new EmojiEntry("star", "", "✳", true, ShowCondition.ALWAYS)));
         String noColon = "<3 is not a token here";
 
         assertSame(noColon, tokensOnly.apply(noColon));
@@ -88,8 +89,8 @@ class EmojiPrefilterTest {
     @Test
     void aDisabledEntryTriggerDoesNotOpenTheGate() {
         EmojiReplacer heartOnly = new EmojiReplacer(List.of(
-            new EmojiEntry("heart", "<3", "❤", true),
-            new EmojiEntry("off", "~~", "X", false)
+            new EmojiEntry("heart", "<3", "❤", true, ShowCondition.ALWAYS),
+            new EmojiEntry("off", "~~", "X", false, ShowCondition.ALWAYS)
         ));
         String message = "~~ only";
 

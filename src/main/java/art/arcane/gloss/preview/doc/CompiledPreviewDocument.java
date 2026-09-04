@@ -74,6 +74,7 @@ public final class CompiledPreviewDocument {
   private final CompiledMatch match;
   private final List<CompiledVariant> variants;
   private final Map<String, Object> vars;
+  private final CompiledExpr show;
   private final CardTemplate card;
   private final List<ElementTemplate> elements;
   private final List<ParticleLayer> particleLayers;
@@ -84,6 +85,7 @@ public final class CompiledPreviewDocument {
       CompiledMatch match,
       List<CompiledVariant> variants,
       Map<String, Object> vars,
+      CompiledExpr show,
       CardTemplate card,
       List<ElementTemplate> elements,
       List<ParticleLayer> particleLayers
@@ -93,6 +95,7 @@ public final class CompiledPreviewDocument {
     this.match = match;
     this.variants = variants;
     this.vars = vars;
+    this.show = show;
     this.card = card;
     this.elements = elements;
     this.particleLayers = particleLayers;
@@ -132,6 +135,56 @@ public final class CompiledPreviewDocument {
 
   public List<ParticleLayer> particleLayers() {
     return particleLayers;
+  }
+
+  public boolean hasDynamicVisibility() {
+    if (!show.isConstant() || card != null && (!card.show().isConstant() || !card.framed().isConstant())) {
+      return true;
+    }
+    for (ElementTemplate element : elements) {
+      if (!element.show().isConstant() || !element.visible().isConstant()) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  public Visibility visibility(PreviewStateContext context) {
+    if (!shown(context, NO_OP_SINK)) {
+      return new Visibility(false, false, List.of());
+    }
+    List<Integer> visible = new ArrayList<>();
+    int remaining = PreviewDocumentParser.MAX_TOTAL_TEMPLATES;
+    for (int templateIndex = 0; templateIndex < elements.size() && remaining > 0; templateIndex++) {
+      ElementTemplate template = elements.get(templateIndex);
+      try {
+        RepeatTemplate repeat = template.repeat();
+        int count = repeat == null ? 1 : repeatCount(repeat, context, NO_OP_SINK);
+        count = Math.min(count, remaining);
+        remaining -= count;
+        for (int index = 0; index < count; index++) {
+          ExprScope scope = repeat == null ? context : new RepeatScope(context, repeat.var(), (double) index);
+          if (bool(template.show(), scope) && bool(template.visible(), scope)) {
+            visible.add(templateIndex * PreviewDocumentParser.MAX_REPEAT_COUNT + index);
+          }
+        }
+      } catch (RuntimeException failure) {
+        reportError(NO_OP_SINK, describe(template) + " visibility: " + failure.getMessage());
+      }
+    }
+    return new Visibility(true, card != null && cardFramed(context, NO_OP_SINK), List.copyOf(visible));
+  }
+
+  public record Visibility(boolean shown, boolean framed, List<Integer> elements) {
+  }
+
+  private boolean shown(PreviewStateContext context, Consumer<String> sink) {
+    try {
+      return bool(show, context);
+    } catch (RuntimeException failure) {
+      reportError(sink, "show: " + failure.getMessage());
+      return false;
+    }
   }
 
   // ---------------------------------------------------------------------
@@ -295,6 +348,9 @@ public final class CompiledPreviewDocument {
    */
   public List<PreviewElement> build(PreviewStateContext context, Consumer<String> errorSink) {
     Consumer<String> sink = errorSink == null ? NO_OP_SINK : errorSink;
+    if (!shown(context, sink)) {
+      return List.of();
+    }
     try {
       List<PreviewElement> content = new ArrayList<>();
       // One budget per build call, so the object is confined to this thread's expansion.
@@ -351,7 +407,7 @@ public final class CompiledPreviewDocument {
   }
 
   private void emit(ElementTemplate template, PreviewStateContext context, ExprScope scope, List<PreviewElement> out, Consumer<String> sink) {
-    if (!bool(template.visible(), scope)) {
+    if (!bool(template.show(), scope) || !bool(template.visible(), scope)) {
       return;
     }
     int x = coordinate(template.x(), scope);
@@ -401,7 +457,7 @@ public final class CompiledPreviewDocument {
 
   private boolean cardFramed(PreviewStateContext context, Consumer<String> sink) {
     try {
-      return bool(card.framed(), context);
+      return bool(card.show(), context) && bool(card.framed(), context);
     } catch (RuntimeException failure) {
       reportError(sink, "card framed: " + failure.getMessage());
       return false;
@@ -653,13 +709,14 @@ public final class CompiledPreviewDocument {
       CompiledExpr index,
       CompiledExpr background,
       CompiledExpr text,
+      CompiledExpr show,
       CompiledExpr visible,
       RepeatTemplate repeat
   ) {
   }
 
   /** {@code title}/{@code accent} are null when the document's {@code card} object omits them. */
-  record CardTemplate(CompiledExpr framed, CompiledExpr title, CompiledExpr accent, int minHalfWidth) {
+  record CardTemplate(CompiledExpr show, CompiledExpr framed, CompiledExpr title, CompiledExpr accent, int minHalfWidth) {
   }
 
   /**

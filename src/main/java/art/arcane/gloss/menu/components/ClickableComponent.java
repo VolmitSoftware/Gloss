@@ -52,7 +52,7 @@ public abstract class ClickableComponent<T extends ComponentData> extends MenuCo
   public abstract void onClick(HoloClickTrigger trigger);
 
   public OptionalDouble intersectionDistance(Vector origin, Vector direction) {
-    if (!open || plane == null) {
+    if (!isInteractable() || plane == null) {
       return OptionalDouble.empty();
     }
     orientTo(origin);
@@ -124,7 +124,7 @@ public abstract class ClickableComponent<T extends ComponentData> extends MenuCo
   }
 
   public void highlightHitbox(World w) {
-    if (plane == null)
+    if (!isInteractable() || plane == null)
       return;
     Vector downRight = plane.getCenter().clone().subtract(plane.getUp().clone().multiply(plane.getHeight() / 2)).add(plane.getRight().clone().multiply(plane.getWidth() / 2));
     Vector downLeft = plane.getCenter().clone().subtract(plane.getUp().clone().multiply(plane.getHeight() / 2)).subtract(plane.getRight().clone().multiply(plane.getWidth() / 2));

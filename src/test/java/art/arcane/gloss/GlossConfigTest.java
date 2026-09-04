@@ -25,6 +25,23 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class GlossConfigTest {
     @Test
+    void dropShowAcceptsTomlBooleansAndExpressions() throws IOException {
+        GlossConfigFile hidden = TomlCodec.fromToml("[drops]\nshow = false\n", GlossConfigFile.class);
+        hidden.normalize();
+        assertFalse(GlossConfig.from(hidden).drops().show().matches(null));
+
+        GlossConfigFile dynamic = TomlCodec.fromToml("[drops]\nshow = \"world.time > 12000\"\n", GlossConfigFile.class);
+        dynamic.normalize();
+        GlossConfigFile restored = TomlCodec.fromToml(
+            TomlCodec.toToml(dynamic, "gloss", ConfigExposePolicy.ALL), GlossConfigFile.class);
+        restored.normalize();
+        assertEquals("world.time > 12000", GlossConfig.from(restored).drops().show().expression());
+
+        GlossConfigFile invalid = TomlCodec.fromToml("[drops]\nshow = 7\n", GlossConfigFile.class);
+        assertThrows(IllegalArgumentException.class, invalid::normalize);
+    }
+
+    @Test
     void defaultsRoundTripThroughToml() throws IOException {
         GlossConfigFile defaults = new GlossConfigFile();
         defaults.normalize();

@@ -1,5 +1,6 @@
 package art.arcane.gloss.menu.icon;
 
+import art.arcane.gloss.condition.ShowCondition;
 import art.arcane.gloss.config.icon.AnimatedImageData;
 import art.arcane.gloss.config.icon.ItemIconData;
 import art.arcane.gloss.config.icon.MenuIconData;
@@ -93,7 +94,7 @@ public class IconFailureFallbackTest {
         false,
         false,
         List.<MenuComponentData>of(),
-        List.of()
+        List.of(), ShowCondition.ALWAYS
     );
     data.setId("icon-test");
     Player player = (Player) Proxy.newProxyInstance(Player.class.getClassLoader(), new Class<?>[]{Player.class},

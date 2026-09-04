@@ -259,6 +259,8 @@ public final class DamageIndicatorsService implements Listener {
             LiveIndicator indicator = entry.getValue();
             if (indicator.expiresAtMs <= now && live.remove(entry.getKey(), indicator)) {
                 indicator.retire(true);
+            } else if (indicator.conditions.dynamicShow()) {
+                scheduleAudience(indicator);
             }
         }
     }

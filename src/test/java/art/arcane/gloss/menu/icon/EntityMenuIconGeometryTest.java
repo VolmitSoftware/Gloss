@@ -1,5 +1,6 @@
 package art.arcane.gloss.menu.icon;
 
+import art.arcane.gloss.condition.ShowCondition;
 import art.arcane.gloss.config.MenuDefinitionData;
 import art.arcane.gloss.config.icon.EntityIconData;
 import art.arcane.gloss.exceptions.MenuIconException;
@@ -56,7 +57,7 @@ public class EntityMenuIconGeometryTest {
         false,
         false,
         List.of(),
-        List.of()
+        List.of(), ShowCondition.ALWAYS
     );
     MenuSession session = new MenuSession(
         definition,

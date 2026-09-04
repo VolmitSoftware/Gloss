@@ -3,6 +3,7 @@ package art.arcane.gloss.indicator;
 import art.arcane.gloss.api.ParticleLayer;
 import art.arcane.gloss.condition.ConditionCompiler;
 import art.arcane.gloss.condition.ConditionSource;
+import art.arcane.gloss.condition.ShowCondition;
 import art.arcane.gloss.doc.DocumentEnvelope;
 import art.arcane.gloss.doc.DocumentParsers;
 import org.bukkit.util.Vector;
@@ -17,7 +18,8 @@ public record DamageIndicatorSettingsDoc(
     Limits limits,
     Style damage,
     Style healing,
-    Audience audience
+    Audience audience,
+    ShowCondition show
 ) {
     public static final String KIND = "damage-indicators";
     public static final String DEFAULT_ID = "default";
@@ -50,7 +52,8 @@ public record DamageIndicatorSettingsDoc(
         DEFAULT_LIMITS,
         DEFAULT_DAMAGE,
         DEFAULT_HEALING,
-        DEFAULT_AUDIENCE);
+        DEFAULT_AUDIENCE,
+        ShowCondition.ALWAYS);
 
     public DamageIndicatorSettingsDoc {
         DocumentEnvelope.requireSchemaVersion(KIND, schemaVersion, CURRENT_SCHEMA_VERSION);
@@ -59,6 +62,7 @@ public record DamageIndicatorSettingsDoc(
         damage = resolveStyle(damage, DEFAULT_DAMAGE);
         healing = resolveStyle(healing, DEFAULT_HEALING);
         audience = audience == null ? DEFAULT_AUDIENCE : resolveAudience(audience);
+        show = show == null ? ShowCondition.ALWAYS : show;
         validateCondition("damage.when", damage.when());
         validateVariants("damage.variants", damage.variants());
         validateCondition("healing.when", healing.when());

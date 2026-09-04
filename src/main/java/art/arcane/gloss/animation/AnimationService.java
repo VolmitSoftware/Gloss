@@ -1,6 +1,7 @@
 package art.arcane.gloss.animation;
 
 import art.arcane.gloss.Gloss;
+import art.arcane.gloss.condition.ShowCondition;
 import art.arcane.gloss.doc.DocumentDelta;
 import art.arcane.gloss.doc.DocumentRegistry;
 import art.arcane.gloss.doc.GlossDocument;
@@ -12,6 +13,7 @@ import art.arcane.volmlib.util.math.M;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -31,6 +33,7 @@ public final class AnimationService {
     private final AtomicLong generation;
     private volatile List<AnimationClip> clips;
     private volatile Map<String, AnimationClip> clipsById;
+    private volatile Map<String, ShowCondition> visibility;
 
     public AnimationService(Gloss plugin) {
         this.plugin = plugin;
@@ -42,6 +45,7 @@ public final class AnimationService {
         this.generation = new AtomicLong();
         this.clips = List.of();
         this.clipsById = Map.of();
+        visibility = Map.of();
     }
 
     public void enable() {
@@ -61,6 +65,7 @@ public final class AnimationService {
         frameCache.clear();
         clips = List.of();
         clipsById = Map.of();
+        visibility = Map.of();
         generation.incrementAndGet();
     }
 
@@ -83,6 +88,16 @@ public final class AnimationService {
     }
 
     public List<String> staticFrames(AnimationClip clip) {
+        if (clip == null) {
+            return null;
+        }
+        ShowCondition show = visibility.getOrDefault(clip.id(), ShowCondition.ALWAYS);
+        if (show.isDynamic()) {
+            return null;
+        }
+        if (!show.isAlwaysVisible()) {
+            return Collections.nCopies(clip.frames().size(), "");
+        }
         if (hasDynamicFrames(clip, new HashSet<>())) {
             return null;
         }
@@ -133,8 +148,10 @@ public final class AnimationService {
         unregisterFunctions();
         frameCache.clear();
         List<AnimationClip> loaded = new ArrayList<>(documents.size());
+        Map<String, ShowCondition> conditions = new HashMap<>(documents.size());
         for (GlossDocument<AnimationDoc> document : documents.values()) {
             AnimationDoc doc = document.value();
+            conditions.put(document.id(), doc.show());
             loaded.add(new AnimationClip(document.id(), 1000.0D / doc.frameIntervalMs(), doc.toMode(), doc.frames()));
         }
 
@@ -146,9 +163,11 @@ public final class AnimationService {
         }
 
         clipsById = Map.copyOf(byId);
+        visibility = Map.copyOf(conditions);
         for (AnimationClip clip : clips) {
             String name = FUNCTION_PREFIX + clip.id();
-            plugin.text().registerFunction(name, player -> clip.frameAt(M.ms()));
+            ShowCondition show = visibility.get(clip.id());
+            plugin.text().registerFunction(name, player -> show.matches(plugin, player) ? clip.frameAt(M.ms()) : "");
             registeredFunctions.add(name);
         }
         generation.incrementAndGet();
@@ -170,6 +189,9 @@ public final class AnimationService {
                 AnimationClip clip = clipsById.get(id);
                 if (clip != null && visiting.add(id)) {
                     try {
+                        if (visibility.getOrDefault(id, ShowCondition.ALWAYS).isDynamic()) {
+                            return true;
+                        }
                         for (String frame : clip.frames()) {
                             boolean direct = viewerSpecific
                                 ? TextPipeline.viewerSpecific(frame)
@@ -218,6 +240,9 @@ public final class AnimationService {
                 AnimationClip clip = clipsById.get(id);
                 if (clip != null && visiting.add(id)) {
                     try {
+                        if (visibility.getOrDefault(id, ShowCondition.ALWAYS).isDynamic()) {
+                            return true;
+                        }
                         for (String frame : clip.frames()) {
                             if (TextPipeline.timeDependent(frame)
                                 || inspectAnimationTimeDependencies(frame, visiting)) {

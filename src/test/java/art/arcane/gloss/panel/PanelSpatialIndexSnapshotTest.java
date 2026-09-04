@@ -1,5 +1,6 @@
 package art.arcane.gloss.panel;
 
+import art.arcane.gloss.condition.ShowCondition;
 import org.junit.Test;
 
 import java.nio.charset.StandardCharsets;
@@ -57,7 +58,7 @@ public class PanelSpatialIndexSnapshotTest {
   public void aRejectedWriteLeavesThePublishedIndexUntouched() {
     PanelDefinition origin = board("origin", 0.0D, 0.0D);
     PanelDefinition idThief = new PanelDefinition(origin.schemaVersion(), origin.id(), UUID.randomUUID(),
-        origin.revision(), origin.rootMenuId(), origin.transform(), origin.follow(), origin.visibility());
+        origin.revision(), origin.rootMenuId(), origin.transform(), origin.follow(), origin.visibility(), origin.show());
     PanelSpatialIndex index = new PanelSpatialIndex();
     index.replaceAll(List.of(origin));
     long published = index.generation();
@@ -153,6 +154,6 @@ public class PanelSpatialIndexSnapshotTest {
         UUID.nameUUIDFromBytes(id.getBytes(StandardCharsets.UTF_8)),
         PanelDefinition.INITIAL_REVISION, "menu",
         PanelTransform.at("example:world", WORLD, x, 64.0D, z, 0.0D),
-        PanelFollow.none(), PanelVisibility.publicAccess());
+        PanelFollow.none(), PanelVisibility.publicAccess(), ShowCondition.ALWAYS);
   }
 }

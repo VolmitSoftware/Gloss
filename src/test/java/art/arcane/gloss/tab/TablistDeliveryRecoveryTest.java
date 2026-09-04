@@ -13,6 +13,20 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class TablistDeliveryRecoveryTest {
     @Test
+    void hiddenHeaderFooterClearsImmediatelyAndCanReturnWithoutAHeartbeat() {
+        TablistService.HeaderFooter visible = new TablistService.HeaderFooter("header", "footer");
+        TablistService.HeaderFooter hidden = new TablistService.HeaderFooter("", "");
+        TablistService.AppliedHeaderFooter applied =
+            new TablistService.AppliedHeaderFooter(visible, Long.MAX_VALUE);
+        TablistService.AppliedHeaderFooter cleared =
+            new TablistService.AppliedHeaderFooter(hidden, Long.MAX_VALUE);
+
+        assertTrue(TablistService.shouldSendHeaderFooter(hidden, applied, 0L, null));
+        assertFalse(TablistService.shouldSendHeaderFooter(hidden, cleared, 0L, null));
+        assertTrue(TablistService.shouldSendHeaderFooter(visible, cleared, 0L, null));
+    }
+
+    @Test
     void unchangedHeaderFooterEventuallyResendsWithinTheCycleBudget() {
         TablistService.HeaderFooter rendered = new TablistService.HeaderFooter("header", "footer");
         TablistService.AppliedHeaderFooter applied =

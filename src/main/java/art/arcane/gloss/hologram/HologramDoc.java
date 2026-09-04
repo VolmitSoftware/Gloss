@@ -3,6 +3,7 @@ package art.arcane.gloss.hologram;
 import art.arcane.gloss.doc.DocumentEnvelope;
 import art.arcane.gloss.doc.DocumentParsers;
 import art.arcane.gloss.api.ParticleLayer;
+import art.arcane.gloss.condition.ShowCondition;
 import org.bukkit.util.Vector;
 
 import java.util.ArrayList;
@@ -12,7 +13,7 @@ import java.util.Objects;
 
 public record HologramDoc(int schemaVersion, long revision, Anchor anchor, List<String> lines,
                           Boolean seeThrough, double scale, String billboard, Double yaw, Double pitch,
-                          List<ParticleLayer> particleLayers) {
+                          List<ParticleLayer> particleLayers, ShowCondition show) {
     public static final String KIND = "holograms";
     public static final int CURRENT_SCHEMA_VERSION = 2;
     public static final double DEFAULT_SCALE = 1.0D;
@@ -48,11 +49,12 @@ public record HologramDoc(int schemaVersion, long revision, Anchor anchor, List<
         yaw = requireAngle("yaw", yaw, MAX_YAW_DEGREES);
         pitch = requireAngle("pitch", pitch, MAX_PITCH_DEGREES);
         particleLayers = ParticleLayer.copyLayers(particleLayers, "hologram");
+        show = show == null ? ShowCondition.ALWAYS : show;
     }
 
     public HologramDoc withRevision(long revision) {
         return new HologramDoc(schemaVersion, revision, anchor, lines, seeThrough, scale, billboard, yaw, pitch,
-            particleLayers);
+            particleLayers, show);
     }
 
     public static HologramDoc parse(String fileName, String raw) {

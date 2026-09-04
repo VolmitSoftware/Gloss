@@ -46,6 +46,9 @@ final class TablistRuntime {
     }
 
     HeaderFooterProfile headerFooter(ExprScope scope, BoundedConditionErrorCallback errors) {
+        if (!headerFooterVisible(scope, errors)) {
+            return null;
+        }
         for (HeaderFooterVariant candidate : headerFooterVariants) {
             if (candidate.condition().matches(scope, errors)) {
                 return new HeaderFooterProfile(candidate.variant().id(), candidate.variant().presentation());
@@ -55,12 +58,21 @@ final class TablistRuntime {
     }
 
     ListNameProfile listName(ExprScope scope, BoundedConditionErrorCallback errors) {
+        if (!doc.listNames().enabled() || !doc.show().matches(scope, errors)
+            || !doc.listNames().show().matches(scope, errors)) {
+            return null;
+        }
         for (ListNameVariant candidate : listNameVariants) {
             if (candidate.condition().matches(scope, errors)) {
                 return new ListNameProfile(candidate.variant().id(), candidate.variant().presentation());
             }
         }
         return new ListNameProfile("base", doc.listNames().presentation());
+    }
+
+    boolean headerFooterVisible(ExprScope scope, BoundedConditionErrorCallback errors) {
+        return doc.headerFooter().enabled() && doc.show().matches(scope, errors)
+            && doc.headerFooter().show().matches(scope, errors);
     }
 
     record HeaderFooterProfile(String id, TablistDoc.HeaderFooterPresentation presentation) {

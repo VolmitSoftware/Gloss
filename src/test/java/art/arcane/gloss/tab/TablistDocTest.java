@@ -1,5 +1,6 @@
 package art.arcane.gloss.tab;
 
+import art.arcane.gloss.condition.ShowCondition;
 import art.arcane.gloss.condition.BoundedConditionErrorCallback;
 import art.arcane.gloss.doc.DocumentEnvelope;
 import art.arcane.gloss.expr.ExprFunctions;
@@ -12,6 +13,7 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -72,9 +74,9 @@ class TablistDocTest {
         assertThrows(IllegalArgumentException.class,
             () -> TablistDoc.parse("tablist.json", "{\"schemaVersion\":1,\"revision\":1}"));
         assertThrows(IllegalArgumentException.class,
-            () -> new TablistDoc(2, 0L, null, null));
+            () -> new TablistDoc(2, 0L, ShowCondition.ALWAYS, null, null));
         assertThrows(IllegalArgumentException.class,
-            () -> new TablistDoc(2, DocumentEnvelope.MAX_SAFE_REVISION + 1L, null, null));
+            () -> new TablistDoc(2, DocumentEnvelope.MAX_SAFE_REVISION + 1L, ShowCondition.ALWAYS, null, null));
     }
 
     @Test
@@ -95,7 +97,7 @@ class TablistDocTest {
             "true", presentation);
 
         assertThrows(IllegalArgumentException.class,
-            () -> new TablistDoc.HeaderFooter(true, presentation, List.of(first, duplicate)));
+            () -> new TablistDoc.HeaderFooter(true, ShowCondition.ALWAYS, presentation, List.of(first, duplicate)));
         assertThrows(IllegalArgumentException.class,
             () -> new TablistDoc.ListNameVariant("bad id", 1, "true",
                 new TablistDoc.ListNamePresentation("$player")));
@@ -139,6 +141,84 @@ class TablistDocTest {
     }
 
     @Test
+    void missingAndNullShowRemainVisible() {
+        TablistDoc missing = TablistDoc.parse("tablist.json", "{\"schemaVersion\":2,\"revision\":1}");
+        TablistDoc explicitNull = TablistDoc.parse("tablist.json", """
+            {"schemaVersion":2,"revision":1,"show":null,
+             "headerFooter":{"enabled":true,"show":null},
+             "listNames":{"enabled":true,"show":null}}
+            """);
+
+        for (TablistDoc doc : List.of(missing, explicitNull)) {
+            assertTrue(doc.show().isAlwaysVisible());
+            assertTrue(doc.headerFooter().show().isAlwaysVisible());
+            assertTrue(doc.listNames().show().isAlwaysVisible());
+        }
+    }
+
+    @Test
+    void topLevelShowGatesBothSurfacesAndTheirVariants() {
+        TablistDoc doc = TablistDoc.parse("tablist.json", """
+            {"schemaVersion":2,"revision":1,"show":false,
+             "headerFooter":{"enabled":true,"variants":[
+               {"id":"always","when":"true","presentation":{"header":"Visible"}}]},
+             "listNames":{"enabled":true,"variants":[
+               {"id":"always","when":"true","presentation":{"format":"Admin $player"}}]}}
+            """);
+        TablistRuntime runtime = TablistRuntime.compile(doc);
+        TestScope scope = new TestScope(Map.of());
+
+        assertNull(runtime.headerFooter(scope, BoundedConditionErrorCallback.silent()));
+        assertNull(runtime.listName(scope, BoundedConditionErrorCallback.silent()));
+        assertFalse(runtime.headerFooterVisible(scope, BoundedConditionErrorCallback.silent()));
+        assertTrue(doc.headerFooter().enabled());
+        assertTrue(doc.listNames().enabled());
+    }
+
+    @Test
+    void showReevaluatesWorldAndTimeWithoutLosingVariantSelection() {
+        TablistDoc doc = TablistDoc.parse("tablist.json", """
+            {"schemaVersion":2,"revision":1,"show":"{{ player.world != 'hidden' }}",
+             "headerFooter":{"enabled":true,"show":"world.time < 12000",
+               "variants":[{"id":"staff","when":"viewer.op",
+                 "presentation":{"header":"Staff"}}]},
+             "listNames":{"enabled":true,"show":"subject.op",
+               "presentation":{"format":"Staff $player"}}}
+            """);
+        TablistRuntime runtime = TablistRuntime.compile(doc);
+        TestScope day = new TestScope(Map.of("player.world", "world", "world.time", 1000.0D,
+            "viewer.op", true, "subject.op", false));
+        TestScope night = new TestScope(Map.of("player.world", "world", "world.time", 14000.0D,
+            "viewer.op", true, "subject.op", true));
+        TestScope hidden = new TestScope(Map.of("player.world", "hidden", "world.time", 1000.0D,
+            "viewer.op", true, "subject.op", true));
+        BoundedConditionErrorCallback errors = BoundedConditionErrorCallback.silent();
+
+        assertEquals("staff", runtime.headerFooter(day, errors).id());
+        assertNull(runtime.listName(day, errors));
+        assertNull(runtime.headerFooter(night, errors));
+        assertEquals("Staff $player", runtime.listName(night, errors).presentation().format());
+        assertNull(runtime.headerFooter(hidden, errors));
+        assertNull(runtime.listName(hidden, errors));
+        assertEquals("staff", runtime.headerFooter(day, errors).id());
+        assertEquals(doc, TablistDoc.parse("tablist.json", BukkitJson.GSON.toJson(doc)));
+    }
+
+    @Test
+    void enabledFalseStillDisablesVisibleSurfaces() {
+        TablistDoc doc = TablistDoc.parse("tablist.json", """
+            {"schemaVersion":2,"revision":1,"show":true,
+             "headerFooter":{"enabled":false,"show":true},
+             "listNames":{"enabled":false,"show":true}}
+            """);
+        TablistRuntime runtime = TablistRuntime.compile(doc);
+        TestScope scope = new TestScope(Map.of());
+
+        assertNull(runtime.headerFooter(scope, BoundedConditionErrorCallback.silent()));
+        assertNull(runtime.listName(scope, BoundedConditionErrorCallback.silent()));
+    }
+
+    @Test
     void tokenSubstitutionIsSinglePass() {
         assertEquals("&cAlex [staff $group]",
             TablistService.substituteTokens("&c$player [$group]", "Alex", "staff $group"));
@@ -148,9 +228,9 @@ class TablistDocTest {
                                        List<TablistDoc.HeaderFooterVariant> headerVariants,
                                        TablistDoc.ListNamePresentation names,
                                        List<TablistDoc.ListNameVariant> nameVariants) {
-        return new TablistDoc(2, 1L,
-            new TablistDoc.HeaderFooter(true, header, headerVariants),
-            new TablistDoc.ListNames(true, names, nameVariants));
+        return new TablistDoc(2, 1L, ShowCondition.ALWAYS,
+            new TablistDoc.HeaderFooter(true, ShowCondition.ALWAYS, header, headerVariants),
+            new TablistDoc.ListNames(true, ShowCondition.ALWAYS, names, nameVariants));
     }
 
     private record TestScope(Map<String, Object> variables) implements ExprScope {

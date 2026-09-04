@@ -138,6 +138,8 @@ public final class PreviewFakes {
     final Map<Integer, ItemStack> items = new LinkedHashMap<>();
     Material type;
     long gameTime;
+    long worldTime;
+    String worldName = "fake";
     String customName;
 
     // Proxies read the builder fields live, so one instance each is enough; caching also keeps
@@ -163,6 +165,16 @@ public final class PreviewFakes {
 
     public T gameTime(long value) {
       this.gameTime = value;
+      return self();
+    }
+
+    public T worldTime(long value) {
+      this.worldTime = value;
+      return self();
+    }
+
+    public T worldName(String value) {
+      this.worldName = value;
       return self();
     }
 
@@ -204,7 +216,8 @@ public final class PreviewFakes {
           calls.record(method.getName());
           return switch (method.getName()) {
             case "getGameTime", "getFullTime" -> gameTime;
-            case "getName" -> "fake";
+            case "getTime" -> worldTime;
+            case "getName" -> worldName;
             default -> identity(proxy, method, arguments);
           };
         });
@@ -704,6 +717,7 @@ public final class PreviewFakes {
         calls.record(method.getName());
         return switch (method.getName()) {
           case "getGameTime", "getFullTime" -> gameTime;
+          case "getTime" -> Math.floorMod(gameTime, 24000L);
           case "getName" -> "fake";
           default -> identity(proxy, method, arguments);
         };

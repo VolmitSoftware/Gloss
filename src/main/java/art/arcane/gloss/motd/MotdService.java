@@ -93,7 +93,11 @@ public final class MotdService {
 
     private void handlePing(ServerListPingEvent event) {
         try {
-            MotdMemo current = memo();
+            MotdDoc document = doc();
+            if (!document.show().matches(plugin, null)) {
+                return;
+            }
+            MotdMemo current = memo(document);
             int index = ThreadLocalRandom.current().nextInt(current.entries().size());
             String cached = current.rendered()[index];
             event.setMotd(cached == null
@@ -112,7 +116,7 @@ public final class MotdService {
      * function ({@code |name|}) is left out of the memo and re-rendered on every ping, so a
      * time-varying function still produces fresh output.
      */
-    private MotdMemo memo() {
+    private MotdMemo memo(MotdDoc document) {
         long generation = docGeneration.get();
         long emojiGeneration = TextPipeline.emojiGeneration();
         MotdMemo current = memo;
@@ -120,7 +124,7 @@ public final class MotdService {
             return current;
         }
 
-        List<MotdDoc.MotdEntry> entries = doc().entries();
+        List<MotdDoc.MotdEntry> entries = document.entries();
         String[] rendered = new String[entries.size()];
         for (int index = 0; index < rendered.length; index++) {
             String joined = entries.get(index).joined();

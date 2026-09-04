@@ -2,6 +2,7 @@ package art.arcane.gloss.tab;
 
 import art.arcane.gloss.condition.ConditionCompiler;
 import art.arcane.gloss.condition.ConditionSource;
+import art.arcane.gloss.condition.ShowCondition;
 import art.arcane.gloss.doc.DocumentEnvelope;
 import art.arcane.gloss.doc.DocumentParsers;
 
@@ -10,18 +11,21 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-public record TablistDoc(int schemaVersion, long revision, HeaderFooter headerFooter, ListNames listNames) {
+public record TablistDoc(int schemaVersion, long revision, ShowCondition show, HeaderFooter headerFooter,
+                         ListNames listNames) {
     public static final String KIND = "tablist";
     public static final int CURRENT_SCHEMA_VERSION = 2;
     public static final String FALLBACK_FORMAT = "$player";
 
     public static final TablistDoc DEFAULTS = new TablistDoc(CURRENT_SCHEMA_VERSION,
-        DocumentEnvelope.INITIAL_REVISION,
-        new HeaderFooter(true, new HeaderFooterPresentation("&d&lGloss", "&7VolmitSoftware.com"), List.of()),
-        new ListNames(true, new ListNamePresentation(FALLBACK_FORMAT), List.of(
+        DocumentEnvelope.INITIAL_REVISION, ShowCondition.ALWAYS,
+        new HeaderFooter(true, ShowCondition.ALWAYS,
+            new HeaderFooterPresentation("&d&lGloss", "&7VolmitSoftware.com"), List.of()),
+        new ListNames(true, ShowCondition.ALWAYS, new ListNamePresentation(FALLBACK_FORMAT), List.of(
             new ListNameVariant("operator", 100, "subject.op", new ListNamePresentation("&6$player")))));
 
     public TablistDoc {
+        show = show == null ? ShowCondition.ALWAYS : show;
         DocumentEnvelope.requireSchemaVersion(KIND, schemaVersion, CURRENT_SCHEMA_VERSION);
         DocumentEnvelope.requireRevision(KIND, revision);
         headerFooter = headerFooter == null ? HeaderFooter.DEFAULTS : headerFooter;
@@ -32,12 +36,13 @@ public record TablistDoc(int schemaVersion, long revision, HeaderFooter headerFo
         return DocumentParsers.parseJson(fileName, raw, TablistDoc.class);
     }
 
-    public record HeaderFooter(boolean enabled, HeaderFooterPresentation presentation,
+    public record HeaderFooter(boolean enabled, ShowCondition show, HeaderFooterPresentation presentation,
                                List<HeaderFooterVariant> variants) {
-        public static final HeaderFooter DEFAULTS = new HeaderFooter(true,
+        public static final HeaderFooter DEFAULTS = new HeaderFooter(true, ShowCondition.ALWAYS,
             new HeaderFooterPresentation("&d&lGloss", "&7VolmitSoftware.com"), List.of());
 
         public HeaderFooter {
+            show = show == null ? ShowCondition.ALWAYS : show;
             presentation = presentation == null ? HeaderFooterPresentation.EMPTY : presentation;
             variants = copyHeaderFooterVariants(variants);
         }
@@ -66,12 +71,13 @@ public record TablistDoc(int schemaVersion, long revision, HeaderFooter headerFo
         }
     }
 
-    public record ListNames(boolean enabled, ListNamePresentation presentation,
+    public record ListNames(boolean enabled, ShowCondition show, ListNamePresentation presentation,
                             List<ListNameVariant> variants) {
-        public static final ListNames DEFAULTS = new ListNames(true,
+        public static final ListNames DEFAULTS = new ListNames(true, ShowCondition.ALWAYS,
             new ListNamePresentation(FALLBACK_FORMAT), List.of());
 
         public ListNames {
+            show = show == null ? ShowCondition.ALWAYS : show;
             presentation = presentation == null ? new ListNamePresentation(FALLBACK_FORMAT) : presentation;
             variants = copyListNameVariants(variants);
         }

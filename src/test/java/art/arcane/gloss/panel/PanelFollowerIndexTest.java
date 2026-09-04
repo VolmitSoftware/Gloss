@@ -1,5 +1,6 @@
 package art.arcane.gloss.panel;
 
+import art.arcane.gloss.condition.ShowCondition;
 import org.junit.Test;
 
 import java.nio.charset.StandardCharsets;
@@ -44,6 +45,6 @@ public class PanelFollowerIndexTest {
         UUID.nameUUIDFromBytes(id.getBytes(StandardCharsets.UTF_8)),
         PanelDefinition.INITIAL_REVISION, "menu",
         PanelTransform.at("example:world", WORLD, 0.0D, 64.0D, 0.0D, 0.0D),
-        PanelFollow.none(), PanelVisibility.publicAccess());
+        PanelFollow.none(), PanelVisibility.publicAccess(), ShowCondition.ALWAYS);
   }
 }

@@ -39,6 +39,9 @@ public class ToggleComponent extends ClickableComponent<ToggleComponentData> {
 
   @Override
   public void onClick(HoloClickTrigger trigger) {
+    if (!isInteractable()) {
+      return;
+    }
     ActionContext context = session.actionContext(getId(), trigger);
     if (state) {
       if (MenuAction.execute(falseActions, context) == ActionOutcome.STOP)

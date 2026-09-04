@@ -193,7 +193,7 @@ final class PanelCommandSupport {
         board.rootMenuId(),
         board.transform(),
         board.follow(),
-        board.visibility()
+        board.visibility(), board.show()
     );
   }
 

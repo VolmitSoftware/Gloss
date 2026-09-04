@@ -37,6 +37,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.function.LongFunction;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 
 final class TemporaryHologramDisplay implements TemporaryHologram {
@@ -92,6 +93,7 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
     private volatile int appliedTeleportTicks;
     private volatile AnimationMemo animationMemo;
     private volatile List<ParticleLayer> particleLayers;
+    private volatile Predicate<Player> viewerCondition;
 
     TemporaryHologramDisplay(HologramService service, String id, Location initial, long durationMs) {
         this.service = service;
@@ -255,6 +257,11 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
     @Override
     public HologramViewers viewers() {
         return viewerList;
+    }
+
+    void setViewerCondition(Predicate<Player> condition) {
+        viewerCondition = condition;
+        visibilityReset.set(true);
     }
 
     @Override
@@ -447,8 +454,8 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
 
         moveIfNeeded(active, anchor);
         applyPresentation(active, presentation);
-        applyText(active, tick, world);
         applyVisibility(active);
+        applyText(active, tick, world);
     }
 
     void emitParticles(HologramTick tick) {
@@ -477,7 +484,8 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
 
     private void emitParticlesFor(Player viewer, Location anchor, LineSet snapshot,
                                   HologramPresentation presentation) {
-        if (!viewer.isOnline() || destroyed.get() || particleLayers.isEmpty()) {
+        if (!viewer.isOnline() || destroyed.get() || particleLayers.isEmpty()
+            || !conditionMatches(viewer)) {
             return;
         }
         ParticleText.Rendered override = renderedParticleText;
@@ -545,7 +553,7 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
         textDirty.set(false);
         LineSet snapshot = lineSet;
         String next = renderLines(snapshot);
-        boolean whitelist = viewerList.isWhitelist();
+        boolean whitelist = viewerList.isWhitelist() || viewerCondition != null;
         AtomicBoolean defaultVisibilityApplied = new AtomicBoolean(!whitelist);
         int teleportTicks = desiredTeleportTicks();
         boolean scheduled = service.plugin().scheduler().runAt(anchor, () -> {
@@ -780,6 +788,26 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
     }
 
     private void applyVisibility(TextDisplay active) {
+        if (viewerCondition != null) {
+            if (visibilityReset.compareAndSet(true, false)) {
+                DisplayVisibility.setVisibleByDefault(active, false);
+                appliedVisibility.clear();
+            }
+            for (UUID viewerId : appliedVisibility.keySet()) {
+                Player viewer = Bukkit.getPlayer(viewerId);
+                if (viewer == null) {
+                    appliedVisibility.remove(viewerId);
+                } else {
+                    dispatchConditionalVisibility(active, viewer);
+                }
+            }
+            service.forEachNearbyViewer(position, service.viewRange() * service.viewRange(), viewer -> {
+                if (!appliedVisibility.containsKey(viewer.getUniqueId())) {
+                    dispatchConditionalVisibility(active, viewer);
+                }
+            });
+            return;
+        }
         boolean whitelist = viewerList.isWhitelist();
         Set<UUID> members = viewerList.members();
         if (visibilityReset.compareAndSet(true, false)) {
@@ -882,6 +910,10 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
         if (active == null || !player.isOnline()) {
             return;
         }
+        if (viewerCondition != null) {
+            dispatchConditionalVisibility(active, player);
+            return;
+        }
         UUID viewerId = player.getUniqueId();
         boolean whitelist = viewerList.isWhitelist();
         boolean visible = whitelist == viewerList.members().contains(viewerId);
@@ -904,16 +936,51 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
         });
     }
 
+    private void dispatchConditionalVisibility(TextDisplay active, Player player) {
+        service.runViewerWork(player, player.getUniqueId(), animatorGroup + "#show", () -> {
+            if (destroyed.get() || display != active || !player.isOnline()) {
+                return;
+            }
+            UUID viewerId = player.getUniqueId();
+            Location viewerLocation = player.getLocation();
+            Location anchor = position;
+            boolean nearby = viewerLocation.getWorld() == anchor.getWorld()
+                && viewerLocation.distanceSquared(anchor) <= service.viewRange() * service.viewRange();
+            boolean visible = nearby && viewerList.isWhitelist() == viewerList.members().contains(viewerId)
+                && conditionMatches(player);
+            Boolean previous = appliedVisibility.put(viewerId, visible);
+            if (previous == null || previous != visible) {
+                retractAnimation();
+                service.animator().discardText(viewerId, active.getEntityId());
+                if (visible) {
+                    player.showEntity(service.plugin(), active);
+                } else {
+                    player.hideEntity(service.plugin(), active);
+                }
+            }
+            if (!nearby) {
+                appliedVisibility.remove(viewerId);
+            }
+        });
+    }
+
+    private boolean conditionMatches(Player viewer) {
+        Predicate<Player> condition = viewerCondition;
+        return condition == null || condition.test(viewer);
+    }
+
     private List<Player> captureViewers(HologramTick tick, World world) {
         boolean whitelist = viewerList.isWhitelist();
         Set<UUID> members = viewerList.members();
-        if (members.isEmpty()) {
+        boolean conditional = viewerCondition != null && display != null;
+        if (members.isEmpty() && !conditional) {
             return whitelist ? List.of() : tick.temporaryPlayers(world, position, service.viewRange());
         }
         List<HologramTick.Viewer> candidates = tick.temporaryViewers(world, position, service.viewRange());
         List<Player> viewers = new ArrayList<>(candidates.size());
         for (HologramTick.Viewer candidate : candidates) {
-            if (whitelist == members.contains(candidate.id())) {
+            if (whitelist == members.contains(candidate.id())
+                && (!conditional || Boolean.TRUE.equals(appliedVisibility.get(candidate.id())))) {
                 viewers.add(candidate.player());
             }
         }

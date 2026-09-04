@@ -80,7 +80,7 @@ class BubbleStyleResolutionTest {
 
     private static BubbleStyleDoc style(BubbleStyleDoc.Select select) {
         return new BubbleStyleDoc(4, 1L, "&7", null, 32, 5000L, true, true,
-            BubbleStyleDoc.DEFAULTS.motion(), BubbleStyleDoc.DEFAULTS.shimmer(), select, List.of());
+            BubbleStyleDoc.DEFAULTS.motion(), BubbleStyleDoc.DEFAULTS.shimmer(), select, List.of(), null);
     }
 
     private static BubbleStyleDoc.Select select(int priority, String when) {

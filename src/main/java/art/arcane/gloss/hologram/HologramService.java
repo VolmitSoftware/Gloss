@@ -60,6 +60,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 import java.util.logging.Level;
 
 public final class HologramService {
@@ -240,6 +241,13 @@ public final class HologramService {
         TemporaryHologramDisplay temporary = new TemporaryHologramDisplay(this, id, initial, durationMs);
         temporaries.add(temporary);
         return temporary;
+    }
+
+    public void setViewerCondition(TemporaryHologram hologram, Predicate<Player> condition) {
+        if (!(hologram instanceof TemporaryHologramDisplay display) || !temporaries.contains(display)) {
+            throw new IllegalArgumentException("Temporary hologram does not belong to this service.");
+        }
+        display.setViewerCondition(condition);
     }
 
     public double stackSpread() {

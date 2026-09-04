@@ -2,6 +2,7 @@ package art.arcane.gloss.preview.doc;
 
 import art.arcane.gloss.Gloss;
 import art.arcane.gloss.api.ParticleLayer;
+import art.arcane.gloss.condition.ShowCondition;
 import art.arcane.gloss.expr.Expr;
 import art.arcane.gloss.expr.ExprEvaluator;
 import art.arcane.gloss.expr.ExprException;
@@ -110,7 +111,7 @@ public final class PreviewDocumentParser {
     PreviewDocument doc;
     try {
       doc = GSON.fromJson(json, PreviewDocument.class);
-    } catch (JsonParseException e) {
+    } catch (JsonParseException | IllegalArgumentException e) {
       throw new PreviewDocumentException(documentName, "malformed JSON: " + e.getMessage(), e);
     }
     if (doc == null) {
@@ -126,6 +127,7 @@ public final class PreviewDocumentParser {
       declaredVarNames.addAll(variant.vars().keySet());
     }
 
+    CompiledExpr show = compileShow(doc.show, "show", Set.of());
     CardTemplate card = compileCard(doc.card);
     List<ElementTemplate> elements = compileElements(doc.elements);
     checkTotalTemplateCount(elements);
@@ -137,7 +139,7 @@ public final class PreviewDocumentParser {
     }
 
     int priority = doc.match != null && doc.match.priority != null ? doc.match.priority : 0;
-    return new CompiledPreviewDocument(documentName, priority, match, variants, vars, card, elements,
+    return new CompiledPreviewDocument(documentName, priority, match, variants, vars, show, card, elements,
         particleLayers);
   }
 
@@ -313,7 +315,7 @@ public final class PreviewDocumentParser {
     CompiledExpr title = card.title == null ? null : compileExpr(card.title, "card.title", Set.of());
     CompiledExpr accent = card.accent == null ? null : compileExpr(card.accent, "card.accent", Set.of());
     int minHalfWidth = card.minHalfWidth != null ? card.minHalfWidth : DEFAULT_MIN_HALF_WIDTH;
-    return new CardTemplate(framed, title, accent, minHalfWidth);
+    return new CardTemplate(compileShow(card.show, "card.show", Set.of()), framed, title, accent, minHalfWidth);
   }
 
   // ---------------------------------------------------------------------
@@ -384,7 +386,8 @@ public final class PreviewDocumentParser {
     }
 
     CompiledExpr visible = compileBoolField(def.visible, path + ".visible", true, scope);
-    return new ElementTemplate(type, x, y, z, width, height, size, color, wellColor, index, background, text, visible, repeat);
+    CompiledExpr show = compileShow(def.show, path + ".show", scope);
+    return new ElementTemplate(type, x, y, z, width, height, size, color, wellColor, index, background, text, show, visible, repeat);
   }
 
   private ElementType compileElementType(String type, String path) {
@@ -473,6 +476,10 @@ public final class PreviewDocumentParser {
     }
     validateVariables(expr, path, scope);
     return fold(expr, path);
+  }
+
+  private CompiledExpr compileShow(ShowCondition show, String path, Set<String> scope) {
+    return compileExpr((show == null ? ShowCondition.ALWAYS : show).expression(), path, scope);
   }
 
   private CompiledExpr compileBoolField(JsonElement raw, String path, boolean defaultValue, Set<String> scope) {

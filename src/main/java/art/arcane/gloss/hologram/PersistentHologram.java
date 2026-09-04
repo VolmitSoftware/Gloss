@@ -4,6 +4,7 @@ import art.arcane.gloss.Gloss;
 import art.arcane.gloss.api.AnchoredHologram;
 import art.arcane.gloss.doc.DocumentEnvelope;
 import art.arcane.gloss.api.ParticleLayer;
+import art.arcane.gloss.condition.ShowCondition;
 import art.arcane.gloss.particle.ParticleFrame;
 import art.arcane.gloss.particle.ParticleRect;
 import art.arcane.gloss.particle.ParticleText;
@@ -72,6 +73,7 @@ final class PersistentHologram implements AnchoredHologram {
     private final Map<UUID, String> viewerRendered;
     private final Map<UUID, ViewerAnimation> viewerAnimations;
     private final Map<UUID, Player> activeViewers;
+    private final Map<UUID, Boolean> shownViewers = new ConcurrentHashMap<>();
     private final AtomicBoolean sharedSpawning;
     private long lineGenerations;
     private volatile LineSet lineSet;
@@ -92,6 +94,7 @@ final class PersistentHologram implements AnchoredHologram {
     private volatile StaticSegments staticSegmentsCache;
     private volatile SharedAnimation sharedAnimationCache;
     private volatile DependencyMemo dependencyMemo;
+    private volatile ShowCondition show = ShowCondition.ALWAYS;
 
     PersistentHologram(HologramService service, String id, Location location) {
         this.service = service;
@@ -263,6 +266,10 @@ final class PersistentHologram implements AnchoredHologram {
     }
 
     void apply(HologramDoc doc) {
+        if (!show.equals(doc.show())) {
+            despawnAll();
+        }
+        show = doc.show();
         HologramDoc.Anchor anchor = doc.anchor();
         AnchorState previousAnchor = anchorState;
         anchorState = new AnchorState(anchor.world(), anchor.position().getX(), anchor.position().getY(),
@@ -297,7 +304,7 @@ final class PersistentHologram implements AnchoredHologram {
         AnchorState anchor = anchorState;
         return new HologramDoc(HologramDoc.CURRENT_SCHEMA_VERSION, revision,
             new HologramDoc.Anchor(anchor.worldName(), new Vector(anchor.x(), anchor.y(), anchor.z())), lineSet.lines(), seeThrough,
-            scale, billboard, yaw, pitch, particleLayers);
+            scale, billboard, yaw, pitch, particleLayers, show);
     }
 
     long nextRevision() {
@@ -372,7 +379,7 @@ final class PersistentHologram implements AnchoredHologram {
         if (!isCurrent(tickAnchor)) {
             return;
         }
-        if (snapshot.lines().isEmpty()) {
+        if (snapshot.lines().isEmpty() || !show.isDynamic() && !show.isAlwaysVisible()) {
             despawnAll();
             return;
         }
@@ -387,7 +394,7 @@ final class PersistentHologram implements AnchoredHologram {
         }
         reconcilePosition(tickAnchor, anchor);
         List<HologramTick.Viewer> viewers = tick.viewers(world, anchor, service.viewRange());
-        if (viewerSpecific(snapshot) && service.perViewerPlaceholders()) {
+        if (show.isDynamic() || viewerSpecific(snapshot) && service.perViewerPlaceholders()) {
             updatePersonalized(world, tickAnchor, anchor, snapshot, viewers);
         } else {
             updateShared(world, tickAnchor, anchor, snapshot, viewers);
@@ -584,7 +591,7 @@ final class PersistentHologram implements AnchoredHologram {
     }
 
     private void emitParticlesFor(Player viewer, Location anchor, List<String> authored) {
-        if (!viewer.isOnline() || particleLayers.isEmpty()) {
+        if (!viewer.isOnline() || particleLayers.isEmpty() || !show.matches(service.plugin(), viewer)) {
             return;
         }
         String source = String.join("\n", authored);
@@ -663,6 +670,9 @@ final class PersistentHologram implements AnchoredHologram {
 
                 Consumer<TextDisplay> configurer = spawned -> {
                     service.configureDisplay(spawned, seeThrough, billboardMode());
+                    if (!show.isAlwaysVisible()) {
+                        DisplayVisibility.setVisibleByDefault(spawned, false);
+                    }
                     spawned.setTransformation(scaleTransformation());
                     spawned.setText(rendered);
                 };
@@ -771,6 +781,7 @@ final class PersistentHologram implements AnchoredHologram {
         }
 
         int entityId = sharedEntityId;
+        shownViewers.remove(viewerId);
         viewerRendered.remove(viewerId);
         viewerAnimations.remove(viewerId);
         service.animator().remove(animatorGroup, viewerId.toString());
@@ -783,7 +794,7 @@ final class PersistentHologram implements AnchoredHologram {
 
     private void refreshViewerText(UUID viewerId, Player player, int entityId, LineSet snapshot,
                                    long delayTicks) {
-        if ((snapshot.flags() & TextPipeline.HAS_FUNCTION) != 0
+        if (!show.isDynamic() && (snapshot.flags() & TextPipeline.HAS_FUNCTION) != 0
             && viewerAnimationFresh(viewerId, snapshot, System.currentTimeMillis())) {
             return;
         }
@@ -797,6 +808,18 @@ final class PersistentHologram implements AnchoredHologram {
             return;
         }
         if (!personalizedDisplay || !activeViewers.containsKey(viewerId) || sharedEntityId != entityId) {
+            return;
+        }
+        TextDisplay expectedDisplay = sharedDisplay;
+        Boolean visible = refreshShow(player, viewerId, expectedDisplay, snapshot);
+        if (visible == null) {
+            return;
+        }
+        if (!visible) {
+            viewerRendered.remove(viewerId);
+            viewerAnimations.remove(viewerId);
+            service.animator().remove(animatorGroup, viewerId.toString());
+            service.animator().discardText(viewerId, entityId);
             return;
         }
         if ((snapshot.flags() & TextPipeline.HAS_FUNCTION) != 0) {
@@ -837,6 +860,27 @@ final class PersistentHologram implements AnchoredHologram {
         return dependencies(snapshot).fastDynamic()
             ? 50L
             : service.persistentUpdateIntervalTicks() * 50L;
+    }
+
+    private Boolean refreshShow(Player player, UUID viewerId, TextDisplay expectedDisplay, LineSet snapshot) {
+        ShowCondition condition = show;
+        if (condition.isAlwaysVisible()) {
+            return true;
+        }
+        boolean visible = condition.matches(service.plugin(), player);
+        if (sharedDisplay != expectedDisplay || expectedDisplay == null || lineSet != snapshot
+            || show != condition || !personalizedDisplay || !activeViewers.containsKey(viewerId)) {
+            return null;
+        }
+        Boolean previous = shownViewers.put(viewerId, visible);
+        if (previous == null || previous != visible) {
+            if (visible) {
+                player.showEntity(service.plugin(), expectedDisplay);
+            } else {
+                player.hideEntity(service.plugin(), expectedDisplay);
+            }
+        }
+        return visible;
     }
 
     private boolean viewerAnimationFresh(UUID viewerId, LineSet snapshot, long nowMs) {
@@ -969,6 +1013,7 @@ final class PersistentHologram implements AnchoredHologram {
 
     private void invalidateViewer(UUID viewerId, boolean clearClientText) {
         Player viewer = activeViewers.remove(viewerId);
+        shownViewers.remove(viewerId);
         viewerRendered.remove(viewerId);
         viewerAnimations.remove(viewerId);
         service.animator().remove(animatorGroup, viewerId.toString());
@@ -980,6 +1025,10 @@ final class PersistentHologram implements AnchoredHologram {
 
         service.runViewerWork(viewer, viewerId, id, () -> {
             if (personalizedDisplay && sharedEntityId == entityId && !activeViewers.containsKey(viewerId)) {
+                TextDisplay display = sharedDisplay;
+                if (!show.isAlwaysVisible() && display != null) {
+                    viewer.hideEntity(service.plugin(), display);
+                }
                 service.animator().sendText(viewer, viewerId, entityId, "");
             }
         });
@@ -992,6 +1041,7 @@ final class PersistentHologram implements AnchoredHologram {
             service.animator().discardText(viewerId, entityId);
         }
         activeViewers.clear();
+        shownViewers.clear();
         viewerRendered.clear();
         viewerAnimations.clear();
     }

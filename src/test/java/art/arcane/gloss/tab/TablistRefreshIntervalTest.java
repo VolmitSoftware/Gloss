@@ -1,5 +1,6 @@
 package art.arcane.gloss.tab;
 
+import art.arcane.gloss.condition.ShowCondition;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -48,8 +49,8 @@ class TablistRefreshIntervalTest {
         assertFalse(TablistService.fastDriverRequired(enabled, true, false, false, 40));
         assertFalse(TablistService.fastDriverRequired(enabled, true, true, false, 1));
 
-        TablistDoc names = new TablistDoc(2, 1L, disabled.headerFooter(),
-            new TablistDoc.ListNames(true, new TablistDoc.ListNamePresentation("$player"), List.of()));
+        TablistDoc names = new TablistDoc(2, 1L, ShowCondition.ALWAYS, disabled.headerFooter(),
+            new TablistDoc.ListNames(true, ShowCondition.ALWAYS, new TablistDoc.ListNamePresentation("$player"), List.of()));
         String ordinary = TablistService.substituteTokens("&7$player", "Alex", "default");
         String animated = TablistService.substituteTokens(
             "{{ wave('$player', ['&a', '&b'], time.ticks) }}", "Alex", "vip");
@@ -61,9 +62,9 @@ class TablistRefreshIntervalTest {
 
     private static TablistDoc doc(boolean enabled, String header, String footer,
                                   List<TablistDoc.HeaderFooterVariant> variants) {
-        return new TablistDoc(2, 1L,
-            new TablistDoc.HeaderFooter(enabled,
+        return new TablistDoc(2, 1L, ShowCondition.ALWAYS,
+            new TablistDoc.HeaderFooter(enabled, ShowCondition.ALWAYS,
                 new TablistDoc.HeaderFooterPresentation(header, footer), variants),
-            new TablistDoc.ListNames(true, new TablistDoc.ListNamePresentation("$player"), List.of()));
+            new TablistDoc.ListNames(true, ShowCondition.ALWAYS, new TablistDoc.ListNamePresentation("$player"), List.of()));
     }
 }

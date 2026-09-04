@@ -5,6 +5,9 @@ import art.arcane.gloss.expr.ExprFunctions;
 import art.arcane.gloss.expr.ExprScope;
 import art.arcane.gloss.preview.PreviewElement;
 import art.arcane.gloss.util.common.TextUtils;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
@@ -40,6 +43,22 @@ public class ShippedPreviewDocumentTest {
   static final List<String> SHIPPED = List.of(
       "chest", "ender_chest", "furnace", "brewing_stand", "hopper", "dispenser", "shelf",
       "chiseled_bookshelf", "jukebox", "beehive", "cauldron", "minecart", "furnace_minecart", "locked");
+
+  @Test
+  public void shippedDocumentsExposeShowAtEveryLevel() throws IOException {
+    for (String name : SHIPPED) {
+      try (InputStream stream = ShippedPreviewDocumentTest.class.getResourceAsStream("/previews/" + name + ".json")) {
+        assertNotNull(name, stream);
+        JsonObject document = JsonParser.parseString(new String(stream.readAllBytes(), StandardCharsets.UTF_8))
+            .getAsJsonObject();
+        assertTrue(name, document.get("show").getAsBoolean());
+        assertTrue(name, document.getAsJsonObject("card").get("show").getAsBoolean());
+        for (JsonElement element : document.getAsJsonArray("elements")) {
+          assertTrue(name, element.getAsJsonObject().has("show"));
+        }
+      }
+    }
+  }
 
   @Test
   public void everyShippedDocumentCompiles() throws IOException {

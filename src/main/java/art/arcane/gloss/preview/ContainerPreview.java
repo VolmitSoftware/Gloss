@@ -34,6 +34,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 public final class ContainerPreview {
 
@@ -72,10 +73,14 @@ public final class ContainerPreview {
   private final Block block;
   private final Entity entity;
   private final Vector targetCenter;
-  private final List<PreviewElement> elements;
+  private List<PreviewElement> elements;
   private final List<ParticleLayer> particleLayers;
   private final boolean showsContents;
-  private final List<Rendered> rendered = new ArrayList<>();
+  private volatile List<Rendered> rendered = List.of();
+  private CompiledPreviewDocument document;
+  private PreviewStateContext context;
+  private CompiledPreviewDocument.Visibility visibility;
+  private final AtomicReference<Layout> pendingLayout = new AtomicReference<>();
 
   private Location anchor;
   private Location eye;
@@ -114,10 +119,24 @@ public final class ContainerPreview {
     this.elements = elements;
     this.particleLayers = particleLayers;
     this.showsContents = showsContents;
+    this.rendered = prepareLayout(elements).rendered();
+  }
+
+  private Layout prepareLayout(List<PreviewElement> elements) {
+    List<Rendered> prepared = new ArrayList<>(elements.size());
     for (PreviewElement element : elements) {
       Rendered r = new Rendered(element);
       seed(r);
-      this.rendered.add(r);
+      prepared.add(r);
+    }
+    return new Layout(elements, List.copyOf(prepared));
+  }
+
+  private void trackVisibility(CompiledPreviewDocument document, PreviewStateContext context) {
+    if (document.hasDynamicVisibility()) {
+      this.document = document;
+      this.context = context;
+      this.visibility = document.visibility(context);
     }
   }
 
@@ -130,12 +149,15 @@ public final class ContainerPreview {
     if (resolved == null) {
       return null;
     }
-    List<PreviewElement> elements = resolved.doc().build(PreviewStateContext.forBlock(block, player, resolved.vars()));
-    if (elements.isEmpty()) {
+    PreviewStateContext context = PreviewStateContext.forBlock(block, player, resolved.vars());
+    List<PreviewElement> elements = resolved.doc().build(context);
+    if (elements.isEmpty() && !resolved.doc().hasDynamicVisibility()) {
       return null;
     }
     Vector center = block.getLocation().toVector().add(new Vector(0.5, 0.5, 0.5));
-    return new ContainerPreview(player, block, null, center, elements, resolved.doc().particleLayers(), true);
+    ContainerPreview preview = new ContainerPreview(player, block, null, center, elements, resolved.doc().particleLayers(), true);
+    preview.trackVisibility(resolved.doc(), context);
+    return preview;
   }
 
   public static ContainerPreview forEnderChest(Block block, Player player, Vector center) {
@@ -147,12 +169,14 @@ public final class ContainerPreview {
     if (resolved == null) {
       return null;
     }
-    List<PreviewElement> elements = resolved.doc().build(
-        PreviewStateContext.forInventory(player.getEnderChest(), player, resolved.vars()));
-    if (elements.isEmpty()) {
+    PreviewStateContext context = PreviewStateContext.forWorld(block.getWorld(), player, player.getEnderChest(), resolved.vars());
+    List<PreviewElement> elements = resolved.doc().build(context);
+    if (elements.isEmpty() && !resolved.doc().hasDynamicVisibility()) {
       return null;
     }
-    return new ContainerPreview(player, block, null, center, elements, resolved.doc().particleLayers(), true);
+    ContainerPreview preview = new ContainerPreview(player, block, null, center, elements, resolved.doc().particleLayers(), true);
+    preview.trackVisibility(resolved.doc(), context);
+    return preview;
   }
 
   public static ContainerPreview forEntity(Entity entity, Player player) {
@@ -164,46 +188,49 @@ public final class ContainerPreview {
     if (resolved == null) {
       return null;
     }
-    List<PreviewElement> elements = resolved.doc().build(PreviewStateContext.forEntity(entity, player, resolved.vars()));
-    if (elements.isEmpty()) {
+    PreviewStateContext context = PreviewStateContext.forEntity(entity, player, resolved.vars());
+    List<PreviewElement> elements = resolved.doc().build(context);
+    if (elements.isEmpty() && !resolved.doc().hasDynamicVisibility()) {
       return null;
     }
     Vector center = entity.getLocation().toVector().add(new Vector(0, Math.max(0.35, entity.getHeight() * 0.5), 0));
-    return new ContainerPreview(player, null, entity, center, elements, resolved.doc().particleLayers(), true);
+    ContainerPreview preview = new ContainerPreview(player, null, entity, center, elements, resolved.doc().particleLayers(), true);
+    preview.trackVisibility(resolved.doc(), context);
+    return preview;
   }
 
   public static ContainerPreview locked(Block block, Player player) {
-    List<PreviewElement> elements = lockedElements(player);
-    if (elements.isEmpty()) {
+    PreviewDocumentRegistry registry = registry();
+    CompiledPreviewDocument.Resolved resolved = registry == null ? null : registry.special(PreviewDocumentRegistry.SPECIAL_LOCKED);
+    if (resolved == null) {
+      return null;
+    }
+    PreviewStateContext context = PreviewStateContext.forWorld(block.getWorld(), player, null, resolved.vars());
+    List<PreviewElement> elements = resolved.doc().build(context);
+    if (elements.isEmpty() && !resolved.doc().hasDynamicVisibility()) {
       return null;
     }
     Vector center = block.getLocation().toVector().add(new Vector(0.5D, 0.5D, 0.5D));
-    return new ContainerPreview(player, block, null, center, elements, lockedParticleLayers(), false);
+    ContainerPreview preview = new ContainerPreview(player, block, null, center, elements, resolved.doc().particleLayers(), false);
+    preview.trackVisibility(resolved.doc(), context);
+    return preview;
   }
 
   public static ContainerPreview locked(Entity entity, Player player) {
-    List<PreviewElement> elements = lockedElements(player);
-    if (elements.isEmpty()) {
+    PreviewDocumentRegistry registry = registry();
+    CompiledPreviewDocument.Resolved resolved = registry == null ? null : registry.special(PreviewDocumentRegistry.SPECIAL_LOCKED);
+    if (resolved == null) {
+      return null;
+    }
+    PreviewStateContext context = PreviewStateContext.forWorld(entity.getWorld(), player, null, resolved.vars());
+    List<PreviewElement> elements = resolved.doc().build(context);
+    if (elements.isEmpty() && !resolved.doc().hasDynamicVisibility()) {
       return null;
     }
     Vector center = entity.getLocation().toVector().add(new Vector(0, Math.max(0.35D, entity.getHeight() * 0.5D), 0));
-    return new ContainerPreview(player, null, entity, center, elements, lockedParticleLayers(), false);
-  }
-
-  private static List<PreviewElement> lockedElements(Player player) {
-    PreviewDocumentRegistry registry = registry();
-    CompiledPreviewDocument.Resolved resolved = registry == null
-        ? null
-        : registry.special(PreviewDocumentRegistry.SPECIAL_LOCKED);
-    return resolved == null ? List.of() : resolved.doc().build(PreviewStateContext.forViewer(player, resolved.vars()));
-  }
-
-  private static List<ParticleLayer> lockedParticleLayers() {
-    PreviewDocumentRegistry registry = registry();
-    CompiledPreviewDocument.Resolved resolved = registry == null
-        ? null
-        : registry.special(PreviewDocumentRegistry.SPECIAL_LOCKED);
-    return resolved == null ? List.of() : resolved.doc().particleLayers();
+    ContainerPreview preview = new ContainerPreview(player, null, entity, center, elements, resolved.doc().particleLayers(), false);
+    preview.trackVisibility(resolved.doc(), context);
+    return preview;
   }
 
   /** Null before the plugin has enabled, which is the one window a preview can be requested in. */
@@ -230,7 +257,7 @@ public final class ContainerPreview {
     refreshViewerScale();
     recomputeAnchor();
     appliedScale = scaleTarget;
-    if (!viewerHidden) {
+    if (!viewerHidden && !rendered.isEmpty()) {
       for (Rendered r : rendered) {
         spawn(r);
       }
@@ -245,14 +272,15 @@ public final class ContainerPreview {
       return false;
     }
     boolean checkAccess = ticks % ACCESS_RECHECK_INTERVAL == 0;
-    boolean refreshContents = showsContents && ticks % REFRESH_INTERVAL == 0;
+    boolean refreshContents = (showsContents || document != null) && ticks % REFRESH_INTERVAL == 0;
     ticks++;
     if (checkAccess || refreshContents) {
       scheduleRefresh(checkAccess);
     }
     refreshViewerScale();
     recomputeAnchor();
-    boolean shouldShow = !viewerHidden;
+    applyPendingLayout();
+    boolean shouldShow = !viewerHidden && !rendered.isEmpty();
     if (shouldShow != visualsShown) {
       if (shouldShow) {
         appliedScale = scaleTarget;
@@ -610,7 +638,9 @@ public final class ContainerPreview {
     GlossTelemetry.countPreviewRefresh();
     Runnable read = () -> {
       try {
-        for (Rendered r : rendered) {
+        refreshVisibility();
+        Layout pending = pendingLayout.get();
+        for (Rendered r : pending == null ? rendered : pending.rendered()) {
           readDynamic(r);
         }
       } finally {
@@ -631,7 +661,11 @@ public final class ContainerPreview {
           }
         }
         if (!showsContents) {
-          refreshScheduled.set(false);
+          if (document == null) {
+            refreshScheduled.set(false);
+          } else {
+            read.run();
+          }
           return;
         }
         if (block.getType() == Material.ENDER_CHEST) {
@@ -661,7 +695,7 @@ public final class ContainerPreview {
             return;
           }
         }
-        if (showsContents) {
+        if (showsContents || document != null) {
           read.run();
         } else {
           refreshScheduled.set(false);
@@ -673,6 +707,32 @@ public final class ContainerPreview {
       return;
     }
     read.run();
+  }
+
+  private void refreshVisibility() {
+    if (document == null) {
+      return;
+    }
+    CompiledPreviewDocument.Visibility current = document.visibility(context);
+    if (current.equals(visibility)) {
+      return;
+    }
+    pendingLayout.set(prepareLayout(document.build(context)));
+    visibility = current;
+  }
+
+  private void applyPendingLayout() {
+    Layout pending = pendingLayout.getAndSet(null);
+    if (pending == null) {
+      return;
+    }
+    despawnVisuals();
+    elements = pending.elements();
+    rendered = pending.rendered();
+    visualsShown = false;
+  }
+
+  private record Layout(List<PreviewElement> elements, List<Rendered> rendered) {
   }
 
   private void readDynamic(Rendered r) {

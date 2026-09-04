@@ -1,5 +1,6 @@
 package art.arcane.gloss.menu;
 
+import art.arcane.gloss.condition.ShowCondition;
 import art.arcane.gloss.api.HoloCloseReason;
 import art.arcane.gloss.config.MenuComponentData;
 import art.arcane.gloss.config.MenuDefinitionData;
@@ -36,10 +37,11 @@ public class MenuSessionManagerMoveTest {
     AtomicReference<Location> playerLocation = new AtomicReference<>(from);
     AtomicReference<Vector> velocity = new AtomicReference<>(new Vector(1D, 2D, 3D));
     MenuDefinitionData data = new MenuDefinitionData(new Vector(), true, false, 1D, false, false,
-        List.<MenuComponentData>of(), List.of());
+        List.<MenuComponentData>of(), List.of(), ShowCondition.ALWAYS);
     data.setId("locked");
     Player player = player(playerLocation, velocity);
     MenuSession session = new MenuSession(data, player, MenuSessionOptions.personal(data, player, null));
+    session.open();
 
     HoloCloseReason reason = MenuSessionManager.handleMovement(session, from, to);
 
@@ -56,7 +58,7 @@ public class MenuSessionManagerMoveTest {
     AtomicReference<Location> playerLocation = new AtomicReference<>(opening);
     AtomicReference<Vector> velocity = new AtomicReference<>(new Vector());
     MenuDefinitionData data = new MenuDefinitionData(new Vector(1D, 2D, 3D), false, false, 8D, false, false,
-        List.<MenuComponentData>of(), List.of());
+        List.<MenuComponentData>of(), List.of(), ShowCondition.ALWAYS);
     data.setId("movable");
     Player player = player(playerLocation, velocity);
     MenuSession session = new MenuSession(data, player, MenuSessionOptions.personal(data, player, null));
@@ -84,7 +86,7 @@ public class MenuSessionManagerMoveTest {
     AtomicReference<Location> playerLocation = new AtomicReference<>(opening);
     AtomicReference<Vector> velocity = new AtomicReference<>(new Vector());
     MenuDefinitionData data = new MenuDefinitionData(new Vector(0D, 0D, 2D), false, true, 8D, false, false,
-        List.<MenuComponentData>of(), List.of());
+        List.<MenuComponentData>of(), List.of(), ShowCondition.ALWAYS);
     data.setId("following");
     Player player = player(playerLocation, velocity);
     MenuSession session = new MenuSession(data, player, MenuSessionOptions.personal(data, player, null));
@@ -111,7 +113,7 @@ public class MenuSessionManagerMoveTest {
     AtomicReference<Location> playerLocation = new AtomicReference<>(opening);
     AtomicReference<Vector> velocity = new AtomicReference<>(new Vector(1D, 0D, 0D));
     MenuDefinitionData data = new MenuDefinitionData(new Vector(0D, 0D, 2D), true, true, 8D, false, false,
-        List.<MenuComponentData>of(), List.of());
+        List.<MenuComponentData>of(), List.of(), ShowCondition.ALWAYS);
     data.setId("locked-following");
     Player player = player(playerLocation, velocity);
     MenuSession session = new MenuSession(data, player, MenuSessionOptions.personal(data, player, null));

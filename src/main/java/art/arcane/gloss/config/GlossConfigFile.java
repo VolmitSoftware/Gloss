@@ -1,6 +1,7 @@
 package art.arcane.gloss.config;
 
 import art.arcane.gloss.Gloss;
+import art.arcane.gloss.condition.ShowCondition;
 import art.arcane.volmlib.util.config.ConfigDescription;
 import art.arcane.volmlib.util.config.ConfigDoc;
 import art.arcane.volmlib.util.localization.VolmitLocales;
@@ -215,6 +216,9 @@ public final class GlossConfigFile {
     }
 
     public static final class Drops {
+        @ConfigDoc("Boolean or boolean expression controlling drop-label visibility for each viewer.")
+        public String show = "true";
+
         @ConfigDoc("Name format for dropped item stacks; {count} and {type} are replaced.")
         public String nameFormat = "&7{count}x {type}";
 
@@ -371,6 +375,7 @@ public final class GlossConfigFile {
         if (drops == null) {
             drops = new Drops();
         }
+        drops.show = ShowCondition.of(drops.show == null ? "true" : drops.show).expression();
         if (commands == null) {
             commands = new Commands();
         }

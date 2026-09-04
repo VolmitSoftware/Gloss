@@ -215,7 +215,7 @@ public final class PanelRepository implements PanelStore {
     }
 
     PanelDefinition renamed = new PanelDefinition(current.schemaVersion(), canonicalNewId, current.uuid(),
-        current.revision() + 1L, current.rootMenuId(), current.transform(), current.follow(), current.visibility());
+        current.revision() + 1L, current.rootMenuId(), current.transform(), current.follow(), current.visibility(), current.show());
     Path source = pathForCanonical(canonicalId);
     Path target = pathForCanonical(canonicalNewId);
     prepareTarget(source);
@@ -327,7 +327,7 @@ public final class PanelRepository implements PanelStore {
     validateUpdateIdentity(current, new PanelDefinition(
         requiredUpdated.schemaVersion(), requiredUpdated.id(), requiredUpdated.uuid(),
         current.revision(), requiredUpdated.rootMenuId(), requiredUpdated.transform(),
-        requiredUpdated.follow(), requiredUpdated.visibility()));
+        requiredUpdated.follow(), requiredUpdated.visibility(), requiredUpdated.show()));
     if (requiredUpdated.revision() != current.revision() + 1L) {
       throw new IllegalArgumentException("external panel publication must advance revision exactly once");
     }

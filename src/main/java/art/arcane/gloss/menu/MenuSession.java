@@ -6,6 +6,7 @@ import art.arcane.gloss.GlossConfig;
 import art.arcane.gloss.api.internal.ApiMenuHandle;
 import art.arcane.gloss.config.MenuComponentData;
 import art.arcane.gloss.config.MenuDefinitionData;
+import art.arcane.gloss.condition.ShowCondition;
 import art.arcane.gloss.menu.action.ActionContext;
 import art.arcane.gloss.menu.action.SessionActionContext;
 import art.arcane.gloss.menu.components.ClickableComponent;
@@ -39,6 +40,7 @@ public class MenuSession {
   private final List<MenuComponent<?>> components;
   private final List<ParticleLayer> particleLayers;
   private final boolean readsEyePose;
+  private final ShowCondition show;
 
   private final Map<String, MenuComponent<?>> componentsById;
 
@@ -47,6 +49,8 @@ public class MenuSession {
 
   private MenuTransform transform;
   private float scaleMultiplier;
+  private ShowCondition parentShow = ShowCondition.ALWAYS;
+  private boolean active;
 
   public MenuSession(MenuDefinitionData data, Player p, MenuSessionOptions options) {
     this.id = data.getId();
@@ -60,6 +64,7 @@ public class MenuSession {
     this.closeOnDeath = data.isCloseOnDeath();
     this.closeOnTeleport = data.isCloseOnTeleport();
     this.offsetDistance = data.getOffset().lengthSquared();
+    this.show = data.getShow();
 
     this.transform = options.transform();
     Map<String, MenuComponent<?>> uniqueComponents = new LinkedHashMap<>(data.getComponents().size());
@@ -95,7 +100,15 @@ public class MenuSession {
   }
 
   public boolean isFreezePlayer() {
-    return freezePlayer;
+    return freezePlayer && isShown();
+  }
+
+  public boolean isShown() {
+    return active && show.matches(Gloss.instance, player) && parentShow.matches(Gloss.instance, player);
+  }
+
+  public void setParentShow(ShowCondition show) {
+    parentShow = Objects.requireNonNull(show, "show");
   }
 
   public boolean isFollowPlayer() {
@@ -188,7 +201,17 @@ public class MenuSession {
    * component — and not at all when nothing in the session reads it.
    */
   public void tick() {
+    if (!active) {
+      return;
+    }
     drainApiUpdates();
+    boolean shown = isShown();
+    for (MenuComponent<?> component : components) {
+      component.refreshVisibility(shown);
+    }
+    if (!shown) {
+      return;
+    }
     Vector eyeOrigin = null;
     Vector eyeDirection = null;
     if (readsEyePose) {
@@ -203,10 +226,14 @@ public class MenuSession {
   }
 
   public void open() {
+    active = true;
     if (options.faceViewerOnOpen()) {
       this.transform = transform.withAnchorAndFacing(transform.anchor(), player.getEyeLocation().getYaw());
     }
-    components.forEach(MenuComponent::open);
+    boolean shown = isShown();
+    for (MenuComponent<?> component : components) {
+      component.refreshVisibility(shown);
+    }
   }
 
   public ActionContext actionContext(String componentId, HoloClickTrigger trigger) {
@@ -214,6 +241,7 @@ public class MenuSession {
   }
 
   public void close() {
+    active = false;
     for (MenuComponent<?> component : components) {
       try {
         component.close();

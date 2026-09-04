@@ -101,7 +101,7 @@ class BubbleStyleDocTest {
             new BubbleStyleDoc.Axis("0", "0", "90 * t"), "1 - t");
         BubbleStyleDoc original = new BubbleStyleDoc(4, 9L, "&d", new Vector(0.0D, 2.0D, 0.0D), 40, 6000L,
             false, true, motion, BubbleStyleDoc.DEFAULTS.shimmer(),
-            new BubbleStyleDoc.Select(3, "subject.world == 'hub' && inGroup('subject', 'vip')"), List.of());
+            new BubbleStyleDoc.Select(3, "subject.world == 'hub' && inGroup('subject', 'vip')"), List.of(), null);
 
         BubbleStyleDoc decoded = BubbleStyleDoc.parse("vip.json", BukkitJson.GSON.toJson(original));
 
@@ -120,16 +120,16 @@ class BubbleStyleDocTest {
     @Test
     void revisionBoundsAreEnforced() {
         assertThrows(IllegalArgumentException.class,
-            () -> new BubbleStyleDoc(4, 0L, "&7", null, 32, 5000L, true, true, null, null, null, List.of()));
+            () -> new BubbleStyleDoc(4, 0L, "&7", null, 32, 5000L, true, true, null, null, null, List.of(), null));
         assertThrows(IllegalArgumentException.class,
             () -> new BubbleStyleDoc(4, DocumentEnvelope.MAX_SAFE_REVISION + 1L, "&7", null, 32, 5000L,
-                true, true, null, null, null, List.of()));
+                true, true, null, null, null, List.of(), null));
     }
 
     @Test
     void outOfRangeValuesClamp() {
         BubbleStyleDoc doc = new BubbleStyleDoc(4, 1L, null, null, 1000, 10L, true, true,
-            null, null, null, List.of());
+            null, null, null, List.of(), null);
 
         assertEquals("&7", doc.prefix());
         assertEquals(new Vector(0.0D, 0.3D, 0.0D), doc.offset());

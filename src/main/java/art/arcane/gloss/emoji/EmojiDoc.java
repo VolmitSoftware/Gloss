@@ -1,13 +1,15 @@
 package art.arcane.gloss.emoji;
 
+import art.arcane.gloss.condition.ShowCondition;
 import art.arcane.gloss.doc.DocumentEnvelope;
 import art.arcane.gloss.doc.DocumentParsers;
 
-public record EmojiDoc(int schemaVersion, long revision, String trigger, String emoji, Boolean enabled) {
+public record EmojiDoc(int schemaVersion, long revision, String trigger, String emoji, Boolean enabled, ShowCondition show) {
     public static final String KIND = "emoji";
     public static final int CURRENT_SCHEMA_VERSION = 1;
 
     public EmojiDoc {
+        show = show == null ? ShowCondition.ALWAYS : show;
         DocumentEnvelope.requireSchemaVersion(KIND, schemaVersion, CURRENT_SCHEMA_VERSION);
         DocumentEnvelope.requireRevision(KIND, revision);
         trigger = trigger == null ? "" : trigger;

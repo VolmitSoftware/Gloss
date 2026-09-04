@@ -367,7 +367,7 @@ public final class BoardService implements Listener {
             BoardManager<Board> target = meta != null && usesFastRefresh(meta)
                 && activeAnimationManager != null ? activeAnimationManager : activeOrdinaryManager;
             BoardManager<Board> other = target == activeOrdinaryManager ? activeAnimationManager : activeOrdinaryManager;
-            if (meta != null) {
+            if (meta != null && meta.show().matches(GlossConditionScope.viewer(plugin, player), conditionErrors)) {
                 if (other != null) {
                     other.remove(player);
                 }

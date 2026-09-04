@@ -1,5 +1,6 @@
 package art.arcane.gloss.emoji;
 
+import art.arcane.gloss.condition.ShowCondition;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -9,9 +10,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class EmojiReplacerTest {
     private final EmojiReplacer replacer = new EmojiReplacer(List.of(
-        new EmojiEntry("heart", "<3", "❤", true),
-        new EmojiEntry("star", "", "✳", true),
-        new EmojiEntry("off", "", "X", false)
+        new EmojiEntry("heart", "<3", "❤", true, ShowCondition.ALWAYS),
+        new EmojiEntry("star", "", "✳", true, ShowCondition.ALWAYS),
+        new EmojiEntry("off", "", "X", false, ShowCondition.ALWAYS)
     ));
 
     @Test

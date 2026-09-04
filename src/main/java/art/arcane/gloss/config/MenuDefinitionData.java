@@ -1,6 +1,7 @@
 package art.arcane.gloss.config;
 
 import art.arcane.gloss.api.ParticleLayer;
+import art.arcane.gloss.condition.ShowCondition;
 import org.bukkit.util.Vector;
 
 import java.util.List;
@@ -14,11 +15,12 @@ public class MenuDefinitionData {
   private final boolean closeOnDeath, closeOnTeleport;
   private final List<MenuComponentData> components;
   private final List<ParticleLayer> particleLayers;
+  private final ShowCondition show;
   private volatile String id;
 
   public MenuDefinitionData(Vector offset, boolean lockPosition, boolean followPlayer, Double maxDistance,
                             boolean closeOnDeath, boolean closeOnTeleport, List<MenuComponentData> components,
-                            List<ParticleLayer> particleLayers) {
+                            List<ParticleLayer> particleLayers, ShowCondition show) {
     this.offset = offset;
     this.lockPosition = lockPosition;
     this.followPlayer = followPlayer;
@@ -27,10 +29,15 @@ public class MenuDefinitionData {
     this.closeOnTeleport = closeOnTeleport;
     this.components = components;
     this.particleLayers = ParticleLayer.copyLayers(particleLayers, "menu");
+    this.show = show == null ? ShowCondition.ALWAYS : show;
   }
 
   public Vector getOffset() {
     return offset;
+  }
+
+  public ShowCondition getShow() {
+    return show == null ? ShowCondition.ALWAYS : show;
   }
 
   public boolean isLockPosition() {
