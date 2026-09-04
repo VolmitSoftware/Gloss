@@ -229,8 +229,7 @@ public final class EditorSyncService {
             saveSessions();
           }
         }, executor));
-    revocation.whenComplete((ignored, failure) -> inFlight.remove(sessionId));
-    return revocation;
+    return revocation.whenComplete((ignored, failure) -> inFlight.remove(sessionId));
   }
 
   public void shutdown() {
@@ -444,8 +443,7 @@ public final class EditorSyncService {
     CompletableFuture<Void> work = startTracked(() -> session.pendingAck() == null
         ? fetchPublication(session)
         : reconcileAndAcknowledge(session));
-    work.whenComplete((ignored, failure) -> inFlight.remove(sessionId));
-    return work;
+    return work.whenComplete((ignored, failure) -> inFlight.remove(sessionId));
   }
 
   <T> CompletableFuture<T> track(CompletableFuture<T> future) {

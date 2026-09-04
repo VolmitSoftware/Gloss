@@ -121,9 +121,10 @@ public class EditorSyncServiceTest {
         () -> service.revoke(session.sessionId()).join());
     assertTrue(busy.getCause() instanceof IllegalStateException);
 
+    CompletableFuture<Void> revocation = pull.thenCompose(ignored ->
+        service.revoke(session.sessionId()));
     publication.complete(Optional.empty());
-    pull.join();
-    service.revoke(session.sessionId()).join();
+    revocation.join();
     assertEquals(1, relay.revocations.get());
   }
 
