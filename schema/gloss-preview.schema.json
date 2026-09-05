@@ -5,6 +5,11 @@
   "description": "Defines the holographic card Gloss draws when a player looks at a container. Documents live in plugins/Gloss/previews/ and are hot reloaded. Documentation grade only: the Java parser (PreviewDocumentParser) is the format's source of truth, and it enforces rules this schema cannot express.",
   "type": "object",
   "properties": {
+    "show": {
+      "title": "Visibility expression",
+      "description": "Boolean expression controlling display visibility.",
+      "$ref": "#/$defs/boolean"
+    },
     "match": {
       "description": "What this document draws, how strongly it claims it, and the variables it draws with.",
       "$ref": "#/$defs/match"
@@ -213,6 +218,11 @@
       "description": "Declaring a card at all asks for the chrome, so framed defaults to true here.",
       "type": "object",
       "properties": {
+        "show": {
+          "title": "Visibility expression",
+          "description": "Boolean expression controlling display visibility.",
+          "$ref": "#/$defs/boolean"
+        },
         "framed": {
           "description": "Whether to draw the chrome. Evaluated once when the preview is built. Default true.",
           "$ref": "#/$defs/boolean"
@@ -357,6 +367,11 @@
         },
         "visible": {
           "description": "Skip this element when false. Evaluated once when the preview is built (per iteration inside a repeat), not per frame: an element hidden at build time stays hidden for the life of that preview. Default true.",
+          "$ref": "#/$defs/boolean"
+        },
+        "show": {
+          "title": "Visibility expression",
+          "description": "Boolean expression controlling display visibility.",
           "$ref": "#/$defs/boolean"
         },
         "repeat": {
