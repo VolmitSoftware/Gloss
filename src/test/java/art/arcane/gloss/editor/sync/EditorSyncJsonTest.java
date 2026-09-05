@@ -18,7 +18,7 @@ public class EditorSyncJsonTest {
     JsonObject fixture = fixture("/editor-sync-canonical-v3.json");
     JsonObject project = fixture.getAsJsonObject("project");
     String expected =
-        "sha256:d6e4724fbb74b84be116ff499472222bb20dfbf141e3f44d41a7a30e038b3127";
+        "sha256:611bfbce886249bc61d11fb1498d85df972cc05277feacb0e1a0aebb61807071";
 
     assertEquals(expected, project.get("baseRevision").getAsString());
     assertEquals(expected, EditorSyncJson.revision(project));

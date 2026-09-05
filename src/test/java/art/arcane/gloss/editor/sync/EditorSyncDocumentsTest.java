@@ -1,6 +1,7 @@
 package art.arcane.gloss.editor.sync;
 
 import art.arcane.gloss.indicator.DamageIndicatorSettingsDoc;
+import art.arcane.gloss.entity.EntityOverlayDoc;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import org.junit.Test;
@@ -45,7 +46,21 @@ public class EditorSyncDocumentsTest {
     for (EditorSyncDocumentKind kind : EditorSyncDocumentKind.ORDERED) {
       assertEquals(kind, EditorSyncDocumentKind.parseWireName(kind.wireName()));
     }
-    assertEquals(12, EditorSyncDocumentKind.ORDERED.size());
+    assertEquals(13, EditorSyncDocumentKind.ORDERED.size());
+  }
+
+  @Test
+  public void entityOverlaysUseTheVersionedCanonicalSingletonContract() {
+    EditorSyncDocumentKind kind = EditorSyncDocumentKind.ENTITY_OVERLAYS;
+    Path dataDirectory = Path.of("build", "sync-contract");
+    EditorSyncDocumentKind.ParsedDocument parsed = kind.parse("default", """
+        {"schemaVersion":1,"revision":7,"healthSegments":12}
+        """);
+    assertEquals(dataDirectory.toAbsolutePath().normalize().resolve("entity-overlays/default.json"),
+        kind.path(dataDirectory, "default"));
+    assertEquals(Long.valueOf(7L), parsed.revision());
+    assertTrue(parsed.value() instanceof EntityOverlayDoc);
+    assertThrows(IllegalArgumentException.class, () -> kind.canonicalId("custom"));
   }
 
   @Test

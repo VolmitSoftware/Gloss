@@ -119,6 +119,20 @@ public final class CommandGlossWebEdit {
     web.openSubject("damage-indicators", id, sender);
   }
 
+  @Director(name = "entity-overlays", description = "Open this live document in the web editor",
+      descriptionKey = "command.help.web.edit.document")
+  public void entityOverlays(
+      @Param(name = "id", description = "Live Gloss document id",
+          descriptionKey = "command.help.arg.web_subject",
+          customHandler = EntityOverlaysIdHandler.class) String id,
+      @Param(name = "sender", contextual = true) CommandSender sender) {
+    web.openSubject("entity-overlays", id, sender);
+  }
+
+  public static final class EntityOverlaysIdHandler extends SubjectIdHandler {
+    public EntityOverlaysIdHandler() { super("entity-overlays"); }
+  }
+
   public abstract static class SubjectIdHandler implements DirectorParameterHandler<String> {
     private final String wireKind;
 

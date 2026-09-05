@@ -8,6 +8,7 @@ public enum EditorSyncKind {
   CONTAINER_PREVIEW("container-preview"),
   DAMAGE_INDICATORS("damage-indicators"),
   EMOJI("emoji"),
+  ENTITY_OVERLAYS("entity-overlays"),
   HOLOGRAM("hologram"),
   MENU("menu"),
   MOTD("motd"),

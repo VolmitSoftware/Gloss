@@ -10,6 +10,7 @@ import art.arcane.gloss.drop.RealDropSettingsDoc;
 import art.arcane.gloss.emoji.EmojiDoc;
 import art.arcane.gloss.hologram.HologramDoc;
 import art.arcane.gloss.indicator.DamageIndicatorSettingsDoc;
+import art.arcane.gloss.entity.EntityOverlayDoc;
 import art.arcane.gloss.motd.MotdDoc;
 import art.arcane.gloss.panel.PanelDefinition;
 import art.arcane.gloss.panel.PanelIds;
@@ -35,6 +36,7 @@ public enum EditorSyncDocumentKind {
   CONTAINER_PREVIEW("container-preview", "previews", Layout.FOLDER, false),
   DAMAGE_INDICATORS("damage-indicators", "damage-indicators", Layout.FOLDER, true),
   EMOJI("emoji", "emoji", Layout.FOLDER, true),
+  ENTITY_OVERLAYS("entity-overlays", "entity-overlays", Layout.FOLDER, true),
   HOLOGRAM("hologram", "holograms", Layout.FOLDER, true),
   MENU("menu", "menus", Layout.TREE, false),
   MOTD("motd", "motd.json", Layout.SINGLE, true),
@@ -88,6 +90,7 @@ public enum EditorSyncDocumentKind {
       case MENU -> MenuIds.require(value);
       case PANEL -> PanelIds.canonicalize(value);
       case DAMAGE_INDICATORS -> requireSingleton(value, DamageIndicatorSettingsDoc.DEFAULT_ID);
+      case ENTITY_OVERLAYS -> requireSingleton(value, EntityOverlayDoc.DEFAULT_ID);
       case MOTD -> requireSingleton(value, "motd");
       case TABLIST -> requireSingleton(value, "tablist");
       case REAL_DROPS -> requireSingleton(value, RealDropSettingsDoc.DEFAULT_ID);
@@ -123,6 +126,7 @@ public enum EditorSyncDocumentKind {
       case CONTAINER_PREVIEW -> PreviewDocumentParser.parse(canonicalId, source);
       case DAMAGE_INDICATORS -> DamageIndicatorSettingsDoc.parse(canonicalId + ".json", source);
       case EMOJI -> EmojiDoc.parse(canonicalId + ".json", source);
+      case ENTITY_OVERLAYS -> EntityOverlayDoc.parse(canonicalId + ".json", source);
       case HOLOGRAM -> HologramDoc.parse(canonicalId + ".json", source);
       case MENU -> MenuDocumentParser.parse(canonicalId, source);
       case MOTD -> MotdDoc.parse("motd.json", source);

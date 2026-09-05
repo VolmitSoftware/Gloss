@@ -2,12 +2,14 @@ package art.arcane.gloss.api;
 
 import org.bukkit.Location;
 import org.bukkit.entity.Item;
+import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 
 public interface GlossAPI {
     static GlossAPI get() {
@@ -46,6 +48,17 @@ public interface GlossAPI {
                          String bundleMoreFormat, int bundleEntryLimit);
 
     void removeDropPresentation(Item item);
+
+    boolean refreshEntityOverlay(LivingEntity entity, int stackCount);
+
+    void removeEntityOverlayStack(LivingEntity entity);
+
+    boolean updateEntityInsight(Plugin owner, Player viewer, LivingEntity target,
+                               List<String> details, long durationMs);
+
+    void clearEntityInsight(Plugin owner, UUID viewerId);
+
+    void restrictEntityOverlays(Plugin owner, boolean restricted);
 
     Optional<String> boardFor(Player player);
 

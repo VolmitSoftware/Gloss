@@ -10,18 +10,46 @@ import art.arcane.gloss.api.TemporaryHologram;
 import art.arcane.gloss.api.internal.GlossApiServiceImpl;
 import org.bukkit.Location;
 import org.bukkit.entity.Item;
+import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 
 public final class GlossAPIImpl implements GlossAPI {
     private final Gloss plugin;
 
     public GlossAPIImpl(Gloss plugin) {
         this.plugin = plugin;
+    }
+
+    @Override
+    public boolean refreshEntityOverlay(LivingEntity entity, int stackCount) {
+        return plugin.entityOverlays().refreshStack(entity, stackCount);
+    }
+
+    @Override
+    public void removeEntityOverlayStack(LivingEntity entity) {
+        plugin.entityOverlays().removeStack(entity);
+    }
+
+    @Override
+    public boolean updateEntityInsight(Plugin owner, Player viewer, LivingEntity target,
+                                      List<String> details, long durationMs) {
+        return plugin.entityOverlays().updateInsight(owner, viewer, target, details, durationMs);
+    }
+
+    @Override
+    public void clearEntityInsight(Plugin owner, UUID viewerId) {
+        plugin.entityOverlays().clearInsight(owner, viewerId);
+    }
+
+    @Override
+    public void restrictEntityOverlays(Plugin owner, boolean restricted) {
+        plugin.entityOverlays().restrict(owner, restricted);
     }
 
     @Override

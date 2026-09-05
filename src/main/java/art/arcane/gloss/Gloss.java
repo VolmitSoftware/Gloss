@@ -16,6 +16,7 @@ import art.arcane.gloss.drop.DropNameService;
 import art.arcane.gloss.editor.sync.EditorSyncService;
 import art.arcane.gloss.editor.sync.EditorSyncDocumentKind;
 import art.arcane.gloss.emoji.EmojiService;
+import art.arcane.gloss.entity.EntityOverlayService;
 import art.arcane.gloss.group.GroupService;
 import art.arcane.gloss.hologram.HologramAnimator;
 import art.arcane.gloss.hologram.HologramService;
@@ -125,6 +126,7 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
     private ChatBubblesService bubbles;
     private DamageIndicatorsService indicators;
     private DropNameService drops;
+    private EntityOverlayService entityOverlays;
     private GlossCommandService commands;
     private GlossAPIImpl api;
     private MetricsRuntime metrics;
@@ -286,6 +288,7 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
             bubbles = new ChatBubblesService(this);
             indicators = new DamageIndicatorsService(this);
             drops = new DropNameService(this);
+            entityOverlays = new EntityOverlayService(this);
             commands = new GlossCommandService(this);
             api = new GlossAPIImpl(this);
 
@@ -304,6 +307,7 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
             enableService("bubbles", bubbles::enable, bubbles::disable);
             enableService("indicators", indicators::enable, indicators::disable);
             enableService("drops", drops::enable, drops::disable);
+            enableService("entity-overlays", entityOverlays::enable, entityOverlays::disable);
 
             hudBar = new HudActionBar(this);
             enableService("hud", () -> {
@@ -486,6 +490,9 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
                 if (kinds.contains(EditorSyncDocumentKind.DAMAGE_INDICATORS)) {
                     indicators.reloadSettings();
                 }
+                if (kinds.contains(EditorSyncDocumentKind.ENTITY_OVERLAYS)) {
+                    entityOverlays.reload();
+                }
                 if (imagesChanged) {
                     imageAssets.publishEditorSyncChanges();
                 }
@@ -551,6 +558,7 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
             bubbles.reload();
             indicators.reload();
             drops.reload();
+            entityOverlays.reload();
             return;
         }
         if (!previous.text().equals(next.text())) {
@@ -564,6 +572,7 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
         }
         if (!previous.holograms().equals(next.holograms())) {
             holograms.reload();
+            entityOverlays.reload();
         }
         if (!previous.boards().equals(next.boards())) {
             boards.reload();
@@ -867,6 +876,10 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
 
     public DropNameService drops() {
         return drops;
+    }
+
+    public EntityOverlayService entityOverlays() {
+        return entityOverlays;
     }
 
     public HudActionBar getHudBar() {

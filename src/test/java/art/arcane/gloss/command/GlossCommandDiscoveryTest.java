@@ -204,7 +204,7 @@ public class GlossCommandDiscoveryTest {
         .collect(Collectors.toUnmodifiableSet());
     assertEquals(Set.of("menu", "panel", "hologram", "scoreboard", "emoji", "animation",
         "bubble-style", "container-preview", "tablist", "motd", "real-drops",
-        "damage-indicators"), editNames);
+        "damage-indicators", "entity-overlays"), editNames);
     assertTrue(parameter(child(edit, "menu"), "id").getCustomHandlerOrNull()
         instanceof CommandGlossWebEdit.MenuIdHandler);
     assertTrue(parameter(child(edit, "panel"), "id").getCustomHandlerOrNull()

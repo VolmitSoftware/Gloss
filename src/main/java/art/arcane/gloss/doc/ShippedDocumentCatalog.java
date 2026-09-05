@@ -9,6 +9,7 @@ import art.arcane.gloss.config.menu.MenuDocumentParser;
 import art.arcane.gloss.emoji.EmojiDoc;
 import art.arcane.gloss.drop.RealDropSettingsDoc;
 import art.arcane.gloss.indicator.DamageIndicatorSettingsDoc;
+import art.arcane.gloss.entity.EntityOverlayDoc;
 import art.arcane.gloss.motd.MotdDoc;
 import art.arcane.gloss.tab.TablistDoc;
 
@@ -63,11 +64,14 @@ public final class ShippedDocumentCatalog {
         new Entry<>(MenuCatalog.KIND, List.of("default"), (fileName, raw) ->
             MenuDocumentParser.parse(ShippedDefaults.normalize(fileName), raw).definition());
 
+    public static final Entry<EntityOverlayDoc> ENTITY_OVERLAYS =
+        new Entry<>(EntityOverlayDoc.KIND, List.of(EntityOverlayDoc.DEFAULT_ID), EntityOverlayDoc::parse);
+
     private ShippedDocumentCatalog() {
     }
 
     public static List<Entry<?>> all() {
         return List.of(EMOJI, ANIMATIONS, BOARDS, BUBBLES, TABLIST, MOTD, REAL_DROPS,
-            DAMAGE_INDICATORS, MENUS);
+            DAMAGE_INDICATORS, ENTITY_OVERLAYS, MENUS);
     }
 }

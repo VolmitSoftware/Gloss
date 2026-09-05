@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://volmit.com/gloss/entity-overlays.schema.json",
+  "title": "Gloss Entity Overlays Document",
+  "description": "Default nearby living-entity overlays at plugins/Gloss/entity-overlays/default.json, with segmented health, custom names, damage feedback, combat stats and optional React/Adapt data.",
+  "type": "object",
+  "required": ["schemaVersion", "revision"],
+  "properties": {
+    "schemaVersion": {"type": "integer", "const": 1},
+    "revision": {"type": "integer", "minimum": 1, "maximum": 9007199254740991},
+    "enabled": {"type": "boolean", "default": true},
+    "range": {"type": "number", "default": 16, "description": "Nearby range in blocks; clamped to 1..64."},
+    "updateIntervalTicks": {"type": "integer", "default": 5, "description": "Update interval in ticks; clamped to 1..40."},
+    "maxEntitiesPerViewer": {"type": "integer", "default": 64, "description": "Maximum overlays per viewer; clamped to 1..256."},
+    "includePlayers": {"type": "boolean", "default": true},
+    "verticalOffset": {"type": "number", "default": 0.35, "description": "Blocks above entity bounds; clamped to -2..8."},
+    "scale": {"type": "number", "default": 0.75, "description": "Text display scale; clamped to 0.1..4."},
+    "healthSegments": {"type": "integer", "default": 10, "description": "Health bar segments; clamped to 1..40."},
+    "showHealthNumbers": {"type": "boolean", "default": true},
+    "showNames": {"type": "boolean", "default": true},
+    "showCombatStats": {"type": "boolean", "default": true},
+    "hitHighlightMs": {"type": "integer", "default": 750, "description": "Recent-hit highlight in milliseconds; clamped to 0..10000."},
+    "blacklistWorlds": {"type": "array", "items": {"type": "string"}, "default": []},
+    "excludedEntityTypes": {"type": "array", "items": {"type": "string"}, "default": ["ARMOR_STAND"]},
+    "nameFormat": {"type": "string", "default": "&f{name}", "description": "Custom name token: {name}."},
+    "healthFormat": {"type": "string", "default": "{bar} &f{health}&7/{max_health}", "description": "Tokens: {bar}, {health}, {max_health}. With showHealthNumbers false only the bar renders."},
+    "stackFormat": {"type": "string", "default": " &7x{count}", "description": "React count token: {count}; appended to the name or health line for stacks greater than one."},
+    "statsFormat": {"type": "string", "default": "&7ATK &f{attack} &8| &7ARM &f{armor}", "description": "Final line tokens: {attack}, {armor}."},
+    "damageFormat": {"type": "string", "default": "&c-{damage}", "description": "Recent health loss token: {damage}."}
+  }
+}
