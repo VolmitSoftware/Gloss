@@ -1,6 +1,4 @@
-package art.arcane.gloss.config.icon;
-
-import art.arcane.gloss.text.TextDisplayLayout;
+package art.arcane.gloss.api;
 
 public record IconDisplayStyle(
     IconBillboard billboard,
@@ -29,7 +27,7 @@ public record IconDisplayStyle(
       IconTextAlignment.CENTER,
       IconArgbColor.TRANSPARENT,
       255,
-      TextDisplayLayout.FULL_WIDTH,
+      16384,
       null,
       null,
       1F,
@@ -42,6 +40,9 @@ public record IconDisplayStyle(
       1F,
       1F
   );
+  private static final IconDisplayStyle HOLOGRAM_DEFAULTS = new IconDisplayStyle(
+      IconBillboard.CENTER, false, true, null, null, null, null, null, null,
+      null, null, null, null, null, null, null, null, null);
 
   public IconDisplayStyle {
     billboard = billboard == null ? IconBillboard.FIXED : billboard;
@@ -50,7 +51,7 @@ public record IconDisplayStyle(
     textAlignment = textAlignment == null ? IconTextAlignment.CENTER : textAlignment;
     backgroundArgb = backgroundArgb == null ? IconArgbColor.TRANSPARENT : backgroundArgb;
     textOpacity = textOpacity == null ? 255 : requireRange(textOpacity, 0, 255, "textOpacity");
-    lineWidth = lineWidth == null ? TextDisplayLayout.FULL_WIDTH : requireRange(lineWidth, 1, 16384, "lineWidth");
+    lineWidth = lineWidth == null ? 16384 : requireRange(lineWidth, 1, 16384, "lineWidth");
     if ((blockLight == null) != (skyLight == null)) {
       throw new IllegalArgumentException("blockLight and skyLight must be supplied together");
     }
@@ -70,6 +71,22 @@ public record IconDisplayStyle(
 
   public static IconDisplayStyle defaults() {
     return DEFAULTS;
+  }
+
+  public static IconDisplayStyle hologramDefaults() {
+    return HOLOGRAM_DEFAULTS;
+  }
+
+  public IconDisplayStyle withBillboard(IconBillboard value) {
+    return new IconDisplayStyle(value, shadow, seeThrough, textAlignment, backgroundArgb, textOpacity,
+        lineWidth, blockLight, skyLight, viewRange, shadowRadius, shadowStrength, cullingWidth,
+        cullingHeight, glowColor, scaleX, scaleY, scaleZ);
+  }
+
+  public IconDisplayStyle withScale(float x, float y, float z) {
+    return new IconDisplayStyle(billboard, shadow, seeThrough, textAlignment, backgroundArgb, textOpacity,
+        lineWidth, blockLight, skyLight, viewRange, shadowRadius, shadowStrength, cullingWidth,
+        cullingHeight, glowColor, x, y, z);
   }
 
   public static IconDisplayStyle resolve(IconDisplayStyle style) {

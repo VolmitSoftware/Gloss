@@ -1,7 +1,7 @@
 package art.arcane.gloss.bubble;
 
 import art.arcane.gloss.doc.DocumentEnvelope;
-import art.arcane.volmlib.util.bukkit.json.BukkitJson;
+import art.arcane.gloss.doc.DocumentParsers;
 import org.bukkit.util.Vector;
 import org.junit.jupiter.api.Test;
 
@@ -18,7 +18,7 @@ class BubbleStyleDocTest {
     void parseReadsTheSchemaFourShape() {
         String json = """
             {
-              "schemaVersion": 4,
+              "schemaVersion": 5,
               "revision": 4,
               "prefix": "&b",
               "offset": [0.5, 1.25, -0.5],
@@ -50,7 +50,7 @@ class BubbleStyleDocTest {
 
         BubbleStyleDoc doc = BubbleStyleDoc.parse("staff.json", json);
 
-        assertEquals(4, doc.schemaVersion());
+        assertEquals(5, doc.schemaVersion());
         assertEquals(4L, doc.revision());
         assertEquals("&b", doc.prefix());
         assertEquals(new Vector(0.5D, 1.25D, -0.5D), doc.offset());
@@ -76,7 +76,7 @@ class BubbleStyleDocTest {
     void motionAndSelectUseDefaultsWhenAbsent() {
         String json = """
             {
-              "schemaVersion": 4,
+              "schemaVersion": 5,
               "revision": 1,
               "prefix": "&7",
               "offset": [0.0, 1.0, 0.0],
@@ -99,11 +99,11 @@ class BubbleStyleDocTest {
             new BubbleStyleDoc.Axis("t", "2 * t", "-t"),
             new BubbleStyleDoc.Axis("1", "1", "1"),
             new BubbleStyleDoc.Axis("0", "0", "90 * t"), "1 - t");
-        BubbleStyleDoc original = new BubbleStyleDoc(4, 9L, "&d", new Vector(0.0D, 2.0D, 0.0D), 40, 6000L,
+        BubbleStyleDoc original = new BubbleStyleDoc(BubbleStyleDoc.CURRENT_SCHEMA_VERSION, 9L, "&d", new Vector(0.0D, 2.0D, 0.0D), 40, 6000L,
             false, true, motion, BubbleStyleDoc.DEFAULTS.shimmer(),
-            new BubbleStyleDoc.Select(3, "subject.world == 'hub' && inGroup('subject', 'vip')"), List.of(), null);
+            new BubbleStyleDoc.Select(3, "subject.world == 'hub' && inGroup('subject', 'vip')"), List.of(), null, null, null);
 
-        BubbleStyleDoc decoded = BubbleStyleDoc.parse("vip.json", BukkitJson.GSON.toJson(original));
+        BubbleStyleDoc decoded = BubbleStyleDoc.parse("vip.json", DocumentParsers.GSON.toJson(original));
 
         assertEquals(original, decoded);
     }
@@ -120,16 +120,16 @@ class BubbleStyleDocTest {
     @Test
     void revisionBoundsAreEnforced() {
         assertThrows(IllegalArgumentException.class,
-            () -> new BubbleStyleDoc(4, 0L, "&7", null, 32, 5000L, true, true, null, null, null, List.of(), null));
+            () -> new BubbleStyleDoc(BubbleStyleDoc.CURRENT_SCHEMA_VERSION, 0L, "&7", null, 32, 5000L, true, true, null, null, null, List.of(), null, null, null));
         assertThrows(IllegalArgumentException.class,
-            () -> new BubbleStyleDoc(4, DocumentEnvelope.MAX_SAFE_REVISION + 1L, "&7", null, 32, 5000L,
-                true, true, null, null, null, List.of(), null));
+            () -> new BubbleStyleDoc(BubbleStyleDoc.CURRENT_SCHEMA_VERSION, DocumentEnvelope.MAX_SAFE_REVISION + 1L, "&7", null, 32, 5000L,
+                true, true, null, null, null, List.of(), null, null, null));
     }
 
     @Test
     void outOfRangeValuesClamp() {
-        BubbleStyleDoc doc = new BubbleStyleDoc(4, 1L, null, null, 1000, 10L, true, true,
-            null, null, null, List.of(), null);
+        BubbleStyleDoc doc = new BubbleStyleDoc(BubbleStyleDoc.CURRENT_SCHEMA_VERSION, 1L, null, null, 1000, 10L, true, true,
+            null, null, null, List.of(), null, null, null);
 
         assertEquals("&7", doc.prefix());
         assertEquals(new Vector(0.0D, 0.3D, 0.0D), doc.offset());
@@ -151,7 +151,7 @@ class BubbleStyleDocTest {
     void shimmerPartialShapeUsesDefaultsAndClampsBoundedValues() {
         BubbleStyleDoc parsed = BubbleStyleDoc.parse("default.json", """
             {
-              "schemaVersion": 4,
+              "schemaVersion": 5,
               "revision": 1,
               "shimmer": {
                 "color": "#ABCDEF",
@@ -176,7 +176,7 @@ class BubbleStyleDocTest {
     void malformedShimmerColorIsRejectedAtLoad() {
         assertThrows(IllegalArgumentException.class,
             () -> BubbleStyleDoc.parse("default.json", """
-                {"schemaVersion":4,"revision":1,"shimmer":{"color":"white"}}
+                {"schemaVersion":5,"revision":1,"shimmer":{"color":"white"}}
                 """));
     }
 

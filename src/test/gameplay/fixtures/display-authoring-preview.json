@@ -1,0 +1,84 @@
+{
+  "show": true,
+  "match": {
+    "blocks": [
+      "CHEST"
+    ],
+    "priority": 1000000
+  },
+  "textStyle": {
+    "billboard": "fixed",
+    "shadow": true,
+    "seeThrough": true,
+    "textAlignment": "right",
+    "backgroundArgb": "#40112233",
+    "textOpacity": 200,
+    "lineWidth": 160,
+    "blockLight": 10,
+    "skyLight": 14,
+    "viewRange": 2.0,
+    "shadowRadius": 0.3,
+    "shadowStrength": 0.4,
+    "cullingWidth": 3.0,
+    "cullingHeight": 4.0,
+    "glowColor": "#FFABCDEF",
+    "scaleX": 1.3,
+    "scaleY": 0.8,
+    "scaleZ": 1.7
+  },
+  "itemStyle": {
+    "billboard": "fixed",
+    "shadow": true,
+    "seeThrough": true,
+    "textAlignment": "right",
+    "backgroundArgb": "#40112233",
+    "textOpacity": 200,
+    "lineWidth": 160,
+    "blockLight": 10,
+    "skyLight": 14,
+    "viewRange": 2.0,
+    "shadowRadius": 0.3,
+    "shadowStrength": 0.4,
+    "cullingWidth": 3.0,
+    "cullingHeight": 4.0,
+    "glowColor": "#FFABCDEF",
+    "scaleX": 0.8,
+    "scaleY": 1.2,
+    "scaleZ": 0.6
+  },
+  "card": {
+    "title": "'Style probe'",
+    "minHalfWidth": 82,
+    "padding": 13,
+    "borderWidth": 5,
+    "trayPadding": 8,
+    "titleHeight": 24,
+    "titleGap": 10,
+    "backgroundArgb": "#FF112233",
+    "trayArgb": "#FF223344",
+    "borderArgb": "#FF445566",
+    "titleArgb": "#FF778899"
+  },
+  "elements": [
+    {
+      "type": "label",
+      "y": 28,
+      "text": "'Box label'",
+      "box": {
+        "enabled": true,
+        "padding": 8,
+        "borderWidth": 3,
+        "backgroundArgb": "#00334455",
+        "borderArgb": "#FF667788"
+      }
+    },
+    {
+      "type": "slot",
+      "x": 0,
+      "y": 0,
+      "size": 22,
+      "index": 0
+    }
+  ],
+  "particleLayers": []
+}

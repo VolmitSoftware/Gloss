@@ -1,62 +1,147 @@
 package art.arcane.gloss.entity;
 
+import art.arcane.gloss.expr.ExprFunctions;
+import art.arcane.gloss.expr.ExprScope;
+import art.arcane.gloss.particle.ParticleText;
+import art.arcane.gloss.text.TextPipeline;
 import org.bukkit.ChatColor;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class EntityOverlayTextTest {
+    private static final EntityOverlayText.Snapshot NAMED = new EntityOverlayText.Snapshot(
+        "Sentinel", 15, 20, 20, 5, 7, 4, 12, "zombie", 3.5);
+
     @Test
-    void namedStackKeepsNameAboveHealthAndCombatStatsLast() {
-        EntityOverlayText.Snapshot entity = new EntityOverlayText.Snapshot("Sentinel", 15, 20,
-            20, 5, 7, 4, 12);
-        List<String> lines = EntityOverlayText.render(EntityOverlayDoc.DEFAULTS, entity,
-            List.of("&7Speed &f0.3"));
-        assertEquals(List.of("Sentinel x12", "|||||||||| 15/20", "-5", "Speed 0.3", "ATK 7 | ARM 4"),
-            lines.stream().map(ChatColor::stripColor).toList());
-        assertTrue(lines.get(1).startsWith("§a||||||||§c||"));
+    void defaultsKeepNameAboveHealthAndCombatStatsLast() {
+        ParticleText.Rendered frame = render(EntityOverlayDoc.DEFAULTS, NAMED, List.of("&7Speed &f0.3"));
+        assertEquals("Sentinel\n|||||||||| 15/20\nx12\n-5\nSpeed 0.3\nATK 7 | ARM 4", plain(frame));
+        assertTrue(frame.text().contains("§a||||||||§c||"));
     }
 
     @Test
-    void unnamedStackPlacesCountBesideHealth() {
-        List<String> lines = EntityOverlayText.render(EntityOverlayDoc.DEFAULTS,
-            new EntityOverlayText.Snapshot(null, 20, 20, 20, 0, 3, 0, 4), List.of());
-        assertEquals("|||||||||| 20/20 x4", ChatColor.stripColor(lines.getFirst()));
-        assertEquals(2, lines.size());
+    void unnamedAndUndamagedRowsDisappear() {
+        ParticleText.Rendered frame = render(EntityOverlayDoc.DEFAULTS,
+            new EntityOverlayText.Snapshot(null, 20, 20, 20, 0, 3, 0, 1, "zombie", 2), List.of());
+        assertEquals("|||||||||| 20/20\nATK 3 | ARM 0", plain(frame));
     }
 
     @Test
-    void damagedSegmentsExpireBackToEmptySegments() {
-        EntityOverlayText.Snapshot entity = new EntityOverlayText.Snapshot(null, 4, 20,
-            4, 0, 0, 0, 1);
-        List<String> lines = EntityOverlayText.render(EntityOverlayDoc.DEFAULTS, entity, List.of());
-        assertTrue(lines.getFirst().startsWith("§c||§c§8||||||||"));
-        assertEquals(2, lines.size());
+    void arbitraryOrderCustomExpressionsAndSpacersUseTheSharedPipeline() {
+        EntityOverlayDoc settings = doc("""
+            "show":"entity.healthPercent == 75 && viewer.level > 1",
+            "lines":[
+              {"id":"stats","text":"<gold>{{ entity.armor + 2 }}</gold> |probe|"},
+              {"id":"gap","type":"spacer"},
+              {"id":"detail","type":"insight","text":"&bDetail: {insight}"},
+              {"id":"footer","text":"{{ entity.type }} {name} {distance} :spark:"},
+              {"id":"hidden","text":"hidden","show":"!entity.named"}
+            ]
+            """);
+        TextPipeline pipeline = new TextPipeline(null);
+        pipeline.registerFunction("probe", ignored -> "function");
+        pipeline.setEmojiFilter(source -> source.replace(":spark:", "*"));
+        EntityOverlayText.Prepared prepared = EntityOverlayText.prepare(pipeline, null, null,
+            scope(Map.of("viewer.level", 3.0)), settings, NAMED, List.of("First", "Second"));
+        assertEquals("6 function\n \nDetail: First\nDetail: Second\nzombie Sentinel 3.5 *", plain(prepared.frame(0)));
+    }
+
+    @Test
+    void runtimeNamesAndInsightCannotExecuteAnyTemplateSyntax() {
+        AtomicInteger calls = new AtomicInteger();
+        TextPipeline pipeline = new TextPipeline(null);
+        pipeline.registerFunction("probe", ignored -> { calls.incrementAndGet(); return "executed"; });
+        pipeline.setEmojiFilter(source -> source.replace(":spark:", "executed"));
+        String payload = "|probe| {{ 1 + 2 }} %player_name% <red>Name</red> <particles:bad>X</particles> :spark:";
+        EntityOverlayText.Snapshot entity = new EntityOverlayText.Snapshot(payload, 1, 2, 1, 0, 0, 0, 1, "zombie", 1);
+        EntityOverlayDoc settings = doc("""
+            "lines":[
+              {"id":"name","text":"<gradient:red:blue>{name}</gradient>"},
+              {"id":"expression","text":"{{ entity.name }}"},
+              {"id":"insight","type":"insight","text":"{insight}"}
+            ]
+            """);
+        ParticleText.Rendered frame = EntityOverlayText.prepare(pipeline, null, null, scope(Map.of()),
+            settings, entity, List.of(payload)).frame(0);
+        assertEquals(String.join("\n", payload, payload, payload), plain(frame));
+        assertEquals(0, calls.get());
+        assertTrue(frame.spans().isEmpty());
+    }
+
+    @Test
+    void authoredParticleSpansRetainNamedContentAndFormattedOffsets() {
+        ParticleText.Rendered frame = render(doc("""
+            "lines":[{"id":"name","text":"<gradient:red:blue><particles:name>{name}</particles></gradient>"}]
+            """), NAMED, List.of());
+        assertEquals("Sentinel", plain(frame));
+        assertEquals(1, frame.spans().size());
+        ParticleText.Span span = frame.spans().getFirst();
+        assertEquals("name", span.name());
+        assertEquals("Sentinel", ChatColor.stripColor(frame.text().substring(span.start(), span.end())));
+    }
+
+    @Test
+    void hiddenRootSkipsAllRenderingAndEmptyLayoutsStayHidden() {
+        AtomicInteger calls = new AtomicInteger();
+        TextPipeline pipeline = new TextPipeline(null);
+        pipeline.registerFunction("probe", ignored -> { calls.incrementAndGet(); return "executed"; });
+        EntityOverlayText.Prepared hidden = EntityOverlayText.prepare(pipeline, null, null, scope(Map.of()),
+            doc("\"show\":false,\"lines\":[{\"id\":\"test\",\"text\":\"|probe|\"}]"), NAMED, List.of());
+        assertFalse(hidden.visible());
+        assertEquals("", hidden.frame(0).text());
+        assertEquals(0, calls.get());
+        assertFalse(EntityOverlayText.prepare(pipeline, null, null, scope(Map.of()),
+            doc("\"lines\":[]"), NAMED, List.of()).visible());
     }
 
     @Test
     void healthClampsAndTinyLivingHealthRetainsOneSegment() {
         assertEquals("&a||||||||||&c&8", EntityOverlayText.bar(EntityOverlayDoc.DEFAULTS,
-            new EntityOverlayText.Snapshot(null, 30, 20, 100, 0, 0, 0, 1)));
+            new EntityOverlayText.Snapshot(null, 30, 20, 100, 0, 0, 0, 1, "zombie", 0)));
         assertEquals("&c|&c&8|||||||||", EntityOverlayText.bar(EntityOverlayDoc.DEFAULTS,
-            new EntityOverlayText.Snapshot(null, 0.01, 20, 0.01, 0, 0, 0, 1)));
-        assertEquals("&c&c&8||||||||||", EntityOverlayText.bar(EntityOverlayDoc.DEFAULTS,
-            new EntityOverlayText.Snapshot(null, 0, 0, 0, 0, 0, 0, 1)));
+            new EntityOverlayText.Snapshot(null, 0.01, 20, 0.01, 0, 0, 0, 1, "zombie", 0)));
     }
 
     @Test
-    void presentationSwitchesKeepInsightAndStackCount() {
-        EntityOverlayDoc settings = EntityOverlayDoc.parse("default.json", """
-            {"schemaVersion":1,"revision":1,"showNames":false,"showHealthNumbers":false,
-             "showCombatStats":false,"healthSegments":5}
-            """);
-        List<String> lines = EntityOverlayText.render(settings,
-            new EntityOverlayText.Snapshot("Hidden", 10, 20, 10, 0, 4, 2, 3), List.of("Type: Zombie"));
-        assertEquals(List.of("||||| x3", "Type: Zombie"), lines.stream().map(ChatColor::stripColor).toList());
-        assertFalse(lines.stream().anyMatch(line -> line.contains("Hidden")));
+    void unchangedDefaultDataCanReusePreparedOutput() {
+        assertFalse(EntityOverlayText.refreshRequired(EntityOverlayDoc.DEFAULTS));
+        assertTrue(EntityOverlayText.refreshRequired(doc("\"show\":\"viewer.level > 1\"")));
+        assertTrue(EntityOverlayText.refreshRequired(doc("\"lines\":[{\"id\":\"clock\",\"text\":\"|animation.clock|\"}]")));
+        assertTrue(EntityOverlayText.refreshRequired(doc("\"lines\":[{\"id\":\"clock\",\"text\":\"{{ time.seconds }}\"}]")));
+    }
+
+    private static ParticleText.Rendered render(EntityOverlayDoc settings, EntityOverlayText.Snapshot entity,
+                                                List<String> insight) {
+        return EntityOverlayText.prepare(new TextPipeline(null), null, null, scope(Map.of()),
+            settings, entity, insight).frame(0);
+    }
+
+    private static EntityOverlayDoc doc(String fields) {
+        return EntityOverlayDoc.parse("default.json", "{\"schemaVersion\":2,\"revision\":1," + fields + "}");
+    }
+
+    private static String plain(ParticleText.Rendered frame) {
+        return ChatColor.stripColor(frame.text());
+    }
+
+    private static ExprScope scope(Map<String, Object> values) {
+        return new ExprScope() {
+            @Override
+            public Object variable(String name) {
+                return values.get(name);
+            }
+
+            @Override
+            public Object call(String name, List<Object> args) {
+                return ExprFunctions.call(name, args);
+            }
+        };
     }
 }

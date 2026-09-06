@@ -2,6 +2,11 @@ package art.arcane.gloss.drop;
 
 import art.arcane.gloss.GlossConfig;
 import art.arcane.gloss.api.ParticleLayer;
+import art.arcane.gloss.api.HologramBox;
+import art.arcane.gloss.api.IconDisplayStyle;
+import art.arcane.gloss.api.IconArgbColor;
+import art.arcane.gloss.api.IconBillboard;
+import art.arcane.gloss.api.IconTextAlignment;
 import art.arcane.gloss.condition.ShowCondition;
 import art.arcane.gloss.doc.DocumentEnvelope;
 import art.arcane.gloss.doc.DocumentParsers;
@@ -26,7 +31,7 @@ public record RealDropSettingsDoc(
 ) {
     public static final String KIND = "real-drops";
     public static final String DEFAULT_ID = "default";
-    public static final int CURRENT_SCHEMA_VERSION = 3;
+    public static final int CURRENT_SCHEMA_VERSION = 4;
 
     public static final RealDropSettingsDoc DEFAULTS = new RealDropSettingsDoc(
         CURRENT_SCHEMA_VERSION,
@@ -74,8 +79,7 @@ public record RealDropSettingsDoc(
                 null, null, null, null, null, null, null, null, null, null) : motion;
             landing = landing == null ? new Landing(
                 null, null, null, null, null, null, null, null) : landing;
-            labels = labels == null ? new Labels(
-                null, null, null, null, null, null, null, null, null, null, null, null) : labels;
+            labels = labels == null ? new Labels(null, null, null, null) : labels;
             filters = filters == null ? new Filters(null, null, null) : filters;
             physics = physics == null ? new Physics(null, null, null, null, null) : physics;
             script = script == null ? new Script(null, null, null, null, null, null, null) : script;
@@ -117,19 +121,8 @@ public record RealDropSettingsDoc(
                     landing.movingFaceAttraction().floatValue(),
                     landing.alignmentDegrees().floatValue(),
                     landing.settleDelayTicks()),
-                new GlossConfig.RealDrops.Labels(
-                    labels.enabled(),
-                    labels.yOffset().floatValue(),
-                    labels.scale().floatValue(),
-                    labels.viewRange().floatValue(),
-                    labels.billboard(),
-                    labels.seeThrough(),
-                    labels.shadow(),
-                    labels.background(),
-                    labels.backgroundRed(),
-                    labels.backgroundGreen(),
-                    labels.backgroundBlue(),
-                    labels.backgroundAlpha()),
+                new GlossConfig.RealDrops.Labels(labels.enabled(), labels.yOffset().floatValue(),
+                    labels.style(), labels.box()),
                 new GlossConfig.RealDrops.Filters(
                     filters.disabledWorlds(),
                     filters.materialBlacklist(),
@@ -236,33 +229,18 @@ public record RealDropSettingsDoc(
         }
     }
 
-    public record Labels(
-        Boolean enabled,
-        Double yOffset,
-        Double scale,
-        Double viewRange,
-        String billboard,
-        Boolean seeThrough,
-        Boolean shadow,
-        Boolean background,
-        Integer backgroundRed,
-        Integer backgroundGreen,
-        Integer backgroundBlue,
-        Integer backgroundAlpha
-    ) {
+    public record Labels(Boolean enabled, Double yOffset, IconDisplayStyle style, HologramBox box) {
         public Labels {
             enabled = enabled == null || enabled;
-            yOffset = clamp(yOffset, 0.0D, 4.0D, 0.55D);
-            scale = clamp(scale, 0.1D, 4.0D, 0.85D);
-            viewRange = clamp(viewRange, 4.0D, 128.0D, 32.0D);
-            billboard = choice(billboard, "CENTER", "FIXED", "HORIZONTAL", "VERTICAL");
-            seeThrough = seeThrough == null || seeThrough;
-            shadow = shadow == null || shadow;
-            background = background == null || background;
-            backgroundRed = clamp(backgroundRed, 0, 255, 0);
-            backgroundGreen = clamp(backgroundGreen, 0, 255, 0);
-            backgroundBlue = clamp(backgroundBlue, 0, 255, 0);
-            backgroundAlpha = clamp(backgroundAlpha, 0, 255, 80);
+            yOffset = clamp(yOffset, -4.0D, 16.0D, 0.55D);
+            style = style == null ? defaultStyle() : style;
+            box = box == null ? HologramBox.defaults() : box;
+        }
+
+        public static IconDisplayStyle defaultStyle() {
+            return new IconDisplayStyle(IconBillboard.CENTER, true, true, IconTextAlignment.CENTER,
+                new IconArgbColor(0x50000000), 255, 16384, null, null, 0.5F,
+                0F, 0F, 0F, 0F, null, 0.85F, 0.85F, 0.85F);
         }
     }
 

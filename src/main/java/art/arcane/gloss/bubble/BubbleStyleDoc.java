@@ -1,6 +1,8 @@
 package art.arcane.gloss.bubble;
 
 import art.arcane.gloss.api.ParticleLayer;
+import art.arcane.gloss.api.HologramBox;
+import art.arcane.gloss.api.IconDisplayStyle;
 import art.arcane.gloss.condition.ConditionCompiler;
 import art.arcane.gloss.condition.ConditionSource;
 import art.arcane.gloss.condition.ShowCondition;
@@ -13,9 +15,10 @@ import java.util.List;
 
 public record BubbleStyleDoc(int schemaVersion, long revision, String prefix, Vector offset, int wordWrapChars,
                              long maxAliveMs, boolean followPlayer, boolean hideOwn, Motion motion,
-                             Shimmer shimmer, Select select, List<ParticleLayer> particleLayers, ShowCondition show) {
+                             Shimmer shimmer, Select select, List<ParticleLayer> particleLayers, ShowCondition show,
+                             IconDisplayStyle style, HologramBox box) {
     public static final String KIND = "bubbles";
-    public static final int CURRENT_SCHEMA_VERSION = 4;
+    public static final int CURRENT_SCHEMA_VERSION = 5;
     public static final String DEFAULT_TRANSLATION_Y =
         "10 * pow(clamp((ageMs - lifetimeMs + 2000) / 2000, 0, 1), 16)";
 
@@ -29,7 +32,7 @@ public record BubbleStyleDoc(int schemaVersion, long revision, String prefix, Ve
 
     public static final BubbleStyleDoc DEFAULTS = new BubbleStyleDoc(CURRENT_SCHEMA_VERSION,
         DocumentEnvelope.INITIAL_REVISION, "&7", new Vector(0.0D, 0.3D, 0.0D), 32, 5000L,
-        true, true, DEFAULT_MOTION, DEFAULT_SHIMMER, null, List.of(), ShowCondition.ALWAYS);
+        true, true, DEFAULT_MOTION, DEFAULT_SHIMMER, null, List.of(), ShowCondition.ALWAYS, null, null);
 
     public BubbleStyleDoc {
         DocumentEnvelope.requireSchemaVersion(KIND, schemaVersion, CURRENT_SCHEMA_VERSION);
@@ -42,6 +45,8 @@ public record BubbleStyleDoc(int schemaVersion, long revision, String prefix, Ve
         shimmer = shimmer == null ? DEFAULT_SHIMMER : shimmer;
         particleLayers = ParticleLayer.copyLayers(particleLayers, "bubble style");
         show = show == null ? ShowCondition.ALWAYS : show;
+        style = style == null ? IconDisplayStyle.hologramDefaults() : style;
+        box = box == null ? HologramBox.defaults() : box;
     }
 
     public static BubbleStyleDoc parse(String fileName, String raw) {

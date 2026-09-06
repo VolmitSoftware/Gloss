@@ -91,7 +91,7 @@ class RealDropModelTest {
         GlossConfig.RealDrops drops = defaults();
 
         assertEquals(1.35F, drops.motion().speedMultiplier());
-        assertTrue(drops.labels().seeThrough());
+        assertTrue(drops.labels().style().seeThrough());
     }
 
     @Test

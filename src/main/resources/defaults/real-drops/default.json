@@ -1,6 +1,6 @@
 {
   "show": true,
-  "schemaVersion": 3,
+  "schemaVersion": 4,
   "revision": 1,
   "presentation": {
     "limits": {
@@ -41,16 +41,33 @@
     "labels": {
       "enabled": true,
       "yOffset": 0.55,
-      "scale": 0.85,
-      "viewRange": 32.0,
-      "billboard": "CENTER",
-      "seeThrough": true,
-      "shadow": true,
-      "background": true,
-      "backgroundRed": 0,
-      "backgroundGreen": 0,
-      "backgroundBlue": 0,
-      "backgroundAlpha": 80
+      "style": {
+        "billboard": "center",
+        "shadow": true,
+        "seeThrough": true,
+        "textAlignment": "center",
+        "backgroundArgb": "#50000000",
+        "textOpacity": 255,
+        "lineWidth": 16384,
+        "blockLight": null,
+        "skyLight": null,
+        "viewRange": 0.5,
+        "shadowRadius": 0,
+        "shadowStrength": 0,
+        "cullingWidth": 0,
+        "cullingHeight": 0,
+        "glowColor": null,
+        "scaleX": 0.85,
+        "scaleY": 0.85,
+        "scaleZ": 0.85
+      },
+      "box": {
+        "enabled": false,
+        "padding": 4,
+        "borderWidth": 1,
+        "backgroundArgb": "#B31B1B22",
+        "borderArgb": "#FFAAAAAA"
+      }
     },
     "filters": {
       "disabledWorlds": [],

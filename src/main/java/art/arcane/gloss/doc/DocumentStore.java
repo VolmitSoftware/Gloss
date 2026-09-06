@@ -1,6 +1,5 @@
 package art.arcane.gloss.doc;
 
-import art.arcane.volmlib.util.bukkit.json.BukkitJson;
 
 import java.io.File;
 import java.io.IOException;
@@ -34,7 +33,7 @@ public final class DocumentStore<T> {
     public void write(String id, T value) throws IOException {
         Objects.requireNonNull(value, "value");
         File file = fileFor(id);
-        byte[] encoded = (BukkitJson.GSON.toJson(value) + System.lineSeparator()).getBytes(StandardCharsets.UTF_8);
+        byte[] encoded = (DocumentParsers.GSON.toJson(value) + System.lineSeparator()).getBytes(StandardCharsets.UTF_8);
         writtenHashes.put(file.getAbsolutePath(), DocumentHashes.sha256(encoded));
         AtomicFiles.replace(file.toPath(), encoded);
     }

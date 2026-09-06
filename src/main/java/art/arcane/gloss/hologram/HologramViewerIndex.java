@@ -64,6 +64,14 @@ final class HologramViewerIndex {
     }
 
     List<HologramTick.Viewer> nearby(Location anchor, double range) {
+        return nearby(anchor, range, false);
+    }
+
+    List<HologramTick.Viewer> withinBox(Location anchor, double range) {
+        return nearby(anchor, range, true);
+    }
+
+    private List<HologramTick.Viewer> nearby(Location anchor, double range, boolean box) {
         World world = anchor.getWorld();
         if (world == null || range < 0.0D || !Double.isFinite(range)) {
             return List.of();
@@ -73,34 +81,50 @@ final class HologramViewerIndex {
             return List.of();
         }
 
-        double rangeSquared = range * range;
         int minimumChunkX = chunkCoordinate(anchor.getX() - range);
         int maximumChunkX = chunkCoordinate(anchor.getX() + range);
         int minimumChunkZ = chunkCoordinate(anchor.getZ() - range);
         int maximumChunkZ = chunkCoordinate(anchor.getZ() + range);
         List<HologramTick.Viewer> matches = new ArrayList<>();
         UUID worldId = world.getUID();
+        double chunkCount = ((long) maximumChunkX - minimumChunkX + 1D)
+            * ((long) maximumChunkZ - minimumChunkZ + 1D);
+        if (chunkCount > worldChunks.size()) {
+            for (Set<UUID> bucket : worldChunks.values()) {
+                appendMatches(matches, bucket, worldId, anchor, range, box);
+            }
+            return List.copyOf(matches);
+        }
         for (long chunkX = minimumChunkX; chunkX <= maximumChunkX; chunkX++) {
             for (long chunkZ = minimumChunkZ; chunkZ <= maximumChunkZ; chunkZ++) {
                 Set<UUID> bucket = worldChunks.get(chunkKey((int) chunkX, (int) chunkZ));
                 if (bucket == null) {
                     continue;
                 }
-                for (UUID playerId : bucket) {
-                    HologramTick.Viewer viewer = viewers.get(playerId);
-                    if (viewer == null || !worldId.equals(viewer.worldId())) {
-                        continue;
-                    }
-                    double dx = viewer.x() - anchor.getX();
-                    double dy = viewer.y() - anchor.getY();
-                    double dz = viewer.z() - anchor.getZ();
-                    if (dx * dx + dy * dy + dz * dz <= rangeSquared) {
-                        matches.add(viewer);
-                    }
-                }
+                appendMatches(matches, bucket, worldId, anchor, range, box);
             }
         }
         return List.copyOf(matches);
+    }
+
+    private void appendMatches(List<HologramTick.Viewer> matches, Set<UUID> bucket, UUID worldId,
+                               Location anchor, double range, boolean box) {
+        double rangeSquared = range * range;
+        for (UUID playerId : bucket) {
+            HologramTick.Viewer viewer = viewers.get(playerId);
+            if (viewer == null || !worldId.equals(viewer.worldId())) {
+                continue;
+            }
+            double dx = viewer.x() - anchor.getX();
+            double dy = viewer.y() - anchor.getY();
+            double dz = viewer.z() - anchor.getZ();
+            boolean inside = box
+                ? Math.abs(dx) <= range && Math.abs(dy) <= range && Math.abs(dz) <= range
+                : dx * dx + dy * dy + dz * dz <= rangeSquared;
+            if (inside) {
+                matches.add(viewer);
+            }
+        }
     }
 
     boolean anyNearby(Location anchor, double range) {

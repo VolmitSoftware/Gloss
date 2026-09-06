@@ -39,13 +39,13 @@ class PersistentHologramScaleTest {
 
     @Test
     void spawnAndLiveUpdatesUseTheUniformTextDisplayTransformation() {
-        hologram.setScale(3.5D);
+        hologram.setStyle(hologram.style().withScale((float) 3.5D, (float) 3.5D, (float) 3.5D));
         harness.driveHolograms();
 
         DisplayHandle display = harness.onlySpawned(world);
         assertUniformScale(display.transformation, 3.5F);
 
-        hologram.setScale(6.25D);
+        hologram.setStyle(hologram.style().withScale((float) 6.25D, (float) 6.25D, (float) 6.25D));
 
         assertUniformScale(display.transformation, 6.25F);
     }
@@ -56,26 +56,25 @@ class PersistentHologramScaleTest {
         DisplayHandle display = harness.onlySpawned(world);
         HologramDoc current = hologram.toDoc(2L);
         HologramDoc changed = new HologramDoc(HologramDoc.CURRENT_SCHEMA_VERSION, 3L,
-            current.anchor(), current.lines(), current.seeThrough(), 4.5D,
-            current.billboard(), current.yaw(), current.pitch(), current.particleLayers(), null);
+            current.anchor(), current.lines(), current.style().withScale(4.5F, 4.5F, 4.5F), current.box(), current.yaw(), current.pitch(), current.particleLayers(), null);
 
         hologram.apply(changed);
 
-        assertEquals(4.5D, hologram.scale());
+        assertEquals(4.5F, hologram.style().scaleX());
         assertUniformScale(display.transformation, 4.5F);
     }
 
     @Test
     void invalidScaleLeavesValueAndPersistenceRevisionUnchanged() throws Exception {
-        double scale = hologram.scale();
+        float scale = hologram.style().scaleX();
         long revision = revision();
 
-        assertThrows(IllegalArgumentException.class, () -> hologram.setScale(0.0D));
-        assertEquals(scale, hologram.scale());
+        assertThrows(IllegalArgumentException.class, () -> hologram.setStyle(hologram.style().withScale((float) 0.0D, (float) 0.0D, (float) 0.0D)));
+        assertEquals(scale, hologram.style().scaleX());
         assertEquals(revision, revision());
 
-        assertThrows(IllegalArgumentException.class, () -> hologram.setScale(Double.NaN));
-        assertEquals(scale, hologram.scale());
+        assertThrows(IllegalArgumentException.class, () -> hologram.setStyle(hologram.style().withScale((float) Double.NaN, (float) Double.NaN, (float) Double.NaN)));
+        assertEquals(scale, hologram.style().scaleX());
         assertEquals(revision, revision());
     }
 

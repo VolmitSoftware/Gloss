@@ -116,16 +116,19 @@ class CharacterizationTemporaryHologramLifecycleTest {
         TemporaryHologramDisplay temporary = temporary("t-fn", List.of("|state|"));
 
         temporary.drive(true);
-        DisplayHandle display = harness.onlySpawned(world);
-        assertEquals("one", display.lastText());
+        temporary.drive(true);
+        harness.animator.pass(0L);
+        assertEquals("one", harness.sender.sent.getLast().text());
 
         value.set("two");
         temporary.drive(true);
-        assertEquals("two", display.lastText(), "function output must refresh on the drive after it changes");
+        harness.animator.pass(100L);
+        assertEquals("two", harness.sender.sent.getLast().text(), "function output must refresh on the drive after it changes");
 
         value.set("three");
         temporary.drive(true);
-        assertEquals("three", display.lastText());
+        harness.animator.pass(200L);
+        assertEquals("three", harness.sender.sent.getLast().text());
     }
 
     @Test

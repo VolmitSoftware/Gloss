@@ -8,6 +8,10 @@ import java.util.function.LongFunction;
 import java.util.function.Supplier;
 
 public interface TemporaryHologram extends Hologram {
+    void setStyle(IconDisplayStyle style);
+
+    void setBox(HologramBox box);
+
     void setRenderedLines(List<String> lines);
 
     void setRenderedParticleText(String text, List<ParticleTextSpan> spans);

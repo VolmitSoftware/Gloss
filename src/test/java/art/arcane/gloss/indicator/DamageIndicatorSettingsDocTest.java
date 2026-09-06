@@ -19,7 +19,7 @@ class DamageIndicatorSettingsDocTest {
     @Test
     void envelopeOnlyDocumentUsesTheCompleteShippedDefaults() {
         DamageIndicatorSettingsDoc parsed = DamageIndicatorSettingsDoc.parse("default.json", """
-            {"schemaVersion":3,"revision":1}
+            {"schemaVersion":4,"revision":1}
             """);
 
         assertEquals(DamageIndicatorSettingsDoc.DEFAULTS, parsed);
@@ -29,7 +29,7 @@ class DamageIndicatorSettingsDocTest {
     void partialBasePresentationsInheritTheirEventDefaults() {
         DamageIndicatorSettingsDoc parsed = DamageIndicatorSettingsDoc.parse("default.json", """
             {
-              "schemaVersion": 3,
+              "schemaVersion": 4,
               "revision": 1,
               "damage": {"when": "subject.health < 5"},
               "healing": {"presentation": {"transform": {"endScale": 2.0}}}
@@ -47,7 +47,7 @@ class DamageIndicatorSettingsDocTest {
     void numericValuesClampAtTheRuntimeBoundary() {
         DamageIndicatorSettingsDoc parsed = DamageIndicatorSettingsDoc.parse("default.json", """
             {
-              "schemaVersion": 3,
+              "schemaVersion": 4,
               "revision": 1,
               "limits": {
                 "maxPerSecond": 0,
@@ -97,7 +97,7 @@ class DamageIndicatorSettingsDocTest {
                 "{amount}",
                 new Vector(Double.NaN, Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY),
                 new DamageIndicatorSettingsDoc.Motion(0.0D, 0.0D, 0.0D, 0.0D),
-                new DamageIndicatorSettingsDoc.Transform(1.0D, 1.0D, 1.0D), List.of());
+                new DamageIndicatorSettingsDoc.Transform(1.0D, 1.0D, 1.0D), List.of(), null, null);
 
         assertEquals(new Vector(), presentation.offset());
     }
@@ -107,7 +107,7 @@ class DamageIndicatorSettingsDocTest {
         IllegalArgumentException failure = assertThrows(IllegalArgumentException.class,
             () -> DamageIndicatorSettingsDoc.parse("default.json", """
                 {
-                  "schemaVersion": 3,
+                  "schemaVersion": 4,
                   "revision": 1,
                   "damage": {
                     "variants": [{
@@ -128,7 +128,7 @@ class DamageIndicatorSettingsDocTest {
         assertThrows(IllegalArgumentException.class,
             () -> DamageIndicatorSettingsDoc.parse("default.json", """
                 {
-                  "schemaVersion": 3,
+                  "schemaVersion": 4,
                   "revision": 1,
                   "audience": {"when": "viewer.health <"}
                 }
@@ -136,12 +136,12 @@ class DamageIndicatorSettingsDocTest {
     }
 
     @Test
-    void formatsMustCarryTheAmountToken() {
-        IllegalArgumentException failure = assertThrows(IllegalArgumentException.class,
-            () -> new DamageIndicatorSettingsDoc.IndicatorPresentation(
-                "&cDamage", new Vector(), null, null, List.of()));
+    void formatsMayContainAuthoredLabelsWithoutAnAmountToken() {
+        DamageIndicatorSettingsDoc.IndicatorPresentation presentation =
+            new DamageIndicatorSettingsDoc.IndicatorPresentation(
+                "&cDamage", new Vector(), null, null, List.of(), null, null);
 
-        assertTrue(failure.getMessage().contains("{amount}"));
+        assertEquals("&cDamage", presentation.format());
     }
 
 }

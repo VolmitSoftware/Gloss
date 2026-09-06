@@ -1,5 +1,7 @@
 package art.arcane.gloss.editor.sync;
 
+import art.arcane.gloss.doc.DocumentParsers;
+
 import art.arcane.gloss.animation.AnimationDoc;
 import art.arcane.gloss.board.BoardDoc;
 import art.arcane.gloss.bubble.BubbleStyleDoc;
@@ -143,7 +145,7 @@ public enum EditorSyncDocumentKind {
     if (this != PANEL) {
       return source;
     }
-    return EditorSyncJson.canonical(BukkitJson.GSON.toJsonTree(parsed.value()));
+    return EditorSyncJson.canonical(DocumentParsers.GSON.toJsonTree(parsed.value()));
   }
 
   byte[] persistedBytes(String id, String wireSource) {

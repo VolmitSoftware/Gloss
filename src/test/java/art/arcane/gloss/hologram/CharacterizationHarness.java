@@ -7,6 +7,7 @@ import art.arcane.gloss.animation.AnimationMode;
 import art.arcane.gloss.animation.AnimationService;
 import art.arcane.gloss.config.GlossConfigFile;
 import art.arcane.gloss.text.TextPipeline;
+import art.arcane.gloss.particle.ParticleService;
 import art.arcane.volmlib.util.scheduling.SchedulerRuntime;
 import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
@@ -28,6 +29,7 @@ import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -82,6 +84,7 @@ final class CharacterizationHarness implements AutoCloseable {
         final List<String> textHistory = new CopyOnWriteArrayList<>();
         final List<Location> teleports = new CopyOnWriteArrayList<>();
         final List<String> callLog = new CopyOnWriteArrayList<>();
+        final Map<String, List<Object>> metadata = new ConcurrentHashMap<>();
         final java.util.Set<String> scoreboardTags = ConcurrentHashMap.newKeySet();
         final Map<String, Object> dataContainer = new ConcurrentHashMap<>();
         volatile String text;
@@ -89,6 +92,7 @@ final class CharacterizationHarness implements AutoCloseable {
         volatile Transformation transformation;
         volatile boolean visibleByDefaultSupported = true;
         volatile boolean removed;
+        volatile Runnable entityIdRead = () -> {};
         TextDisplay proxy;
 
         DisplayHandle(int entityId) {
@@ -106,6 +110,7 @@ final class CharacterizationHarness implements AutoCloseable {
         final Map<UUID, Boolean> perceived = new ConcurrentHashMap<>();
         final Map<UUID, Integer> showCalls = new ConcurrentHashMap<>();
         final Map<UUID, Integer> hideCalls = new ConcurrentHashMap<>();
+        final List<Location> particleLocations = new CopyOnWriteArrayList<>();
         volatile boolean online = true;
         volatile Location location;
         volatile Runnable locationRead = () -> {};
@@ -147,6 +152,10 @@ final class CharacterizationHarness implements AutoCloseable {
 
     final List<Throwable> schedulerErrors = new CopyOnWriteArrayList<>();
     final List<DelayedTask> delayedTasks = new CopyOnWriteArrayList<>();
+    final List<Runnable> immediateTasks = new CopyOnWriteArrayList<>();
+    volatile boolean ownsThread = true;
+    volatile boolean serverStopping;
+    volatile boolean deferImmediateTasks;
     final AtomicInteger onlinePlayerQueries = new AtomicInteger();
     final Map<String, WorldState> worlds = new LinkedHashMap<>();
     final List<PlayerHandle> online = new CopyOnWriteArrayList<>();
@@ -200,6 +209,7 @@ final class CharacterizationHarness implements AutoCloseable {
             setDeclaredField(gloss, Gloss.class, "text", text);
             setDeclaredField(gloss, Gloss.class, "animator", animator);
             setDeclaredField(gloss, Gloss.class, "animations", animations);
+            setDeclaredField(gloss, Gloss.class, "particles", new ParticleService(gloss));
 
             publishAnimationClips();
 
@@ -369,6 +379,22 @@ final class CharacterizationHarness implements AutoCloseable {
         }
     }
 
+    void drainImmediate() {
+        List<Runnable> snapshot = new ArrayList<>(immediateTasks);
+        immediateTasks.clear();
+        for (Runnable task : snapshot) {
+            task.run();
+        }
+    }
+
+    private void dispatchImmediate(Runnable task) {
+        if (deferImmediateTasks) {
+            immediateTasks.add(task);
+        } else {
+            task.run();
+        }
+    }
+
     void fireEntitiesLoad(WorldState world) {
         try {
             Object listener = declaredField(service, HologramService.class, "listener");
@@ -410,8 +436,16 @@ final class CharacterizationHarness implements AutoCloseable {
         }
     }
 
+    void sweepLeases() {
+        invokeService("sweepLeases");
+    }
+
     void driveTemporaries() {
         invokeService("driveTemporaries");
+    }
+
+    void driveTemporaryParticles() {
+        invokeService("driveTemporaryParticles");
     }
 
     void driveTemporary(TemporaryHologramDisplay temporary, boolean enabled) {
@@ -502,7 +536,7 @@ final class CharacterizationHarness implements AutoCloseable {
 
         InvocationHandler scheduler = (proxy, method, args) -> switch (method.getName()) {
             case "runTask" -> {
-                ((Runnable) args[1]).run();
+                dispatchImmediate((Runnable) args[1]);
                 yield bukkitTask;
             }
             case "runTaskLater" -> {
@@ -511,7 +545,7 @@ final class CharacterizationHarness implements AutoCloseable {
             }
             case "scheduleSyncDelayedTask" -> {
                 if (args.length == 2 || (Long) args[2] <= 0L) {
-                    ((Runnable) args[1]).run();
+                    dispatchImmediate((Runnable) args[1]);
                 } else {
                     delayedTasks.add(new DelayedTask((Runnable) args[1], (Long) args[2]));
                 }
@@ -552,7 +586,8 @@ final class CharacterizationHarness implements AutoCloseable {
             }
             case "getScheduler" -> schedulerProxy;
             case "getPluginManager" -> pluginManagerProxy;
-            case "isPrimaryThread", "isTickThread", "isGlobalTickThread", "isOwnedByCurrentRegion" -> true;
+            case "isPrimaryThread", "isTickThread", "isGlobalTickThread", "isOwnedByCurrentRegion" -> ownsThread;
+            case "isStopping" -> serverStopping;
             case "getGlobalRegionScheduler", "getRegionScheduler", "getAsyncScheduler" -> null;
             case "getLogger" -> serverLogger;
             case "getName", "getVersion", "getBukkitVersion", "getMinecraftVersion" -> "characterization";
@@ -626,6 +661,7 @@ final class CharacterizationHarness implements AutoCloseable {
             String name = method.getName();
             switch (name) {
                 case "getEntityId":
+                    handle.entityIdRead.run();
                     return handle.entityId;
                 case "getUniqueId":
                     return handle.uuid;
@@ -678,6 +714,7 @@ final class CharacterizationHarness implements AutoCloseable {
             // motion) reach the call log instead of detonating the fixture.
             if (name.startsWith("set") || name.startsWith("add")) {
                 handle.callLog.add(name);
+                handle.metadata.put(name, args == null ? List.of() : Arrays.asList(args.clone()));
                 return primitiveDefault(method.getReturnType());
             }
 
@@ -697,6 +734,11 @@ final class CharacterizationHarness implements AutoCloseable {
             case "getLocation" -> {
                 handle.locationRead.run();
                 yield handle.location.clone();
+            }
+            case "getEyeLocation" -> handle.location.clone().add(0, 1.62D, 0);
+            case "spawnParticle" -> {
+                handle.particleLocations.add(((Location) args[1]).clone());
+                yield null;
             }
             case "getWorld" -> handle.location.getWorld();
             case "showEntity" -> {

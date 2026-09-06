@@ -206,7 +206,7 @@ public class CharacterizationPreviewRefreshTest {
     PreviewFakes.InventoryFake inventoryFake = PreviewFakes.inventory(27)
         .item(0, PreviewFakes.stack(Material.STICK, 3));
     Inventory inventory = inventoryFake.build();
-    PreviewElement.Slot slot = new PreviewElement.Slot(0, 0, 0, 18, 0, inventory, 0);
+    PreviewElement.Slot slot = new PreviewElement.Slot(0, 0, 0, 18, 0, inventory, 0, null, null);
     ContainerPreview preview = preview(List.of(slot), true);
 
     ItemStack seeded = pendingItem(preview);
@@ -238,7 +238,7 @@ public class CharacterizationPreviewRefreshTest {
     return new PreviewElement.Label(0, 0, 0, () -> {
       reads.incrementAndGet();
       return Component.text("count " + reads.get());
-    }, () -> new ParticleText.Rendered("count " + reads.get(), List.of()), 0);
+    }, () -> new ParticleText.Rendered("count " + reads.get(), List.of()), 0, null, null);
   }
 
   private static ItemStack pendingItem(ContainerPreview preview) throws ReflectiveOperationException {

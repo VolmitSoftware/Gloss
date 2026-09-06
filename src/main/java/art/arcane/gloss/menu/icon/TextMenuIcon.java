@@ -1,6 +1,12 @@
 package art.arcane.gloss.menu.icon;
 
 import art.arcane.gloss.Gloss;
+import art.arcane.gloss.api.HologramPresentation;
+import art.arcane.gloss.api.IconDisplayStyle;
+import art.arcane.gloss.api.HologramBox;
+import art.arcane.gloss.hologram.HologramBoxLayout;
+import art.arcane.gloss.hologram.PacketTextDecoration;
+import com.github.retrooper.packetevents.util.Vector3f;
 import art.arcane.gloss.GlossConfig;
 import art.arcane.gloss.config.icon.TextIconData;
 import art.arcane.gloss.exceptions.MenuIconException;
@@ -11,17 +17,20 @@ import art.arcane.gloss.particle.ParticleText;
 import art.arcane.gloss.util.common.TextUtils;
 import art.arcane.gloss.util.common.math.CollisionPlane;
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
 import org.bukkit.util.Vector;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 
 public class TextMenuIcon extends MenuIcon<TextIconData> {
 
   private final List<Component> components;
+  private PacketTextDecoration decoration;
   private int refreshInterval;
   /**
    * The post-pipeline string each line was last parsed from. MiniMessage parsing is deterministic,
@@ -57,6 +66,57 @@ public class TextMenuIcon extends MenuIcon<TextIconData> {
       lineLocation.add(session.getTransform().localVector(new Vector(0F, -localLineHeight(), 0F)));
     });
     return uuids;
+  }
+
+  @Override
+  public void spawn() {
+    super.spawn();
+    updateDecoration();
+  }
+
+  @Override
+  public void remove() {
+    if (decoration != null) {
+      decoration.remove();
+    }
+    super.remove();
+  }
+
+  @Override
+  public void move(Vector offset) {
+    super.move(offset);
+    updateDecoration();
+  }
+
+  @Override
+  protected void applyOrientation() {
+    super.applyOrientation();
+    updateDecoration();
+  }
+
+  private void updateDecoration() {
+    if (!data.box().enabled() || displayEntities == null || components == null) {
+      return;
+    }
+    if (decoration == null) {
+      decoration = new PacketTextDecoration(session.getPlayer());
+    }
+    List<String> lines = new ArrayList<>(components.size());
+    for (Component component : components) {
+      lines.add(LegacyComponentSerializer.legacySection().serialize(component));
+    }
+    String text = String.join("\n", lines);
+    HologramBoxLayout layout = HologramBoxLayout.measure(text, style.lineWidth(), data.box());
+    Location anchor = session.getTransform().orient(position);
+    Vector center = textBoundingBoxCenter(position);
+    anchor.setX(center.getX());
+    anchor.setY(center.getY());
+    anchor.setZ(center.getZ());
+    float scale = uiScale();
+    float offsetY = -layout.textHeight() / 2F * 0.025F * scale * style.scaleY();
+    decoration.update(new PacketTextDecoration.Update(anchor, text, style, data.box(),
+        new HologramPresentation(scale, scale, scale, 0D, 0D, session.getTransform().roll(), 1D),
+        new Vector3f(0F, offsetY, 0F)));
   }
 
   @Override
@@ -101,7 +161,13 @@ public class TextMenuIcon extends MenuIcon<TextIconData> {
 
   @Override
   public ParticleText.Rendered particleText() {
-    return ParticleText.render(sourceText, text -> TextPipeline.menuText(session.getPlayer(), text));
+    return ParticleText.renderLegacy(sourceText, text -> TextPipeline.menuText(session.getPlayer(), text));
+  }
+
+  public boolean matchesAppearance(IconDisplayStyle nextStyle, HologramBox nextBox, Integer refreshTicks) {
+    return style.equals(IconDisplayStyle.resolve(nextStyle))
+        && data.box().equals(nextBox == null ? HologramBox.defaults() : nextBox)
+        && Objects.equals(data.refreshTicks(), refreshTicks);
   }
 
   public boolean updateText(String text) {
@@ -132,6 +198,7 @@ public class TextMenuIcon extends MenuIcon<TextIconData> {
       updateName(index, replacement.get(index));
     }
 
+    updateDecoration();
     markGeometryChanged();
     return true;
   }

@@ -1,5 +1,7 @@
 package art.arcane.gloss.config.icon;
 
+import art.arcane.gloss.api.IconDisplayStyle;
+
 import art.arcane.gloss.enums.MenuIconType;
 import art.arcane.gloss.exceptions.MenuIconException;
 

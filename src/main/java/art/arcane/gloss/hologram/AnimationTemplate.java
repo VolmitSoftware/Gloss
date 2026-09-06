@@ -94,7 +94,7 @@ public final class AnimationTemplate implements TextFrameSource {
     }
 
     @Override
-    public String compose(long nowMs) {
+    public synchronized String compose(long nowMs) {
         if (segments.size() == 1 && segments.getFirst() instanceof LiteralSegment only) {
             return only.text();
         }

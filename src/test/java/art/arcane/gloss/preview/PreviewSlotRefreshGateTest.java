@@ -48,7 +48,7 @@ public class PreviewSlotRefreshGateTest {
     scaleFactors().put(VIEWER, 0.0D);
     inventoryFake = PreviewFakes.inventory(27).item(0, PreviewFakes.stack(Material.STICK, 3));
     Inventory inventory = inventoryFake.build();
-    preview = preview(new PreviewElement.Slot(0, 0, 0, 18, 0, inventory, 0));
+    preview = preview(new PreviewElement.Slot(0, 0, 0, 18, 0, inventory, 0, null, null));
     preview.open();
   }
 

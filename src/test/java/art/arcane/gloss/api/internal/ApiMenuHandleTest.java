@@ -64,8 +64,8 @@ public class ApiMenuHandleTest {
     Map<String, HoloIcon> applied = new LinkedHashMap<>();
     assertTrue(handle.dirty());
     assertEquals(2, handle.drain(applied::put));
-    assertEquals(new HoloIcon.Text("In stock: 49"), applied.get("stock"));
-    assertEquals(new HoloIcon.Text("Title 49"), applied.get("title"));
+    assertEquals(HoloIcon.text("In stock: 49"), applied.get("stock"));
+    assertEquals(HoloIcon.text("Title 49"), applied.get("title"));
     assertFalse(handle.dirty());
   }
 

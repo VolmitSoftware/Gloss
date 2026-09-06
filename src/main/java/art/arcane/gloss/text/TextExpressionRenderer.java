@@ -18,6 +18,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.DoubleSupplier;
 import java.util.function.IntSupplier;
+import java.util.function.UnaryOperator;
 
 public final class TextExpressionRenderer {
     public static final Set<String> STANDARD_VARIABLES = Set.of(
@@ -46,6 +47,10 @@ public final class TextExpressionRenderer {
     }
 
     public String render(Player viewer, String input) {
+        return render(scope(viewer), input, UnaryOperator.identity());
+    }
+
+    public String render(ExprScope scope, String input, UnaryOperator<String> resolvedText) {
         if (input == null || input.isEmpty() || input.indexOf("{{") < 0) {
             return input == null ? "" : input;
         }
@@ -58,13 +63,13 @@ public final class TextExpressionRenderer {
                 break;
             }
             String source = input.substring(open + 2, close).trim();
-            String resolved = resolve(scope(viewer), source);
+            String resolved = resolve(scope, source);
             if (resolved != null) {
                 if (output == null) {
                     output = new StringBuilder(input.length() + 16);
                 }
                 output.append(input, cursor, open);
-                output.append(resolved);
+                output.append(resolvedText.apply(resolved));
                 cursor = close + 2;
             }
             open = input.indexOf("{{", close + 2);

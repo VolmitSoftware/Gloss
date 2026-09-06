@@ -1,6 +1,7 @@
 package art.arcane.gloss.preview.doc;
 
 import art.arcane.gloss.particle.ParticleText;
+import art.arcane.gloss.api.IconDisplayStyle;
 import art.arcane.gloss.preview.PreviewElement;
 import art.arcane.gloss.util.common.TextUtils;
 import net.kyori.adventure.text.Component;
@@ -29,32 +30,22 @@ public final class CardFramer {
   private static final int WELL = 18;
   private static final int LINE = 12;
 
-  private static final int TRAY_PAD = 4;
-  private static final int PANEL_PAD = 7;
-  private static final int TITLE_BAR_HEIGHT = 17;
-  private static final int FRAME_BORDER = 3;
-  private static final int GAP = 6;
-
   private static final int Z_FRAME = 0;
   private static final int Z_PANEL = 1;
   private static final int Z_TRAY = 2;
   private static final int Z_TITLE_BAR = 3;
   private static final int Z_LABEL = 6;
 
-  private static final int PANEL_COLOR = 0xF21B1B22;
-  private static final int TRAY_COLOR = 0xFF33333E;
-  private static final int FRAME_ALPHA = 0xCC;
-  private static final int TITLE_BAR_ALPHA = 0xE6;
-
   private CardFramer() {
   }
 
-  public static List<PreviewElement> frame(
-      List<PreviewElement> content,
-      Supplier<Component> title,
-      int accentColor,
-      int minHalfWidth
-  ) {
+  public record Settings(Supplier<Component> title, int accent, int minHalfWidth,
+                         PreviewCardStyle style, IconDisplayStyle textStyle) {
+  }
+
+  public static List<PreviewElement> frame(List<PreviewElement> content, Settings settings) {
+    PreviewCardStyle style = settings.style();
+    Supplier<Component> title = settings.title();
     boolean hasGrid = false;
     int gridLeft = 0;
     int gridRight = 0;
@@ -91,32 +82,32 @@ public final class CardFramer {
       contentBottom = -WELL / 2;
     }
 
-    int panelHalfWidth = Math.max(minHalfWidth, (hasGrid ? (gridRight - gridLeft) / 2 : WELL / 2) + PANEL_PAD);
-    int titleBarBottom = contentTop + GAP;
-    int panelTop = titleBarBottom + TITLE_BAR_HEIGHT;
-    int panelBottom = contentBottom - PANEL_PAD;
+    int panelHalfWidth = Math.max(settings.minHalfWidth(), (hasGrid ? (gridRight - gridLeft) / 2 : WELL / 2) + style.padding());
+    int titleBarBottom = contentTop + style.titleGap();
+    int panelTop = titleBarBottom + style.titleHeight();
+    int panelBottom = contentBottom - style.padding();
     int panelCenterY = (panelTop + panelBottom) / 2;
     int panelWidth = panelHalfWidth * 2;
     int panelHeight = panelTop - panelBottom;
 
-    int accent = accentColor;
-    int frameColor = (FRAME_ALPHA << 24) | (accent & 0xFFFFFF);
-    int titleBarColor = (TITLE_BAR_ALPHA << 24) | (accent & 0xFFFFFF);
+    int accent = settings.accent();
+    int frameColor = style.borderArgb() == null ? 0xCC000000 | (accent & 0xFFFFFF) : style.borderArgb().argb();
+    int titleBarColor = style.titleArgb() == null ? 0xE6000000 | (accent & 0xFFFFFF) : style.titleArgb().argb();
 
     List<PreviewElement> styled = new ArrayList<>();
-    styled.add(new PreviewElement.Panel(0, panelCenterY, Z_FRAME, panelWidth + FRAME_BORDER * 2, panelHeight + FRAME_BORDER * 2, frameColor));
-    styled.add(new PreviewElement.Panel(0, panelCenterY, Z_PANEL, panelWidth, panelHeight, PANEL_COLOR));
+    styled.add(new PreviewElement.Panel(0, panelCenterY, Z_FRAME, panelWidth + style.borderWidth() * 2, panelHeight + style.borderWidth() * 2, frameColor, settings.textStyle()));
+    styled.add(new PreviewElement.Panel(0, panelCenterY, Z_PANEL, panelWidth, panelHeight, style.backgroundArgb().argb(), settings.textStyle()));
     if (hasGrid) {
-      int trayWidth = (gridRight - gridLeft) + TRAY_PAD * 2;
-      int trayHeight = (gridTop - gridBottom) + TRAY_PAD * 2;
+      int trayWidth = (gridRight - gridLeft) + style.trayPadding() * 2;
+      int trayHeight = (gridTop - gridBottom) + style.trayPadding() * 2;
       int trayCenterX = (gridRight + gridLeft) / 2;
       int trayCenterY = (gridTop + gridBottom) / 2;
-      styled.add(new PreviewElement.Panel(trayCenterX, trayCenterY, Z_TRAY, trayWidth, trayHeight, TRAY_COLOR));
+      styled.add(new PreviewElement.Panel(trayCenterX, trayCenterY, Z_TRAY, trayWidth, trayHeight, style.trayArgb().argb(), settings.textStyle()));
     }
     int titleBarCenterY = (panelTop + titleBarBottom) / 2;
-    styled.add(new PreviewElement.Panel(0, titleBarCenterY, Z_TITLE_BAR, panelWidth, TITLE_BAR_HEIGHT, titleBarColor));
+    styled.add(new PreviewElement.Panel(0, titleBarCenterY, Z_TITLE_BAR, panelWidth, style.titleHeight(), titleBarColor, settings.textStyle()));
     styled.add(new PreviewElement.Label(0, titleBarCenterY, Z_LABEL, title,
-        () -> new ParticleText.Rendered(TextUtils.content(title.get()), List.of()), 0));
+        () -> new ParticleText.Rendered(TextUtils.content(title.get()), List.of()), 0, settings.textStyle(), null));
     styled.addAll(content);
     return styled;
   }

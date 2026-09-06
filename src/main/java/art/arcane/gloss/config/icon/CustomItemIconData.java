@@ -1,5 +1,7 @@
 package art.arcane.gloss.config.icon;
 
+import art.arcane.gloss.api.IconDisplayStyle;
+
 import art.arcane.gloss.enums.MenuIconType;
 
 // component names are the JSON keys, the Gson instance applies no naming policy

@@ -1,5 +1,7 @@
 package art.arcane.gloss.particle;
 
+import art.arcane.gloss.util.common.TextUtils;
+
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
@@ -25,7 +27,35 @@ public final class ParticleText {
     public static Rendered renderMarked(String marked, Function<String, String> renderer) {
         Objects.requireNonNull(renderer, "particle text renderer may not be null");
         String rendered = renderer.apply(marked == null ? "" : marked);
-        return resolve(rendered == null ? "" : rendered);
+        return resolve(stripMarkerFormatting(rendered == null ? "" : rendered));
+    }
+
+    public static Rendered renderLegacy(String authored, Function<String, String> renderer) {
+        return render(authored, marked -> TextUtils.renderLegacy(renderer.apply(marked)));
+    }
+
+    public static Rendered renderLegacyMarked(String marked, Function<String, String> renderer) {
+        return renderMarked(marked, value -> TextUtils.renderLegacy(renderer.apply(value)));
+    }
+
+    private static String stripMarkerFormatting(String source) {
+        if (source.indexOf(MARKER) < 0) {
+            return source;
+        }
+        StringBuilder output = new StringBuilder(source.length());
+        boolean marker = false;
+        for (int index = 0; index < source.length(); index++) {
+            char value = source.charAt(index);
+            if (value == MARKER) {
+                marker = !marker;
+            }
+            if (marker && value == '§' && index + 1 < source.length()) {
+                index++;
+                continue;
+            }
+            output.append(value);
+        }
+        return output.toString();
     }
 
     public static Template parse(String authored) {

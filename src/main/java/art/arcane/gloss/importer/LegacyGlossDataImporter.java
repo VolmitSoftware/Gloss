@@ -12,7 +12,7 @@ import art.arcane.gloss.doc.DocumentEnvelope;
 import art.arcane.gloss.emoji.EmojiDoc;
 import art.arcane.gloss.hologram.HologramDoc;
 import art.arcane.gloss.motd.MotdDoc;
-import art.arcane.volmlib.util.bukkit.json.BukkitJson;
+import art.arcane.gloss.doc.DocumentParsers;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -156,8 +156,7 @@ public final class LegacyGlossDataImporter {
             legacy.get("z").getAsDouble());
         HologramDoc.Anchor anchor = new HologramDoc.Anchor(legacy.get("world").getAsString(), position);
         return new HologramDoc(HologramDoc.CURRENT_SCHEMA_VERSION, DocumentEnvelope.INITIAL_REVISION,
-            anchor, stringList(legacy.getAsJsonArray("lines")), true,
-            HologramDoc.DEFAULT_SCALE, HologramDoc.DEFAULT_BILLBOARD, 0.0D, 0.0D, List.of(), ShowCondition.ALWAYS);
+            anchor, stringList(legacy.getAsJsonArray("lines")), null, null, 0.0D, 0.0D, List.of(), ShowCondition.ALWAYS);
     }
 
     private static EmojiDoc convertEmoji(JsonObject legacy) {
@@ -285,7 +284,7 @@ public final class LegacyGlossDataImporter {
                 motion,
                 base.shimmer(),
                 base.select(),
-                base.particleLayers(), base.show());
+                base.particleLayers(), base.show(), null, null);
             writeDocument(styleFile.toPath(), updated);
             entries.add(Entry.of("config", LEGACY_CONFIG_FILE_NAME + ":chat-bubbles", Status.OVERLAID));
         } catch (IOException | RuntimeException failure) {
@@ -399,7 +398,7 @@ public final class LegacyGlossDataImporter {
 
     private static void writeDocument(Path file, Object document) throws IOException {
         AtomicFiles.replace(file,
-            (BukkitJson.GSON.toJson(document) + System.lineSeparator()).getBytes(StandardCharsets.UTF_8));
+            (DocumentParsers.GSON.toJson(document) + System.lineSeparator()).getBytes(StandardCharsets.UTF_8));
     }
 
     private static byte[] readResource(String path) throws IOException {

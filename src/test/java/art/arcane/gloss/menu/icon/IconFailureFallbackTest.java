@@ -1,5 +1,7 @@
 package art.arcane.gloss.menu.icon;
 
+import art.arcane.gloss.doc.DocumentParsers;
+
 import art.arcane.gloss.condition.ShowCondition;
 import art.arcane.gloss.config.icon.AnimatedImageData;
 import art.arcane.gloss.config.icon.ItemIconData;
@@ -12,7 +14,6 @@ import art.arcane.gloss.menu.MenuSession;
 import art.arcane.gloss.menu.MenuSessionOptions;
 import art.arcane.gloss.util.common.TextUtils;
 import art.arcane.gloss.util.common.math.CollisionPlane;
-import art.arcane.volmlib.util.bukkit.json.BukkitJson;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
 import org.bukkit.util.Vector;
@@ -66,8 +67,8 @@ public class IconFailureFallbackTest {
 
   @Test
   public void unknownAndBadlyCasedItemIdsStillParseSoTheMenuFileSurvives() {
-    MenuIconData unknown = BukkitJson.GSON.fromJson("{\"type\":\"item\",\"item\":\"minecraft:not_a_real_item\"}", MenuIconData.class);
-    MenuIconData badCase = BukkitJson.GSON.fromJson("{\"type\":\"item\",\"item\":\"DIAMOND_SWORD\"}", MenuIconData.class);
+    MenuIconData unknown = DocumentParsers.GSON.fromJson("{\"type\":\"item\",\"item\":\"minecraft:not_a_real_item\"}", MenuIconData.class);
+    MenuIconData badCase = DocumentParsers.GSON.fromJson("{\"type\":\"item\",\"item\":\"DIAMOND_SWORD\"}", MenuIconData.class);
 
     assertTrue(unknown instanceof ItemIconData);
     assertTrue(badCase instanceof ItemIconData);

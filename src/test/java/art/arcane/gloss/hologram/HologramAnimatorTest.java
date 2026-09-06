@@ -12,15 +12,23 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.UnaryOperator;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class HologramAnimatorTest {
     private record Sent(List<Player> viewers, int entityId, String text, TextCodec codec) {
@@ -87,6 +95,19 @@ class HologramAnimatorTest {
 
         assertNotNull(template);
         assertTrue(template.hasSlots());
+    }
+
+    @Test
+    void scopedFramesUseTheirRendererInsteadOfSharedStaticFrames() {
+        GlossConfig config = config(true);
+        HologramAnimator animator = new HologramAnimator(() -> config, name -> true,
+            name -> FAST, clip -> List.of("shared-A", "shared-B", "shared-C", "shared-D"),
+            new RecordingSender());
+        AnimationTemplate template = animator.compileTemplate(List.of("|animation.fast|"),
+            frame -> "scoped-" + frame, false);
+        assertNotNull(template);
+        assertEquals("scoped-A", template.compose(0));
+        assertEquals("scoped-B", template.compose(10));
     }
 
     @Test
@@ -182,6 +203,188 @@ class HologramAnimatorTest {
         assertEquals(1, animator.targetCount());
         assertEquals(1, animator.pass(0L));
         assertEquals(3, sender.sent.get(0).entityId());
+    }
+
+    @Test
+    void retiredPersonalizedFrameCannotOverwriteSharedTextAfterCompositionResumes() throws Exception {
+        RecordingSender sender = new RecordingSender();
+        HologramAnimator animator = animator(config(true), sender);
+        Player viewer = player(UUID.randomUUID(), true);
+        CountDownLatch composing = new CountDownLatch(1);
+        CountDownLatch resume = new CountDownLatch(1);
+        animator.publish("pane", "viewer", new HologramAnimator.Target(7, now -> {
+            composing.countDown();
+            awaitSignal(resume);
+            return "old personalized text";
+        }, List.of(viewer)));
+        try (ExecutorService executor = Executors.newSingleThreadExecutor()) {
+            Future<Integer> pass = executor.submit(() -> animator.pass(0L));
+            try {
+                assertTrue(composing.await(5, TimeUnit.SECONDS));
+                animator.removeGroup("pane");
+                sender.sent.add(new Sent(List.of(viewer), 7, "new shared text", TextCodec.AUTHORED));
+            } finally {
+                resume.countDown();
+            }
+            assertEquals(0, pass.get(5, TimeUnit.SECONDS));
+        }
+        assertEquals(List.of("new shared text"), sender.sent.stream().map(Sent::text).toList());
+        assertEquals(0, animator.targetCount());
+    }
+
+    @Test
+    void aReplacedPublicationCannotCommitItsCapturedFrame() {
+        RecordingSender sender = new RecordingSender();
+        HologramAnimator animator = animator(config(true), sender);
+        Player viewer = player(UUID.randomUUID(), true);
+        HologramAnimator.Target replacement = new HologramAnimator.Target(7, now -> "new", List.of(viewer));
+        animator.publish("pane", "viewer", new HologramAnimator.Target(7, now -> {
+            animator.publish("pane", "viewer", replacement);
+            return "old";
+        }, List.of(viewer)));
+
+        assertEquals(0, animator.pass(0L));
+        assertEquals(1, animator.pass(1L));
+        assertEquals(List.of("new"), sender.sent.stream().map(Sent::text).toList());
+    }
+
+    @Test
+    void stoppingDuringCompositionCancelsTheCapturedFrame() {
+        RecordingSender sender = new RecordingSender();
+        HologramAnimator animator = animator(config(true), sender);
+        Player viewer = player(UUID.randomUUID(), true);
+        animator.publish("pane", "viewer", new HologramAnimator.Target(7, now -> {
+            animator.stop();
+            return "old";
+        }, List.of(viewer)));
+
+        assertEquals(0, animator.pass(0L));
+        assertTrue(sender.sent.isEmpty());
+    }
+
+    @Test
+    void retirementWaitsForAnAlreadyCommittedPacketBeforeReplacement() throws Exception {
+        for (boolean direct : List.of(false, true)) {
+            GlossConfig active = config(true);
+            UUID viewerId = UUID.randomUUID();
+            Player viewer = player(viewerId, true);
+            CountDownLatch sending = new CountDownLatch(1);
+            CountDownLatch finishSend = new CountDownLatch(1);
+            CountDownLatch retiring = new CountDownLatch(1);
+            CountDownLatch retired = new CountDownLatch(1);
+            List<String> order = new ArrayList<>();
+            HologramAnimator animator = new HologramAnimator(() -> active, name -> false, name -> null,
+                (viewers, entityId, text, codec) -> {
+                    sending.countDown();
+                    awaitSignal(finishSend);
+                    order.add(text);
+                });
+            if (direct) {
+                animator.sendText(viewer, viewerId, 7, "old");
+            } else {
+                animator.publish("pane", "viewer", new HologramAnimator.Target(7, now -> "old", List.of(viewer)));
+            }
+            try (ExecutorService executor = Executors.newFixedThreadPool(2)) {
+                Future<Integer> pass = executor.submit(() -> animator.pass(0L));
+                try {
+                    assertTrue(sending.await(5, TimeUnit.SECONDS));
+                    Future<?> cancellation = executor.submit(() -> {
+                        retiring.countDown();
+                        if (direct) {
+                            animator.discardText(viewerId, 7);
+                        } else {
+                            animator.removeGroup("pane");
+                        }
+                        order.add("replacement");
+                        retired.countDown();
+                    });
+                    assertTrue(retiring.await(5, TimeUnit.SECONDS));
+                    assertFalse(retired.await(100, TimeUnit.MILLISECONDS));
+                    finishSend.countDown();
+                    cancellation.get(5, TimeUnit.SECONDS);
+                    assertEquals(1, pass.get(5, TimeUnit.SECONDS));
+                    assertEquals(List.of("old", "replacement"), order);
+                } finally {
+                    finishSend.countDown();
+                }
+            }
+        }
+    }
+
+    @Test
+    void discardedDirectUpdateCannotReturnAfterSendFailure() {
+        GlossConfig active = config(true);
+        UUID viewerId = UUID.randomUUID();
+        Player viewer = player(viewerId, true);
+        AtomicReference<HologramAnimator> owner = new AtomicReference<>();
+        HologramAnimator animator = new HologramAnimator(() -> active, name -> false, name -> null,
+            (viewers, entityId, text, codec) -> {
+                owner.get().discardText(viewerId, entityId);
+                throw new IllegalStateException("send failed after retirement");
+            });
+        owner.set(animator);
+        animator.sendText(viewer, viewerId, 7, "old");
+
+        assertThrows(IllegalStateException.class, () -> animator.pass(0L));
+        assertEquals(0, animator.pendingTextUpdateCount());
+        assertEquals(0, animator.pass(1L));
+    }
+
+    @Test
+    void directSendFailurePreservesTheLatestReplacement() {
+        GlossConfig active = config(true);
+        UUID viewerId = UUID.randomUUID();
+        Player viewer = player(viewerId, true);
+        List<String> sent = new ArrayList<>();
+        AtomicReference<HologramAnimator> owner = new AtomicReference<>();
+        HologramAnimator animator = new HologramAnimator(() -> active, name -> false, name -> null,
+            (viewers, entityId, text, codec) -> {
+                if (text.equals("old")) {
+                    owner.get().sendText(viewer, viewerId, entityId, "new");
+                    throw new IllegalStateException("old send failed");
+                }
+                sent.add(text);
+            });
+        owner.set(animator);
+        animator.sendText(viewer, viewerId, 7, "old");
+
+        assertThrows(IllegalStateException.class, () -> animator.pass(0L));
+        assertEquals(1, animator.pendingTextUpdateCount());
+        assertEquals(1, animator.pass(1L));
+        assertEquals(List.of("new"), sent);
+        assertEquals(0, animator.pendingTextUpdateCount());
+    }
+
+    @Test
+    void uncancelledDirectSendFailureRemainsRetryable() {
+        GlossConfig active = config(true);
+        UUID viewerId = UUID.randomUUID();
+        Player viewer = player(viewerId, true);
+        AtomicInteger attempts = new AtomicInteger();
+        HologramAnimator animator = new HologramAnimator(() -> active, name -> false, name -> null,
+            (viewers, entityId, text, codec) -> {
+                if (attempts.getAndIncrement() == 0) {
+                    throw new IllegalStateException("transient send failure");
+                }
+            });
+        animator.sendText(viewer, viewerId, 7, "text");
+
+        assertThrows(IllegalStateException.class, () -> animator.pass(0L));
+        assertEquals(1, animator.pendingTextUpdateCount());
+        assertEquals(1, animator.pass(1L));
+        assertEquals(2, attempts.get());
+        assertEquals(0, animator.pendingTextUpdateCount());
+    }
+
+    private static void awaitSignal(CountDownLatch latch) {
+        try {
+            if (!latch.await(5, TimeUnit.SECONDS)) {
+                throw new AssertionError("frame composition did not resume");
+            }
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            throw new AssertionError(interrupted);
+        }
     }
 
     @Test

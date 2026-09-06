@@ -1,6 +1,9 @@
 package art.arcane.gloss.preview.doc;
 
 import art.arcane.gloss.api.ParticleLayer;
+import art.arcane.gloss.api.IconDisplayStyle;
+import art.arcane.gloss.api.IconArgbColor;
+import art.arcane.gloss.api.HologramBox;
 import art.arcane.gloss.condition.ShowCondition;
 import com.google.gson.JsonElement;
 
@@ -20,6 +23,8 @@ final class PreviewDocument {
   MatchDef match;
   List<VariantDef> variants;
   CardDef card;
+  IconDisplayStyle textStyle;
+  IconDisplayStyle itemStyle;
   List<ElementDef> elements;
   List<ParticleLayer> particleLayers;
 }
@@ -50,6 +55,15 @@ final class CardDef {
   String title;
   String accent;
   Integer minHalfWidth;
+  Integer padding;
+  Integer borderWidth;
+  Integer trayPadding;
+  Integer titleHeight;
+  Integer titleGap;
+  IconArgbColor backgroundArgb;
+  IconArgbColor trayArgb;
+  IconArgbColor borderArgb;
+  IconArgbColor titleArgb;
 }
 
 final class ElementDef {
@@ -70,6 +84,8 @@ final class ElementDef {
   // constant OR an expression string.
   JsonElement visible;
   RepeatDef repeat;
+  IconDisplayStyle style;
+  HologramBox box;
 }
 
 final class RepeatDef {

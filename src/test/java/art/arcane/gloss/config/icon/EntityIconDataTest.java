@@ -1,7 +1,8 @@
 package art.arcane.gloss.config.icon;
 
+import art.arcane.gloss.doc.DocumentParsers;
+
 import art.arcane.gloss.exceptions.MenuIconException;
-import art.arcane.volmlib.util.bukkit.json.BukkitJson;
 import com.google.gson.JsonObject;
 import org.bukkit.entity.EntityType;
 import org.junit.Test;
@@ -21,7 +22,7 @@ public class EntityIconDataTest {
     assertEquals(0.5F, data.resolvedWidth(), 0F);
     assertEquals(0.9F, data.resolvedHeight(), 0F);
 
-    JsonObject encoded = BukkitJson.GSON.toJsonTree(data, MenuIconData.class).getAsJsonObject();
+    JsonObject encoded = DocumentParsers.GSON.toJsonTree(data, MenuIconData.class).getAsJsonObject();
     assertEquals("entity", encoded.get("type").getAsString());
     assertEquals("minecraft:parrot", encoded.get("entity").getAsString());
   }
@@ -63,6 +64,6 @@ public class EntityIconDataTest {
   }
 
   private static EntityIconData entity(String json) {
-    return (EntityIconData) BukkitJson.GSON.fromJson(json, MenuIconData.class);
+    return (EntityIconData) DocumentParsers.GSON.fromJson(json, MenuIconData.class);
   }
 }

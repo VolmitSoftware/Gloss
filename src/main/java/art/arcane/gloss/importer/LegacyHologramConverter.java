@@ -1,5 +1,7 @@
 package art.arcane.gloss.importer;
 
+import art.arcane.gloss.doc.DocumentParsers;
+
 import art.arcane.gloss.panel.PanelDefinition;
 import art.arcane.gloss.panel.PanelIds;
 import art.arcane.gloss.panel.PanelTransform;
@@ -7,13 +9,12 @@ import art.arcane.gloss.panel.PanelVisibility;
 import art.arcane.gloss.config.components.DecoComponentData;
 import art.arcane.gloss.config.icon.BlockIconData;
 import art.arcane.gloss.config.icon.EntityIconData;
-import art.arcane.gloss.config.icon.IconArgbColor;
+import art.arcane.gloss.api.IconArgbColor;
 import art.arcane.gloss.config.icon.ItemIconData;
 import art.arcane.gloss.config.icon.MenuIconData;
 import art.arcane.gloss.config.menu.MenuDocument;
 import art.arcane.gloss.config.menu.MenuDocumentParser;
 import art.arcane.gloss.config.menu.MenuIds;
-import art.arcane.volmlib.util.bukkit.json.BukkitJson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
@@ -138,7 +139,7 @@ final class LegacyHologramConverter {
       components.add(component);
     }
     menu.add("components", components);
-    return new MenuConversion(BukkitJson.GSON.toJson(menu) + System.lineSeparator(), warnings);
+    return new MenuConversion(DocumentParsers.GSON.toJson(menu) + System.lineSeparator(), warnings);
   }
 
   private static IconConversion icon(String content, LegacyHologramDraft.LegacyStyle style,

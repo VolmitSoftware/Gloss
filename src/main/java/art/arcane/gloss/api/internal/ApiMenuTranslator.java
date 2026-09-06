@@ -65,11 +65,11 @@ public final class ApiMenuTranslator {
 
   public static MenuIconData iconData(HoloIcon icon) {
     return switch (icon) {
-      case HoloIcon.Text text -> new TextIconData(text.miniMessage(), null, null);
-      case HoloIcon.Item item -> new ItemStackIconData(item.stack());
-      case HoloIcon.Block block -> new BlockIconData(block.material(), null);
-      case HoloIcon.Image image -> new TextImageIconData(image.relativePath(), null);
-      case HoloIcon.AnimatedImage animated -> new AnimatedImageData(animated.relativePaths(), animated.tickSpeed(), null);
+      case HoloIcon.Text text -> new TextIconData(text.miniMessage(), text.style(), text.refreshTicks(), text.box());
+      case HoloIcon.Item item -> new ItemStackIconData(item.stack(), item.style());
+      case HoloIcon.Block block -> new BlockIconData(block.material(), block.style());
+      case HoloIcon.Image image -> new TextImageIconData(image.relativePath(), image.style());
+      case HoloIcon.AnimatedImage animated -> new AnimatedImageData(animated.relativePaths(), animated.tickSpeed(), animated.style());
       case HoloIcon.Entity entity -> new EntityIconData(entity.entityType(), entity.width(), entity.height());
     };
   }

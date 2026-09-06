@@ -36,20 +36,20 @@ class PersistentHologramOrientationTest {
         long revision = revision();
 
         assertThrows(IllegalArgumentException.class,
-            () -> hologram.setOrientation("SPIN", 10.0D, 20.0D));
+            () -> hologram.setOrientation(Double.NaN, 20.0D));
         assertUnchanged(revision);
 
         assertThrows(IllegalArgumentException.class,
-            () -> hologram.setOrientation("FIXED", 181.0D, 20.0D));
+            () -> hologram.setOrientation(181.0D, 20.0D));
         assertUnchanged(revision);
 
         assertThrows(IllegalArgumentException.class,
-            () -> hologram.setOrientation("VERTICAL", -30.0D, 91.0D));
+            () -> hologram.setOrientation(-30.0D, 91.0D));
         assertUnchanged(revision);
     }
 
     private void assertUnchanged(long revision) throws Exception {
-        assertEquals(HologramDoc.DEFAULT_BILLBOARD, hologram.billboard());
+        assertEquals(HologramDoc.DEFAULT_BILLBOARD, hologram.style().billboard().name());
         assertEquals(0.0D, hologram.yaw());
         assertEquals(0.0D, hologram.pitch());
         assertEquals(revision, revision());

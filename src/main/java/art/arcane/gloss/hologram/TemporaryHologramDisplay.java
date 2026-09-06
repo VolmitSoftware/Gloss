@@ -2,10 +2,13 @@ package art.arcane.gloss.hologram;
 
 import art.arcane.gloss.Gloss;
 import art.arcane.gloss.api.HologramPresentation;
+import art.arcane.gloss.api.HologramBox;
 import art.arcane.gloss.api.HologramViewers;
 import art.arcane.gloss.api.TemporaryHologram;
 import art.arcane.gloss.api.ParticleLayer;
 import art.arcane.gloss.api.ParticleTextSpan;
+import art.arcane.gloss.api.IconDisplayStyle;
+import art.arcane.gloss.api.IconBillboard;
 import art.arcane.gloss.particle.ParticleFrame;
 import art.arcane.gloss.particle.ParticleRect;
 import art.arcane.gloss.particle.ParticleText;
@@ -22,12 +25,12 @@ import org.bukkit.entity.Display;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.TextDisplay;
-import org.bukkit.util.Transformation;
 import org.bukkit.util.Vector;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -39,6 +42,7 @@ import java.util.function.Consumer;
 import java.util.function.LongFunction;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
+import java.util.function.UnaryOperator;
 
 final class TemporaryHologramDisplay implements TemporaryHologram {
     private static final double POSITION_EPSILON_SQUARED = 1.0E-6D;
@@ -79,6 +83,9 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
     private final AtomicBoolean textDirty;
     private final AtomicBoolean visibilityReset;
     private final ViewerList viewerList;
+    private final Object viewerTextLock = new Object();
+    private final Map<UUID, ViewerText> viewerTexts = new ConcurrentHashMap<>();
+    private final Set<UUID> untrackedViewers = ConcurrentHashMap.newKeySet();
     private volatile LineSet lineSet;
     private volatile ParticleText.Rendered renderedParticleText;
     private volatile Location position;
@@ -88,12 +95,18 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
     private volatile HologramPresentation boundPresentation;
     private volatile FrameComposer frameComposer;
     private volatile TextDisplay display;
+    private volatile int displayEntityId;
     private volatile String rendered;
     private volatile HologramPresentation appliedPresentation;
     private volatile int appliedTeleportTicks;
     private volatile AnimationMemo animationMemo;
     private volatile List<ParticleLayer> particleLayers;
     private volatile Predicate<Player> viewerCondition;
+    private volatile IconDisplayStyle style;
+    private volatile IconDisplayStyle appliedStyle;
+    private volatile HologramBox box = HologramBox.defaults();
+    private volatile TextDisplayDecoration decoration;
+    private volatile boolean personalized;
 
     TemporaryHologramDisplay(HologramService service, String id, Location initial, long durationMs) {
         this.service = service;
@@ -119,6 +132,16 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
         this.position = startingPosition;
         this.boundPresentation = HologramPresentation.identity();
         this.particleLayers = List.of();
+    }
+
+    @Override
+    public void setStyle(IconDisplayStyle style) {
+        this.style = IconDisplayStyle.resolve(style);
+    }
+
+    @Override
+    public void setBox(HologramBox box) {
+        this.box = box == null ? HologramBox.defaults() : box;
     }
 
     @Override
@@ -272,8 +295,14 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
 
         service.removeTemporary(this);
         retractAnimation();
-        TextDisplay active = display;
-        display = null;
+        TextDisplay active;
+        synchronized (viewerTextLock) {
+            active = display;
+            display = null;
+            clearViewerText();
+            untrackedViewers.clear();
+        }
+        destroyDecoration();
         appliedVisibility.clear();
         if (active != null) {
             service.despawnEntity(active, position);
@@ -397,6 +426,8 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
     private void scheduleAfterRetirement(TextDisplay retired, Runnable driveTask) {
         if (display == retired) {
             display = null;
+            destroyDecoration();
+            clearViewerText();
             retractAnimation();
             service.despawnEntity(retired, position);
         }
@@ -419,6 +450,8 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
         }
         if (!enabled) {
             retractAnimation();
+            destroyDecoration();
+            clearViewerText();
             TextDisplay active = display;
             if (active != null) {
                 display = null;
@@ -439,6 +472,8 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
         TextDisplay active = display;
         if (active == null || !active.isValid()) {
             retractAnimation();
+            destroyDecoration();
+            clearViewerText();
             if (active != null) {
                 display = null;
                 service.despawnEntity(active, anchor);
@@ -453,9 +488,11 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
         }
 
         moveIfNeeded(active, anchor);
+        applyStyle(active);
         applyPresentation(active, presentation);
         applyVisibility(active);
         applyText(active, tick, world);
+        updateDecoration(anchor, presentation);
     }
 
     void emitParticles(HologramTick tick) {
@@ -493,10 +530,10 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
             ? override == null
                 ? new ParticleText.Rendered(TextUtils.joinLegacyLines(snapshot.lines()), List.of())
                 : override
-            : service.plugin().text().renderParticleText(viewer, String.join("\n", snapshot.lines()));
+            : service.plugin().text().renderLegacyParticleText(viewer, String.join("\n", snapshot.lines()));
         ParticleFrame frame = particleFrame(viewer, anchor, presentation);
         long tick = System.currentTimeMillis() / 50L;
-        double scale = Math.max(presentation.scaleX(), presentation.scaleY());
+        Vector3f scale = TextDisplayStyle.scale(presentation, style);
         for (ParticleLayer layer : particleLayers) {
             List<ParticleRect> targets = particleTargets(layer, particleText, scale);
             if (!layer.target().scope().equals("local") && targets.isEmpty()) {
@@ -507,42 +544,65 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
     }
 
     private List<ParticleRect> particleTargets(ParticleLayer layer, ParticleText.Rendered rendered,
-                                                double scale) {
+                                                Vector3f scale) {
         String scope = layer.target().scope();
-        if (scope.equals("projection") || scope.equals("text")) {
-            return List.of(ParticleTextLayout.textBounds(rendered.text(), scale));
-        }
-        if (scope.equals("line")) {
-            List<ParticleRect> lines = ParticleTextLayout.lineBounds(rendered.text(), scale);
+        List<ParticleRect> targets;
+        if (scope.equals("projection") || scope.equals("text") || scope.equals("label")) {
+            targets = List.of(ParticleTextLayout.textBounds(rendered.text(), 1D));
+        } else if (scope.equals("line")) {
+            List<ParticleRect> lines = ParticleTextLayout.lineBounds(rendered.text(), 1D);
             int index = layer.target().line() - 1;
-            return index < lines.size() ? List.of(lines.get(index)) : List.of();
-        }
-        if (scope.equals("span")) {
+            targets = index < lines.size() ? List.of(lines.get(index)) : List.of();
+        } else if (scope.equals("span")) {
             boolean perLetter = layer.geometry().type().equals("letterBounds")
                 || layer.geometry().type().equals("glyphOutline")
                 || layer.geometry().type().equals("glyphFill");
-            return ParticleTextLayout.bounds(rendered, layer.target().name(), scale, perLetter);
+            targets = ParticleTextLayout.bounds(rendered, layer.target().name(), 1D, perLetter);
+        } else {
+            return List.of();
         }
-        return List.of();
+        List<ParticleRect> scaled = new ArrayList<>(targets.size());
+        for (ParticleRect target : targets) {
+            scaled.add(new ParticleRect(target.centerX() * scale.x, target.centerY() * scale.y,
+                target.centerZ() * scale.z, Math.min(256D, target.width() * scale.x),
+                Math.min(256D, target.height() * scale.y), Math.min(256D, target.depth() * scale.z)));
+        }
+        return List.copyOf(scaled);
     }
 
     private ParticleFrame particleFrame(Player viewer, Location anchor,
                                         HologramPresentation presentation) {
-        Vector front = viewer.getEyeLocation().toVector().subtract(anchor.toVector());
-        if (front.lengthSquared() < 1.0E-12D) {
-            front = new Vector(0.0D, 0.0D, 1.0D);
-        }
-        front.normalize();
-        Vector referenceUp = Math.abs(front.getY()) > 0.999D
-            ? new Vector(0.0D, 0.0D, 1.0D)
-            : new Vector(0.0D, 1.0D, 0.0D);
-        Vector right = front.clone().crossProduct(referenceUp).normalize();
-        Vector up = right.clone().crossProduct(front).normalize();
-        return new ParticleFrame(anchor, right, up, front.clone().multiply(-1.0D));
+        IconDisplayStyle currentStyle = style;
+        IconBillboard billboard = currentStyle == null ? IconBillboard.CENTER : currentStyle.billboard();
+        return TextDisplayStyle.particleFrame(anchor, viewer.getEyeLocation(), presentation, billboard);
     }
 
     void onPlayerQuit(UUID playerId) {
         appliedVisibility.remove(playerId);
+        untrackedViewers.remove(playerId);
+        removeViewerText(playerId);
+    }
+
+    void invalidateTrackingFor(Player player) {
+        synchronized (viewerTextLock) {
+            untrackedViewers.remove(player.getUniqueId());
+            removeViewerText(player.getUniqueId());
+        }
+    }
+
+    private void trackingChanged(TextDisplay expected, Player player, boolean tracked) {
+        synchronized (viewerTextLock) {
+            if (display != expected || destroyed.get()) {
+                return;
+            }
+            UUID viewerId = player.getUniqueId();
+            if (tracked) {
+                untrackedViewers.remove(viewerId);
+            } else {
+                untrackedViewers.add(viewerId);
+            }
+            removeViewerText(viewerId);
+        }
     }
 
     private void spawn(World world, Location anchor, HologramPresentation presentation) {
@@ -550,9 +610,11 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
             return;
         }
 
+        untrackedViewers.clear();
         textDirty.set(false);
         LineSet snapshot = lineSet;
-        String next = renderLines(snapshot);
+        boolean viewerSpecific = viewerSpecific(snapshot);
+        String next = viewerSpecific ? "" : renderLines(snapshot);
         boolean whitelist = viewerList.isWhitelist() || viewerCondition != null;
         AtomicBoolean defaultVisibilityApplied = new AtomicBoolean(!whitelist);
         int teleportTicks = desiredTeleportTicks();
@@ -567,8 +629,12 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
 
                 Consumer<TextDisplay> configurer = spawned -> {
                     service.configureDisplay(spawned, false, Display.Billboard.CENTER);
+                    service.trackDisplay(spawned, (player, tracked) -> trackingChanged(spawned, player, tracked));
                     spawned.setText(next);
-                    if (snapshot.rendered()) {
+                    IconDisplayStyle currentStyle = style;
+                    if (currentStyle != null) {
+                        TextDisplayStyle.apply(spawned, currentStyle);
+                    } else if (snapshot.rendered()) {
                         spawned.setLineWidth(RENDERED_LINE_WIDTH);
                         spawned.setAlignment(TextDisplay.TextAlignment.LEFT);
                     }
@@ -581,20 +647,25 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
                     }
                 };
                 TextDisplay spawned = world.spawn(anchor, TextDisplay.class, configurer);
-                if (destroyed.get()) {
-                    service.despawnEntity(spawned, anchor);
-                    return;
+                synchronized (viewerTextLock) {
+                    if (destroyed.get()) {
+                        service.despawnEntity(spawned, anchor);
+                        return;
+                    }
+                    rendered = next;
+                    personalized = viewerSpecific;
+                    appliedPosition = anchor;
+                    appliedTeleportTicks = teleportTicks;
+                    appliedPresentation = presentation;
+                    appliedStyle = style;
+                    appliedVisibility.clear();
+                    if (viewerList.isWhitelist() == whitelist) {
+                        visibilityReset.set(whitelist && !defaultVisibilityApplied.get());
+                    }
+                    displayEntityId = spawned.getEntityId();
+                    display = spawned;
                 }
-
-                rendered = next;
-                appliedPosition = anchor;
-                appliedTeleportTicks = teleportTicks;
-                appliedPresentation = presentation;
-                appliedVisibility.clear();
-                if (viewerList.isWhitelist() == whitelist) {
-                    visibilityReset.set(whitelist && !defaultVisibilityApplied.get());
-                }
-                display = spawned;
+                updateDecoration(anchor, presentation);
                 applyVisibility(spawned);
             } catch (RuntimeException failure) {
                 Gloss.logExceptionStackThrottled(false, "temporary-hologram-spawn", failure,
@@ -653,32 +724,77 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
 
     private void applyPresentationNow(TextDisplay display, HologramPresentation presentation,
                                       int interpolationTicks, boolean restartInterpolation) {
-        Quaternionf rotation = new Quaternionf().rotationXYZ(
-            (float) Math.toRadians(presentation.rotationXDegrees()),
-            (float) Math.toRadians(presentation.rotationYDegrees()),
-            (float) Math.toRadians(presentation.rotationZDegrees()));
-        Transformation transformation = new Transformation(
-            new Vector3f(),
-            rotation,
-            new Vector3f((float) presentation.scaleX(), (float) presentation.scaleY(),
-                (float) presentation.scaleZ()),
-            new Quaternionf());
         display.setInterpolationDuration(interpolationTicks);
         if (restartInterpolation && interpolationTicks > 0) {
             display.setInterpolationDelay(-1);
         }
-        display.setTransformation(transformation);
-        display.setTextOpacity((byte) Math.round(presentation.opacity() * 255.0D));
+        display.setTransformation(TextDisplayStyle.transform(presentation, style));
+        display.setTextOpacity(TextDisplayStyle.opacity(presentation, style));
+    }
+
+    private void applyStyle(TextDisplay active) {
+        IconDisplayStyle current = style;
+        if (current == null || current.equals(appliedStyle)) {
+            return;
+        }
+        TextDisplayStyle.apply(active, current);
+        appliedStyle = current;
+        appliedPresentation = null;
+    }
+
+    private synchronized void updateDecoration(Location anchor, HologramPresentation presentation) {
+        if (destroyed.get()) {
+            return;
+        }
+        HologramBox current = box;
+        if (!current.enabled() || personalized) {
+            destroyDecoration();
+            return;
+        }
+        TextDisplayDecoration active = decoration;
+        if (active == null) {
+            active = new TextDisplayDecoration(service, () -> visibilityReset.set(true));
+            decoration = active;
+        }
+        FrameComposer frames = frameComposer;
+        String text = frames == null ? rendered : frames.compose(M.ms());
+        active.update(new TextDisplayDecoration.Update(anchor, presentation, style, current,
+            text == null ? "" : text, desiredTeleportTicks()));
+    }
+
+    private synchronized void destroyDecoration() {
+        TextDisplayDecoration active = decoration;
+        decoration = null;
+        if (active != null) {
+            active.destroy(position);
+        }
     }
 
     private void applyText(TextDisplay active, HologramTick tick, World world) {
+        LineSet snapshot = lineSet;
+        boolean viewerSpecific = viewerSpecific(snapshot);
+        if (viewerSpecific != personalized) {
+            personalized = viewerSpecific;
+            retractAnimation();
+            clearViewerText();
+            destroyDecoration();
+            rendered = "";
+            active.setText("");
+            textDirty.set(true);
+            if (viewerSpecific) {
+                return;
+            }
+        }
+        if (viewerSpecific) {
+            applyViewerText(active, snapshot, captureViewers(tick, world));
+            return;
+        }
         FrameComposer frames = frameComposer;
         if (frames != null) {
             applyFrames(active, tick, world, frames);
             return;
         }
 
-        LineSet snapshot = lineSet;
         if ((snapshot.flags() & TextPipeline.HAS_FUNCTION) != 0) {
             AnimationTemplate template = animationTemplate(snapshot);
             if (template != null) {
@@ -705,6 +821,141 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
                 active.setText(next);
             }
         });
+    }
+
+    private boolean viewerSpecific(LineSet snapshot) {
+        if (snapshot.rendered() || frameComposer != null || !service.perViewerPlaceholders()) {
+            return false;
+        }
+        for (String line : snapshot.lines()) {
+            if (TextPipeline.viewerSpecific(line)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void applyViewerText(TextDisplay active, LineSet snapshot, List<Player> viewers) {
+        Set<UUID> current = new HashSet<>(viewers.size());
+        for (Player viewer : viewers) {
+            UUID viewerId = viewer.getUniqueId();
+            if (untrackedViewers.contains(viewerId)) {
+                continue;
+            }
+            current.add(viewerId);
+            ViewerText state;
+            synchronized (viewerTextLock) {
+                if (destroyed.get() || display != active || lineSet != snapshot) {
+                    return;
+                }
+                state = viewerTexts.get(viewerId);
+                if (state == null || state.player != viewer || state.display != active) {
+                    removeViewerText(viewerId);
+                    state = new ViewerText(viewer, active);
+                    viewerTexts.put(viewerId, state);
+                }
+            }
+            ViewerText target = state;
+            service.runViewerWork(viewer, viewerId, animatorGroup + "#text",
+                () -> refreshViewerText(target, snapshot));
+        }
+        for (UUID viewerId : viewerTexts.keySet()) {
+            if (!current.contains(viewerId)) {
+                removeViewerText(viewerId);
+            }
+        }
+    }
+
+    private void refreshViewerText(ViewerText state, LineSet snapshot) {
+        Player viewer = state.player;
+        UUID viewerId = viewer.getUniqueId();
+        if (!viewer.isOnline() || !conditionMatches(viewer)) {
+            synchronized (viewerTextLock) {
+                if (viewerTexts.get(viewerId) == state) {
+                    removeViewerText(viewerId);
+                }
+            }
+            return;
+        }
+        long nowMs = M.ms();
+        ViewerFrame frame = state.frame;
+        long emojiGeneration = TextPipeline.emojiGeneration();
+        long renderGeneration = service.plugin().text().renderGeneration();
+        long animationGeneration = service.animationGeneration();
+        if (frame == null || frame.frames() == null || frame.snapshot() != snapshot || frame.emojiGeneration() != emojiGeneration
+            || frame.renderGeneration() != renderGeneration || frame.animationGeneration() != animationGeneration
+            || nowMs >= frame.refreshAfterMs()) {
+            String authored = String.join("\n", snapshot.lines());
+            AnimationTemplate animation = service.animator().compileTemplate(
+                List.of(ParticleText.parse(authored).marked()), line -> service.plugin().text().render(viewer, line), false);
+            TextFrameSource frames = animation == null ? null
+                : now -> ParticleText.renderMarked(animation.compose(now), UnaryOperator.identity()).text();
+            String text = frames == null ? service.plugin().text().renderParticleText(viewer, authored).text()
+                : frames.compose(nowMs);
+            frame = new ViewerFrame(snapshot, emojiGeneration, renderGeneration, animationGeneration,
+                nowMs + service.temporaryUpdateIntervalTicks() * 50L, frames, text);
+        }
+        synchronized (viewerTextLock) {
+            if (destroyed.get() || !personalized || display != state.display || lineSet != snapshot
+                || viewerTexts.get(viewerId) != state || untrackedViewers.contains(viewerId)) {
+                return;
+            }
+            state.frame = frame;
+            if (frame.frames() != null) {
+                service.animator().discardText(viewerId, state.entityId);
+                state.sentText = null;
+                publishAnimation(viewerId.toString(), new HologramAnimator.Target(
+                    state.entityId, frame.frames(), List.of(viewer)));
+            } else {
+                service.animator().remove(animatorGroup, viewerId.toString());
+                if (!frame.text().equals(state.sentText)) {
+                    service.animator().sendText(viewer, viewerId, state.entityId, frame.text());
+                    state.sentText = frame.text();
+                }
+            }
+            updateViewerDecoration(state, frame.frames() == null ? frame.text() : frame.frames().compose(nowMs));
+        }
+    }
+
+    private void updateViewerDecoration(ViewerText state, String text) {
+        if (!box.enabled()) {
+            if (state.decoration != null) {
+                state.decoration.remove();
+                state.decoration = null;
+            }
+            return;
+        }
+        if (state.decoration == null) {
+            state.decoration = new PacketTextDecoration(state.player);
+        }
+        IconDisplayStyle currentStyle = style == null ? IconDisplayStyle.hologramDefaults() : style;
+        state.decoration.update(PacketTextDecoration.Update.atAnchor(position, TextUtils.renderLegacy(text),
+            currentStyle, box, boundPresentation));
+    }
+
+    private void removeViewerText(UUID viewerId) {
+        synchronized (viewerTextLock) {
+            ViewerText state = viewerTexts.remove(viewerId);
+            if (state == null) {
+                return;
+            }
+            service.animator().remove(animatorGroup, viewerId.toString());
+            service.animator().discardText(viewerId, state.entityId);
+            if (state.decoration != null) {
+                Runnable remove = once(state.decoration::remove);
+                if (!FoliaScheduler.runEntity(service.plugin(), state.player, remove, 0L, remove)) {
+                    remove.run();
+                }
+            }
+        }
+    }
+
+    private void clearViewerText() {
+        synchronized (viewerTextLock) {
+            for (UUID viewerId : viewerTexts.keySet()) {
+                removeViewerText(viewerId);
+            }
+        }
     }
 
     /**
@@ -791,6 +1042,7 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
         if (viewerCondition != null) {
             if (visibilityReset.compareAndSet(true, false)) {
                 DisplayVisibility.setVisibleByDefault(active, false);
+                setDecorationDefaultVisibility(false);
                 appliedVisibility.clear();
             }
             for (UUID viewerId : appliedVisibility.keySet()) {
@@ -812,6 +1064,7 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
         Set<UUID> members = viewerList.members();
         if (visibilityReset.compareAndSet(true, false)) {
             service.plugin().scheduler().runEntity(active, () -> DisplayVisibility.setVisibleByDefault(active, !whitelist));
+            setDecorationDefaultVisibility(!whitelist);
             appliedVisibility.clear();
             reconcileVisibility(active, whitelist, members);
             return;
@@ -925,18 +1178,46 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
 
     private void dispatchVisibility(TextDisplay active, Player player, boolean visible) {
         service.plugin().scheduler().runEntity(player, () -> {
-            if (!player.isOnline()) {
+            if (destroyed.get() || display != active || !player.isOnline()) {
                 return;
             }
+            removeViewerText(player.getUniqueId());
             if (visible) {
                 player.showEntity(service.plugin(), active);
             } else {
                 player.hideEntity(service.plugin(), active);
             }
+            applyDecorationVisibility(player, visible);
         });
     }
 
+    private void setDecorationDefaultVisibility(boolean visible) {
+        TextDisplayDecoration active = decoration;
+        if (active == null) {
+            return;
+        }
+        for (TextDisplay display : active.displays()) {
+            service.plugin().scheduler().runEntity(display,
+                () -> DisplayVisibility.setVisibleByDefault(display, visible));
+        }
+    }
+
+    private void applyDecorationVisibility(Player player, boolean visible) {
+        TextDisplayDecoration active = decoration;
+        if (active == null) {
+            return;
+        }
+        for (TextDisplay display : active.displays()) {
+            if (visible) {
+                player.showEntity(service.plugin(), display);
+            } else {
+                player.hideEntity(service.plugin(), display);
+            }
+        }
+    }
+
     private void dispatchConditionalVisibility(TextDisplay active, Player player) {
+        int entityId = displayEntityId;
         service.runViewerWork(player, player.getUniqueId(), animatorGroup + "#show", () -> {
             if (destroyed.get() || display != active || !player.isOnline()) {
                 return;
@@ -950,13 +1231,17 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
                 && conditionMatches(player);
             Boolean previous = appliedVisibility.put(viewerId, visible);
             if (previous == null || previous != visible) {
-                retractAnimation();
-                service.animator().discardText(viewerId, active.getEntityId());
+                removeViewerText(viewerId);
+                if (!personalized) {
+                    retractAnimation();
+                }
+                service.animator().discardText(viewerId, entityId);
                 if (visible) {
                     player.showEntity(service.plugin(), active);
                 } else {
                     player.hideEntity(service.plugin(), active);
                 }
+                applyDecorationVisibility(player, visible);
             }
             if (!nearby) {
                 appliedVisibility.remove(viewerId);
@@ -967,6 +1252,25 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
     private boolean conditionMatches(Player viewer) {
         Predicate<Player> condition = viewerCondition;
         return condition == null || condition.test(viewer);
+    }
+
+    private record ViewerFrame(LineSet snapshot, long emojiGeneration, long renderGeneration,
+                               long animationGeneration, long refreshAfterMs, TextFrameSource frames, String text) {
+    }
+
+    private static final class ViewerText {
+        private final Player player;
+        private final TextDisplay display;
+        private final int entityId;
+        private volatile ViewerFrame frame;
+        private String sentText;
+        private PacketTextDecoration decoration;
+
+        private ViewerText(Player player, TextDisplay display) {
+            this.player = player;
+            this.display = display;
+            this.entityId = display.getEntityId();
+        }
     }
 
     private List<Player> captureViewers(HologramTick tick, World world) {
@@ -1066,7 +1370,7 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
         }
 
         @Override
-        public String compose(long nowMs) {
+        public synchronized String compose(long nowMs) {
             List<String> lines = frames.apply(nowMs);
             if (lines == lastLines) {
                 return lastText;

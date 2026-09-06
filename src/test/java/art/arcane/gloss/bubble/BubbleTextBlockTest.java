@@ -1,12 +1,14 @@
 package art.arcane.gloss.bubble;
 
 import art.arcane.gloss.particle.ParticleText;
+import art.arcane.gloss.util.common.TextUtils;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class BubbleTextBlockTest {
@@ -99,5 +101,32 @@ class BubbleTextBlockTest {
         assertEquals("rank", rendered.spans().getFirst().name());
         assertEquals("§4VIP", rendered.text().substring(
             rendered.spans().getFirst().start(), rendered.spans().getFirst().end()));
+    }
+
+    @Test
+    void trustedRichPrefixPreservesColorOnlyAndClosedTagStates() {
+        assertEquals(List.of("§cHello"), ChatBubblesService.renderTextBlock("<red>", "Hello", 64,
+            prefix -> prefix));
+        assertEquals(List.of("§cVIP§r Hello"), ChatBubblesService.renderTextBlock("<red>VIP</red> ",
+            "Hello", 64, prefix -> prefix));
+        assertEquals(List.of("§7Hello"), ChatBubblesService.renderTextBlock("&7", "Hello", 64,
+            prefix -> prefix));
+    }
+
+    @Test
+    void richPrefixKeepsParticleRangesAndPlayerMarkupLiteral() {
+        String message = "<red>chat</red> |animation.fast| &a";
+        ParticleText.Rendered rendered = ChatBubblesService.renderParticleTextBlock(
+            "<particles:rank><gradient:#ff0000:#0000ff>VIP</gradient></particles> ",
+            message, 128, prefix -> prefix);
+
+        assertEquals("VIP " + message, TextUtils.content(TextUtils.parseLegacy(rendered.text())));
+        assertEquals(1, rendered.spans().size());
+        ParticleText.Span span = rendered.spans().getFirst();
+        assertEquals("rank", span.name());
+        assertEquals("VIP", TextUtils.content(TextUtils.parseLegacy(
+            rendered.text().substring(span.start(), span.end()))));
+        assertTrue(rendered.text().contains("§x"));
+        assertFalse(rendered.text().contains("\uE000"));
     }
 }

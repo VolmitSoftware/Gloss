@@ -1,6 +1,6 @@
 package art.arcane.gloss.menu.icon;
 
-import art.arcane.gloss.config.icon.IconBillboard;
+import art.arcane.gloss.api.IconBillboard;
 import art.arcane.gloss.util.common.math.CollisionPlane;
 import org.bukkit.util.Vector;
 import org.junit.Test;

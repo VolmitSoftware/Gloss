@@ -3,6 +3,8 @@ package art.arcane.gloss.drop;
 import art.arcane.gloss.Gloss;
 import art.arcane.gloss.GlossConfig;
 import art.arcane.gloss.api.ParticleLayer;
+import art.arcane.gloss.api.HologramPresentation;
+import art.arcane.gloss.api.TemporaryHologram;
 import art.arcane.gloss.hologram.DisplayVisibility;
 import art.arcane.gloss.hologram.HologramMath;
 import art.arcane.gloss.particle.ParticleFrame;
@@ -10,7 +12,9 @@ import art.arcane.gloss.particle.ParticleRect;
 import art.arcane.gloss.particle.ParticleText;
 import art.arcane.gloss.particle.ParticleTextLayout;
 import art.arcane.gloss.service.AdmissionBudget;
-import art.arcane.gloss.text.TextDisplayLayout;
+import art.arcane.gloss.hologram.TextDisplayStyle;
+import art.arcane.gloss.api.HologramBox;
+import art.arcane.gloss.api.IconDisplayStyle;
 import art.arcane.volmlib.util.scheduling.FoliaScheduler;
 import org.bukkit.Color;
 import org.bukkit.Location;
@@ -26,7 +30,6 @@ import org.bukkit.entity.Entity;
 import org.bukkit.entity.Item;
 import org.bukkit.entity.ItemDisplay;
 import org.bukkit.entity.Player;
-import org.bukkit.entity.TextDisplay;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.util.Transformation;
@@ -140,6 +143,13 @@ final class RealDropService {
         return states.size();
     }
 
+    Label preservedLabel(Item item) {
+        State state = states.get(item.getUniqueId());
+        boolean visible = state != null && !state.closed
+            ? state.restoreNameVisible : item.isCustomNameVisible();
+        return visible ? Label.rendered(item.getCustomName()) : Label.none();
+    }
+
     private void presentOwned(Item item, Label requestedLabel,
                               RealDropConditionPlan.Selection selection) {
         State existing = states.get(item.getUniqueId());
@@ -199,7 +209,7 @@ final class RealDropService {
             ItemStack stack = item.getItemStack();
             int visualCount = desiredVisualCount(stack, config);
             boolean createLabel = config.labels().enabled() && !label.lines().isEmpty();
-            reserved = visualCount + (createLabel ? 1 : 0);
+            reserved = visualCount + (createLabel ? labelVisualCount(config.labels().box()) : 0);
             reservedChunk = chunkKey(item.getLocation());
             if (!reserve(reservedChunk, reserved, config.limits().maxVisualsPerChunk())) {
                 admission.close();
@@ -247,6 +257,7 @@ final class RealDropService {
                 state.label = spawnLabel(state, label, config);
                 state.labelText = label.text();
                 state.labelAuthoredText = label.authoredText();
+                state.labelReserved = labelVisualCount(config.labels().box());
             }
             item.getPersistentDataContainer().set(markerKey, PersistentDataType.BOOLEAN, true);
             item.getPersistentDataContainer().set(restoreNameKey, PersistentDataType.BOOLEAN, restoreName);
@@ -329,35 +340,27 @@ final class RealDropService {
         return display;
     }
 
-    private TextDisplay spawnLabel(State state, Label label, GlossConfig.RealDrops config) {
-        GlossConfig.RealDrops.Labels labels = config.labels();
-        TextDisplay display = state.item.getWorld().spawn(state.item.getLocation(), TextDisplay.class);
-        display.setPersistent(false);
-        display.setBillboard(Display.Billboard.valueOf(labels.billboard()));
-        display.setSeeThrough(labels.seeThrough());
-        display.setShadowed(labels.shadow());
-        display.setViewRange(HologramMath.viewRangeMultiplier(labels.viewRange()));
-        display.setLineWidth(TextDisplayLayout.FULL_WIDTH);
-        display.setTextOpacity((byte) -1);
-        display.setBackgroundColor(labels.background()
-            ? Color.fromARGB(labels.backgroundAlpha(), labels.backgroundRed(), labels.backgroundGreen(), labels.backgroundBlue())
-            : Color.fromARGB(0, 0, 0, 0));
-        display.setText(label.text());
-        display.setTransformation(new Transformation(
-            new Vector3f(0.0F, labels.yOffset(), 0.0F),
-            new Quaternionf(),
-            new Vector3f(labels.scale(), labels.scale(), labels.scale()),
-            new Quaternionf()));
-        display.getPersistentDataContainer().set(ownerKey, PersistentDataType.STRING,
-            state.item.getUniqueId().toString());
-        if (!state.selection.universalAudience()) {
-            DisplayVisibility.setVisibleByDefault(display, false);
+    private TemporaryHologram spawnLabel(State state, Label label, GlossConfig.RealDrops config) {
+        TemporaryHologram hologram = plugin.holograms().createTemporary(
+            "real-drop-label-" + state.itemId,
+            state.item.getLocation().add(0, config.labels().yOffset(), 0), Long.MAX_VALUE);
+        try {
+            hologram.setStyle(config.labels().style());
+            hologram.setBox(config.labels().box());
+            DropNameService.applyLabelText(hologram, label);
+            if (!state.selection.universalAudience()) {
+                plugin.holograms().setViewerCondition(hologram,
+                    viewer -> !state.closed && state.selection.visibleTo(plugin, viewer));
+            }
+            return hologram;
+        } catch (RuntimeException | Error failure) {
+            try {
+                hologram.destroy();
+            } catch (RuntimeException | Error cleanupFailure) {
+                failure.addSuppressed(cleanupFailure);
+            }
+            throw failure;
         }
-        if (usesPassengerCarrier(detachedRegionizedDisplays) && !carrier(state).addPassenger(display)) {
-            display.remove();
-            throw new IllegalStateException("Display carrier refused the dropped-item label");
-        }
-        return display;
     }
 
     private void refreshOwned(State state, Label label) {
@@ -433,46 +436,47 @@ final class RealDropService {
         for (int index = 0; index < count; index++) {
             state.visuals.add(spawnVisual(state, stack, index, count, config));
         }
-        if (usesPassengerCarrier(detachedRegionizedDisplays)
-            && state.label != null && state.label.isValid()
-            && !carrier(state).addPassenger(state.label)) {
-            throw new IllegalStateException("Display carrier refused the dropped-item label after model replacement");
+    }
+
+    private static int labelVisualCount(HologramBox box) {
+        if (!box.enabled()) {
+            return 1;
         }
+        return 1 + ((box.backgroundArgb().argb() >>> 24) == 0 ? 0 : 1)
+            + (box.borderWidth() == 0 || (box.borderArgb().argb() >>> 24) == 0 ? 0 : 4);
     }
 
     private void refreshLabel(State state, Label label, GlossConfig.RealDrops config) {
         boolean wanted = config.labels().enabled() && !label.lines().isEmpty();
         if (!wanted) {
             if (state.label != null) {
-                removeEntity(state.label);
+                state.label.destroy();
                 state.label = null;
                 state.labelText = "";
                 state.labelAuthoredText = "";
-                release(state.chunkKey, 1);
-                state.reserved--;
+                release(state.chunkKey, state.labelReserved);
+                state.reserved -= state.labelReserved;
+                state.labelReserved = 0;
             }
             state.item.setCustomNameVisible(state.restoreNameVisible && state.item.getCustomName() != null);
             return;
         }
         state.item.setCustomNameVisible(false);
-        if (state.label == null || !state.label.isValid()) {
-            if (state.label != null) {
-                release(state.chunkKey, 1);
-                state.reserved--;
-            }
-            if (!reserve(state.chunkKey, 1, config.limits().maxVisualsPerChunk())) {
+        if (state.label == null) {
+            if (!reserve(state.chunkKey, labelVisualCount(config.labels().box()), config.limits().maxVisualsPerChunk())) {
                 state.label = null;
                 return;
             }
-            state.reserved++;
+            state.labelReserved = labelVisualCount(config.labels().box());
+            state.reserved += state.labelReserved;
             state.label = spawnLabel(state, label, config);
             state.labelText = label.text();
             state.labelAuthoredText = label.authoredText();
             return;
         }
         String text = label.text();
-        if (!text.equals(state.labelText)) {
-            state.label.setText(text);
+        if (!text.equals(state.labelText) || !label.authoredText().equals(state.labelAuthoredText)) {
+            DropNameService.applyLabelText(state.label, label);
             state.labelText = text;
         }
         state.labelAuthoredText = label.authoredText();
@@ -1143,48 +1147,69 @@ final class RealDropService {
             return;
         }
         Location itemOrigin = state.item.getLocation().clone();
-        double range = Math.max(config.limits().viewRange(), config.labels().viewRange());
-        String authoredLabel = state.labelAuthoredText;
-        String renderedLabel = state.labelText;
-        boolean hasLabel = state.label != null && state.label.isValid() && !renderedLabel.isEmpty();
-        RealDropConditionPlan.Selection selection = state.selection;
-        for (Entity nearby : state.item.getNearbyEntities(range, range, range)) {
-            if (!(nearby instanceof Player viewer)) {
+        boolean hasLabel = state.label != null
+            && (!state.labelText.isEmpty() || !state.labelAuthoredText.isEmpty());
+        long tick = System.currentTimeMillis() / 50L;
+        boolean itemParticles = false;
+        boolean labelParticles = false;
+        for (ParticleLayer layer : config.particleLayers()) {
+            if (tick % layer.emission().intervalTicks() != 0L) {
                 continue;
             }
-            plugin.scheduler().runEntity(viewer, () -> emitParticlesForViewer(
-                state, selection, viewer, itemOrigin, authoredLabel, renderedLabel, hasLabel, config));
+            if (isLabelParticleScope(layer.target().scope())) {
+                labelParticles |= hasLabel;
+            } else {
+                itemParticles = true;
+            }
+        }
+        if (!itemParticles && !labelParticles) {
+            return;
+        }
+        Location labelOrigin = itemOrigin.clone().add(0.0D, config.labels().yOffset(), 0.0D);
+        ParticleEmission emission = new ParticleEmission(state, state.selection, itemOrigin, labelOrigin,
+            state.labelAuthoredText, state.labelText, hasLabel, config, tick);
+        double range = plugin.cfg().particles().viewRange();
+        if (itemParticles) {
+            plugin.holograms().forEachNearbyViewer(itemOrigin, range * range,
+                viewer -> plugin.scheduler().runEntity(viewer,
+                    () -> emitParticlesForViewer(emission, viewer, false)));
+        }
+        if (labelParticles) {
+            plugin.holograms().forEachNearbyViewer(labelOrigin, range * range,
+                viewer -> plugin.scheduler().runEntity(viewer,
+                    () -> emitParticlesForViewer(emission, viewer, true)));
         }
     }
 
-    private void emitParticlesForViewer(State state, RealDropConditionPlan.Selection selection,
-                                        Player viewer, Location itemOrigin, String authoredLabel,
-                                        String renderedLabel, boolean hasLabel,
-                                        GlossConfig.RealDrops config) {
-        if (state.closed || !viewer.isOnline() || !selection.visibleTo(plugin, viewer)) {
+    private void emitParticlesForViewer(ParticleEmission emission, Player viewer, boolean labelScope) {
+        if (emission.state().closed || !viewer.isOnline() || !emission.selection().visibleTo(plugin, viewer)) {
             return;
         }
-        ParticleText.Rendered label = authoredLabel.isEmpty()
-            ? new ParticleText.Rendered(renderedLabel, List.of())
-            : plugin.text().renderParticleText(viewer, authoredLabel);
-        long tick = System.currentTimeMillis() / 50L;
+        GlossConfig.RealDrops config = emission.config();
+        ParticleText.Rendered label = emission.authoredLabel().isEmpty()
+            ? new ParticleText.Rendered(emission.renderedLabel(), List.of())
+            : plugin.text().renderLegacyParticleText(viewer, emission.authoredLabel());
+        Location origin = labelScope ? emission.labelOrigin() : emission.itemOrigin();
+        ParticleFrame frame = labelScope
+            ? TextDisplayStyle.particleFrame(origin, viewer.getEyeLocation(),
+                HologramPresentation.identity(), config.labels().style().billboard())
+            : billboardFrame(viewer, origin);
         for (ParticleLayer layer : config.particleLayers()) {
             String scope = layer.target().scope();
-            boolean labelScope = scope.equals("label") || scope.equals("text")
-                || scope.equals("line") || scope.equals("span");
-            if (labelScope && !hasLabel) {
+            if (isLabelParticleScope(scope) != labelScope
+                || emission.tick() % layer.emission().intervalTicks() != 0L) {
                 continue;
             }
-            Location origin = labelScope
-                ? itemOrigin.clone().add(0.0D, config.labels().yOffset(), 0.0D)
-                : itemOrigin;
-            ParticleFrame particleFrame = billboardFrame(viewer, origin);
-            List<ParticleRect> targets = realDropTargets(layer, label, config, hasLabel);
+            List<ParticleRect> targets = realDropTargets(layer, label, config, emission.hasLabel());
             if (!scope.equals("local") && targets.isEmpty()) {
                 continue;
             }
-            plugin.particles().emit(viewer, particleFrame, layer, targets, tick);
+            plugin.particles().emit(viewer, frame, layer, targets, emission.tick());
         }
+    }
+
+    private static boolean isLabelParticleScope(String scope) {
+        return scope.equals("label") || scope.equals("text") || scope.equals("line") || scope.equals("span");
     }
 
     private List<ParticleRect> realDropTargets(ParticleLayer layer, ParticleText.Rendered label,
@@ -1193,10 +1218,10 @@ final class RealDropService {
         float modelScale = Math.max(config.scale().defaultScale(),
             Math.max(config.scale().flatItems(), config.scale().thinBlocks()));
         if (scope.equals("projection")) {
-            double labelHeight = hasLabel ? config.labels().yOffset() + config.labels().scale() * 0.26D : 0.0D;
+            double labelHeight = hasLabel ? config.labels().yOffset() + config.labels().style().scaleY() * 0.26D : 0.0D;
             return List.of(new ParticleRect(0.0D, labelHeight / 2.0D, 0.0D,
                 Math.max(modelScale, hasLabel
-                    ? ParticleTextLayout.textBounds(label.text(), config.labels().scale()).width()
+                    ? ParticleTextLayout.textBounds(label.text(), config.labels().style().scaleX()).width()
                     : 0.0D),
                 Math.max(modelScale, labelHeight), modelScale));
         }
@@ -1205,20 +1230,30 @@ final class RealDropService {
                 modelScale, modelScale, modelScale));
         }
         if (scope.equals("label") || scope.equals("text")) {
-            return List.of(ParticleTextLayout.textBounds(label.text(), config.labels().scale()));
+            return scaledLabelBounds(List.of(ParticleTextLayout.textBounds(label.text(), 1D)), config.labels().style());
         }
         if (scope.equals("line")) {
-            List<ParticleRect> lines = ParticleTextLayout.lineBounds(label.text(), config.labels().scale());
+            List<ParticleRect> lines = ParticleTextLayout.lineBounds(label.text(), 1D);
             int index = layer.target().line() - 1;
-            return index < lines.size() ? List.of(lines.get(index)) : List.of();
+            return index < lines.size() ? scaledLabelBounds(List.of(lines.get(index)), config.labels().style()) : List.of();
         }
         if (scope.equals("span")) {
             boolean perLetter = layer.geometry().type().equals("letterBounds")
                 || layer.geometry().type().equals("glyphOutline")
                 || layer.geometry().type().equals("glyphFill");
-            return ParticleTextLayout.bounds(label, layer.target().name(), config.labels().scale(), perLetter);
+            return scaledLabelBounds(ParticleTextLayout.bounds(label, layer.target().name(), 1D, perLetter), config.labels().style());
         }
         return List.of();
+    }
+
+    private static List<ParticleRect> scaledLabelBounds(List<ParticleRect> bounds, IconDisplayStyle style) {
+        List<ParticleRect> scaled = new ArrayList<>(bounds.size());
+        for (ParticleRect bound : bounds) {
+            scaled.add(new ParticleRect(bound.centerX() * style.scaleX(), bound.centerY() * style.scaleY(),
+                bound.centerZ() * style.scaleZ(), Math.min(256D, bound.width() * style.scaleX()),
+                Math.min(256D, bound.height() * style.scaleY()), Math.min(256D, bound.depth() * style.scaleZ())));
+        }
+        return List.copyOf(scaled);
     }
 
     private static ParticleFrame billboardFrame(Player viewer, Location origin) {
@@ -1237,28 +1272,20 @@ final class RealDropService {
 
     private void reconcileAudience(State state) {
         RealDropConditionPlan.Selection selection = state.selection;
-        if (selection.universalAudience() || state.closed) {
+        if (state.closed || selection.universalAudience()) {
             return;
         }
         GlossConfig.RealDrops config = selection.style().config();
-        double range = Math.max(config.limits().viewRange(), config.labels().viewRange());
+        double range = Math.max(config.limits().viewRange(), (config.labels().style().viewRange() * 64.0D));
         List<Display> displays = visibleDisplays(state);
-        for (Entity nearby : state.item.getNearbyEntities(range, range, range)) {
-            if (!(nearby instanceof Player viewer)) {
-                continue;
-            }
+        plugin.holograms().forEachViewerWithinBox(state.item.getLocation(), range, viewer -> {
             state.audienceViewers.add(viewer.getUniqueId());
             dispatchAudience(state, selection, viewer, displays);
-        }
+        });
     }
 
     private List<Display> visibleDisplays(State state) {
-        List<Display> displays = new ArrayList<>(state.visuals.size() + 1);
-        displays.addAll(state.visuals);
-        if (state.label != null) {
-            displays.add(state.label);
-        }
-        return List.copyOf(displays);
+        return List.copyOf(state.visuals);
     }
 
     private void dispatchAudience(State state, RealDropConditionPlan.Selection selection,
@@ -1286,7 +1313,7 @@ final class RealDropService {
     }
 
     private void restoreAudience(State state) {
-        if (state.selection.universalAudience() || state.audienceViewers.isEmpty()) {
+        if (state.audienceViewers.isEmpty()) {
             return;
         }
         for (UUID viewerId : state.audienceViewers) {
@@ -1334,7 +1361,7 @@ final class RealDropService {
         }
         state.visuals.clear();
         if (state.label != null) {
-            removeEntity(state.label);
+            state.label.destroy();
             state.label = null;
         }
         if (current && state.item.isValid()) {
@@ -1359,7 +1386,7 @@ final class RealDropService {
             removeEntity(display);
         }
         if (state.label != null) {
-            removeEntity(state.label);
+            state.label.destroy();
         }
     }
 
@@ -1415,7 +1442,7 @@ final class RealDropService {
         }
         String customName = item.getCustomName();
         if (customName != null && item.isCustomNameVisible()) {
-            return Label.single(customName);
+            return Label.rendered(customName);
         }
         return Label.none();
     }
@@ -1456,8 +1483,7 @@ final class RealDropService {
                 return false;
             }
         }
-        return state.label == null || !state.label.isValid()
-            || plugin.scheduler().isOwnedByCurrentRegion(state.label);
+        return true;
     }
 
     private void moveCarrier(State state, int interpolationTicks) {
@@ -1476,11 +1502,13 @@ final class RealDropService {
         state.lastCarrierY = destination.getY();
         state.lastCarrierZ = destination.getZ();
         int duration = Math.max(0, Math.min(interpolationTicks, 59));
+        if (state.label != null) {
+            state.label.teleport(destination.clone().add(0, state.selection.style().config().labels().yOffset(), 0));
+        }
         if (detachedRegionizedDisplays) {
             for (Display display : state.visuals) {
                 moveDisplay(display, destination, duration);
             }
-            moveDisplay(state.label, destination, duration);
             return;
         }
         moveDisplay(carrier, destination, duration);
@@ -1582,17 +1610,19 @@ final class RealDropService {
         if (entity == null) {
             return;
         }
-        if (plugin.scheduler().isOwnedByCurrentRegion(entity)) {
+        Runnable removal = () -> {
+            if (detachedRegionizedDisplays && FoliaScheduler.isStopping(plugin.getServer())) {
+                return;
+            }
             if (entity.isValid()) {
                 entity.remove();
             }
+        };
+        if (plugin.scheduler().isOwnedByCurrentRegion(entity)) {
+            removal.run();
             return;
         }
-        FoliaScheduler.runEntity(plugin, entity, () -> {
-            if (entity.isValid()) {
-                entity.remove();
-            }
-        }, 0L, () -> {
+        FoliaScheduler.runEntity(plugin, entity, removal, 0L, () -> {
         });
     }
 
@@ -1613,10 +1643,6 @@ final class RealDropService {
 
         static Label none() {
             return new Label(List.of(), List.of());
-        }
-
-        static Label single(String text) {
-            return text == null || text.isEmpty() ? none() : new Label(List.of(text), List.of(text));
         }
 
         static Label rendered(String text) {
@@ -1650,7 +1676,8 @@ final class RealDropService {
         private final AtomicBoolean destroyed = new AtomicBoolean();
 
         private ChunkKey chunkKey;
-        private TextDisplay label;
+        private TemporaryHologram label;
+        private int labelReserved;
         private String labelText = "";
         private String labelAuthoredText = "";
         private RealDropModel.ModelKind modelKind;
@@ -1720,6 +1747,11 @@ final class RealDropService {
     }
 
     private record PhysicsResult(Vector velocity, boolean bounced) {
+    }
+
+    private record ParticleEmission(State state, RealDropConditionPlan.Selection selection,
+                                    Location itemOrigin, Location labelOrigin, String authoredLabel,
+                                    String renderedLabel, boolean hasLabel, GlossConfig.RealDrops config, long tick) {
     }
 
     private record PresentationSample(

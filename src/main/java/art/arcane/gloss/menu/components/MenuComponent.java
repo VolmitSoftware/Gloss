@@ -139,6 +139,7 @@ public abstract class MenuComponent<T extends ComponentData> {
 
     if (icon instanceof HoloIcon.Text text
         && currentIcon instanceof TextMenuIcon textIcon
+        && textIcon.matchesAppearance(text.style(), text.box(), text.refreshTicks())
         && textIcon.updateText(text.miniMessage())) {
       currentIcon.applyTransform(location);
       onIconChanged();

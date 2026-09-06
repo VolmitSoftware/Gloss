@@ -2,6 +2,7 @@ package art.arcane.gloss.command;
 
 import art.arcane.gloss.Gloss;
 import art.arcane.gloss.api.AnchoredHologram;
+import art.arcane.gloss.api.IconBillboard;
 import art.arcane.gloss.hologram.HologramBaselines;
 import art.arcane.gloss.hologram.HologramDoc;
 import art.arcane.gloss.locale.GlossLocalization;
@@ -227,8 +228,8 @@ public class CommandGlossHologram {
                 MessageArgument.trusted("y", location.getBlockY()),
                 MessageArgument.trusted("z", location.getBlockZ()));
         GlossCommandMessages.send(sender, GlossMessages.HOLOGRAM_INFO_ORIENTATION,
-                MessageArgument.trusted("scale", hologram.scale()),
-                MessageArgument.trusted("billboard", hologram.billboard()),
+                MessageArgument.trusted("scale", hologram.style().scaleX() + "/" + hologram.style().scaleY() + "/" + hologram.style().scaleZ()),
+                MessageArgument.trusted("billboard", hologram.style().billboard().name()),
                 MessageArgument.trusted("yaw", hologram.yaw()),
                 MessageArgument.trusted("pitch", hologram.pitch()));
         List<String> lines = hologram.lines();
@@ -265,7 +266,8 @@ public class CommandGlossHologram {
             return;
         }
 
-        hologram.setOrientation(mode, yaw, pitch);
+        hologram.setStyle(hologram.style().withBillboard(IconBillboard.valueOf(mode)));
+        hologram.setOrientation(yaw, pitch);
         GlossCommandMessages.send(sender, GlossMessages.HOLOGRAM_ORIENTED,
                 MessageArgument.untrusted("id", id),
                 MessageArgument.trusted("billboard", mode),
@@ -299,7 +301,7 @@ public class CommandGlossHologram {
         }
 
         AnchoredHologram hologram = plugin.holograms().create(id, player.getLocation());
-        hologram.setScale(scale);
+        hologram.setStyle(hologram.style().withScale((float) scale, (float) scale, (float) scale));
         hologram.setLines(List.of(text));
         GlossCommandMessages.send(player, GlossMessages.HOLOGRAM_RENDERED,
                 MessageArgument.untrusted("id", id),

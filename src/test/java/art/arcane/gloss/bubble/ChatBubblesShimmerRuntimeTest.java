@@ -1,10 +1,12 @@
 package art.arcane.gloss.bubble;
 
 import art.arcane.gloss.api.HologramPresentation;
+import art.arcane.gloss.api.HologramBox;
 import art.arcane.gloss.api.HologramViewers;
 import art.arcane.gloss.api.ParticleLayer;
 import art.arcane.gloss.api.ParticleTextSpan;
 import art.arcane.gloss.api.TemporaryHologram;
+import art.arcane.gloss.api.IconDisplayStyle;
 import art.arcane.gloss.particle.ParticleText;
 import org.bukkit.Location;
 import org.bukkit.entity.Entity;
@@ -75,6 +77,14 @@ class ChatBubblesShimmerRuntimeTest {
         private List<String> lines = List.of();
         private LongFunction<List<String>> frames;
         private int publishCount;
+
+        @Override
+        public void setStyle(IconDisplayStyle style) {
+        }
+
+        @Override
+        public void setBox(HologramBox box) {
+        }
 
         @Override
         public String id() {

@@ -1,6 +1,8 @@
 package art.arcane.gloss.indicator;
 
 import art.arcane.gloss.api.ParticleLayer;
+import art.arcane.gloss.api.HologramBox;
+import art.arcane.gloss.api.IconDisplayStyle;
 import art.arcane.gloss.condition.ConditionCompiler;
 import art.arcane.gloss.condition.ConditionSource;
 import art.arcane.gloss.condition.ShowCondition;
@@ -23,7 +25,7 @@ public record DamageIndicatorSettingsDoc(
 ) {
     public static final String KIND = "damage-indicators";
     public static final String DEFAULT_ID = "default";
-    public static final int CURRENT_SCHEMA_VERSION = 3;
+    public static final int CURRENT_SCHEMA_VERSION = 4;
 
     private static final String DEFAULT_AUDIENCE_PERMISSION = "gloss.indicators.show";
     private static final Limits DEFAULT_LIMITS = new Limits(null, null, null, null);
@@ -32,13 +34,13 @@ public record DamageIndicatorSettingsDoc(
         new Vector(0.0D, 0.7D, 0.0D),
         new Motion(0.8D, 1.3D, -0.93D, 0.0D),
         new Transform(1.0D, 0.82D, 0.68D),
-        List.of());
+        List.of(), null, null);
     private static final IndicatorPresentation DEFAULT_HEALING_PRESENTATION = new IndicatorPresentation(
         "&a&l{amount}",
         new Vector(0.0D, -0.1D, 0.0D),
         new Motion(0.45D, 0.65D, 0.05D, 0.0D),
         new Transform(1.0D, 1.1D, 0.62D),
-        List.of());
+        List.of(), null, null);
     private static final Style DEFAULT_DAMAGE = new Style(
         "true", DEFAULT_DAMAGE_PRESENTATION, List.of());
     private static final Style DEFAULT_HEALING = new Style(
@@ -102,15 +104,14 @@ public record DamageIndicatorSettingsDoc(
     }
 
     public record IndicatorPresentation(String format, Vector offset, Motion motion,
-                                        Transform transform, List<ParticleLayer> particleLayers) {
+                                        Transform transform, List<ParticleLayer> particleLayers,
+                                        IconDisplayStyle style, HologramBox box) {
         public IndicatorPresentation {
-            if (format != null && !format.contains("{amount}")) {
-                throw new IllegalArgumentException(
-                    "damage-indicator format must contain the {amount} token");
-            }
             offset = normalizeOffset(offset);
             particleLayers = particleLayers == null ? null
                 : ParticleLayer.copyLayers(particleLayers, "damage-indicator presentation");
+            style = style == null ? IconDisplayStyle.hologramDefaults() : style;
+            box = box == null ? HologramBox.defaults() : box;
         }
 
         @Override
@@ -183,7 +184,8 @@ public record DamageIndicatorSettingsDoc(
             source.offset() == null ? defaults.offset() : source.offset(),
             motion,
             transform,
-            source.particleLayers() == null ? defaults.particleLayers() : source.particleLayers());
+            source.particleLayers() == null ? defaults.particleLayers() : source.particleLayers(),
+            source.style(), source.box());
     }
 
     private static Motion resolveMotion(Motion source, Motion defaults) {

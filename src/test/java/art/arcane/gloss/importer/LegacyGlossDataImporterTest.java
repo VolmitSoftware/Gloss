@@ -10,7 +10,7 @@ import art.arcane.gloss.doc.DocumentEnvelope;
 import art.arcane.gloss.emoji.EmojiDoc;
 import art.arcane.gloss.hologram.HologramDoc;
 import art.arcane.gloss.motd.MotdDoc;
-import art.arcane.volmlib.util.bukkit.json.BukkitJson;
+import art.arcane.gloss.doc.DocumentParsers;
 import org.bukkit.util.Vector;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -85,8 +85,7 @@ class LegacyGlossDataImporterTest {
         assertEquals(LegacyGlossDataImporter.Status.MIGRATED, status(result, "holograms/spawn.json"));
         HologramDoc expected = new HologramDoc(HologramDoc.CURRENT_SCHEMA_VERSION, DocumentEnvelope.INITIAL_REVISION,
             new HologramDoc.Anchor("world", new Vector(10.5D, 70.0D, -4.25D)),
-            List.of("&aWelcome", "&7Second line"), true,
-            HologramDoc.DEFAULT_SCALE, HologramDoc.DEFAULT_BILLBOARD, 0.0D, 0.0D, List.of(), ShowCondition.ALWAYS);
+            List.of("&aWelcome", "&7Second line"), null, null, 0.0D, 0.0D, List.of(), ShowCondition.ALWAYS);
         assertEquals(document(expected), read("holograms/spawn.json"));
         assertFalse(read("holograms/spawn.json").contains("\"id\""));
         assertEquals(LEGACY_HOLOGRAM, backedUp(result, "holograms/spawn.json"));
@@ -228,7 +227,7 @@ class LegacyGlossDataImporterTest {
     void customizedBubbleStyleBlocksConfigYmlBubbleContent() throws IOException {
         write("bubbles/default.json", document(new BubbleStyleDoc(BubbleStyleDoc.CURRENT_SCHEMA_VERSION, 5L,
             "&d", new Vector(0.0D, 2.0D, 0.0D), 48, 9000L, true, false,
-            BubbleStyleDoc.DEFAULTS.motion(), BubbleStyleDoc.DEFAULTS.shimmer(), null, List.of(), ShowCondition.ALWAYS)));
+            BubbleStyleDoc.DEFAULTS.motion(), BubbleStyleDoc.DEFAULTS.shimmer(), null, List.of(), ShowCondition.ALWAYS, null, null)));
         write("config.yml", """
             chat-bubbles:
               message:
@@ -290,7 +289,7 @@ class LegacyGlossDataImporterTest {
     }
 
     private static String document(Object doc) {
-        return BukkitJson.GSON.toJson(doc) + System.lineSeparator();
+        return DocumentParsers.GSON.toJson(doc) + System.lineSeparator();
     }
 
     private String backedUp(LegacyGlossDataImporter.Result result, String relativePath) throws IOException {

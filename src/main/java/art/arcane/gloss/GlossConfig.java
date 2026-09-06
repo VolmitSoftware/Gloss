@@ -1,6 +1,8 @@
 package art.arcane.gloss;
 
 import art.arcane.gloss.api.ParticleLayer;
+import art.arcane.gloss.api.IconDisplayStyle;
+import art.arcane.gloss.api.HologramBox;
 import art.arcane.gloss.condition.ShowCondition;
 import art.arcane.gloss.config.GlossConfigFile;
 import art.arcane.gloss.drop.RealDropSettingsDoc;
@@ -184,20 +186,7 @@ public record GlossConfig(
         ) {
         }
 
-        public record Labels(
-            boolean enabled,
-            float yOffset,
-            float scale,
-            float viewRange,
-            String billboard,
-            boolean seeThrough,
-            boolean shadow,
-            boolean background,
-            int backgroundRed,
-            int backgroundGreen,
-            int backgroundBlue,
-            int backgroundAlpha
-        ) {
+        public record Labels(boolean enabled, float yOffset, IconDisplayStyle style, HologramBox box) {
         }
 
         public record Filters(

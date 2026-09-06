@@ -1,6 +1,11 @@
 package art.arcane.gloss.preview;
 
 import art.arcane.gloss.Gloss;
+import art.arcane.gloss.api.IconDisplayStyle;
+import art.arcane.gloss.api.HologramPresentation;
+import art.arcane.gloss.hologram.PacketTextDecoration;
+import art.arcane.gloss.hologram.TextDisplayStyle;
+import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import art.arcane.gloss.GlossConfig;
 import art.arcane.gloss.api.ParticleLayer;
 import art.arcane.gloss.menu.DisplayEntityManager;
@@ -55,7 +60,6 @@ public final class ContainerPreview {
   private static final int ITEM_PX = 15;
   private static final byte BILLBOARD_FIXED = 0;
   private static final byte ITEM_DISPLAY_CONTEXT = 8;
-  private static final int ITEM_BRIGHTNESS = 0xF000F0;
   private static final byte TEXT_FLAGS = 0;
   private static final byte TEXT_OPACITY_VISIBLE = (byte) 0xFF;
   private static final byte TEXT_OPACITY_HIDDEN = 0;
@@ -453,6 +457,9 @@ public final class ContainerPreview {
 
   private void despawnVisuals() {
     for (Rendered r : rendered) {
+      if (r.decoration != null) {
+        r.decoration.remove();
+      }
       despawn(r.background);
       despawn(r.item);
       despawn(r.count);
@@ -532,24 +539,25 @@ public final class ContainerPreview {
     switch (r.element) {
       case PreviewElement.Panel panel -> {
         r.backgroundPx = new double[]{panel.x(), panel.y(), panel.z()};
-        r.background = spawnBackground(r.backgroundPx, panel.width(), panel.height(), panel.color());
+        r.background = spawnBackground(r.backgroundPx, panel.width(), panel.height(), panel.color(), panel.style());
       }
       case PreviewElement.Cell cell -> {
         r.backgroundPx = new double[]{cell.x(), cell.y(), cell.z()};
-        r.background = spawnBackground(r.backgroundPx, cell.size(), cell.size(), r.appliedColor);
+        r.background = spawnBackground(r.backgroundPx, cell.size(), cell.size(), r.appliedColor, cell.style());
       }
       case PreviewElement.Slot slot -> {
         r.backgroundPx = new double[]{slot.x(), slot.y(), slot.z()};
-        r.background = spawnBackground(r.backgroundPx, slot.size(), slot.size(), slot.wellColor());
+        r.background = spawnBackground(r.backgroundPx, slot.size(), slot.size(), slot.wellColor(), slot.textStyle());
         if (r.appliedItem != null) {
           r.itemPx = new double[]{slot.x(), slot.y(), slot.z() + ITEM_Z_OFFSET};
-          r.item = spawnItem(r.itemPx, r.appliedItem);
+          r.item = spawnItem(r.itemPx, r.appliedItem, slot.style());
           spawnCountIfNeeded(r, slot);
         }
       }
       case PreviewElement.Label label -> {
         r.backgroundPx = new double[]{label.x(), label.y(), label.z()};
-        r.background = spawnText(r.backgroundPx, r.appliedText, label.backgroundColor());
+        r.background = spawnText(r.backgroundPx, r.appliedText, label.backgroundColor(), label.style());
+        updateDecoration(r, label);
       }
     }
   }
@@ -560,6 +568,9 @@ public final class ContainerPreview {
    * send calls per element.
    */
   private void reposition(Rendered r, List<PacketWrapper<?>> teleports) {
+    if (r.element instanceof PreviewElement.Label label) {
+      updateDecoration(r, label);
+    }
     if (r.background != null && r.backgroundPx != null) {
       collect(teleports, DisplayEntityManager.goToPacket(r.background, at(r.backgroundPx)));
     }
@@ -586,11 +597,12 @@ public final class ContainerPreview {
           DisplayEntityManager.changeTextBackground(r.background, r.appliedColor);
         }
       }
-      case PreviewElement.Label ignored -> {
+      case PreviewElement.Label label -> {
         Component pending = r.pendingText;
         if (r.background != null && pending != null && !pending.equals(r.appliedText)) {
           r.appliedText = pending;
           DisplayEntityManager.changeName(r.background, pending);
+          updateDecoration(r, label);
         }
       }
       case PreviewElement.Slot slot -> applySlot(r, slot);
@@ -618,7 +630,7 @@ public final class ContainerPreview {
       r.appliedItem = pending.clone();
       if (r.item == null) {
         r.itemPx = new double[]{slot.x(), slot.y(), slot.z() + ITEM_Z_OFFSET};
-        r.item = spawnItem(r.itemPx, r.appliedItem);
+        r.item = spawnItem(r.itemPx, r.appliedItem, slot.style());
       } else {
         DisplayEntityManager.changeItem(r.item, r.appliedItem);
       }
@@ -765,12 +777,16 @@ public final class ContainerPreview {
     r.pendingItem = stack.clone();
   }
 
-  private UUID spawnBackground(double[] px, int width, int height, int color) {
+  private UUID spawnBackground(double[] px, int width, int height, int color, IconDisplayStyle style) {
     float shrink = (float) depthShrink(px[2]);
-    float scaleX = bgScaleX(width) * shrink;
-    float scaleY = bgScaleY(height) * shrink;
+    float scaleX = bgScaleX(width) * shrink * style.scaleX();
+    float scaleY = bgScaleY(height) * shrink * style.scaleY();
     DisplayEntity displayEntity = DisplayEntity.Builder.textDisplay(
-        Component.text(" "), at(px), scaleX, scaleY, 1F, BILLBOARD_FIXED, TEXT_FLAGS, color, TEXT_OPACITY_HIDDEN);
+        Component.text(" "), at(px), scaleX, scaleY, style.scaleZ(), BILLBOARD_FIXED, TEXT_FLAGS, color, TEXT_OPACITY_HIDDEN);
+    TextDisplayStyle.apply(displayEntity, style);
+    displayEntity.textFlags((byte) (style.textFlags() & 0x03));
+    displayEntity.textOpacity(TEXT_OPACITY_HIDDEN);
+    displayEntity.backgroundColor(color);
     displayEntity.translation(backgroundCenteringTranslation(scaleX, scaleY));
     UUID uuid = DisplayEntityManager.add(displayEntity);
     DisplayEntityManager.spawn(uuid, player);
@@ -779,31 +795,34 @@ public final class ContainerPreview {
 
   private void rescale(Rendered r) {
     switch (r.element) {
-      case PreviewElement.Panel panel -> retransformBackground(r.background, panel.width(), panel.height(), r.backgroundPx[2]);
-      case PreviewElement.Cell cell -> retransformBackground(r.background, cell.size(), cell.size(), r.backgroundPx[2]);
+      case PreviewElement.Panel panel -> retransformBackground(r.background, panel.width(), panel.height(), r.backgroundPx[2], panel.style());
+      case PreviewElement.Cell cell -> retransformBackground(r.background, cell.size(), cell.size(), r.backgroundPx[2], cell.style());
       case PreviewElement.Slot slot -> {
-        retransformBackground(r.background, slot.size(), slot.size(), r.backgroundPx[2]);
+        retransformBackground(r.background, slot.size(), slot.size(), r.backgroundPx[2], slot.textStyle());
         if (r.item != null) {
           float scale = itemScale() * (float) depthShrink(r.itemPx[2]);
-          DisplayEntityManager.changeScale(r.item, scale, scale, scale);
+          DisplayEntityManager.changeScale(r.item, scale * slot.style().scaleX(), scale * slot.style().scaleY(), scale * slot.style().scaleZ());
         }
         if (r.count != null) {
           float scale = baseTextScale() * (float) depthShrink(r.countPx[2]);
-          DisplayEntityManager.changeTransform(r.count, scale, scale, 1F, textCenteringTranslation(scale));
+          DisplayEntityManager.changeTransform(r.count, scale * slot.textStyle().scaleX(), scale * slot.textStyle().scaleY(),
+              slot.textStyle().scaleZ(), textCenteringTranslation(scale * slot.textStyle().scaleX(), scale * slot.textStyle().scaleY()));
         }
       }
-      case PreviewElement.Label ignored -> {
+      case PreviewElement.Label label -> {
         float scale = baseTextScale() * (float) depthShrink(r.backgroundPx[2]);
-        DisplayEntityManager.changeTransform(r.background, scale, scale, 1F, textCenteringTranslation(scale));
+        DisplayEntityManager.changeTransform(r.background, scale * label.style().scaleX(), scale * label.style().scaleY(),
+            label.style().scaleZ(), textCenteringTranslation(scale * label.style().scaleX(), scale * label.style().scaleY()));
+        updateDecoration(r, label);
       }
     }
   }
 
-  private void retransformBackground(UUID uuid, int widthPx, int heightPx, double z) {
+  private void retransformBackground(UUID uuid, int widthPx, int heightPx, double z, IconDisplayStyle style) {
     float shrink = (float) depthShrink(z);
-    float scaleX = bgScaleX(widthPx) * shrink;
-    float scaleY = bgScaleY(heightPx) * shrink;
-    DisplayEntityManager.changeTransform(uuid, scaleX, scaleY, 1F, backgroundCenteringTranslation(scaleX, scaleY));
+    float scaleX = bgScaleX(widthPx) * shrink * style.scaleX();
+    float scaleY = bgScaleY(heightPx) * shrink * style.scaleY();
+    DisplayEntityManager.changeTransform(uuid, scaleX, scaleY, style.scaleZ(), backgroundCenteringTranslation(scaleX, scaleY));
   }
 
   private Vector3f backgroundCenteringTranslation(float scaleX, float scaleY) {
@@ -813,10 +832,10 @@ public final class ContainerPreview {
         0F);
   }
 
-  private Vector3f textCenteringTranslation(float scale) {
+  private Vector3f textCenteringTranslation(float scaleX, float scaleY) {
     return new Vector3f(
-        (float) (-TEXT_CENTER_X_PX * scale * VANILLA_TEXT_BLOCKS_PER_PIXEL),
-        (float) (-TEXT_HALF_HEIGHT_PX * scale * VANILLA_TEXT_BLOCKS_PER_PIXEL),
+        (float) (-TEXT_CENTER_X_PX * scaleX * VANILLA_TEXT_BLOCKS_PER_PIXEL),
+        (float) (-TEXT_HALF_HEIGHT_PX * scaleY * VANILLA_TEXT_BLOCKS_PER_PIXEL),
         0F);
   }
 
@@ -832,20 +851,24 @@ public final class ContainerPreview {
     return (float) (ITEM_PX * pixel());
   }
 
-  private UUID spawnText(double[] px, Component text, int backgroundColor) {
+  private UUID spawnText(double[] px, Component text, int backgroundColor, IconDisplayStyle style) {
     float scale = baseTextScale() * (float) depthShrink(px[2]);
     DisplayEntity displayEntity = DisplayEntity.Builder.textDisplay(
-        text, at(px), scale, scale, 1F, BILLBOARD_FIXED, TEXT_FLAGS, backgroundColor, TEXT_OPACITY_VISIBLE);
-    displayEntity.translation(textCenteringTranslation(scale));
+        text, at(px), scale * style.scaleX(), scale * style.scaleY(), style.scaleZ(),
+        style.billboard().metadataValue(), style.textFlags(), backgroundColor, (byte) (style.textOpacity() & 0xFF));
+    TextDisplayStyle.apply(displayEntity, style);
+    displayEntity.backgroundColor(backgroundColor);
+    displayEntity.translation(textCenteringTranslation(scale * style.scaleX(), scale * style.scaleY()));
     UUID uuid = DisplayEntityManager.add(displayEntity);
     DisplayEntityManager.spawn(uuid, player);
     return uuid;
   }
 
-  private UUID spawnItem(double[] px, ItemStack stack) {
+  private UUID spawnItem(double[] px, ItemStack stack, IconDisplayStyle style) {
     float scale = itemScale() * (float) depthShrink(px[2]);
     DisplayEntity displayEntity = DisplayEntity.Builder.itemDisplay(stack, at(px), scale, BILLBOARD_FIXED, ITEM_DISPLAY_CONTEXT);
-    displayEntity.brightness(ITEM_BRIGHTNESS);
+    TextDisplayStyle.apply(displayEntity, style);
+    displayEntity.scale(new Vector3f(scale * style.scaleX(), scale * style.scaleY(), scale * style.scaleZ()));
     UUID uuid = DisplayEntityManager.add(displayEntity);
     DisplayEntityManager.spawn(uuid, player);
     return uuid;
@@ -870,12 +893,30 @@ public final class ContainerPreview {
       float scale = baseTextScale() * (float) depthShrink(r.countPx[2]);
       DisplayEntity displayEntity = DisplayEntity.Builder.textDisplay(
           text, at(r.countPx), scale, scale, 1F, BILLBOARD_FIXED, TEXT_FLAGS, 0, TEXT_OPACITY_VISIBLE);
-      displayEntity.translation(textCenteringTranslation(scale));
+      IconDisplayStyle style = slot.textStyle();
+      TextDisplayStyle.apply(displayEntity, style);
+      displayEntity.scale(new Vector3f(scale * style.scaleX(), scale * style.scaleY(), style.scaleZ()));
+      displayEntity.translation(textCenteringTranslation(scale * style.scaleX(), scale * style.scaleY()));
       r.count = DisplayEntityManager.add(displayEntity);
       DisplayEntityManager.spawn(r.count, player);
     } else {
       DisplayEntityManager.changeName(r.count, text);
     }
+  }
+
+  private void updateDecoration(Rendered rendered, PreviewElement.Label label) {
+    if (!label.box().enabled() || rendered.background == null) {
+      return;
+    }
+    if (rendered.decoration == null) {
+      rendered.decoration = new PacketTextDecoration(player);
+    }
+    float scale = baseTextScale() * (float) depthShrink(rendered.backgroundPx[2]);
+    IconDisplayStyle style = label.style();
+    rendered.decoration.update(new PacketTextDecoration.Update(at(rendered.backgroundPx),
+        LegacyComponentSerializer.legacySection().serialize(rendered.appliedText), style, label.box(),
+        new HologramPresentation(scale, scale, 1D, 0D, 0D, 0D, 1D),
+        textCenteringTranslation(scale * style.scaleX(), scale * style.scaleY())));
   }
 
   private void despawn(UUID uuid) {
@@ -971,6 +1012,7 @@ public final class ContainerPreview {
   private static final class Rendered {
     private final PreviewElement element;
     private UUID background;
+    private PacketTextDecoration decoration;
     private UUID item;
     private UUID count;
     private double[] backgroundPx;

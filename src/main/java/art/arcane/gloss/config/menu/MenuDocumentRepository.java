@@ -1,8 +1,9 @@
 package art.arcane.gloss.config.menu;
 
+import art.arcane.gloss.doc.DocumentParsers;
+
 import art.arcane.gloss.doc.AtomicFiles;
 import art.arcane.gloss.doc.DocumentRevisionConflictException;
-import art.arcane.volmlib.util.bukkit.json.BukkitJson;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
@@ -57,7 +58,7 @@ final class MenuDocumentRepository {
     }
     JsonObject changed = Objects.requireNonNull(
         requiredMutation.apply(parsed.getAsJsonObject().deepCopy()), "menu mutation result");
-    String changedSource = BukkitJson.GSON.toJson(changed) + System.lineSeparator();
+    String changedSource = DocumentParsers.GSON.toJson(changed) + System.lineSeparator();
     MenuDocument validated = MenuDocumentParser.parse(menuId, changedSource);
 
     if (changed.equals(parsed)) {
@@ -86,7 +87,7 @@ final class MenuDocumentRepository {
     if (!parsed.isJsonObject()) {
       throw new IllegalArgumentException("menu document must be a JSON object");
     }
-    String copiedSource = BukkitJson.GSON.toJson(parsed) + System.lineSeparator();
+    String copiedSource = DocumentParsers.GSON.toJson(parsed) + System.lineSeparator();
     MenuDocument validated = MenuDocumentParser.parse(targetMenuId, copiedSource);
 
     prepareParent(target);

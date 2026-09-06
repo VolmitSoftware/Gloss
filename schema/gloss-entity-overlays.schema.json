@@ -4,28 +4,494 @@
   "title": "Gloss Entity Overlays Document",
   "description": "Default nearby living-entity overlays at plugins/Gloss/entity-overlays/default.json, with segmented health, custom names, damage feedback, combat stats and optional React/Adapt data.",
   "type": "object",
-  "required": ["schemaVersion", "revision"],
+  "required": [
+    "schemaVersion",
+    "revision"
+  ],
   "properties": {
-    "schemaVersion": {"type": "integer", "const": 1},
-    "revision": {"type": "integer", "minimum": 1, "maximum": 9007199254740991},
-    "enabled": {"type": "boolean", "default": true},
-    "range": {"type": "number", "default": 16, "description": "Nearby range in blocks; clamped to 1..64."},
-    "updateIntervalTicks": {"type": "integer", "default": 5, "description": "Update interval in ticks; clamped to 1..40."},
-    "maxEntitiesPerViewer": {"type": "integer", "default": 64, "description": "Maximum overlays per viewer; clamped to 1..256."},
-    "includePlayers": {"type": "boolean", "default": true},
-    "verticalOffset": {"type": "number", "default": 0.35, "description": "Blocks above entity bounds; clamped to -2..8."},
-    "scale": {"type": "number", "default": 0.75, "description": "Text display scale; clamped to 0.1..4."},
-    "healthSegments": {"type": "integer", "default": 10, "description": "Health bar segments; clamped to 1..40."},
-    "showHealthNumbers": {"type": "boolean", "default": true},
-    "showNames": {"type": "boolean", "default": true},
-    "showCombatStats": {"type": "boolean", "default": true},
-    "hitHighlightMs": {"type": "integer", "default": 750, "description": "Recent-hit highlight in milliseconds; clamped to 0..10000."},
-    "blacklistWorlds": {"type": "array", "items": {"type": "string"}, "default": []},
-    "excludedEntityTypes": {"type": "array", "items": {"type": "string"}, "default": ["ARMOR_STAND"]},
-    "nameFormat": {"type": "string", "default": "&f{name}", "description": "Custom name token: {name}."},
-    "healthFormat": {"type": "string", "default": "{bar} &f{health}&7/{max_health}", "description": "Tokens: {bar}, {health}, {max_health}. With showHealthNumbers false only the bar renders."},
-    "stackFormat": {"type": "string", "default": " &7x{count}", "description": "React count token: {count}; appended to the name or health line for stacks greater than one."},
-    "statsFormat": {"type": "string", "default": "&7ATK &f{attack} &8| &7ARM &f{armor}", "description": "Final line tokens: {attack}, {armor}."},
-    "damageFormat": {"type": "string", "default": "&c-{damage}", "description": "Recent health loss token: {damage}."}
+    "schemaVersion": {
+      "type": "integer",
+      "const": 2
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991
+    },
+    "enabled": {
+      "type": "boolean",
+      "default": true
+    },
+    "range": {
+      "type": "number",
+      "default": 16,
+      "description": "Nearby range in blocks; clamped to 1..64."
+    },
+    "updateIntervalTicks": {
+      "type": "integer",
+      "default": 5,
+      "description": "Update interval in ticks; clamped to 1..40."
+    },
+    "maxEntitiesPerViewer": {
+      "type": "integer",
+      "default": 64,
+      "description": "Maximum overlays per viewer; clamped to 1..256."
+    },
+    "includePlayers": {
+      "type": "boolean",
+      "default": true
+    },
+    "verticalOffset": {
+      "type": "number",
+      "default": 0.35,
+      "description": "Blocks above entity bounds; clamped to -2..8."
+    },
+    "healthSegments": {
+      "type": "integer",
+      "default": 10,
+      "description": "Health bar segments; clamped to 1..40."
+    },
+    "hitHighlightMs": {
+      "type": "integer",
+      "default": 750,
+      "description": "Recent-hit highlight in milliseconds; clamped to 0..10000."
+    },
+    "blacklistWorlds": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": []
+    },
+    "excludedEntityTypes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [
+        "ARMOR_STAND"
+      ]
+    },
+    "show": {
+      "$ref": "#/$defs/show",
+      "default": true
+    },
+    "lines": {
+      "type": "array",
+      "maxItems": 64,
+      "items": {
+        "$ref": "#/$defs/line"
+      },
+      "description": "Ordered rows. Text rows use the Gloss text engine; insight rows expand Adapt details; spacers reserve one blank row. IDs must be unique."
+    },
+    "style": {
+      "$ref": "#/$defs/iconDisplayStyle",
+      "description": "Native Gloss TextDisplay style. An omitted style uses center billboard and scale 0.75 on every axis. Fields omitted from an explicit style use native IconDisplayStyle defaults."
+    },
+    "box": {
+      "$ref": "#/$defs/box"
+    },
+    "particleLayers": {
+      "type": "array",
+      "maxItems": 64,
+      "items": {
+        "$ref": "#/$defs/particleLayer"
+      },
+      "default": []
+    }
+  },
+  "$defs": {
+    "iconDisplayStyle": {
+      "title": "Icon Display Style",
+      "description": "Optional display-entity metadata shared by text, image, item, block, and custom-item icons. Packet entity icons do not accept this object.",
+      "type": "object",
+      "dependentRequired": {
+        "blockLight": [
+          "skyLight"
+        ],
+        "skyLight": [
+          "blockLight"
+        ]
+      },
+      "properties": {
+        "billboard": {
+          "type": "string",
+          "enum": [
+            "fixed",
+            "vertical",
+            "horizontal",
+            "center"
+          ],
+          "default": "fixed"
+        },
+        "shadow": {
+          "type": "boolean",
+          "default": false
+        },
+        "seeThrough": {
+          "type": "boolean",
+          "default": false
+        },
+        "textAlignment": {
+          "type": "string",
+          "enum": [
+            "center",
+            "left",
+            "right"
+          ],
+          "default": "center"
+        },
+        "backgroundArgb": {
+          "type": "string",
+          "pattern": "^#[0-9A-Fa-f]{8}$",
+          "default": "#00000000"
+        },
+        "textOpacity": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 255,
+          "default": 255
+        },
+        "lineWidth": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 16384,
+          "default": 16384
+        },
+        "blockLight": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 15
+        },
+        "skyLight": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 15
+        },
+        "viewRange": {
+          "type": "number",
+          "minimum": 0.01,
+          "maximum": 64,
+          "default": 1
+        },
+        "shadowRadius": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 64,
+          "default": 0
+        },
+        "shadowStrength": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 0
+        },
+        "cullingWidth": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 4096,
+          "default": 0
+        },
+        "cullingHeight": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 4096,
+          "default": 0
+        },
+        "glowColor": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^#[0-9A-Fa-f]{8}$"
+        },
+        "scaleX": {
+          "type": "number",
+          "minimum": 0.01,
+          "maximum": 64,
+          "default": 1
+        },
+        "scaleY": {
+          "type": "number",
+          "minimum": 0.01,
+          "maximum": 64,
+          "default": 1
+        },
+        "scaleZ": {
+          "type": "number",
+          "minimum": 0.01,
+          "maximum": 64,
+          "default": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "particleLayer": {
+      "type": "object",
+      "required": [
+        "id",
+        "target",
+        "geometry",
+        "particle"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$"
+        },
+        "target": {
+          "type": "object",
+          "required": [
+            "scope"
+          ],
+          "properties": {
+            "scope": {
+              "enum": [
+                "projection",
+                "component",
+                "text",
+                "line",
+                "span",
+                "label",
+                "model",
+                "local"
+              ]
+            },
+            "name": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$"
+            },
+            "component": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$"
+            },
+            "line": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        },
+        "geometry": {
+          "type": "object",
+          "required": [
+            "type"
+          ],
+          "properties": {
+            "type": {
+              "enum": [
+                "point",
+                "line",
+                "polyline",
+                "outline",
+                "filledPlane",
+                "cuboid",
+                "letterBounds",
+                "glyphOutline",
+                "glyphFill"
+              ]
+            },
+            "from": {
+              "$ref": "#/$defs/vector3"
+            },
+            "to": {
+              "$ref": "#/$defs/vector3"
+            },
+            "points": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/vector3"
+              }
+            },
+            "width": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 128
+            },
+            "height": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 128
+            },
+            "depth": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 128
+            },
+            "padding": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 16
+            },
+            "spacing": {
+              "type": "number",
+              "minimum": 0.02,
+              "maximum": 16
+            }
+          }
+        },
+        "placement": {
+          "type": "object",
+          "properties": {
+            "layer": {
+              "enum": [
+                "behind",
+                "front",
+                "center"
+              ]
+            },
+            "depth": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 16
+            },
+            "offset": {
+              "$ref": "#/$defs/vector3"
+            }
+          }
+        },
+        "particle": {
+          "type": "object",
+          "required": [
+            "key"
+          ],
+          "properties": {
+            "key": {
+              "type": "string",
+              "pattern": "^[a-z0-9_.-]+:[a-z0-9_./-]+$"
+            },
+            "color": {
+              "type": "string",
+              "pattern": "^#[0-9A-Fa-f]{6}$"
+            },
+            "size": {
+              "type": "number",
+              "minimum": 0.01,
+              "maximum": 4
+            }
+          }
+        },
+        "emission": {
+          "type": "object",
+          "properties": {
+            "intervalTicks": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200
+            },
+            "pattern": {
+              "enum": [
+                "steady",
+                "chase",
+                "pulse",
+                "twinkle",
+                "scan",
+                "corners"
+              ]
+            },
+            "periodTicks": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 72000
+            },
+            "seed": {
+              "type": "integer"
+            }
+          }
+        },
+        "priority": {
+          "type": "integer",
+          "minimum": -1000,
+          "maximum": 1000
+        }
+      }
+    },
+    "vector3": {
+      "title": "3D Vector",
+      "description": "Represents a 3D floating-point vector.",
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": {
+        "type": "number"
+      }
+    },
+    "show": {
+      "oneOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "string",
+          "minLength": 1
+        }
+      ],
+      "description": "Boolean or Gloss boolean expression. Entity variables include entity.name, named, type, health, maxHealth, healthPercent (0..100), damage, damaged, attack, armor, stackCount, distance, and insight.active. Viewer, world, server, time, permissions, groups, regions and integration functions use the shared condition scope."
+    },
+    "line": {
+      "type": "object",
+      "required": [
+        "id"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$"
+        },
+        "type": {
+          "enum": [
+            "text",
+            "insight",
+            "spacer"
+          ],
+          "default": "text"
+        },
+        "text": {
+          "type": "string",
+          "maxLength": 4096,
+          "description": "Gloss functions, expressions, PlaceholderAPI, emoji, colors, MiniMessage, animations and particle spans. Tokens: {name}, {type}, {bar}, {health}, {max_health}, {count}, {attack}, {armor}, {damage}, {distance}, {insight}. Entity names, Insight details and expression results are literal data with legacy colors."
+        },
+        "show": {
+          "$ref": "#/$defs/show",
+          "default": true
+        }
+      }
+    },
+    "box": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false
+        },
+        "padding": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 64,
+          "default": 4
+        },
+        "borderWidth": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 16,
+          "default": 1
+        },
+        "backgroundArgb": {
+          "type": "string",
+          "pattern": "^#[0-9A-Fa-f]{8}$",
+          "default": "#B31B1B22"
+        },
+        "borderArgb": {
+          "type": "string",
+          "pattern": "^#[0-9A-Fa-f]{8}$",
+          "default": "#FFAAAAAA"
+        }
+      }
+    }
   }
 }

@@ -54,7 +54,7 @@ public class EditorSyncDocumentsTest {
     EditorSyncDocumentKind kind = EditorSyncDocumentKind.ENTITY_OVERLAYS;
     Path dataDirectory = Path.of("build", "sync-contract");
     EditorSyncDocumentKind.ParsedDocument parsed = kind.parse("default", """
-        {"schemaVersion":1,"revision":7,"healthSegments":12}
+        {"schemaVersion":2,"revision":7,"healthSegments":12}
         """);
     assertEquals(dataDirectory.toAbsolutePath().normalize().resolve("entity-overlays/default.json"),
         kind.path(dataDirectory, "default"));
@@ -68,7 +68,7 @@ public class EditorSyncDocumentsTest {
     EditorSyncDocumentKind kind = EditorSyncDocumentKind.DAMAGE_INDICATORS;
     Path dataDirectory = Path.of("build", "sync-contract");
     EditorSyncDocumentKind.ParsedDocument parsed = kind.parse("default", """
-        {"schemaVersion":3,"revision":7,"damage":{},"healing":{}}
+        {"schemaVersion":4,"revision":7,"damage":{},"healing":{}}
         """);
 
     assertEquals("damage-indicators", kind.wireName());

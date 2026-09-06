@@ -1,11 +1,12 @@
 package art.arcane.gloss.config.action;
 
+import art.arcane.gloss.doc.DocumentParsers;
+
 import art.arcane.gloss.api.HoloClickTrigger;
 import art.arcane.gloss.config.MenuDefinitionData;
 import art.arcane.gloss.enums.MenuActionCommandSource;
 import art.arcane.gloss.enums.NavigationMode;
 import art.arcane.gloss.enums.SoundSource;
-import art.arcane.volmlib.util.bukkit.json.BukkitJson;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
@@ -18,7 +19,7 @@ import static org.junit.Assert.assertTrue;
 public class ActionDataDefaultsTest {
 
   private static MenuActionData action(String json) {
-    return BukkitJson.GSON.fromJson(json, MenuActionData.class);
+    return DocumentParsers.GSON.fromJson(json, MenuActionData.class);
   }
 
   private static String menu(String soundKey) {
@@ -29,7 +30,7 @@ public class ActionDataDefaultsTest {
 
   @Test
   public void aMenuDeclaringAnUnknownSoundKeyStillLoads() {
-    MenuDefinitionData decoded = BukkitJson.GSON.fromJson(menu("ui.button.nonexistent"), MenuDefinitionData.class);
+    MenuDefinitionData decoded = DocumentParsers.GSON.fromJson(menu("ui.button.nonexistent"), MenuDefinitionData.class);
 
     assertNotNull("an unresolvable sound key must not discard the menu file", decoded);
     assertEquals(1, decoded.getComponents().size());
@@ -37,7 +38,7 @@ public class ActionDataDefaultsTest {
 
   @Test
   public void aMenuDeclaringAMalformedSoundKeyStillLoads() {
-    MenuDefinitionData decoded = BukkitJson.GSON.fromJson(menu("UI_BUTTON_CLICK"), MenuDefinitionData.class);
+    MenuDefinitionData decoded = DocumentParsers.GSON.fromJson(menu("UI_BUTTON_CLICK"), MenuDefinitionData.class);
 
     assertNotNull("a malformed sound key must not discard the menu file", decoded);
     assertEquals(1, decoded.getComponents().size());
@@ -164,7 +165,7 @@ public class ActionDataDefaultsTest {
     assertThrows(RuntimeException.class, () -> action(
         "{\"type\":\"command\",\"command\":\"spawn\",\"trigger\":\"middle_click\"}"));
 
-    String encoded = BukkitJson.GSON.toJson(
+    String encoded = DocumentParsers.GSON.toJson(
         new MessageActionData("Hello", HoloClickTrigger.SHIFT_LEFT_CLICK)
     );
     assertTrue(encoded, encoded.contains("\"trigger\": \"shift_left_click\""));

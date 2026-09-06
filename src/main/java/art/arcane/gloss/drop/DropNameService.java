@@ -57,6 +57,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.UnaryOperator;
 
 public final class DropNameService implements Listener {
     private static final int PRUNE_INTERVAL_TICKS = 40;
@@ -311,9 +312,7 @@ public final class DropNameService implements Listener {
 
         if (DropNameFormatter.preservesExistingName(
             drops.preserveCustomNames(), item.getCustomName() != null, glossOwned)) {
-            RealDropService.Label preserved = item.isCustomNameVisible()
-                ? RealDropService.Label.rendered(item.getCustomName())
-                : RealDropService.Label.none();
+            RealDropService.Label preserved = realDrops.preservedLabel(item);
             trackNativeParticles(item, preserved, presentation);
             realDrops.present(item, preserved, presentation);
             return;
@@ -324,7 +323,8 @@ public final class DropNameService implements Listener {
             ? DropNameFormatter.format(drops.nameFormat(), count, typeLabel(drops, stack))
             : DropNameFormatter.formatBundle(
                 drops.bundleFormat(), contents, bundleEntryLimit(suppliedFormats, drops), DropNameService::renderMore);
-        String rendered = renderName(raw);
+        String fallbackName = count + "x " + typeLabel(drops, stack);
+        String rendered = renderNativeName(raw, fallbackName, this::renderName);
         if (!rendered.equals(item.getCustomName())) {
             item.setCustomName(rendered);
         }
@@ -338,7 +338,7 @@ public final class DropNameService implements Listener {
         List<String> labelLines = verticalLabelLines(contents, suppliedFormats, drops, raw);
         List<String> renderedLines = new ArrayList<>(labelLines.size());
         for (String line : labelLines) {
-            renderedLines.add(renderName(line));
+            renderedLines.add(renderNativeName(line, fallbackName, this::renderName));
         }
         RealDropService.Label label = new RealDropService.Label(labelLines, renderedLines);
         trackNativeParticles(item, label, presentation);
@@ -346,20 +346,21 @@ public final class DropNameService implements Listener {
             item.setCustomNameVisible(false);
         }
         realDrops.present(item, drops.show().isAlwaysVisible() ? label : RealDropService.Label.none(), presentation);
-        applyConditionalLabel(item, label, presentation);
+        applyStyledLabel(item, label, presentation);
     }
 
-    private void applyConditionalLabel(Item item, RealDropService.Label label,
+    private void applyStyledLabel(Item item, RealDropService.Label label,
                                        RealDropConditionPlan.Selection selection) {
         UUID itemId = item.getUniqueId();
         ShowCondition show = plugin.cfg().drops().show();
-        if (show.isAlwaysVisible()) {
+        if (show.isAlwaysVisible() && selection.style().config().enabled()) {
             removeConditionalLabel(itemId);
             return;
         }
         item.setCustomNameVisible(false);
         nativeParticleLabels.remove(itemId);
-        if (!show.isDynamic() || label.lines().isEmpty()) {
+        if ((!show.isAlwaysVisible() && !show.isDynamic()) || label.lines().isEmpty()
+            || !selection.style().config().labels().enabled()) {
             removeConditionalLabel(itemId);
             return;
         }
@@ -384,8 +385,18 @@ public final class DropNameService implements Listener {
             });
         }
         current.selection = selection;
-        current.hologram.setRenderedLines(label.lines());
+        current.hologram.setStyle(selection.style().config().labels().style());
+        current.hologram.setBox(selection.style().config().labels().box());
+        applyLabelText(current.hologram, label);
         current.hologram.setParticleLayers(selection.style().config().particleLayers());
+    }
+
+    static void applyLabelText(TemporaryHologram hologram, RealDropService.Label label) {
+        if (label.authoredLines().isEmpty()) {
+            hologram.setRenderedLines(label.lines());
+        } else {
+            hologram.setLines(label.authoredLines());
+        }
     }
 
     private void removeConditionalLabel(UUID itemId) {
@@ -416,6 +427,10 @@ public final class DropNameService implements Listener {
             : suppliedFormats;
         return DropNameFormatter.formatBundleLines(
             formats.header(), formats.entry(), formats.more(), contents, formats.entryLimit());
+    }
+
+    static String renderNativeName(String authored, String fallback, UnaryOperator<String> renderer) {
+        return TextPipeline.viewerSpecific(authored) ? fallback : renderer.apply(authored);
     }
 
     private String renderName(String raw) {
@@ -681,14 +696,11 @@ public final class DropNameService implements Listener {
         if (!plugin.cfg().drops().show().isAlwaysVisible()) {
             return;
         }
-        double range = Math.max(config.labels().viewRange(), plugin.cfg().particles().viewRange());
+        double range = plugin.cfg().particles().viewRange();
         Location origin = item.getLocation().clone().add(0.0D, config.labels().yOffset(), 0.0D);
-        for (Entity nearby : item.getNearbyEntities(range, range, range)) {
-            if (nearby instanceof Player viewer) {
-                plugin.scheduler().runEntity(viewer,
-                    () -> emitNativeParticlesForViewer(state, viewer, origin, tick));
-            }
-        }
+        plugin.holograms().forEachNearbyViewer(origin, range * range,
+            viewer -> plugin.scheduler().runEntity(viewer,
+                () -> emitNativeParticlesForViewer(state, viewer, origin, tick)));
     }
 
     private void emitNativeParticlesForViewer(NativeParticleLabel state, Player viewer,
@@ -698,7 +710,7 @@ public final class DropNameService implements Listener {
         }
         ParticleText.Rendered rendered = state.authored().isEmpty()
             ? new ParticleText.Rendered(state.rendered(), List.of())
-            : plugin.text().renderParticleText(viewer, state.authored());
+            : plugin.text().renderLegacyParticleText(viewer, state.authored());
         ParticleFrame frame = nativeLabelFrame(viewer, origin);
         for (ParticleLayer layer : state.selection().style().config().particleLayers()) {
             List<ParticleRect> targets = nativeLabelTargets(layer, rendered);

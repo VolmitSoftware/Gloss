@@ -1,7 +1,10 @@
 package art.arcane.gloss.config.icon;
 
+import art.arcane.gloss.doc.DocumentParsers;
+
+import art.arcane.gloss.api.IconBillboard;
+
 import art.arcane.gloss.exceptions.MenuIconException;
-import art.arcane.volmlib.util.bukkit.json.BukkitJson;
 import com.google.gson.JsonObject;
 import org.bukkit.Material;
 import org.junit.Test;
@@ -17,7 +20,7 @@ public class BlockIconDataTest {
     BlockIconData data = block("{\"type\":\"block\",\"block\":\"minecraft:stone\"}");
 
     assertEquals(Material.STONE, data.blockType());
-    JsonObject encoded = BukkitJson.GSON.toJsonTree(data, MenuIconData.class).getAsJsonObject();
+    JsonObject encoded = DocumentParsers.GSON.toJsonTree(data, MenuIconData.class).getAsJsonObject();
     assertEquals("block", encoded.get("type").getAsString());
     assertEquals("minecraft:stone", encoded.get("block").getAsString());
   }
@@ -43,6 +46,6 @@ public class BlockIconDataTest {
   }
 
   private static BlockIconData block(String json) {
-    return (BlockIconData) BukkitJson.GSON.fromJson(json, MenuIconData.class);
+    return (BlockIconData) DocumentParsers.GSON.fromJson(json, MenuIconData.class);
   }
 }

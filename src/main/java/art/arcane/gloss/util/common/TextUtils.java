@@ -4,6 +4,7 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.TextComponent;
 import net.kyori.adventure.text.format.TextColor;
 import net.kyori.adventure.text.minimessage.MiniMessage;
+import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.bukkit.ChatColor;
 
@@ -22,6 +23,14 @@ public final class TextUtils {
 
   public static Component parse(String text) {
     return MiniMessage.miniMessage().deserialize(translateLegacy(text));
+  }
+
+  public static String renderLegacy(String text) {
+    return LEGACY.serialize(parse(text));
+  }
+
+  public static Component parse(String text, TagResolver resolver) {
+    return MiniMessage.miniMessage().deserialize(translateLegacy(text), resolver);
   }
 
   /**

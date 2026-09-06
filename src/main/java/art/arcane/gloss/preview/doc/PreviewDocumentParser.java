@@ -1,7 +1,12 @@
 package art.arcane.gloss.preview.doc;
 
+import art.arcane.gloss.doc.DocumentParsers;
+
 import art.arcane.gloss.Gloss;
 import art.arcane.gloss.api.ParticleLayer;
+import art.arcane.gloss.api.IconDisplayStyle;
+import art.arcane.gloss.api.HologramBox;
+import art.arcane.gloss.preview.PreviewElement;
 import art.arcane.gloss.condition.ShowCondition;
 import art.arcane.gloss.expr.Expr;
 import art.arcane.gloss.expr.ExprEvaluator;
@@ -17,7 +22,6 @@ import art.arcane.gloss.preview.doc.CompiledPreviewDocument.ElementTemplate;
 import art.arcane.gloss.preview.doc.CompiledPreviewDocument.ElementType;
 import art.arcane.gloss.preview.doc.CompiledPreviewDocument.RepeatTemplate;
 import art.arcane.gloss.text.TextExpressionRenderer;
-import art.arcane.volmlib.util.bukkit.json.BukkitJson;
 import com.google.gson.Gson;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonParseException;
@@ -46,7 +50,7 @@ import java.util.regex.Pattern;
  */
 public final class PreviewDocumentParser {
 
-  private static final Gson GSON = BukkitJson.GSON;
+  private static final Gson GSON = DocumentParsers.GSON;
 
   private static final Set<String> SPECIAL_VALUES = Set.of("enderChest", "locked", "anyInventoryHolder");
   private static final Set<String> ELEMENT_TYPES = Set.of("panel", "cell", "slot", "label");
@@ -86,6 +90,8 @@ public final class PreviewDocumentParser {
   };
 
   private final String documentName;
+  private IconDisplayStyle textStyle;
+  private IconDisplayStyle itemStyle;
   private final Set<String> flatCatalog;
   private final Set<String> declaredVarNames = new LinkedHashSet<>();
 
@@ -118,6 +124,8 @@ public final class PreviewDocumentParser {
       throw new PreviewDocumentException(documentName, "empty document", null);
     }
 
+    textStyle = IconDisplayStyle.resolve(doc.textStyle);
+    itemStyle = doc.itemStyle == null ? PreviewElement.DEFAULT_ITEM_STYLE : doc.itemStyle;
     CompiledMatch match = compileMatch(doc.match, "match");
     Map<String, Object> vars = doc.match == null ? Map.of() : compileVars(doc.match.vars, "match.vars");
     declaredVarNames.addAll(vars.keySet());
@@ -315,7 +323,9 @@ public final class PreviewDocumentParser {
     CompiledExpr title = card.title == null ? null : compileExpr(card.title, "card.title", Set.of());
     CompiledExpr accent = card.accent == null ? null : compileExpr(card.accent, "card.accent", Set.of());
     int minHalfWidth = card.minHalfWidth != null ? card.minHalfWidth : DEFAULT_MIN_HALF_WIDTH;
-    return new CardTemplate(compileShow(card.show, "card.show", Set.of()), framed, title, accent, minHalfWidth);
+    return new CardTemplate(compileShow(card.show, "card.show", Set.of()), framed, title, accent, minHalfWidth,
+        new PreviewCardStyle(card.padding, card.borderWidth, card.trayPadding, card.titleHeight, card.titleGap,
+            card.backgroundArgb, card.trayArgb, card.borderArgb, card.titleArgb), textStyle);
   }
 
   // ---------------------------------------------------------------------
@@ -352,6 +362,7 @@ public final class PreviewDocumentParser {
     CompiledExpr y = compileNumericField(def.y, path + ".y", 0.0, scope);
     CompiledExpr z = compileNumericField(def.z, path + ".z", defaultZ(type), scope);
 
+    IconDisplayStyle resolvedStyle = def.style == null ? type == ElementType.SLOT ? itemStyle : textStyle : def.style;
     CompiledExpr width = null;
     CompiledExpr height = null;
     CompiledExpr size = null;
@@ -381,13 +392,16 @@ public final class PreviewDocumentParser {
           throw fail(path + ".text", "required for type label", null);
         }
         text = compileParticleTextExpr(def.text, path + ".text", scope);
-        background = compileNumericField(def.background, path + ".background", 0.0, scope);
+        background = compileNumericField(def.background, path + ".background",
+            (double) Integer.toUnsignedLong(resolvedStyle.backgroundArgb().argb()), scope);
       }
     }
 
     CompiledExpr visible = compileBoolField(def.visible, path + ".visible", true, scope);
     CompiledExpr show = compileShow(def.show, path + ".show", scope);
-    return new ElementTemplate(type, x, y, z, width, height, size, color, wellColor, index, background, text, show, visible, repeat);
+    return new ElementTemplate(type, x, y, z, width, height, size, color, wellColor, index, background, text, show, visible, repeat,
+        resolvedStyle, textStyle,
+        def.box == null ? HologramBox.defaults() : def.box);
   }
 
   private ElementType compileElementType(String type, String path) {

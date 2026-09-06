@@ -4,7 +4,7 @@ import art.arcane.gloss.condition.ShowCondition;
 import art.arcane.gloss.hologram.CharacterizationHarness.DisplayHandle;
 import art.arcane.gloss.hologram.CharacterizationHarness.PlayerHandle;
 import art.arcane.gloss.hologram.CharacterizationHarness.WorldState;
-import art.arcane.volmlib.util.bukkit.json.BukkitJson;
+import art.arcane.gloss.doc.DocumentParsers;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -44,6 +44,29 @@ class HologramShowConditionTest {
             assertEquals(Boolean.FALSE, bob.perceivedVisibility(display));
             assertEquals(1, harness.liveSpawned(world).size());
             assertTrue(harness.schedulerErrors.isEmpty());
+        }
+    }
+
+    @Test
+    void untrackedViewerStillReevaluatesShowBeforeTrackingRestarts() {
+        try (CharacterizationHarness harness = new CharacterizationHarness(directory)) {
+            WorldState world = harness.world("world");
+            PlayerHandle viewer = harness.join("Viewer", world, 0.0D, 64.0D, 0.0D);
+            PersistentHologram hologram = harness.persistent("show", harness.at(world, 0.0D, 64.0D, 0.0D));
+            hologram.apply(document("player.x > 1"));
+            hologram.update();
+            harness.drainDelayed();
+            DisplayHandle display = harness.onlySpawned(world);
+            harness.service.displayTrackingChanged(display.proxy.getEntityId(), viewer.proxy, viewer.uuid, false);
+            harness.drainDelayed();
+            viewer.location.setX(3.0D);
+            hologram.update();
+            assertEquals(Boolean.TRUE, viewer.perceivedVisibility(display));
+            assertEquals(0, harness.animator.pass(0L));
+            harness.service.displayTrackingChanged(display.proxy.getEntityId(), viewer.proxy, viewer.uuid, true);
+            harness.drainDelayed();
+            hologram.update();
+            assertEquals(1, harness.animator.pass(100L));
         }
     }
 
@@ -93,7 +116,7 @@ class HologramShowConditionTest {
     @Test
     void showSurvivesPersistenceAndRevisionChanges() {
         HologramDoc original = document("{{ world.time > 12000 }}");
-        HologramDoc decoded = HologramDoc.parse("show.json", BukkitJson.GSON.toJson(original));
+        HologramDoc decoded = HologramDoc.parse("show.json", DocumentParsers.GSON.toJson(original));
         assertEquals(original.show(), decoded.show());
         assertEquals(original.show(), decoded.withRevision(2L).show());
     }
@@ -151,11 +174,11 @@ class HologramShowConditionTest {
 
     private static HologramDoc document(String expression) {
         HologramDoc base = HologramDoc.parse("show.json", """
-            {"schemaVersion":2,"revision":1,"anchor":{"world":"world","position":[0,64,0]},
-             "lines":["static"],"scale":1}
+            {"schemaVersion":3,"revision":1,"anchor":{"world":"world","position":[0,64,0]},
+             "lines":["static"]}
             """);
         return new HologramDoc(base.schemaVersion(), base.revision(), base.anchor(), base.lines(),
-            base.seeThrough(), base.scale(), base.billboard(), base.yaw(), base.pitch(),
+            base.style(), base.box(), base.yaw(), base.pitch(),
             base.particleLayers(), ShowCondition.of(expression));
     }
 }

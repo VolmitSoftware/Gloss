@@ -1,9 +1,10 @@
 package art.arcane.gloss.integration;
 
+import art.arcane.gloss.doc.DocumentParsers;
+
 import art.arcane.gloss.config.icon.CustomItemIconData;
 import art.arcane.gloss.config.icon.MenuIconData;
 import art.arcane.gloss.enums.MenuIconType;
-import art.arcane.volmlib.util.bukkit.json.BukkitJson;
 import com.google.gson.JsonObject;
 import org.bukkit.Bukkit;
 import org.bukkit.Server;
@@ -137,7 +138,7 @@ public class CustomItemIntegrationTest {
 
   @Test
   public void customItemIconDataRoundTripsThroughBukkitJson() {
-    MenuIconData decoded = BukkitJson.GSON.fromJson(CANONICAL_JSON, MenuIconData.class);
+    MenuIconData decoded = DocumentParsers.GSON.fromJson(CANONICAL_JSON, MenuIconData.class);
     assertTrue(decoded instanceof CustomItemIconData);
 
     CustomItemIconData data = (CustomItemIconData) decoded;
@@ -147,7 +148,7 @@ public class CustomItemIntegrationTest {
     assertEquals("myitems:ruby", data.item());
     assertEquals(1, data.count());
 
-    JsonObject encoded = BukkitJson.GSON.toJsonTree(data, MenuIconData.class).getAsJsonObject();
+    JsonObject encoded = DocumentParsers.GSON.toJsonTree(data, MenuIconData.class).getAsJsonObject();
     assertEquals(Set.of("type", "provider", "item", "count", "style"), encoded.keySet());
     assertTrue(encoded.get("style").isJsonNull());
     assertEquals("customItem", encoded.get("type").getAsString());
@@ -155,17 +156,17 @@ public class CustomItemIntegrationTest {
     assertEquals("myitems:ruby", encoded.get("item").getAsString());
     assertEquals(1, encoded.get("count").getAsInt());
 
-    assertEquals(data, BukkitJson.GSON.fromJson(encoded, MenuIconData.class));
+    assertEquals(data, DocumentParsers.GSON.fromJson(encoded, MenuIconData.class));
   }
 
   @Test
   public void customItemIconDataKeepsAuthoredIdsVerbatimAndToleratesOmittedKeys() {
     CustomItemIconData mixedCase = new CustomItemIconData("mmoitems", "SWORD:CUTLASS", 64, null);
-    JsonObject encoded = BukkitJson.GSON.toJsonTree(mixedCase, MenuIconData.class).getAsJsonObject();
+    JsonObject encoded = DocumentParsers.GSON.toJsonTree(mixedCase, MenuIconData.class).getAsJsonObject();
     assertEquals("SWORD:CUTLASS", encoded.get("item").getAsString());
-    assertEquals(mixedCase, BukkitJson.GSON.fromJson(encoded, MenuIconData.class));
+    assertEquals(mixedCase, DocumentParsers.GSON.fromJson(encoded, MenuIconData.class));
 
-    MenuIconData sparse = BukkitJson.GSON.fromJson("{\"type\":\"customItem\",\"item\":\"ruby\"}", MenuIconData.class);
+    MenuIconData sparse = DocumentParsers.GSON.fromJson("{\"type\":\"customItem\",\"item\":\"ruby\"}", MenuIconData.class);
     CustomItemIconData data = (CustomItemIconData) sparse;
     assertNull(data.provider());
     assertEquals("ruby", data.item());

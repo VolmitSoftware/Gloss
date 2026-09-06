@@ -235,6 +235,11 @@ public class DisplayEntityManager {
    * stored orientation already matches, but the state is written before spawn in both cases.
    */
   public static void orient(UUID uuid, float yaw, float pitch, float roll) {
+    double halfRoll = Math.toRadians(roll) / 2.0D;
+    orient(uuid, yaw, pitch, new Quaternion4f(0F, 0F, (float) Math.sin(halfRoll), (float) Math.cos(halfRoll)));
+  }
+
+  public static void orient(UUID uuid, float yaw, float pitch, Quaternion4f rotation) {
     if (unsupportedVersion())
       return;
     DisplayEntity displayEntity = displayEntities.get(uuid);
@@ -258,30 +263,22 @@ public class DisplayEntityManager {
       return;
     }
 
-    double halfRoll = Math.toRadians(roll) / 2.0D;
-    float rollZ = (float) Math.sin(halfRoll);
-    float rollW = (float) Math.cos(halfRoll);
-    boolean rollUnchanged = isRoll(displayEntity.leftRotation(), rollZ, rollW);
+    Quaternion4f previous = displayEntity.leftRotation();
+    boolean rotationUnchanged = previous != null && previous.getX() == rotation.getX()
+        && previous.getY() == rotation.getY() && previous.getZ() == rotation.getZ()
+        && previous.getW() == rotation.getW();
     displayEntity.yaw(yaw)
         .pitch(pitch)
-        .leftRotation(new Quaternion4f(0F, 0F, rollZ, rollW));
+        .leftRotation(rotation);
     if (player == null) {
       return;
     }
     if (!facingUnchanged) {
       PacketUtils.sendOne(player, displayEntity.rotate(yaw, pitch));
     }
-    if (!rollUnchanged) {
+    if (!rotationUnchanged) {
       PacketUtils.sendOne(player, displayEntity.metadataPacket(MetadataIndex.LEFT_ROTATION));
     }
-  }
-
-  private static boolean isRoll(Quaternion4f rotation, float rollZ, float rollW) {
-    return rotation != null
-        && rotation.getX() == 0F
-        && rotation.getY() == 0F
-        && rotation.getZ() == rollZ
-        && rotation.getW() == rollW;
   }
 
   private static List<PacketWrapper<?>> removalPackets(DisplayEntity displayEntity) {

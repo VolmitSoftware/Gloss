@@ -7,11 +7,10 @@ import art.arcane.gloss.config.components.ButtonComponentData;
 import art.arcane.gloss.config.components.ComponentData;
 import art.arcane.gloss.config.components.ToggleComponentData;
 import art.arcane.gloss.menu.action.MenuAction;
-import art.arcane.volmlib.util.bukkit.json.BukkitJson;
+import art.arcane.gloss.doc.DocumentParsers;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonParser;
 
-import java.io.StringReader;
 import java.util.List;
 
 public final class MenuDocumentParser {
@@ -27,7 +26,7 @@ public final class MenuDocumentParser {
     if (!root.isJsonObject()) {
       throw new IllegalArgumentException("menu document must be a JSON object");
     }
-    MenuDefinitionData definition = BukkitJson.parse(new StringReader(source), MenuDefinitionData.class);
+    MenuDefinitionData definition = DocumentParsers.GSON.fromJson(source, MenuDefinitionData.class);
     if (definition == null) {
       throw new IllegalArgumentException("menu document must not be null");
     }

@@ -1,6 +1,7 @@
 package art.arcane.gloss.config.icon;
 
-import art.arcane.volmlib.util.bukkit.json.BukkitJson;
+import art.arcane.gloss.doc.DocumentParsers;
+
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
@@ -32,6 +33,6 @@ public class TextIconDataTest {
   }
 
   private static TextIconData text(String json) {
-    return (TextIconData) BukkitJson.GSON.fromJson(json, MenuIconData.class);
+    return (TextIconData) DocumentParsers.GSON.fromJson(json, MenuIconData.class);
   }
 }

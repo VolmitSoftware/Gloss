@@ -2,6 +2,8 @@ package art.arcane.gloss.preview.doc;
 
 import art.arcane.gloss.Gloss;
 import art.arcane.gloss.api.ParticleLayer;
+import art.arcane.gloss.api.IconDisplayStyle;
+import art.arcane.gloss.api.HologramBox;
 import art.arcane.gloss.expr.Expr;
 import art.arcane.gloss.expr.ExprEvaluator;
 import art.arcane.gloss.expr.ExprScope;
@@ -418,11 +420,11 @@ public final class CompiledPreviewDocument {
           x, y, z,
           coordinate(template.width(), scope),
           coordinate(template.height(), scope),
-          color(template.color(), scope)));
+          color(template.color(), scope), template.style()));
       case CELL -> out.add(new PreviewElement.Cell(
           x, y, z,
           coordinate(template.size(), scope),
-          cellColor(template.color(), scope, sink)));
+          cellColor(template.color(), scope, sink), template.style()));
       case SLOT -> {
         Inventory inventory = context.inventory();
         if (inventory == null) {
@@ -434,13 +436,13 @@ public final class CompiledPreviewDocument {
             coordinate(template.size(), scope),
             color(template.wellColor(), scope),
             inventory,
-            coordinate(template.index(), scope)));
+            coordinate(template.index(), scope), template.style(), template.textStyle()));
       }
       case LABEL -> out.add(new PreviewElement.Label(
           x, y, z,
           labelText(template.text(), scope, sink),
           labelParticleText(template.text(), scope, sink),
-          color(template.background(), scope)));
+          color(template.background(), scope), template.style(), template.box()));
     }
   }
 
@@ -452,7 +454,7 @@ public final class CompiledPreviewDocument {
     // golden snapshots record them as fixed values.
     Component title = cardTitle(context, sink);
     int accent = cardAccent(context, sink);
-    return CardFramer.frame(content, () -> title, accent, card.minHalfWidth());
+    return CardFramer.frame(content, new CardFramer.Settings(() -> title, accent, card.minHalfWidth(), card.style(), card.textStyle()));
   }
 
   private boolean cardFramed(PreviewStateContext context, Consumer<String> sink) {
@@ -541,7 +543,8 @@ public final class CompiledPreviewDocument {
 
   private Component renderText(Expr expr, ExprScope scope, Consumer<String> sink) {
     try {
-      return TextUtils.parse(renderParticleText(expr, scope, sink).text());
+      return TextUtils.parse(ParticleText.renderMarked(
+          ExprEvaluator.string(expr, scope), TextPipeline::emojiText).text());
     } catch (RuntimeException failure) {
       reportError(sink, "label text: " + failure.getMessage());
       return Component.empty();
@@ -550,7 +553,7 @@ public final class CompiledPreviewDocument {
 
   private ParticleText.Rendered renderParticleText(Expr expr, ExprScope scope, Consumer<String> sink) {
     try {
-      return ParticleText.renderMarked(ExprEvaluator.string(expr, scope), TextPipeline::emojiText);
+      return ParticleText.renderLegacyMarked(ExprEvaluator.string(expr, scope), TextPipeline::emojiText);
     } catch (RuntimeException failure) {
       reportError(sink, "label particle text: " + failure.getMessage());
       return new ParticleText.Rendered("", List.of());
@@ -711,12 +714,15 @@ public final class CompiledPreviewDocument {
       CompiledExpr text,
       CompiledExpr show,
       CompiledExpr visible,
-      RepeatTemplate repeat
+      RepeatTemplate repeat,
+      IconDisplayStyle style,
+      IconDisplayStyle textStyle,
+      HologramBox box
   ) {
   }
 
   /** {@code title}/{@code accent} are null when the document's {@code card} object omits them. */
-  record CardTemplate(CompiledExpr show, CompiledExpr framed, CompiledExpr title, CompiledExpr accent, int minHalfWidth) {
+  record CardTemplate(CompiledExpr show, CompiledExpr framed, CompiledExpr title, CompiledExpr accent, int minHalfWidth, PreviewCardStyle style, IconDisplayStyle textStyle) {
   }
 
   /**

@@ -16,6 +16,7 @@ import art.arcane.gloss.doc.ShippedDocumentCatalog;
 import art.arcane.gloss.service.GlossTelemetry;
 import art.arcane.gloss.particle.ParticleText;
 import art.arcane.gloss.text.TextPipeline;
+import art.arcane.gloss.util.common.TextUtils;
 import art.arcane.volmlib.util.math.M;
 import art.arcane.volmlib.util.scheduling.FoliaScheduler;
 import com.google.gson.Gson;
@@ -309,6 +310,8 @@ public final class ChatBubblesService implements Listener {
         BubbleRecord record = null;
         try {
             hologram = plugin.holograms().createTemporary(id, captured.clone(), style.maxAliveMs());
+            hologram.setStyle(style.style());
+            hologram.setBox(style.box());
             if (!style.show().isAlwaysVisible()) {
                 plugin.holograms().setViewerCondition(hologram, viewer -> style.show().matches(plugin, viewer));
             }
@@ -405,7 +408,9 @@ public final class ChatBubblesService implements Listener {
     }
 
     static List<String> renderTextBlock(String prefix, String message, int wrapChars, UnaryOperator<String> renderer) {
-        return BubbleTextBlock.wrap(renderer.apply(prefix), message, wrapChars);
+        String rendered = renderer.apply(prefix);
+        String legacy = TextUtils.renderLegacy((rendered == null ? "" : rendered) + '\uE000');
+        return BubbleTextBlock.wrap(legacy.substring(0, legacy.length() - 1), message, wrapChars);
     }
 
     static ParticleText.Rendered renderParticleTextBlock(String prefix, String message, int wrapChars,

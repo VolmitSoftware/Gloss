@@ -185,6 +185,28 @@ class CharacterizationPersistentHologramRoutingTest {
     }
 
     @Test
+    void stationaryViewerReceivesTextAfterNativeTrackingStartsAndRestarts() {
+        PersistentHologram hologram = hologram("h-tracking", List.of("Hello {{ player.name }}"));
+        hologram.update();
+        harness.drainDelayed();
+        assertEquals(2, harness.animator.pass(0L));
+        int entityId = harness.onlySpawned(world).proxy.getEntityId();
+        harness.service.displayTrackingChanged(entityId, alice.proxy, alice.uuid, true);
+        harness.drainDelayed();
+        hologram.update();
+        assertEquals(1, harness.animator.pass(100L));
+        harness.service.displayTrackingChanged(entityId, alice.proxy, alice.uuid, false);
+        harness.drainDelayed();
+        hologram.update();
+        assertEquals(0, harness.animator.pass(200L));
+        harness.service.displayTrackingChanged(entityId, alice.proxy, alice.uuid, true);
+        harness.drainDelayed();
+        hologram.update();
+        assertEquals(1, harness.animator.pass(300L));
+        assertEquals("Hello Alice", latestViewerText().get(alice.uuid));
+    }
+
+    @Test
     void perViewerTextReassignsOnlyWhenTheRenderingChanges() {
         AtomicReference<String> mood = new AtomicReference<>("happy");
         harness.registerFunction("mood", player -> mood.get());

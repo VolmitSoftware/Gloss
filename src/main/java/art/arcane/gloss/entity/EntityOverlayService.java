@@ -1,8 +1,10 @@
 package art.arcane.gloss.entity;
 
 import art.arcane.gloss.Gloss;
-import art.arcane.gloss.api.HologramPresentation;
 import art.arcane.gloss.api.TemporaryHologram;
+import art.arcane.gloss.api.ParticleTextSpan;
+import art.arcane.gloss.particle.ParticleText;
+import art.arcane.gloss.text.TextPipeline;
 import art.arcane.gloss.doc.DocumentDelta;
 import art.arcane.gloss.doc.DocumentRegistry;
 import art.arcane.gloss.doc.GlossDocument;
@@ -35,6 +37,7 @@ import org.bukkit.plugin.Plugin;
 import org.bukkit.persistence.PersistentDataType;
 
 import java.io.File;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -58,6 +61,8 @@ public final class EntityOverlayService implements Listener {
     private volatile EntityOverlayDoc settings;
     private volatile boolean started;
     private volatile boolean reactPresent;
+    private volatile boolean refreshText;
+    private volatile boolean trackDistance;
     private int taskId = -1;
 
     public EntityOverlayService(Gloss plugin) {
@@ -240,6 +245,8 @@ public final class EntityOverlayService implements Listener {
     private void applySettings(EntityOverlayDoc updated) {
         stopDriver();
         settings = updated;
+        refreshText = updated != null && EntityOverlayText.refreshRequired(updated);
+        trackDistance = updated != null && usesDistance(updated);
         if (enabled()) {
             taskId = plugin.scheduler().sr(this::drive, settings.updateIntervalTicks());
         }
@@ -330,65 +337,160 @@ public final class EntityOverlayService implements Listener {
             state.overlays.remove(targetId, overlay);
             overlay.destroy();
         };
-        if (!FoliaScheduler.runEntity(plugin, target, () -> {
-            try {
-                update(player.getUniqueId(), state, overlay, target, origin, current);
-            } finally {
-                overlay.sampling.set(false);
-            }
-        }, 0, retired)) {
+        if (!FoliaScheduler.runEntity(plugin, target,
+            () -> update(player, state, overlay, target, origin, current), 0, retired)) {
             retired.run();
         }
     }
 
-    private void update(UUID viewerId, ViewerState state, Overlay overlay, LivingEntity target,
+    private void update(Player player, ViewerState state, Overlay overlay, LivingEntity target,
                         Location origin, EntityOverlayDoc current) {
+        boolean dispatched = false;
+        try {
+            synchronized (overlay) {
+                if (!state.active || overlay.retired || !enabled() || settings != current) {
+                    return;
+                }
+                Location position = target.getLocation();
+                long now = System.currentTimeMillis();
+                Insight insight = insight(player.getUniqueId(), now);
+                boolean selected = insight != null && insight.target().getUniqueId().equals(target.getUniqueId());
+                if (!target.isValid() || target.isDead() || target.isInvisible()
+                    || !origin.getWorld().equals(position.getWorld())
+                    || !selected && origin.distanceSquared(position) > current.range() * current.range()
+                    || !current.includePlayers() && target instanceof Player
+                    || target instanceof Player other && other.getGameMode() == GameMode.SPECTATOR
+                    || current.excludedEntityTypes().contains(target.getType().name())
+                    || !restrictions.isEmpty() && !selected) {
+                    overlay.hide();
+                    return;
+                }
+                Hit hit = hits.get(target.getUniqueId());
+                boolean struck = hit != null && hit.expiresAt() > now;
+                double health = target.getHealth();
+                EntityOverlayText.Snapshot snapshot = new EntityOverlayText.Snapshot(
+                    target.getCustomName(), health, attribute(target, Attribute.MAX_HEALTH),
+                    struck ? hit.previousHealth() : health, struck ? hit.damage() : 0,
+                    attribute(target, Attribute.ATTACK_DAMAGE), attribute(target, Attribute.ARMOR),
+                    stackCount(target), target.getType().getKey().getKey(), trackDistance ? origin.distance(position) : 0);
+                OverlaySample sample = new OverlaySample(target.getUniqueId(), snapshot,
+                    position.clone(), position.add(0, target.getHeight() + current.verticalOffset(), 0));
+                Runnable retired = () -> {
+                    overlay.sampling.set(false);
+                    state.overlays.remove(sample.targetId(), overlay);
+                    overlay.destroy();
+                };
+                dispatched = FoliaScheduler.runEntity(plugin, player, () -> {
+                    try {
+                        render(player, state, overlay, target, current, sample);
+                    } finally {
+                        overlay.sampling.set(false);
+                    }
+                }, 0, retired);
+                if (!dispatched) {
+                    retired.run();
+                }
+            }
+        } catch (RuntimeException failure) {
+            synchronized (overlay) {
+                overlay.hide();
+            }
+            Gloss.logExceptionStackThrottled(false, "entity-overlay-sample", failure,
+                "Failed to sample an entity overlay for %s.", player.getUniqueId());
+        } finally {
+            if (!dispatched) {
+                overlay.sampling.set(false);
+            }
+        }
+    }
+
+    private void render(Player player, ViewerState state, Overlay overlay, LivingEntity target,
+                        EntityOverlayDoc current, OverlaySample sample) {
         synchronized (overlay) {
             if (!state.active || overlay.retired || !enabled() || settings != current) {
                 return;
             }
-            Location position = target.getLocation();
-            long now = System.currentTimeMillis();
-            Insight insight = insight(viewerId, now);
-            boolean selected = insight != null && insight.target().getUniqueId().equals(target.getUniqueId());
-            if (!target.isValid() || target.isDead() || target.isInvisible()
-                || !origin.getWorld().equals(position.getWorld())
-                || !selected && origin.distanceSquared(position) > current.range() * current.range()
-                || !current.includePlayers() && target instanceof Player
-                || target instanceof Player other && other.getGameMode() == GameMode.SPECTATOR
-                || current.excludedEntityTypes().contains(target.getType().name())
-                || !restrictions.isEmpty() && !selected) {
+            if (!player.isOnline() || player.isDead() || player.getGameMode() == GameMode.SPECTATOR
+                || player.getWorld() != sample.anchor().getWorld() || !player.canSee(target)) {
                 overlay.hide();
                 return;
             }
-            Hit hit = hits.get(target.getUniqueId());
-            boolean struck = hit != null && hit.expiresAt() > now;
-            double health = target.getHealth();
-            EntityOverlayText.Snapshot snapshot = new EntityOverlayText.Snapshot(
-                target.getCustomName(), health, attribute(target, Attribute.MAX_HEALTH),
-                struck ? hit.previousHealth() : health, struck ? hit.damage() : 0,
-                attribute(target, Attribute.ATTACK_DAMAGE), attribute(target, Attribute.ARMOR),
-                stackCount(target));
-            List<String> details = selected ? insight.details() : List.of();
-            if (overlay.display == null) {
-                TemporaryHologram display = plugin.holograms().createTemporary(
-                    "entity-overlay:" + viewerId + ":" + target.getUniqueId(),
-                    position.clone().add(0, target.getHeight() + current.verticalOffset(), 0), Long.MAX_VALUE);
-                display.viewers().whitelist();
-                display.viewers().add(viewerId);
-                display.bindPosition(target, () -> target.getLocation()
-                    .add(0, target.getHeight() + current.verticalOffset(), 0));
-                HologramPresentation presentation = new HologramPresentation(current.scale(), current.scale(),
-                    current.scale(), 0, 0, 0, 1);
-                display.bindPresentation(target, () -> presentation);
-                overlay.display = display;
+            Insight insight = insight(player.getUniqueId(), System.currentTimeMillis());
+            boolean selected = insight != null && insight.target().getUniqueId().equals(sample.targetId());
+            if (!restrictions.isEmpty() && !selected
+                || !selected && player.getLocation().distanceSquared(sample.position()) > current.range() * current.range()) {
+                overlay.hide();
+                return;
             }
-            if (!snapshot.equals(overlay.snapshot) || !details.equals(overlay.details)) {
-                overlay.display.setRenderedLines(EntityOverlayText.render(current, snapshot, details));
-                overlay.snapshot = snapshot;
-                overlay.details = details;
+            List<String> details = selected ? insight.details() : List.of();
+            try {
+                long renderGeneration = plugin.text().renderGeneration();
+                long emojiGeneration = TextPipeline.emojiGeneration();
+                long animationGeneration = plugin.animations().generation();
+                boolean prepare = overlay.prepared == null || refreshText
+                    || !sample.snapshot().equals(overlay.snapshot) || !details.equals(overlay.details)
+                    || renderGeneration != overlay.renderGeneration || emojiGeneration != overlay.emojiGeneration
+                    || animationGeneration != overlay.animationGeneration;
+                if (prepare) {
+                    overlay.prepared = EntityOverlayText.prepare(plugin, player, current,
+                        sample.snapshot(), details);
+                    overlay.snapshot = sample.snapshot();
+                    overlay.details = details;
+                    overlay.renderGeneration = renderGeneration;
+                    overlay.emojiGeneration = emojiGeneration;
+                    overlay.animationGeneration = animationGeneration;
+                }
+                EntityOverlayText.Prepared prepared = overlay.prepared;
+                ParticleText.Rendered frame = prepared.frame(System.currentTimeMillis());
+                if (frame.text().isEmpty()) {
+                    overlay.hide();
+                    return;
+                }
+                if (overlay.display == null) {
+                    TemporaryHologram display = plugin.holograms().createTemporary(
+                        "entity-overlay:" + player.getUniqueId() + ":" + sample.targetId(),
+                        sample.anchor(), Long.MAX_VALUE);
+                    display.viewers().whitelist();
+                    display.viewers().add(player.getUniqueId());
+                    display.setStyle(current.style());
+                    display.setBox(current.box());
+                    display.setParticleLayers(current.particleLayers());
+                    display.bindPosition(target, () -> target.getLocation()
+                        .add(0, target.getHeight() + current.verticalOffset(), 0));
+                    overlay.display = display;
+                }
+                if (!frame.equals(overlay.frame)) {
+                    overlay.display.setRenderedLines(List.of(frame.text().split("\\n", -1)));
+                    List<ParticleTextSpan> spans = new ArrayList<>(frame.spans().size());
+                    for (ParticleText.Span span : frame.spans()) {
+                        spans.add(new ParticleTextSpan(span.name(), span.start(), span.end()));
+                    }
+                    overlay.display.setRenderedParticleText(frame.text(), spans);
+                    overlay.frame = frame;
+                }
+                if (prepare) {
+                    overlay.display.bindRenderedFrames(prepared.animated()
+                        ? now -> List.of(prepared.frame(now).text().split("\\n", -1)) : null);
+                }
+            } catch (RuntimeException failure) {
+                overlay.hide();
+                Gloss.logExceptionStackThrottled(false, "entity-overlay-render", failure,
+                    "Failed to render an entity overlay for %s.", player.getUniqueId());
             }
         }
+    }
+
+    private static boolean usesDistance(EntityOverlayDoc settings) {
+        if (settings.show().expression().contains("entity.distance")) {
+            return true;
+        }
+        for (EntityOverlayDoc.Line line : settings.lines()) {
+            if (line.text().contains("{distance}") || line.text().contains("entity.distance")
+                || line.show().expression().contains("entity.distance")) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private Insight insight(UUID viewer, long now) {
@@ -452,6 +554,10 @@ public final class EntityOverlayService implements Listener {
     private record Insight(Plugin owner, LivingEntity target, List<String> details, long expiresAt) {
     }
 
+    private record OverlaySample(UUID targetId, EntityOverlayText.Snapshot snapshot,
+                                 Location position, Location anchor) {
+    }
+
     private record Hit(double previousHealth, double damage, long expiresAt) {
     }
 
@@ -464,8 +570,13 @@ public final class EntityOverlayService implements Listener {
     private static final class Overlay {
         private final AtomicBoolean sampling = new AtomicBoolean();
         private TemporaryHologram display;
+        private ParticleText.Rendered frame;
+        private EntityOverlayText.Prepared prepared;
         private EntityOverlayText.Snapshot snapshot;
         private List<String> details = List.of();
+        private long renderGeneration;
+        private long emojiGeneration;
+        private long animationGeneration;
         private boolean retired;
 
         private synchronized void destroy() {
@@ -478,7 +589,10 @@ public final class EntityOverlayService implements Listener {
                 display.destroy();
                 display = null;
             }
+            frame = null;
+            prepared = null;
             snapshot = null;
+            details = List.of();
         }
     }
 }

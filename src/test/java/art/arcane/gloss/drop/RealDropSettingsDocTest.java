@@ -20,7 +20,7 @@ class RealDropSettingsDocTest {
     @Test
     void absentSectionsResolveToTheShippedWebEditableDefaults() {
         RealDropSettingsDoc parsed = RealDropSettingsDoc.parse("default.json", """
-            {"schemaVersion":3,"revision":1}
+            {"schemaVersion":4,"revision":1}
             """);
         GlossConfig.RealDrops config = parsed.toConfig(true);
 
@@ -34,7 +34,7 @@ class RealDropSettingsDocTest {
         assertEquals(1.0F, config.motion().groundRollMultiplier());
         assertEquals(0.55F, config.landing().faceAttraction());
         assertEquals(4, config.landing().settleDelayTicks());
-        assertTrue(config.labels().seeThrough());
+        assertTrue(config.labels().style().seeThrough());
         assertEquals(List.of("BEDROCK", "BARRIER"), config.filters().materialBlacklist());
     }
 
@@ -42,7 +42,7 @@ class RealDropSettingsDocTest {
     void documentValuesClampAndNormalizeAtTheRuntimeBoundary() {
         RealDropSettingsDoc parsed = RealDropSettingsDoc.parse("default.json", """
             {
-              "schemaVersion": 3,
+              "schemaVersion": 4,
               "revision": 8,
               "presentation": {
               "limits": {
@@ -77,15 +77,10 @@ class RealDropSettingsDocTest {
               },
               "labels": {
                 "enabled": false,
-                "yOffset": -1,
-                "scale": 99,
-                "viewRange": 1,
-                "billboard": "diagonal",
-                "seeThrough": false,
-                "backgroundRed": -1,
-                "backgroundGreen": 999,
-                "backgroundBlue": 999,
-                "backgroundAlpha": -1
+                "yOffset": -99,
+                "style": {"seeThrough": false, "scaleX": 2, "scaleY": 0.5, "scaleZ": 1,
+                  "backgroundArgb": "#0000FF00"},
+                "box": {"enabled": true, "padding": 8, "borderWidth": 2}
               },
               "filters": {
                 "disabledWorlds": [" world ", ""],
@@ -122,10 +117,13 @@ class RealDropSettingsDocTest {
         assertEquals(10.0F, config.landing().alignmentDegrees());
         assertEquals(100, config.landing().settleDelayTicks());
         assertFalse(config.labels().enabled());
-        assertFalse(config.labels().seeThrough());
-        assertEquals(0, config.labels().backgroundRed());
-        assertEquals(255, config.labels().backgroundGreen());
-        assertEquals(0, config.labels().backgroundAlpha());
+        assertFalse(config.labels().style().seeThrough());
+        assertEquals(-4F, config.labels().yOffset());
+        assertEquals(2F, config.labels().style().scaleX());
+        assertEquals(0.5F, config.labels().style().scaleY());
+        assertEquals(0x0000FF00, config.labels().style().backgroundArgb().argb());
+        assertTrue(config.labels().box().enabled());
+        assertEquals(8, config.labels().box().padding());
         assertEquals(List.of("world"), config.filters().disabledWorlds());
         assertEquals(List.of("stone"), config.filters().materialBlacklist());
         assertTrue(config.filters().onlyPlayerDrops());

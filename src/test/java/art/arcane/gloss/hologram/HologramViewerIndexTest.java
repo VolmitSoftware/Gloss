@@ -7,6 +7,7 @@ import org.bukkit.entity.Player;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -110,6 +111,37 @@ class HologramViewerIndexTest {
         index.reconcileBatch(32, ignored -> reconciled.incrementAndGet());
         assertEquals(1, reconciled.get(), "one active viewer must be reconciled at most once per sweep");
         assertEquals(1, index.reconciliationQueueSize());
+    }
+
+    @Test
+    void boxAudienceRetainsCornersOutsideTheParticleSphere() {
+        World world = world(UUID.randomUUID());
+        HologramViewerIndex index = new HologramViewerIndex();
+        Player corner = player(UUID.randomUUID());
+        Player outside = player(UUID.randomUUID());
+        Location anchor = new Location(world, 0D, 64D, 0D);
+        index.update(corner, new Location(world, 10D, 74D, 10D));
+        index.update(outside, new Location(world, 0D, 75D, 0D));
+
+        assertEquals(List.of(corner.getUniqueId()), ids(index.withinBox(anchor, 10D)));
+        assertTrue(index.nearby(anchor, 10D).isEmpty());
+    }
+
+    @Test
+    void largeAuthoredRangesOnlyInspectPopulatedViewerBuckets() {
+        World world = world(UUID.randomUUID());
+        HologramViewerIndex index = new HologramViewerIndex();
+        Player local = player(UUID.randomUUID());
+        Player distant = player(UUID.randomUUID());
+        Player otherWorld = player(UUID.randomUUID());
+        Location anchor = new Location(world, 0D, 64D, 0D);
+        index.update(local, anchor);
+        index.update(distant, new Location(world, 4096D, 64D, 0D));
+        index.update(otherWorld, new Location(world(UUID.randomUUID()), 0D, 64D, 0D));
+
+        Set<UUID> expected = Set.of(local.getUniqueId(), distant.getUniqueId());
+        assertEquals(expected, Set.copyOf(ids(index.nearby(anchor, 6E7D))));
+        assertEquals(expected, Set.copyOf(ids(index.withinBox(anchor, 6E7D))));
     }
 
     private static void await(CountDownLatch latch) {

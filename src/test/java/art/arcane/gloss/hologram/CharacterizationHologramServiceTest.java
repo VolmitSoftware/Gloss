@@ -1,6 +1,7 @@
 package art.arcane.gloss.hologram;
 
 import art.arcane.gloss.api.Hologram;
+import art.arcane.volmlib.util.scheduling.FoliaScheduler;
 import art.arcane.gloss.hologram.CharacterizationHarness.DisplayHandle;
 import art.arcane.gloss.hologram.CharacterizationHarness.WorldState;
 import org.junit.jupiter.api.AfterEach;
@@ -9,6 +10,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
+import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.ArrayList;
@@ -186,6 +188,58 @@ class CharacterizationHologramServiceTest {
 
         hologram.despawnAll();
         assertEquals(0, harness.service.activeEntityCount());
+    }
+
+    @Test
+    void cleanupUsesCapturedEntityIdsAfterLeavingTheDisplayOwner() {
+        TemporaryHologramDisplay temporary = harness.temporary("cached-id", harness.at(world, 0.5D, 64.0D, 0.5D), 60000L);
+        temporary.setLines(List.of("text"));
+        temporary.drive(true);
+        DisplayHandle display = harness.onlySpawned(world);
+        display.entityIdRead = () -> { throw new AssertionError("Entity ID read outside registration"); };
+        harness.ownsThread = false;
+        harness.deferImmediateTasks = true;
+        temporary.destroy();
+        assertEquals(0, harness.service.activeEntityCount());
+        harness.ownsThread = true;
+        harness.drainImmediate();
+        assertTrue(display.removed);
+        assertTrue(harness.schedulerErrors.isEmpty(), harness.schedulerErrors.toString());
+    }
+
+    @Test
+    void invalidLeaseCleanupUsesCapturedEntityIds() {
+        TemporaryHologramDisplay temporary = harness.temporary("retired-id", harness.at(world, 0.5D, 64.0D, 0.5D), 60000L);
+        temporary.setLines(List.of("text"));
+        temporary.drive(true);
+        DisplayHandle display = harness.onlySpawned(world);
+        display.removed = true;
+        display.entityIdRead = () -> { throw new AssertionError("Retired entity ID read"); };
+        harness.sweepLeases();
+        assertEquals(0, harness.service.activeEntityCount());
+        assertTrue(harness.schedulerErrors.isEmpty(), harness.schedulerErrors.toString());
+        temporary.destroy();
+    }
+
+    @Test
+    void terminalFoliaShutdownForgetsNonpersistentDisplaysWithoutWorldRemoval() throws ReflectiveOperationException {
+        TemporaryHologramDisplay temporary = harness.temporary("shutdown", harness.at(world, 0.5D, 64.0D, 0.5D), 60000L);
+        temporary.setLines(List.of("text"));
+        temporary.drive(true);
+        DisplayHandle display = harness.onlySpawned(world);
+        Field forced = FoliaScheduler.class.getDeclaredField("forcedFoliaThreading");
+        forced.setAccessible(true);
+        boolean previous = forced.getBoolean(null);
+        try {
+            FoliaScheduler.forceFoliaThreading(harness.gloss.getServer());
+            harness.serverStopping = true;
+            temporary.destroy();
+            assertEquals(0, harness.service.activeEntityCount());
+            assertFalse(display.removed);
+            assertTrue(harness.schedulerErrors.isEmpty(), harness.schedulerErrors.toString());
+        } finally {
+            forced.setBoolean(null, previous);
+        }
     }
 
     @Test

@@ -1,6 +1,7 @@
 package art.arcane.gloss.config.components;
 
-import art.arcane.volmlib.util.bukkit.json.BukkitJson;
+import art.arcane.gloss.doc.DocumentParsers;
+
 import com.google.gson.JsonObject;
 import org.bukkit.util.Vector;
 import org.junit.Test;
@@ -16,7 +17,7 @@ public class ButtonHitboxDataTest {
 
   @Test
   public void omittedHitboxKeepsAutomaticIconSizing() {
-    ComponentData decoded = BukkitJson.GSON.fromJson(
+    ComponentData decoded = DocumentParsers.GSON.fromJson(
         "{\"type\":\"button\",\"actions\":[],\"icon\":{\"type\":\"text\",\"text\":\"Play\"}}",
         ComponentData.class);
 
@@ -26,7 +27,7 @@ public class ButtonHitboxDataTest {
 
   @Test
   public void explicitHitboxRoundTripsAndScales() {
-    ComponentData decoded = BukkitJson.GSON.fromJson(
+    ComponentData decoded = DocumentParsers.GSON.fromJson(
         "{\"type\":\"button\",\"actions\":[],\"icon\":{\"type\":\"text\",\"text\":\"Play\"},"
             + "\"hitbox\":{\"width\":1.25,\"height\":0.35,\"offset\":[0.5,-0.1,0.25],\"anchor\":\"menu\"}}",
         ComponentData.class);
@@ -39,7 +40,7 @@ public class ButtonHitboxDataTest {
     assertEquals(new Vector(1.25, -0.25, 0.625), button.hitbox().scaledOffset(2.5F));
     assertEquals(HitboxAnchor.MENU, button.hitbox().anchorOrDefault());
 
-    JsonObject encoded = BukkitJson.GSON.toJsonTree(button, ComponentData.class).getAsJsonObject();
+    JsonObject encoded = DocumentParsers.GSON.toJsonTree(button, ComponentData.class).getAsJsonObject();
     assertEquals(1.25F, encoded.getAsJsonObject("hitbox").get("width").getAsFloat(), 0F);
     assertEquals(0.35F, encoded.getAsJsonObject("hitbox").get("height").getAsFloat(), 0F);
     assertEquals(0.5F, encoded.getAsJsonObject("hitbox").getAsJsonArray("offset").get(0).getAsFloat(), 0F);
@@ -56,7 +57,7 @@ public class ButtonHitboxDataTest {
 
   @Test
   public void offsetOnlyKeepsAutomaticSizing() {
-    ComponentData decoded = BukkitJson.GSON.fromJson(
+    ComponentData decoded = DocumentParsers.GSON.fromJson(
         "{\"type\":\"button\",\"actions\":[],\"icon\":{\"type\":\"text\",\"text\":\"Play\"},"
             + "\"hitbox\":{\"offset\":[0.5,0,0]}}",
         ComponentData.class);
@@ -69,7 +70,7 @@ public class ButtonHitboxDataTest {
 
   @Test
   public void toggleUsesTheSameStableHitboxAndHoverContract() {
-    ComponentData decoded = BukkitJson.GSON.fromJson(
+    ComponentData decoded = DocumentParsers.GSON.fromJson(
         "{\"type\":\"toggle\",\"highlightModifier\":0.2,\"hoverDurationTicks\":8,"
             + "\"hoverEasing\":\"back_out\",\"condition\":\"yes\",\"expectedValue\":\"yes\","
             + "\"trueActions\":[],\"falseActions\":[],"
@@ -87,7 +88,7 @@ public class ButtonHitboxDataTest {
 
   @Test
   public void omittedHoverAnimationUsesRuntimeDefaults() {
-    ComponentData decoded = BukkitJson.GSON.fromJson(
+    ComponentData decoded = DocumentParsers.GSON.fromJson(
         "{\"type\":\"button\",\"highlightModifier\":0.05,\"actions\":[],"
             + "\"icon\":{\"type\":\"text\",\"text\":\"Play\"}}",
         ComponentData.class);

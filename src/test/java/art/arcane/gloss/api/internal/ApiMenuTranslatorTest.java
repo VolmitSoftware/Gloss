@@ -3,6 +3,9 @@ package art.arcane.gloss.api.internal;
 import art.arcane.gloss.api.HoloClickHandler;
 import art.arcane.gloss.api.HoloComponent;
 import art.arcane.gloss.api.HoloIcon;
+import art.arcane.gloss.api.IconDisplayStyle;
+import art.arcane.gloss.api.IconBillboard;
+import art.arcane.gloss.api.HologramBox;
 import art.arcane.gloss.api.HoloMenu;
 import art.arcane.gloss.config.MenuComponentData;
 import art.arcane.gloss.config.MenuDefinitionData;
@@ -31,6 +34,23 @@ public class ApiMenuTranslatorTest {
 
   private final HoloClickHandler buyHandler = click -> {
   };
+
+  @Test
+  public void apiIconsRetainAuthoredDisplayStyleAndTextBox() {
+    IconDisplayStyle style = IconDisplayStyle.defaults().withBillboard(IconBillboard.HORIZONTAL)
+        .withScale(2F, 0.5F, 3F);
+    HologramBox box = new HologramBox(true, 9, 2, null, null);
+    HoloIcon.Text text = HoloIcon.text("<gold>Styled").withStyle(style).withBox(box).withRefreshTicks(3);
+    TextIconData translated = (TextIconData) ApiMenuTranslator.iconData(text);
+    assertEquals(style, translated.style());
+    assertEquals(box, translated.box());
+    assertEquals(3, translated.resolvedRefreshTicks());
+    assertEquals(style, ApiMenuTranslator.iconData(HoloIcon.block(Material.STONE).withStyle(style)).style());
+    assertEquals(style, ApiMenuTranslator.iconData(HoloIcon.image("image.png").withStyle(style)).style());
+    assertEquals(style, ApiMenuTranslator.iconData(HoloIcon.animatedImage(List.of("a.png", "b.png"), 4)
+        .withStyle(style)).style());
+    assertThrows(IllegalArgumentException.class, () -> HoloIcon.text("bad").withRefreshTicks(-1));
+  }
 
   @Test
   public void aDescriptorMapsOntoTheJsonConfigModelFieldForField() {
@@ -63,7 +83,7 @@ public class ApiMenuTranslatorTest {
     assertEquals(1.2D, component.offset().getY(), 0.0D);
     assertEquals(-0.25D, component.offset().getZ(), 0.0D);
     assertEquals(MenuComponentType.DECO, component.data().getType());
-    assertEquals(new TextIconData("<red>Shop", null, null), ((DecoComponentData) component.data()).iconData());
+    assertEquals(new TextIconData("<red>Shop", null, null, null), ((DecoComponentData) component.data()).iconData());
   }
 
   @Test

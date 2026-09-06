@@ -26,7 +26,7 @@ public class ApiPendingIconsTest {
     Map<String, HoloIcon> applied = new LinkedHashMap<>();
     assertEquals(1, pending.drain(applied::put));
     assertEquals(1, applied.size());
-    assertEquals(new HoloIcon.Text("In stock: 199"), applied.get("stock"));
+    assertEquals(HoloIcon.text("In stock: 199"), applied.get("stock"));
   }
 
   @Test
@@ -71,8 +71,8 @@ public class ApiPendingIconsTest {
 
     Map<String, HoloIcon> recovered = new LinkedHashMap<>();
     assertEquals(2, pending.drain(recovered::put));
-    assertEquals(new HoloIcon.Text("a"), recovered.get("a"));
-    assertEquals(new HoloIcon.Text("b"), recovered.get("b"));
+    assertEquals(HoloIcon.text("a"), recovered.get("a"));
+    assertEquals(HoloIcon.text("b"), recovered.get("b"));
     assertFalse(pending.dirty());
   }
 

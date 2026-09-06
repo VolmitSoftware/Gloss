@@ -1,5 +1,12 @@
 package art.arcane.gloss.config.icon;
 
+import art.arcane.gloss.doc.DocumentParsers;
+
+import art.arcane.gloss.api.IconDisplayStyle;
+import art.arcane.gloss.api.IconBillboard;
+import art.arcane.gloss.api.IconTextAlignment;
+import art.arcane.gloss.api.IconArgbColor;
+
 import art.arcane.gloss.condition.ShowCondition;
 import art.arcane.gloss.config.MenuComponentData;
 import art.arcane.gloss.config.MenuDefinitionData;
@@ -9,7 +16,6 @@ import art.arcane.gloss.menu.MenuSessionOptions;
 import art.arcane.gloss.menu.icon.MenuIcon;
 import art.arcane.gloss.util.common.DisplayEntity;
 import art.arcane.gloss.util.common.math.CollisionPlane;
-import art.arcane.volmlib.util.bukkit.json.BukkitJson;
 import com.github.retrooper.packetevents.protocol.entity.type.EntityType;
 import com.google.gson.JsonObject;
 import org.bukkit.Location;
@@ -59,7 +65,7 @@ public class IconDisplayStyleTest {
     assertEquals(2F, style.scaleX(), 0F);
     assertEquals(0.5F, style.scaleY(), 0F);
 
-    JsonObject encoded = BukkitJson.GSON.toJsonTree(data, MenuIconData.class).getAsJsonObject();
+    JsonObject encoded = DocumentParsers.GSON.toJsonTree(data, MenuIconData.class).getAsJsonObject();
     JsonObject encodedStyle = encoded.getAsJsonObject("style");
     assertEquals("center", encodedStyle.get("billboard").getAsString());
     assertEquals("right", encodedStyle.get("textAlignment").getAsString());
@@ -89,7 +95,7 @@ public class IconDisplayStyleTest {
         0.5F, 0.75F, 4F, 5F, IconArgbColor.parse("#FFAA00CC"),
         2F, 0.5F, 1.5F
     );
-    StyledProbe icon = new StyledProbe(session(), new TextIconData("A", style, null));
+    StyledProbe icon = new StyledProbe(session(), new TextIconData("A", style, null, null));
     DisplayEntity entity = icon.render();
 
     assertEquals((byte) 1, entity.billboard());
@@ -110,7 +116,7 @@ public class IconDisplayStyleTest {
   }
 
   private static MenuIconData icon(String json) {
-    return BukkitJson.GSON.fromJson(json, MenuIconData.class);
+    return DocumentParsers.GSON.fromJson(json, MenuIconData.class);
   }
 
   private static MenuSession session() {

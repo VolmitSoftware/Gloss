@@ -585,7 +585,7 @@ public class PreviewBuildTest {
         PreviewStateContext.forInventory(PreviewFakes.inventory(1).build(), null, Map.of()));
     PreviewElement.Label label = label(elements.get(0));
 
-    assertEquals("&4GREEN 0", label.particleText().get().text());
+    assertEquals("§4GREEN 0", label.particleText().get().text());
     assertEquals(1, label.particleText().get().spans().size());
     assertEquals("green-word", label.particleText().get().spans().get(0).name());
     assertEquals(0, label.particleText().get().spans().get(0).start());

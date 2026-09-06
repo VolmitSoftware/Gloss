@@ -16,6 +16,14 @@ import art.arcane.gloss.util.common.TextUtils;
 import art.arcane.volmlib.util.entity.StackExclusion;
 import art.arcane.volmlib.util.scheduling.FoliaScheduler;
 import art.arcane.volmlib.util.scheduling.SchedulerUtils;
+import com.github.retrooper.packetevents.PacketEvents;
+import com.github.retrooper.packetevents.event.PacketListenerAbstract;
+import com.github.retrooper.packetevents.event.PacketListenerCommon;
+import com.github.retrooper.packetevents.event.PacketListenerPriority;
+import com.github.retrooper.packetevents.event.PacketSendEvent;
+import com.github.retrooper.packetevents.protocol.packettype.PacketType;
+import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerDestroyEntities;
+import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerSpawnEntity;
 import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
 import org.bukkit.Location;
@@ -44,6 +52,8 @@ import org.bukkit.persistence.PersistentDataType;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -82,6 +92,9 @@ public final class HologramService {
     private record ChunkPurge(World world, int chunkX, int chunkZ) {
     }
 
+    private record DisplayIdentity(UUID uuid, int entityId) {
+    }
+
     private static final DocumentReviser<HologramDoc> REVISER = new DocumentReviser<>() {
         @Override
         public long revisionOf(HologramDoc value) {
@@ -101,6 +114,9 @@ public final class HologramService {
     private final Map<String, PersistentHologram> holograms;
     private final Set<TemporaryHologramDisplay> temporaries;
     private final Map<UUID, TextDisplay> leased;
+    private final Map<Integer, DisplayTracking> displayTracking = new ConcurrentHashMap<>();
+    private final Map<TextDisplay, DisplayIdentity> displayIdentities = Collections.synchronizedMap(new IdentityHashMap<>());
+    private PacketListenerCommon trackingListener;
     private final HologramViewerIndex viewerIndex;
     private final Set<PersistentHologram> persistentTicks;
     private final Map<UUID, ViewerWorkQueue> viewerWorkQueues;
@@ -156,6 +172,13 @@ public final class HologramService {
         loadAll();
         plugin.watchdog().register("holograms", this::pollRegistry);
         Bukkit.getPluginManager().registerEvents(listener, plugin);
+        trackingListener = PacketEvents.getAPI().getEventManager().registerListener(
+            new PacketListenerAbstract(PacketListenerPriority.MONITOR) {
+                @Override
+                public void onPacketSend(PacketSendEvent event) {
+                    observeDisplayTracking(event);
+                }
+            });
         captureOnlineViewers();
         sweepLoadedChunks();
         startTasks();
@@ -169,6 +192,10 @@ public final class HologramService {
         registry.close();
         stopTasks();
         HandlerList.unregisterAll(listener);
+        if (trackingListener != null) {
+            PacketEvents.getAPI().getEventManager().unregisterListener(trackingListener);
+            trackingListener = null;
+        }
         List<PersistentHologram> retiring = new ArrayList<>(holograms.values());
         holograms.clear();
         retirePersistentHolograms(retiring, "disable");
@@ -179,6 +206,8 @@ public final class HologramService {
         persistentTicks.clear();
         store.forgetAll();
         leased.clear();
+        displayTracking.clear();
+        displayIdentities.clear();
         viewerIndex.clear();
         viewerWorkQueues.clear();
     }
@@ -336,7 +365,45 @@ public final class HologramService {
         display.addScoreboardTag(DISPLAY_TAG);
         StackExclusion.exclude(display);
         display.getPersistentDataContainer().set(markerKey, PersistentDataType.BOOLEAN, true);
-        leased.put(display.getUniqueId(), display);
+        DisplayIdentity identity = new DisplayIdentity(display.getUniqueId(), display.getEntityId());
+        displayIdentities.put(display, identity);
+        leased.put(identity.uuid(), display);
+    }
+
+    void trackDisplay(TextDisplay display, DisplayTracking tracking) {
+        DisplayIdentity identity = Objects.requireNonNull(displayIdentities.get(display),
+            "Display must be configured before tracking.");
+        displayTracking.put(identity.entityId(), tracking);
+    }
+
+    private void observeDisplayTracking(PacketSendEvent event) {
+        if (event.isCancelled() || displayTracking.isEmpty()) {
+            return;
+        }
+        if (event.getPacketType() == PacketType.Play.Server.SPAWN_ENTITY) {
+            displayTrackingChanged(new WrapperPlayServerSpawnEntity(event).getEntityId(),
+                event.getPlayer(), event.getUser().getUUID(), true);
+        } else if (event.getPacketType() == PacketType.Play.Server.DESTROY_ENTITIES) {
+            for (int entityId : new WrapperPlayServerDestroyEntities(event).getEntityIds()) {
+                displayTrackingChanged(entityId, event.getPlayer(), event.getUser().getUUID(), false);
+            }
+        }
+    }
+
+    void displayTrackingChanged(int entityId, Player player, UUID playerId, boolean tracked) {
+        DisplayTracking tracking = displayTracking.get(entityId);
+        if (tracking == null || player == null || playerId == null) {
+            return;
+        }
+        runViewerWork(player, playerId, "tracking:" + entityId, () -> {
+            if (displayTracking.get(entityId) == tracking) {
+                tracking.changed(player, tracked);
+            }
+        }, 1L);
+    }
+
+    interface DisplayTracking {
+        void changed(Player player, boolean tracked);
     }
 
     void despawnEntity(TextDisplay entity, Location anchor) {
@@ -344,13 +411,16 @@ public final class HologramService {
             return;
         }
 
-        leased.remove(entity.getUniqueId());
+        forgetDisplay(entity);
+        boolean folia = plugin.scheduler().isFoliaThreading();
         Runnable removal = () -> {
+            if (folia && FoliaScheduler.isStopping(plugin.getServer())) {
+                return;
+            }
             if (entity.isValid()) {
                 entity.remove();
             }
         };
-        boolean folia = plugin.scheduler().isFoliaThreading();
         boolean ownsThread = folia ? FoliaScheduler.isOwnedByCurrentRegion(entity) : FoliaScheduler.isPrimaryThread();
         if (ownsThread) {
             removal.run();
@@ -373,6 +443,14 @@ public final class HologramService {
         Runnable retirement = once(retired);
         if (!FoliaScheduler.runEntity(plugin, entity, action, 0L, retirement)) {
             retirement.run();
+        }
+    }
+
+    private void forgetDisplay(TextDisplay display) {
+        DisplayIdentity identity = displayIdentities.remove(display);
+        if (identity != null) {
+            leased.remove(identity.uuid(), display);
+            displayTracking.remove(identity.entityId());
         }
     }
 
@@ -592,7 +670,7 @@ public final class HologramService {
     String renderStaticLines(List<String> lines) {
         List<String> rendered = new ArrayList<>(lines.size());
         for (String line : lines) {
-            rendered.add(plugin.text().renderParticleText(null, line).text());
+            rendered.add(TextUtils.renderLegacy(plugin.text().renderParticleText(null, line).text()));
         }
         return TextUtils.joinLegacyLines(rendered);
     }
@@ -782,6 +860,12 @@ public final class HologramService {
         return true;
     }
 
+    public void forEachViewerWithinBox(Location anchor, double range, Consumer<Player> action) {
+        for (HologramTick.Viewer viewer : viewerIndex.withinBox(anchor, range)) {
+            action.accept(viewer.player());
+        }
+    }
+
     private void captureOnlineViewers() {
         for (Player player : Bukkit.getOnlinePlayers()) {
             captureViewer(player);
@@ -818,16 +902,14 @@ public final class HologramService {
             return;
         }
         nextLeaseSweepNanos = now + LEASE_SWEEP_INTERVAL_NANOS;
-        for (Map.Entry<UUID, TextDisplay> entry : leased.entrySet()) {
-            UUID displayId = entry.getKey();
-            TextDisplay display = entry.getValue();
+        for (TextDisplay display : leased.values()) {
             Runnable inspect = () -> {
                 if (!display.isValid()) {
-                    leased.remove(displayId, display);
+                    forgetDisplay(display);
                 }
             };
             if (!plugin.scheduler().runEntity(display, inspect)) {
-                leased.remove(displayId, display);
+                forgetDisplay(display);
             }
         }
     }
@@ -1102,6 +1184,7 @@ public final class HologramService {
 
     private void reconcileViewerLifecycle(Player player) {
         for (TemporaryHologramDisplay temporary : temporaries) {
+            temporary.invalidateTrackingFor(player);
             temporary.reconcileVisibilityFor(player);
         }
         invalidatePersonalizedTracking(player, true);

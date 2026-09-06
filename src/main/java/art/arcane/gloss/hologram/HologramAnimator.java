@@ -49,7 +49,14 @@ public final class HologramAnimator {
     private record DirectKey(UUID viewerId, int entityId) {
     }
 
-    private record DirectUpdate(List<Player> viewers, String text) {
+    private static final class DirectUpdate {
+        private final List<Player> viewers;
+        private final String text;
+
+        private DirectUpdate(List<Player> viewers, String text) {
+            this.viewers = viewers;
+            this.text = text;
+        }
     }
 
     private record BudgetSample(long atMs, int recipients) {
@@ -140,15 +147,23 @@ public final class HologramAnimator {
 
     public void stop() {
         stopped = true;
+        List<Target> retiredTargets = new ArrayList<>(targets.values());
         if (!targets.isEmpty()) {
             targets.clear();
             targetMembershipGeneration.incrementAndGet();
         }
-        states.clear();
+        List<DirectUpdate> retiredUpdates = new ArrayList<>(directUpdates.values());
         if (!directUpdates.isEmpty()) {
             directUpdates.clear();
             directMembershipGeneration.incrementAndGet();
         }
+        for (Target target : retiredTargets) {
+            awaitCommittedSend(target);
+        }
+        for (DirectUpdate update : retiredUpdates) {
+            awaitCommittedSend(update);
+        }
+        states.clear();
         Thread active;
         synchronized (workerLock) {
             active = worker;
@@ -183,16 +198,24 @@ public final class HologramAnimator {
         if (previous == null) {
             directMembershipGeneration.incrementAndGet();
         }
+        awaitCommittedSend(previous);
         ensureWorker();
     }
 
     void discardText(UUID viewerId, int entityId) {
-        if (directUpdates.remove(new DirectKey(viewerId, entityId)) != null) {
+        DirectUpdate removed = directUpdates.remove(new DirectKey(viewerId, entityId));
+        if (removed != null) {
             directMembershipGeneration.incrementAndGet();
+            awaitCommittedSend(removed);
         }
     }
 
     public AnimationTemplate compileTemplate(List<String> rawLines, UnaryOperator<String> renderer) {
+        return compileTemplate(rawLines, renderer, true);
+    }
+
+    public AnimationTemplate compileTemplate(List<String> rawLines, UnaryOperator<String> renderer,
+                                             boolean useSharedFrames) {
         if (!containsAnimationTokens(rawLines)) {
             return null;
         }
@@ -203,7 +226,7 @@ public final class HologramAnimator {
         }
 
         AnimationTemplate template = AnimationTemplate.compile(String.join("\n", rawLines),
-            isFunction, this::fastClip, renderer, sharedFrames);
+            isFunction, this::fastClip, renderer, useSharedFrames ? sharedFrames : clip -> null);
         return template.hasSlots() ? template : null;
     }
 
@@ -223,6 +246,7 @@ public final class HologramAnimator {
         if (previous == null) {
             targetMembershipGeneration.incrementAndGet();
         }
+        awaitCommittedSend(previous);
         if (previous != null
             && (previous.entityId() != target.entityId() || previous.codec() != target.codec())) {
             states.remove(key);
@@ -232,9 +256,11 @@ public final class HologramAnimator {
 
     public void remove(String group, String sub) {
         TargetKey key = new TargetKey(group, sub);
-        if (targets.remove(key) != null) {
+        Target removed = targets.remove(key);
+        if (removed != null) {
             targetMembershipGeneration.incrementAndGet();
         }
+        awaitCommittedSend(removed);
         states.remove(key);
     }
 
@@ -242,7 +268,9 @@ public final class HologramAnimator {
         boolean removed = false;
         for (TargetKey key : targets.keySet()) {
             if (key.group().equals(group)) {
-                removed |= targets.remove(key) != null;
+                Target retired = targets.remove(key);
+                removed |= retired != null;
+                awaitCommittedSend(retired);
                 states.remove(key);
             }
         }
@@ -288,7 +316,13 @@ public final class HologramAnimator {
                 if (target == null) {
                     continue;
                 }
-                SendState state = states.computeIfAbsent(key, ignored -> new SendState());
+                SendState state;
+                synchronized (target) {
+                    if (targets.get(key) != target) {
+                        continue;
+                    }
+                    state = states.computeIfAbsent(key, ignored -> new SendState());
+                }
                 boolean evaluationDue = minIntervalMs <= 0L || state.lastEvaluatedMs == Long.MIN_VALUE
                     || state.lastEvaluatedMs + minIntervalMs <= nowMs;
                 if (!state.pendingRecipients && !evaluationDue) {
@@ -321,16 +355,21 @@ public final class HologramAnimator {
                     continue;
                 }
 
-                int recipients = batch.viewers().size();
-                reservedRecipients += recipients;
-                remainingRecipients -= recipients;
-                state.pendingRecipients = true;
-                sender.send(batch.viewers(), target.entityId(), state.lastText, target.codec());
-                state.lastViewers = batch.hasMore()
-                    ? combinedViewerSet(state.lastViewers, batch.viewers())
-                    : viewerSet(viewers);
-                state.pendingRecipients = batch.hasMore();
-                sends++;
+                synchronized (target) {
+                    if (targets.get(key) != target || states.get(key) != state) {
+                        continue;
+                    }
+                    int recipients = batch.viewers().size();
+                    reservedRecipients += recipients;
+                    remainingRecipients -= recipients;
+                    state.pendingRecipients = true;
+                    sender.send(batch.viewers(), target.entityId(), state.lastText, target.codec());
+                    state.lastViewers = batch.hasMore()
+                        ? combinedViewerSet(state.lastViewers, batch.viewers())
+                        : viewerSet(viewers);
+                    state.pendingRecipients = batch.hasMore();
+                    sends++;
+                }
             }
         } finally {
             if (order.length > 0 && visited > 0) {
@@ -366,24 +405,33 @@ public final class HologramAnimator {
             DirectKey key = order[(start + visited) % order.length];
             visited++;
             DirectUpdate update = directUpdates.get(key);
-            if (update == null || !directUpdates.remove(key, update)) {
+            if (update == null) {
                 continue;
             }
-            directMembershipGeneration.incrementAndGet();
-            try {
-                sender.send(update.viewers(), key.entityId(), update.text(), TextCodec.AUTHORED);
-                sends++;
-            } catch (Throwable failure) {
-                if (directUpdates.putIfAbsent(key, update) == null) {
+            synchronized (update) {
+                if (directUpdates.get(key) != update) {
+                    continue;
+                }
+                sender.send(update.viewers, key.entityId(), update.text, TextCodec.AUTHORED);
+                if (directUpdates.remove(key, update)) {
                     directMembershipGeneration.incrementAndGet();
                 }
-                throw failure;
+                sends++;
             }
         }
         if (visited > 0) {
             directStartOffset = (start + visited) % order.length;
         }
         return sends;
+    }
+
+    private static void awaitCommittedSend(Object publication) {
+        if (publication == null) {
+            return;
+        }
+        synchronized (publication) {
+            // Retirement must finish after an already committed packet send.
+        }
     }
 
     private long advanceBudgetTime(long nowMs) {

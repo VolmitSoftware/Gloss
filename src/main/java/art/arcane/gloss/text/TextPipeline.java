@@ -80,7 +80,15 @@ public final class TextPipeline implements TextRenderer {
         return ParticleText.render(raw, marked -> renderMarked(viewer, marked));
     }
 
+    public ParticleText.Rendered renderLegacyParticleText(Player viewer, String raw) {
+        return ParticleText.renderLegacy(raw, marked -> renderMarked(viewer, marked));
+    }
+
     private String renderMarked(Player viewer, String raw) {
+        return renderScoped(viewer, raw, null, UnaryOperator.identity());
+    }
+
+    public String renderScoped(Player viewer, String raw, ExprScope scope, UnaryOperator<String> resolvedText) {
         if (raw == null || raw.isEmpty()) {
             return "";
         }
@@ -90,7 +98,7 @@ public final class TextPipeline implements TextRenderer {
             out = applyFunctions(viewer, out);
         }
         if (functionsEnabled() && out.indexOf("{{") >= 0) {
-            out = expressions.render(viewer, out);
+            out = scope == null ? expressions.render(viewer, out) : expressions.render(scope, out, resolvedText);
         }
         if (viewer != null && placeholdersEnabled() && out.indexOf('%') >= 0) {
             out = Placeholders.setPlaceholders(viewer, out);

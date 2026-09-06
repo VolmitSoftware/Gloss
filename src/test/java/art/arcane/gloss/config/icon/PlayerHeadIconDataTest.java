@@ -1,8 +1,12 @@
 package art.arcane.gloss.config.icon;
 
+import art.arcane.gloss.doc.DocumentParsers;
+
+import art.arcane.gloss.api.IconDisplayStyle;
+import art.arcane.gloss.api.IconBillboard;
+
 import art.arcane.gloss.enums.MenuIconType;
 import art.arcane.gloss.exceptions.MenuIconException;
-import art.arcane.volmlib.util.bukkit.json.BukkitJson;
 import com.google.gson.JsonObject;
 import org.junit.Test;
 
@@ -15,7 +19,7 @@ import static org.junit.Assert.assertTrue;
 public class PlayerHeadIconDataTest {
 
   private static PlayerHeadIconData head(String json) {
-    return (PlayerHeadIconData) BukkitJson.GSON.fromJson(json, MenuIconData.class);
+    return (PlayerHeadIconData) DocumentParsers.GSON.fromJson(json, MenuIconData.class);
   }
 
   @Test
@@ -26,7 +30,7 @@ public class PlayerHeadIconDataTest {
     assertEquals("Notch", data.requirePlayer());
     assertEquals(40, data.resolvedRefreshTicks());
 
-    JsonObject encoded = BukkitJson.GSON.toJsonTree(data, MenuIconData.class).getAsJsonObject();
+    JsonObject encoded = DocumentParsers.GSON.toJsonTree(data, MenuIconData.class).getAsJsonObject();
     assertEquals("playerHead", encoded.get("type").getAsString());
     assertEquals("Notch", encoded.get("player").getAsString());
   }
