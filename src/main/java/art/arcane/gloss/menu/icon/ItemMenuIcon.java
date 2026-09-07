@@ -39,6 +39,13 @@ public class ItemMenuIcon extends MenuIcon<MenuIconData> {
       Material.BLACK_STAINED_GLASS_PANE, Material.GLASS_PANE, Material.POPPY, Material.DANDELION);
   private ItemStack item;
 
+  private MenuTransform appliedBlockTransform;
+  private double appliedBlockX;
+  private double appliedBlockY;
+  private double appliedBlockZ;
+  private float appliedBlockYaw;
+  private float appliedBlockPitch;
+
   /**
    * The registry rename this constant exists for, resolved defensively. {@code org.bukkit.Registry}
    * needs a live server to initialize, and a class initializer that throws stays broken for the
@@ -103,6 +110,7 @@ public class ItemMenuIcon extends MenuIcon<MenuIconData> {
   }
 
   protected List<UUID> createDisplayEntities(Location loc) {
+    appliedBlockTransform = null;
     List<UUID> uuids = Lists.newArrayList();
     float countOffset = item.getAmount() > 1 ? 0F : .09F;
     MenuTransform transform = session.getTransform();
@@ -153,6 +161,9 @@ public class ItemMenuIcon extends MenuIcon<MenuIconData> {
   }
 
   public void updateCount(int count) {
+    // The nudge below moves the display without moving the icon, so the block correction has to be
+    // re-asserted even though applyOrientation's inputs are unchanged.
+    appliedBlockTransform = null;
     if (displayEntities.size() == 1 && count > 1) {
       DisplayEntityManager.move(displayEntities.get(0), session.getTransform().localVector(new Vector(0F, .09F, 0F)));
       UUID displayEntity = DisplayEntityManager.add(textDisplay(countText(count), countLocation()));
@@ -168,12 +179,35 @@ public class ItemMenuIcon extends MenuIcon<MenuIconData> {
     }
   }
 
+  /**
+   * A block-shaped item sits at its own vertical offset, which has to be re-asserted after the
+   * icon is moved. This runs every tick from the hover pass, so it is gated the way
+   * {@link MenuIcon#teleport} is: the correction is only rebuilt when one of its two inputs — the
+   * icon's position and the session transform — has actually changed. Without the gate every block
+   * and player-head button on the server ships a teleport per tick that moves nothing.
+   */
   @Override
   protected void applyOrientation() {
     super.applyOrientation();
-    if (isBlock() && displayEntities != null && !displayEntities.isEmpty()) {
-      DisplayEntityManager.goTo(displayEntities.getFirst(), blockLocation(session.getTransform()));
+    if (!isBlock() || displayEntities == null || displayEntities.isEmpty()) {
+      return;
     }
+    MenuTransform transform = session.getTransform();
+    if (transform == appliedBlockTransform
+        && position.getX() == appliedBlockX
+        && position.getY() == appliedBlockY
+        && position.getZ() == appliedBlockZ
+        && position.getYaw() == appliedBlockYaw
+        && position.getPitch() == appliedBlockPitch) {
+      return;
+    }
+    appliedBlockTransform = transform;
+    appliedBlockX = position.getX();
+    appliedBlockY = position.getY();
+    appliedBlockZ = position.getZ();
+    appliedBlockYaw = position.getYaw();
+    appliedBlockPitch = position.getPitch();
+    DisplayEntityManager.goTo(displayEntities.getFirst(), blockLocation(transform));
   }
 
   private boolean isBlock() {

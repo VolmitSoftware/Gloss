@@ -21,6 +21,8 @@ import org.junit.rules.TemporaryFolder;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Predicate;
 
 import static org.junit.Assert.assertEquals;
@@ -106,9 +108,78 @@ public class PreviewRaycastNarrowingTest {
     assertEquals("the block trace still runs", 1, world.blockReach.size());
   }
 
+  @Test
+  public void aPlayerWithNothingOpenStillOnlyPaysTheEntitySweepOncePerInterval()
+      throws ReflectiveOperationException {
+    withRegistry();
+    // A non-preview block, so no target is acquired and no holder is ever created: this is the
+    // walking-around population the cadence exists for.
+    world.blockHit(PreviewFakes.block(Material.STONE).build(), 2.0D);
+    AtomicReference<Location> eye = new AtomicReference<>();
+    Player player = scanningPlayer(eye);
+
+    for (int scan = 0; scan < 8; scan++) {
+      eye.set(new Location(world.bukkit(), 0.0D, 65.0D, scan, 0.0F, 0.0F));
+      manager.managePreviewEvents(player, false);
+    }
+
+    assertEquals("the block trace answers on every scan", 8, world.blockReach.size());
+    assertEquals("the entity sweep is granted once every four scans, holder or no holder",
+        2, world.entityReach.size());
+  }
+
+  @Test
+  public void aForcedRescanAlwaysSweeps() throws ReflectiveOperationException {
+    withRegistry();
+    world.blockHit(PreviewFakes.block(Material.STONE).build(), 2.0D);
+    AtomicReference<Location> eye = new AtomicReference<>();
+    Player player = scanningPlayer(eye);
+
+    for (int scan = 0; scan < 4; scan++) {
+      eye.set(new Location(world.bukkit(), 0.0D, 65.0D, scan, 0.0F, 0.0F));
+      manager.managePreviewEvents(player, true);
+    }
+
+    assertEquals("the fallback sweep must never be held back by the cadence",
+        4, world.entityReach.size());
+  }
+
+  @Test
+  public void aDepartedPlayerLeavesNoTraceBookkeepingBehind() throws ReflectiveOperationException {
+    withRegistry();
+    world.blockHit(PreviewFakes.block(Material.STONE).build(), 2.0D);
+    AtomicReference<Location> eye = new AtomicReference<>();
+    Player player = scanningPlayer(eye);
+    eye.set(new Location(world.bukkit(), 0.0D, 65.0D, 0.0D, 0.0F, 0.0F));
+    manager.managePreviewEvents(player, false);
+    eye.set(new Location(world.bukkit(), 0.0D, 65.0D, 1.0D, 0.0F, 0.0F));
+    manager.managePreviewEvents(player, false);
+    assertEquals(1, world.entityReach.size());
+
+    manager.forgetPlayer(player);
+
+    eye.set(new Location(world.bukkit(), 0.0D, 65.0D, 2.0D, 0.0F, 0.0F));
+    manager.managePreviewEvents(player, false);
+    assertEquals("a rejoining player starts a fresh interval rather than inheriting a countdown",
+        2, world.entityReach.size());
+  }
+
   // ---------------------------------------------------------------------
   // Plumbing
   // ---------------------------------------------------------------------
+
+  private Player scanningPlayer(AtomicReference<Location> eye) {
+    UUID playerId = UUID.fromString("00000000-0000-0000-0000-00000000ca57");
+    return (Player) CharacterizationSupport.proxy(new Class<?>[]{Player.class},
+        (proxy, method, args) -> switch (method.getName()) {
+          case "getEyeLocation" -> eye.get().clone();
+          case "getUniqueId" -> playerId;
+          case "isOnline" -> true;
+          case "hasPermission" -> false;
+          case "getName" -> "scanning";
+          default -> CharacterizationSupport.identity(proxy, method, args);
+        });
+  }
 
   private void withRegistry() throws ReflectiveOperationException {
     try {

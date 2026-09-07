@@ -33,6 +33,27 @@ class ParticleTextTest {
     }
 
     @Test
+    void spanNamesAcceptExactlyTheDocumentedAlphabet() {
+        assertEquals("a", new ParticleText.Span("A", 0, 0).name());
+        assertEquals("a", new ParticleText.Span("  a  ", 0, 0).name());
+        assertEquals("a0._-", new ParticleText.Span("a0._-", 0, 0).name());
+        assertEquals("0a", new ParticleText.Span("0a", 0, 0).name());
+        assertEquals("x".repeat(64), new ParticleText.Span("x".repeat(64), 0, 0).name());
+    }
+
+    @Test
+    void spanNamesRejectAnythingOutsideThatAlphabet() {
+        assertThrows(IllegalArgumentException.class, () -> new ParticleText.Span("", 0, 0));
+        assertThrows(IllegalArgumentException.class, () -> new ParticleText.Span("   ", 0, 0));
+        assertThrows(IllegalArgumentException.class, () -> new ParticleText.Span(".lead", 0, 0));
+        assertThrows(IllegalArgumentException.class, () -> new ParticleText.Span("-lead", 0, 0));
+        assertThrows(IllegalArgumentException.class, () -> new ParticleText.Span("a b", 0, 0));
+        assertThrows(IllegalArgumentException.class, () -> new ParticleText.Span("a/b", 0, 0));
+        assertThrows(IllegalArgumentException.class, () -> new ParticleText.Span("café", 0, 0));
+        assertThrows(IllegalArgumentException.class, () -> new ParticleText.Span("x".repeat(65), 0, 0));
+    }
+
+    @Test
     void rendererCannotInjectAuthoredParticleTags() {
         ParticleText.Rendered rendered = ParticleText.render("{value}",
             ignored -> "<particles:injected>text</particles>");

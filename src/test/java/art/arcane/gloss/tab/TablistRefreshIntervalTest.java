@@ -51,12 +51,6 @@ class TablistRefreshIntervalTest {
 
         TablistDoc names = new TablistDoc(2, 1L, ShowCondition.ALWAYS, disabled.headerFooter(),
             new TablistDoc.ListNames(true, ShowCondition.ALWAYS, new TablistDoc.ListNamePresentation("$player"), List.of()));
-        String ordinary = TablistService.substituteTokens("&7$player", "Alex", "default");
-        String animated = TablistService.substituteTokens(
-            "{{ wave('$player', ['&a', '&b'], time.ticks) }}", "Alex", "vip");
-        assertFalse(TablistService.requiresFastNameRefresh(ordinary, true));
-        assertTrue(TablistService.requiresFastNameRefresh(animated, true));
-        assertFalse(TablistService.requiresFastNameRefresh(animated, false));
         assertTrue(TablistService.fastDriverRequired(names, true, false, true, 40));
     }
 

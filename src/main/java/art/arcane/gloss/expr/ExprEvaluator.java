@@ -73,6 +73,10 @@ public final class ExprEvaluator {
   // ---------------------------------------------------------------------
 
   private static List<Object> evalList(Expr.ListLiteral l, ExprScope scope) {
+    List<Object> constants = l.constantItems();
+    if (constants != null) {
+      return constants;
+    }
     List<Object> items = new ArrayList<>(l.items().size());
     for (Expr item : l.items()) {
       items.add(eval(item, scope));

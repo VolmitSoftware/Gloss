@@ -9,6 +9,7 @@ import com.github.retrooper.packetevents.PacketEvents;
 import com.github.retrooper.packetevents.PacketEventsAPI;
 import com.github.retrooper.packetevents.manager.server.ServerVersion;
 import com.github.retrooper.packetevents.util.Quaternion4f;
+import com.github.retrooper.packetevents.util.Vector3d;
 import com.github.retrooper.packetevents.util.Vector3f;
 import com.github.retrooper.packetevents.wrapper.PacketWrapper;
 import net.kyori.adventure.text.Component;
@@ -22,6 +23,7 @@ import java.util.ArrayList;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -39,6 +41,12 @@ public class DisplayEntityManager {
 
   private static final Map<UUID, DisplayEntity> displayEntities = new ConcurrentHashMap<>();
   private static final Map<UUID, Player> playerVisibility = new ConcurrentHashMap<>();
+  /**
+   * Reverse of {@link #playerVisibility}. A quit has to drop one player's handles, and without this
+   * it would compare every handle on the server to do it — a mass disconnect turns that into a
+   * quadratic sweep on the main thread inside a single tick.
+   */
+  private static final Map<UUID, Set<UUID>> handlesByViewer = new ConcurrentHashMap<>();
   private static final Map<Integer, UUID> rawEntityIds = new ConcurrentHashMap<>();
   private static final AtomicBoolean unsupportedVersionWarning = new AtomicBoolean(false);
   private static final AtomicLong keySequence = new AtomicLong();
@@ -71,17 +79,17 @@ public class DisplayEntityManager {
       return;
 
     PacketUtils.send(player, displayEntity.spawn());
-    playerVisibility.put(uuid, player);
+    bind(uuid, player);
     GlossTelemetry.countSpawnChurn();
   }
 
   public static void despawn(UUID uuid) {
     if (unsupportedVersion()) {
-      playerVisibility.remove(uuid);
+      unbind(uuid);
       return;
     }
     DisplayEntity displayEntity = displayEntities.get(uuid);
-    Player player = playerVisibility.remove(uuid);
+    Player player = unbind(uuid);
     if (displayEntity == null || player == null)
       return;
     PacketUtils.send(player, removalPackets(displayEntity));
@@ -94,7 +102,6 @@ public class DisplayEntityManager {
 
     despawn(uuid);
     forgetEntity(displayEntities.remove(uuid));
-    playerVisibility.remove(uuid);
   }
 
   public static void delete(UUID uuid, Player fallbackPlayer) {
@@ -103,18 +110,17 @@ public class DisplayEntityManager {
 
     if (unsupportedVersion()) {
       forgetEntity(displayEntities.remove(uuid));
-      playerVisibility.remove(uuid);
+      unbind(uuid);
       return;
     }
 
     DisplayEntity displayEntity = displayEntities.get(uuid);
-    Player player = playerVisibility.remove(uuid);
+    Player player = unbind(uuid);
     Player target = player == null ? fallbackPlayer : player;
     if (displayEntity != null && target != null) {
       PacketUtils.send(target, removalPackets(displayEntity));
     }
     forgetEntity(displayEntities.remove(uuid));
-    playerVisibility.remove(uuid);
   }
 
   /**
@@ -131,7 +137,7 @@ public class DisplayEntityManager {
     for (UUID uuid : uuids) {
       DisplayEntity displayEntity = displayEntities.remove(uuid);
       forgetEntity(displayEntity);
-      Player player = playerVisibility.remove(uuid);
+      Player player = unbind(uuid);
       if (unsupported || displayEntity == null)
         continue;
       Player target = player == null ? fallbackPlayer : player;
@@ -163,14 +169,41 @@ public class DisplayEntityManager {
 
   /**
    * Drops a departed player's visibility bookkeeping. Menu teardown normally deletes the handles
-   * first; this is the sweep for anything that outlived its session.
+   * first; this is the sweep for anything that outlived its session. It costs that player's own
+   * handles, not every handle on the server, which is what keeps a mass disconnect off the tick.
    */
   public static void forget(Player player) {
     if (player == null)
       return;
-    UUID playerId = player.getUniqueId();
-    playerVisibility.values().removeIf(viewer ->
-        viewer == player || (viewer != null && viewer.getUniqueId().equals(playerId)));
+    Set<UUID> handles = handlesByViewer.remove(player.getUniqueId());
+    if (handles == null)
+      return;
+    for (UUID handle : handles) {
+      playerVisibility.remove(handle);
+    }
+  }
+
+  private static void bind(UUID uuid, Player player) {
+    Player previous = playerVisibility.put(uuid, player);
+    if (previous != null && !previous.getUniqueId().equals(player.getUniqueId())) {
+      detach(previous.getUniqueId(), uuid);
+    }
+    handlesByViewer.computeIfAbsent(player.getUniqueId(), id -> ConcurrentHashMap.newKeySet()).add(uuid);
+  }
+
+  private static Player unbind(UUID uuid) {
+    Player previous = playerVisibility.remove(uuid);
+    if (previous != null) {
+      detach(previous.getUniqueId(), uuid);
+    }
+    return previous;
+  }
+
+  private static void detach(UUID playerId, UUID handle) {
+    handlesByViewer.computeIfPresent(playerId, (id, handles) -> {
+      handles.remove(handle);
+      return handles.isEmpty() ? null : handles;
+    });
   }
 
   public static boolean isVisibleRawEntity(Player player, int entityId) {
@@ -208,6 +241,11 @@ public class DisplayEntityManager {
    * null when there is nothing to send. Callers that move many displays belonging to one viewer in
    * the same tick collect these and hand the whole list to
    * {@link PacketUtils#send(Player, java.util.Collection)} instead of paying a send call per entity.
+   *
+   * <p>Nothing is sent when the entity is already exactly where it is being sent, mirroring the
+   * elision {@link #orient} makes. Callers that re-assert a fixed offset every tick — a block
+   * icon's vertical correction, most of all — would otherwise ship a teleport per icon per tick
+   * that moves nothing.
    */
   public static PacketWrapper<?> goToPacket(UUID uuid, Location location) {
     if (unsupportedVersion())
@@ -216,7 +254,20 @@ public class DisplayEntityManager {
     Player player = playerVisibility.get(uuid);
     if (displayEntity == null || player == null)
       return null;
+    if (isAlreadyAt(displayEntity, location))
+      return null;
     return displayEntity.goTo(location);
+  }
+
+  private static boolean isAlreadyAt(DisplayEntity displayEntity, Location location) {
+    Vector3d current = displayEntity.location();
+    return current != null
+        && current.getX() == location.getX()
+        && current.getY() == location.getY()
+        && current.getZ() == location.getZ()
+        && displayEntity.yaw() == location.getYaw()
+        && displayEntity.pitch() == location.getPitch()
+        && displayEntity.headYaw() == location.getYaw();
   }
 
   public static void move(UUID uuid, Vector offset) {
@@ -240,27 +291,40 @@ public class DisplayEntityManager {
   }
 
   public static void orient(UUID uuid, float yaw, float pitch, Quaternion4f rotation) {
-    if (unsupportedVersion())
+    List<PacketWrapper<?>> packets = orientPackets(uuid, yaw, pitch, rotation);
+    if (packets.isEmpty())
       return;
-    DisplayEntity displayEntity = displayEntities.get(uuid);
     Player player = playerVisibility.get(uuid);
-    if (displayEntity == null)
-      return;
+    for (PacketWrapper<?> packet : packets) {
+      PacketUtils.sendOne(player, packet);
+    }
+  }
 
+  /**
+   * The packets {@link #orient} would have sent, with the entity's state already advanced and
+   * nothing sent: empty when facing and rotation are unchanged or the display has no viewer. Box
+   * decorations collect these with their teleports and transforms so a multi-part update leaves
+   * in one flush instead of one per packet.
+   */
+  public static List<PacketWrapper<?>> orientPackets(UUID uuid, float yaw, float pitch, Quaternion4f rotation) {
+    if (unsupportedVersion())
+      return List.of();
+    DisplayEntity displayEntity = displayEntities.get(uuid);
+    if (displayEntity == null)
+      return List.of();
+    Player player = playerVisibility.get(uuid);
     boolean facingUnchanged = displayEntity.yaw() == yaw && displayEntity.pitch() == pitch;
     if (displayEntity.isRawEntity()) {
       boolean headUnchanged = displayEntity.headYaw() == yaw;
       displayEntity.yaw(yaw).pitch(pitch).headYaw(yaw);
-      if (player == null) {
-        return;
-      }
-      if (!facingUnchanged) {
-        PacketUtils.sendOne(player, displayEntity.rotate(yaw, pitch));
-      }
-      if (!headUnchanged) {
-        PacketUtils.sendOne(player, displayEntity.headLook());
-      }
-      return;
+      if (player == null || (facingUnchanged && headUnchanged))
+        return List.of();
+      List<PacketWrapper<?>> packets = new ArrayList<>(2);
+      if (!facingUnchanged)
+        packets.add(displayEntity.rotate(yaw, pitch));
+      if (!headUnchanged)
+        packets.add(displayEntity.headLook());
+      return packets;
     }
 
     Quaternion4f previous = displayEntity.leftRotation();
@@ -270,15 +334,14 @@ public class DisplayEntityManager {
     displayEntity.yaw(yaw)
         .pitch(pitch)
         .leftRotation(rotation);
-    if (player == null) {
-      return;
-    }
-    if (!facingUnchanged) {
-      PacketUtils.sendOne(player, displayEntity.rotate(yaw, pitch));
-    }
-    if (!rotationUnchanged) {
-      PacketUtils.sendOne(player, displayEntity.metadataPacket(MetadataIndex.LEFT_ROTATION));
-    }
+    if (player == null || (facingUnchanged && rotationUnchanged))
+      return List.of();
+    List<PacketWrapper<?>> packets = new ArrayList<>(2);
+    if (!facingUnchanged)
+      packets.add(displayEntity.rotate(yaw, pitch));
+    if (!rotationUnchanged)
+      packets.add(displayEntity.metadataPacket(MetadataIndex.LEFT_ROTATION));
+    return packets;
   }
 
   private static List<PacketWrapper<?>> removalPackets(DisplayEntity displayEntity) {
@@ -328,16 +391,23 @@ public class DisplayEntityManager {
   }
 
   public static void changeTextBackground(UUID uuid, int backgroundColor) {
+    PacketWrapper<?> packet = changeTextBackgroundPacket(uuid, backgroundColor);
+    if (packet != null)
+      PacketUtils.sendOne(playerVisibility.get(uuid), packet);
+  }
+
+  /** The packet {@link #changeTextBackground} would have sent, state advanced, nothing sent. */
+  public static PacketWrapper<?> changeTextBackgroundPacket(UUID uuid, int backgroundColor) {
     if (unsupportedVersion())
-      return;
+      return null;
     DisplayEntity displayEntity = displayEntities.get(uuid);
     Player player = playerVisibility.get(uuid);
     if (displayEntity == null || player == null)
-      return;
+      return null;
     if (!displayEntity.isTextDisplay())
-      return;
+      return null;
     displayEntity.backgroundColor(backgroundColor);
-    PacketUtils.sendOne(player, displayEntity.metadataPacket(MetadataIndex.TEXT_BACKGROUND));
+    return displayEntity.metadataPacket(MetadataIndex.TEXT_BACKGROUND);
   }
 
   public static void changeScale(UUID uuid, float x, float y, float z) {
@@ -352,15 +422,22 @@ public class DisplayEntityManager {
   }
 
   public static void changeTransform(UUID uuid, float x, float y, float z, Vector3f translation) {
+    PacketWrapper<?> packet = changeTransformPacket(uuid, x, y, z, translation);
+    if (packet != null)
+      PacketUtils.sendOne(playerVisibility.get(uuid), packet);
+  }
+
+  /** The packet {@link #changeTransform} would have sent, state advanced, nothing sent. */
+  public static PacketWrapper<?> changeTransformPacket(UUID uuid, float x, float y, float z, Vector3f translation) {
     if (unsupportedVersion())
-      return;
+      return null;
     DisplayEntity displayEntity = displayEntities.get(uuid);
     Player player = playerVisibility.get(uuid);
     if (displayEntity == null || player == null)
-      return;
+      return null;
     displayEntity.scale(new Vector3f(x, y, z));
     displayEntity.translation(translation == null ? new Vector3f(0, 0, 0) : translation);
-    PacketUtils.sendOne(player, displayEntity.metadataPacket(MetadataIndex.TRANSLATION, MetadataIndex.SCALE));
+    return displayEntity.metadataPacket(MetadataIndex.TRANSLATION, MetadataIndex.SCALE);
   }
 
   public static void changeItem(UUID uuid, ItemStack itemStack) {

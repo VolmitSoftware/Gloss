@@ -31,6 +31,7 @@ import org.bukkit.event.player.PlayerQuitEvent;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
@@ -45,6 +46,8 @@ import java.util.logging.Level;
 public final class BoardService implements Listener {
     private static final int MAX_LINES = 15;
     private static final int ANIMATION_REFRESH_INTERVAL_TICKS = 1;
+    private static final int SELECTION_STRIPE_PERIOD_TICKS = 1;
+    private static final long TICK_NANOS = 50_000_000L;
 
     private static final DocumentReviser<BoardDoc> REVISER = new DocumentReviser<>() {
         @Override
@@ -69,6 +72,10 @@ public final class BoardService implements Listener {
     private final Set<UUID> sticky;
     private final UnaryOperator<String> staticRender;
     private final BoundedConditionErrorCallback conditionErrors;
+    private final BoardRenderCache renderCache;
+    private final List<UUID> selectionOrder;
+    private int selectionStripeIndex;
+    private int selectionCursor;
     private volatile BoardManager<Board> ordinaryManager;
     private volatile BoardManager<Board> animationManager;
     private volatile int ordinaryManagerIntervalTicks;
@@ -93,6 +100,10 @@ public final class BoardService implements Listener {
         this.conditionErrors = BoundedConditionErrorCallback.bounded(100, error ->
             Gloss.logExceptionStackThrottled(false, "board-condition-" + error.path(), error.cause(),
                 "Board condition %s failed and was treated as false.", error.path()));
+        this.renderCache = new BoardRenderCache();
+        this.selectionOrder = new ArrayList<>();
+        this.selectionStripeIndex = 0;
+        this.selectionCursor = 0;
         this.selectionTaskId = -1;
     }
 
@@ -144,6 +155,7 @@ public final class BoardService implements Listener {
         profiles.clear();
         sticky.clear();
         metas.clear();
+        renderCache.clear();
         boardSnapshot = null;
         store.forgetAll();
     }
@@ -287,6 +299,7 @@ public final class BoardService implements Listener {
         selections.remove(uuid);
         profiles.remove(uuid);
         sticky.remove(uuid);
+        renderCache.forget(uuid);
         removeFromManagers(event.getPlayer());
     }
 
@@ -298,11 +311,16 @@ public final class BoardService implements Listener {
         animationManager = animationIntervalTicks == ordinaryIntervalTicks
             ? null
             : createManager(animationIntervalTicks, "animation");
-        selectionTaskId = plugin.scheduler().sr(this::selectAllAutomatically, ordinaryIntervalTicks);
+        // The sweep is armed every tick and walks a slice of the fleet, so a 1,000 player server
+        // re-selects every viewer once per interval without a single-tick burst.
+        selectionStripeIndex = 0;
+        selectionTaskId = plugin.scheduler().sr(this::selectStripe, SELECTION_STRIPE_PERIOD_TICKS);
     }
 
     private BoardManager<Board> createManager(int intervalTicks, String cadenceName) {
-        BoardSettings settings = new BoardSettings(new SelectionBoardProvider(), ScoreDirection.DOWN, intervalTicks);
+        boolean fastCadence = intervalTicks <= ANIMATION_REFRESH_INTERVAL_TICKS;
+        BoardSettings settings = new BoardSettings(new SelectionBoardProvider(fastCadence),
+            ScoreDirection.DOWN, intervalTicks);
         try {
             return new BoardManager<>(plugin, settings, Board::new);
         } catch (Throwable failure) {
@@ -326,61 +344,141 @@ public final class BoardService implements Listener {
         if (activeAnimationManager != null && activeAnimationManager != activeOrdinaryManager) {
             activeAnimationManager.onDisable();
         }
+        renderCache.clear();
     }
 
+    /**
+     * One condition scope per viewer per sweep: the selection loop already decided the board's
+     * {@code show} condition with this scope, so the manager attach never re-evaluates it.
+     */
     private void selectAutomatically(Player player) {
         GlossConditionScope scope = GlossConditionScope.viewer(plugin, player);
         String chosen = selectBoardId(boards(), scope, conditionErrors);
-        if (chosen == null) {
-            selections.remove(player.getUniqueId());
-            profiles.remove(player.getUniqueId());
+        UUID uuid = player.getUniqueId();
+        GlossBoardMeta meta = chosen == null ? null : metas.get(chosen);
+        if (meta == null) {
+            selections.remove(uuid);
+            profiles.remove(uuid);
         } else {
-            selections.put(player.getUniqueId(), chosen);
-            GlossBoardMeta meta = metas.get(chosen);
-            profiles.put(player.getUniqueId(), meta.activeProfile(scope, conditionErrors));
+            selections.put(uuid, chosen);
+            profiles.put(uuid, meta.activeProfile(scope, conditionErrors));
         }
-        syncManager(player);
+        applyManager(player, meta, meta != null);
     }
 
     private void selectAllAutomatically() {
         for (Player player : Bukkit.getOnlinePlayers()) {
-            if (sticky.contains(player.getUniqueId())) {
-                plugin.scheduler().runEntity(player, () -> {
-                    refreshProfile(player, selectedMeta(player));
-                    syncManager(player);
-                });
-                continue;
-            }
-            plugin.scheduler().runEntity(player, () -> selectAutomatically(player));
+            selectOne(player);
         }
     }
 
+    /** Re-selects the slice of online players that belongs to this tick. */
+    private void selectStripe() {
+        if (ordinaryManager == null) {
+            return;
+        }
+        int intervalTicks = Math.max(1, ordinaryManagerIntervalTicks);
+        if (sweepsWholeFleet(intervalTicks)) {
+            selectionStripeIndex = 0;
+            selectionOrder.clear();
+            selectionCursor = 0;
+            selectAllAutomatically();
+            return;
+        }
+        if (selectionStripeIndex >= intervalTicks) {
+            selectionStripeIndex = 0;
+        }
+        if (selectionStripeIndex == 0) {
+            beginSelectionCycle();
+        }
+        int remaining = selectionOrder.size() - selectionCursor;
+        if (remaining > 0) {
+            int slice = stripeSize(remaining, intervalTicks - selectionStripeIndex);
+            for (int index = 0; index < slice; index++) {
+                Player player = Bukkit.getPlayer(selectionOrder.get(selectionCursor++));
+                if (player != null) {
+                    selectOne(player);
+                }
+            }
+        }
+        selectionStripeIndex++;
+    }
+
+    /**
+     * At a one-tick interval every tick is a whole cycle, so the roster snapshot, its sort and the
+     * per-uuid player lookups are pure waste: sweep the online roster directly.
+     */
+    static boolean sweepsWholeFleet(int intervalTicks) {
+        return intervalTicks <= 1;
+    }
+
+    /** Sweep slice for this tick: ceil(remaining / remaining stripes), so the cycle always closes. */
+    static int stripeSize(int remaining, int remainingStripes) {
+        if (remaining <= 0) {
+            return 0;
+        }
+        int stripes = Math.max(1, remainingStripes);
+        return (remaining + stripes - 1) / stripes;
+    }
+
+    private void beginSelectionCycle() {
+        selectionOrder.clear();
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            selectionOrder.add(player.getUniqueId());
+        }
+        selectionOrder.sort(Comparator.naturalOrder());
+        selectionCursor = 0;
+    }
+
+    private void selectOne(Player player) {
+        if (sticky.contains(player.getUniqueId())) {
+            plugin.scheduler().runEntity(player, () -> resyncSelected(player));
+            return;
+        }
+        plugin.scheduler().runEntity(player, () -> selectAutomatically(player));
+    }
+
     private void syncManager(Player player) {
+        if (ordinaryManager == null) {
+            return;
+        }
+        plugin.scheduler().runEntity(player, () -> resyncSelected(player));
+    }
+
+    /** Refreshes the viewer's profile and manager for the board it is already on. */
+    private void resyncSelected(Player player) {
+        GlossBoardMeta meta = selectedMeta(player);
+        GlossConditionScope scope = GlossConditionScope.viewer(plugin, player);
+        refreshProfile(player, meta, scope);
+        applyManager(player, meta, meta != null && meta.show().matches(scope, conditionErrors));
+    }
+
+    private void applyManager(Player player, GlossBoardMeta meta, boolean visible) {
         BoardManager<Board> activeOrdinaryManager = ordinaryManager;
         if (activeOrdinaryManager == null) {
             return;
         }
-        plugin.scheduler().runEntity(player, () -> {
-            GlossBoardMeta meta = selectedMeta(player);
-            refreshProfile(player, meta);
-            BoardManager<Board> activeAnimationManager = animationManager;
-            BoardManager<Board> target = meta != null && usesFastRefresh(meta)
-                && activeAnimationManager != null ? activeAnimationManager : activeOrdinaryManager;
+        BoardManager<Board> activeAnimationManager = animationManager;
+        if (meta != null && visible) {
+            BoardManager<Board> target = usesFastRefresh(meta) && activeAnimationManager != null
+                ? activeAnimationManager : activeOrdinaryManager;
             BoardManager<Board> other = target == activeOrdinaryManager ? activeAnimationManager : activeOrdinaryManager;
-            if (meta != null && meta.show().matches(GlossConditionScope.viewer(plugin, player), conditionErrors)) {
-                if (other != null) {
-                    other.remove(player);
-                }
-                if (!target.hasBoard(player)) {
-                    target.setup(player);
-                }
-                return;
+            if (other != null) {
+                other.remove(player);
             }
-            activeOrdinaryManager.remove(player);
-            if (activeAnimationManager != null) {
-                activeAnimationManager.remove(player);
+            if (target != activeAnimationManager) {
+                renderCache.forget(player.getUniqueId());
             }
-        });
+            if (!target.hasBoard(player)) {
+                target.setup(player);
+            }
+            return;
+        }
+        activeOrdinaryManager.remove(player);
+        if (activeAnimationManager != null) {
+            activeAnimationManager.remove(player);
+        }
+        renderCache.forget(player.getUniqueId());
     }
 
     private void removeFromManagers(Player player) {
@@ -395,40 +493,13 @@ public final class BoardService implements Listener {
     }
 
     private boolean usesFastRefresh(GlossBoardMeta meta) {
-        return plugin.cfg().text().functions() && usesFastRefreshText(meta);
+        return plugin.cfg().text().functions() && meta != null && meta.usesFastRefreshText();
     }
 
     static int refreshIntervalTicks(GlossBoardMeta meta, int configuredIntervalTicks) {
-        return usesFastRefreshText(meta)
+        return meta != null && meta.usesFastRefreshText()
             ? Math.min(configuredIntervalTicks, ANIMATION_REFRESH_INTERVAL_TICKS)
             : configuredIntervalTicks;
-    }
-
-    private static boolean usesFastRefreshText(GlossBoardMeta meta) {
-        if (meta == null) {
-            return false;
-        }
-        if (usesFastRefreshText(meta.presentation())) {
-            return true;
-        }
-        for (BoardDoc.Variant variant : meta.variants()) {
-            if (usesFastRefreshText(variant.presentation())) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private static boolean usesFastRefreshText(BoardDoc.Presentation presentation) {
-        if (TextPipeline.requiresFastRefresh(presentation.title())) {
-            return true;
-        }
-        for (String line : presentation.lines()) {
-            if (TextPipeline.requiresFastRefresh(line)) {
-                return true;
-            }
-        }
-        return false;
     }
 
     private GlossBoardMeta selectedMeta(Player player) {
@@ -437,11 +508,14 @@ public final class BoardService implements Listener {
     }
 
     private void refreshProfile(Player player, GlossBoardMeta meta) {
+        refreshProfile(player, meta, meta == null ? null : GlossConditionScope.viewer(plugin, player));
+    }
+
+    private void refreshProfile(Player player, GlossBoardMeta meta, GlossConditionScope scope) {
         if (meta == null) {
             profiles.remove(player.getUniqueId());
             return;
         }
-        GlossConditionScope scope = GlossConditionScope.viewer(plugin, player);
         profiles.put(player.getUniqueId(), meta.activeProfile(scope, conditionErrors));
     }
 
@@ -512,6 +586,12 @@ public final class BoardService implements Listener {
     }
 
     private final class SelectionBoardProvider implements BoardProvider {
+        private final boolean fastCadence;
+
+        private SelectionBoardProvider(boolean fastCadence) {
+            this.fastCadence = fastCadence;
+        }
+
         @Override
         public String getTitle(Player player) {
             GlossBoardMeta meta = selectedMeta(player);
@@ -520,15 +600,15 @@ public final class BoardService implements Listener {
             }
             GlossBoardMeta.ActiveProfile profile = selectedProfile(player, meta);
             GlossBoardMeta.RenderPlan plan = plan(meta, profile);
+            if (fastCadence) {
+                return renderCache.entry(player.getUniqueId()).title(plan, System.nanoTime(),
+                    slowIntervalNanos(), player.getUniqueId().hashCode(), raw -> render(player, raw));
+            }
             String cached = plan.staticTitle();
             if (cached != null) {
                 return cached;
             }
-            String rendered = plugin.text().render(player, plan.rawTitle());
-            if (rendered == null) {
-                return "";
-            }
-            return rendered;
+            return render(player, plan.rawTitle());
         }
 
         @Override
@@ -539,6 +619,10 @@ public final class BoardService implements Listener {
             }
             GlossBoardMeta.ActiveProfile profile = selectedProfile(player, meta);
             GlossBoardMeta.RenderPlan plan = plan(meta, profile);
+            if (fastCadence) {
+                return Arrays.asList(renderCache.entry(player.getUniqueId()).lines(plan, System.nanoTime(),
+                    slowIntervalNanos(), player.getUniqueId().hashCode(), raw -> render(player, raw)));
+            }
             int count = plan.lineCount();
             List<String> rendered = new ArrayList<>(count);
             for (int index = 0; index < count; index++) {
@@ -547,8 +631,7 @@ public final class BoardService implements Listener {
                     rendered.add(cached);
                     continue;
                 }
-                String value = plugin.text().render(player, plan.rawLine(index));
-                rendered.add(value == null ? "" : value);
+                rendered.add(render(player, plan.rawLine(index)));
             }
             return rendered;
         }
@@ -560,9 +643,22 @@ public final class BoardService implements Listener {
             return profile != null && profile.presentation().hideNumbers();
         }
 
+        private String render(Player player, String raw) {
+            String rendered = plugin.text().render(player, raw);
+            return rendered == null ? "" : rendered;
+        }
+
         private GlossBoardMeta.RenderPlan plan(GlossBoardMeta meta, GlossBoardMeta.ActiveProfile profile) {
             return meta.renderPlan(profile.id(), profile.presentation(), TextPipeline.emojiGeneration(),
                 MAX_LINES, staticRender);
         }
+    }
+
+    /**
+     * How long a viewer on the one-tick manager may serve a line that does not need per-tick
+     * refresh from its last render: the ordinary board interval.
+     */
+    private long slowIntervalNanos() {
+        return Math.max(1, ordinaryManagerIntervalTicks) * TICK_NANOS;
     }
 }

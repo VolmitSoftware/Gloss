@@ -31,11 +31,25 @@ import java.util.concurrent.atomic.AtomicReferenceArray;
  *
  * <p>{@link #generation()} increments on every published change. A bounded change history lets
  * callers retain a cached query when every intervening change occurred outside its chunk window.
+ *
+ * <p>Each state also carries a coarse occupancy index — the occupied chunk buckets grouped by
+ * 256-block cell — so {@link #hasCandidate}, which the panel driver runs per player per tick,
+ * answers from a few cell lookups and only ever visits buckets a hit cell actually lists. It is
+ * maintained the same way the buckets are: a write copies the worlds and cells whose occupancy
+ * actually changed and shares every other one with the previous state.
  */
 public final class PanelSpatialIndex {
   private static final double CHUNK_SIZE = 16.0D;
   private static final int DEFINITION_PARTITIONS = 64;
   static final int CHANGE_HISTORY_SIZE = 1024;
+
+  /**
+   * Chunks per axis in one coarse occupancy cell. A cell covers 256 blocks, so the widest legal
+   * view range ({@link PanelVisibility#MAX_VIEW_RANGE} plus a chunk of padding) spans at most four
+   * cells per axis: {@link #hasCandidate} answers the runtime's per-player prefilter from a handful
+   * of cell lookups instead of walking the whole chunk window or every occupied bucket.
+   */
+  private static final int COARSE_CHUNKS = 16;
 
   private final Object writeLock = new Object();
   private final AtomicReferenceArray<SpatialChange> changeHistory =
@@ -99,7 +113,8 @@ public final class PanelSpatialIndex {
     List<UUID> orderedUuids = orderedUuids(replacementBoards.values());
     DefinitionTable replacementTable = DefinitionTable.from(replacementBoards);
     synchronized (writeLock) {
-      State next = state.publish(replacementTable, replacementIds, replacementChunks, orderedUuids);
+      State next = state.publish(replacementTable, replacementIds, replacementChunks,
+          cellIndex(replacementChunks), orderedUuids);
       publish(next, SpatialChange.global(next.generation()));
     }
   }
@@ -173,10 +188,13 @@ public final class PanelSpatialIndex {
           chunkMutation.add(replacement);
         }
       }
-      Map<UUID, Map<Long, Set<UUID>>> chunksByWorld = chunkMutation == null
-          ? current.chunksByWorld()
-          : chunkMutation.finish();
-      State next = current.publish(updatedBoards, uuidsById, chunksByWorld, orderedUuids);
+      Map<UUID, Map<Long, Set<UUID>>> chunksByWorld = current.chunksByWorld();
+      Map<UUID, Map<Long, List<Long>>> cellsByWorld = current.cellsByWorld();
+      if (chunkMutation != null) {
+        chunksByWorld = chunkMutation.finish();
+        cellsByWorld = chunkMutation.cells(current.cellsByWorld());
+      }
+      State next = current.publish(updatedBoards, uuidsById, chunksByWorld, cellsByWorld, orderedUuids);
       publish(next, SpatialChange.local(next.generation(), touchedBuckets));
     }
   }
@@ -196,8 +214,9 @@ public final class PanelSpatialIndex {
       chunkMutation.remove(removed);
       Map<UUID, Set<Long>> touchedBuckets = new HashMap<>();
       touch(touchedBuckets, removed);
-      State next = current.publish(boards, uuidsById, chunkMutation.finish(),
-          orderedUuids(boards.values()));
+      Map<UUID, Map<Long, Set<UUID>>> chunksByWorld = chunkMutation.finish();
+      State next = current.publish(boards, uuidsById, chunksByWorld,
+          chunkMutation.cells(current.cellsByWorld()), orderedUuids(boards.values()));
       publish(next, SpatialChange.local(next.generation(), touchedBuckets));
       return true;
     }
@@ -270,6 +289,12 @@ public final class PanelSpatialIndex {
     return List.copyOf(matches);
   }
 
+  /**
+   * True when at least one panel lies within {@code radius} of the point. Answered from the coarse
+   * occupancy cells covering the query window, so an empty neighbourhood costs a few map lookups
+   * however many panels the world holds; only the occupied buckets a hit cell actually lists are
+   * ever visited, never the whole chunk window and never every occupied bucket.
+   */
   public boolean hasCandidate(UUID worldUuid, double x, double z, double radius) {
     UUID requiredWorldUuid = Objects.requireNonNull(worldUuid, "worldUuid");
     requireFinite(x, "x");
@@ -277,6 +302,10 @@ public final class PanelSpatialIndex {
     requireRadius(radius);
 
     State current = state;
+    Map<Long, List<Long>> worldCells = current.cellsByWorld().get(requiredWorldUuid);
+    if (worldCells == null || worldCells.isEmpty()) {
+      return false;
+    }
     Map<Long, Set<UUID>> worldChunks = current.chunksByWorld().get(requiredWorldUuid);
     if (worldChunks == null || worldChunks.isEmpty()) {
       return false;
@@ -286,14 +315,19 @@ public final class PanelSpatialIndex {
     int maximumChunkX = chunkCoordinate(x + radius);
     int minimumChunkZ = chunkCoordinate(z - radius);
     int maximumChunkZ = chunkCoordinate(z + radius);
-    long width = (long) maximumChunkX - minimumChunkX + 1L;
-    long depth = (long) maximumChunkZ - minimumChunkZ + 1L;
-    if (width <= worldChunks.size() && depth <= worldChunks.size()
-        && width * depth <= worldChunks.size()) {
-      for (long chunkX = minimumChunkX; chunkX <= maximumChunkX; chunkX++) {
-        for (long chunkZ = minimumChunkZ; chunkZ <= maximumChunkZ; chunkZ++) {
-          Set<UUID> bucket = worldChunks.get(chunkKey((int) chunkX, (int) chunkZ));
-          if (bucket != null && containsCandidate(current, bucket, x, z, radius)) {
+    int minimumCellX = cellCoordinate(minimumChunkX);
+    int maximumCellX = cellCoordinate(maximumChunkX);
+    int minimumCellZ = cellCoordinate(minimumChunkZ);
+    int maximumCellZ = cellCoordinate(maximumChunkZ);
+    long width = (long) maximumCellX - minimumCellX + 1L;
+    long depth = (long) maximumCellZ - minimumCellZ + 1L;
+    if (width <= worldCells.size() && depth <= worldCells.size()
+        && width * depth <= worldCells.size()) {
+      for (long cellX = minimumCellX; cellX <= maximumCellX; cellX++) {
+        for (long cellZ = minimumCellZ; cellZ <= maximumCellZ; cellZ++) {
+          List<Long> occupied = worldCells.get(chunkKey((int) cellX, (int) cellZ));
+          if (occupied != null && containsCandidate(current, worldChunks, occupied,
+              minimumChunkX, maximumChunkX, minimumChunkZ, maximumChunkZ, x, z, radius)) {
             return true;
           }
         }
@@ -301,13 +335,14 @@ public final class PanelSpatialIndex {
       return false;
     }
 
-    for (Map.Entry<Long, Set<UUID>> entry : worldChunks.entrySet()) {
+    for (Map.Entry<Long, List<Long>> entry : worldCells.entrySet()) {
       long key = entry.getKey();
-      int chunkX = (int) (key >> 32);
-      int chunkZ = (int) key;
-      if (chunkX >= minimumChunkX && chunkX <= maximumChunkX
-          && chunkZ >= minimumChunkZ && chunkZ <= maximumChunkZ
-          && containsCandidate(current, entry.getValue(), x, z, radius)) {
+      int cellX = (int) (key >> 32);
+      int cellZ = (int) key;
+      if (cellX >= minimumCellX && cellX <= maximumCellX
+          && cellZ >= minimumCellZ && cellZ <= maximumCellZ
+          && containsCandidate(current, worldChunks, entry.getValue(),
+          minimumChunkX, maximumChunkX, minimumChunkZ, maximumChunkZ, x, z, radius)) {
         return true;
       }
     }
@@ -366,11 +401,13 @@ public final class PanelSpatialIndex {
   }
 
   private static final class ChunkMutation {
+    private final Map<UUID, Map<Long, Set<UUID>>> source;
     private final Map<UUID, Map<Long, Set<UUID>>> chunksByWorld;
     private final Map<UUID, Map<Long, Set<UUID>>> copiedWorlds = new HashMap<>();
     private final Map<WorldBucket, Set<UUID>> copiedBuckets = new HashMap<>();
 
     private ChunkMutation(Map<UUID, Map<Long, Set<UUID>>> source) {
+      this.source = source;
       this.chunksByWorld = new HashMap<>(source);
     }
 
@@ -414,6 +451,56 @@ public final class PanelSpatialIndex {
         }
       }
       return chunksByWorld;
+    }
+
+    /**
+     * The coarse cell index after this mutation. Only the buckets that actually appeared or
+     * disappeared move a cell, and only the worlds and cells they belong to are copied — a follow
+     * panel crossing a chunk therefore costs two cell edits, not a walk of every occupied bucket.
+     */
+    private Map<UUID, Map<Long, List<Long>>> cells(Map<UUID, Map<Long, List<Long>>> previous) {
+      Map<UUID, Map<Long, List<Long>>> touchedWorlds = new HashMap<>();
+      Map<WorldBucket, List<Long>> touchedCells = new HashMap<>();
+      for (Map.Entry<WorldBucket, Set<UUID>> entry : copiedBuckets.entrySet()) {
+        UUID worldUuid = entry.getKey().worldUuid();
+        long chunkKey = entry.getKey().chunkKey();
+        boolean occupied = !entry.getValue().isEmpty();
+        if (occupied == source.getOrDefault(worldUuid, Map.of()).containsKey(chunkKey)) {
+          continue;
+        }
+        Map<Long, List<Long>> worldCells = touchedWorlds.computeIfAbsent(worldUuid,
+            id -> new HashMap<>(previous.getOrDefault(id, Map.of())));
+        long cellKey = cellKey(chunkKey);
+        List<Long> chunkKeys = touchedCells.computeIfAbsent(new WorldBucket(worldUuid, cellKey),
+            ignored -> {
+              List<Long> mutable = new ArrayList<>(worldCells.getOrDefault(cellKey, List.of()));
+              worldCells.put(cellKey, mutable);
+              return mutable;
+            });
+        if (occupied) {
+          chunkKeys.add(chunkKey);
+        } else {
+          chunkKeys.remove(Long.valueOf(chunkKey));
+        }
+      }
+      if (touchedWorlds.isEmpty()) {
+        return previous;
+      }
+      Map<UUID, Map<Long, List<Long>>> replacement = new HashMap<>(previous);
+      for (Map.Entry<UUID, Map<Long, List<Long>>> world : touchedWorlds.entrySet()) {
+        Map<Long, List<Long>> frozen = new HashMap<>(capacityFor(world.getValue().size()));
+        for (Map.Entry<Long, List<Long>> cell : world.getValue().entrySet()) {
+          if (!cell.getValue().isEmpty()) {
+            frozen.put(cell.getKey(), List.copyOf(cell.getValue()));
+          }
+        }
+        if (frozen.isEmpty()) {
+          replacement.remove(world.getKey());
+        } else {
+          replacement.put(world.getKey(), Map.copyOf(frozen));
+        }
+      }
+      return Map.copyOf(replacement);
     }
   }
 
@@ -472,15 +559,62 @@ public final class PanelSpatialIndex {
     return left.uuid().compareTo(right.uuid());
   }
 
-  private static boolean containsCandidate(State state, Set<UUID> candidates,
+  private static boolean containsCandidate(State state, Map<Long, Set<UUID>> worldChunks,
+                                           List<Long> occupiedChunkKeys,
+                                           int minimumChunkX, int maximumChunkX,
+                                           int minimumChunkZ, int maximumChunkZ,
                                            double x, double z, double radius) {
-    for (UUID candidateUuid : candidates) {
-      PanelDefinition board = state.boards().get(candidateUuid);
-      if (board != null && horizontalDistance(board, x, z) <= radius) {
-        return true;
+    for (int index = 0; index < occupiedChunkKeys.size(); index++) {
+      long chunkKey = occupiedChunkKeys.get(index);
+      int chunkX = (int) (chunkKey >> 32);
+      int chunkZ = (int) chunkKey;
+      if (chunkX < minimumChunkX || chunkX > maximumChunkX
+          || chunkZ < minimumChunkZ || chunkZ > maximumChunkZ) {
+        continue;
+      }
+      Set<UUID> bucket = worldChunks.get(chunkKey);
+      if (bucket == null) {
+        continue;
+      }
+      for (UUID candidateUuid : bucket) {
+        PanelDefinition board = state.boards().get(candidateUuid);
+        if (board != null && horizontalDistance(board, x, z) <= radius) {
+          return true;
+        }
       }
     }
     return false;
+  }
+
+  /**
+   * The occupied chunk buckets of every world, grouped by the coarse cell that contains them.
+   * Only a bulk replacement builds this from scratch; incremental writes edit the cells they touch.
+   */
+  private static Map<UUID, Map<Long, List<Long>>> cellIndex(Map<UUID, Map<Long, Set<UUID>>> chunksByWorld) {
+    Map<UUID, Map<Long, List<Long>>> cells = new HashMap<>(capacityFor(chunksByWorld.size()));
+    for (Map.Entry<UUID, Map<Long, Set<UUID>>> world : chunksByWorld.entrySet()) {
+      Map<Long, List<Long>> worldCells = new HashMap<>();
+      for (Long chunkKey : world.getValue().keySet()) {
+        int chunkX = (int) (chunkKey >> 32);
+        int chunkZ = (int) (long) chunkKey;
+        worldCells.computeIfAbsent(chunkKey(cellCoordinate(chunkX), cellCoordinate(chunkZ)),
+            ignored -> new ArrayList<>()).add(chunkKey);
+      }
+      Map<Long, List<Long>> frozen = new HashMap<>(capacityFor(worldCells.size()));
+      for (Map.Entry<Long, List<Long>> cell : worldCells.entrySet()) {
+        frozen.put(cell.getKey(), List.copyOf(cell.getValue()));
+      }
+      cells.put(world.getKey(), Map.copyOf(frozen));
+    }
+    return Map.copyOf(cells);
+  }
+
+  private static int cellCoordinate(int chunkCoordinate) {
+    return Math.floorDiv(chunkCoordinate, COARSE_CHUNKS);
+  }
+
+  private static long cellKey(long chunkKey) {
+    return chunkKey(cellCoordinate((int) (chunkKey >> 32)), cellCoordinate((int) chunkKey));
   }
 
   private static double horizontalDistance(PanelDefinition board, double x, double z) {
@@ -655,14 +789,17 @@ public final class PanelSpatialIndex {
   private record State(DefinitionTable boards,
                        Map<String, UUID> uuidsById,
                        Map<UUID, Map<Long, Set<UUID>>> chunksByWorld,
+                       Map<UUID, Map<Long, List<Long>>> cellsByWorld,
                        List<UUID> orderedUuids,
                        long generation) {
 
-    private static final State EMPTY = new State(DefinitionTable.EMPTY, Map.of(), Map.of(), List.of(), 0L);
+    private static final State EMPTY =
+        new State(DefinitionTable.EMPTY, Map.of(), Map.of(), Map.of(), List.of(), 0L);
 
     private State publish(DefinitionTable boards, Map<String, UUID> ids,
-                          Map<UUID, Map<Long, Set<UUID>>> chunks, List<UUID> orderedUuids) {
-      return new State(boards, ids, chunks, orderedUuids, generation + 1L);
+                          Map<UUID, Map<Long, Set<UUID>>> chunks,
+                          Map<UUID, Map<Long, List<Long>>> cells, List<UUID> orderedUuids) {
+      return new State(boards, ids, chunks, cells, orderedUuids, generation + 1L);
     }
   }
 }

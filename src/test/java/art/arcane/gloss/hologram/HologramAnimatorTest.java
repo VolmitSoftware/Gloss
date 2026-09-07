@@ -38,8 +38,9 @@ class HologramAnimatorTest {
         private final List<Sent> sent = new ArrayList<>();
 
         @Override
-        public void send(List<Player> viewers, int entityId, String legacyText, TextCodec codec) {
-            sent.add(new Sent(List.copyOf(viewers), entityId, legacyText, codec));
+        public void send(AnimationTextSender.Batch batch) {
+            sent.add(new Sent(List.copyOf(batch.viewers()), batch.entityId(), batch.legacyText(),
+                batch.codec()));
         }
 
         private int recipientCount() {
@@ -263,52 +264,113 @@ class HologramAnimatorTest {
     }
 
     @Test
-    void retirementWaitsForAnAlreadyCommittedPacketBeforeReplacement() throws Exception {
+    void retirementDoesNotWaitForAnInFlightSend() throws Exception {
         for (boolean direct : List.of(false, true)) {
             GlossConfig active = config(true);
             UUID viewerId = UUID.randomUUID();
             Player viewer = player(viewerId, true);
             CountDownLatch sending = new CountDownLatch(1);
             CountDownLatch finishSend = new CountDownLatch(1);
-            CountDownLatch retiring = new CountDownLatch(1);
-            CountDownLatch retired = new CountDownLatch(1);
             List<String> order = new ArrayList<>();
             HologramAnimator animator = new HologramAnimator(() -> active, name -> false, name -> null,
-                (viewers, entityId, text, codec) -> {
+                batch -> {
                     sending.countDown();
                     awaitSignal(finishSend);
-                    order.add(text);
+                    order.add(batch.legacyText());
                 });
             if (direct) {
                 animator.sendText(viewer, viewerId, 7, "old");
             } else {
                 animator.publish("pane", "viewer", new HologramAnimator.Target(7, now -> "old", List.of(viewer)));
             }
-            try (ExecutorService executor = Executors.newFixedThreadPool(2)) {
+            try (ExecutorService executor = Executors.newSingleThreadExecutor()) {
                 Future<Integer> pass = executor.submit(() -> animator.pass(0L));
                 try {
                     assertTrue(sending.await(5, TimeUnit.SECONDS));
-                    Future<?> cancellation = executor.submit(() -> {
-                        retiring.countDown();
-                        if (direct) {
-                            animator.discardText(viewerId, 7);
-                        } else {
-                            animator.removeGroup("pane");
-                        }
-                        order.add("replacement");
-                        retired.countDown();
-                    });
-                    assertTrue(retiring.await(5, TimeUnit.SECONDS));
-                    assertFalse(retired.await(100, TimeUnit.MILLISECONDS));
-                    finishSend.countDown();
-                    cancellation.get(5, TimeUnit.SECONDS);
-                    assertEquals(1, pass.get(5, TimeUnit.SECONDS));
-                    assertEquals(List.of("old", "replacement"), order);
+                    if (direct) {
+                        animator.discardText(viewerId, 7);
+                    } else {
+                        animator.removeGroup("pane");
+                    }
+                    order.add("retired");
                 } finally {
                     finishSend.countDown();
                 }
+                assertEquals(1, pass.get(5, TimeUnit.SECONDS));
+                assertEquals(List.of("retired", "old"), order,
+                    "retirement must not block on a fan-out that is already under way");
             }
         }
+    }
+
+    @Test
+    void aRepublishDuringTheFanOutStillLetsTheNextPassEvaluateTheNextFrame() {
+        GlossConfig active = config(true);
+        Player viewer = player(UUID.randomUUID(), true);
+        AtomicInteger composes = new AtomicInteger();
+        List<String> sent = new ArrayList<>();
+        AtomicReference<HologramAnimator> owner = new AtomicReference<>();
+        TextFrameSource frames = now -> "frame-" + composes.incrementAndGet();
+        HologramAnimator animator = new HologramAnimator(() -> active, name -> false, name -> null,
+            batch -> {
+                sent.add(batch.legacyText());
+                owner.get().publish("pane", "viewer",
+                    new HologramAnimator.Target(7, frames, List.of(viewer)));
+            });
+        owner.set(animator);
+        animator.publish("pane", "viewer", new HologramAnimator.Target(7, frames, List.of(viewer)));
+
+        assertEquals(1, animator.pass(0L));
+        assertEquals(1, animator.pass(10L));
+        assertEquals(List.of("frame-1", "frame-2"), sent,
+            "a publish that lands during the fan-out must not leave the send state pending and "
+                + "re-send the same frame");
+    }
+
+    @Test
+    void aRetiredTargetStopsWritingToLaterRecipients() {
+        GlossConfig active = config(true);
+        Player first = player(UUID.randomUUID(), true);
+        Player second = player(UUID.randomUUID(), true);
+        List<Player> reached = new ArrayList<>();
+        AtomicReference<HologramAnimator> owner = new AtomicReference<>();
+        HologramAnimator animator = new HologramAnimator(() -> active, name -> false, name -> null,
+            batch -> {
+                for (Player viewer : batch.viewers()) {
+                    if (!batch.live().getAsBoolean()) {
+                        return;
+                    }
+                    reached.add(viewer);
+                    owner.get().removeGroup("pane");
+                }
+            });
+        owner.set(animator);
+        animator.publish("pane", "viewer",
+            new HologramAnimator.Target(7, now -> "text", List.of(first, second)));
+
+        assertEquals(1, animator.pass(0L));
+        assertEquals(List.of(first), reached,
+            "a target retired mid fan-out must not keep writing its text to the remaining viewers");
+    }
+
+    @Test
+    void aRetiredDirectUpdateStopsWritingToLaterRecipients() {
+        GlossConfig active = config(true);
+        UUID viewerId = UUID.randomUUID();
+        Player viewer = player(viewerId, true);
+        List<Boolean> liveness = new ArrayList<>();
+        AtomicReference<HologramAnimator> owner = new AtomicReference<>();
+        HologramAnimator animator = new HologramAnimator(() -> active, name -> false, name -> null,
+            batch -> {
+                liveness.add(batch.live().getAsBoolean());
+                owner.get().discardText(viewerId, batch.entityId());
+                liveness.add(batch.live().getAsBoolean());
+            });
+        owner.set(animator);
+        animator.sendText(viewer, viewerId, 7, "text");
+
+        assertEquals(1, animator.pass(0L));
+        assertEquals(List.of(true, false), liveness);
     }
 
     @Test
@@ -318,8 +380,8 @@ class HologramAnimatorTest {
         Player viewer = player(viewerId, true);
         AtomicReference<HologramAnimator> owner = new AtomicReference<>();
         HologramAnimator animator = new HologramAnimator(() -> active, name -> false, name -> null,
-            (viewers, entityId, text, codec) -> {
-                owner.get().discardText(viewerId, entityId);
+            batch -> {
+                owner.get().discardText(viewerId, batch.entityId());
                 throw new IllegalStateException("send failed after retirement");
             });
         owner.set(animator);
@@ -338,12 +400,12 @@ class HologramAnimatorTest {
         List<String> sent = new ArrayList<>();
         AtomicReference<HologramAnimator> owner = new AtomicReference<>();
         HologramAnimator animator = new HologramAnimator(() -> active, name -> false, name -> null,
-            (viewers, entityId, text, codec) -> {
-                if (text.equals("old")) {
-                    owner.get().sendText(viewer, viewerId, entityId, "new");
+            batch -> {
+                if (batch.legacyText().equals("old")) {
+                    owner.get().sendText(viewer, viewerId, batch.entityId(), "new");
                     throw new IllegalStateException("old send failed");
                 }
-                sent.add(text);
+                sent.add(batch.legacyText());
             });
         owner.set(animator);
         animator.sendText(viewer, viewerId, 7, "old");
@@ -362,7 +424,7 @@ class HologramAnimatorTest {
         Player viewer = player(viewerId, true);
         AtomicInteger attempts = new AtomicInteger();
         HologramAnimator animator = new HologramAnimator(() -> active, name -> false, name -> null,
-            (viewers, entityId, text, codec) -> {
+            batch -> {
                 if (attempts.getAndIncrement() == 0) {
                     throw new IllegalStateException("transient send failure");
                 }
@@ -374,6 +436,26 @@ class HologramAnimatorTest {
         assertEquals(1, animator.pass(1L));
         assertEquals(2, attempts.get());
         assertEquals(0, animator.pendingTextUpdateCount());
+    }
+
+    @Test
+    void aTargetThatIsNotDueIsSkippedWithoutComposingItsFrame() {
+        RecordingSender sender = new RecordingSender();
+        HologramAnimator animator = animator(config(true, 100), sender);
+        AtomicInteger composes = new AtomicInteger();
+        Player viewer = player(UUID.randomUUID(), true);
+        animator.publish("holo:test", HologramAnimator.SHARED_SUB,
+            new HologramAnimator.Target(7, now -> {
+                composes.incrementAndGet();
+                return "frame-" + now;
+            }, List.of(viewer)));
+
+        assertEquals(1, animator.pass(0L));
+        assertEquals(1, composes.get());
+        assertEquals(0, animator.pass(5L));
+        assertEquals(1, composes.get(), "a target inside its send interval must not be composed");
+        assertEquals(1, animator.pass(10L));
+        assertEquals(2, composes.get());
     }
 
     private static void awaitSignal(CountDownLatch latch) {

@@ -2,11 +2,9 @@ package art.arcane.gloss.hologram;
 
 import art.arcane.gloss.entity.EntityOverlayDoc;
 import art.arcane.gloss.entity.EntityOverlayService;
-import org.bukkit.Location;
 import org.bukkit.damage.DamageSource;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.LivingEntity;
-import org.bukkit.entity.Player;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.EntityRemoveEvent;
 import org.bukkit.event.server.PluginDisableEvent;
@@ -17,20 +15,15 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
-import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
-import java.util.HashSet;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class EntityOverlayServiceTest {
@@ -102,47 +95,27 @@ class EntityOverlayServiceTest {
     }
 
     @Test
-    void retiringOldViewerStateKeepsWorldChangeReplacement() throws Exception {
+    void leavingTheWorldDropsTheViewerAnchorAndItsInsight() throws Exception {
         try (CharacterizationHarness harness = new CharacterizationHarness(dataFolder)) {
             EntityOverlayService service = new EntityOverlayService(harness.gloss);
-            UUID playerId = UUID.randomUUID();
-            Object old = viewerState();
-            Object replacement = viewerState();
-            map(service, "viewers").put(playerId, replacement);
-            Method remove = EntityOverlayService.class.getDeclaredMethod("removeViewer", UUID.class, old.getClass());
+            Field settings = EntityOverlayService.class.getDeclaredField("settings");
+            settings.setAccessible(true);
+            settings.set(service, EntityOverlayDoc.DEFAULTS);
+            Field started = EntityOverlayService.class.getDeclaredField("started");
+            started.setAccessible(true);
+            started.setBoolean(service, true);
+            CharacterizationHarness.PlayerHandle viewer = harness.join("Viewer", harness.world("world"), 0, 64, 0);
+            LivingEntity target = entity(EntityType.ZOMBIE, new AtomicInteger(1));
+            assertTrue(service.updateInsight(harness.gloss, viewer.proxy, target, java.util.List.of("detail"), 5000L));
+            map(service, "anchors").put(viewer.uuid, new Object());
+
+            Method remove = EntityOverlayService.class.getDeclaredMethod("removeViewer", UUID.class);
             remove.setAccessible(true);
+            remove.invoke(service, viewer.uuid);
 
-            remove.invoke(service, playerId, old);
-
-            assertSame(replacement, map(service, "viewers").get(playerId));
-            Field active = old.getClass().getDeclaredField("active");
-            active.setAccessible(true);
-            assertFalse(active.getBoolean(old));
-            assertTrue(active.getBoolean(replacement));
-        }
-    }
-
-    @Test
-    void hiddenAndExcludedEntitiesDoNotConsumeViewerLimit() throws Exception {
-        try (CharacterizationHarness harness = new CharacterizationHarness(dataFolder)) {
-            EntityOverlayService service = new EntityOverlayService(harness.gloss);
-            Player viewer = proxy(Player.class, (object, method, args) -> switch (method.getName()) {
-                case "getUniqueId" -> UUID.fromString("00000000-0000-0000-0000-000000000123");
-                case "canSee" -> false;
-                default -> throw new AssertionError(method.getName());
-            });
-            Object state = viewerState();
-            Set<UUID> selected = new HashSet<>();
-            Method select = EntityOverlayService.class.getDeclaredMethod("select", Player.class, state.getClass(),
-                Location.class, LivingEntity.class, Set.class, EntityOverlayDoc.class);
-            select.setAccessible(true);
-
-            select.invoke(service, viewer, state, null, entity(EntityType.ZOMBIE, new AtomicInteger(1)), selected,
-                EntityOverlayDoc.DEFAULTS);
-            select.invoke(service, viewer, state, null, entity(EntityType.ARMOR_STAND, new AtomicInteger(1)), selected,
-                EntityOverlayDoc.DEFAULTS);
-
-            assertTrue(selected.isEmpty());
+            assertTrue(map(service, "anchors").isEmpty());
+            assertTrue(map(service, "insights").isEmpty());
+            assertTrue(map(service, "insightTargets").isEmpty());
         }
     }
 
@@ -171,13 +144,6 @@ class EntityOverlayServiceTest {
             case "equals" -> object == args[0];
             default -> throw new AssertionError(method.getName());
         });
-    }
-
-    private static Object viewerState() throws ReflectiveOperationException {
-        Class<?> state = Class.forName(EntityOverlayService.class.getName() + "$ViewerState");
-        Constructor<?> constructor = state.getDeclaredConstructor();
-        constructor.setAccessible(true);
-        return constructor.newInstance();
     }
 
     private static int stackCount(EntityOverlayService service, LivingEntity entity) throws ReflectiveOperationException {

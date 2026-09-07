@@ -14,8 +14,10 @@ import org.bukkit.entity.Player;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 
 final class RealDropConditionPlan {
 
@@ -27,10 +29,12 @@ final class RealDropConditionPlan {
     private final ShowCondition show;
     private final boolean universalAudience;
     private final boolean emptyAudience;
+    private final RealDropConditionSnapshot.Fields fields;
     private final BoundedConditionErrorCallback errors;
 
     private RealDropConditionPlan(ResolvedStyle base, List<ConditionalStyle> variants,
                                   CompiledCondition audience, ShowCondition show,
+                                  RealDropConditionSnapshot.Fields fields,
                                   BoundedConditionErrorCallback errors) {
         this.base = base;
         this.variants = variants;
@@ -39,18 +43,22 @@ final class RealDropConditionPlan {
         this.universalAudience = show.isAlwaysVisible() && audience.source().expression().equals("true");
         this.emptyAudience = !show.isDynamic() && !show.isAlwaysVisible()
             || audience.source().expression().equals("false");
+        this.fields = fields;
         this.errors = errors;
     }
 
     static RealDropConditionPlan compile(RealDropSettingsDoc document, boolean enabled,
-                                         BoundedConditionErrorCallback errors) {
+                                         BoundedConditionErrorCallback errors, ShowCondition viewerShow) {
         Objects.requireNonNull(document);
         Objects.requireNonNull(errors);
+        Objects.requireNonNull(viewerShow);
         ResolvedStyle base = resolve(BASE_ID, document.presentation(), enabled);
         List<ConditionalStyle> variants = new ArrayList<>(document.variants().size());
+        Set<String> referenced = new HashSet<>();
         for (RealDropSettingsDoc.Variant variant : document.variants()) {
             CompiledCondition condition = ConditionCompiler.compile(new ConditionSource(
                 "real-drops/default.json $.variants[" + variant.id() + "].when", variant.when()));
+            referenced.addAll(condition.references().variables());
             variants.add(new ConditionalStyle(
                 variant.id(), variant.priority(), condition,
                 resolve(variant.id(), variant.presentation(), enabled)));
@@ -59,12 +67,21 @@ final class RealDropConditionPlan {
             .thenComparing(ConditionalStyle::id));
         CompiledCondition audience = ConditionCompiler.compile(new ConditionSource(
             "real-drops/default.json $.audience.when", document.audience().when()));
-        return new RealDropConditionPlan(base, List.copyOf(variants), audience, document.show(), errors);
+        referenced.addAll(audience.references().variables());
+        referenced.addAll(showReferences(document.show()));
+        referenced.addAll(showReferences(viewerShow));
+        return new RealDropConditionPlan(base, List.copyOf(variants), audience, document.show(),
+            RealDropConditionSnapshot.Fields.of(referenced), errors);
+    }
+
+    RealDropConditionSnapshot.Fields fields() {
+        return fields;
     }
 
     Selection select(Gloss plugin, Item item, RealDropConditionSnapshot snapshot) {
         ExprScope scope = new GlossConditionScope(plugin, snapshot.itemContext(item));
-        return new Selection(select(scope), audience, universalAudience, emptyAudience, snapshot, errors, show);
+        return new Selection(select(scope), audience, universalAudience, emptyAudience, snapshot,
+            fields, errors, show);
     }
 
     ResolvedStyle select(ExprScope scope) {
@@ -74,6 +91,11 @@ final class RealDropConditionPlan {
             }
         }
         return base;
+    }
+
+    private static Set<String> showReferences(ShowCondition show) {
+        return ConditionCompiler.compile(new ConditionSource("show", show.expression()))
+            .references().variables();
     }
 
     private static ResolvedStyle resolve(String id, RealDropSettingsDoc.Presentation presentation,
@@ -88,12 +110,14 @@ final class RealDropConditionPlan {
 
     record Selection(ResolvedStyle style, CompiledCondition audience, boolean universalAudience,
                      boolean emptyAudience, RealDropConditionSnapshot snapshot,
+                     RealDropConditionSnapshot.Fields fields,
                      BoundedConditionErrorCallback errors, ShowCondition show) {
 
         Selection {
             Objects.requireNonNull(style);
             Objects.requireNonNull(audience);
             Objects.requireNonNull(snapshot);
+            Objects.requireNonNull(fields);
             Objects.requireNonNull(errors);
         }
 
@@ -110,7 +134,8 @@ final class RealDropConditionPlan {
 
         Selection refreshSnapshot(Item item) {
             return new Selection(style, audience, universalAudience, emptyAudience,
-                RealDropConditionSnapshot.capture(item, (String) snapshot.values().get("event.type")), errors, show);
+                RealDropConditionSnapshot.capture(item, (String) snapshot.values().get("event.type"), fields),
+                fields, errors, show);
         }
     }
 

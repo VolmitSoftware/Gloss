@@ -17,6 +17,8 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 
 /**
@@ -34,6 +36,14 @@ public final class ImageAssets {
   public static final String KIND = "images";
 
   private final File imageDir;
+  /**
+   * Decoded images by relative path. Every icon construction used to canonicalize, stat and fully
+   * decode its file on the main thread — a menu with four pictures opened by a thousand players is
+   * four thousand synchronous PNG decodes. Entries carry the length and modification time they were
+   * decoded from, so an operator editing a file straight on disk is picked up even between watcher
+   * passes; the watcher drops the whole map on any change it reports.
+   */
+  private final Map<String, Decoded> decoded = new ConcurrentHashMap<>();
   private volatile ReactiveFolder watcher;
 
   public ImageAssets(File configDir) {
@@ -60,6 +70,7 @@ public final class ImageAssets {
     }
     ReactiveFolder previous = watcher;
     watcher = null;
+    decoded.clear();
     if (previous != null) {
       previous.clear();
     }
@@ -67,10 +78,19 @@ public final class ImageAssets {
 
   public Pair<ImageFormat, BufferedImage> get(String relative) throws IOException {
     File file = resolve(imageDir, relative);
-    return Pair.of(Imaging.guessFormat(file), Imaging.getBufferedImage(file));
+    long length = file.length();
+    long modified = file.lastModified();
+    Decoded cached = decoded.get(relative);
+    if (cached != null && cached.matches(file, length, modified)) {
+      return cached.image();
+    }
+    Pair<ImageFormat, BufferedImage> image = Pair.of(Imaging.guessFormat(file), Imaging.getBufferedImage(file));
+    decoded.put(relative, new Decoded(file, length, modified, image));
+    return image;
   }
 
   public void publishEditorSyncChanges() {
+    decoded.clear();
     if (Gloss.instance.getSessionManager() != null) {
       Gloss.instance.getSessionManager().refreshVisuals();
     }
@@ -133,6 +153,7 @@ public final class ImageAssets {
     if (changed.isEmpty() && created.isEmpty() && deleted.isEmpty()) {
       return;
     }
+    decoded.clear();
     boolean scheduled = SchedulerUtils.runGlobal(Gloss.instance, () -> {
       for (File file : changed) {
         Gloss.log(Level.INFO, "Image asset \"%s\" changed and was hot reloaded.", file.getName());
@@ -182,5 +203,13 @@ public final class ImageAssets {
         || name.endsWith(".bak")
         || name.contains(".tmp.")
         || name.contains(".temp.");
+  }
+
+  /** One decode, keyed by the file it came from and the bytes that were on disk at the time. */
+  private record Decoded(File file, long length, long modified, Pair<ImageFormat, BufferedImage> image) {
+
+    private boolean matches(File candidate, long candidateLength, long candidateModified) {
+      return length == candidateLength && modified == candidateModified && file.equals(candidate);
+    }
   }
 }

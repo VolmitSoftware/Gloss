@@ -19,6 +19,7 @@ import art.arcane.volmlib.util.scheduling.FoliaScheduler;
 import art.arcane.volmlib.util.scheduling.SchedulerUtils;
 import art.arcane.volmlib.util.scheduling.SlidingWindowRateLimiter;
 import org.bukkit.Location;
+import org.bukkit.World;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
@@ -43,6 +44,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Supplier;
 
 public final class DamageIndicatorsService implements Listener {
     private static final long DEBOUNCE_MS = 150L;
@@ -57,6 +59,7 @@ public final class DamageIndicatorsService implements Listener {
     private final Map<UUID, Long> debounce = new ConcurrentHashMap<>();
     private final SlidingWindowRateLimiter rateLimiter = new SlidingWindowRateLimiter();
     private final Map<String, LiveIndicator> live = new ConcurrentHashMap<>();
+    private final IndicatorChunkIndex<LiveIndicator> index = new IndicatorChunkIndex<>();
     private final AtomicLong sequence = new AtomicLong();
     private final AtomicLong lifecycleEpoch = new AtomicLong();
     private final IndicatorBudget budget = new IndicatorBudget(BUDGET_WINDOW_MS);
@@ -139,13 +142,13 @@ public final class DamageIndicatorsService implements Listener {
     public void onDamage(EntityDamageEvent event) {
         ActiveSettings snapshot = activeSettings;
         sample(event.getEntity(), snapshot,
-            DamageIndicatorEventSnapshot.damage(event, plugin, criticality));
+            () -> DamageIndicatorEventSnapshot.damage(event, plugin, criticality));
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onRegainHealth(EntityRegainHealthEvent event) {
         ActiveSettings snapshot = activeSettings;
-        sample(event.getEntity(), snapshot, DamageIndicatorEventSnapshot.healing(event));
+        sample(event.getEntity(), snapshot, () -> DamageIndicatorEventSnapshot.healing(event));
     }
 
     @EventHandler(priority = EventPriority.MONITOR)
@@ -166,6 +169,9 @@ public final class DamageIndicatorsService implements Listener {
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onViewerMove(PlayerMoveEvent event) {
+        if (index.isEmpty()) {
+            return;
+        }
         Location destination = event.getTo();
         if (destination == null || sameChunk(event.getFrom(), destination)) {
             return;
@@ -266,7 +272,7 @@ public final class DamageIndicatorsService implements Listener {
     }
 
     private void sample(Entity entity, ActiveSettings snapshot,
-                        DamageIndicatorEventSnapshot eventSnapshot) {
+                        Supplier<DamageIndicatorEventSnapshot> eventSnapshot) {
         GlossConfig.Indicators cfg = plugin.cfg().indicators();
         if (!cfg.enabled()) {
             return;
@@ -274,17 +280,27 @@ public final class DamageIndicatorsService implements Listener {
         if (!(entity instanceof LivingEntity living)) {
             return;
         }
-        long now = nowMs();
-        if (budget.saturated(now, snapshot.document().limits().maxPerSecond())) {
-            return;
-        }
-        if (!claimDebounce(debounce, living.getUniqueId(), now, DEBOUNCE_MS)) {
+        DamageIndicatorEventSnapshot captured = admit(living.getUniqueId(),
+            snapshot.document().limits().maxPerSecond(), nowMs(), eventSnapshot);
+        if (captured == null) {
             return;
         }
 
         double before = living.getHealth();
         FoliaScheduler.runEntity(plugin, living,
-            () -> compare(living, before, snapshot, eventSnapshot), SAMPLE_DELAY_TICKS);
+            () -> compare(living, before, snapshot, captured), SAMPLE_DELAY_TICKS);
+    }
+
+    /** Builds the event snapshot only once the rate and debounce gates have admitted the event. */
+    DamageIndicatorEventSnapshot admit(UUID entityId, int maxPerSecond, long nowMs,
+                                       Supplier<DamageIndicatorEventSnapshot> eventSnapshot) {
+        if (budget.saturated(nowMs, maxPerSecond)) {
+            return null;
+        }
+        if (!claimDebounce(debounce, entityId, nowMs, DEBOUNCE_MS)) {
+            return null;
+        }
+        return eventSnapshot.get();
     }
 
     static boolean claimDebounce(Map<UUID, Long> debounce, UUID entityId, long nowMs, long windowMs) {
@@ -388,6 +404,7 @@ public final class DamageIndicatorsService implements Listener {
                 anchor,
                 plugin.cfg().holograms().viewRange());
             live.put(id, candidate);
+            candidate.index();
             if (!spawnStillCurrent(
                 listening, lifecycleEpoch.get(), spawnEpoch, plugin.cfg().indicators().enabled())) {
                 return;
@@ -421,6 +438,7 @@ public final class DamageIndicatorsService implements Listener {
                 failures++;
             }
         }
+        index.clear();
         if (failures > 0) {
             Gloss.warn("Failed to destroy " + failures + " damage indicators on shutdown.");
         }
@@ -438,12 +456,16 @@ public final class DamageIndicatorsService implements Listener {
     }
 
     private void reevaluateViewer(Player viewer) {
-        if (!listening || !viewer.isOnline()) {
+        if (!listening || !viewer.isOnline() || index.isEmpty()) {
             return;
         }
-        for (LiveIndicator indicator : live.values()) {
-            indicator.updateViewer(viewer);
+        Location viewerLocation = viewer.getLocation();
+        World world = viewerLocation.getWorld();
+        if (world == null) {
+            return;
         }
+        index.forEachNear(world.getUID(), viewerLocation.getBlockX() >> 4, viewerLocation.getBlockZ() >> 4,
+            indicator -> indicator.updateViewer(viewer, viewerLocation));
     }
 
     private static boolean sameChunk(Location first, Location second) {
@@ -503,6 +525,10 @@ public final class DamageIndicatorsService implements Listener {
         private final Map<String, Object> eventValues;
         private final Location anchor;
         private final double rangeSquared;
+        private final UUID worldId;
+        private final int chunkX;
+        private final int chunkZ;
+        private final int chunkRadius;
         private final AtomicBoolean retired = new AtomicBoolean();
 
         private LiveIndicator(TemporaryHologram hologram, long expiresAtMs,
@@ -518,20 +544,32 @@ public final class DamageIndicatorsService implements Listener {
             this.eventValues = Map.copyOf(eventValues);
             this.anchor = anchor.clone();
             this.rangeSquared = viewRange * viewRange;
+            World world = this.anchor.getWorld();
+            this.worldId = world == null ? null : world.getUID();
+            this.chunkX = this.anchor.getBlockX() >> 4;
+            this.chunkZ = this.anchor.getBlockZ() >> 4;
+            this.chunkRadius = IndicatorChunkIndex.chunkRadius(viewRange);
+        }
+
+        private void index() {
+            index.add(worldId, chunkX, chunkZ, chunkRadius, this);
         }
 
         private void updateViewer(Player viewer) {
+            updateViewer(viewer, viewer.getLocation());
+        }
+
+        private void updateViewer(Player viewer, Location viewerLocation) {
             if (retired.get()) {
                 return;
             }
-            Location viewerLocation = viewer.getLocation();
             if (viewerLocation.getWorld() != anchor.getWorld()
                 || viewerLocation.distanceSquared(anchor) > rangeSquared) {
                 hologram.viewers().remove(viewer.getUniqueId());
                 return;
             }
             GlossConditionContext context = new GlossConditionContext(
-                viewer, null, null, viewer.getLocation(), eventValues);
+                viewer, null, null, viewerLocation, eventValues);
             boolean included = conditions.includesViewer(
                 new GlossConditionScope(plugin, context), conditionErrors);
             if (included) {
@@ -545,6 +583,7 @@ public final class DamageIndicatorsService implements Listener {
             if (!retired.compareAndSet(false, true)) {
                 return true;
             }
+            index.remove(worldId, chunkX, chunkZ, this);
             try {
                 if (destroy) {
                     hologram.destroy();

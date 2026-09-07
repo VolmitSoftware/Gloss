@@ -231,11 +231,19 @@ final class PreviewStateAdapters {
     return block.getState();
   }
 
+  /**
+   * One contents read per sample. {@code getItem} builds a fresh stack mirror per call, so counting
+   * an occupied 27-slot chest that way costs 27 allocations; the array read costs one. Only the
+   * inventory's own slots are counted, so a backing array that carries extra slots (armour on a
+   * player inventory) reads the same as it always did.
+   */
   private static void sampleInventory(Inventory inventory, Map<String, Object> out) {
     int size = inventory.getSize();
+    ItemStack[] contents = inventory.getContents();
+    int counted = contents == null ? 0 : Math.min(size, contents.length);
     int occupied = 0;
-    for (int slot = 0; slot < size; slot++) {
-      if (!empty(inventory.getItem(slot))) {
+    for (int slot = 0; slot < counted; slot++) {
+      if (!empty(contents[slot])) {
         occupied++;
       }
     }

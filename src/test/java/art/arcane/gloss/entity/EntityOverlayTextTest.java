@@ -16,6 +16,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class EntityOverlayTextTest {
+    private static final java.util.function.Predicate<String> SHARED_CLIPS = line -> false;
+
     private static final EntityOverlayText.Snapshot NAMED = new EntityOverlayText.Snapshot(
         "Sentinel", 15, 20, 20, 5, 7, 4, 12, "zombie", 3.5);
 
@@ -115,6 +117,28 @@ class EntityOverlayTextTest {
         assertTrue(EntityOverlayText.refreshRequired(doc("\"show\":\"viewer.level > 1\"")));
         assertTrue(EntityOverlayText.refreshRequired(doc("\"lines\":[{\"id\":\"clock\",\"text\":\"|animation.clock|\"}]")));
         assertTrue(EntityOverlayText.refreshRequired(doc("\"lines\":[{\"id\":\"clock\",\"text\":\"{{ time.seconds }}\"}]")));
+    }
+
+    @Test
+    void personalTextIsOnlyRequiredWhenTheRenderActuallyVariesByViewer() {
+        assertFalse(EntityOverlayText.personalRequired(EntityOverlayDoc.DEFAULTS, SHARED_CLIPS));
+        assertFalse(EntityOverlayText.personalRequired(doc("\"show\":\"entity.health > 1\""), SHARED_CLIPS));
+        assertTrue(EntityOverlayText.personalRequired(
+            doc("\"lines\":[{\"id\":\"who\",\"text\":\"%player_name%\"}]"), SHARED_CLIPS));
+        assertTrue(EntityOverlayText.personalRequired(
+            doc("\"lines\":[{\"id\":\"who\",\"text\":\"|viewer|\"}]"), SHARED_CLIPS));
+        assertTrue(EntityOverlayText.personalRequired(doc("\"show\":\"viewer.level > 1\""), SHARED_CLIPS));
+        assertTrue(EntityOverlayText.personalRequired(
+            doc("\"lines\":[{\"id\":\"far\",\"text\":\"{distance}\"}]"), SHARED_CLIPS));
+    }
+
+    @Test
+    void animationClipsDecideSharingThroughTheAnimationService() {
+        EntityOverlayDoc animated = doc("\"lines\":[{\"id\":\"clock\",\"text\":\"|animation.clock|\"}]");
+
+        assertFalse(EntityOverlayText.personalRequired(animated, SHARED_CLIPS));
+        assertTrue(EntityOverlayText.personalRequired(animated,
+            line -> line.contains("|animation.clock|")));
     }
 
     private static ParticleText.Rendered render(EntityOverlayDoc settings, EntityOverlayText.Snapshot entity,

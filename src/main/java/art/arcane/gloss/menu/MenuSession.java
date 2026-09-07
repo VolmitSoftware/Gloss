@@ -52,6 +52,19 @@ public class MenuSession {
   private ShowCondition parentShow = ShowCondition.ALWAYS;
   private boolean active;
 
+  /**
+   * Identifies the tick pass currently running, and zero between passes. Every {@code show} in the
+   * session — the menu's own and each component's — is evaluated at most once per pass, so the
+   * visibility sweep, the components it opens and the geometry that follows all read one answer
+   * instead of re-running the condition (and, through {@code papi(..)}, a whole placeholder
+   * expansion) per component per tick. Outside a pass the conditions are live, so a click or a
+   * freeze check still sees the state as it is now.
+   */
+  private long conditionEpoch;
+  private long conditionSequence;
+  private long showEpoch;
+  private boolean showMemo;
+
   public MenuSession(MenuDefinitionData data, Player p, MenuSessionOptions options) {
     this.id = data.getId();
     this.player = p;
@@ -104,11 +117,29 @@ public class MenuSession {
   }
 
   public boolean isShown() {
-    return active && show.matches(Gloss.instance, player) && parentShow.matches(Gloss.instance, player);
+    return active && conditionsMatch();
+  }
+
+  /** The pass component memos key off, or zero when no pass is running; see {@link #conditionEpoch}. */
+  public long conditionEpoch() {
+    return conditionEpoch;
   }
 
   public void setParentShow(ShowCondition show) {
     parentShow = Objects.requireNonNull(show, "show");
+  }
+
+  private boolean conditionsMatch() {
+    long epoch = conditionEpoch;
+    if (epoch != 0L && showEpoch == epoch) {
+      return showMemo;
+    }
+    boolean matches = show.matches(Gloss.instance, player) && parentShow.matches(Gloss.instance, player);
+    if (epoch != 0L) {
+      showMemo = matches;
+      showEpoch = epoch;
+    }
+    return matches;
   }
 
   public boolean isFollowPlayer() {
@@ -204,6 +235,15 @@ public class MenuSession {
     if (!active) {
       return;
     }
+    conditionEpoch = ++conditionSequence;
+    try {
+      tickPass();
+    } finally {
+      conditionEpoch = 0L;
+    }
+  }
+
+  private void tickPass() {
     drainApiUpdates();
     boolean shown = isShown();
     for (MenuComponent<?> component : components) {

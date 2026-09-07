@@ -53,6 +53,13 @@ public final class PanelRuntimeManager implements PanelServiceListener {
    */
   private static final double CHUNK_QUERY_PADDING = CHUNK_SIZE * Math.sqrt(2.0D);
 
+  /**
+   * How long a viewer reuses one permission answer. A permission changes when an operator edits a
+   * group, never between ticks, so a viewer samples each node about once a second instead of once
+   * per candidate panel per tick.
+   */
+  private static final long PERMISSION_TTL_NANOS = TimeUnit.SECONDS.toNanos(1L);
+
   private final Gloss plugin;
   private final PanelService boards;
   private final Object definitionLock = new Object();
@@ -245,16 +252,16 @@ public final class PanelRuntimeManager implements PanelServiceListener {
       return;
     }
 
-    double maximumRange = boards.maximumViewRange();
+    double queryRange = boards.maximumViewRange() + CHUNK_QUERY_PADDING;
     for (PlayerPresence presence : playerPresences.values()) {
-      UUID playerId = presence.player().getUniqueId();
+      Player player = presence.player();
+      UUID playerId = player.getUniqueId();
       ViewerState state = viewers.get(playerId);
       boolean active = previews.containsKey(playerId) || state != null && state.anyViews;
-      if (!active && !effectiveIndex.hasCandidate(
-          presence.worldUuid(), presence.x(), presence.z(), maximumRange)) {
+      if (!active && !presence.hasCandidate(effectiveIndex, queryRange)) {
         continue;
       }
-      scheduleViewer(presence.player());
+      scheduleViewer(player);
     }
     for (ViewerState state : viewers.values()) {
       if (state.anyViews) {
@@ -359,6 +366,11 @@ public final class PanelRuntimeManager implements PanelServiceListener {
         () -> playerPresences.remove(player.getUniqueId()));
   }
 
+  /**
+   * Records where a player stands for the candidate prefilter. Only a world or chunk change is
+   * written: the prefilter and the per-viewer candidate cache both key off the chunk, so a move
+   * inside one chunk is a comparison rather than an allocation and a map write on every packet.
+   */
   private void recordPresence(Player player, Location location) {
     World world = location.getWorld();
     UUID playerId = player.getUniqueId();
@@ -366,8 +378,16 @@ public final class PanelRuntimeManager implements PanelServiceListener {
       playerPresences.remove(playerId);
       return;
     }
-    playerPresences.put(playerId,
-        new PlayerPresence(player, world.getUID(), location.getX(), location.getZ()));
+    UUID worldUuid = world.getUID();
+    int chunkX = (int) Math.floor(location.getX() / CHUNK_SIZE);
+    int chunkZ = (int) Math.floor(location.getZ() / CHUNK_SIZE);
+    PlayerPresence presence = playerPresences.get(playerId);
+    if (presence == null || presence.player() != player) {
+      playerPresences.put(playerId, new PlayerPresence(player,
+          new PlayerPosition(worldUuid, chunkX, chunkZ, location.getX(), location.getZ())));
+    } else if (!presence.at(worldUuid, chunkX, chunkZ)) {
+      presence.moveTo(new PlayerPosition(worldUuid, chunkX, chunkZ, location.getX(), location.getZ()));
+    }
     if (followedBoardsByTarget.containsKey(playerId)) {
       pendingFollowPoses.put(playerId, PanelFollowPose.from(location));
     }
@@ -513,25 +533,14 @@ public final class PanelRuntimeManager implements PanelServiceListener {
     }
   }
 
-  private boolean canView(Player player, PanelDefinition board) {
-    PanelVisibility visibility = board.visibility();
-    return switch (visibility.mode()) {
-      case PUBLIC -> true;
-      case PERMISSION -> player.hasPermission(visibility.viewPermission());
-      case HIDDEN -> false;
-    };
-  }
-
-  private boolean canInteract(Player player, PanelDefinition board) {
-    String permission = board.visibility().interactPermission();
-    return permission == null || player.hasPermission(permission);
-  }
-
   private final class ViewerState {
     private final Player player;
     private final Map<UUID, PanelViewSession> views = new HashMap<>();
     private final Map<UUID, Long> unavailable = new HashMap<>();
     private final Set<UUID> dismissed = new HashSet<>();
+    private final Map<String, PermissionSample> permissions = new HashMap<>();
+    private final Map<UUID, PanelDefinition> effectiveCandidates = new LinkedHashMap<>();
+    private final Set<UUID> inRange = new HashSet<>();
     private final long visibleBoardEpoch;
 
     private List<PanelDefinition> cachedCandidates = List.of();
@@ -540,7 +549,8 @@ public final class PanelRuntimeManager implements PanelServiceListener {
     private double cachedRange = -1.0D;
     private int cachedChunkX;
     private int cachedChunkZ;
-    private boolean closed;
+    private UUID permissionWorld;
+    private volatile boolean closed;
 
     private volatile boolean anyViews;
 
@@ -549,7 +559,12 @@ public final class PanelRuntimeManager implements PanelServiceListener {
       this.visibleBoardEpoch = visibleBoards.epoch();
     }
 
-    private synchronized void tick() {
+    /**
+     * Samples what this viewer can see without holding the viewer monitor — the position read, the
+     * presence write and the spatial query are all answered from snapshots — and takes it only for
+     * the view lifecycle, which has to stay exclusive against close, refresh and click handling.
+     */
+    private void tick() {
       if (closed || !running) {
         close();
         return;
@@ -558,17 +573,29 @@ public final class PanelRuntimeManager implements PanelServiceListener {
       recordPresence(player, location);
       World world = location.getWorld();
       if (world == null) {
-        closeViews();
+        discardViews();
         return;
       }
+      applyViews(world, location, candidates(world, location), previews.get(player.getUniqueId()));
+    }
 
-      List<PanelDefinition> candidates = candidates(world, location);
-      PanelPreview preview = previews.get(player.getUniqueId());
+    private synchronized void discardViews() {
+      closeViews();
+    }
+
+    private synchronized void applyViews(World world, Location location,
+                                         List<PanelDefinition> candidates, PanelPreview preview) {
+      if (closed || !running) {
+        close();
+        return;
+      }
+      effectiveCandidates.clear();
+      inRange.clear();
+      forgetPermissionsOnWorldChange(world);
       if (candidates.isEmpty() && preview == null && views.isEmpty()
           && dismissed.isEmpty() && unavailable.isEmpty()) {
         return;
       }
-      Map<UUID, PanelDefinition> effectiveCandidates = new LinkedHashMap<>(candidates.size() + 1);
       for (PanelDefinition candidate : candidates) {
         effectiveCandidates.put(candidate.uuid(), candidate);
       }
@@ -583,13 +610,12 @@ public final class PanelRuntimeManager implements PanelServiceListener {
         }
         effectiveCandidates.put(previewDefinition.uuid(), previewDefinition.withTransform(previewTransform));
       }
-      Set<UUID> inRange = new HashSet<>();
       for (PanelDefinition effective : effectiveCandidates.values()) {
         boolean editing = preview != null && preview.definition().uuid().equals(effective.uuid());
         PanelDefinition definition = editing ? preview.definition() : definitions.get(effective.uuid());
         if (definition == null
             || !effective.transform().worldUuid().equals(world.getUID())
-            || (!editing && !canView(player, definition))) {
+            || (!editing && !canView(definition))) {
           continue;
         }
         double range = definition.visibility().viewRange();
@@ -726,7 +752,7 @@ public final class PanelRuntimeManager implements PanelServiceListener {
                     .orElse(preview.effectiveTransform())
                 : preview.effectiveTransform())
             : effectiveIndex.get(definition.uuid()).map(PanelDefinition::transform).orElse(null);
-        if ((!editing && (!canView(player, definition) || !canInteract(player, definition)))
+        if ((!editing && (!canView(definition) || !canInteract(definition)))
             || currentEffective == null
             || !view.effectiveTransform().equals(currentEffective)
             || PanelPlacement.distanceSquared(view.effectiveTransform(), eye) > interactionRange * interactionRange) {
@@ -796,6 +822,45 @@ public final class PanelRuntimeManager implements PanelServiceListener {
       closeViews();
       dismissed.clear();
       unavailable.clear();
+      permissions.clear();
+      permissionWorld = null;
+      effectiveCandidates.clear();
+      inRange.clear();
+    }
+
+    private boolean canView(PanelDefinition board) {
+      PanelVisibility visibility = board.visibility();
+      return switch (visibility.mode()) {
+        case PUBLIC -> true;
+        case PERMISSION -> hasPermission(visibility.viewPermission());
+        case HIDDEN -> false;
+      };
+    }
+
+    private boolean canInteract(PanelDefinition board) {
+      String permission = board.visibility().interactPermission();
+      return permission == null || hasPermission(permission);
+    }
+
+    /** A world change is a permission context boundary, so cached answers do not survive it. */
+    private void forgetPermissionsOnWorldChange(World world) {
+      UUID worldUuid = world.getUID();
+      if (worldUuid.equals(permissionWorld)) {
+        return;
+      }
+      permissionWorld = worldUuid;
+      permissions.clear();
+    }
+
+    private boolean hasPermission(String node) {
+      long now = System.nanoTime();
+      PermissionSample sample = permissions.get(node);
+      if (sample != null && now - sample.sampledAtNanos() < PERMISSION_TTL_NANOS) {
+        return sample.granted();
+      }
+      boolean granted = player.hasPermission(node);
+      permissions.put(node, new PermissionSample(now, granted));
+      return granted;
     }
 
     private void closeViews() {
@@ -847,6 +912,9 @@ public final class PanelRuntimeManager implements PanelServiceListener {
     }
   }
 
+  private record PermissionSample(long sampledAtNanos, boolean granted) {
+  }
+
   private record PanelPreview(PanelDefinition definition, PanelTransform effectiveTransform) {
     private PanelPreview {
       definition = Objects.requireNonNull(definition, "definition");
@@ -858,6 +926,59 @@ public final class PanelRuntimeManager implements PanelServiceListener {
     }
   }
 
-  private record PlayerPresence(Player player, UUID worldUuid, double x, double z) {
+  /**
+   * One player's last known chunk plus the prefilter answer for it. The position is replaced only
+   * on a world or chunk change; the candidate fields are read and written by the driver tick alone.
+   */
+  private static final class PlayerPresence {
+    private final Player player;
+    private volatile PlayerPosition position;
+    private PlayerPosition candidatePosition;
+    private double candidateRange = -1.0D;
+    private long candidateGeneration = -1L;
+    private boolean candidate;
+
+    private PlayerPresence(Player player, PlayerPosition position) {
+      this.player = player;
+      this.position = position;
+    }
+
+    private Player player() {
+      return player;
+    }
+
+    private boolean at(UUID worldUuid, int chunkX, int chunkZ) {
+      PlayerPosition current = position;
+      return current.chunkX() == chunkX && current.chunkZ() == chunkZ
+          && current.worldUuid().equals(worldUuid);
+    }
+
+    private void moveTo(PlayerPosition replacement) {
+      position = replacement;
+    }
+
+    /**
+     * Whether any panel can reach this player, recomputed only when the player changed chunk or
+     * the index published a change intersecting the queried window. The query is padded by a chunk
+     * diagonal so the answer holds for every position the recorded chunk contains.
+     */
+    private boolean hasCandidate(PanelSpatialIndex index, double queryRange) {
+      PlayerPosition current = position;
+      long generation = index.generation();
+      if (current == candidatePosition && queryRange == candidateRange
+          && (generation == candidateGeneration || !index.changedSince(candidateGeneration,
+          generation, current.worldUuid(), current.x(), current.z(), queryRange))) {
+        candidateGeneration = generation;
+        return candidate;
+      }
+      candidate = index.hasCandidate(current.worldUuid(), current.x(), current.z(), queryRange);
+      candidatePosition = current;
+      candidateRange = queryRange;
+      candidateGeneration = generation;
+      return candidate;
+    }
+  }
+
+  private record PlayerPosition(UUID worldUuid, int chunkX, int chunkZ, double x, double z) {
   }
 }

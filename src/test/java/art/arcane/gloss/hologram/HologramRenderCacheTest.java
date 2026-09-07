@@ -16,6 +16,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -113,7 +114,40 @@ class HologramRenderCacheTest {
         hologram.update();
 
         assertEquals(1L, renderCount("&aStatic"), "static segments must survive across drives");
-        assertEquals(4L, renderCount("%p% dynamic"));
+        assertEquals(2L, renderCount("%p% dynamic"),
+            "a second drive inside the configured refresh window reuses the per-viewer memo");
+    }
+
+    @Test
+    void thePerViewerMemoExpiresAtTheConfiguredRefreshWindow() throws InterruptedException {
+        harness.configure(file -> file.holograms.updateIntervalTicks = 1);
+        AtomicReference<String> value = new AtomicReference<>("one");
+        harness.text.setEmojiFilter(raw -> {
+            renders.add(raw);
+            return raw.equals("%p% dynamic") ? "%p% " + value.get() : raw;
+        });
+        PersistentHologram hologram = hologram("h-memo-window", List.of("%p% dynamic"));
+        hologram.update();
+        harness.drainDelayed();
+        assertEquals(Set.of("%p% one"), new HashSet<>(latestViewerText().values()));
+        long afterFirst = renderCount("%p% dynamic");
+
+        value.set("two");
+        hologram.update();
+        harness.drainDelayed();
+
+        assertEquals(afterFirst, renderCount("%p% dynamic"),
+            "a drive inside the refresh window reuses the per-viewer memo");
+        assertEquals(Set.of("%p% one"), new HashSet<>(latestViewerText().values()),
+            "a placeholder value that changed without a generation bump stays until the window ends");
+
+        Thread.sleep(60L);
+        hologram.update();
+        harness.drainDelayed();
+
+        assertTrue(renderCount("%p% dynamic") > afterFirst,
+            "the memo must expire at the configured refresh window");
+        assertEquals(Set.of("%p% two"), new HashSet<>(latestViewerText().values()));
     }
 
     @Test

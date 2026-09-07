@@ -59,13 +59,14 @@ import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.util.RayTraceResult;
 import org.bukkit.util.Vector;
 
-import java.util.ArrayDeque;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Queue;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 
 public final class MenuSessionManager {
@@ -77,9 +78,30 @@ public final class MenuSessionManager {
   private static final double OBSTRUCTION_START = 0.1D;
   static final int PREVIEW_DISCOVERY_LIMIT_PER_TICK = 10;
   static final int PREVIEW_FALLBACK_INTERVAL_TICKS = 100;
+  /**
+   * Interactive discovery gets one slot per this many online players on top of the floor, so a
+   * thousand-player server is not sharing the same ten slots a ten-player one had — and so the
+   * fallback sweep, which already offers ten a tick at that size, cannot eat the whole budget.
+   */
+  static final int PREVIEW_DISCOVERY_PLAYERS_PER_SLOT = 20;
+  /**
+   * How often a player's scan runs the entity ray trace. The block trace answers on every scan; the
+   * entity trace is the expensive half — a swept sweep of everything near the ray, which is a
+   * function of local crowd density — and only carts and chest boats can ever win it. A player
+   * already holding an entity target keeps tracing every scan, so a cart card never flickers or
+   * lingers; everyone else acquires one within this many ticks.
+   */
+  static final int PREVIEW_ENTITY_TRACE_INTERVAL_TICKS = 4;
 
   private final Map<UUID, SessionHolder> holders = new ConcurrentHashMap<>();
   private final Map<UUID, PreviewMiss> previewMisses = new ConcurrentHashMap<>();
+  /**
+   * Scans left before each viewer's next entity ray trace. Keyed per player rather than held on a
+   * {@link SessionHolder}, which exists only while that player has a menu or a preview open — the
+   * population this cadence is for is everyone else, walking around with nothing open and no
+   * holder. Same lifecycle as {@link #previewMisses}.
+   */
+  private final Map<UUID, Integer> entityTraceCountdowns = new ConcurrentHashMap<>();
   private final PreviewDiscoveryQueue previewDiscoveryQueue = new PreviewDiscoveryQueue();
   private final PreviewFallbackSweep previewFallbackSweep = new PreviewFallbackSweep();
 
@@ -183,14 +205,8 @@ public final class MenuSessionManager {
     Events.listen(Gloss.instance, PlayerJoinEvent.class, EventPriority.MONITOR, e -> {
       queuePreviewDiscovery(e.getPlayer(), false);
     });
-    Events.listen(Gloss.instance, PlayerQuitEvent.class, EventPriority.MONITOR, e -> {
-      DisplayEntityManager.forget(e.getPlayer());
-      previewMisses.remove(e.getPlayer().getUniqueId());
-      previewDiscoveryQueue.remove(e.getPlayer().getUniqueId());
-      SessionHolder holder = holders.remove(e.getPlayer().getUniqueId());
-      if (holder == null) return;
-      holder.close(HoloCloseReason.QUIT);
-    });
+    Events.listen(Gloss.instance, PlayerQuitEvent.class, EventPriority.MONITOR,
+        e -> forgetPlayer(e.getPlayer()));
     Events.listen(Gloss.instance, PlayerInteractEvent.class, EventPriority.HIGHEST, this::dispatchClick);
     entityInteractionListener = PacketEvents.getAPI() == null
         || PacketEvents.getAPI().getEventManager() == null
@@ -561,6 +577,7 @@ public final class MenuSessionManager {
     holders.values().forEach(holder -> holder.close(HoloCloseReason.GLOSS_SHUTDOWN));
     holders.clear();
     previewMisses.clear();
+    entityTraceCountdowns.clear();
     previewDiscoveryQueue.clear();
     previewFallbackSweep.clear();
     openMenus.clear();
@@ -687,6 +704,7 @@ public final class MenuSessionManager {
     return SchedulerUtils.scheduleSyncTask(Gloss.instance, 1L, () -> {
       if (!ContainerPreviewAccess.isEnabled()) {
         previewMisses.clear();
+        entityTraceCountdowns.clear();
         previewDiscoveryQueue.clear();
         previewFallbackSweep.clear();
         previewFallbackPhase = 0;
@@ -696,12 +714,51 @@ public final class MenuSessionManager {
         previewFallbackSweep.begin(Bukkit.getOnlinePlayers());
       }
       previewFallbackSweep.drainBatch(player -> queuePreviewDiscovery(player, true));
-      previewDiscoveryQueue.drain(PREVIEW_DISCOVERY_LIMIT_PER_TICK, this::schedulePreviewDiscovery);
+      previewDiscoveryQueue.drain(discoveryLimitPerTick(), this::schedulePreviewDiscovery);
       previewFallbackPhase++;
       if (previewFallbackPhase >= PREVIEW_FALLBACK_INTERVAL_TICKS) {
         previewFallbackPhase = 0;
       }
     }, false);
+  }
+
+  /**
+   * Discovery slots for this tick, scaled to the population. Ten a tick is five seconds of backlog
+   * at a thousand players; the floor keeps small servers on exactly the behaviour they had.
+   */
+  static int discoveryLimitPerTick(int onlinePlayers) {
+    return Math.max(PREVIEW_DISCOVERY_LIMIT_PER_TICK, onlinePlayers / PREVIEW_DISCOVERY_PLAYERS_PER_SLOT);
+  }
+
+  /**
+   * Drops everything a departing player left behind. Also the seam the quit listener routes to, so
+   * the per-player bookkeeping has one place that owns its removal.
+   */
+  void forgetPlayer(Player player) {
+    UUID playerId = player.getUniqueId();
+    DisplayEntityManager.forget(player);
+    previewMisses.remove(playerId);
+    entityTraceCountdowns.remove(playerId);
+    previewDiscoveryQueue.remove(playerId);
+    SessionHolder holder = holders.remove(playerId);
+    if (holder != null) {
+      holder.close(HoloCloseReason.QUIT);
+    }
+  }
+
+  /**
+   * Whether this viewer's scan may run the entity ray trace, granting the first scan and then one
+   * in every {@link #PREVIEW_ENTITY_TRACE_INTERVAL_TICKS}. The block trace still answers on every
+   * scan, so a container never lags; only the swept entity sweep is rationed.
+   */
+  private boolean claimEntityTrace(UUID playerId) {
+    int remaining = entityTraceCountdowns.compute(playerId, (id, countdown) ->
+        countdown != null && countdown > 1 ? countdown - 1 : PREVIEW_ENTITY_TRACE_INTERVAL_TICKS);
+    return remaining == PREVIEW_ENTITY_TRACE_INTERVAL_TICKS;
+  }
+
+  private int discoveryLimitPerTick() {
+    return discoveryLimitPerTick(Bukkit.getOnlinePlayers().size());
   }
 
   void managePreviewEvents(Player p, boolean forceRescan) {
@@ -710,6 +767,7 @@ public final class MenuSessionManager {
       SessionHolder holder = holders.get(playerId);
       if (!ContainerPreviewAccess.isEnabled() || !p.isOnline()) {
         previewMisses.remove(playerId);
+        entityTraceCountdowns.remove(playerId);
         if (holder != null) {
           holder.closePreview();
         }
@@ -721,12 +779,16 @@ public final class MenuSessionManager {
       if (!forceRescan && miss != null && miss.matches(eye)) {
         return;
       }
+      // Resolved before stableAim, which forgets the record when the preview has already gone.
+      boolean holdsEntityAim = holder != null
+          && holder.aimTarget() instanceof PreviewTarget aimed && aimed.entity() != null;
       if (!forceRescan && holder != null
           && holder.stableAim(eye) instanceof PreviewTarget held && stillEligible(held)) {
         return;
       }
 
-      PreviewTarget target = getLookedAtPreviewTarget(p, eye);
+      boolean traceEntities = forceRescan || holdsEntityAim || claimEntityTrace(playerId);
+      PreviewTarget target = getLookedAtPreviewTarget(p, eye, traceEntities);
       if (target == null) {
         previewMisses.put(playerId, PreviewMiss.at(eye));
         if (holder != null) {
@@ -847,10 +909,10 @@ public final class MenuSessionManager {
    * would have rejected everything.
    */
   private PreviewTarget getLookedAtPreviewTarget(Player player) {
-    return getLookedAtPreviewTarget(player, null);
+    return getLookedAtPreviewTarget(player, null, true);
   }
 
-  private PreviewTarget getLookedAtPreviewTarget(Player player, Location knownEye) {
+  private PreviewTarget getLookedAtPreviewTarget(Player player, Location knownEye, boolean traceEntities) {
     if (!ContainerPreviewAccess.isEnabled()) {
       return null;
     }
@@ -875,7 +937,7 @@ public final class MenuSessionManager {
         : null;
 
     PreviewDocumentRegistry registry = previewRegistry();
-    if (registry == null || !registry.hasEntityMatchers()) {
+    if (!traceEntities || registry == null || !registry.hasEntityMatchers()) {
       return blockTarget;
     }
 
@@ -1079,34 +1141,53 @@ public final class MenuSessionManager {
     }
   }
 
+  /**
+   * The discovery backlog. Every {@code PlayerMoveEvent} on the server offers into it, so it holds
+   * no lock of its own: the deque is a concurrent queue, the pending map is a concurrent map, and
+   * each discovery's own state is guarded by that discovery. On Folia the move event fires on the
+   * player's region thread, and a single shared monitor here would serialise the hottest event on
+   * the server across every region.
+   */
   static final class PreviewDiscoveryQueue {
-    private final ArrayDeque<PreviewDiscovery> queued = new ArrayDeque<>();
-    private final Map<UUID, PreviewDiscovery> pending = new HashMap<>();
+    private final Queue<PreviewDiscovery> queued = new ConcurrentLinkedQueue<>();
+    private final Map<UUID, PreviewDiscovery> pending = new ConcurrentHashMap<>();
+    /** {@link ConcurrentLinkedQueue#size()} walks the queue; the drain budget needs O(1). */
+    private final AtomicInteger queuedCount = new AtomicInteger();
 
-    synchronized boolean offer(Player player, boolean forceRescan) {
+    boolean offer(Player player, boolean forceRescan) {
       UUID playerId = player.getUniqueId();
-      PreviewDiscovery existing = pending.get(playerId);
-      if (existing != null) {
-        if (existing.inFlight) {
-          existing.rerun = true;
-          existing.rerunForce |= forceRescan;
-        } else {
-          existing.forceRescan |= forceRescan;
+      while (true) {
+        PreviewDiscovery existing = pending.get(playerId);
+        if (existing == null) {
+          PreviewDiscovery candidate = new PreviewDiscovery(player, playerId, forceRescan);
+          if (pending.putIfAbsent(playerId, candidate) == null) {
+            enqueue(candidate);
+            return true;
+          }
+          continue;
         }
-        return false;
+        synchronized (existing) {
+          // Re-read under the monitor: a drain thread may have completed and dropped this entry
+          // between the read above and here, in which case the merge would be lost.
+          if (pending.get(playerId) != existing) {
+            continue;
+          }
+          if (existing.inFlight) {
+            existing.rerun = true;
+            existing.rerunForce |= forceRescan;
+          } else {
+            existing.forceRescan |= forceRescan;
+          }
+          return false;
+        }
       }
-
-      PreviewDiscovery discovery = new PreviewDiscovery(player, playerId, forceRescan);
-      pending.put(playerId, discovery);
-      queued.addLast(discovery);
-      return true;
     }
 
     int drain(int limit, Consumer<PreviewDiscovery> action) {
       if (limit <= 0) {
         return 0;
       }
-      int available = Math.min(limit, queuedSize());
+      int available = Math.min(limit, queuedCount.get());
       int drained = 0;
       while (drained < available) {
         PreviewDiscovery discovery = claim();
@@ -1124,64 +1205,89 @@ public final class MenuSessionManager {
       return drained;
     }
 
-    synchronized void complete(PreviewDiscovery discovery) {
-      if (!discovery.inFlight || pending.get(discovery.playerId()) != discovery) {
-        return;
-      }
-      if (discovery.rerun) {
+    void complete(PreviewDiscovery discovery) {
+      boolean requeue;
+      synchronized (discovery) {
+        if (!discovery.inFlight || pending.get(discovery.playerId()) != discovery) {
+          return;
+        }
+        requeue = discovery.rerun;
         discovery.inFlight = false;
-        discovery.forceRescan = discovery.rerunForce;
-        discovery.rerun = false;
-        discovery.rerunForce = false;
-        queued.addLast(discovery);
-        return;
+        if (requeue) {
+          discovery.forceRescan = discovery.rerunForce;
+          discovery.rerun = false;
+          discovery.rerunForce = false;
+        } else {
+          pending.remove(discovery.playerId(), discovery);
+        }
       }
-      pending.remove(discovery.playerId());
-      discovery.inFlight = false;
+      if (requeue) {
+        enqueue(discovery);
+      }
     }
 
-    synchronized void discard(PreviewDiscovery discovery) {
-      if (pending.get(discovery.playerId()) != discovery) {
-        return;
+    void discard(PreviewDiscovery discovery) {
+      synchronized (discovery) {
+        if (!pending.remove(discovery.playerId(), discovery)) {
+          return;
+        }
+        discovery.inFlight = false;
       }
-      pending.remove(discovery.playerId());
-      queued.remove(discovery);
-      discovery.inFlight = false;
+      dequeue(discovery);
     }
 
-    synchronized boolean remove(UUID playerId) {
-      PreviewDiscovery discovery = pending.remove(playerId);
-      if (discovery == null) {
-        return false;
+    boolean remove(UUID playerId) {
+      while (true) {
+        PreviewDiscovery discovery = pending.get(playerId);
+        if (discovery == null) {
+          return false;
+        }
+        synchronized (discovery) {
+          if (pending.get(playerId) != discovery) {
+            continue;
+          }
+          pending.remove(playerId, discovery);
+        }
+        dequeue(discovery);
+        return true;
       }
-      queued.remove(discovery);
-      return true;
     }
 
-    synchronized boolean isPending(PreviewDiscovery discovery) {
+    boolean isPending(PreviewDiscovery discovery) {
       return pending.get(discovery.playerId()) == discovery;
     }
 
-    synchronized int size() {
+    int size() {
       return pending.size();
     }
 
-    synchronized void clear() {
+    void clear() {
       pending.clear();
       queued.clear();
+      queuedCount.set(0);
     }
 
-    private synchronized int queuedSize() {
-      return queued.size();
+    private void enqueue(PreviewDiscovery discovery) {
+      queued.add(discovery);
+      queuedCount.incrementAndGet();
     }
 
-    private synchronized PreviewDiscovery claim() {
-      while (!queued.isEmpty()) {
-        PreviewDiscovery discovery = queued.removeFirst();
-        if (pending.get(discovery.playerId()) != discovery) {
-          continue;
+    private void dequeue(PreviewDiscovery discovery) {
+      if (queued.remove(discovery)) {
+        queuedCount.decrementAndGet();
+      }
+    }
+
+    private PreviewDiscovery claim() {
+      PreviewDiscovery discovery;
+      while ((discovery = queued.poll()) != null) {
+        queuedCount.decrementAndGet();
+        synchronized (discovery) {
+          if (pending.get(discovery.playerId()) != discovery) {
+            continue;
+          }
+          discovery.inFlight = true;
         }
-        discovery.inFlight = true;
         return discovery;
       }
       return null;
@@ -1191,7 +1297,7 @@ public final class MenuSessionManager {
   static final class PreviewDiscovery {
     private final Player player;
     private final UUID playerId;
-    private boolean forceRescan;
+    private volatile boolean forceRescan;
     private boolean inFlight;
     private boolean rerun;
     private boolean rerunForce;

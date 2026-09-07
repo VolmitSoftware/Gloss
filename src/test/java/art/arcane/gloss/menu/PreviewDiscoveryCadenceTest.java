@@ -91,6 +91,35 @@ public class PreviewDiscoveryCadenceTest {
   }
 
   @Test
+  public void theDrainBudgetScalesWithTheOnlineCount() {
+    assertEquals("a small server keeps exactly the budget it had",
+        MenuSessionManager.PREVIEW_DISCOVERY_LIMIT_PER_TICK, MenuSessionManager.discoveryLimitPerTick(0));
+    assertEquals(MenuSessionManager.PREVIEW_DISCOVERY_LIMIT_PER_TICK,
+        MenuSessionManager.discoveryLimitPerTick(200));
+    assertEquals("at a thousand players the fallback sweep alone offers ten a tick, so interactive "
+            + "discovery must have its own room", 50, MenuSessionManager.discoveryLimitPerTick(1000));
+    assertEquals(100, MenuSessionManager.discoveryLimitPerTick(2000));
+  }
+
+  @Test
+  public void aThousandQueuedPlayersDrainWithinASecondAtScale() {
+    MenuSessionManager.PreviewDiscoveryQueue queue = new MenuSessionManager.PreviewDiscoveryQueue();
+    World world = world(new AtomicInteger());
+    for (int index = 0; index < 1000; index++) {
+      queue.offer(player(new UUID(0L, index + 1L), eye(world)), false);
+    }
+
+    int limit = MenuSessionManager.discoveryLimitPerTick(1000);
+    int ticks = 0;
+    while (queue.size() > 0) {
+      queue.drain(limit, queue::complete);
+      ticks++;
+    }
+
+    assertEquals(20, ticks);
+  }
+
+  @Test
   public void emptyFallbackSweepSchedulesNothing() {
     MenuSessionManager.PreviewFallbackSweep sweep = new MenuSessionManager.PreviewFallbackSweep();
 

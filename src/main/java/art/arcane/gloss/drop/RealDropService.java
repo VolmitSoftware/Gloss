@@ -13,6 +13,7 @@ import art.arcane.gloss.particle.ParticleText;
 import art.arcane.gloss.particle.ParticleTextLayout;
 import art.arcane.gloss.service.AdmissionBudget;
 import art.arcane.gloss.hologram.TextDisplayStyle;
+import art.arcane.gloss.text.TextPipeline;
 import art.arcane.gloss.api.HologramBox;
 import art.arcane.gloss.api.IconDisplayStyle;
 import art.arcane.volmlib.util.scheduling.FoliaScheduler;
@@ -42,10 +43,10 @@ import java.util.Arrays;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 final class RealDropService {
     private static final float DEG_TO_RAD = (float) (Math.PI / 180.0D);
@@ -56,6 +57,7 @@ final class RealDropService {
     private static final double ACTIVE_CARRIER_POSITION_EPSILON = 1.0E-7D;
     private static final double SETTLED_CARRIER_POSITION_EPSILON = 1.0D / 512.0D;
     private static final int MAX_DYNAMIC_LIGHTS_PER_CHUNK = 8;
+    static final int MISSING_VISUAL_TEARDOWN_TICKS = 2;
     private static final int DYNAMIC_LIGHT_UPDATE_TICKS = 4;
     static final int MAX_ACTIVE_PRESENTATIONS = 2048;
 
@@ -172,8 +174,7 @@ final class RealDropService {
             existing.selection = selection;
             if (!presentationOwned(existing)) {
                 moveCarrier(existing, config.limits().updateIntervalTicks());
-                plugin.scheduler().runEntity(item,
-                    () -> presentOwned(item, requestedLabel, selection), 1);
+                scheduleRetry(item, existing, requestedLabel);
                 return;
             }
             refreshOwned(existing, label);
@@ -184,6 +185,23 @@ final class RealDropService {
             teardownOwned(existing);
         }
         createOwned(item, label, selection);
+    }
+
+    private void scheduleRetry(Item item, State state, Label requestedLabel) {
+        state.pendingLabel = requestedLabel;
+        if (state.retryPending) {
+            return;
+        }
+        state.retryPending = true;
+        plugin.scheduler().runEntity(item, () -> retryPresent(item, state), 1);
+    }
+
+    private void retryPresent(Item item, State state) {
+        state.retryPending = false;
+        if (state.closed || states.get(state.itemId) != state) {
+            return;
+        }
+        presentOwned(item, state.pendingLabel, state.selection);
     }
 
     private void createOwned(Item item, Label label, RealDropConditionPlan.Selection selection) {
@@ -253,6 +271,7 @@ final class RealDropService {
             for (int index = 0; index < visualCount; index++) {
                 state.visuals.add(spawnVisual(state, stack, index, visualCount, config));
             }
+            visualsChanged(state);
             if (createLabel) {
                 state.label = spawnLabel(state, label, config);
                 state.labelText = label.text();
@@ -267,7 +286,9 @@ final class RealDropService {
             if (createLabel && restoreName) {
                 item.setCustomNameVisible(false);
             }
-            state.stackHash = stack.hashCode();
+            state.stackType = stack.getType();
+            state.stackAmount = stack.getAmount();
+            state.desiredVisuals = visualCount;
             applyPose(state, state.animation.rotation(), state.onGround
                 ? config.landing().transitionTicks()
                 : config.limits().updateIntervalTicks());
@@ -350,7 +371,7 @@ final class RealDropService {
             DropNameService.applyLabelText(hologram, label);
             if (!state.selection.universalAudience()) {
                 plugin.holograms().setViewerCondition(hologram,
-                    viewer -> !state.closed && state.selection.visibleTo(plugin, viewer));
+                    viewer -> !state.closed && audienceVisible(state, viewer));
             }
             return hologram;
         } catch (RuntimeException | Error failure) {
@@ -390,10 +411,10 @@ final class RealDropService {
             }
         }
         ItemStack stack = state.item.getItemStack();
-        int stackHash = stack.hashCode();
-        int desired = desiredVisualCount(stack, config);
-        if (stackHash != state.stackHash) {
-            RealDropModel.ModelKind nextKind = RealDropModel.modelKind(stack.getType());
+        Material stackType = stack.getType();
+        int stackAmount = stack.getAmount();
+        if (stackChanged(state.stackType, state.stackAmount, stackType, stackAmount)) {
+            RealDropModel.ModelKind nextKind = RealDropModel.modelKind(stackType);
             if (usesBlockDisplay(state.modelKind) != usesBlockDisplay(nextKind)) {
                 replaceVisuals(state, stack, nextKind, config);
             } else {
@@ -402,9 +423,12 @@ final class RealDropService {
                     setDisplayContent(display, stack);
                 }
             }
-            state.stackHash = stackHash;
+            state.stackType = stackType;
+            state.stackAmount = stackAmount;
+            state.desiredVisuals = desiredVisualCount(stack, config);
             poseRefreshRequired = true;
         }
+        int desired = state.desiredVisuals;
         int delta = desired - state.visuals.size();
         if (delta > 0 && reserve(state.chunkKey, delta, config.limits().maxVisualsPerChunk())) {
             state.reserved += delta;
@@ -421,8 +445,23 @@ final class RealDropService {
             poseRefreshRequired = true;
         }
         if (poseRefreshRequired) {
+            visualsChanged(state);
             applyPose(state, state.animation.rotation(), config.limits().updateIntervalTicks());
         }
+    }
+
+    /**
+     * The tick path never deep-copies item meta to notice a swap: type plus amount decides the model
+     * kind and the visual count, and a plugin that rewrites a dropped stack in place refreshes it
+     * through the drop API.
+     */
+    static boolean stackChanged(Material appliedType, int appliedAmount, Material type, int amount) {
+        return appliedType != type || appliedAmount != amount;
+    }
+
+    private static void visualsChanged(State state) {
+        state.visualsRevision++;
+        state.visualsView = null;
     }
 
     private void replaceVisuals(State state, ItemStack stack, RealDropModel.ModelKind nextKind,
@@ -436,6 +475,7 @@ final class RealDropService {
         for (int index = 0; index < count; index++) {
             state.visuals.add(spawnVisual(state, stack, index, count, config));
         }
+        visualsChanged(state);
     }
 
     private static int labelVisualCount(HologramBox box) {
@@ -506,16 +546,23 @@ final class RealDropService {
             return;
         }
 
+        int elapsed = Math.max(1, state.lastPollDelayTicks);
+        if (particleOnlyPoll(state.fullPollRemainingTicks, elapsed)) {
+            state.fullPollRemainingTicks -= elapsed;
+            state.pendingElapsedTicks += elapsed;
+            emitParticles(state, config);
+            schedulePoll(state, config, state.fullPollRemainingTicks);
+            return;
+        }
+
         if (!state.selection.universalAudience()) {
             state.selection = state.selection.refreshSnapshot(state.item);
         }
 
         RealDropScriptPlan scriptPlan = state.selection.style().script();
-        int elapsedTicks = Math.max(1, state.lastPollDelayTicks);
+        int elapsedTicks = state.pendingElapsedTicks + elapsed;
+        state.pendingElapsedTicks = 0;
         state.animationAgeTicks += elapsedTicks;
-        RealDropAnimationPlan.AnimationSample sampledAnimation = authoredAnimationSample(state);
-        boolean authoredChanged = !sampledAnimation.equals(state.authoredSample);
-        state.authoredSample = sampledAnimation;
         applyAuthoredPhysics(state, state.authoredSample.physics());
         boolean onGround = state.item.isOnGround();
         Location itemLocation = state.item.getLocation();
@@ -552,28 +599,33 @@ final class RealDropService {
             config);
         recordAnimationEvents(state, previousPhase, frame.phase(), previousInWater, inWater,
             onGround && !state.onGround, bounced);
-        sampledAnimation = authoredAnimationSample(state);
-        authoredChanged |= !sampledAnimation.equals(state.authoredSample);
+        RealDropAnimationPlan plan = state.selection.style().animation();
+        List<RealDropAnimationPlan.ActiveClip> clips = authoredAnimationClips(state, plan);
+        RealDropAnimationPlan.AnimationSample sampledAnimation = authoredAnimationSample(state, plan, clips);
+        boolean authoredChanged = !sampledAnimation.equals(state.authoredSample);
         state.authoredSample = sampledAnimation;
         updateAuthoredLight(state, state.authoredSample.lightLevel());
         state.settled = frame.settled();
-        boolean authoredContinuous = authoredAnimationRequiresContinuousUpdates(state);
+        boolean authoredContinuous = authoredAnimationRequiresContinuousUpdates(state, plan, clips);
         int pollDelayTicks = frame.settled()
             && ((scriptPlan != null && scriptPlan.continuousUpdatesRequired()) || authoredContinuous)
             ? config.limits().updateIntervalTicks()
             : frame.pollDelayTicks();
-        pollDelayTicks = particlePollDelay(config, pollDelayTicks);
         if (!presentationOwned(state)) {
+            if (visualsVanished(state)) {
+                state.closed = true;
+                teardownOwned(state);
+                return;
+            }
             moveCarrier(state, frame.interpolationTicks());
             state.animation.markPoseDirty();
             state.onGround = supported;
             state.lastVelocityY = velocityY;
             state.lastItemX = itemLocation.getX();
             state.lastItemZ = itemLocation.getZ();
-            state.lastPollDelayTicks = pollDelayTicks;
             reconcileAudience(state);
             emitParticles(state, config);
-            scheduleTick(state, pollDelayTicks);
+            schedulePoll(state, config, pollDelayTicks);
             return;
         }
         if (!moveReservation(state, chunkKey(state.item.getLocation()), config.limits().maxVisualsPerChunk())) {
@@ -582,6 +634,7 @@ final class RealDropService {
             return;
         }
         refreshVisuals(state, config);
+        state.missingVisualTicks = 0;
         moveCarrier(state, frame.interpolationTicks());
 
         state.onGround = supported;
@@ -592,10 +645,26 @@ final class RealDropService {
         state.lastVelocityY = velocityY;
         state.lastItemX = itemLocation.getX();
         state.lastItemZ = itemLocation.getZ();
-        state.lastPollDelayTicks = pollDelayTicks;
         reconcileAudience(state);
         emitParticles(state, config);
-        scheduleTick(state, pollDelayTicks);
+        schedulePoll(state, config, pollDelayTicks);
+    }
+
+    /**
+     * Particle layers keep their configured emission rate on a settled drop by polling at the layer
+     * rate; the polls in between the settled cadence only emit, so the stack, carrier and surface
+     * checks stay on {@code settledPollIntervalTicks}.
+     */
+    static boolean particleOnlyPoll(int fullPollRemainingTicks, int elapsedTicks) {
+        return fullPollRemainingTicks > elapsedTicks;
+    }
+
+    private void schedulePoll(State state, GlossConfig.RealDrops config, int fullPollTicks) {
+        state.fullPollRemainingTicks = fullPollTicks;
+        int delay = Math.max(1, particlePollDelay(config.particleLayers(), fullPollTicks,
+            plugin.cfg().particles().enabled()));
+        state.lastPollDelayTicks = delay;
+        scheduleTick(state, delay);
     }
 
     private void failState(State state, RuntimeException failure) {
@@ -705,26 +774,45 @@ final class RealDropService {
 
     private RealDropAnimationPlan.AnimationSample authoredAnimationSample(State state) {
         RealDropAnimationPlan plan = state.selection.style().animation();
-        if (plan == null || !plan.enabled()) {
-            return RealDropAnimationPlan.AnimationSample.neutral("");
-        }
-        String material = state.item.getItemStack().getType().name();
-        List<RealDropAnimationPlan.ActiveClip> active = activeAnimationClips(state, plan, material);
-        return plan.sample(material, active);
+        return authoredAnimationSample(state, plan, authoredAnimationClips(state, plan));
     }
 
-    private boolean authoredAnimationRequiresContinuousUpdates(State state) {
-        RealDropAnimationPlan plan = state.selection.style().animation();
-        if (plan == null || !plan.enabled()) {
+    private RealDropAnimationPlan.AnimationSample authoredAnimationSample(
+        State state,
+        RealDropAnimationPlan plan,
+        List<RealDropAnimationPlan.ActiveClip> clips
+    ) {
+        if (clips.isEmpty()) {
+            return RealDropAnimationPlan.AnimationSample.neutral("");
+        }
+        return plan.sample(state.item.getItemStack().getType().name(), clips);
+    }
+
+    private boolean authoredAnimationRequiresContinuousUpdates(
+        State state,
+        RealDropAnimationPlan plan,
+        List<RealDropAnimationPlan.ActiveClip> clips
+    ) {
+        if (clips.isEmpty()) {
             return false;
         }
         String material = state.item.getItemStack().getType().name();
-        for (RealDropAnimationPlan.ActiveClip clip : activeAnimationClips(state, plan, material)) {
+        for (RealDropAnimationPlan.ActiveClip clip : clips) {
             if (plan.requiresContinuousUpdates(material, clip.trigger(), clip.elapsedTicks())) {
                 return true;
             }
         }
         return false;
+    }
+
+    private static List<RealDropAnimationPlan.ActiveClip> authoredAnimationClips(
+        State state,
+        RealDropAnimationPlan plan
+    ) {
+        if (plan == null || !plan.enabled()) {
+            return List.of();
+        }
+        return activeAnimationClips(state, plan, state.item.getItemStack().getType().name());
     }
 
     private static List<RealDropAnimationPlan.ActiveClip> activeAnimationClips(
@@ -746,6 +834,25 @@ final class RealDropService {
             }
         }
         return active;
+    }
+
+    /**
+     * A presentation whose displays were removed under it (an admin kill, another plugin) keeps its
+     * admission lease and chunk reservation while ticking with nothing to show. Two consecutive
+     * empty polls tear it down so the next drop event can rebuild it.
+     */
+    private static boolean visualsVanished(State state) {
+        state.missingVisualTicks = missingVisualStrikes(state.visuals, state.missingVisualTicks);
+        return state.missingVisualTicks >= MISSING_VISUAL_TEARDOWN_TICKS;
+    }
+
+    static int missingVisualStrikes(List<Display> visuals, int strikes) {
+        for (Display display : visuals) {
+            if (display.isValid()) {
+                return 0;
+            }
+        }
+        return strikes + 1;
     }
 
     private static void recordAnimationEvents(
@@ -1131,12 +1238,13 @@ final class RealDropService {
         }
     }
 
-    private int particlePollDelay(GlossConfig.RealDrops config, int pollDelayTicks) {
-        if (!plugin.cfg().particles().enabled() || config.particleLayers().isEmpty()) {
+    /** The poll rate a drop needs to keep every configured layer emitting at its own interval. */
+    static int particlePollDelay(List<ParticleLayer> layers, int pollDelayTicks, boolean particlesEnabled) {
+        if (!particlesEnabled || layers.isEmpty()) {
             return pollDelayTicks;
         }
         int delay = pollDelayTicks;
-        for (ParticleLayer layer : config.particleLayers()) {
+        for (ParticleLayer layer : layers) {
             delay = Math.min(delay, layer.emission().intervalTicks());
         }
         return Math.max(1, delay);
@@ -1166,8 +1274,9 @@ final class RealDropService {
             return;
         }
         Location labelOrigin = itemOrigin.clone().add(0.0D, config.labels().yOffset(), 0.0D);
-        ParticleEmission emission = new ParticleEmission(state, state.selection, itemOrigin, labelOrigin,
-            state.labelAuthoredText, state.labelText, hasLabel, config, tick);
+        ParticleEmission emission = new ParticleEmission(state, itemOrigin, labelOrigin,
+            state.labelAuthoredText, state.labelText, hasLabel, config, tick,
+            TextPipeline.viewerSpecific(state.labelAuthoredText), new AtomicReference<>());
         double range = plugin.cfg().particles().viewRange();
         if (itemParticles) {
             plugin.holograms().forEachNearbyViewer(itemOrigin, range * range,
@@ -1181,26 +1290,59 @@ final class RealDropService {
         }
     }
 
+    /**
+     * The rendered label and its glyph layout only depend on the viewer when the authored text has a
+     * viewer-specific token. Otherwise the first viewer of an emitting tick builds them and every
+     * other viewer of that tick reuses them; a duplicate build under a race yields the same value.
+     */
+    private ParticleLabel sharedParticleLabel(ParticleEmission emission) {
+        ParticleLabel shared = emission.shared().get();
+        if (shared != null) {
+            return shared;
+        }
+        ParticleText.Rendered label = emission.authoredLabel().isEmpty()
+            ? new ParticleText.Rendered(emission.renderedLabel(), List.of())
+            : plugin.text().renderLegacyParticleText(null, emission.authoredLabel());
+        shared = new ParticleLabel(label, particleTargets(emission, label));
+        emission.shared().set(shared);
+        return shared;
+    }
+
+    private List<List<ParticleRect>> particleTargets(ParticleEmission emission, ParticleText.Rendered label) {
+        List<ParticleLayer> layers = emission.config().particleLayers();
+        List<List<ParticleRect>> targets = new ArrayList<>(layers.size());
+        for (ParticleLayer layer : layers) {
+            targets.add(realDropTargets(layer, label, emission.config(), emission.hasLabel()));
+        }
+        return List.copyOf(targets);
+    }
+
     private void emitParticlesForViewer(ParticleEmission emission, Player viewer, boolean labelScope) {
-        if (emission.state().closed || !viewer.isOnline() || !emission.selection().visibleTo(plugin, viewer)) {
+        if (emission.state().closed || !viewer.isOnline()
+            || !audienceVisible(emission.state(), viewer)) {
             return;
         }
         GlossConfig.RealDrops config = emission.config();
-        ParticleText.Rendered label = emission.authoredLabel().isEmpty()
-            ? new ParticleText.Rendered(emission.renderedLabel(), List.of())
-            : plugin.text().renderLegacyParticleText(viewer, emission.authoredLabel());
+        ParticleLabel shared = emission.viewerText() ? null : sharedParticleLabel(emission);
+        ParticleText.Rendered label = shared == null
+            ? plugin.text().renderLegacyParticleText(viewer, emission.authoredLabel())
+            : shared.label();
         Location origin = labelScope ? emission.labelOrigin() : emission.itemOrigin();
         ParticleFrame frame = labelScope
             ? TextDisplayStyle.particleFrame(origin, viewer.getEyeLocation(),
                 HologramPresentation.identity(), config.labels().style().billboard())
             : billboardFrame(viewer, origin);
-        for (ParticleLayer layer : config.particleLayers()) {
+        List<ParticleLayer> layers = config.particleLayers();
+        for (int index = 0; index < layers.size(); index++) {
+            ParticleLayer layer = layers.get(index);
             String scope = layer.target().scope();
             if (isLabelParticleScope(scope) != labelScope
                 || emission.tick() % layer.emission().intervalTicks() != 0L) {
                 continue;
             }
-            List<ParticleRect> targets = realDropTargets(layer, label, config, emission.hasLabel());
+            List<ParticleRect> targets = shared == null
+                ? realDropTargets(layer, label, config, emission.hasLabel())
+                : shared.targets().get(index);
             if (!scope.equals("local") && targets.isEmpty()) {
                 continue;
             }
@@ -1278,23 +1420,37 @@ final class RealDropService {
         GlossConfig.RealDrops config = selection.style().config();
         double range = Math.max(config.limits().viewRange(), (config.labels().style().viewRange() * 64.0D));
         List<Display> displays = visibleDisplays(state);
+        int revision = state.visualsRevision;
+        long tick = System.currentTimeMillis() / 50L;
         plugin.holograms().forEachViewerWithinBox(state.item.getLocation(), range, viewer -> {
-            state.audienceViewers.add(viewer.getUniqueId());
-            dispatchAudience(state, selection, viewer, displays);
+            if (!state.audience.refreshRequired(viewer.getUniqueId(), revision, tick)) {
+                return;
+            }
+            dispatchAudience(state, selection, viewer, displays, revision, tick);
         });
     }
 
-    private List<Display> visibleDisplays(State state) {
-        return List.copyOf(state.visuals);
+    /**
+     * The audience condition reads the viewer, so it is evaluated on the viewer's own thread. On a
+     * server without regionised threading the drop poll already runs on that same thread.
+     */
+    private void dispatchAudience(State state, RealDropConditionPlan.Selection selection, Player viewer,
+                                  List<Display> displays, int revision, long tick) {
+        if (!detachedRegionizedDisplays) {
+            applyAudience(state, selection, viewer, displays, revision, tick);
+            return;
+        }
+        plugin.scheduler().runEntity(viewer,
+            () -> applyAudience(state, selection, viewer, displays, revision, tick));
     }
 
-    private void dispatchAudience(State state, RealDropConditionPlan.Selection selection,
-                                  Player viewer, List<Display> displays) {
-        plugin.scheduler().runEntity(viewer, () -> {
-            if (state.closed || !viewer.isOnline()) {
-                return;
-            }
-            boolean visible = selection.visibleTo(plugin, viewer);
+    private void applyAudience(State state, RealDropConditionPlan.Selection selection, Player viewer,
+                               List<Display> displays, int revision, long tick) {
+        if (state.closed || !viewer.isOnline()) {
+            return;
+        }
+        boolean visible = selection.visibleTo(plugin, viewer);
+        if (state.audience.changed(viewer.getUniqueId(), visible, revision)) {
             if (visible) {
                 viewer.hideEntity(plugin, state.item);
             } else if (state.restoreVisibleByDefault) {
@@ -1309,14 +1465,41 @@ final class RealDropService {
                     viewer.hideEntity(plugin, display);
                 }
             }
-        });
+        }
+        state.audience.applied(viewer.getUniqueId(), visible, revision, tick);
+    }
+
+    /** The decision the label hologram and the particle emitters read; never a fresh dispatch. */
+    private boolean audienceVisible(State state, Player viewer) {
+        RealDropConditionPlan.Selection selection = state.selection;
+        if (selection.universalAudience()) {
+            return true;
+        }
+        Boolean applied = state.audience.visibility(viewer.getUniqueId());
+        return applied == null ? selection.visibleTo(plugin, viewer) : applied;
+    }
+
+    /** A viewer that quit or changed world keeps none of this drop's applied state. */
+    void forgetViewer(UUID viewerId) {
+        for (State state : states.values()) {
+            state.audience.forget(viewerId);
+        }
+    }
+
+    private static List<Display> visibleDisplays(State state) {
+        List<Display> view = state.visualsView;
+        if (view == null) {
+            view = List.copyOf(state.visuals);
+            state.visualsView = view;
+        }
+        return view;
     }
 
     private void restoreAudience(State state) {
-        if (state.audienceViewers.isEmpty()) {
+        if (state.audience.isEmpty()) {
             return;
         }
-        for (UUID viewerId : state.audienceViewers) {
+        for (UUID viewerId : state.audience.viewers()) {
             Player viewer = plugin.getServer().getPlayer(viewerId);
             if (viewer == null) {
                 continue;
@@ -1332,7 +1515,7 @@ final class RealDropService {
                 }
             });
         }
-        state.audienceViewers.clear();
+        state.audience.clear();
     }
 
     private void scheduleTeardown(State state) {
@@ -1671,11 +1854,12 @@ final class RealDropService {
         private final float[] appliedViewRange;
         private final int[] appliedLightLevel;
         private final Map<GlossConfig.RealDrops.AnimationTrigger, Long> eventTicks;
-        private final Set<UUID> audienceViewers;
+        private final RealDropAudienceMemo audience;
         private final AdmissionBudget.Lease admission;
         private final AtomicBoolean destroyed = new AtomicBoolean();
 
         private ChunkKey chunkKey;
+        private List<Display> visualsView;
         private TemporaryHologram label;
         private int labelReserved;
         private String labelText = "";
@@ -1688,7 +1872,13 @@ final class RealDropService {
         private long animationAgeTicks;
         private long lastLightUpdateTick = Long.MIN_VALUE / 2L;
         private int reserved;
-        private int stackHash;
+        private Material stackType;
+        private int stackAmount;
+        private int desiredVisuals;
+        private int visualsRevision;
+        private int missingVisualTicks;
+        private int fullPollRemainingTicks;
+        private int pendingElapsedTicks;
         private int lastPollDelayTicks;
         private int bounceRevision;
         private int blockLight;
@@ -1715,6 +1905,8 @@ final class RealDropService {
         private LightKey lightBlock;
         private ChunkKey lightChunk;
         private int lightLevel;
+        private volatile Label pendingLabel;
+        private volatile boolean retryPending;
         private volatile RealDropConditionPlan.Selection selection;
         private volatile boolean closed;
 
@@ -1738,7 +1930,7 @@ final class RealDropService {
             this.appliedViewRange = new float[MAX_VISUALS];
             this.appliedLightLevel = new int[MAX_VISUALS];
             this.eventTicks = new EnumMap<>(GlossConfig.RealDrops.AnimationTrigger.class);
-            this.audienceViewers = ConcurrentHashMap.newKeySet();
+            this.audience = new RealDropAudienceMemo();
             Arrays.fill(this.appliedViewRange, -1.0F);
             Arrays.fill(this.appliedLightLevel, -1);
             this.velocity = new Vector();
@@ -1749,9 +1941,13 @@ final class RealDropService {
     private record PhysicsResult(Vector velocity, boolean bounced) {
     }
 
-    private record ParticleEmission(State state, RealDropConditionPlan.Selection selection,
-                                    Location itemOrigin, Location labelOrigin, String authoredLabel,
-                                    String renderedLabel, boolean hasLabel, GlossConfig.RealDrops config, long tick) {
+    private record ParticleEmission(State state, Location itemOrigin, Location labelOrigin,
+                                    String authoredLabel, String renderedLabel, boolean hasLabel,
+                                    GlossConfig.RealDrops config, long tick, boolean viewerText,
+                                    AtomicReference<ParticleLabel> shared) {
+    }
+
+    private record ParticleLabel(ParticleText.Rendered label, List<List<ParticleRect>> targets) {
     }
 
     private record PresentationSample(

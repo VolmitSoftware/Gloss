@@ -16,6 +16,40 @@ public record HologramBoxLayout(int textWidth, int textHeight, int panelWidth, i
                          int frameWidth, int frameHeight) {
     private static final float PIXEL = 0.025F;
 
+    /**
+     * The projection of a string that {@link #measure} actually reads: glyphs, line breaks and the
+     * bold state. Colour codes only reset bold, so an animated gradient produces a stable key and
+     * the box does not re-measure and reconfigure its parts on every frame.
+     */
+    public static String layoutKey(String text) {
+        StringBuilder key = null;
+        for (int index = 0; index < text.length();) {
+            char value = text.charAt(index);
+            if (value != '\u00a7' || index + 1 >= text.length()) {
+                if (key != null) {
+                    key.append(value);
+                }
+                index++;
+                continue;
+            }
+            char code = Character.toLowerCase(text.charAt(index + 1));
+            boolean reset = "0123456789abcdefrx".indexOf(code) >= 0;
+            int width = code == 'x' && index + 13 < text.length() ? 14 : 2;
+            if (key == null) {
+                key = new StringBuilder(text.length());
+                key.append(text, 0, index);
+            }
+            if (code == 'l') {
+                key.append('\u00a7').append('l');
+            } else if (reset) {
+                key.append('\u00a7').append('r');
+            }
+            index += width;
+        }
+
+        return key == null ? text : key.toString();
+    }
+
     public static HologramBoxLayout measure(String text, int lineWidth, HologramBox box) {
         int maximum = 0;
         int width = 0;

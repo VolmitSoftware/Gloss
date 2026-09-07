@@ -30,6 +30,8 @@ public final class GlossBoardMeta {
     private volatile List<BoardDoc.Variant> variants;
     private volatile CompiledCondition selectionCondition;
     private volatile List<CompiledVariant> compiledVariants;
+    private volatile CachedBase base;
+    private volatile CachedFastRefresh fastRefreshText;
     private volatile long revision;
 
     public GlossBoardMeta(String id) {
@@ -103,6 +105,7 @@ public final class GlossBoardMeta {
 
     public void setHideNumbers(boolean hideNumbers) {
         this.hideNumbers = hideNumbers;
+        contentChanged();
     }
 
     public BoardDoc.Selection selection() {
@@ -130,7 +133,7 @@ public final class GlossBoardMeta {
     public void setVariants(List<BoardDoc.Variant> variants) {
         this.variants = variants == null ? List.of() : List.copyOf(variants);
         this.compiledVariants = compileVariants(this.variants);
-        renderPlans.clear();
+        contentChanged();
     }
 
     boolean matchesSelection(ExprScope scope, BoundedConditionErrorCallback errors) {
@@ -143,7 +146,7 @@ public final class GlossBoardMeta {
                 return new ActiveProfile(variant.variant().id(), variant.variant().presentation());
             }
         }
-        return new ActiveProfile("base", presentation());
+        return baseProfile();
     }
 
     public long revision() {
@@ -159,12 +162,61 @@ public final class GlossBoardMeta {
     }
 
     /**
-     * Returns the cached render plan for the current content and emoji generation,
-     * rebuilding it when either changed. Lines without placeholders and functions are
-     * viewer-independent, so their rendered value is computed once and shared.
+     * The board's own presentation, cached because the selection sweep asks for it several times
+     * per viewer per interval and {@link BoardDoc.Presentation} copies its line list.
      */
     BoardDoc.Presentation presentation() {
-        return new BoardDoc.Presentation(title, lines(), hideNumbers);
+        return baseProfile().presentation();
+    }
+
+    /**
+     * Whether any line of this board, in the base presentation or in a variant, needs the one-tick
+     * cadence. It is a pure function of the document, so it is computed once per content revision
+     * instead of re-parsing every expression per viewer per selection sweep.
+     */
+    boolean usesFastRefreshText() {
+        long generation = contentGeneration.get();
+        long emojiGeneration = TextPipeline.emojiGeneration();
+        CachedFastRefresh current = fastRefreshText;
+        if (current != null && current.contentGeneration() == generation
+            && current.emojiGeneration() == emojiGeneration) {
+            return current.value();
+        }
+        boolean computed = usesFastRefreshText(presentation());
+        if (!computed) {
+            for (BoardDoc.Variant variant : variants) {
+                if (usesFastRefreshText(variant.presentation())) {
+                    computed = true;
+                    break;
+                }
+            }
+        }
+        fastRefreshText = new CachedFastRefresh(generation, emojiGeneration, computed);
+        return computed;
+    }
+
+    private static boolean usesFastRefreshText(BoardDoc.Presentation presentation) {
+        if (TextPipeline.requiresFastRefresh(presentation.title())) {
+            return true;
+        }
+        for (String line : presentation.lines()) {
+            if (TextPipeline.requiresFastRefresh(line)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private ActiveProfile baseProfile() {
+        long generation = contentGeneration.get();
+        CachedBase current = base;
+        if (current != null && current.contentGeneration() == generation) {
+            return current.profile();
+        }
+        ActiveProfile built = new ActiveProfile("base",
+            new BoardDoc.Presentation(title, lines(), hideNumbers));
+        base = new CachedBase(generation, built);
+        return built;
     }
 
     RenderPlan renderPlan(String profileId, BoardDoc.Presentation presentation, long emojiGeneration,
@@ -206,6 +258,18 @@ public final class GlossBoardMeta {
     record ActiveProfile(String id, BoardDoc.Presentation presentation) {
     }
 
+    /**
+     * Both memos carry the generations they were derived from, so a reader that started before an
+     * edit can never publish a stale value over a newer one: the stamp simply stops matching.
+     * {@code usesFastRefreshText} also depends on the published conditional-emoji table, which the
+     * emoji registry republishes independently of any board document.
+     */
+    private record CachedBase(long contentGeneration, ActiveProfile profile) {
+    }
+
+    private record CachedFastRefresh(long contentGeneration, long emojiGeneration, boolean value) {
+    }
+
     private record CompiledVariant(BoardDoc.Variant variant, CompiledCondition condition) {
     }
 
@@ -221,17 +285,21 @@ public final class GlossBoardMeta {
         private final long emojiGeneration;
         private final String rawTitle;
         private final String staticTitle;
+        private final boolean fastTitle;
         private final String[] rawLines;
         private final String[] staticLines;
+        private final boolean[] fastLines;
 
         private RenderPlan(long contentGeneration, long emojiGeneration, String rawTitle, String staticTitle,
-                           String[] rawLines, String[] staticLines) {
+                           boolean fastTitle, String[] rawLines, String[] staticLines, boolean[] fastLines) {
             this.contentGeneration = contentGeneration;
             this.emojiGeneration = emojiGeneration;
             this.rawTitle = rawTitle;
             this.staticTitle = staticTitle;
+            this.fastTitle = fastTitle;
             this.rawLines = rawLines;
             this.staticLines = staticLines;
+            this.fastLines = fastLines;
         }
 
         static RenderPlan build(long contentGeneration, long emojiGeneration, String title, List<String> content,
@@ -246,14 +314,17 @@ public final class GlossBoardMeta {
             int count = Math.min(snapshot.length, maxLines);
             String[] rawLines = new String[count];
             String[] staticLines = new String[count];
+            boolean[] fastLines = new boolean[count];
             for (int i = 0; i < count; i++) {
                 String raw = (String) snapshot[i];
                 rawLines[i] = raw;
                 staticLines[i] = (TextPipeline.classify(raw) & DYNAMIC_FLAGS) == 0
                     ? renderValue(raw, staticRender)
                     : null;
+                fastLines[i] = staticLines[i] == null && TextPipeline.requiresFastRefresh(raw);
             }
-            return new RenderPlan(contentGeneration, emojiGeneration, rawTitle, staticTitle, rawLines, staticLines);
+            return new RenderPlan(contentGeneration, emojiGeneration, rawTitle, staticTitle,
+                staticTitle == null && TextPipeline.requiresFastRefresh(rawTitle), rawLines, staticLines, fastLines);
         }
 
         private static String renderValue(String raw, UnaryOperator<String> staticRender) {
@@ -274,6 +345,14 @@ public final class GlossBoardMeta {
 
         String staticTitle() {
             return staticTitle;
+        }
+
+        boolean fastTitle() {
+            return fastTitle;
+        }
+
+        boolean fastLine(int index) {
+            return fastLines[index];
         }
 
         int lineCount() {

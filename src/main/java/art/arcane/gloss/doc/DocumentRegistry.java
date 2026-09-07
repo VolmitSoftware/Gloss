@@ -68,6 +68,7 @@ public final class DocumentRegistry<T> implements AutoCloseable {
     private final Set<String> retryIds;
     private final Set<String> failedIds;
     private final Set<String> reconciliationLoaded;
+    private final Set<String> ownerWrites;
     private final long reconciliationInitialOffsetNanos;
     private volatile Map<String, GlossDocument<T>> snapshot;
     private volatile FolderWatcher folderWatcher;
@@ -77,6 +78,8 @@ public final class DocumentRegistry<T> implements AutoCloseable {
     private long nextFullWatchScanNanos;
     private long nextContentReconciliationNanos;
     private boolean reconciliationInProgress;
+    private boolean polling;
+    private boolean pollInvalidated;
     private DocumentDelta pendingDelta;
     private Map<String, GlossDocument<T>> pendingSnapshot;
     private PendingState pendingState;
@@ -100,11 +103,12 @@ public final class DocumentRegistry<T> implements AutoCloseable {
         this.pendingDeletions = new HashMap<>();
         this.pendingFailureFingerprints = new HashMap<>();
         this.reportedFailureFingerprints = new HashMap<>();
-        this.ignoredSchemaFingerprints = new HashMap<>();
+        this.ignoredSchemaFingerprints = new ConcurrentHashMap<>();
         this.failureRetryIds = new HashSet<>();
         this.retryIds = new HashSet<>();
         this.failedIds = new HashSet<>();
         this.reconciliationLoaded = new HashSet<>();
+        this.ownerWrites = new HashSet<>();
         this.reconciliationInitialOffsetNanos = reconciliationInitialOffsetNanos(kind);
         this.snapshot = Map.of();
         this.reconciliationFiles = List.of();
@@ -188,6 +192,7 @@ public final class DocumentRegistry<T> implements AutoCloseable {
         Objects.requireNonNull(raw, "raw");
         Objects.requireNonNull(value, "value");
         invalidatePending(id);
+        recordOwnerWrite(id);
         clearFailure(id);
         ignoredSchemaFingerprints.remove(id);
         reconciliationLoaded.remove(id);
@@ -204,6 +209,7 @@ public final class DocumentRegistry<T> implements AutoCloseable {
             return false;
         }
         invalidatePending(id);
+        recordOwnerWrite(id);
         clearFailure(id);
         ignoredSchemaFingerprints.remove(id);
         reconciliationLoaded.remove(id);
@@ -222,6 +228,7 @@ public final class DocumentRegistry<T> implements AutoCloseable {
      * reports its contents as creations on the poll after that.
      */
     public synchronized void reload() {
+        pollInvalidated = polling;
         clearPending();
         retryIds.clear();
         failedIds.clear();
@@ -246,49 +253,232 @@ public final class DocumentRegistry<T> implements AutoCloseable {
         publish();
     }
 
-    public synchronized DocumentDelta poll() {
-        if (pendingDelta != null) {
+    /**
+     * One hot-reload pass. The directory walk, the reads and the parses all run off the registry
+     * monitor and land in locals; the monitor is taken only to apply what the pass already holds,
+     * so a main-thread {@code get}, {@code snapshot} or apply never queues behind a stat walk of
+     * the document folder. The pending-delta state machine is unchanged: a pass that finds nothing
+     * stages nothing, and a pass that races an authoritative {@code publish}/{@code remove} drops
+     * exactly the ids the owner just settled.
+     */
+    public DocumentDelta poll() {
+        return layout == Layout.FILE ? pollSingle() : pollFolder();
+    }
+
+    private DocumentDelta pollFolder() {
+        PollStart start = beginPoll();
+        if (start == null) {
             return DocumentDelta.EMPTY;
         }
-        failedIds.clear();
-        if (layout == Layout.FILE) {
-            return pollSingle();
-        }
-        FolderWatcher watcher = folderWatcher;
-        List<String> loaded = new ArrayList<>();
-        List<String> removed = new ArrayList<>();
-        long now = clock.getAsLong();
-        boolean fullWatchScan = now >= nextFullWatchScanNanos;
-        boolean watcherChanged;
         try {
-            watcherChanged = watcher != null
-                && (fullWatchScan ? watcher.checkModified() : watcher.checkModifiedEvents());
+            List<String> loaded = new ArrayList<>();
+            SweepPlan plan = applyWatched(start, readWatched(start), loaded);
+            if (plan == null) {
+                return DocumentDelta.EMPTY;
+            }
+            return applySweep(plan, readSweep(plan), loaded);
         } finally {
-            if (fullWatchScan) {
-                nextFullWatchScanNanos = clock.getAsLong() + FULL_WATCH_SCAN_WINDOW_NANOS;
+            endPoll();
+        }
+    }
+
+    private synchronized PollStart beginPoll() {
+        if (pendingDelta != null) {
+            return null;
+        }
+        failedIds.clear();
+        polling = true;
+        pollInvalidated = false;
+        ownerWrites.clear();
+        long now = clock.getAsLong();
+        String singleId = layout == Layout.FILE ? baseName(target) : null;
+        return new PollStart(folderWatcher, fileWatcher, now >= nextFullWatchScanNanos,
+            now >= nextContentReconciliationNanos,
+            singleId != null && (retryIds.contains(singleId) || failureRetryIds.contains(singleId)), now);
+    }
+
+    private synchronized void endPoll() {
+        polling = false;
+        pollInvalidated = false;
+        ownerWrites.clear();
+    }
+
+    private synchronized void recordOwnerWrite(String id) {
+        if (polling) {
+            ownerWrites.add(id);
+        }
+    }
+
+    /** The full-scan window opens again when the scan finishes, not when it started. */
+    private synchronized void recordFullWatchScan() {
+        nextFullWatchScanNanos = clock.getAsLong() + FULL_WATCH_SCAN_WINDOW_NANOS;
+    }
+
+    private synchronized void recordContentReconciliation() {
+        nextContentReconciliationNanos = clock.getAsLong() + CONTENT_RECONCILIATION_WINDOW_NANOS;
+    }
+
+    private WatchScan<T> readWatched(PollStart start) {
+        FolderWatcher watcher = start.folderWatcher();
+        boolean changed = false;
+        try {
+            changed = watcher != null
+                && (start.fullWatchScan() ? watcher.checkModified() : watcher.checkModifiedEvents());
+        } finally {
+            if (start.fullWatchScan()) {
+                recordFullWatchScan();
             }
         }
-        if (watcherChanged) {
-            for (File file : watcher.getChanged()) {
-                loadTouched(file, loaded, false);
+        if (!changed) {
+            return new WatchScan<>(false, List.of(), List.of());
+        }
+        List<PreparedLoad<T>> touched = new ArrayList<>();
+        for (File file : watcher.getChanged()) {
+            readTouched(file, touched, false);
+        }
+        for (File file : watcher.getCreated()) {
+            readTouched(file, touched, true);
+        }
+        List<DeletedCandidate> deleted = new ArrayList<>();
+        for (File file : watcher.getDeleted()) {
+            if (file != null) {
+                deleted.add(readDeleted(file));
             }
-            for (File file : watcher.getCreated()) {
-                loadTouched(file, loaded, true);
+        }
+        return new WatchScan<>(true, List.copyOf(touched), List.copyOf(deleted));
+    }
+
+    /** Ids still worth reading this pass: one that already failed is not re-read until the next. */
+    private List<String> pending(Set<String> ids) {
+        if (ids.isEmpty()) {
+            return List.of();
+        }
+        List<String> candidates = new ArrayList<>(ids.size());
+        for (String id : ids) {
+            if (!failedIds.contains(id)) {
+                candidates.add(id);
             }
-            for (File file : watcher.getDeleted()) {
-                queueDeleted(file);
+        }
+        return List.copyOf(candidates);
+    }
+
+    private synchronized SweepPlan applyWatched(PollStart start, WatchScan<T> scan, List<String> loaded) {
+        if (pollInvalidated || pendingDelta != null) {
+            return null;
+        }
+        if (scan.changed()) {
+            for (PreparedLoad<T> prepared : scan.touched()) {
+                acceptPrepared(prepared, loaded);
+            }
+            for (DeletedCandidate candidate : scan.deleted()) {
+                applyDeleted(candidate);
             }
             reconciliationLoaded.removeAll(loaded);
             reconciliationLoaded.removeAll(pendingDeletions.keySet());
         }
-        startContentReconciliation(now);
-        if (reconciliationInProgress) {
-            reconcileContent(loaded);
+        startContentReconciliation(start.now());
+        return new SweepPlan(reconciliationInProgress, reconciliationFiles, reconciliationIndex,
+            Set.copyOf(failedIds), pending(retryIds), pending(failureRetryIds));
+    }
+
+    /**
+     * Reads the content-reconciliation slice and every retry candidate. The slice honours the same
+     * file, byte and time budgets as before; they now measure the read and the parse, which is the
+     * work they were always meant to bound.
+     */
+    private Sweep<T> readSweep(SweepPlan plan) {
+        List<PreparedLoad<T>> reconciled = new ArrayList<>();
+        int index = plan.index();
+        if (plan.active()) {
+            long startedAt = HotloadReconciliationBudget.nanoTime();
+            long bytes = 0L;
+            int files = 0;
+            while (index < plan.files().size() && files < RECONCILIATION_FILE_BUDGET) {
+                if (files > 0
+                    && HotloadReconciliationBudget.nanoTime() - startedAt >= RECONCILIATION_TIME_BUDGET_NANOS) {
+                    break;
+                }
+                File file = plan.files().get(index);
+                long size = file.isFile() ? Math.max(0L, file.length()) : 0L;
+                if (files > 0 && bytes + Math.min(size, MAX_DOCUMENT_BYTES) > RECONCILIATION_BYTE_BUDGET) {
+                    break;
+                }
+                if (!HotloadReconciliationBudget.tryAcquire(size)) {
+                    break;
+                }
+                index++;
+                files++;
+                bytes += Math.min(size, MAX_DOCUMENT_BYTES);
+                String id = idOf(file);
+                if (file.isFile() && !plan.failed().contains(id)) {
+                    reconciled.add(readCandidate(id, file));
+                }
+            }
         }
-        reconcileRetries(loaded);
-        reconcileFailedLoads(loaded);
+        return new Sweep<>(List.copyOf(reconciled), index,
+            readRetries(plan.retryIds()), readRetries(plan.failureRetryIds()));
+    }
+
+    private List<PreparedLoad<T>> readRetries(List<String> ids) {
+        if (ids.isEmpty()) {
+            return List.of();
+        }
+        List<PreparedLoad<T>> prepared = new ArrayList<>(ids.size());
+        for (String id : ids) {
+            File file = fileForId(id);
+            prepared.add(file.isFile() ? readCandidate(id, file) : PreparedLoad.missing(id, file));
+        }
+        return List.copyOf(prepared);
+    }
+
+    private synchronized DocumentDelta applySweep(SweepPlan plan, Sweep<T> sweep, List<String> loaded) {
+        if (pollInvalidated || pendingDelta != null) {
+            return DocumentDelta.EMPTY;
+        }
+        if (plan.active() && reconciliationInProgress && reconciliationFiles == plan.files()) {
+            applyReconciliation(sweep, loaded);
+        }
+        for (PreparedLoad<T> prepared : sweep.retries()) {
+            if (failedIds.contains(prepared.id()) || prepared.missing()) {
+                continue;
+            }
+            acceptPrepared(prepared, loaded);
+        }
+        for (PreparedLoad<T> prepared : sweep.failureRetries()) {
+            if (failedIds.contains(prepared.id())) {
+                continue;
+            }
+            if (prepared.missing()) {
+                clearFailure(prepared.id());
+                continue;
+            }
+            acceptPrepared(prepared, loaded);
+        }
+        List<String> removed = new ArrayList<>();
         applyMatureDeletions(removed);
         return stage(loaded, removed);
+    }
+
+    private void applyReconciliation(Sweep<T> sweep, List<String> loaded) {
+        List<String> sliceLoaded = new ArrayList<>();
+        for (PreparedLoad<T> prepared : sweep.reconciled()) {
+            acceptPrepared(prepared, sliceLoaded);
+        }
+        reconciliationIndex = sweep.nextIndex();
+        reconciliationLoaded.addAll(sliceLoaded);
+        if (reconciliationIndex < reconciliationFiles.size()) {
+            return;
+        }
+        reconciliationFiles = List.of();
+        reconciliationIndex = 0;
+        reconciliationInProgress = false;
+        nextContentReconciliationNanos = clock.getAsLong() + CONTENT_RECONCILIATION_WINDOW_NANOS;
+        for (String id : reconciliationLoaded) {
+            if (!loaded.contains(id)) {
+                loaded.add(id);
+            }
+        }
+        reconciliationLoaded.clear();
     }
 
     public synchronized boolean acknowledge(DocumentDelta delta) {
@@ -379,46 +569,59 @@ public final class DocumentRegistry<T> implements AutoCloseable {
      * contents moved as well as the file that moved, and walking it would re-read the whole subtree
      * for every edit inside it. A flat folder only ever sees its own children.
      */
-    private void loadTouched(File file, List<String> loaded, boolean walk) {
+    private void readTouched(File file, List<PreparedLoad<T>> prepared, boolean walk) {
         if (layout == Layout.TREE) {
             if (walk) {
                 for (File document : DocumentTree.discover(target, file)) {
-                    acceptTouched(document, loaded);
+                    prepared.add(readCandidate(idOf(document), document));
                 }
             } else if (DocumentTree.isDocument(target, file)) {
-                acceptTouched(file, loaded);
+                prepared.add(readCandidate(idOf(file), file));
             }
             return;
         }
         if (!isFolderDocument(file) || !isDirectChild(file)) {
             return;
         }
-        acceptTouched(file, loaded);
+        prepared.add(readCandidate(idOf(file), file));
     }
 
-    private void acceptTouched(File file, List<String> loaded) {
-        String id = idOf(file);
+    private void acceptPrepared(PreparedLoad<T> prepared, List<String> loaded) {
+        String id = prepared.id();
         pendingDeletions.remove(id);
-        if (failedIds.contains(id) || ownWrite.test(file)) {
+        if (failedIds.contains(id) || prepared.ownWrite() || ownerWrites.contains(id)) {
             return;
         }
-        if (load(id, file) && !loaded.contains(id)) {
+        if (applyPrepared(prepared, true) && !loaded.contains(id)) {
             loaded.add(id);
         }
     }
 
-    private void queueDeleted(File file) {
-        if (file != null && file.exists()) {
+    /** Everything a deletion decision needs from disk, resolved before the monitor is taken. */
+    private DeletedCandidate readDeleted(File file) {
+        if (file.exists()) {
+            return new DeletedCandidate(file, true, false, null);
+        }
+        if (layout != Layout.TREE) {
+            return new DeletedCandidate(file, false, false, null);
+        }
+        return new DeletedCandidate(file, false, DocumentTree.isDocument(target, file),
+            DocumentTree.prefixOf(target, file));
+    }
+
+    private void applyDeleted(DeletedCandidate candidate) {
+        File file = candidate.file();
+        if (candidate.exists()) {
             if (isDocument(file)) {
                 pendingDeletions.remove(idOf(file));
             }
             return;
         }
         if (layout == Layout.TREE) {
-            if (DocumentTree.isDocument(target, file)) {
+            if (candidate.treeDocument()) {
                 markDeleted(DocumentTree.idOf(target, file));
             }
-            String prefix = DocumentTree.prefixOf(target, file);
+            String prefix = candidate.treePrefix();
             if (prefix == null) {
                 return;
             }
@@ -455,6 +658,7 @@ public final class DocumentRegistry<T> implements AutoCloseable {
 
     @Override
     public synchronized void close() {
+        pollInvalidated = polling;
         replaceFolderWatcher(null);
         replaceFileWatcher(null);
         clearPending();
@@ -486,36 +690,59 @@ public final class DocumentRegistry<T> implements AutoCloseable {
     }
 
     private DocumentDelta pollSingle() {
-        FileWatcher watcher = fileWatcher;
-        long now = clock.getAsLong();
-        boolean reconcileContent = now >= nextContentReconciliationNanos;
+        PollStart start = beginPoll();
+        if (start == null) {
+            return DocumentDelta.EMPTY;
+        }
+        boolean reconcileContent = start.reconcileContent();
         try {
-            boolean modified = watcher != null && watcher.checkModifiedEvents();
-            String id = baseName(target);
-            if (!target.isFile()) {
-                if (modified || (reconcileContent && documents.containsKey(id))) {
-                    markDeleted(id);
-                }
-                List<String> removed = new ArrayList<>();
-                applyMatureDeletions(removed);
-                return stage(List.of(), removed);
-            }
-            pendingDeletions.remove(id);
-            if (!modified && !reconcileContent && !retryIds.contains(id) && !failureRetryIds.contains(id)) {
-                return stage(List.of(), List.of());
-            }
-            if (ownWrite.test(target)) {
-                return DocumentDelta.EMPTY;
-            }
-            if (!load(id, target, true)) {
-                return stage(List.of(), List.of());
-            }
-            return stage(List.of(id), List.of());
+            return applySingle(readSingle(start, reconcileContent), reconcileContent);
         } finally {
             if (reconcileContent) {
-                nextContentReconciliationNanos = clock.getAsLong() + CONTENT_RECONCILIATION_WINDOW_NANOS;
+                recordContentReconciliation();
             }
+            endPoll();
         }
+    }
+
+    private SingleScan<T> readSingle(PollStart start, boolean reconcileContent) {
+        FileWatcher watcher = start.fileWatcher();
+        boolean modified = watcher != null && watcher.checkModifiedEvents();
+        String id = baseName(target);
+        if (!target.isFile()) {
+            return new SingleScan<>(modified, false, null);
+        }
+        if (!modified && !reconcileContent && !start.retryPending()) {
+            return new SingleScan<>(false, true, null);
+        }
+        return new SingleScan<>(modified, true, readCandidate(id, target));
+    }
+
+    private synchronized DocumentDelta applySingle(SingleScan<T> scan, boolean reconcileContent) {
+        if (pollInvalidated || pendingDelta != null) {
+            return DocumentDelta.EMPTY;
+        }
+        String id = baseName(target);
+        if (!scan.present()) {
+            if (scan.modified() || (reconcileContent && documents.containsKey(id))) {
+                markDeleted(id);
+            }
+            List<String> removed = new ArrayList<>();
+            applyMatureDeletions(removed);
+            return stage(List.of(), removed);
+        }
+        pendingDeletions.remove(id);
+        PreparedLoad<T> prepared = scan.prepared();
+        if (prepared == null) {
+            return stage(List.of(), List.of());
+        }
+        if (prepared.ownWrite() || ownerWrites.contains(id)) {
+            return DocumentDelta.EMPTY;
+        }
+        if (!applyPrepared(prepared, true)) {
+            return stage(List.of(), List.of());
+        }
+        return stage(List.of(id), List.of());
     }
 
     private DocumentDelta stage(List<String> detectedLoaded, List<String> detectedRemoved) {
@@ -645,13 +872,23 @@ public final class DocumentRegistry<T> implements AutoCloseable {
      * read back, or a touch — and re-reporting it would republish and re-apply a document nothing
      * did anything to.
      */
-    @SuppressWarnings("removal")
-    private boolean load(String id, File file) {
-        return load(id, file, true);
+    private boolean load(String id, File file, boolean stabilizeFailure) {
+        return applyPrepared(read(id, file), stabilizeFailure);
     }
 
+    /** A watcher-reported candidate: an own write is adopted as-is and never read back. */
+    private PreparedLoad<T> readCandidate(String id, File file) {
+        return ownWrite.test(file) ? PreparedLoad.ownWrite(id, file) : read(id, file);
+    }
+
+    /**
+     * Reads and parses one document without touching registry state, so the whole cost can be paid
+     * off the monitor. Bytes that match what is already loaded are not a change: the file was
+     * rewritten with the content the registry is already serving — an own write read back, or a
+     * touch — and re-reporting it would republish and re-apply a document nothing did anything to.
+     */
     @SuppressWarnings("removal")
-    private boolean load(String id, File file, boolean stabilizeFailure) {
+    private PreparedLoad<T> read(String id, File file) {
         String raw = null;
         try {
             long size = Files.size(file.toPath());
@@ -661,113 +898,65 @@ public final class DocumentRegistry<T> implements AutoCloseable {
             raw = Files.readString(file.toPath(), StandardCharsets.UTF_8);
             GlossDocument<T> current = documents.get(id);
             if (current != null && current.raw().equals(raw)) {
-                clearFailure(id);
-                ignoredSchemaFingerprints.remove(id);
-                return false;
+                return PreparedLoad.unchanged(id, file, raw);
             }
             String ignoredSchemaFingerprint = ignoredSchemaFingerprints.get(id);
             if (ignoredSchemaFingerprint != null
                 && ignoredSchemaFingerprint.equals(DocumentHashes.sha256(raw))) {
-                return false;
+                return PreparedLoad.unchanged(id, file, raw);
             }
             T value = parser.parse(id + EXTENSION, raw);
             if (value == null) {
                 throw new IllegalArgumentException("document must not be null");
             }
+            return PreparedLoad.parsed(id, file, raw, value);
+        } catch (ThreadDeath fatal) {
+            throw fatal;
+        } catch (Throwable failure) {
+            return PreparedLoad.failed(id, file, raw, failure);
+        }
+    }
+
+    /** Applies one already-read document. The bytes are re-tested against the state as it is now. */
+    private boolean applyPrepared(PreparedLoad<T> prepared, boolean stabilizeFailure) {
+        String id = prepared.id();
+        String raw = prepared.raw();
+        Throwable failure = prepared.failure();
+        if (failure == null) {
+            GlossDocument<T> current = documents.get(id);
+            if (current != null && current.raw().equals(raw)) {
+                clearFailure(id);
+                ignoredSchemaFingerprints.remove(id);
+                return false;
+            }
+            T value = prepared.value();
+            if (value == null) {
+                return false;
+            }
             documents.put(id, GlossDocument.of(id, raw, value, revisionOf.applyAsLong(value)));
             clearFailure(id);
             ignoredSchemaFingerprints.remove(id);
             return true;
-        } catch (ThreadDeath fatal) {
-            throw fatal;
-        } catch (Throwable failure) {
-            failedIds.add(id);
-            GlossDocument<T> committed = snapshot.get(id);
-            if (committed == null) {
-                documents.remove(id);
-            } else {
-                documents.put(id, committed);
+        }
+        failedIds.add(id);
+        GlossDocument<T> committed = snapshot.get(id);
+        if (committed == null) {
+            documents.remove(id);
+        } else {
+            documents.put(id, committed);
+        }
+        if (DocumentEnvelope.isUnsupportedSchemaVersion(failure)) {
+            clearFailure(id);
+            if (raw != null) {
+                ignoredSchemaFingerprints.put(id, DocumentHashes.sha256(raw));
             }
-            if (DocumentEnvelope.isUnsupportedSchemaVersion(failure)) {
-                clearFailure(id);
-                if (raw != null) {
-                    ignoredSchemaFingerprints.put(id, DocumentHashes.sha256(raw));
-                }
-                return false;
-            }
-            if (stabilizeFailure && raw != null && deferFailure(id, raw)) {
-                return false;
-            }
-            Gloss.logExceptionStack(false, failure, "%s/%s%s: %s", kind, id, EXTENSION, detail(id, failure));
             return false;
         }
-    }
-
-    private void reconcileContent(List<String> loaded) {
-        long startedAt = HotloadReconciliationBudget.nanoTime();
-        long bytes = 0L;
-        int files = 0;
-        List<String> sliceLoaded = new ArrayList<>();
-        while (reconciliationIndex < reconciliationFiles.size() && files < RECONCILIATION_FILE_BUDGET) {
-            if (files > 0
-                && HotloadReconciliationBudget.nanoTime() - startedAt >= RECONCILIATION_TIME_BUDGET_NANOS) {
-                break;
-            }
-            File file = reconciliationFiles.get(reconciliationIndex);
-            long size = file.isFile() ? Math.max(0L, file.length()) : 0L;
-            if (files > 0 && bytes + Math.min(size, MAX_DOCUMENT_BYTES) > RECONCILIATION_BYTE_BUDGET) {
-                break;
-            }
-            if (!HotloadReconciliationBudget.tryAcquire(size)) {
-                break;
-            }
-            reconciliationIndex++;
-            files++;
-            bytes += Math.min(size, MAX_DOCUMENT_BYTES);
-            if (file.isFile()) {
-                acceptTouched(file, sliceLoaded);
-            }
+        if (stabilizeFailure && raw != null && deferFailure(id, raw)) {
+            return false;
         }
-        reconciliationLoaded.addAll(sliceLoaded);
-        if (reconciliationIndex >= reconciliationFiles.size()) {
-            reconciliationFiles = List.of();
-            reconciliationIndex = 0;
-            reconciliationInProgress = false;
-            nextContentReconciliationNanos = clock.getAsLong() + CONTENT_RECONCILIATION_WINDOW_NANOS;
-            for (String id : reconciliationLoaded) {
-                if (!loaded.contains(id)) {
-                    loaded.add(id);
-                }
-            }
-            reconciliationLoaded.clear();
-        }
-    }
-
-    private void reconcileRetries(List<String> loaded) {
-        for (String id : List.copyOf(retryIds)) {
-            if (failedIds.contains(id)) {
-                continue;
-            }
-            File file = fileForId(id);
-            if (!file.isFile()) {
-                continue;
-            }
-            acceptTouched(file, loaded);
-        }
-    }
-
-    private void reconcileFailedLoads(List<String> loaded) {
-        for (String id : List.copyOf(failureRetryIds)) {
-            if (failedIds.contains(id)) {
-                continue;
-            }
-            File file = fileForId(id);
-            if (!file.isFile()) {
-                clearFailure(id);
-                continue;
-            }
-            acceptTouched(file, loaded);
-        }
+        Gloss.logExceptionStack(false, failure, "%s/%s%s: %s", kind, id, EXTENSION, detail(id, failure));
+        return false;
     }
 
     private void markDeleted(String id) {
@@ -916,6 +1105,54 @@ public final class DocumentRegistry<T> implements AutoCloseable {
         Gloss current = Gloss.instance;
         if (current != null && current.watchdog() != null) {
             current.watchdog().recordHotload(kind, changes);
+        }
+    }
+
+    /** Every monitor-guarded decision one pass needs, resolved once when the pass opens. */
+    private record PollStart(FolderWatcher folderWatcher, FileWatcher fileWatcher, boolean fullWatchScan,
+                             boolean reconcileContent, boolean retryPending, long now) {
+    }
+
+    private record WatchScan<V>(boolean changed, List<PreparedLoad<V>> touched,
+                                List<DeletedCandidate> deleted) {
+    }
+
+    private record SweepPlan(boolean active, List<File> files, int index, Set<String> failed,
+                             List<String> retryIds, List<String> failureRetryIds) {
+    }
+
+    private record Sweep<V>(List<PreparedLoad<V>> reconciled, int nextIndex,
+                            List<PreparedLoad<V>> retries, List<PreparedLoad<V>> failureRetries) {
+    }
+
+    private record SingleScan<V>(boolean modified, boolean present, PreparedLoad<V> prepared) {
+    }
+
+    /** What the deletion rules need from disk, resolved before the monitor is taken. */
+    private record DeletedCandidate(File file, boolean exists, boolean treeDocument, String treePrefix) {
+    }
+
+    /** One candidate document read and parsed off the monitor, ready to be applied under it. */
+    private record PreparedLoad<V>(String id, File file, boolean missing, boolean ownWrite,
+                                   String raw, V value, Throwable failure) {
+        private static <V> PreparedLoad<V> missing(String id, File file) {
+            return new PreparedLoad<>(id, file, true, false, null, null, null);
+        }
+
+        private static <V> PreparedLoad<V> ownWrite(String id, File file) {
+            return new PreparedLoad<>(id, file, false, true, null, null, null);
+        }
+
+        private static <V> PreparedLoad<V> unchanged(String id, File file, String raw) {
+            return new PreparedLoad<>(id, file, false, false, raw, null, null);
+        }
+
+        private static <V> PreparedLoad<V> parsed(String id, File file, String raw, V value) {
+            return new PreparedLoad<>(id, file, false, false, raw, value, null);
+        }
+
+        private static <V> PreparedLoad<V> failed(String id, File file, String raw, Throwable failure) {
+            return new PreparedLoad<>(id, file, false, false, raw, null, failure);
         }
     }
 }

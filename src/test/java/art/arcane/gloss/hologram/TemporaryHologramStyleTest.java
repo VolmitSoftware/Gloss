@@ -32,6 +32,16 @@ class TemporaryHologramStyleTest {
     @TempDir
     File dataFolder;
 
+    /** Effective visibility = explicit dispatch when present, else the display's spawn default. */
+    private static boolean effectivelyVisible(PlayerHandle player, DisplayHandle display) {
+        Boolean dispatched = player.perceivedVisibility(display);
+        if (dispatched != null) {
+            return dispatched;
+        }
+
+        return display.visibleByDefault == null || display.visibleByDefault;
+    }
+
     private CharacterizationHarness harness;
     private WorldState world;
     private PlayerHandle viewer;
@@ -99,7 +109,8 @@ class TemporaryHologramStyleTest {
         for (DisplayHandle display : displays) {
             assertFalse(display.visibleByDefault);
             assertEquals(true, viewer.perceivedVisibility(display));
-            assertEquals(false, stranger.perceivedVisibility(display));
+            assertFalse(effectivelyVisible(stranger, display),
+                "a non-member is carried by the hidden default, with or without a dispatch");
         }
 
         temporary.teleport(harness.at(world, 2, 65, 2));

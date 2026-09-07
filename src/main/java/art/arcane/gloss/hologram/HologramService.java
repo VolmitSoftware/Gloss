@@ -21,9 +21,8 @@ import com.github.retrooper.packetevents.event.PacketListenerAbstract;
 import com.github.retrooper.packetevents.event.PacketListenerCommon;
 import com.github.retrooper.packetevents.event.PacketListenerPriority;
 import com.github.retrooper.packetevents.event.PacketSendEvent;
+import com.github.retrooper.packetevents.netty.buffer.ByteBufHelper;
 import com.github.retrooper.packetevents.protocol.packettype.PacketType;
-import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerDestroyEntities;
-import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerSpawnEntity;
 import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
 import org.bukkit.Location;
@@ -95,6 +94,9 @@ public final class HologramService {
     private record DisplayIdentity(UUID uuid, int entityId) {
     }
 
+    private record TrackedDisplay(String workKey, DisplayTracking tracking) {
+    }
+
     private static final DocumentReviser<HologramDoc> REVISER = new DocumentReviser<>() {
         @Override
         public long revisionOf(HologramDoc value) {
@@ -114,7 +116,7 @@ public final class HologramService {
     private final Map<String, PersistentHologram> holograms;
     private final Set<TemporaryHologramDisplay> temporaries;
     private final Map<UUID, TextDisplay> leased;
-    private final Map<Integer, DisplayTracking> displayTracking = new ConcurrentHashMap<>();
+    private final Map<Integer, TrackedDisplay> displayTracking = new ConcurrentHashMap<>();
     private final Map<TextDisplay, DisplayIdentity> displayIdentities = Collections.synchronizedMap(new IdentityHashMap<>());
     private PacketListenerCommon trackingListener;
     private final HologramViewerIndex viewerIndex;
@@ -373,31 +375,61 @@ public final class HologramService {
     void trackDisplay(TextDisplay display, DisplayTracking tracking) {
         DisplayIdentity identity = Objects.requireNonNull(displayIdentities.get(display),
             "Display must be configured before tracking.");
-        displayTracking.put(identity.entityId(), tracking);
+        displayTracking.put(identity.entityId(),
+            new TrackedDisplay("tracking:" + identity.entityId(), tracking));
     }
 
+    /**
+     * Spawn and destroy are among the highest-volume clientbound families on a busy server and this
+     * listener sees all of them on the netty threads. Building a PacketEvents wrapper here would
+     * decode the whole packet — and, once a wrapper exists for an event, PacketEvents re-encodes it
+     * afterwards — purely to read a leading entity id that misses {@code displayTracking} almost
+     * every time. The ids are read straight off the buffer and the reader index is put back.
+     */
     private void observeDisplayTracking(PacketSendEvent event) {
         if (event.isCancelled() || displayTracking.isEmpty()) {
             return;
         }
-        if (event.getPacketType() == PacketType.Play.Server.SPAWN_ENTITY) {
-            displayTrackingChanged(new WrapperPlayServerSpawnEntity(event).getEntityId(),
-                event.getPlayer(), event.getUser().getUUID(), true);
-        } else if (event.getPacketType() == PacketType.Play.Server.DESTROY_ENTITIES) {
-            for (int entityId : new WrapperPlayServerDestroyEntities(event).getEntityIds()) {
-                displayTrackingChanged(entityId, event.getPlayer(), event.getUser().getUUID(), false);
+        boolean spawn = event.getPacketType() == PacketType.Play.Server.SPAWN_ENTITY;
+        if (!spawn && event.getPacketType() != PacketType.Play.Server.DESTROY_ENTITIES) {
+            return;
+        }
+
+        readTrackedEntityIds(event.getByteBuf(), spawn, event.getPlayer(), event.getUser().getUUID());
+    }
+
+    /**
+     * Spawn carries its entity id as the leading varint; destroy carries a varint count and that
+     * many varint ids. The reader index goes back where it was, so the next handler in the pipeline
+     * still sees an untouched packet.
+     */
+    void readTrackedEntityIds(Object buffer, boolean spawn, Player player, UUID playerId) {
+        if (buffer == null || !ByteBufHelper.isReadable(buffer)) {
+            return;
+        }
+        int readerIndex = ByteBufHelper.readerIndex(buffer);
+        try {
+            if (spawn) {
+                displayTrackingChanged(ByteBufHelper.readVarInt(buffer), player, playerId, true);
+                return;
             }
+            int count = ByteBufHelper.readVarInt(buffer);
+            for (int index = 0; index < count && ByteBufHelper.isReadable(buffer); index++) {
+                displayTrackingChanged(ByteBufHelper.readVarInt(buffer), player, playerId, false);
+            }
+        } finally {
+            ByteBufHelper.readerIndex(buffer, readerIndex);
         }
     }
 
     void displayTrackingChanged(int entityId, Player player, UUID playerId, boolean tracked) {
-        DisplayTracking tracking = displayTracking.get(entityId);
-        if (tracking == null || player == null || playerId == null) {
+        TrackedDisplay entry = displayTracking.get(entityId);
+        if (entry == null || player == null || playerId == null) {
             return;
         }
-        runViewerWork(player, playerId, "tracking:" + entityId, () -> {
-            if (displayTracking.get(entityId) == tracking) {
-                tracking.changed(player, tracked);
+        runViewerWork(player, playerId, entry.workKey(), () -> {
+            if (displayTracking.get(entityId) == entry) {
+                entry.tracking().changed(player, tracked);
             }
         }, 1L);
     }
@@ -485,13 +517,13 @@ public final class HologramService {
 
     private void drainViewerWork(UUID playerId, ViewerWorkQueue queue) {
         while (true) {
-            List<Map.Entry<String, Runnable>> batch = new ArrayList<>(queue.tasks.entrySet());
-            for (Map.Entry<String, Runnable> entry : batch) {
-                if (!queue.tasks.remove(entry.getKey(), entry.getValue())) {
+            for (Map.Entry<String, Runnable> entry : queue.tasks.entrySet()) {
+                Runnable work = entry.getValue();
+                if (!queue.tasks.remove(entry.getKey(), work)) {
                     continue;
                 }
                 try {
-                    entry.getValue().run();
+                    work.run();
                 } catch (Throwable failure) {
                     Gloss.logExceptionStackThrottled(false, "hologram-viewer-refresh", failure,
                         "Hologram viewer refresh failed for %s.", playerId);

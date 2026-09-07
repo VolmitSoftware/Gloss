@@ -3,10 +3,23 @@ package art.arcane.gloss.indicator;
 import art.arcane.volmlib.util.scheduling.SlidingWindowRateLimiter;
 import org.junit.jupiter.api.Test;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.lang.classfile.ClassFile;
+import java.lang.classfile.ClassModel;
+import java.lang.classfile.CodeModel;
+import java.lang.classfile.MethodModel;
+import java.lang.classfile.instruction.MonitorInstruction;
+import java.lang.reflect.AccessFlag;
+import java.util.Optional;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class IndicatorBudgetTest {
@@ -88,6 +101,66 @@ class IndicatorBudgetTest {
         assertFalse(budget.saturated(2L, 8));
         budget.record(2L, 8);
         assertFalse(budget.saturated(3L, 2));
+    }
+
+    /**
+     * Every damage event on every Folia region thread hits this pre-gate, so it may not be a
+     * monitor those threads have to queue on.
+     */
+    @Test
+    void theProbeNeverSerializesCallersOnAMonitor() {
+        ClassModel model = ClassFile.of().parse(classBytes());
+        for (MethodModel method : model.methods()) {
+            String name = method.methodName().stringValue();
+            assertFalse(method.flags().has(AccessFlag.SYNCHRONIZED),
+                "IndicatorBudget." + name + " must not be a synchronized method");
+            Optional<CodeModel> code = method.code();
+            if (code.isEmpty()) {
+                continue;
+            }
+            assertFalse(code.get().elementStream().anyMatch(MonitorInstruction.class::isInstance),
+                "IndicatorBudget." + name + " must not enter a monitor");
+        }
+    }
+
+    private static byte[] classBytes() {
+        try (InputStream input = IndicatorBudget.class.getResourceAsStream("IndicatorBudget.class")) {
+            assertNotNull(input, "missing compiled IndicatorBudget");
+            return input.readAllBytes();
+        } catch (IOException failure) {
+            throw new IllegalStateException("could not read IndicatorBudget bytecode", failure);
+        }
+    }
+
+    @Test
+    void concurrentRecordingKeepsTheWindowConsistent() throws InterruptedException {
+        int threads = 8;
+        int perThread = 500;
+        int limit = 64;
+        IndicatorBudget budget = new IndicatorBudget(WINDOW_MS);
+        CountDownLatch start = new CountDownLatch(1);
+        CountDownLatch done = new CountDownLatch(threads);
+        AtomicInteger failures = new AtomicInteger();
+        for (int thread = 0; thread < threads; thread++) {
+            new Thread(() -> {
+                try {
+                    start.await();
+                    for (int index = 0; index < perThread; index++) {
+                        budget.saturated(index, limit);
+                        budget.record(index, limit);
+                    }
+                } catch (Throwable failure) {
+                    failures.incrementAndGet();
+                } finally {
+                    done.countDown();
+                }
+            }).start();
+        }
+        start.countDown();
+        assertTrue(done.await(20L, TimeUnit.SECONDS), "concurrent probing must not deadlock");
+        assertEquals(0, failures.get());
+        assertTrue(budget.saturated(perThread, limit),
+            "a full window of recent records must still read as saturated");
     }
 
     @Test

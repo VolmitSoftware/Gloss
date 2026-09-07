@@ -63,6 +63,10 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
                                  long animationGeneration, AnimationTemplate template) {
     }
 
+    /** The authored join and its particle-marker parse are per snapshot, never per viewer. */
+    private record AuthoredText(LineSet snapshot, String authored, List<String> markedLines) {
+    }
+
     private record PositionBinding(Entity owner, Supplier<Location> binder) {
     }
 
@@ -107,6 +111,8 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
     private volatile HologramBox box = HologramBox.defaults();
     private volatile TextDisplayDecoration decoration;
     private volatile boolean personalized;
+    private volatile boolean defaultVisibilityUsable = DisplayVisibility.canHideByDefault();
+    private volatile AuthoredText authoredText;
 
     TemporaryHologramDisplay(HologramService service, String id, Location initial, long durationMs) {
         this.service = service;
@@ -530,7 +536,7 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
             ? override == null
                 ? new ParticleText.Rendered(TextUtils.joinLegacyLines(snapshot.lines()), List.of())
                 : override
-            : service.plugin().text().renderLegacyParticleText(viewer, String.join("\n", snapshot.lines()));
+            : service.plugin().text().renderLegacyParticleText(viewer, authoredText(snapshot).authored());
         ParticleFrame frame = particleFrame(viewer, anchor, presentation);
         long tick = System.currentTimeMillis() / 50L;
         Vector3f scale = TextDisplayStyle.scale(presentation, style);
@@ -659,6 +665,9 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
                     appliedPresentation = presentation;
                     appliedStyle = style;
                     appliedVisibility.clear();
+                    if (whitelist) {
+                        defaultVisibilityUsable = defaultVisibilityApplied.get();
+                    }
                     if (viewerList.isWhitelist() == whitelist) {
                         visibilityReset.set(whitelist && !defaultVisibilityApplied.get());
                     }
@@ -885,12 +894,15 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
         if (frame == null || frame.frames() == null || frame.snapshot() != snapshot || frame.emojiGeneration() != emojiGeneration
             || frame.renderGeneration() != renderGeneration || frame.animationGeneration() != animationGeneration
             || nowMs >= frame.refreshAfterMs()) {
-            String authored = String.join("\n", snapshot.lines());
-            AnimationTemplate animation = service.animator().compileTemplate(
-                List.of(ParticleText.parse(authored).marked()), line -> service.plugin().text().render(viewer, line), false);
+            AuthoredText authored = authoredText(snapshot);
+            // Shared clip frames: the animation service falls back to a viewer render for any clip
+            // whose frames actually depend on the viewer, so only the literals are personalized.
+            AnimationTemplate animation = service.animator().compileTemplate(authored.markedLines(),
+                line -> service.plugin().text().render(viewer, line));
             TextFrameSource frames = animation == null ? null
                 : now -> ParticleText.renderMarked(animation.compose(now), UnaryOperator.identity()).text();
-            String text = frames == null ? service.plugin().text().renderParticleText(viewer, authored).text()
+            String text = frames == null
+                ? service.plugin().text().renderParticleText(viewer, authored.authored()).text()
                 : frames.compose(nowMs);
             frame = new ViewerFrame(snapshot, emojiGeneration, renderGeneration, animationGeneration,
                 nowMs + service.temporaryUpdateIntervalTicks() * 50L, frames, text);
@@ -915,6 +927,18 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
             }
             updateViewerDecoration(state, frame.frames() == null ? frame.text() : frame.frames().compose(nowMs));
         }
+    }
+
+    private AuthoredText authoredText(LineSet snapshot) {
+        AuthoredText cached = authoredText;
+        if (cached != null && cached.snapshot() == snapshot) {
+            return cached;
+        }
+        String authored = String.join("\n", snapshot.lines());
+        AuthoredText resolved = new AuthoredText(snapshot, authored,
+            List.of(ParticleText.parse(authored).marked()));
+        authoredText = resolved;
+        return resolved;
     }
 
     private void updateViewerDecoration(ViewerText state, String text) {
@@ -1062,32 +1086,40 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
         }
         boolean whitelist = viewerList.isWhitelist();
         Set<UUID> members = viewerList.members();
-        if (visibilityReset.compareAndSet(true, false)) {
-            service.plugin().scheduler().runEntity(active, () -> DisplayVisibility.setVisibleByDefault(active, !whitelist));
+        boolean reset = visibilityReset.compareAndSet(true, false);
+        if (reset) {
+            applyDefaultVisibility(active, !whitelist);
             setDecorationDefaultVisibility(!whitelist);
-            appliedVisibility.clear();
-            reconcileVisibility(active, whitelist, members);
-            return;
+            if (!defaultVisibilityUsable) {
+                appliedVisibility.clear();
+                reconcileRoster(active, whitelist, members);
+                return;
+            }
         }
         if (whitelist) {
-            reconcileWhitelist(active, members);
+            reconcileWhitelist(active, members, reset);
             return;
         }
-        if (members.isEmpty() && appliedVisibility.isEmpty()) {
+        if (!reset && members.isEmpty() && appliedVisibility.isEmpty()) {
             return;
         }
 
-        reconcileBlacklist(active, members);
+        reconcileBlacklist(active, members, reset);
     }
 
-    private void reconcileWhitelist(TextDisplay active, Set<UUID> members) {
+    /**
+     * A reset flips the display's default, which inverts the meaning of every per player override
+     * already in place, so the members and everyone holding an override are re-dispatched. Players
+     * at the default are carried by the default itself and are never touched.
+     */
+    private void reconcileWhitelist(TextDisplay active, Set<UUID> members, boolean forced) {
         for (Map.Entry<UUID, Boolean> entry : appliedVisibility.entrySet()) {
             if (members.contains(entry.getKey())) {
                 continue;
             }
 
             appliedVisibility.remove(entry.getKey());
-            if (!entry.getValue()) {
+            if (!forced && !entry.getValue()) {
                 continue;
             }
 
@@ -1098,7 +1130,7 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
         }
 
         for (UUID member : members) {
-            if (Boolean.TRUE.equals(appliedVisibility.get(member))) {
+            if (!forced && Boolean.TRUE.equals(appliedVisibility.get(member))) {
                 continue;
             }
 
@@ -1112,9 +1144,9 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
         }
     }
 
-    private void reconcileBlacklist(TextDisplay active, Set<UUID> members) {
+    private void reconcileBlacklist(TextDisplay active, Set<UUID> members, boolean forced) {
         for (UUID member : members) {
-            if (Boolean.FALSE.equals(appliedVisibility.get(member))) {
+            if (!forced && Boolean.FALSE.equals(appliedVisibility.get(member))) {
                 continue;
             }
 
@@ -1133,7 +1165,7 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
             }
 
             appliedVisibility.remove(entry.getKey());
-            if (entry.getValue()) {
+            if (!forced && entry.getValue()) {
                 continue;
             }
 
@@ -1144,7 +1176,19 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
         }
     }
 
-    private void reconcileVisibility(TextDisplay active, boolean whitelist, Set<UUID> members) {
+    private void applyDefaultVisibility(TextDisplay active, boolean visible) {
+        service.plugin().scheduler().runEntity(active, () -> {
+            if (DisplayVisibility.setVisibleByDefault(active, visible) || !defaultVisibilityUsable) {
+                return;
+            }
+            // First failure only: without a usable default every non-member has to be hidden by
+            // hand, so re-arm the reset once to take the roster path.
+            defaultVisibilityUsable = false;
+            visibilityReset.set(true);
+        });
+    }
+
+    private void reconcileRoster(TextDisplay active, boolean whitelist, Set<UUID> members) {
         for (Player online : Bukkit.getOnlinePlayers()) {
             UUID viewerId = online.getUniqueId();
             boolean visible = whitelist ? members.contains(viewerId) : !members.contains(viewerId);

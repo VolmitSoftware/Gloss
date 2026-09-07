@@ -3,11 +3,22 @@ package art.arcane.gloss.indicator;
 import org.bukkit.Location;
 import org.junit.jupiter.api.Test;
 
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Supplier;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class IndicatorAdmissionTest {
+    private static final DamageIndicatorEventSnapshot SNAPSHOT = new DamageIndicatorEventSnapshot(
+        true, "entity_attack", 8.0D, false, true, "player",
+        new DamageIndicatorEventSnapshot.EntityState(Map.of()));
+
     @Test
     void motionOffsetsNeverMutateTheCapturedOrigin() {
         Location origin = new Location(null, 10.0D, 20.0D, 30.0D);
@@ -44,6 +55,48 @@ class IndicatorAdmissionTest {
     @Test
     void invalidInputsStillProduceAPositiveLimit() {
         assertEquals(1, DamageIndicatorsService.liveLimit(0, 0L));
+    }
+
+    @Test
+    void theEventSnapshotIsBuiltOnlyAfterTheAdmissionGates() {
+        DamageIndicatorsService service = new DamageIndicatorsService(null);
+        UUID entity = UUID.randomUUID();
+        AtomicInteger built = new AtomicInteger();
+        Supplier<DamageIndicatorEventSnapshot> supplier = () -> {
+            built.incrementAndGet();
+            return SNAPSHOT;
+        };
+
+        assertSame(SNAPSHOT, service.admit(entity, 40, 0L, supplier));
+        assertNull(service.admit(entity, 40, 10L, supplier),
+            "a debounced event must be rejected before the snapshot is built");
+        assertEquals(1, built.get(), "a rejected event must not allocate a snapshot");
+    }
+
+    @Test
+    void theDebounceGateIsPerEntity() {
+        DamageIndicatorsService service = new DamageIndicatorsService(null);
+        AtomicInteger built = new AtomicInteger();
+        Supplier<DamageIndicatorEventSnapshot> supplier = () -> {
+            built.incrementAndGet();
+            return SNAPSHOT;
+        };
+
+        assertSame(SNAPSHOT, service.admit(UUID.randomUUID(), 40, 0L, supplier));
+        assertSame(SNAPSHOT, service.admit(UUID.randomUUID(), 40, 0L, supplier));
+
+        assertEquals(2, built.get());
+    }
+
+    @Test
+    void theDebounceWindowReopensAfterItExpires() {
+        DamageIndicatorsService service = new DamageIndicatorsService(null);
+        UUID entity = UUID.randomUUID();
+        Supplier<DamageIndicatorEventSnapshot> supplier = () -> SNAPSHOT;
+
+        assertSame(SNAPSHOT, service.admit(entity, 40, 0L, supplier));
+        assertNull(service.admit(entity, 40, 149L, supplier));
+        assertSame(SNAPSHOT, service.admit(entity, 40, 150L, supplier));
     }
 
     @Test

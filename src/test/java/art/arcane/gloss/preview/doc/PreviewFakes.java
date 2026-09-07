@@ -277,9 +277,21 @@ public final class PreviewFakes {
       return switch (method.getName()) {
         case "getSize", "getMaxStackSize" -> size;
         case "getItem" -> items.get((Integer) arguments[0]);
+        case "getContents" -> contents(size);
         case "getHolder" -> state();
         default -> identity(proxy, method, arguments);
       };
+    }
+
+    private ItemStack[] contents(int size) {
+      ItemStack[] array = new ItemStack[size];
+      for (Map.Entry<Integer, ItemStack> entry : items.entrySet()) {
+        int slot = entry.getKey();
+        if (slot >= 0 && slot < size) {
+          array[slot] = entry.getValue();
+        }
+      }
+      return array;
     }
   }
 
@@ -620,12 +632,24 @@ public final class PreviewFakes {
       return calls.of(methodName);
     }
 
+    private ItemStack[] contents() {
+      ItemStack[] array = new ItemStack[size];
+      for (Map.Entry<Integer, ItemStack> entry : items.entrySet()) {
+        int slot = entry.getKey();
+        if (slot >= 0 && slot < size) {
+          array[slot] = entry.getValue();
+        }
+      }
+      return array;
+    }
+
     public Inventory build() {
       return (Inventory) proxy(Inventory.class, (proxy, method, arguments) -> {
         calls.record(method.getName());
         return switch (method.getName()) {
           case "getSize", "getMaxStackSize" -> size;
           case "getItem" -> items.get((Integer) arguments[0]);
+          case "getContents" -> contents();
           case "getHolder" -> null;
           default -> identity(proxy, method, arguments);
         };

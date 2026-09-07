@@ -18,6 +18,7 @@ import com.github.retrooper.packetevents.manager.protocol.ProtocolManager;
 import com.github.retrooper.packetevents.manager.server.ServerManager;
 import com.github.retrooper.packetevents.manager.server.ServerVersion;
 import com.github.retrooper.packetevents.netty.NettyManager;
+import com.github.retrooper.packetevents.netty.channel.ChannelOperator;
 import com.github.retrooper.packetevents.protocol.entity.data.EntityData;
 import com.github.retrooper.packetevents.protocol.entity.type.EntityType;
 import com.github.retrooper.packetevents.util.Quaternion4f;
@@ -45,6 +46,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -418,9 +420,87 @@ public class DisplayEntityManagerPacketShapeTest {
     DisplayEntityManager.delete(key, viewer);
   }
 
+  @Test
+  public void forgettingAPlayerNeverLooksAtAnotherPlayersHandles() {
+    AtomicInteger foreignReads = new AtomicInteger();
+    Player staying = countingViewer(foreignReads);
+    Player leaving = viewer();
+    List<UUID> stayingKeys = new ArrayList<>();
+    for (int handle = 0; handle < 64; handle++) {
+      UUID key = DisplayEntityManager.add(textDisplay());
+      DisplayEntityManager.spawn(key, staying);
+      stayingKeys.add(key);
+    }
+    UUID leavingKey = DisplayEntityManager.add(textDisplay());
+    DisplayEntityManager.spawn(leavingKey, leaving);
+    int before = DisplayEntityManager.visibleCount();
+    foreignReads.set(0);
+
+    DisplayEntityManager.forget(leaving);
+
+    assertEquals("only the departing player's handle may be dropped", before - 1,
+        DisplayEntityManager.visibleCount());
+    assertEquals("a quit must cost that player's handles, not every handle on the server",
+        0, foreignReads.get());
+    for (UUID key : stayingKeys) {
+      DisplayEntityManager.delete(key, staying);
+    }
+    DisplayEntityManager.delete(leavingKey, leaving);
+  }
+
+  @Test
+  public void forgettingAPlayerTwiceIsANoOp() {
+    Player viewer = viewer();
+    UUID key = DisplayEntityManager.add(textDisplay());
+    DisplayEntityManager.spawn(key, viewer);
+    int before = DisplayEntityManager.visibleCount();
+
+    DisplayEntityManager.forget(viewer);
+    DisplayEntityManager.forget(viewer);
+
+    assertEquals(before - 1, DisplayEntityManager.visibleCount());
+    DisplayEntityManager.delete(key, viewer);
+  }
+
+  @Test
+  public void teleportingToWhereTheEntityAlreadyIsSendsNothing() {
+    Player viewer = viewer();
+    Location spawn = new Location(null, 0D, 64D, 0D);
+    DisplayEntity entity = DisplayEntity.Builder.textDisplay(Component.text("x"), spawn);
+    UUID key = DisplayEntityManager.add(entity);
+    DisplayEntityManager.spawn(key, viewer);
+    SENT.clear();
+
+    DisplayEntityManager.goTo(key, spawn.clone());
+    assertTrue("an icon re-asserting the position it already has must send nothing", SENT.isEmpty());
+
+    DisplayEntityManager.goTo(key, new Location(null, 0D, 64.25D, 0D));
+    assertEquals(1, SENT.size());
+    assertTrue(SENT.getFirst() instanceof WrapperPlayServerEntityTeleport);
+
+    SENT.clear();
+    DisplayEntityManager.goTo(key, new Location(null, 0D, 64.25D, 0D));
+    assertTrue("and must keep sending nothing once it has settled", SENT.isEmpty());
+
+    DisplayEntityManager.delete(key, viewer);
+  }
+
   // ---------------------------------------------------------------------
   // Plumbing
   // ---------------------------------------------------------------------
+
+  private static Player countingViewer(AtomicInteger identityReads) {
+    UUID id = UUID.randomUUID();
+    return (Player) CharacterizationSupport.proxy(new Class<?>[]{Player.class},
+        (proxy, method, args) -> switch (method.getName()) {
+          case "getUniqueId" -> {
+            identityReads.incrementAndGet();
+            yield id;
+          }
+          case "getName" -> "staying";
+          default -> CharacterizationSupport.identity(proxy, method, args);
+        });
+  }
 
   private static EntityData<?> single(WrapperPlayServerEntityMetadata packet) {
     List<EntityData<?>> values = packet.getEntityMetadata();
@@ -455,7 +535,14 @@ public class DisplayEntityManagerPacketShapeTest {
         });
   }
 
+  /**
+   * Records whatever reaches the wire. {@code PacketUtils} writes each packet to the recipient's
+   * channel and flushes the channel once, so the recorder sits on the protocol manager's write as
+   * well as the player manager's direct send.
+   */
   private static final class RecordingPacketEventsApi extends PacketEventsAPI<Object> {
+    private static final Object CHANNEL = new Object();
+
     private final PlayerManager playerManager = (PlayerManager) CharacterizationSupport.proxy(
         new Class<?>[]{PlayerManager.class},
         (proxy, method, args) -> {
@@ -464,11 +551,47 @@ public class DisplayEntityManagerPacketShapeTest {
             return null;
           }
           return switch (method.getName()) {
+            case "getChannel" -> CHANNEL;
             case "hashCode" -> System.identityHashCode(proxy);
             case "equals" -> proxy == args[0];
             case "toString" -> "PlayerManager[recording]";
             default -> null;
           };
+        });
+
+    private final ProtocolManager protocolManager = (ProtocolManager) CharacterizationSupport.proxy(
+        new Class<?>[]{ProtocolManager.class},
+        (proxy, method, args) -> {
+          if (method.getName().startsWith("writePacket") && args[1] instanceof PacketWrapper<?> packet) {
+            SENT.add(packet);
+            return null;
+          }
+          return switch (method.getName()) {
+            case "hashCode" -> System.identityHashCode(proxy);
+            case "equals" -> proxy == args[0];
+            case "toString" -> "ProtocolManager[recording]";
+            default -> null;
+          };
+        });
+
+    private final ChannelOperator channelOperator = (ChannelOperator) CharacterizationSupport.proxy(
+        new Class<?>[]{ChannelOperator.class},
+        (proxy, method, args) -> switch (method.getName()) {
+          case "isOpen" -> true;
+          case "hashCode" -> System.identityHashCode(proxy);
+          case "equals" -> proxy == args[0];
+          case "toString" -> "ChannelOperator[recording]";
+          default -> null;
+        });
+
+    private final NettyManager nettyManager = (NettyManager) CharacterizationSupport.proxy(
+        new Class<?>[]{NettyManager.class},
+        (proxy, method, args) -> switch (method.getName()) {
+          case "getChannelOperator" -> channelOperator;
+          case "hashCode" -> System.identityHashCode(proxy);
+          case "equals" -> proxy == args[0];
+          case "toString" -> "NettyManager[recording]";
+          default -> null;
         });
 
     @Override
@@ -502,7 +625,7 @@ public class DisplayEntityManagerPacketShapeTest {
 
     @Override
     public ProtocolManager getProtocolManager() {
-      return null;
+      return protocolManager;
     }
 
     @Override
@@ -512,7 +635,7 @@ public class DisplayEntityManagerPacketShapeTest {
 
     @Override
     public NettyManager getNettyManager() {
-      return null;
+      return nettyManager;
     }
 
     @Override

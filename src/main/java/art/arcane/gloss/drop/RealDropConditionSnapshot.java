@@ -11,25 +11,32 @@ import org.bukkit.inventory.ItemStack;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 record RealDropConditionSnapshot(Location location, Map<String, Object> values) {
+    private static final String SUBJECT_NAME = "subject.name";
+    private static final String WORLD_PLAYERS = "world.players";
+    private static final int PLAYER_COUNT_WORLDS = 64;
+
+    private static final Map<UUID, PlayerCount> PLAYER_COUNTS = new ConcurrentHashMap<>();
 
     RealDropConditionSnapshot {
         location = location.clone();
         values = Map.copyOf(values);
     }
 
-    static RealDropConditionSnapshot capture(Item item, String eventType) {
+    static RealDropConditionSnapshot capture(Item item, String eventType, Fields fields) {
         Location location = item.getLocation();
         World world = item.getWorld();
         ItemStack stack = item.getItemStack();
         UUID thrower = item.getThrower();
         Map<String, Object> values = new LinkedHashMap<>();
         putDropValues(values, item, stack, location, thrower);
-        putSubjectValues(values, item, location);
+        putSubjectValues(values, item, location, fields);
         putSourceValues(values, thrower);
-        putWorldValues(values, world);
+        putWorldValues(values, world, fields);
         values.put("event.type", eventType);
         values.put("event.playerDrop", thrower != null);
         return new RealDropConditionSnapshot(location, values);
@@ -41,6 +48,24 @@ record RealDropConditionSnapshot(Location location, Map<String, Object> values) 
 
     GlossConditionContext viewerContext(Player viewer) {
         return new GlossConditionContext(viewer, null, null, location, values);
+    }
+
+    /**
+     * One player-list walk per world per tick: at a saturated presentation budget the same count is
+     * asked for hundreds of times per tick, and {@code World#getPlayers} copies the whole list.
+     */
+    static int worldPlayers(World world, long tick) {
+        UUID worldId = world.getUID();
+        PlayerCount cached = PLAYER_COUNTS.get(worldId);
+        if (cached != null && cached.tick() == tick) {
+            return cached.count();
+        }
+        if (PLAYER_COUNTS.size() > PLAYER_COUNT_WORLDS) {
+            PLAYER_COUNTS.clear();
+        }
+        int count = world.getPlayers().size();
+        PLAYER_COUNTS.put(worldId, new PlayerCount(tick, count));
+        return count;
     }
 
     private static void putDropValues(Map<String, Object> values, Item item, ItemStack stack,
@@ -67,8 +92,11 @@ record RealDropConditionSnapshot(Location location, Map<String, Object> values) 
         values.put("drop.pickupDelay", (double) item.getPickupDelay());
     }
 
-    private static void putSubjectValues(Map<String, Object> values, Item item, Location location) {
-        values.put("subject.name", item.getName());
+    private static void putSubjectValues(Map<String, Object> values, Item item, Location location,
+                                         Fields fields) {
+        if (fields.subjectName()) {
+            values.put(SUBJECT_NAME, item.getName());
+        }
         values.put("subject.uuid", item.getUniqueId().toString());
         values.put("subject.type", item.getType().getKey().getKey());
         values.put("subject.world", item.getWorld().getName());
@@ -94,7 +122,7 @@ record RealDropConditionSnapshot(Location location, Map<String, Object> values) 
         values.put("source.uuid", present ? thrower.toString() : "");
     }
 
-    private static void putWorldValues(Map<String, Object> values, World world) {
+    private static void putWorldValues(Map<String, Object> values, World world, Fields fields) {
         values.put("world.name", world.getName());
         values.put("world.uuid", world.getUID().toString());
         values.put("world.environment", world.getEnvironment().name().toLowerCase(Locale.ROOT));
@@ -104,6 +132,24 @@ record RealDropConditionSnapshot(Location location, Map<String, Object> values) 
         values.put("world.storm", world.hasStorm());
         values.put("world.thundering", world.isThundering());
         values.put("world.pvp", world.getPVP());
-        values.put("world.players", (double) world.getPlayers().size());
+        if (fields.worldPlayers()) {
+            values.put(WORLD_PLAYERS, (double) worldPlayers(world, System.currentTimeMillis() / 50L));
+        }
+    }
+
+    /**
+     * The two snapshot values that cost more than a field read. Anything a plan never names is left
+     * out; the condition scope resolves an absent key from the live entity or world with the same
+     * value, so gating only removes work.
+     */
+    record Fields(boolean subjectName, boolean worldPlayers) {
+        static final Fields ALL = new Fields(true, true);
+
+        static Fields of(Set<String> referenced) {
+            return new Fields(referenced.contains(SUBJECT_NAME), referenced.contains(WORLD_PLAYERS));
+        }
+    }
+
+    private record PlayerCount(long tick, int count) {
     }
 }

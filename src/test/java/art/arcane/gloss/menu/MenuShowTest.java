@@ -28,6 +28,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Proxy;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -39,6 +40,7 @@ import static org.junit.Assert.assertTrue;
 
 public class MenuShowTest {
   private final AtomicLong time = new AtomicLong(14000L);
+  private final AtomicInteger timeReads = new AtomicInteger();
   private final AtomicReference<String> worldName = new AtomicReference<>("world");
   private Gloss previousPlugin;
 
@@ -158,11 +160,50 @@ public class MenuShowTest {
     hiddenMenu.close();
   }
 
+  @Test
+  public void everyShowConditionIsEvaluatedOncePerTickPass() {
+    ShowCondition dynamic = ShowCondition.of("world.time < 12000");
+    MenuSession session = session(dynamic, ShowCondition.of("world.time < 12000"));
+    time.set(1000L);
+    session.open();
+    session.tick();
+
+    timeReads.set(0);
+    session.tick();
+    assertEquals("the menu's own show and the component's must each be evaluated exactly once",
+        2, timeReads.get());
+
+    timeReads.set(0);
+    session.tick();
+    assertEquals(2, timeReads.get());
+    session.close();
+  }
+
+  @Test
+  public void conditionsStayLiveBetweenTickPasses() {
+    MenuSession session = session(ShowCondition.of("world.time < 12000"), ShowCondition.ALWAYS);
+    time.set(1000L);
+    session.open();
+    session.tick();
+    assertTrue(session.isShown());
+
+    time.set(18000L);
+    assertFalse("a memo scoped to the tick pass must not survive it", session.isShown());
+
+    timeReads.set(0);
+    assertFalse(session.isShown());
+    assertEquals("and outside a pass the condition is simply evaluated", 1, timeReads.get());
+    session.close();
+  }
+
   private MenuSession session(ShowCondition show, ShowCondition componentShow) {
     World world = (World) Proxy.newProxyInstance(World.class.getClassLoader(), new Class<?>[]{World.class},
         (proxy, method, args) -> switch (method.getName()) {
           case "getName" -> worldName.get();
-          case "getTime" -> time.get();
+          case "getTime" -> {
+            timeReads.incrementAndGet();
+            yield time.get();
+          }
           default -> throw new UnsupportedOperationException(method.getName());
         });
     Player player = (Player) Proxy.newProxyInstance(Player.class.getClassLoader(), new Class<?>[]{Player.class},

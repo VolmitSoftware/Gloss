@@ -47,23 +47,23 @@ public final class TextDisplayDecoration {
         HologramPresentation presentation = update.presentation();
         IconDisplayStyle style = update.style();
         HologramBox box = update.box();
-        String text = update.text();
         int teleportTicks = update.teleportTicks();
         State previous = state;
+        String layoutKey = HologramBoxLayout.layoutKey(update.text());
         if (previous != null && previous.anchor().equals(anchor) && previous.presentation().equals(presentation)
             && Objects.equals(previous.style(), style) && previous.box().equals(box)
-            && previous.text().equals(text) && previous.teleportTicks() == teleportTicks) {
+            && previous.layoutKey().equals(layoutKey) && previous.teleportTicks() == teleportTicks) {
             return;
         }
         int lineWidth = style == null ? 16384 : style.lineWidth();
         int previousLineWidth = previous == null || previous.style() == null ? 16384 : previous.style().lineWidth();
-        boolean sameLayout = previous != null && previous.text().equals(text) && previousLineWidth == lineWidth
+        boolean sameLayout = previous != null && previous.layoutKey().equals(layoutKey) && previousLineWidth == lineWidth
             && previous.box().padding().equals(box.padding()) && previous.box().borderWidth().equals(box.borderWidth());
-        HologramBoxLayout layout = sameLayout ? previous.layout() : HologramBoxLayout.measure(text, lineWidth, box);
+        HologramBoxLayout layout = sameLayout ? previous.layout() : HologramBoxLayout.measure(layoutKey, lineWidth, box);
         List<HologramBoxLayout.Part> parts = sameLayout && previous.box().equals(box)
             ? previous.parts() : layout.parts(box);
         State next = new State(anchor.clone(), presentation, style, box,
-            text, layout, parts, teleportTicks);
+            layoutKey, layout, parts, teleportTicks);
         if (previous != null && !sameTopology(previous, next)) {
             removeDisplays(anchor);
         }
@@ -234,15 +234,10 @@ public final class TextDisplayDecoration {
             box = Objects.requireNonNull(box);
             text = Objects.requireNonNull(text);
         }
-
-        @Override
-        public Location anchor() {
-            return anchor.clone();
-        }
     }
 
     private record State(Location anchor, HologramPresentation presentation, IconDisplayStyle style,
-                         HologramBox box, String text, HologramBoxLayout layout, List<HologramBoxLayout.Part> parts,
-                         int teleportTicks) {
+                         HologramBox box, String layoutKey, HologramBoxLayout layout,
+                         List<HologramBoxLayout.Part> parts, int teleportTicks) {
     }
 }

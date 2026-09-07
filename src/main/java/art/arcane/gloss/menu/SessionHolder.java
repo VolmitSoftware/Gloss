@@ -85,6 +85,16 @@ class SessionHolder {
     }
   }
 
+  /**
+   * What the last scan acquired, regardless of whether the eye has moved since. The scan uses it
+   * to decide whether the entity ray trace is still load-bearing for this viewer.
+   */
+  Object aimTarget() {
+    synchronized (previewLock) {
+      return aimTarget;
+    }
+  }
+
   void recordAim(Location eye, Object target) {
     synchronized (previewLock) {
       aimX = eye.getX();

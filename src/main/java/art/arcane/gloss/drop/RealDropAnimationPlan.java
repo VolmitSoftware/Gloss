@@ -11,14 +11,18 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 
 final class RealDropAnimationPlan {
     private static final int TARGET_COUNT = GlossConfig.RealDrops.AnimationTarget.values().length;
+    private static final CompiledProfile NO_PROFILE =
+        new CompiledProfile("", 0, 0, List.of(), Map.of(), Map.of());
 
     private final boolean enabled;
     private final List<CompiledProfile> profiles;
     private final Map<String, MaterialMap> materialProperties;
+    private final Map<String, CompiledProfile> profileMemo = new ConcurrentHashMap<>();
 
     private RealDropAnimationPlan(GlossConfig.RealDrops.RealDropAnimation animation) {
         enabled = animation != null && animation.enabled();
@@ -77,15 +81,8 @@ final class RealDropAnimationPlan {
         if (profile == null || trigger == null) {
             return -1.0D;
         }
-        List<CompiledClip> clips = profile.clips().get(trigger);
-        if (clips == null || clips.isEmpty()) {
-            return -1.0D;
-        }
-        double duration = 0.0D;
-        for (CompiledClip clip : clips) {
-            duration = Math.max(duration, clip.durationTicks());
-        }
-        return duration;
+        Double duration = profile.durations().get(trigger);
+        return duration == null ? -1.0D : duration;
     }
 
     boolean requiresContinuousUpdates(
@@ -117,12 +114,21 @@ final class RealDropAnimationPlan {
     }
 
     private CompiledProfile profile(String material) {
-        for (CompiledProfile profile : profiles) {
-            if (profile.matches(material)) {
-                return profile;
-            }
+        if (profiles.isEmpty()) {
+            return null;
         }
-        return null;
+        CompiledProfile memoized = profileMemo.get(material);
+        if (memoized == null) {
+            memoized = NO_PROFILE;
+            for (CompiledProfile profile : profiles) {
+                if (profile.matches(material)) {
+                    memoized = profile;
+                    break;
+                }
+            }
+            profileMemo.put(material, memoized);
+        }
+        return memoized == NO_PROFILE ? null : memoized;
     }
 
     private static Map<String, MaterialMap> compileMaterialProperties(
@@ -188,11 +194,30 @@ final class RealDropAnimationPlan {
                 profile.priority(),
                 index,
                 List.copyOf(materials),
-                clips));
+                clips,
+                clipDurations(clips)));
         }
         compiled.sort(Comparator.comparingInt(CompiledProfile::priority).reversed()
             .thenComparingInt(CompiledProfile::order));
         return List.copyOf(compiled);
+    }
+
+    private static Map<GlossConfig.RealDrops.AnimationTrigger, Double> clipDurations(
+        Map<GlossConfig.RealDrops.AnimationTrigger, List<CompiledClip>> clips
+    ) {
+        Map<GlossConfig.RealDrops.AnimationTrigger, Double> durations =
+            new EnumMap<>(GlossConfig.RealDrops.AnimationTrigger.class);
+        for (Map.Entry<GlossConfig.RealDrops.AnimationTrigger, List<CompiledClip>> entry : clips.entrySet()) {
+            if (entry.getValue().isEmpty()) {
+                continue;
+            }
+            double duration = 0.0D;
+            for (CompiledClip clip : entry.getValue()) {
+                duration = Math.max(duration, clip.durationTicks());
+            }
+            durations.put(entry.getKey(), duration);
+        }
+        return Map.copyOf(durations);
     }
 
     private Map<GlossConfig.RealDrops.AnimationTrigger, List<CompiledClip>> compileClips(
@@ -423,7 +448,13 @@ final class RealDropAnimationPlan {
         boolean physics,
         int lightLevel
     ) {
+        private static final AnimationSample NEUTRAL = new AnimationSample(
+            "", 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 1.0D, 1.0D, 1.0D, 0L, true, true, 0);
+
         static AnimationSample neutral(String profileId) {
+            if (profileId.isEmpty()) {
+                return NEUTRAL;
+            }
             return new AnimationSample(
                 profileId,
                 0.0D,
@@ -447,7 +478,8 @@ final class RealDropAnimationPlan {
         int priority,
         int order,
         List<Pattern> materials,
-        Map<GlossConfig.RealDrops.AnimationTrigger, List<CompiledClip>> clips
+        Map<GlossConfig.RealDrops.AnimationTrigger, List<CompiledClip>> clips,
+        Map<GlossConfig.RealDrops.AnimationTrigger, Double> durations
     ) {
         boolean matches(String material) {
             for (Pattern pattern : materials) {

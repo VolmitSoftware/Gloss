@@ -17,7 +17,7 @@ import java.util.Set;
 
 public record EntityOverlayDoc(
     int schemaVersion, long revision, Boolean enabled, Double range, Integer updateIntervalTicks,
-    Integer maxEntitiesPerViewer, Boolean includePlayers, Double verticalOffset,
+    Integer maxEntitiesPerViewer, Integer maxActiveOverlays, Boolean includePlayers, Double verticalOffset,
     Integer healthSegments, Long hitHighlightMs, List<String> blacklistWorlds,
     List<String> excludedEntityTypes, ShowCondition show, List<Line> lines,
     IconDisplayStyle style, HologramBox box, List<ParticleLayer> particleLayers
@@ -38,7 +38,7 @@ public record EntityOverlayDoc(
         new Line("stats", "text", "&7ATK &f{attack} &8| &7ARM &f{armor}", null));
     public static final EntityOverlayDoc DEFAULTS = new EntityOverlayDoc(
         CURRENT_SCHEMA_VERSION, DocumentEnvelope.INITIAL_REVISION, null, null, null, null,
-        null, null, null, null, null, null, null, null, null, null, null);
+        null, null, null, null, null, null, null, null, null, null, null, null);
 
     public EntityOverlayDoc {
         DocumentEnvelope.requireSchemaVersion(KIND, schemaVersion, CURRENT_SCHEMA_VERSION);
@@ -46,7 +46,8 @@ public record EntityOverlayDoc(
         enabled = enabled == null || enabled;
         range = number(range, 1, 64, 16);
         updateIntervalTicks = integer(updateIntervalTicks, 1, 40, 5);
-        maxEntitiesPerViewer = integer(maxEntitiesPerViewer, 1, 256, 64);
+        maxEntitiesPerViewer = integer(maxEntitiesPerViewer, 1, 256, 16);
+        maxActiveOverlays = integer(maxActiveOverlays, 16, 16384, 1024);
         includePlayers = includePlayers == null || includePlayers;
         verticalOffset = number(verticalOffset, -2, 8, 0.35);
         healthSegments = integer(healthSegments, 1, 40, 10);

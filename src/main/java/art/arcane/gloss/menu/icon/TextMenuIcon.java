@@ -12,6 +12,7 @@ import art.arcane.gloss.config.icon.TextIconData;
 import art.arcane.gloss.exceptions.MenuIconException;
 import art.arcane.gloss.menu.DisplayEntityManager;
 import art.arcane.gloss.menu.MenuSession;
+import art.arcane.gloss.menu.MenuTransform;
 import art.arcane.gloss.text.TextPipeline;
 import art.arcane.gloss.particle.ParticleText;
 import art.arcane.gloss.util.common.TextUtils;
@@ -42,6 +43,17 @@ public class TextMenuIcon extends MenuIcon<TextIconData> {
   private boolean dynamicSource;
   private boolean refreshFailureLogged;
   private int refreshCountdown;
+  /**
+   * What the box was last measured and sent from. {@code applyOrientation} runs every tick from the
+   * hover pass, and the decoration update it builds costs a legacy serialise per line, a box
+   * measure and two Location clones — all of it thrown away by the equality check downstream when
+   * nothing moved. These are the update's inputs, compared before any of that work happens.
+   */
+  private String decorationText;
+  private MenuTransform decorationTransform;
+  private double decorationX;
+  private double decorationY;
+  private double decorationZ;
 
   public TextMenuIcon(MenuSession session, Location loc, TextIconData data) throws MenuIconException {
     super(session, loc, data);
@@ -79,6 +91,8 @@ public class TextMenuIcon extends MenuIcon<TextIconData> {
     if (decoration != null) {
       decoration.remove();
     }
+    decorationText = null;
+    decorationTransform = null;
     super.remove();
   }
 
@@ -106,16 +120,26 @@ public class TextMenuIcon extends MenuIcon<TextIconData> {
       lines.add(LegacyComponentSerializer.legacySection().serialize(component));
     }
     String text = String.join("\n", lines);
-    HologramBoxLayout layout = HologramBoxLayout.measure(text, style.lineWidth(), data.box());
-    Location anchor = session.getTransform().orient(position);
+    MenuTransform transform = session.getTransform();
     Vector center = textBoundingBoxCenter(position);
+    if (transform == decorationTransform && text.equals(decorationText)
+        && center.getX() == decorationX && center.getY() == decorationY && center.getZ() == decorationZ) {
+      return;
+    }
+    decorationTransform = transform;
+    decorationText = text;
+    decorationX = center.getX();
+    decorationY = center.getY();
+    decorationZ = center.getZ();
+    HologramBoxLayout layout = HologramBoxLayout.measure(text, style.lineWidth(), data.box());
+    Location anchor = transform.orient(position);
     anchor.setX(center.getX());
     anchor.setY(center.getY());
     anchor.setZ(center.getZ());
     float scale = uiScale();
     float offsetY = -layout.textHeight() / 2F * 0.025F * scale * style.scaleY();
     decoration.update(new PacketTextDecoration.Update(anchor, text, style, data.box(),
-        new HologramPresentation(scale, scale, scale, 0D, 0D, session.getTransform().roll(), 1D),
+        new HologramPresentation(scale, scale, scale, 0D, 0D, transform.roll(), 1D),
         new Vector3f(0F, offsetY, 0F)));
   }
 

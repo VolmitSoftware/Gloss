@@ -1,7 +1,6 @@
 package art.arcane.gloss.group;
 
 import art.arcane.gloss.Gloss;
-import art.arcane.volmlib.util.scheduling.FoliaScheduler;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -13,7 +12,6 @@ import org.bukkit.event.player.PlayerQuitEvent;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
@@ -24,13 +22,11 @@ public final class GroupService implements Listener {
 
     private final Gloss plugin;
     private final Map<UUID, CachedPrimaryGroup> primaryGroups;
-    private final Set<UUID> refreshing;
     private volatile VaultPermissionHook vault;
 
     public GroupService(Gloss plugin) {
         this.plugin = plugin;
         this.primaryGroups = new ConcurrentHashMap<>();
-        this.refreshing = ConcurrentHashMap.newKeySet();
     }
 
     public void enable() {
@@ -44,12 +40,10 @@ public final class GroupService implements Listener {
         HandlerList.unregisterAll(this);
         vault = null;
         primaryGroups.clear();
-        refreshing.clear();
     }
 
     public void reload() {
         primaryGroups.clear();
-        refreshing.clear();
         if (plugin.cfg().groups().useVault() && vault == null) {
             hookVault();
         }
@@ -62,18 +56,6 @@ public final class GroupService implements Listener {
         return Optional.ofNullable(primaryGroupName(player));
     }
 
-    public Optional<String> cachedPrimaryGroupFor(Player player) {
-        if (player == null || !plugin.cfg().groups().useVault() || vault == null) {
-            return Optional.empty();
-        }
-        CachedPrimaryGroup cached = primaryGroups.get(player.getUniqueId());
-        if (cached != null && cached.fresh(nowMs())) {
-            return Optional.ofNullable(cached.name());
-        }
-        scheduleRefresh(player);
-        return Optional.empty();
-    }
-
     public static String normalizeGroupName(String resolved) {
         if (resolved == null || resolved.isBlank()) {
             return null;
@@ -83,9 +65,7 @@ public final class GroupService implements Listener {
 
     @EventHandler(priority = EventPriority.MONITOR)
     public void on(PlayerQuitEvent event) {
-        UUID uuid = event.getPlayer().getUniqueId();
-        primaryGroups.remove(uuid);
-        refreshing.remove(uuid);
+        primaryGroups.remove(event.getPlayer().getUniqueId());
     }
 
     private String primaryGroupName(Player player) {
@@ -110,26 +90,6 @@ public final class GroupService implements Listener {
         return cache.compute(uuid, (key, existing) -> existing != null && existing.fresh(now)
             ? existing
             : new CachedPrimaryGroup(normalizeGroupName(resolver.apply(key)), now + jitterMs(key)));
-    }
-
-    private void scheduleRefresh(Player player) {
-        UUID uuid = player.getUniqueId();
-        if (!refreshing.add(uuid)) {
-            return;
-        }
-        Runnable retired = () -> refreshing.remove(uuid);
-        Runnable refresh = () -> {
-            try {
-                if (player.isOnline()) {
-                    primaryGroupName(player);
-                }
-            } finally {
-                retired.run();
-            }
-        };
-        if (!FoliaScheduler.runEntity(plugin, player, refresh, 0L, retired)) {
-            retired.run();
-        }
     }
 
     private void hookVault() {

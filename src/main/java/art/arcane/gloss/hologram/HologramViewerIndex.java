@@ -32,9 +32,16 @@ final class HologramViewerIndex {
             return true;
         }
 
+        HologramTick.Viewer observed = viewers.get(playerId);
+        if (observed != null && observed.player() == player
+            && observed.worldId().equals(world.getUID())
+            && observed.x() == location.getX() && observed.y() == location.getY()
+            && observed.z() == location.getZ()) {
+            return false;
+        }
+
         HologramTick.Viewer next = new HologramTick.Viewer(
             player, playerId, world.getUID(), location.getX(), location.getY(), location.getZ());
-        HologramTick.Viewer observed = viewers.get(playerId);
         long nextChunk = chunkKey(next.x(), next.z());
         boolean transitioned = observed == null || !observed.worldId().equals(next.worldId())
             || chunkKey(observed.x(), observed.z()) != nextChunk;

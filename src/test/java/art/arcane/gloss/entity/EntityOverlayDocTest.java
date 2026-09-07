@@ -36,6 +36,18 @@ class EntityOverlayDocTest {
     }
 
     @Test
+    void admissionBudgetsDefaultAndClamp() {
+        assertEquals(1024, EntityOverlayDoc.DEFAULTS.maxActiveOverlays());
+        assertEquals(16, EntityOverlayDoc.DEFAULTS.maxEntitiesPerViewer());
+        assertEquals(16, EntityOverlayDoc.parse("default.json",
+            "{\"schemaVersion\":2,\"revision\":1,\"maxActiveOverlays\":0}").maxActiveOverlays());
+        assertEquals(16384, EntityOverlayDoc.parse("default.json",
+            "{\"schemaVersion\":2,\"revision\":1,\"maxActiveOverlays\":999999}").maxActiveOverlays());
+        assertEquals(1, EntityOverlayDoc.parse("default.json",
+            "{\"schemaVersion\":2,\"revision\":1,\"maxEntitiesPerViewer\":0}").maxEntitiesPerViewer());
+    }
+
+    @Test
     void invalidCurrentDocumentsFailValidation() {
         assertThrows(IllegalArgumentException.class, () -> EntityOverlayDoc.parse("default.json", "{}"));
         assertInvalid("\"lines\":[{\"id\":\"too-long\",\"text\":\"" + "x".repeat(4097) + "\"}]");

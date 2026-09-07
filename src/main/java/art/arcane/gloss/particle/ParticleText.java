@@ -140,11 +140,29 @@ public final class ParticleText {
 
     private static String normalizeName(String value) {
         String normalized = value.trim().toLowerCase(Locale.ROOT);
-        if (normalized.isEmpty() || normalized.length() > 64 || !normalized.matches("[a-z0-9][a-z0-9._-]*")) {
+        if (!validName(normalized)) {
             throw new IllegalArgumentException(
                 "particle text span name must match [a-z0-9][a-z0-9._-]* and be at most 64 characters");
         }
         return normalized;
+    }
+
+    private static boolean validName(String value) {
+        int length = value.length();
+        if (length == 0 || length > 64 || !isAlphanumeric(value.charAt(0))) {
+            return false;
+        }
+        for (int index = 1; index < length; index++) {
+            char current = value.charAt(index);
+            if (!isAlphanumeric(current) && current != '.' && current != '_' && current != '-') {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static boolean isAlphanumeric(char value) {
+        return (value >= 'a' && value <= 'z') || (value >= '0' && value <= '9');
     }
 
     public record Template(String marked) {

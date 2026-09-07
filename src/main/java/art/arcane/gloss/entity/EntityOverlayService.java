@@ -16,6 +16,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.NamespacedKey;
+import org.bukkit.World;
 import org.bukkit.attribute.Attribute;
 import org.bukkit.attribute.AttributeInstance;
 import org.bukkit.entity.Entity;
@@ -34,11 +35,11 @@ import org.bukkit.event.server.PluginDisableEvent;
 import org.bukkit.event.server.PluginEnableEvent;
 import org.bukkit.event.world.EntitiesUnloadEvent;
 import org.bukkit.plugin.Plugin;
+import org.bukkit.util.BoundingBox;
 import org.bukkit.persistence.PersistentDataType;
 
 import java.io.File;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -46,23 +47,36 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 
 public final class EntityOverlayService implements Listener {
     private static final NamespacedKey REACT_STACK_COUNT = new NamespacedKey("react", "react-stack-count");
+    private static final long ANCHOR_GRACE_DRIVES = 1L;
+    private static final long AUDIENCE_GRACE_DRIVES = 1L;
+
     private final Gloss plugin;
     private final ShippedDefaults defaults;
     private final DocumentRegistry<EntityOverlayDoc> registry;
-    private final ConcurrentMap<UUID, ViewerState> viewers = new ConcurrentHashMap<>();
+    private final ConcurrentMap<UUID, EntityOverlayCell.Anchor> anchors = new ConcurrentHashMap<>();
+    private final ConcurrentMap<UUID, EntityOverlayTarget> overlays = new ConcurrentHashMap<>();
     private final ConcurrentMap<UUID, Insight> insights = new ConcurrentHashMap<>();
+    private final ConcurrentMap<UUID, Set<UUID>> insightTargets = new ConcurrentHashMap<>();
     private final ConcurrentMap<UUID, Integer> stackCounts = new ConcurrentHashMap<>();
     private final ConcurrentMap<UUID, Hit> hits = new ConcurrentHashMap<>();
     private final Set<Plugin> restrictions = ConcurrentHashMap.newKeySet();
+    private final AtomicLong renderPasses = new AtomicLong();
+    private final AtomicLong textPreparations = new AtomicLong();
+    private final AtomicLong removalMutations = new AtomicLong();
+    private final AtomicLong driveSequence = new AtomicLong();
     private volatile EntityOverlayDoc settings;
     private volatile boolean started;
     private volatile boolean reactPresent;
     private volatile boolean refreshText;
     private volatile boolean trackDistance;
+    private volatile boolean personalText;
+    private volatile long renderGeneration = -1;
+    private volatile long emojiGeneration = -1;
+    private volatile long animationGeneration = -1;
     private int taskId = -1;
 
     public EntityOverlayService(Gloss plugin) {
@@ -90,6 +104,7 @@ public final class EntityOverlayService implements Listener {
         registry.close();
         restrictions.clear();
         insights.clear();
+        insightTargets.clear();
         stackCounts.clear();
         hits.clear();
     }
@@ -117,11 +132,7 @@ public final class EntityOverlayService implements Listener {
     }
 
     public int activeCount() {
-        int count = 0;
-        for (ViewerState viewer : viewers.values()) {
-            count += viewer.overlays.size();
-        }
-        return count;
+        return overlays.size();
     }
 
     public boolean refreshStack(LivingEntity entity, int count) {
@@ -150,13 +161,20 @@ public final class EntityOverlayService implements Listener {
         if (!enabled() || !owner.isEnabled()) {
             return false;
         }
-        insights.put(viewer.getUniqueId(), new Insight(owner, target, lines,
-            System.currentTimeMillis() + Math.clamp(durationMs, 100, 10000)));
+        Insight next = new Insight(owner, target, target.getUniqueId(), lines,
+            System.currentTimeMillis() + Math.clamp(durationMs, 100, 10000));
+        linkInsight(viewer.getUniqueId(), next);
         return true;
     }
 
     public void clearInsight(Plugin owner, UUID viewerId) {
-        insights.computeIfPresent(viewerId, (ignored, current) -> current.owner() == owner ? null : current);
+        insights.computeIfPresent(viewerId, (id, current) -> {
+            if (current.owner() != owner) {
+                return current;
+            }
+            unlinkInsight(id, current);
+            return null;
+        });
     }
 
     public void restrict(Plugin owner, boolean restricted) {
@@ -214,7 +232,11 @@ public final class EntityOverlayService implements Listener {
     public void onPluginDisable(PluginDisableEvent event) {
         Plugin owner = event.getPlugin();
         restrictions.remove(owner);
-        insights.entrySet().removeIf(entry -> entry.getValue().owner() == owner);
+        for (Map.Entry<UUID, Insight> entry : insights.entrySet()) {
+            if (entry.getValue().owner() == owner) {
+                clearInsight(owner, entry.getKey());
+            }
+        }
         if (owner.getName().equals("React")) {
             reactPresent = false;
             stackCounts.clear();
@@ -246,7 +268,9 @@ public final class EntityOverlayService implements Listener {
         stopDriver();
         settings = updated;
         refreshText = updated != null && EntityOverlayText.refreshRequired(updated);
-        trackDistance = updated != null && usesDistance(updated);
+        trackDistance = updated != null && EntityOverlayText.usesDistance(updated);
+        personalText = updated != null && EntityOverlayText.personalRequired(updated,
+            plugin.animations()::framesViewerSpecific);
         if (enabled()) {
             taskId = plugin.scheduler().sr(this::drive, settings.updateIntervalTicks());
         }
@@ -257,245 +281,592 @@ public final class EntityOverlayService implements Listener {
             plugin.scheduler().csr(taskId);
             taskId = -1;
         }
-        for (UUID viewer : List.copyOf(viewers.keySet())) {
-            removeViewer(viewer);
+        anchors.clear();
+        insights.clear();
+        insightTargets.clear();
+        for (UUID targetId : List.copyOf(overlays.keySet())) {
+            EntityOverlayTarget overlay = overlays.remove(targetId);
+            if (overlay != null) {
+                overlay.destroy();
+            }
         }
     }
 
     private void drive() {
-        if (!enabled()) {
+        EntityOverlayDoc current = settings;
+        if (!enabled() || current == null) {
             return;
         }
+        long sequence = driveSequence.incrementAndGet();
         long now = System.currentTimeMillis();
+        sweepHits(now);
+        sweepInsights(now);
+        markStaleRenders();
+        sweepOverlays(sequence);
+        sampleAnchors(current, sequence);
+        admitInsightTargets(current, sequence);
+        scanCells(current, sequence);
+    }
+
+    private void sweepHits(long now) {
         hits.entrySet().removeIf(entry -> entry.getValue().expiresAt() <= now);
-        insights.entrySet().removeIf(entry -> entry.getValue().expiresAt() <= now);
-        for (Player player : Bukkit.getOnlinePlayers()) {
-            ViewerState state = viewers.computeIfAbsent(player.getUniqueId(), ignored -> new ViewerState());
-            if (!state.scanning.compareAndSet(false, true)) {
+    }
+
+    private void sweepInsights(long now) {
+        for (Map.Entry<UUID, Insight> entry : insights.entrySet()) {
+            if (entry.getValue().expiresAt() > now) {
                 continue;
             }
-            Runnable retired = () -> {
-                state.scanning.set(false);
-                removeViewer(player.getUniqueId(), state);
-            };
-            if (!FoliaScheduler.runEntity(plugin, player, () -> scan(player, state), 0, retired)) {
+            insights.computeIfPresent(entry.getKey(), (viewerId, current) -> {
+                if (current.expiresAt() > now) {
+                    return current;
+                }
+                unlinkInsight(viewerId, current);
+                return null;
+            });
+        }
+    }
+
+    private void markStaleRenders() {
+        long render = plugin.text().renderGeneration();
+        long emoji = TextPipeline.emojiGeneration();
+        long animation = plugin.animations().generation();
+        boolean drift = render != renderGeneration || emoji != emojiGeneration
+            || animation != animationGeneration;
+        if (drift) {
+            if (animation != animationGeneration) {
+                EntityOverlayDoc current = settings;
+                personalText = current != null && EntityOverlayText.personalRequired(current,
+                    plugin.animations()::framesViewerSpecific);
+            }
+            renderGeneration = render;
+            emojiGeneration = emoji;
+            animationGeneration = animation;
+        }
+        if (!drift && !refreshText && !trackDistance) {
+            return;
+        }
+        for (EntityOverlayTarget overlay : overlays.values()) {
+            overlay.dirty = true;
+        }
+    }
+
+    private void sweepOverlays(long sequence) {
+        for (EntityOverlayTarget overlay : overlays.values()) {
+            boolean changed = overlay.audience.entrySet()
+                .removeIf(entry -> sequence - entry.getValue() > AUDIENCE_GRACE_DRIVES);
+            if (overlay.audience.isEmpty()) {
+                if (overlays.remove(overlay.targetId(), overlay)) {
+                    overlay.destroy();
+                }
+                continue;
+            }
+            if (changed) {
+                overlay.personalViewers.removeIf(viewerId -> !overlay.audience.containsKey(viewerId));
+                overlay.dirty = true;
+            }
+        }
+    }
+
+    private void sampleAnchors(EntityOverlayDoc current, long sequence) {
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            UUID viewerId = player.getUniqueId();
+            Runnable retired = () -> dropViewer(viewerId, sequence);
+            if (!FoliaScheduler.runEntity(plugin, player,
+                () -> captureAnchor(player, viewerId, current, sequence), 0, retired)) {
                 retired.run();
             }
         }
+        anchors.entrySet().removeIf(entry -> sequence - entry.getValue().sequence() > AUDIENCE_GRACE_DRIVES);
     }
 
-    private void scan(Player player, ViewerState state) {
+    private void captureAnchor(Player player, UUID viewerId, EntityOverlayDoc current, long sequence) {
+        if (!enabled() || settings != current) {
+            return;
+        }
+        if (!player.isOnline() || player.isDead() || player.getGameMode() == GameMode.SPECTATOR
+            || current.blacklistWorlds().contains(player.getWorld().getName())) {
+            dropViewer(viewerId, sequence);
+            return;
+        }
+        Location at = player.getLocation();
+        World world = at.getWorld();
+        if (world == null) {
+            dropViewer(viewerId, sequence);
+            return;
+        }
+        anchors.put(viewerId, new EntityOverlayCell.Anchor(viewerId, player, world,
+            at.getX(), at.getY(), at.getZ(), sequence));
+    }
+
+    private void scanCells(EntityOverlayDoc current, long sequence) {
+        if (!restrictions.isEmpty()) {
+            return;
+        }
+        for (EntityOverlayCell cell : EntityOverlayCell.bucket(anchors.values(), sequence, ANCHOR_GRACE_DRIVES)) {
+            Location center = cell.center();
+            if (!plugin.scheduler().runAt(center, () -> scanCell(cell, current, sequence))) {
+                Gloss.warnThrottled("entity-overlay-cell-scheduling",
+                    "Entity overlay scan could not reach a region thread; the pass was skipped.");
+            }
+        }
+    }
+
+    private void scanCell(EntityOverlayCell cell, EntityOverlayDoc current, long sequence) {
+        if (!enabled() || settings != current) {
+            return;
+        }
         try {
-            EntityOverlayDoc current = settings;
-            if (!enabled() || !state.active || !player.isOnline() || player.isDead()
-                || player.getGameMode() == GameMode.SPECTATOR
-                || current.blacklistWorlds().contains(player.getWorld().getName())) {
-                clearOverlays(state);
+            BoundingBox box = cell.box(current.range());
+            if (!EntityOverlayCell.owned(cell.world(), box, folia())) {
+                splitCell(cell, current, sequence);
                 return;
             }
-            Location origin = player.getLocation();
-            Set<UUID> selected = new HashSet<>();
-            Insight insight = insight(player.getUniqueId(), System.currentTimeMillis());
-            if (insight != null) {
-                select(player, state, origin, insight.target(), selected, current);
+            List<CellTarget> targets = sampleTargets(cell.world(), box, current);
+            if (targets.isEmpty()) {
+                return;
             }
-            if (restrictions.isEmpty()) {
-                for (Entity candidate : player.getNearbyEntities(current.range(), current.range(), current.range())) {
-                    if (selected.size() >= current.maxEntitiesPerViewer()) {
-                        break;
-                    }
-                    if (candidate instanceof LivingEntity living) {
-                        select(player, state, origin, living, selected, current);
-                    }
-                }
+            for (int index = 0; index < cell.size(); index++) {
+                admitViewer(cell.anchor(index), targets, current, sequence);
             }
-            for (Map.Entry<UUID, Overlay> entry : state.overlays.entrySet()) {
-                if (!selected.contains(entry.getKey()) && state.overlays.remove(entry.getKey(), entry.getValue())) {
-                    entry.getValue().destroy();
-                }
-            }
-        } finally {
-            state.scanning.set(false);
+        } catch (RuntimeException failure) {
+            Gloss.logExceptionStackThrottled(false, "entity-overlay-scan", failure,
+                "Failed to scan entity overlays around %s.", cell.world().getName());
         }
     }
 
-    private void select(Player player, ViewerState state, Location origin, LivingEntity target,
-                        Set<UUID> selected, EntityOverlayDoc current) {
-        UUID targetId = target.getUniqueId();
-        if (!state.active || targetId.equals(player.getUniqueId())
-            || !current.includePlayers() && target instanceof Player
-            || current.excludedEntityTypes().contains(target.getType().name())
-            || !player.canSee(target) || !selected.add(targetId)) {
+    private boolean folia() {
+        return plugin.scheduler().isFoliaThreading();
+    }
+
+    private void splitCell(EntityOverlayCell cell, EntityOverlayDoc current, long sequence) {
+        for (int index = 0; index < cell.size(); index++) {
+            EntityOverlayCell.Anchor anchor = cell.anchor(index);
+            if (!plugin.scheduler().runAt(anchor.location(), () -> scanAnchor(anchor, current, sequence))) {
+                Gloss.warnThrottled("entity-overlay-cell-scheduling",
+                    "Entity overlay scan could not reach a region thread; the pass was skipped.");
+            }
+        }
+    }
+
+    private void scanAnchor(EntityOverlayCell.Anchor anchor, EntityOverlayDoc current, long sequence) {
+        if (!enabled() || settings != current) {
             return;
         }
-        Overlay overlay = state.overlays.computeIfAbsent(targetId, ignored -> new Overlay());
-        if (!overlay.sampling.compareAndSet(false, true)) {
+        try {
+            BoundingBox box = EntityOverlayCell.ownedPortion(anchor.world(),
+                anchor.box(current.range()), anchor.x(), anchor.z(), folia());
+            if (box == null) {
+                return;
+            }
+            List<CellTarget> targets = sampleTargets(anchor.world(), box, current);
+            if (targets.isEmpty()) {
+                return;
+            }
+            admitViewer(anchor, targets, current, sequence);
+        } catch (RuntimeException failure) {
+            Gloss.logExceptionStackThrottled(false, "entity-overlay-scan", failure,
+                "Failed to scan entity overlays around %s.", anchor.world().getName());
+        }
+    }
+
+    private List<CellTarget> sampleTargets(World world, BoundingBox box, EntityOverlayDoc current) {
+        List<CellTarget> targets = new ArrayList<>();
+        long now = System.currentTimeMillis();
+        for (Entity candidate : world.getNearbyEntities(box, EntityOverlayService::isLivingCandidate)) {
+            LivingEntity target = (LivingEntity) candidate;
+            if (!eligible(target, current)) {
+                continue;
+            }
+            Location position = target.getLocation();
+            Hit hit = hits.get(target.getUniqueId());
+            boolean struck = hit != null && hit.expiresAt() > now;
+            double health = target.getHealth();
+            EntityOverlayText.Snapshot snapshot = new EntityOverlayText.Snapshot(
+                target.getCustomName(), health, attribute(target, Attribute.MAX_HEALTH),
+                struck ? hit.previousHealth() : health, struck ? hit.damage() : 0,
+                attribute(target, Attribute.ATTACK_DAMAGE), attribute(target, Attribute.ARMOR),
+                stackCount(target), target.getType().getKey().getKey(), 0);
+            targets.add(new CellTarget(target, target.getUniqueId(), position.getX(), position.getY(),
+                position.getZ(), snapshot,
+                position.clone().add(0, target.getHeight() + current.verticalOffset(), 0)));
+        }
+        return targets;
+    }
+
+    private void admitViewer(EntityOverlayCell.Anchor anchor, List<CellTarget> targets,
+                             EntityOverlayDoc current, long sequence) {
+        Player viewer = anchor.player();
+        Runnable admit = () -> admitOnViewerRegion(viewer, anchor, targets, current, sequence);
+        if (!FoliaScheduler.runEntity(plugin, viewer, admit, 0, null)) {
+            dropViewer(anchor.viewerId(), sequence);
+        }
+    }
+
+    private void admitOnViewerRegion(Player viewer, EntityOverlayCell.Anchor anchor, List<CellTarget> targets,
+                                     EntityOverlayDoc current, long sequence) {
+        if (!enabled() || settings != current || !viewer.isOnline()) {
             return;
         }
-        Runnable retired = () -> {
-            overlay.sampling.set(false);
-            state.overlays.remove(targetId, overlay);
-            overlay.destroy();
+        UUID viewerId = anchor.viewerId();
+        double rangeSquared = current.range() * current.range();
+        List<Admission> admissions = new ArrayList<>(Math.min(targets.size(), current.maxEntitiesPerViewer()));
+        for (CellTarget target : targets) {
+            if (viewerId.equals(target.targetId())) {
+                continue;
+            }
+            double distanceSquared = anchor.distanceSquared(target.x(), target.y(), target.z());
+            if (distanceSquared > rangeSquared || !viewer.canSee(target.entity())) {
+                continue;
+            }
+            admissions.add(new Admission(target, distanceSquared));
+        }
+        if (admissions.size() > current.maxEntitiesPerViewer()
+            || overlays.size() + admissions.size() > current.maxActiveOverlays()) {
+            admissions.sort((left, right) -> Double.compare(left.distanceSquared(), right.distanceSquared()));
+        }
+        int admitted = 0;
+        for (Admission admission : admissions) {
+            if (admitted >= current.maxEntitiesPerViewer()) {
+                break;
+            }
+            EntityOverlayTarget overlay = admit(viewerId, admission.target(), current, sequence);
+            if (overlay == null) {
+                continue;
+            }
+            admitted++;
+            if (overlay.dirty) {
+                dispatchRender(overlay, viewer, current);
+            }
+        }
+    }
+
+    private EntityOverlayTarget admit(UUID viewerId, CellTarget target, EntityOverlayDoc current, long sequence) {
+        EntityOverlayTarget overlay = overlays.get(target.targetId());
+        if (overlay == null) {
+            if (overlays.size() >= current.maxActiveOverlays()) {
+                return null;
+            }
+            overlay = overlays.computeIfAbsent(target.targetId(), EntityOverlayTarget::new);
+        }
+        overlay.target = target.entity();
+        overlay.publish(target.snapshot(), target.anchor(), target.x(), target.y(), target.z());
+        boolean personal = personalText || insightFor(viewerId, target.targetId()) != null;
+        overlay.audience.put(viewerId, sequence);
+        if (personal ? overlay.personalViewers.add(viewerId) : overlay.personalViewers.remove(viewerId)) {
+            overlay.dirty = true;
+        }
+        if (overlay.awaiting(viewerId, personal)) {
+            overlay.dirty = true;
+        }
+        return overlay;
+    }
+
+    private void admitInsightTargets(EntityOverlayDoc current, long sequence) {
+        for (Map.Entry<UUID, Insight> entry : insights.entrySet()) {
+            UUID viewerId = entry.getKey();
+            Insight insight = entry.getValue();
+            if (!anchors.containsKey(viewerId)) {
+                continue;
+            }
+            LivingEntity target = insight.target();
+            if (!FoliaScheduler.runEntity(plugin, target,
+                () -> admitInsightTarget(viewerId, insight, current, sequence), 0, null)) {
+                dropInsight(viewerId, insight);
+            }
+        }
+    }
+
+    private void admitInsightTarget(UUID viewerId, Insight insight, EntityOverlayDoc current, long sequence) {
+        if (!enabled() || settings != current || insights.get(viewerId) != insight) {
+            return;
+        }
+        EntityOverlayCell.Anchor anchor = anchors.get(viewerId);
+        LivingEntity target = insight.target();
+        if (anchor == null || !eligible(target, current)) {
+            return;
+        }
+        Location position = target.getLocation();
+        if (position.getWorld() != anchor.world()) {
+            return;
+        }
+        long now = System.currentTimeMillis();
+        Hit hit = hits.get(insight.targetId());
+        boolean struck = hit != null && hit.expiresAt() > now;
+        double health = target.getHealth();
+        EntityOverlayText.Snapshot snapshot = new EntityOverlayText.Snapshot(
+            target.getCustomName(), health, attribute(target, Attribute.MAX_HEALTH),
+            struck ? hit.previousHealth() : health, struck ? hit.damage() : 0,
+            attribute(target, Attribute.ATTACK_DAMAGE), attribute(target, Attribute.ARMOR),
+            stackCount(target), target.getType().getKey().getKey(), 0);
+        CellTarget cellTarget = new CellTarget(target, insight.targetId(), position.getX(), position.getY(),
+            position.getZ(), snapshot,
+            position.clone().add(0, target.getHeight() + current.verticalOffset(), 0));
+        Player viewer = anchor.player();
+        Runnable admit = () -> {
+            if (!enabled() || settings != current || !viewer.isOnline() || !viewer.canSee(target)) {
+                return;
+            }
+            EntityOverlayTarget overlay = admit(viewerId, cellTarget, current, sequence);
+            if (overlay != null && overlay.dirty) {
+                dispatchRender(overlay, viewer, current);
+            }
         };
-        if (!FoliaScheduler.runEntity(plugin, target,
-            () -> update(player, state, overlay, target, origin, current), 0, retired)) {
+        if (!FoliaScheduler.runEntity(plugin, viewer, admit, 0, null)) {
+            dropInsight(viewerId, insight);
+        }
+    }
+
+    private void dispatchRender(EntityOverlayTarget overlay, Player representative, EntityOverlayDoc current) {
+        if (!overlay.rendering.compareAndSet(false, true)) {
+            return;
+        }
+        Runnable retired = () -> overlay.rendering.set(false);
+        if (!FoliaScheduler.runEntity(plugin, representative, () -> {
+            try {
+                render(overlay, representative, current);
+            } finally {
+                overlay.rendering.set(false);
+            }
+        }, 0, retired)) {
             retired.run();
         }
     }
 
-    private void update(Player player, ViewerState state, Overlay overlay, LivingEntity target,
-                        Location origin, EntityOverlayDoc current) {
-        boolean dispatched = false;
-        try {
-            synchronized (overlay) {
-                if (!state.active || overlay.retired || !enabled() || settings != current) {
-                    return;
-                }
-                Location position = target.getLocation();
-                long now = System.currentTimeMillis();
-                Insight insight = insight(player.getUniqueId(), now);
-                boolean selected = insight != null && insight.target().getUniqueId().equals(target.getUniqueId());
-                if (!target.isValid() || target.isDead() || target.isInvisible()
-                    || !origin.getWorld().equals(position.getWorld())
-                    || !selected && origin.distanceSquared(position) > current.range() * current.range()
-                    || !current.includePlayers() && target instanceof Player
-                    || target instanceof Player other && other.getGameMode() == GameMode.SPECTATOR
-                    || current.excludedEntityTypes().contains(target.getType().name())
-                    || !restrictions.isEmpty() && !selected) {
-                    overlay.hide();
-                    return;
-                }
-                Hit hit = hits.get(target.getUniqueId());
-                boolean struck = hit != null && hit.expiresAt() > now;
-                double health = target.getHealth();
-                EntityOverlayText.Snapshot snapshot = new EntityOverlayText.Snapshot(
-                    target.getCustomName(), health, attribute(target, Attribute.MAX_HEALTH),
-                    struck ? hit.previousHealth() : health, struck ? hit.damage() : 0,
-                    attribute(target, Attribute.ATTACK_DAMAGE), attribute(target, Attribute.ARMOR),
-                    stackCount(target), target.getType().getKey().getKey(), trackDistance ? origin.distance(position) : 0);
-                OverlaySample sample = new OverlaySample(target.getUniqueId(), snapshot,
-                    position.clone(), position.add(0, target.getHeight() + current.verticalOffset(), 0));
-                Runnable retired = () -> {
-                    overlay.sampling.set(false);
-                    state.overlays.remove(sample.targetId(), overlay);
-                    overlay.destroy();
-                };
-                dispatched = FoliaScheduler.runEntity(plugin, player, () -> {
-                    try {
-                        render(player, state, overlay, target, current, sample);
-                    } finally {
-                        overlay.sampling.set(false);
-                    }
-                }, 0, retired);
-                if (!dispatched) {
-                    retired.run();
-                }
+    private void render(EntityOverlayTarget overlay, Player representative, EntityOverlayDoc current) {
+        LivingEntity target = overlay.target;
+        EntityOverlayTarget.Sample sample = overlay.sample;
+        if (overlay.retired || !enabled() || settings != current || target == null || sample == null) {
+            return;
+        }
+        overlay.dirty = false;
+        renderPasses.incrementAndGet();
+        synchronized (overlay.shared) {
+            try {
+                renderShared(overlay, representative, target, current, sample);
+            } catch (RuntimeException failure) {
+                overlay.shared.hide();
+                Gloss.logExceptionStackThrottled(false, "entity-overlay-render", failure,
+                    "Failed to render the entity overlay for %s.", overlay.targetId());
             }
-        } catch (RuntimeException failure) {
-            synchronized (overlay) {
-                overlay.hide();
+        }
+        for (UUID viewerId : overlay.personalViewers) {
+            dispatchPersonal(overlay, viewerId, current);
+        }
+        for (UUID viewerId : List.copyOf(overlay.personal.keySet())) {
+            if (overlay.personalViewers.contains(viewerId)) {
+                continue;
             }
-            Gloss.logExceptionStackThrottled(false, "entity-overlay-sample", failure,
-                "Failed to sample an entity overlay for %s.", player.getUniqueId());
-        } finally {
-            if (!dispatched) {
-                overlay.sampling.set(false);
-            }
+            overlay.retirePersonal(viewerId);
         }
     }
 
-    private void render(Player player, ViewerState state, Overlay overlay, LivingEntity target,
-                        EntityOverlayDoc current, OverlaySample sample) {
-        synchronized (overlay) {
-            if (!state.active || overlay.retired || !enabled() || settings != current) {
-                return;
+    private void renderShared(EntityOverlayTarget overlay, Player representative, LivingEntity target,
+                              EntityOverlayDoc current, EntityOverlayTarget.Sample sample) {
+        EntityOverlayTarget.Render shared = overlay.shared;
+        List<UUID> audience = new ArrayList<>(overlay.audience.size());
+        for (UUID viewerId : overlay.audience.keySet()) {
+            if (!overlay.personalViewers.contains(viewerId)) {
+                audience.add(viewerId);
             }
-            if (!player.isOnline() || player.isDead() || player.getGameMode() == GameMode.SPECTATOR
-                || player.getWorld() != sample.anchor().getWorld() || !player.canSee(target)) {
-                overlay.hide();
-                return;
-            }
-            Insight insight = insight(player.getUniqueId(), System.currentTimeMillis());
-            boolean selected = insight != null && insight.target().getUniqueId().equals(sample.targetId());
-            if (!restrictions.isEmpty() && !selected
-                || !selected && player.getLocation().distanceSquared(sample.position()) > current.range() * current.range()) {
-                overlay.hide();
-                return;
-            }
-            List<String> details = selected ? insight.details() : List.of();
+        }
+        if (audience.isEmpty()) {
+            shared.hide();
+            return;
+        }
+        if (!apply(overlay, shared, representative, target, current, sample.snapshot(), List.of(),
+            sample.anchor())) {
+            return;
+        }
+        syncWhitelist(shared, audience);
+    }
+
+    private void dispatchPersonal(EntityOverlayTarget overlay, UUID viewerId, EntityOverlayDoc current) {
+        Player viewer = Bukkit.getPlayer(viewerId);
+        if (viewer == null) {
+            return;
+        }
+        if (!FoliaScheduler.runEntity(plugin, viewer, () -> renderPersonal(overlay, viewer, current), 0, null)) {
+            overlay.retirePersonal(viewerId);
+        }
+    }
+
+    private void renderPersonal(EntityOverlayTarget overlay, Player viewer, EntityOverlayDoc current) {
+        LivingEntity target = overlay.target;
+        EntityOverlayTarget.Sample sample = overlay.sample;
+        UUID viewerId = viewer.getUniqueId();
+        if (overlay.retired || !enabled() || settings != current || target == null || sample == null
+            || !overlay.personalViewers.contains(viewerId)) {
+            return;
+        }
+        EntityOverlayTarget.Render personal = overlay.personal.computeIfAbsent(viewerId,
+            ignored -> new EntityOverlayTarget.Render());
+        synchronized (personal) {
             try {
-                long renderGeneration = plugin.text().renderGeneration();
-                long emojiGeneration = TextPipeline.emojiGeneration();
-                long animationGeneration = plugin.animations().generation();
-                boolean prepare = overlay.prepared == null || refreshText
-                    || !sample.snapshot().equals(overlay.snapshot) || !details.equals(overlay.details)
-                    || renderGeneration != overlay.renderGeneration || emojiGeneration != overlay.emojiGeneration
-                    || animationGeneration != overlay.animationGeneration;
-                if (prepare) {
-                    overlay.prepared = EntityOverlayText.prepare(plugin, player, current,
-                        sample.snapshot(), details);
-                    overlay.snapshot = sample.snapshot();
-                    overlay.details = details;
-                    overlay.renderGeneration = renderGeneration;
-                    overlay.emojiGeneration = emojiGeneration;
-                    overlay.animationGeneration = animationGeneration;
-                }
-                EntityOverlayText.Prepared prepared = overlay.prepared;
-                ParticleText.Rendered frame = prepared.frame(System.currentTimeMillis());
-                if (frame.text().isEmpty()) {
-                    overlay.hide();
-                    return;
-                }
-                if (overlay.display == null) {
-                    TemporaryHologram display = plugin.holograms().createTemporary(
-                        "entity-overlay:" + player.getUniqueId() + ":" + sample.targetId(),
-                        sample.anchor(), Long.MAX_VALUE);
-                    display.viewers().whitelist();
-                    display.viewers().add(player.getUniqueId());
-                    display.setStyle(current.style());
-                    display.setBox(current.box());
-                    display.setParticleLayers(current.particleLayers());
-                    display.bindPosition(target, () -> target.getLocation()
-                        .add(0, target.getHeight() + current.verticalOffset(), 0));
-                    overlay.display = display;
-                }
-                if (!frame.equals(overlay.frame)) {
-                    overlay.display.setRenderedLines(List.of(frame.text().split("\\n", -1)));
-                    List<ParticleTextSpan> spans = new ArrayList<>(frame.spans().size());
-                    for (ParticleText.Span span : frame.spans()) {
-                        spans.add(new ParticleTextSpan(span.name(), span.start(), span.end()));
-                    }
-                    overlay.display.setRenderedParticleText(frame.text(), spans);
-                    overlay.frame = frame;
-                }
-                if (prepare) {
-                    overlay.display.bindRenderedFrames(prepared.animated()
-                        ? now -> List.of(prepared.frame(now).text().split("\\n", -1)) : null);
+                Insight insight = insightFor(viewerId, overlay.targetId());
+                List<String> details = insight == null ? List.of() : insight.details();
+                EntityOverlayText.Snapshot snapshot = personalSnapshot(sample, viewerId);
+                if (apply(overlay, personal, viewer, target, current, snapshot, details, sample.anchor())) {
+                    syncWhitelist(personal, List.of(viewerId));
                 }
             } catch (RuntimeException failure) {
-                overlay.hide();
+                personal.hide();
                 Gloss.logExceptionStackThrottled(false, "entity-overlay-render", failure,
-                    "Failed to render an entity overlay for %s.", player.getUniqueId());
+                    "Failed to render an entity overlay for %s.", viewerId);
             }
         }
     }
 
-    private static boolean usesDistance(EntityOverlayDoc settings) {
-        if (settings.show().expression().contains("entity.distance")) {
+    private EntityOverlayText.Snapshot personalSnapshot(EntityOverlayTarget.Sample sample, UUID viewerId) {
+        if (!trackDistance) {
+            return sample.snapshot();
+        }
+        EntityOverlayCell.Anchor anchor = anchors.get(viewerId);
+        double distance = anchor == null ? 0
+            : Math.sqrt(anchor.distanceSquared(sample.x(), sample.y(), sample.z()));
+        EntityOverlayText.Snapshot base = sample.snapshot();
+        return new EntityOverlayText.Snapshot(base.name(), base.health(), base.maxHealth(),
+            base.previousHealth(), base.damage(), base.attack(), base.armor(), base.stackCount(),
+            base.type(), distance);
+    }
+
+    private boolean apply(EntityOverlayTarget overlay, EntityOverlayTarget.Render render, Player viewer,
+                          LivingEntity target, EntityOverlayDoc current,
+                          EntityOverlayText.Snapshot snapshot, List<String> details, Location anchor) {
+        long render0 = plugin.text().renderGeneration();
+        long emoji = TextPipeline.emojiGeneration();
+        long animation = plugin.animations().generation();
+        boolean prepare = render.prepared == null || refreshText || !snapshot.equals(render.snapshot)
+            || !details.equals(render.details) || render0 != render.renderGeneration
+            || emoji != render.emojiGeneration || animation != render.animationGeneration;
+        if (prepare) {
+            textPreparations.incrementAndGet();
+            render.prepared = EntityOverlayText.prepare(plugin, viewer, current, snapshot, details);
+            render.snapshot = snapshot;
+            render.details = details;
+            render.renderGeneration = render0;
+            render.emojiGeneration = emoji;
+            render.animationGeneration = animation;
+        }
+        EntityOverlayText.Prepared prepared = render.prepared;
+        ParticleText.Rendered frame = prepared.frame(System.currentTimeMillis());
+        if (frame.text().isEmpty()) {
+            render.hide();
+            return false;
+        }
+        if (!overlay.attach(render, () -> createDisplay(target, current, anchor))) {
+            return false;
+        }
+        if (!frame.equals(render.frame)) {
+            render.display.setRenderedLines(lines(frame.text()));
+            List<ParticleTextSpan> spans = new ArrayList<>(frame.spans().size());
+            for (ParticleText.Span span : frame.spans()) {
+                spans.add(new ParticleTextSpan(span.name(), span.start(), span.end()));
+            }
+            render.display.setRenderedParticleText(frame.text(), spans);
+            render.frame = frame;
+        }
+        if (prepare) {
+            render.display.bindRenderedFrames(prepared.animated()
+                ? now -> lines(prepared.frame(now).text()) : null);
+        }
+        return true;
+    }
+
+    private TemporaryHologram createDisplay(LivingEntity target, EntityOverlayDoc current, Location anchor) {
+        TemporaryHologram display = plugin.holograms().createTemporary(
+            "entity-overlay:" + target.getUniqueId(), anchor, Long.MAX_VALUE);
+        display.viewers().whitelist();
+        display.setStyle(current.style());
+        display.setBox(current.box());
+        display.setParticleLayers(current.particleLayers());
+        display.bindPosition(target, () -> target.getLocation()
+            .add(0, target.getHeight() + current.verticalOffset(), 0));
+        return display;
+    }
+
+    private static void syncWhitelist(EntityOverlayTarget.Render render, List<UUID> audience) {
+        for (UUID viewerId : audience) {
+            if (render.whitelist.add(viewerId)) {
+                render.display.viewers().add(viewerId);
+            }
+        }
+        render.whitelist.removeIf(viewerId -> {
+            if (audience.contains(viewerId)) {
+                return false;
+            }
+            render.display.viewers().remove(viewerId);
             return true;
-        }
-        for (EntityOverlayDoc.Line line : settings.lines()) {
-            if (line.text().contains("{distance}") || line.text().contains("entity.distance")
-                || line.show().expression().contains("entity.distance")) {
-                return true;
-            }
-        }
-        return false;
+        });
     }
 
-    private Insight insight(UUID viewer, long now) {
-        Insight current = insights.get(viewer);
-        return current != null && current.expiresAt() > now ? current : null;
+    private static List<String> lines(String text) {
+        List<String> lines = new ArrayList<>(4);
+        int cursor = 0;
+        while (true) {
+            int split = text.indexOf('\n', cursor);
+            if (split < 0) {
+                lines.add(text.substring(cursor));
+                return lines;
+            }
+            lines.add(text.substring(cursor, split));
+            cursor = split + 1;
+        }
+    }
+
+    private boolean eligible(LivingEntity target, EntityOverlayDoc current) {
+        return target.isValid() && !target.isDead() && !target.isInvisible()
+            && (current.includePlayers() || !(target instanceof Player))
+            && !(target instanceof Player other && other.getGameMode() == GameMode.SPECTATOR)
+            && !current.excludedEntityTypes().contains(target.getType().name());
+    }
+
+    private static boolean isLivingCandidate(Entity entity) {
+        return entity instanceof LivingEntity;
+    }
+
+    private Insight insightFor(UUID viewerId, UUID targetId) {
+        Insight current = insights.get(viewerId);
+        return current != null && current.targetId().equals(targetId)
+            && current.expiresAt() > System.currentTimeMillis() ? current : null;
+    }
+
+    private void linkInsight(UUID viewerId, Insight next) {
+        insightTargets.computeIfAbsent(next.targetId(), ignored -> ConcurrentHashMap.newKeySet()).add(viewerId);
+        Insight previous = insights.put(viewerId, next);
+        if (previous != null) {
+            detachInsight(viewerId, previous);
+        }
+        EntityOverlayTarget overlay = overlays.get(next.targetId());
+        if (overlay != null) {
+            overlay.dirty = true;
+        }
+    }
+
+    private void dropInsight(UUID viewerId, Insight expected) {
+        insights.computeIfPresent(viewerId, (id, current) -> {
+            if (current != expected) {
+                return current;
+            }
+            unlinkInsight(id, current);
+            return null;
+        });
+    }
+
+    private void unlinkInsight(UUID viewerId, Insight current) {
+        detachInsight(viewerId, current);
+        EntityOverlayTarget overlay = overlays.get(current.targetId());
+        if (overlay != null) {
+            overlay.personalViewers.remove(viewerId);
+            overlay.dirty = true;
+        }
+    }
+
+    private void detachInsight(UUID viewerId, Insight current) {
+        insightTargets.computeIfPresent(current.targetId(), (ignored, viewers) -> {
+            viewers.remove(viewerId);
+            return viewers.isEmpty() ? null : viewers;
+        });
     }
 
     private static double attribute(LivingEntity entity, Attribute attribute) {
@@ -516,83 +887,65 @@ public final class EntityOverlayService implements Listener {
     private void removeEntity(UUID entityId) {
         hits.remove(entityId);
         stackCounts.remove(entityId);
-        insights.entrySet().removeIf(entry -> entry.getValue().target().getUniqueId().equals(entityId));
-        for (ViewerState viewer : viewers.values()) {
-            Overlay overlay = viewer.overlays.remove(entityId);
-            if (overlay != null) {
-                overlay.destroy();
+        Set<UUID> viewers = insightTargets.remove(entityId);
+        if (viewers != null) {
+            for (UUID viewerId : viewers) {
+                insights.computeIfPresent(viewerId,
+                    (ignored, current) -> current.targetId().equals(entityId) ? null : current);
             }
+            removalMutations.incrementAndGet();
         }
+        EntityOverlayTarget overlay = overlays.remove(entityId);
+        if (overlay != null) {
+            overlay.destroy();
+            removalMutations.incrementAndGet();
+        }
+    }
+
+    private void dropViewer(UUID viewerId, long sequence) {
+        EntityOverlayCell.Anchor current = anchors.get(viewerId);
+        if (current != null && current.sequence() > sequence) {
+            return;
+        }
+        if (current == null && !insights.containsKey(viewerId)) {
+            return;
+        }
+        removeViewer(viewerId);
     }
 
     private void removeViewer(UUID viewerId) {
-        insights.remove(viewerId);
-        ViewerState state = viewers.remove(viewerId);
-        if (state != null) {
-            state.active = false;
-            clearOverlays(state);
+        anchors.remove(viewerId);
+        Insight insight = insights.remove(viewerId);
+        if (insight != null) {
+            detachInsight(viewerId, insight);
         }
-    }
-
-    private void removeViewer(UUID viewerId, ViewerState expected) {
-        if (viewers.remove(viewerId, expected)) {
-            insights.remove(viewerId);
-        }
-        expected.active = false;
-        clearOverlays(expected);
-    }
-
-    private static void clearOverlays(ViewerState state) {
-        for (UUID targetId : List.copyOf(state.overlays.keySet())) {
-            Overlay overlay = state.overlays.remove(targetId);
-            if (overlay != null) {
-                overlay.destroy();
+        for (EntityOverlayTarget overlay : overlays.values()) {
+            if (overlay.audience.remove(viewerId) == null) {
+                continue;
+            }
+            overlay.personalViewers.remove(viewerId);
+            overlay.dirty = true;
+            overlay.retirePersonal(viewerId);
+            EntityOverlayTarget.Render shared = overlay.shared;
+            synchronized (shared) {
+                if (shared.display != null && shared.whitelist.remove(viewerId)) {
+                    shared.display.viewers().remove(viewerId);
+                }
             }
         }
     }
 
-    private record Insight(Plugin owner, LivingEntity target, List<String> details, long expiresAt) {
+    private record Insight(Plugin owner, LivingEntity target, UUID targetId, List<String> details, long expiresAt) {
     }
 
-    private record OverlaySample(UUID targetId, EntityOverlayText.Snapshot snapshot,
-                                 Location position, Location anchor) {
+    private record CellTarget(LivingEntity entity, UUID targetId, double x, double y, double z,
+                              EntityOverlayText.Snapshot snapshot, Location anchor) {
+    }
+
+    private record Admission(CellTarget target, double distanceSquared) {
     }
 
     private record Hit(double previousHealth, double damage, long expiresAt) {
     }
 
-    private static final class ViewerState {
-        private final ConcurrentMap<UUID, Overlay> overlays = new ConcurrentHashMap<>();
-        private final AtomicBoolean scanning = new AtomicBoolean();
-        private volatile boolean active = true;
-    }
-
-    private static final class Overlay {
-        private final AtomicBoolean sampling = new AtomicBoolean();
-        private TemporaryHologram display;
-        private ParticleText.Rendered frame;
-        private EntityOverlayText.Prepared prepared;
-        private EntityOverlayText.Snapshot snapshot;
-        private List<String> details = List.of();
-        private long renderGeneration;
-        private long emojiGeneration;
-        private long animationGeneration;
-        private boolean retired;
-
-        private synchronized void destroy() {
-            retired = true;
-            hide();
-        }
-
-        private void hide() {
-            if (display != null) {
-                display.destroy();
-                display = null;
-            }
-            frame = null;
-            prepared = null;
-            snapshot = null;
-            details = List.of();
-        }
-    }
 }

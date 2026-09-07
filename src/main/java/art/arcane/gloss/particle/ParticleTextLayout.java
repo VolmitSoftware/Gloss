@@ -6,12 +6,43 @@ import java.util.List;
 public final class ParticleTextLayout {
     private static final double DEFAULT_CHARACTER_WIDTH = 0.1D;
     private static final double DEFAULT_LINE_HEIGHT = 0.26D;
+    private static final int MAX_CACHED_LAYOUTS = 512;
+
+    /**
+     * Every viewer of a hologram lays out the same rendered string on every tick, so the per
+     * character pass and its derived rectangles are memoized by the text they came from.
+     */
+    private static final BoundedCache<LayoutKey, Layout> LAYOUTS = new BoundedCache<>(MAX_CACHED_LAYOUTS);
+    private static final BoundedCache<LayoutKey, List<ParticleRect>> LINES =
+        new BoundedCache<>(MAX_CACHED_LAYOUTS);
+    private static final BoundedCache<SpanKey, List<ParticleRect>> SPANS =
+        new BoundedCache<>(MAX_CACHED_LAYOUTS);
 
     private ParticleTextLayout() {
     }
 
     public static List<ParticleRect> bounds(ParticleText.Rendered rendered, String spanName,
                                             double scale, boolean perLetter) {
+        return SPANS.get(new SpanKey(rendered.text(), rendered.spans(), spanName, scale, perLetter),
+            key -> spanBounds(rendered, key.name(), key.scale(), key.perLetter()));
+    }
+
+    public static ParticleRect textBounds(String rendered, double scale) {
+        return layout(rendered, scale).bounds();
+    }
+
+    public static List<ParticleRect> lineBounds(String rendered, double scale) {
+        return LINES.get(new LayoutKey(rendered, scale), key -> computeLineBounds(key.text(), key.scale()));
+    }
+
+    static void clearCaches() {
+        LAYOUTS.clear();
+        LINES.clear();
+        SPANS.clear();
+    }
+
+    private static List<ParticleRect> spanBounds(ParticleText.Rendered rendered, String spanName,
+                                                 double scale, boolean perLetter) {
         List<ParticleText.Span> spans = rendered.named(spanName);
         if (spans.isEmpty()) {
             return List.of();
@@ -36,11 +67,7 @@ public final class ParticleTextLayout {
         return List.copyOf(bounds);
     }
 
-    public static ParticleRect textBounds(String rendered, double scale) {
-        return layout(rendered, scale).bounds();
-    }
-
-    public static List<ParticleRect> lineBounds(String rendered, double scale) {
+    private static List<ParticleRect> computeLineBounds(String rendered, double scale) {
         Layout layout = layout(rendered, scale);
         int lineCount = Math.max(1, countLines(rendered));
         double lineHeight = DEFAULT_LINE_HEIGHT * scale;
@@ -63,6 +90,10 @@ public final class ParticleTextLayout {
     }
 
     private static Layout layout(String rendered, double scale) {
+        return LAYOUTS.get(new LayoutKey(rendered, scale), key -> computeLayout(key.text(), key.scale()));
+    }
+
+    private static Layout computeLayout(String rendered, double scale) {
         double safeScale = Double.isFinite(scale) ? Math.max(0.0D, scale) : 1.0D;
         double characterWidth = DEFAULT_CHARACTER_WIDTH * safeScale;
         double lineHeight = DEFAULT_LINE_HEIGHT * safeScale;
@@ -156,6 +187,13 @@ public final class ParticleTextLayout {
     }
 
     private record Layout(List<Cell> cells, ParticleRect bounds) {
+    }
+
+    private record LayoutKey(String text, double scale) {
+    }
+
+    private record SpanKey(String text, List<ParticleText.Span> spans, String name, double scale,
+                           boolean perLetter) {
     }
 
     private record CellDraft(int sourceIndex, int line, int column) {

@@ -23,6 +23,8 @@ import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerRespawnEvent;
 
 import java.io.File;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -38,8 +40,9 @@ import java.util.function.IntSupplier;
 
 public final class TablistService implements Listener {
     private static final String PLAYER_TOKEN = "$player";
-    private static final String GROUP_TOKEN = "$group";
+    static final String GROUP_TOKEN = "$group";
     private static final int ANIMATION_REFRESH_INTERVAL_TICKS = 1;
+    private static final int DRIVER_STRIPE_PERIOD_TICKS = 1;
     private static final int VIEWER_DEPENDENT = TextPipeline.HAS_PLACEHOLDER | TextPipeline.HAS_FUNCTION;
     private static final long HEADER_FOOTER_HEARTBEAT_NANOS = TimeUnit.SECONDS.toNanos(30L);
     private static final int HEADER_FOOTER_HEARTBEAT_LIMIT_PER_CYCLE = 64;
@@ -61,6 +64,10 @@ public final class TablistService implements Listener {
     private final FastDriverLifecycle fastDriverLifecycle;
     private final AtomicLong docGeneration;
     private final AtomicLong driverEpoch;
+    private final List<UUID> applyOrder;
+    private int applyStripeIndex;
+    private int applyCursor;
+    private HeaderFooterHeartbeatCycle heartbeatCycle;
     private final BoundedConditionErrorCallback conditionErrors;
     private volatile TablistDoc activeDoc;
     private volatile TablistRuntime activeRuntime;
@@ -86,6 +93,9 @@ public final class TablistService implements Listener {
         this.fastDriverLifecycle = new FastDriverLifecycle();
         this.docGeneration = new AtomicLong();
         this.driverEpoch = new AtomicLong();
+        this.applyOrder = new ArrayList<>();
+        this.applyStripeIndex = 0;
+        this.applyCursor = 0;
         this.conditionErrors = BoundedConditionErrorCallback.bounded(100, error ->
             Gloss.logExceptionStackThrottled(false, "tablist-condition-" + error.path(), error.cause(),
                 "Tablist condition %s failed and was treated as false.", error.path()));
@@ -327,8 +337,11 @@ public final class TablistService implements Listener {
         driverEpoch.incrementAndGet();
         running = true;
         int intervalTicks = desiredDriverIntervalTicks();
-        driverTaskId = plugin.scheduler().sr(this::tick, intervalTicks);
+        // The driver ticks every tick and applies a slice of the fleet, so the configured interval
+        // is the per-player refresh rate rather than a single-tick burst across every player.
+        driverTaskId = plugin.scheduler().sr(this::tick, DRIVER_STRIPE_PERIOD_TICKS);
         driverIntervalTicks = intervalTicks;
+        applyStripeIndex = 0;
         reconcileFastDriverLocked();
     }
 
@@ -391,11 +404,65 @@ public final class TablistService implements Listener {
         if (!isActiveEpoch(epoch)) {
             return;
         }
-        HeaderFooterHeartbeatCycle heartbeatCycle =
-            new HeaderFooterHeartbeatCycle(HEADER_FOOTER_HEARTBEAT_LIMIT_PER_CYCLE);
-        for (Player player : Bukkit.getOnlinePlayers()) {
-            requestApply(player, epoch, APPLY_FULL, heartbeatCycle);
+        int intervalTicks = Math.max(1, driverIntervalTicks);
+        if (sweepsWholeFleet(intervalTicks)) {
+            applyStripeIndex = 0;
+            applyOrder.clear();
+            applyCursor = 0;
+            HeaderFooterHeartbeatCycle cycle = new HeaderFooterHeartbeatCycle(HEADER_FOOTER_HEARTBEAT_LIMIT_PER_CYCLE);
+            for (Player player : Bukkit.getOnlinePlayers()) {
+                requestApply(player, epoch, APPLY_FULL, cycle);
+            }
+            return;
         }
+        if (applyStripeIndex >= intervalTicks) {
+            applyStripeIndex = 0;
+        }
+        if (applyStripeIndex == 0) {
+            beginApplyCycle();
+        }
+        int remaining = applyOrder.size() - applyCursor;
+        if (remaining > 0) {
+            int slice = stripeSize(remaining, intervalTicks - applyStripeIndex);
+            for (int index = 0; index < slice; index++) {
+                Player player = Bukkit.getPlayer(applyOrder.get(applyCursor++));
+                if (player != null) {
+                    requestApply(player, epoch, APPLY_FULL, heartbeatCycle);
+                }
+            }
+        }
+        applyStripeIndex++;
+    }
+
+    /**
+     * The heartbeat budget belongs to the whole cycle, not to one tick, so the anti-entropy re-send
+     * limit still means "at most this many players per interval".
+     */
+    private void beginApplyCycle() {
+        applyOrder.clear();
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            applyOrder.add(player.getUniqueId());
+        }
+        applyOrder.sort(Comparator.naturalOrder());
+        applyCursor = 0;
+        heartbeatCycle = new HeaderFooterHeartbeatCycle(HEADER_FOOTER_HEARTBEAT_LIMIT_PER_CYCLE);
+    }
+
+    /**
+     * At a one-tick interval every tick is a whole cycle, so the roster snapshot, its sort and the
+     * per-uuid player lookups are pure waste: sweep the online roster directly.
+     */
+    static boolean sweepsWholeFleet(int intervalTicks) {
+        return intervalTicks <= 1;
+    }
+
+    /** Boards and tablist both walk their fleet this way: ceil(remaining / remaining stripes). */
+    static int stripeSize(int remaining, int remainingStripes) {
+        if (remaining <= 0) {
+            return 0;
+        }
+        int stripes = Math.max(1, remainingStripes);
+        return (remaining + stripes - 1) / stripes;
     }
 
     private void tickFastPlayers() {
@@ -581,9 +648,11 @@ public final class TablistService implements Listener {
             }
             return;
         }
-        String primaryGroup = plugin.groups().primaryGroupFor(player).orElse(null);
+        // Resolving the Vault primary group is a blocking call on a cache miss; only the formats
+        // that actually splice $group pay for it.
+        String primaryGroup = profile.usesGroup() ? plugin.groups().primaryGroupFor(player).orElse(null) : null;
         String substituted = substituteTokens(template, player.getName(), primaryGroup);
-        setFastNamePlayer(uuid, requiresFastNameRefresh(substituted, plugin.cfg().text().functions()));
+        setFastNamePlayer(uuid, plugin.cfg().text().functions() && profile.fastRefresh());
         if ((TextPipeline.classify(substituted) & VIEWER_DEPENDENT) == 0) {
             // Viewer-independent: the render is a pure function of the substituted text plus the
             // emoji table, so an unchanged source guarantees an unchanged applied name.
@@ -717,10 +786,6 @@ public final class TablistService implements Listener {
             || (hasFastNames && doc.listNames().enabled());
     }
 
-    static boolean requiresFastNameRefresh(String substituted, boolean functionsEnabled) {
-        return functionsEnabled && TextPipeline.requiresFastRefresh(substituted);
-    }
-
     private static boolean usesAnimatedHeaderFooter(TablistDoc doc) {
         if (!doc.headerFooter().enabled()) {
             return false;
@@ -747,6 +812,11 @@ public final class TablistService implements Listener {
     }
 
     private void setFastNamePlayer(UUID uuid, boolean fast) {
+        // Called for every player on every tablist tick: on Folia the drains run on per-region
+        // threads, so the no-op case must not reach the shared monitor at all.
+        if (fastNamePlayers.contains(uuid) == fast) {
+            return;
+        }
         synchronized (fastDriverLifecycle) {
             boolean changed = fast ? fastNamePlayers.add(uuid) : fastNamePlayers.remove(uuid);
             if (!changed) {

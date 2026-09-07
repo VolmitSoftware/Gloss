@@ -1,6 +1,7 @@
 package art.arcane.gloss.drop;
 
 import art.arcane.gloss.condition.BoundedConditionErrorCallback;
+import art.arcane.gloss.condition.ShowCondition;
 import art.arcane.gloss.expr.ExprFunctions;
 import art.arcane.gloss.expr.ExprScope;
 import org.junit.jupiter.api.Test;
@@ -61,7 +62,7 @@ class RealDropConditionPlanTest {
             variants,
             new RealDropSettingsDoc.Audience("true"), null);
         return RealDropConditionPlan.compile(
-            document, true, BoundedConditionErrorCallback.silent());
+            document, true, BoundedConditionErrorCallback.silent(), ShowCondition.ALWAYS);
     }
 
     private static RealDropSettingsDoc.Variant variant(String id, int priority, String when) {

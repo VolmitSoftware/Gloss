@@ -28,7 +28,7 @@ public final class ParticleService {
     private record SampleKey(ParticleLayer.Geometry geometry, List<ParticleRect> targets, int limit) {
     }
 
-    private static final class Budget {
+    static final class Budget {
         private final AtomicLong tick = new AtomicLong(Long.MIN_VALUE);
         private final AtomicInteger used = new AtomicInteger();
 
@@ -48,18 +48,31 @@ public final class ParticleService {
                 }
             }
         }
+
+        private void release(long currentTick, int amount) {
+            if (amount <= 0) {
+                return;
+            }
+            while (tick.get() == currentTick) {
+                int current = used.get();
+                int returned = Math.max(0, current - amount);
+                if (used.compareAndSet(current, returned)) {
+                    return;
+                }
+            }
+        }
     }
 
     private final Gloss plugin;
     private final Map<ParticleLayer.ParticleSpec, ResolvedParticle> particles;
-    private final Map<SampleKey, List<Vector>> samples;
+    private final BoundedCache<SampleKey, List<Vector>> samples;
     private final Map<UUID, Budget> viewerBudgets;
     private final Budget globalBudget;
 
     public ParticleService(Gloss plugin) {
         this.plugin = plugin;
         this.particles = new ConcurrentHashMap<>();
-        this.samples = new ConcurrentHashMap<>();
+        this.samples = new BoundedCache<>(MAX_SAMPLE_CACHE_ENTRIES);
         this.viewerBudgets = new ConcurrentHashMap<>();
         this.globalBudget = new Budget();
     }
@@ -78,17 +91,8 @@ public final class ParticleService {
         }
         int cachedLimit = plugin.cfg().particles().maxCachedSamplesPerLayer();
         List<ParticleRect> stableTargets = targets == null ? List.of() : List.copyOf(targets);
-        SampleKey sampleKey = new SampleKey(layer.geometry(), stableTargets, cachedLimit);
-        List<Vector> sampled = samples.get(sampleKey);
-        if (sampled == null) {
-            sampled = ParticleGeometrySampler.sample(layer.geometry(), stableTargets, cachedLimit);
-            if (samples.size() < MAX_SAMPLE_CACHE_ENTRIES) {
-                List<Vector> raced = samples.putIfAbsent(sampleKey, sampled);
-                if (raced != null) {
-                    sampled = raced;
-                }
-            }
-        }
+        List<Vector> sampled = samples.get(new SampleKey(layer.geometry(), stableTargets, cachedLimit),
+            key -> ParticleGeometrySampler.sample(key.geometry(), key.targets(), key.limit()));
         List<Vector> selected = select(sampled, layer.emission(), tick);
         int admitted = reserve(viewer.getUniqueId(), selected.size());
         if (admitted == 0) {
@@ -113,16 +117,26 @@ public final class ParticleService {
         particles.clear();
         samples.clear();
         viewerBudgets.clear();
+        ParticleTextLayout.clearCaches();
     }
 
     private int reserve(UUID playerId, int requested) {
         long tick = System.currentTimeMillis() / TICK_MILLIS;
-        int global = globalBudget.reserve(tick, requested, plugin.cfg().particles().samplesPerTick());
-        if (global == 0) {
+        return admit(globalBudget, viewerBudgets.computeIfAbsent(playerId, ignored -> new Budget()),
+            tick, requested, plugin.cfg().particles().samplesPerTick(),
+            plugin.cfg().particles().samplesPerViewerPerTick());
+    }
+
+    /** The global pool may only lose what the viewer pool actually admits for emission. */
+    static int admit(Budget global, Budget viewer, long tick, int requested, int globalLimit,
+                     int viewerLimit) {
+        int reserved = global.reserve(tick, requested, globalLimit);
+        if (reserved == 0) {
             return 0;
         }
-        Budget viewer = viewerBudgets.computeIfAbsent(playerId, ignored -> new Budget());
-        return viewer.reserve(tick, global, plugin.cfg().particles().samplesPerViewerPerTick());
+        int admitted = viewer.reserve(tick, reserved, viewerLimit);
+        global.release(tick, reserved - admitted);
+        return admitted;
     }
 
     private ResolvedParticle resolve(ParticleLayer.ParticleSpec spec) {

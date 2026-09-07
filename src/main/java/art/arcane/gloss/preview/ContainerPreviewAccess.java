@@ -32,6 +32,9 @@ public final class ContainerPreviewAccess {
   private static final String BLOCK_LOCK_LISTENER = "art.arcane.gloss.paper.PaperBlockLockListener";
   private static final AtomicBoolean LOCK_FAILURE_LOGGED = new AtomicBoolean();
 
+  /** Paper's non-copying {@code Block.getState(boolean)}, or null on a server without it. */
+  private static final Method LIVE_STATE = liveStateMethod();
+
   private static final Method CHEST_IS_BLOCKED = paperStateMethod(Chest.class, "isBlocked");
   private static final Method ENDER_CHEST_IS_BLOCKED = paperStateMethod(EnderChest.class, "isBlocked");
   private static final Method SHULKER_BOX_IS_OPEN = paperStateMethod(ShulkerBox.class, "isOpen");
@@ -51,24 +54,27 @@ public final class ContainerPreviewAccess {
     return GlossConfig.current().previews().enabled();
   }
 
+  /**
+   * The viewer state a recheck needs, taken once. The key item is copied by {@link ViewerAccess}
+   * itself, so it is handed over as read rather than cloned twice.
+   */
   public static ViewerAccess capture(Player viewer) {
     boolean previewPermitted = canView(viewer);
     boolean spectator = viewer.getGameMode() == GameMode.SPECTATOR;
-    ItemStack mainHandItem = viewer.getInventory().getItemInMainHand().clone();
-    return new ViewerAccess(previewPermitted, spectator, mainHandItem);
+    return new ViewerAccess(previewPermitted, spectator, viewer.getInventory().getItemInMainHand());
   }
 
   public static boolean canOpen(Player viewer, Block block, ViewerAccess access) {
     if (!access.previewPermitted()) {
       return false;
     }
-    BlockState state = block.getState();
+    BlockState state = liveState(block);
     if (!isPhysicallyOpenable(block, state) || !canUnlock(viewer, block, state, access)) {
       return false;
     }
     Block connected = connectedChest(block);
     if (connected != null) {
-      BlockState connectedState = connected.getState();
+      BlockState connectedState = liveState(connected);
       if (!isPhysicallyOpenable(connected, connectedState)
           || !canUnlock(viewer, connected, connectedState, access)) {
         return false;
@@ -89,11 +95,36 @@ public final class ContainerPreviewAccess {
   }
 
   public static boolean isOpenable(Block block) {
-    BlockState state = block.getState();
+    BlockState state = liveState(block);
     if (!isOpenable(state)) {
       return false;
     }
     return isPhysicallyOpenable(block, state);
+  }
+
+  /**
+   * The tile entity behind a block, read rather than copied. A recheck only ever asks questions of
+   * it — is it locked, is the lid clear — so the 27-slot snapshot {@code getState()} builds is pure
+   * cost. The reflective gate keeps the Spigot compatibility build, which has no such overload, on
+   * the copying call.
+   */
+  private static BlockState liveState(Block block) {
+    if (LIVE_STATE != null) {
+      try {
+        return (BlockState) LIVE_STATE.invoke(block, false);
+      } catch (ReflectiveOperationException | RuntimeException unavailable) {
+        return block.getState();
+      }
+    }
+    return block.getState();
+  }
+
+  private static Method liveStateMethod() {
+    try {
+      return Block.class.getMethod("getState", boolean.class);
+    } catch (NoSuchMethodException absent) {
+      return null;
+    }
   }
 
   private static boolean isPhysicallyOpenable(Block block, BlockState state) {

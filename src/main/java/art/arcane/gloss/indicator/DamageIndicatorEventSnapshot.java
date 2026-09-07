@@ -18,6 +18,9 @@ import java.util.Map;
 record DamageIndicatorEventSnapshot(boolean damage, String cause, double reportedAmount,
                                     boolean critical, boolean criticalKnown,
                                     String directSourceType, EntityState source) {
+    private static final String[] DAMAGE_CAUSES = lowerNames(EntityDamageEvent.DamageCause.values());
+    private static final String[] REGAIN_REASONS =
+        lowerNames(EntityRegainHealthEvent.RegainReason.values());
 
     static DamageIndicatorEventSnapshot damage(EntityDamageEvent event, Gloss plugin,
                                                 DamageIndicatorCriticality criticality) {
@@ -33,7 +36,7 @@ record DamageIndicatorEventSnapshot(boolean damage, String cause, double reporte
             : criticality.detect(byEntity);
         return new DamageIndicatorEventSnapshot(
             true,
-            event.getCause().name().toLowerCase(Locale.ROOT),
+            DAMAGE_CAUSES[event.getCause().ordinal()],
             event.getFinalDamage(),
             criticalHit.critical(),
             criticalHit.known(),
@@ -44,12 +47,20 @@ record DamageIndicatorEventSnapshot(boolean damage, String cause, double reporte
     static DamageIndicatorEventSnapshot healing(EntityRegainHealthEvent event) {
         return new DamageIndicatorEventSnapshot(
             false,
-            event.getRegainReason().name().toLowerCase(Locale.ROOT),
+            REGAIN_REASONS[event.getRegainReason().ordinal()],
             event.getAmount(),
             false,
             true,
             "",
             EntityState.empty());
+    }
+
+    private static String[] lowerNames(Enum<?>[] values) {
+        String[] names = new String[values.length];
+        for (int index = 0; index < values.length; index++) {
+            names[index] = values[index].name().toLowerCase(Locale.ROOT);
+        }
+        return names;
     }
 
     Map<String, Object> values(LivingEntity subject, Gloss plugin, double observedAmount) {
@@ -73,6 +84,8 @@ record DamageIndicatorEventSnapshot(boolean damage, String cause, double reporte
     }
 
     record EntityState(Map<String, Object> values) {
+        private static final EntityState EMPTY = new EntityState(Map.copyOf(defaults()));
+
         private static EntityState capture(Entity entity, Gloss plugin) {
             if (entity == null) {
                 return empty();
@@ -104,8 +117,8 @@ record DamageIndicatorEventSnapshot(boolean damage, String cause, double reporte
             return new EntityState(Map.copyOf(values));
         }
 
-        private static EntityState empty() {
-            return new EntityState(Map.copyOf(defaults()));
+        static EntityState empty() {
+            return EMPTY;
         }
 
         private static Map<String, Object> defaults() {

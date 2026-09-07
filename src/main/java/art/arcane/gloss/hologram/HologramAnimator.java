@@ -19,6 +19,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.BooleanSupplier;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
@@ -49,13 +50,38 @@ public final class HologramAnimator {
     private record DirectKey(UUID viewerId, int entityId) {
     }
 
-    private static final class DirectUpdate {
+    /**
+     * A published target plus its retirement latch. Retirement never waits for an in-flight
+     * fan-out; the latch is what stops one instead, polled by the sender before every recipient
+     * write and re-checked when the send returns.
+     */
+    private static final class Publication implements BooleanSupplier {
+        private final Target target;
+        private volatile boolean retired;
+
+        private Publication(Target target) {
+            this.target = target;
+        }
+
+        @Override
+        public boolean getAsBoolean() {
+            return !retired;
+        }
+    }
+
+    private static final class DirectUpdate implements BooleanSupplier {
         private final List<Player> viewers;
         private final String text;
+        private volatile boolean retired;
 
         private DirectUpdate(List<Player> viewers, String text) {
             this.viewers = viewers;
             this.text = text;
+        }
+
+        @Override
+        public boolean getAsBoolean() {
+            return !retired;
         }
     }
 
@@ -66,10 +92,10 @@ public final class HologramAnimator {
     }
 
     private static final class SendState {
-        private String lastText;
-        private Set<Player> lastViewers = Set.of();
-        private long lastEvaluatedMs = Long.MIN_VALUE;
-        private boolean pendingRecipients;
+        private volatile String lastText;
+        private volatile Set<Player> lastViewers = Set.of();
+        private volatile long lastEvaluatedMs = Long.MIN_VALUE;
+        private volatile boolean pendingRecipients;
     }
 
     private final Supplier<GlossConfig> config;
@@ -77,7 +103,7 @@ public final class HologramAnimator {
     private final Function<String, AnimationClip> clipResolver;
     private final Function<AnimationClip, List<String>> sharedFrames;
     private final AnimationTextSender sender;
-    private final Map<TargetKey, Target> targets;
+    private final Map<TargetKey, Publication> targets;
     private final Map<TargetKey, SendState> states;
     private final Map<DirectKey, DirectUpdate> directUpdates;
     private final ArrayDeque<BudgetSample> budgetSamples;
@@ -147,21 +173,19 @@ public final class HologramAnimator {
 
     public void stop() {
         stopped = true;
-        List<Target> retiredTargets = new ArrayList<>(targets.values());
+        for (Publication publication : targets.values()) {
+            publication.retired = true;
+        }
         if (!targets.isEmpty()) {
             targets.clear();
             targetMembershipGeneration.incrementAndGet();
         }
-        List<DirectUpdate> retiredUpdates = new ArrayList<>(directUpdates.values());
+        for (DirectUpdate update : directUpdates.values()) {
+            update.retired = true;
+        }
         if (!directUpdates.isEmpty()) {
             directUpdates.clear();
             directMembershipGeneration.incrementAndGet();
-        }
-        for (Target target : retiredTargets) {
-            awaitCommittedSend(target);
-        }
-        for (DirectUpdate update : retiredUpdates) {
-            awaitCommittedSend(update);
         }
         states.clear();
         Thread active;
@@ -197,16 +221,17 @@ public final class HologramAnimator {
         DirectUpdate previous = directUpdates.put(key, new DirectUpdate(List.of(viewer), text));
         if (previous == null) {
             directMembershipGeneration.incrementAndGet();
+        } else {
+            previous.retired = true;
         }
-        awaitCommittedSend(previous);
         ensureWorker();
     }
 
     void discardText(UUID viewerId, int entityId) {
         DirectUpdate removed = directUpdates.remove(new DirectKey(viewerId, entityId));
         if (removed != null) {
+            removed.retired = true;
             directMembershipGeneration.incrementAndGet();
-            awaitCommittedSend(removed);
         }
     }
 
@@ -242,13 +267,15 @@ public final class HologramAnimator {
 
     public void publish(String group, String sub, Target target) {
         TargetKey key = new TargetKey(group, sub);
-        Target previous = targets.put(key, target);
+        Publication previous = targets.put(key, new Publication(target));
         if (previous == null) {
             targetMembershipGeneration.incrementAndGet();
+            ensureWorker();
+            return;
         }
-        awaitCommittedSend(previous);
-        if (previous != null
-            && (previous.entityId() != target.entityId() || previous.codec() != target.codec())) {
+
+        previous.retired = true;
+        if (previous.target.entityId() != target.entityId() || previous.target.codec() != target.codec()) {
             states.remove(key);
         }
         ensureWorker();
@@ -256,11 +283,11 @@ public final class HologramAnimator {
 
     public void remove(String group, String sub) {
         TargetKey key = new TargetKey(group, sub);
-        Target removed = targets.remove(key);
+        Publication removed = targets.remove(key);
         if (removed != null) {
+            removed.retired = true;
             targetMembershipGeneration.incrementAndGet();
         }
-        awaitCommittedSend(removed);
         states.remove(key);
     }
 
@@ -268,9 +295,11 @@ public final class HologramAnimator {
         boolean removed = false;
         for (TargetKey key : targets.keySet()) {
             if (key.group().equals(group)) {
-                Target retired = targets.remove(key);
-                removed |= retired != null;
-                awaitCommittedSend(retired);
+                Publication retired = targets.remove(key);
+                if (retired != null) {
+                    retired.retired = true;
+                    removed = true;
+                }
                 states.remove(key);
             }
         }
@@ -312,23 +341,23 @@ public final class HologramAnimator {
             while (visited < order.length && remainingRecipients > 0) {
                 TargetKey key = order[(start + visited) % order.length];
                 visited++;
-                Target target = targets.get(key);
-                if (target == null) {
+                Publication publication = targets.get(key);
+                if (publication == null) {
                     continue;
                 }
-                SendState state;
-                synchronized (target) {
-                    if (targets.get(key) != target) {
-                        continue;
-                    }
+                SendState state = states.get(key);
+                boolean pending = state != null && state.pendingRecipients;
+                boolean evaluationDue = state == null || minIntervalMs <= 0L
+                    || state.lastEvaluatedMs == Long.MIN_VALUE
+                    || state.lastEvaluatedMs + minIntervalMs <= nowMs;
+                if (!pending && !evaluationDue) {
+                    continue;
+                }
+                if (state == null) {
                     state = states.computeIfAbsent(key, ignored -> new SendState());
                 }
-                boolean evaluationDue = minIntervalMs <= 0L || state.lastEvaluatedMs == Long.MIN_VALUE
-                    || state.lastEvaluatedMs + minIntervalMs <= nowMs;
-                if (!state.pendingRecipients && !evaluationDue) {
-                    continue;
-                }
 
+                Target target = publication.target;
                 List<Player> viewers = target.viewers();
                 if (viewers.isEmpty()) {
                     state.lastViewers = Set.of();
@@ -339,7 +368,7 @@ public final class HologramAnimator {
                     continue;
                 }
 
-                if (!state.pendingRecipients) {
+                if (!pending) {
                     state.lastEvaluatedMs = nowMs;
                     String text = target.frames().compose(nowMs);
                     if (!text.equals(state.lastText)) {
@@ -355,20 +384,29 @@ public final class HologramAnimator {
                     continue;
                 }
 
-                synchronized (target) {
-                    if (targets.get(key) != target || states.get(key) != state) {
+                String text;
+                synchronized (publication) {
+                    if (targets.get(key) != publication || states.get(key) != state || publication.retired) {
                         continue;
                     }
                     int recipients = batch.viewers().size();
                     reservedRecipients += recipients;
                     remainingRecipients -= recipients;
                     state.pendingRecipients = true;
-                    sender.send(batch.viewers(), target.entityId(), state.lastText, target.codec());
-                    state.lastViewers = batch.hasMore()
-                        ? combinedViewerSet(state.lastViewers, batch.viewers())
-                        : viewerSet(viewers);
-                    state.pendingRecipients = batch.hasMore();
-                    sends++;
+                    text = state.lastText;
+                }
+                sender.send(new AnimationTextSender.Batch(batch.viewers(), target.entityId(), text,
+                    target.codec(), publication));
+                sends++;
+                synchronized (publication) {
+                    if (targets.get(key) == publication && states.get(key) == state) {
+                        state.lastViewers = batch.hasMore()
+                            ? combinedViewerSet(state.lastViewers, batch.viewers())
+                            : viewerSet(viewers);
+                        state.pendingRecipients = batch.hasMore();
+                    } else {
+                        state.pendingRecipients = false;
+                    }
                 }
             }
         } finally {
@@ -405,33 +443,22 @@ public final class HologramAnimator {
             DirectKey key = order[(start + visited) % order.length];
             visited++;
             DirectUpdate update = directUpdates.get(key);
-            if (update == null) {
+            if (update == null || update.retired) {
                 continue;
             }
+            sender.send(new AnimationTextSender.Batch(update.viewers, key.entityId(), update.text,
+                TextCodec.AUTHORED, update));
             synchronized (update) {
-                if (directUpdates.get(key) != update) {
-                    continue;
-                }
-                sender.send(update.viewers, key.entityId(), update.text, TextCodec.AUTHORED);
                 if (directUpdates.remove(key, update)) {
                     directMembershipGeneration.incrementAndGet();
                 }
-                sends++;
             }
+            sends++;
         }
         if (visited > 0) {
             directStartOffset = (start + visited) % order.length;
         }
         return sends;
-    }
-
-    private static void awaitCommittedSend(Object publication) {
-        if (publication == null) {
-            return;
-        }
-        synchronized (publication) {
-            // Retirement must finish after an already committed packet send.
-        }
     }
 
     private long advanceBudgetTime(long nowMs) {
@@ -459,8 +486,9 @@ public final class HologramAnimator {
 
     private long audienceRecipients() {
         long recipients = 0L;
-        for (Target target : targets.values()) {
-            recipients = Math.min(Long.MAX_VALUE / 1000L, recipients + target.viewers().size());
+        for (Publication publication : targets.values()) {
+            recipients = Math.min(Long.MAX_VALUE / 1000L,
+                recipients + publication.target.viewers().size());
         }
         return recipients;
     }
@@ -598,10 +626,11 @@ public final class HologramAnimator {
         return plugin.animations().clip(name.substring(FUNCTION_PREFIX.length()));
     }
 
-    private static void sendPacket(List<Player> viewers, int entityId, String legacyText, TextCodec codec) {
-        List<PacketWrapper<?>> packets = List.of(DisplayEntity.textUpdate(entityId,
-            codec == TextCodec.LEGACY ? TextUtils.parseLegacy(legacyText) : TextUtils.parse(legacyText)));
-        PacketUtils.send(viewers, packets);
+    private static void sendPacket(AnimationTextSender.Batch batch) {
+        String legacyText = batch.legacyText();
+        PacketWrapper<?> packet = DisplayEntity.textUpdate(batch.entityId(),
+            batch.codec() == TextCodec.LEGACY ? TextUtils.parseLegacy(legacyText) : TextUtils.parse(legacyText));
+        PacketUtils.broadcast(batch.viewers(), packet, batch.live());
     }
 
     private static RecipientBatch unsentViewers(List<Player> viewers, Set<Player> lastViewers, int limit) {

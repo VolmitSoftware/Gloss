@@ -62,6 +62,34 @@ class PersistentHologramDecorationTest {
     }
 
     @Test
+    void colourOnlyTextChangesDoNotReconfigureTheBoxParts() {
+        try (CharacterizationHarness harness = new CharacterizationHarness(directory)) {
+            WorldState world = harness.world("world");
+            harness.join("Alice", world, 0, 64, 3);
+            PersistentHologram hologram = harness.persistent("box", harness.at(world, 0, 64, 0));
+            hologram.setBox(new HologramBox(true, 4, 2, null, null));
+            hologram.setLines(List.of("\u00a7aHello"));
+            hologram.update();
+            DisplayHandle panel = harness.liveSpawned(world).get(1);
+            long configured = configureCount(panel);
+
+            hologram.setLines(List.of("\u00a7cHello"));
+            hologram.update();
+            assertEquals(configured, configureCount(panel),
+                "a colour-only frame must not re-measure or reconfigure the box parts");
+
+            hologram.setLines(List.of("\u00a7cHelloWWWW"));
+            hologram.update();
+            assertTrue(configureCount(panel) > configured,
+                "a width-changing frame still has to resize the box");
+        }
+    }
+
+    private static long configureCount(DisplayHandle display) {
+        return display.callLog.stream().filter("setTransformation"::equals).count();
+    }
+
+    @Test
     void personalizedBoxesFitEachViewerAndFollowTheShowCondition() {
         try (CharacterizationHarness harness = new CharacterizationHarness(directory)) {
             WorldState world = harness.world("world");

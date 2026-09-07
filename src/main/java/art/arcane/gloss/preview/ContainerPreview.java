@@ -31,6 +31,7 @@ import org.bukkit.Material;
 import org.bukkit.block.Block;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.util.Vector;
 
@@ -72,6 +73,24 @@ public final class ContainerPreview {
   private static final double SCALE_EPSILON = 0.02;
   private static final int REFRESH_INTERVAL = 4;
   private static final int ACCESS_RECHECK_INTERVAL = 10;
+
+  /**
+   * How far the eye may drift from the pose the card was placed at before it is placed again. A
+   * card anchored to the eye moves with every mouse sample, and a sub-centimetre shift is not a
+   * pixel on screen — it is only packets.
+   */
+  private static final double POSE_TRANSLATION_DEADBAND = 0.02;
+  private static final double POSE_TRANSLATION_DEADBAND_SQUARED = POSE_TRANSLATION_DEADBAND * POSE_TRANSLATION_DEADBAND;
+  private static final float POSE_ROTATION_DEADBAND_DEGREES = 0.5F;
+
+  /**
+   * How long a client eases a preview element into a teleport it has just received. The card hangs
+   * off the viewer's eye, so it must be caught up by the time the next tick's teleport arrives —
+   * anything longer is a standing lag behind the crosshair, not smoothing. One tick is what turns
+   * the 20 Hz teleport stream into continuous motion on a high-refresh client without the card ever
+   * trailing the camera by more than the tick it is already a tick behind.
+   */
+  private static final int TELEPORT_INTERPOLATION_TICKS = 1;
 
   private final Player player;
   private final Block block;
@@ -471,21 +490,47 @@ public final class ContainerPreview {
   }
 
   /**
-   * True when anything {@link #at} reads has moved since the layout was last placed.
+   * True when anything {@link #at} reads has moved far enough since the layout was last placed to
+   * be worth placing again.
    *
    * <p>Every element position is a pure function of the viewer's eye pose and the applied scale —
    * {@code recomputeAnchor} derives the anchor, the basis vectors and the facing from the eye
-   * alone, and the target centre is fixed for the life of the preview. A viewer who has not moved
-   * therefore gets byte-identical coordinates, so skipping the whole reposition pass sends nothing
-   * a client would have seen. Comparisons are exact: an ulp of drift is a real move.
+   * alone, and the target centre is fixed for the life of the preview. The deadbands are measured
+   * against the pose the card was last placed at, not against the previous tick, so slow drift
+   * still crosses them and is placed once rather than never. A pose that has moved is followed on
+   * the tick it moves — the card is head-locked, so deferring it would trail the crosshair; the
+   * saving is the whole reposition pass a still viewer never pays, and one flush for the elements
+   * of a moving one. The applied scale stays an exact comparison: it only ever changes when
+   * something already decided to rescale.
    */
   private boolean poseMoved() {
-    if (posePinned && eye.getX() == poseEyeX && eye.getY() == poseEyeY && eye.getZ() == poseEyeZ
-        && eye.getYaw() == poseYaw && eye.getPitch() == posePitch && appliedScale == poseScale) {
+    if (posePinned && appliedScale == poseScale
+        && withinTranslationDeadband()
+        && Math.abs(yawDelta(eye.getYaw(), poseYaw)) < POSE_ROTATION_DEADBAND_DEGREES
+        && Math.abs(eye.getPitch() - posePitch) < POSE_ROTATION_DEADBAND_DEGREES) {
       return false;
     }
     pinPose();
     return true;
+  }
+
+  private boolean withinTranslationDeadband() {
+    double dx = eye.getX() - poseEyeX;
+    double dy = eye.getY() - poseEyeY;
+    double dz = eye.getZ() - poseEyeZ;
+    return dx * dx + dy * dy + dz * dz < POSE_TRANSLATION_DEADBAND_SQUARED;
+  }
+
+  /** Signed shortest turn between two yaws, so 359.9 to 0.1 reads as a fifth of a degree. */
+  private static float yawDelta(float yaw, float previous) {
+    float delta = (yaw - previous) % 360F;
+    if (delta > 180F) {
+      return delta - 360F;
+    }
+    if (delta < -180F) {
+      return delta + 360F;
+    }
+    return delta;
   }
 
   private void pinPose() {
@@ -652,8 +697,10 @@ public final class ContainerPreview {
       try {
         refreshVisibility();
         Layout pending = pendingLayout.get();
-        for (Rendered r : pending == null ? rendered : pending.rendered()) {
-          readDynamic(r);
+        List<Rendered> targets = pending == null ? rendered : pending.rendered();
+        SlotSnapshot slots = SlotSnapshot.of(targets);
+        for (Rendered r : targets) {
+          readDynamic(r, slots);
         }
       } finally {
         refreshScheduled.set(false);
@@ -747,13 +794,39 @@ public final class ContainerPreview {
   private record Layout(List<PreviewElement> elements, List<Rendered> rendered) {
   }
 
-  private void readDynamic(Rendered r) {
+  private void readDynamic(Rendered r, SlotSnapshot slots) {
     switch (r.element) {
-      case PreviewElement.Slot slot -> readSlot(r, slot);
+      case PreviewElement.Slot slot -> readSlot(r, slot, slots);
       case PreviewElement.Cell cell -> r.pendingColor = cell.color().getAsInt();
       case PreviewElement.Label label -> r.pendingText = safe(label.text().get());
       case PreviewElement.Panel ignored -> {
       }
+    }
+  }
+
+  /**
+   * The container read once for a whole refresh pass. Every slot a document emits comes from the
+   * one inventory its context selected, and {@code getItem} builds a fresh stack mirror per call,
+   * so the pass reads the contents array once instead of once per slot. A layout that somehow
+   * mixes inventories keeps the per-slot read for the odd ones out.
+   */
+  private record SlotSnapshot(Inventory inventory, ItemStack[] contents) {
+
+    private static SlotSnapshot of(List<Rendered> targets) {
+      for (Rendered r : targets) {
+        if (r.element instanceof PreviewElement.Slot slot) {
+          return new SlotSnapshot(slot.inventory(), slot.inventory().getContents());
+        }
+      }
+      return null;
+    }
+
+    private ItemStack item(PreviewElement.Slot slot) {
+      int index = slot.slot();
+      if (slot.inventory() != inventory || contents == null || index < 0 || index >= contents.length) {
+        return slot.inventory().getItem(index);
+      }
+      return contents[index];
     }
   }
 
@@ -764,8 +837,8 @@ public final class ContainerPreview {
    * sends nothing. The previous pending stack is the reference rather than the applied one because
    * this runs on the target's region thread while the applied side belongs to the viewer's.
    */
-  private void readSlot(Rendered r, PreviewElement.Slot slot) {
-    ItemStack stack = slot.inventory().getItem(slot.slot());
+  private void readSlot(Rendered r, PreviewElement.Slot slot, SlotSnapshot slots) {
+    ItemStack stack = slots == null ? slot.inventory().getItem(slot.slot()) : slots.item(slot);
     if (isEmpty(stack)) {
       r.pendingItem = null;
       return;
@@ -787,6 +860,7 @@ public final class ContainerPreview {
     displayEntity.textFlags((byte) (style.textFlags() & 0x03));
     displayEntity.textOpacity(TEXT_OPACITY_HIDDEN);
     displayEntity.backgroundColor(color);
+    displayEntity.teleportDuration(TELEPORT_INTERPOLATION_TICKS);
     displayEntity.translation(backgroundCenteringTranslation(scaleX, scaleY));
     UUID uuid = DisplayEntityManager.add(displayEntity);
     DisplayEntityManager.spawn(uuid, player);
@@ -858,6 +932,7 @@ public final class ContainerPreview {
         style.billboard().metadataValue(), style.textFlags(), backgroundColor, (byte) (style.textOpacity() & 0xFF));
     TextDisplayStyle.apply(displayEntity, style);
     displayEntity.backgroundColor(backgroundColor);
+    displayEntity.teleportDuration(TELEPORT_INTERPOLATION_TICKS);
     displayEntity.translation(textCenteringTranslation(scale * style.scaleX(), scale * style.scaleY()));
     UUID uuid = DisplayEntityManager.add(displayEntity);
     DisplayEntityManager.spawn(uuid, player);
@@ -868,6 +943,7 @@ public final class ContainerPreview {
     float scale = itemScale() * (float) depthShrink(px[2]);
     DisplayEntity displayEntity = DisplayEntity.Builder.itemDisplay(stack, at(px), scale, BILLBOARD_FIXED, ITEM_DISPLAY_CONTEXT);
     TextDisplayStyle.apply(displayEntity, style);
+    displayEntity.teleportDuration(TELEPORT_INTERPOLATION_TICKS);
     displayEntity.scale(new Vector3f(scale * style.scaleX(), scale * style.scaleY(), scale * style.scaleZ()));
     UUID uuid = DisplayEntityManager.add(displayEntity);
     DisplayEntityManager.spawn(uuid, player);
@@ -895,6 +971,7 @@ public final class ContainerPreview {
           text, at(r.countPx), scale, scale, 1F, BILLBOARD_FIXED, TEXT_FLAGS, 0, TEXT_OPACITY_VISIBLE);
       IconDisplayStyle style = slot.textStyle();
       TextDisplayStyle.apply(displayEntity, style);
+      displayEntity.teleportDuration(TELEPORT_INTERPOLATION_TICKS);
       displayEntity.scale(new Vector3f(scale * style.scaleX(), scale * style.scaleY(), style.scaleZ()));
       displayEntity.translation(textCenteringTranslation(scale * style.scaleX(), scale * style.scaleY()));
       r.count = DisplayEntityManager.add(displayEntity);

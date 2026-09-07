@@ -73,8 +73,9 @@ final class CharacterizationHarness implements AutoCloseable {
         final List<Sent> sent = new CopyOnWriteArrayList<>();
 
         @Override
-        public void send(List<Player> viewers, int entityId, String legacyText, TextCodec codec) {
-            sent.add(new Sent(List.copyOf(viewers), entityId, legacyText, codec));
+        public void send(AnimationTextSender.Batch batch) {
+            sent.add(new Sent(List.copyOf(batch.viewers()), batch.entityId(), batch.legacyText(),
+                batch.codec()));
         }
     }
 

@@ -26,6 +26,8 @@ public abstract class MenuComponent<T extends ComponentData> {
   protected MenuIcon<?> currentIcon;
   private long observedGeometryRevision;
   private final ShowCondition show;
+  private long showEpoch;
+  private boolean showMemo;
   private HoloIcon pendingIcon;
 
   protected boolean open = false;
@@ -54,17 +56,36 @@ public abstract class MenuComponent<T extends ComponentData> {
   }
 
   public boolean isInteractable() {
-    return open && session.isShown() && show.matches(Gloss.instance, session.getPlayer());
+    return open && session.isShown() && shown();
   }
 
   public void refreshVisibility(boolean parentShown) {
-    if (parentShown && show.matches(Gloss.instance, session.getPlayer())) {
+    if (parentShown && shown()) {
       if (!open) {
         open();
       }
     } else if (open) {
       hide();
     }
+  }
+
+  /**
+   * This component's own {@code show}, evaluated at most once per session tick pass. The
+   * visibility sweep and the open check it drives used to run the condition — and, through
+   * {@code papi(..)}, a whole placeholder expansion — twice per component per tick. Outside a pass
+   * the epoch is zero and the condition is live, so a click still sees the state as it is now.
+   */
+  private boolean shown() {
+    long epoch = session.conditionEpoch();
+    if (epoch != 0L && showEpoch == epoch) {
+      return showMemo;
+    }
+    boolean matches = show.matches(Gloss.instance, session.getPlayer());
+    if (epoch != 0L) {
+      showMemo = matches;
+      showEpoch = epoch;
+    }
+    return matches;
   }
 
   public CollisionPlane particlePlane() {
@@ -106,7 +127,7 @@ public abstract class MenuComponent<T extends ComponentData> {
   protected abstract void onClose();
 
   public void open() {
-    if (open || !session.isShown() || !show.matches(Gloss.instance, session.getPlayer())) {
+    if (open || !session.isShown() || !shown()) {
       return;
     }
     applyTransform();

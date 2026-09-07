@@ -78,6 +78,17 @@ class HologramViewerReconciliationTest {
         hologram.update();
         harness.animator.pass(System.currentTimeMillis());
 
-        assertEquals(initialPackets + 1, harness.sender.sent.size());
+        assertEquals(initialPackets, harness.sender.sent.size(),
+            "a chunk crossing that did not re-track the display must not resend personalized metadata");
+
+        int entityId = harness.onlySpawned(world).proxy.getEntityId();
+        harness.service.displayTrackingChanged(entityId, player.proxy, player.uuid, true);
+        harness.drainDelayed();
+        hologram.update();
+        harness.drainDelayed();
+        harness.animator.pass(System.currentTimeMillis());
+
+        assertEquals(initialPackets + 1, harness.sender.sent.size(),
+            "a reported re-track is what forces the personalized text to be sent again");
     }
 }

@@ -12,6 +12,8 @@ final class ConditionWorldGuard {
 
     private static volatile Adapter adapter;
     private static volatile long retryAfterMs;
+    private static volatile Method regionsMethod;
+    private static volatile Method regionIdMethod;
 
     private ConditionWorldGuard() {
     }
@@ -62,20 +64,48 @@ final class ConditionWorldGuard {
         }
     }
 
+    /**
+     * Walks the applicable region set looking for {@code regionId}. The two reflective lookups are
+     * resolved once and reused: {@code Class.getMethod} copies and searches the declared-method
+     * array, and a region condition runs this per viewer per interval.
+     */
+    static boolean containsRegion(Object applicableRegions, String regionId) throws ReflectiveOperationException {
+        Collection<?> regions = (Collection<?>) regionsMethod(applicableRegions.getClass()).invoke(applicableRegions);
+        for (Object region : regions) {
+            String id = (String) regionIdMethod(region.getClass()).invoke(region);
+            if (id.equalsIgnoreCase(regionId)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static Method regionsMethod(Class<?> owner) throws NoSuchMethodException {
+        Method cached = regionsMethod;
+        if (cached != null && cached.getDeclaringClass().isAssignableFrom(owner)) {
+            return cached;
+        }
+        Method resolved = owner.getMethod("getRegions");
+        regionsMethod = resolved;
+        return resolved;
+    }
+
+    private static Method regionIdMethod(Class<?> owner) throws NoSuchMethodException {
+        Method cached = regionIdMethod;
+        if (cached != null && cached.getDeclaringClass().isAssignableFrom(owner)) {
+            return cached;
+        }
+        Method resolved = owner.getMethod("getId");
+        regionIdMethod = resolved;
+        return resolved;
+    }
+
     private record Adapter(Object query, Method adapt, Method applicable) {
         private boolean contains(Location location, String regionId) {
             try {
                 Object worldEditLocation = adapt.invoke(null, location);
                 Object applicableRegions = applicable.invoke(query, worldEditLocation);
-                Method getRegions = applicableRegions.getClass().getMethod("getRegions");
-                Collection<?> regions = (Collection<?>) getRegions.invoke(applicableRegions);
-                for (Object region : regions) {
-                    String id = (String) region.getClass().getMethod("getId").invoke(region);
-                    if (id.equalsIgnoreCase(regionId)) {
-                        return true;
-                    }
-                }
-                return false;
+                return containsRegion(applicableRegions, regionId);
             } catch (ReflectiveOperationException | RuntimeException failure) {
                 return false;
             }

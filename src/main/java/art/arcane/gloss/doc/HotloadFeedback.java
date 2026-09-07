@@ -37,12 +37,15 @@ final class HotloadFeedback {
         }
         String kinds = String.join(", ", snapshot.changesByKind().keySet());
         for (Player player : Bukkit.getOnlinePlayers()) {
+            if (!player.hasPermission(ADMIN_PERMISSION)) {
+                continue;
+            }
             SchedulerUtils.runEntity(plugin, player, () -> deliver(player, kinds, snapshot.totalChanges()));
         }
     }
 
     private void deliver(Player player, String kinds, int changes) {
-        if (!player.isOnline() || !player.hasPermission(ADMIN_PERMISSION)) {
+        if (!player.isOnline()) {
             return;
         }
         GlossLocalization localization = plugin.getLocalization();

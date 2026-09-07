@@ -37,10 +37,13 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.HandlerList;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityPickupItemEvent;
+import org.bukkit.event.entity.EntityRemoveEvent;
 import org.bukkit.event.entity.ItemDespawnEvent;
 import org.bukkit.event.entity.ItemMergeEvent;
 import org.bukkit.event.entity.ItemSpawnEvent;
 import org.bukkit.event.inventory.InventoryPickupItemEvent;
+import org.bukkit.event.player.PlayerChangedWorldEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.world.EntitiesLoadEvent;
 import org.bukkit.event.world.EntitiesUnloadEvent;
 import org.bukkit.inventory.ItemStack;
@@ -50,13 +53,14 @@ import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.util.Vector;
 
 import java.io.File;
-import java.util.ArrayDeque;
+import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.UnaryOperator;
 
 public final class DropNameService implements Listener {
@@ -102,9 +106,9 @@ public final class DropNameService implements Listener {
         this.renderedNames = new ConcurrentHashMap<>();
         this.trackedItems = new ConcurrentHashMap<>();
         this.nativeParticleLabels = new ConcurrentHashMap<>();
-        this.rehydrateChunks = new ArrayDeque<>();
+        this.rehydrateChunks = new ConcurrentLinkedDeque<>();
         this.realDropDoc = RealDropSettingsDoc.DEFAULTS;
-        this.realDropPlan = compileRealDropPlan(realDropDoc, false);
+        this.realDropPlan = compileRealDropPlan(realDropDoc, false, ShowCondition.ALWAYS);
     }
 
     public void enable() {
@@ -241,9 +245,6 @@ public final class DropNameService implements Listener {
         Item source = event.getEntity();
         Item target = event.getTarget();
         remove(source);
-        ItemStack targetStack = target.getItemStack();
-        applyName(target, targetStack, targetStack.getAmount() + source.getItemStack().getAmount(), null,
-            "merge");
         plugin.scheduler().runEntity(target, () -> refreshOnOwner(target, "merge"), 1);
     }
 
@@ -269,6 +270,23 @@ public final class DropNameService implements Listener {
     }
 
     @EventHandler(priority = EventPriority.MONITOR)
+    public void onEntityRemove(EntityRemoveEvent event) {
+        if (event.getEntity() instanceof Item item) {
+            remove(item);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onPlayerQuit(PlayerQuitEvent event) {
+        realDrops.forgetViewer(event.getPlayer().getUniqueId());
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onPlayerChangedWorld(PlayerChangedWorldEvent event) {
+        realDrops.forgetViewer(event.getPlayer().getUniqueId());
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR)
     public void onEntitiesLoad(EntitiesLoadEvent event) {
         for (Entity entity : event.getEntities()) {
             if (entity instanceof Item item) {
@@ -288,8 +306,9 @@ public final class DropNameService implements Listener {
 
     private void applyName(Item item, ItemStack stack, int count, BundleFormats suppliedFormats,
                            String eventType) {
-        RealDropConditionSnapshot snapshot = RealDropConditionSnapshot.capture(item, eventType);
-        RealDropConditionPlan.Selection presentation = realDropPlan.select(plugin, item, snapshot);
+        RealDropConditionPlan plan = realDropPlan;
+        RealDropConditionSnapshot snapshot = RealDropConditionSnapshot.capture(item, eventType, plan.fields());
+        RealDropConditionPlan.Selection presentation = plan.select(plugin, item, snapshot);
         GlossConfig.Drops drops = plugin.cfg().drops();
         boolean marked = item.getPersistentDataContainer().has(nameKey, PersistentDataType.BOOLEAN);
         String lastRendered = item.getPersistentDataContainer().get(renderedNameKey, PersistentDataType.STRING);
@@ -564,7 +583,8 @@ public final class DropNameService implements Listener {
     }
 
     private void refreshRealDropConfig() {
-        realDropPlan = compileRealDropPlan(realDropDoc, plugin.cfg().realDrops().enabled());
+        realDropPlan = compileRealDropPlan(realDropDoc, plugin.cfg().realDrops().enabled(),
+            plugin.cfg().drops().show());
     }
 
     private void reloadPresentations() {
@@ -590,10 +610,10 @@ public final class DropNameService implements Listener {
     }
 
     private static RealDropConditionPlan compileRealDropPlan(RealDropSettingsDoc document,
-                                                             boolean enabled) {
+                                                             boolean enabled, ShowCondition viewerShow) {
         BoundedConditionErrorCallback errors = BoundedConditionErrorCallback.bounded(8, error ->
             Gloss.warn("Real-drop condition %s failed closed: %s", error.path(), error.message()));
-        return RealDropConditionPlan.compile(document, enabled, errors);
+        return RealDropConditionPlan.compile(document, enabled, errors, viewerShow);
     }
 
     private static String typeLabel(GlossConfig.Drops drops, ItemStack stack) {
@@ -698,22 +718,53 @@ public final class DropNameService implements Listener {
         }
         double range = plugin.cfg().particles().viewRange();
         Location origin = item.getLocation().clone().add(0.0D, config.labels().yOffset(), 0.0D);
+        boolean viewerText = TextPipeline.viewerSpecific(state.authored());
+        AtomicReference<NativeParticleFrame> shared = new AtomicReference<>();
         plugin.holograms().forEachNearbyViewer(origin, range * range,
             viewer -> plugin.scheduler().runEntity(viewer,
-                () -> emitNativeParticlesForViewer(state, viewer, origin, tick)));
+                () -> emitNativeParticlesForViewer(state, viewer, origin, tick, viewerText, shared)));
     }
 
-    private void emitNativeParticlesForViewer(NativeParticleLabel state, Player viewer,
-                                               Location origin, long tick) {
-        if (!viewer.isOnline() || !state.selection().visibleTo(plugin, viewer)) {
-            return;
+    /**
+     * A label with no viewer-specific token renders and lays out the same for everyone, so the first
+     * viewer of an emitting tick builds it and the rest of that tick reuses it.
+     */
+    private NativeParticleFrame sharedNativeLabel(NativeParticleLabel state,
+                                                  AtomicReference<NativeParticleFrame> shared) {
+        NativeParticleFrame cached = shared.get();
+        if (cached != null) {
+            return cached;
         }
         ParticleText.Rendered rendered = state.authored().isEmpty()
             ? new ParticleText.Rendered(state.rendered(), List.of())
-            : plugin.text().renderLegacyParticleText(viewer, state.authored());
+            : plugin.text().renderLegacyParticleText(null, state.authored());
+        List<ParticleLayer> layers = state.selection().style().config().particleLayers();
+        List<List<ParticleRect>> targets = new ArrayList<>(layers.size());
+        for (ParticleLayer layer : layers) {
+            targets.add(nativeLabelTargets(layer, rendered));
+        }
+        cached = new NativeParticleFrame(rendered, List.copyOf(targets));
+        shared.set(cached);
+        return cached;
+    }
+
+    private void emitNativeParticlesForViewer(NativeParticleLabel state, Player viewer,
+                                               Location origin, long tick, boolean viewerText,
+                                               AtomicReference<NativeParticleFrame> sharedLabel) {
+        if (!viewer.isOnline() || !state.selection().visibleTo(plugin, viewer)) {
+            return;
+        }
+        NativeParticleFrame shared = viewerText ? null : sharedNativeLabel(state, sharedLabel);
+        ParticleText.Rendered rendered = shared == null
+            ? plugin.text().renderLegacyParticleText(viewer, state.authored())
+            : shared.rendered();
         ParticleFrame frame = nativeLabelFrame(viewer, origin);
-        for (ParticleLayer layer : state.selection().style().config().particleLayers()) {
-            List<ParticleRect> targets = nativeLabelTargets(layer, rendered);
+        List<ParticleLayer> layers = state.selection().style().config().particleLayers();
+        for (int index = 0; index < layers.size(); index++) {
+            ParticleLayer layer = layers.get(index);
+            List<ParticleRect> targets = shared == null
+                ? nativeLabelTargets(layer, rendered)
+                : shared.targets().get(index);
             if (!layer.target().scope().equals("local") && targets.isEmpty()) {
                 continue;
             }
@@ -806,5 +857,8 @@ public final class DropNameService implements Listener {
 
     private record NativeParticleLabel(Item item, RealDropConditionPlan.Selection selection,
                                        String authored, String rendered) {
+    }
+
+    private record NativeParticleFrame(ParticleText.Rendered rendered, List<List<ParticleRect>> targets) {
     }
 }

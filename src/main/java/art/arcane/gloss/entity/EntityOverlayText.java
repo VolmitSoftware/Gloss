@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Predicate;
 import java.util.function.UnaryOperator;
 
 public final class EntityOverlayText {
@@ -85,6 +86,39 @@ public final class EntityOverlayText {
                 return true;
             }
             if (TextPipeline.viewerDependent(line.text())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public static boolean personalRequired(EntityOverlayDoc settings,
+                                           Predicate<String> animationFramesViewerSpecific) {
+        if (usesDistance(settings)) {
+            return true;
+        }
+        if (settings.show().isDynamic() && external(ExprParser.parse(settings.show().expression()))) {
+            return true;
+        }
+        for (EntityOverlayDoc.Line line : settings.lines()) {
+            if (line.show().isDynamic() && external(ExprParser.parse(line.show().expression()))) {
+                return true;
+            }
+            if (TextPipeline.viewerSpecific(line.text())
+                || animationFramesViewerSpecific.test(line.text())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public static boolean usesDistance(EntityOverlayDoc settings) {
+        if (settings.show().expression().contains("entity.distance")) {
+            return true;
+        }
+        for (EntityOverlayDoc.Line line : settings.lines()) {
+            if (line.text().contains("{distance}") || line.text().contains("entity.distance")
+                || line.show().expression().contains("entity.distance")) {
                 return true;
             }
         }

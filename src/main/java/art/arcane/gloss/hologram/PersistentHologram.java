@@ -45,8 +45,8 @@ final class PersistentHologram implements AnchoredHologram {
     record TickAnchor(long generation, Location location) {
     }
 
-    private record DependencyMemo(long lineGeneration, long animationGeneration,
-                                  boolean viewerSpecific, boolean fastDynamic) {
+    private record DependencyMemo(long lineGeneration, long animationGeneration, long renderGeneration,
+                                  boolean viewerSpecific, boolean fastDynamic, boolean dynamicText) {
     }
 
     private record AppliedAnchor(long generation, Location location) {
@@ -67,15 +67,22 @@ final class PersistentHologram implements AnchoredHologram {
                                    AnimationTemplate template) {
     }
 
+    private record ViewerRender(long lineGeneration, long emojiGeneration, long renderGeneration,
+                                long refreshAfterMs, String text) {
+    }
+
     private final HologramService service;
     private final String id;
     private final String animatorGroup;
+    private final String particlesWorkKey;
+    private final String boxWorkKey;
     private final Object linesLock;
-    private final Map<UUID, String> viewerRendered;
+    private final Map<UUID, ViewerRender> viewerRendered;
     private final Map<UUID, ViewerAnimation> viewerAnimations;
     private final Map<UUID, Player> activeViewers;
     private final Map<UUID, Boolean> shownViewers = new ConcurrentHashMap<>();
     private final Set<UUID> untrackedViewers = ConcurrentHashMap.newKeySet();
+    private final Set<UUID> trackingChangedViewers = ConcurrentHashMap.newKeySet();
     private final AtomicBoolean sharedSpawning;
     private long lineGenerations;
     private volatile LineSet lineSet;
@@ -106,6 +113,8 @@ final class PersistentHologram implements AnchoredHologram {
         this.service = service;
         this.id = id;
         this.animatorGroup = "holo:" + id;
+        this.particlesWorkKey = id + "#particles";
+        this.boxWorkKey = id + "#box";
         this.linesLock = new Object();
         this.lineSet = new LineSet(List.of(), 0, 0L, false);
         this.viewerRendered = new ConcurrentHashMap<>();
@@ -127,6 +136,8 @@ final class PersistentHologram implements AnchoredHologram {
         this.service = service;
         this.id = id;
         this.animatorGroup = "holo:" + id;
+        this.particlesWorkKey = id + "#particles";
+        this.boxWorkKey = id + "#box";
         this.linesLock = new Object();
         this.lineSet = new LineSet(List.of(), 0, 0L, false);
         this.viewerRendered = new ConcurrentHashMap<>();
@@ -435,9 +446,11 @@ final class PersistentHologram implements AnchoredHologram {
 
     private DependencyMemo dependencies(LineSet snapshot) {
         long animationGeneration = service.animationGeneration();
+        long renderGeneration = service.plugin().text().renderGeneration();
         DependencyMemo cached = dependencyMemo;
         if (cached != null && cached.lineGeneration() == snapshot.generation()
-            && cached.animationGeneration() == animationGeneration) {
+            && cached.animationGeneration() == animationGeneration
+            && cached.renderGeneration() == renderGeneration) {
             return cached;
         }
         boolean dependent = false;
@@ -449,7 +462,8 @@ final class PersistentHologram implements AnchoredHologram {
             }
         }
         DependencyMemo resolved = new DependencyMemo(snapshot.generation(), animationGeneration,
-            dependent, service.hasFastDynamicAnimationContent(snapshot.lines()));
+            renderGeneration, dependent, service.hasFastDynamicAnimationContent(snapshot.lines()),
+            hasDynamicText(snapshot));
         dependencyMemo = resolved;
         return resolved;
     }
@@ -463,6 +477,7 @@ final class PersistentHologram implements AnchoredHologram {
 
     void onPlayerQuit(UUID playerId) {
         untrackedViewers.remove(playerId);
+        trackingChangedViewers.remove(playerId);
         invalidateViewer(playerId, false);
     }
 
@@ -599,7 +614,7 @@ final class PersistentHologram implements AnchoredHologram {
         for (HologramTick.Viewer viewer : viewers) {
             Player player = viewer.player();
             UUID playerId = viewer.id();
-            service.runViewerWork(player, playerId, id + "#particles",
+            service.runViewerWork(player, playerId, particlesWorkKey,
                 () -> emitParticlesFor(player, anchor, authored));
         }
     }
@@ -772,6 +787,7 @@ final class PersistentHologram implements AnchoredHologram {
 
     void invalidateTrackingFor(Player player, boolean clearClientText) {
         untrackedViewers.remove(player.getUniqueId());
+        trackingChangedViewers.remove(player.getUniqueId());
         if (personalizedDisplay) {
             invalidateViewer(player.getUniqueId(), clearClientText);
         }
@@ -787,17 +803,23 @@ final class PersistentHologram implements AnchoredHologram {
         } else {
             untrackedViewers.add(viewerId);
         }
+        trackingChangedViewers.add(viewerId);
         if (personalizedDisplay) {
             invalidateViewer(viewerId, false);
         }
     }
 
+    /**
+     * Only the viewers whose client-side tracking of the display actually changed need their memo
+     * dropped. The packet listener reports every spawn and destroy per viewer, so a chunk crossing
+     * that did not re-track this display is nothing to react to.
+     */
     void refreshTrackingFor(Player player) {
-        if (!personalizedDisplay) {
+        if (!personalizedDisplay || trackingChangedViewers.isEmpty()) {
             return;
         }
         UUID viewerId = player.getUniqueId();
-        if (!activeViewers.containsKey(viewerId)) {
+        if (!trackingChangedViewers.remove(viewerId) || !activeViewers.containsKey(viewerId)) {
             return;
         }
 
@@ -815,8 +837,7 @@ final class PersistentHologram implements AnchoredHologram {
 
     private void refreshViewerText(UUID viewerId, Player player, int entityId, LineSet snapshot,
                                    long delayTicks) {
-        if (!show.isDynamic() && (snapshot.flags() & TextPipeline.HAS_FUNCTION) != 0
-            && viewerAnimationFresh(viewerId, snapshot, System.currentTimeMillis())) {
+        if (viewerTextFresh(viewerId, snapshot, System.currentTimeMillis())) {
             return;
         }
         service.runViewerWork(player, viewerId, id,
@@ -868,12 +889,20 @@ final class PersistentHologram implements AnchoredHologram {
 
         viewerAnimations.remove(viewerId);
         service.animator().remove(animatorGroup, viewerId.toString());
-        String rendered = composeViewerText(player, snapshot);
-        if (rendered.equals(viewerRendered.get(viewerId))) {
+        long nowMs = System.currentTimeMillis();
+        ViewerRender cached = viewerRendered.get(viewerId);
+        if (viewerRenderFresh(cached, snapshot, nowMs)) {
             return;
         }
 
-        viewerRendered.put(viewerId, rendered);
+        String rendered = composeViewerText(player, snapshot);
+        ViewerRender next = new ViewerRender(snapshot.generation(), TextPipeline.emojiGeneration(),
+            service.plugin().text().renderGeneration(), nowMs + viewerRefreshIntervalMs(snapshot), rendered);
+        viewerRendered.put(viewerId, next);
+        if (cached != null && rendered.equals(cached.text())) {
+            return;
+        }
+
         service.animator().sendText(player, viewerId, entityId, rendered);
     }
 
@@ -910,6 +939,25 @@ final class PersistentHologram implements AnchoredHologram {
             && cached.emojiGeneration() == TextPipeline.emojiGeneration()
             && cached.renderGeneration() == service.plugin().text().renderGeneration()
             && cached.animationGeneration() == service.animationGeneration()
+            && nowMs < cached.refreshAfterMs();
+    }
+
+    /**
+     * Both per-viewer memos, so the fast driver (a box or particles pins it to 20 Hz) does not
+     * re-render viewer-dependent text ten times per configured refresh only to discard the result.
+     * A dynamic show condition still has to be evaluated every pass.
+     */
+    private boolean viewerTextFresh(UUID viewerId, LineSet snapshot, long nowMs) {
+        return !show.isDynamic()
+            && (viewerAnimationFresh(viewerId, snapshot, nowMs)
+            || viewerRenderFresh(viewerRendered.get(viewerId), snapshot, nowMs));
+    }
+
+    private boolean viewerRenderFresh(ViewerRender cached, LineSet snapshot, long nowMs) {
+        return !snapshot.fastRefresh() && !dependencies(snapshot).dynamicText()
+            && cached != null && cached.lineGeneration() == snapshot.generation()
+            && cached.emojiGeneration() == TextPipeline.emojiGeneration()
+            && cached.renderGeneration() == service.plugin().text().renderGeneration()
             && nowMs < cached.refreshAfterMs();
     }
 
@@ -990,7 +1038,7 @@ final class PersistentHologram implements AnchoredHologram {
         }
         for (HologramTick.Viewer viewer : viewers) {
             Player player = viewer.player();
-            service.runViewerWork(player, viewer.id(), id + "#box",
+            service.runViewerWork(player, viewer.id(), boxWorkKey,
                 () -> updateViewerDecoration(player, expected, tickAnchor, anchor, snapshot));
         }
     }
@@ -1013,7 +1061,9 @@ final class PersistentHologram implements AnchoredHologram {
                 return;
             }
             ViewerAnimation animation = viewerAnimations.get(viewerId);
-            String text = animation == null ? viewerRendered.get(viewerId)
+            ViewerRender render = animation == null ? viewerRendered.get(viewerId) : null;
+            String text = animation == null
+                ? (render == null ? null : render.text())
                 : animation.template().compose(System.currentTimeMillis());
             if (text == null) {
                 return;
@@ -1068,6 +1118,7 @@ final class PersistentHologram implements AnchoredHologram {
         clearPersonalizedState();
         sharedDisplay = null;
         untrackedViewers.clear();
+        trackingChangedViewers.clear();
         clearDecorations();
         sharedFrames = null;
         sharedEntityId = 0;
@@ -1125,6 +1176,7 @@ final class PersistentHologram implements AnchoredHologram {
         clearPersonalizedState();
         sharedDisplay = null;
         untrackedViewers.clear();
+        trackingChangedViewers.clear();
         clearDecorations();
         sharedFrames = null;
         sharedEntityId = 0;

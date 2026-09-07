@@ -11,6 +11,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -71,6 +72,38 @@ class HologramBoxLayoutTest {
         HologramBoxLayout wrapped = HologramBoxLayout.measure("WW WW", 24, box);
         assertEquals(word.textWidth(), wrapped.textWidth());
         assertEquals(19, wrapped.textHeight());
+    }
+
+    @Test
+    void theLayoutKeyMeasuresIdenticallyToTheTextItProjects() {
+        HologramBox box = new HologramBox(true, 4, 2, null, null);
+        List<String> samples = List.of(
+            "plain",
+            "\u00a7aHello \u00a7bworld",
+            "\u00a7lBold\u00a7r plain",
+            "\u00a7x\u00a7f\u00a7f\u00a70\u00a70\u00a70\u00a70gradient",
+            "\u00a7ka\u00a7mb\u00a7nc\u00a7od",
+            "line one\nline two",
+            "trailing \u00a7",
+            "\u00a7lbold \u00a7cthen coloured",
+            "");
+        for (String sample : samples) {
+            assertEquals(HologramBoxLayout.measure(sample, 16384, box),
+                HologramBoxLayout.measure(HologramBoxLayout.layoutKey(sample), 16384, box),
+                "layout key changed the measurement of " + sample);
+        }
+    }
+
+    @Test
+    void colourOnlyChangesShareOneLayoutKeyButBoldAndGlyphsDoNot() {
+        assertEquals(HologramBoxLayout.layoutKey("\u00a7aHello"),
+            HologramBoxLayout.layoutKey("\u00a7cHello"));
+        assertEquals(HologramBoxLayout.layoutKey("\u00a7aHello"),
+            HologramBoxLayout.layoutKey("\u00a7x\u00a7f\u00a7f\u00a70\u00a70\u00a70\u00a70Hello"));
+        assertNotEquals(HologramBoxLayout.layoutKey("\u00a7aHello"),
+            HologramBoxLayout.layoutKey("\u00a7lHello"));
+        assertNotEquals(HologramBoxLayout.layoutKey("\u00a7aHello"),
+            HologramBoxLayout.layoutKey("\u00a7aHellO"));
     }
 
     private static Vector3f center(Transformation transformation) {
