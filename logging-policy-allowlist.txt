@@ -1,0 +1,3 @@
+# Gloss.java owns the branded fallback logger and the dependency-loading lifecycle lines.
+art/arcane/gloss/Gloss.java Logger.getLogger(
+art/arcane/gloss/Gloss.java getLogger().info(

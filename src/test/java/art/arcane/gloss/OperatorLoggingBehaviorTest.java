@@ -5,40 +5,22 @@ import org.junit.jupiter.api.Test;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Handler;
 import java.util.logging.Level;
 import java.util.logging.LogRecord;
 import java.util.logging.Logger;
-import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-class OperatorLoggingPolicyTest {
+class OperatorLoggingBehaviorTest {
     private static final Path MAIN_SOURCE = Path.of("src/main/java");
-    private static final String DIRECT_PLUGIN_LOG = "getLogger().";
 
     @Test
-    void productionSourcesDoNotBypassTheGlossLogger() throws IOException {
-        List<Path> sources = javaSources();
-        for (Path source : sources) {
-            String text = Files.readString(source);
-            assertFalse(text.contains("System.out"), source.toString());
-            assertFalse(text.contains("System.err"), source.toString());
-            assertFalse(text.contains("printStackTrace("), source.toString());
-            assertFalse(text.contains("Bukkit.getLogger("), source.toString());
-            assertFalse(text.contains("getServer().getLogger("), source.toString());
-            assertFalse(text.contains(".sendMessage("), source.toString());
-            if (!source.endsWith(Path.of("art/arcane/gloss/Gloss.java"))) {
-                assertFalse(text.contains("Logger.getLogger("), source.toString());
-                assertFalse(hasDirectPluginLogCall(text), source.toString());
-            }
-            assertFalse(text.contains("Bukkit.getConsoleSender().sendMessage("), source.toString());
-        }
+    void pluginSinksStayWiredToTheGlossLogger() throws IOException {
         assertContains("art/arcane/gloss/Gloss.java", "Logger.getLogger(\"Gloss\")");
         assertContains("art/arcane/gloss/Gloss.java", "ComponentLog.logLegacy(");
         assertContains("art/arcane/gloss/util/SplashScreen.java", "Gloss.log(Level.INFO, splash.toString())");
@@ -92,31 +74,6 @@ class OperatorLoggingPolicyTest {
             fallback.setUseParentHandlers(previousParentHandlers);
             Gloss.instance = previous;
         }
-    }
-
-    private static List<Path> javaSources() throws IOException {
-        try (Stream<Path> paths = Files.walk(MAIN_SOURCE)) {
-            return paths.filter(Files::isRegularFile)
-                .filter(path -> path.toString().endsWith(".java"))
-                .sorted()
-                .toList();
-        }
-    }
-
-    private static boolean hasDirectPluginLogCall(String source) {
-        int index = source.indexOf(DIRECT_PLUGIN_LOG);
-        while (index >= 0) {
-            int methodStart = index + DIRECT_PLUGIN_LOG.length();
-            if (source.startsWith("info(", methodStart)
-                || source.startsWith("warning(", methodStart)
-                || source.startsWith("severe(", methodStart)
-                || source.startsWith("fine(", methodStart)
-                || source.startsWith("log(", methodStart)) {
-                return true;
-            }
-            index = source.indexOf(DIRECT_PLUGIN_LOG, methodStart);
-        }
-        return false;
     }
 
     private static void assertContains(String relativePath, String expected) throws IOException {

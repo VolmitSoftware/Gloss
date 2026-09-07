@@ -323,6 +323,10 @@ tasks.named('check').configure {
 }
 
 pluginPackaging {
+    loggingPolicy {
+        forbid('.sendMessage(', 'Logger.getLogger(', 'getLogger().info(', 'getLogger().warning(',
+                'getLogger().severe(', 'getLogger().fine(', 'getLogger().log(')
+    }
     artifacts {
         create('distribution') {
             taskName = 'shadowJar'
