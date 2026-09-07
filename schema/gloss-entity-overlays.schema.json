@@ -34,8 +34,15 @@
     },
     "maxEntitiesPerViewer": {
       "type": "integer",
-      "default": 64,
+      "default": 16,
       "description": "Maximum overlays per viewer; clamped to 1..256."
+    },
+    "maxActiveOverlays": {
+      "type": "integer",
+      "minimum": 16,
+      "maximum": 16384,
+      "default": 1024,
+      "description": "Server-wide cap on simultaneously tracked entity overlays, admitting the nearest targets first; clamped to 16..16384."
     },
     "includePlayers": {
       "type": "boolean",
