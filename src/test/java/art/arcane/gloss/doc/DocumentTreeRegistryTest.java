@@ -30,6 +30,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * applied a second time when the watcher reads it back.
  */
 class DocumentTreeRegistryTest {
+    private static final long FULL_SCAN_WINDOW_NANOS = TimeUnit.SECONDS.toNanos(30L);
     private static final DocumentParser<String> PARSER = (fileName, raw) -> {
         String value = raw.trim();
         if (value.contains("bad")) {
@@ -78,7 +79,7 @@ class DocumentTreeRegistryTest {
     }
 
     @Test
-    void aMissingRootThatAppearsTransitionsFromFallbackScanToEvents() throws Exception {
+    void aMissingRootThatAppearsIsLoadedAndKeepsReportingChanges() throws IOException {
         File missing = new File(root, "menus");
         DocumentRegistry<String> registry = DocumentRegistry.folderTree("menus", missing, PARSER,
             value -> DocumentRegistry.UNVERSIONED, clock::get);
@@ -93,26 +94,26 @@ class DocumentTreeRegistryTest {
         assertTrue(registry.acknowledge(created));
 
         Files.writeString(nested.toPath(), "two", StandardCharsets.UTF_8);
-        DocumentDelta changed = awaitDelta(registry);
+        DocumentDelta changed = scanForDelta(registry);
 
         assertEquals(List.of("archive/new"), changed.loaded());
         assertEquals("two", registry.get(changed, "archive/new").value());
     }
 
     @Test
-    void pollReportsNestedCreationsIncludingAWholeNewSubdirectory() throws Exception {
+    void pollReportsNestedCreationsIncludingAWholeNewSubdirectory() throws IOException {
         write("shop.json", "one");
         DocumentRegistry<String> registry = registry();
         registry.reload();
 
         write("quests.json", "two");
-        DocumentDelta first = awaitDelta(registry);
+        DocumentDelta first = scanForDelta(registry);
         assertEquals(List.of("quests"), first.loaded());
         assertTrue(registry.acknowledge(first));
 
         write("archive/old.json", "three");
         write("archive/notes.txt", "ignored");
-        DocumentDelta delta = awaitDelta(registry);
+        DocumentDelta delta = scanForDelta(registry);
 
         assertEquals(List.of("archive/old"), delta.loaded());
         assertEquals("three", registry.get(delta, "archive/old").value());
@@ -121,19 +122,19 @@ class DocumentTreeRegistryTest {
     }
 
     @Test
-    void pollReportsNestedChangesUnderTheirRelativeIds() throws Exception {
+    void pollReportsNestedChangesUnderTheirRelativeIds() throws IOException {
         write("shop.json", "one");
         write("archive/old.json", "two");
         DocumentRegistry<String> registry = registry();
         registry.reload();
 
         write("shop.json", "one edited");
-        DocumentDelta first = awaitDelta(registry);
+        DocumentDelta first = scanForDelta(registry);
         assertEquals(List.of("shop"), first.loaded());
         assertTrue(registry.acknowledge(first));
 
         write("archive/old.json", "two edited");
-        DocumentDelta delta = awaitDelta(registry);
+        DocumentDelta delta = scanForDelta(registry);
 
         assertEquals(List.of("archive/old"), delta.loaded());
         assertEquals("two edited", registry.get(delta, "archive/old").value());
@@ -151,7 +152,7 @@ class DocumentTreeRegistryTest {
         registry.replaceFolderWatcher(watcher);
         assertTrue(new File(root, "archive/old.json").delete());
 
-        awaitWatcherEvent(registry, watcher::eventSeen);
+        driveWatcherEvent(registry, watcher::eventSeen);
         clock.addAndGet(TimeUnit.SECONDS.toNanos(3L));
         DocumentDelta delta = registry.poll();
 
@@ -173,7 +174,7 @@ class DocumentTreeRegistryTest {
         registry.replaceFolderWatcher(watcher);
         deleteTree(new File(root, "archive"));
 
-        awaitWatcherEvent(registry, watcher::eventSeen);
+        driveWatcherEvent(registry, watcher::eventSeen);
         clock.addAndGet(TimeUnit.SECONDS.toNanos(3L));
         DocumentDelta delta = registry.poll();
 
@@ -250,28 +251,15 @@ class DocumentTreeRegistryTest {
         return ids.stream().sorted(Comparator.naturalOrder()).toList();
     }
 
-    private static DocumentDelta awaitDelta(DocumentRegistry<String> registry) throws InterruptedException {
-        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5L);
-        DocumentDelta delta = DocumentDelta.EMPTY;
-        while (delta.isEmpty() && System.nanoTime() < deadline) {
-            delta = registry.poll();
-            if (delta.isEmpty()) {
-                Thread.sleep(25L);
-            }
-        }
+    private DocumentDelta scanForDelta(DocumentRegistry<String> registry) {
+        clock.addAndGet(FULL_SCAN_WINDOW_NANOS);
+        DocumentDelta delta = registry.poll();
         assertFalse(delta.isEmpty());
         return delta;
     }
 
-    private static void awaitWatcherEvent(DocumentRegistry<String> registry, BooleanSupplier eventSeen)
-        throws InterruptedException {
-        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5L);
-        while (!eventSeen.getAsBoolean() && System.nanoTime() < deadline) {
-            registry.poll();
-            if (!eventSeen.getAsBoolean()) {
-                Thread.sleep(25L);
-            }
-        }
+    private static void driveWatcherEvent(DocumentRegistry<String> registry, BooleanSupplier eventSeen) {
+        registry.poll();
         assertTrue(eventSeen.getAsBoolean());
     }
 

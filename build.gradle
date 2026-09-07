@@ -136,6 +136,7 @@ tasks.named('compileJava', JavaCompile).configure {
 tasks.named('test').configure {
     useJUnitPlatform()
     systemProperty('gloss.projectVersion', project.version.toString())
+    maxParallelForks = Math.max(1, Runtime.runtime.availableProcessors().intdiv(2))
 }
 
 configurations {

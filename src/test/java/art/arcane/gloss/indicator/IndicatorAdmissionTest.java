@@ -2,11 +2,15 @@ package art.arcane.gloss.indicator;
 
 import org.bukkit.Location;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -35,26 +39,20 @@ class IndicatorAdmissionTest {
         assertEquals(24.0D, second.getY());
     }
 
-    @Test
-    void defaultRateAndLifetimeAllowOneExpectedLifetimeWindow() {
-        assertEquals(120, DamageIndicatorsService.liveLimit(40, 3000L));
+    static Stream<Arguments> limits() {
+        return Stream.of(
+            Arguments.of("defaultRateAndLifetimeAllowOneExpectedLifetimeWindow", 40, 3000L, 120),
+            Arguments.of("partialSecondsRoundUp", 41, 3001L, 124),
+            Arguments.of("configuredExtremesCannotExceedTheHardCeiling", 1000, 30000L,
+                DamageIndicatorsService.MAX_LIVE_INDICATORS),
+            Arguments.of("invalidInputsStillProduceAPositiveLimit", 0, 0L, 1)
+        );
     }
 
-    @Test
-    void partialSecondsRoundUp() {
-        assertEquals(124, DamageIndicatorsService.liveLimit(41, 3001L));
-    }
-
-    @Test
-    void configuredExtremesCannotExceedTheHardCeiling() {
-        assertEquals(
-            DamageIndicatorsService.MAX_LIVE_INDICATORS,
-            DamageIndicatorsService.liveLimit(1000, 30000L));
-    }
-
-    @Test
-    void invalidInputsStillProduceAPositiveLimit() {
-        assertEquals(1, DamageIndicatorsService.liveLimit(0, 0L));
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("limits")
+    void liveLimitBoundsTheFleet(String label, int rate, long lifetime, int expected) {
+        assertEquals(expected, DamageIndicatorsService.liveLimit(rate, lifetime), label);
     }
 
     @Test

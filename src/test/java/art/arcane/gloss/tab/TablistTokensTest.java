@@ -1,46 +1,34 @@
 package art.arcane.gloss.tab;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
+
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class TablistTokensTest {
-    @Test
-    void substitutesPlayerToken() {
-        assertEquals("&6Steve", TablistService.substituteTokens("&6$player", "Steve", "admin"));
-    }
-
-    @Test
-    void substitutesGroupToken() {
-        assertEquals("[admin] Steve", TablistService.substituteTokens("[$group] Steve", "Steve", "admin"));
-    }
-
-    @Test
-    void substitutesBothTokensRepeatedly() {
-        assertEquals(
-            "admin:Steve admin:Steve",
-            TablistService.substituteTokens("$group:$player $group:$player", "Steve", "admin")
+    static Stream<Arguments> substitutions() {
+        return Stream.of(
+            Arguments.of("substitutesPlayerToken", "&6$player", "Steve", "admin", "&6Steve"),
+            Arguments.of("substitutesGroupToken", "[$group] Steve", "Steve", "admin", "[admin] Steve"),
+            Arguments.of("substitutesBothTokensRepeatedly", "$group:$player $group:$player", "Steve", "admin",
+                "admin:Steve admin:Steve"),
+            Arguments.of("leavesTextWithoutTokensUntouched", "&7Plain", "Steve", "admin", "&7Plain"),
+            Arguments.of("nullTemplateBecomesEmpty", null, "Steve", "admin", ""),
+            Arguments.of("nullValuesSubstituteAsEmpty", "$player - $group", null, null, " - "),
+            Arguments.of("adjacentTokensSubstitute", "$player$group$player", "Steve", "admin", "SteveadminSteve"),
+            Arguments.of("emptyTemplateStaysEmpty", "", "Steve", "admin", "")
         );
     }
 
-    @Test
-    void leavesTextWithoutTokensUntouched() {
-        assertEquals("&7Plain", TablistService.substituteTokens("&7Plain", "Steve", "admin"));
-    }
-
-    @Test
-    void nullTemplateBecomesEmpty() {
-        assertEquals("", TablistService.substituteTokens(null, "Steve", "admin"));
-    }
-
-    @Test
-    void nullValuesSubstituteAsEmpty() {
-        assertEquals(" - ", TablistService.substituteTokens("$player - $group", null, null));
-    }
-
-    @Test
-    void adjacentTokensSubstitute() {
-        assertEquals("SteveadminSteve", TablistService.substituteTokens("$player$group$player", "Steve", "admin"));
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("substitutions")
+    void substituteTokensResolvesTemplates(String label, String template, String player, String group,
+                                           String expected) {
+        assertEquals(expected, TablistService.substituteTokens(template, player, group), label);
     }
 
     @Test
@@ -54,10 +42,5 @@ class TablistTokensTest {
     void substitutedValuesAreNotRescannedForOtherTokens() {
         assertEquals("$group", TablistService.substituteTokens("$player", "$group", "admin"));
         assertEquals("$player", TablistService.substituteTokens("$group", "Steve", "$player"));
-    }
-
-    @Test
-    void emptyTemplateStaysEmpty() {
-        assertEquals("", TablistService.substituteTokens("", "Steve", "admin"));
     }
 }

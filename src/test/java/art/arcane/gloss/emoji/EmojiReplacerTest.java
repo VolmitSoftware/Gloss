@@ -2,9 +2,13 @@ package art.arcane.gloss.emoji;
 
 import art.arcane.gloss.condition.ShowCondition;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -15,39 +19,22 @@ class EmojiReplacerTest {
         new EmojiEntry("off", "", "X", false, ShowCondition.ALWAYS)
     ));
 
-    @Test
-    void tokenFormReplaces() {
-        assertEquals("❤", replacer.apply(":heart:"));
+    static Stream<Arguments> messages() {
+        return Stream.of(
+            Arguments.of("tokenFormReplaces", ":heart:", "\u2764"),
+            Arguments.of("triggerFormReplaces", "<3", "\u2764"),
+            Arguments.of("tokenAndTriggerMixReplace", "I <3 :star:", "I \u2764 \u2733"),
+            Arguments.of("repeatedTriggersAllReplace", "<3<3", "\u2764\u2764"),
+            Arguments.of("disabledEmojiIsIgnored", ":off:", ":off:"),
+            Arguments.of("textWithoutTokensIsUnchanged", "none", "none"),
+            Arguments.of("nullMessageBecomesEmpty", null, "")
+        );
     }
 
-    @Test
-    void triggerFormReplaces() {
-        assertEquals("❤", replacer.apply("<3"));
-    }
-
-    @Test
-    void tokenAndTriggerMixReplace() {
-        assertEquals("I ❤ ✳", replacer.apply("I <3 :star:"));
-    }
-
-    @Test
-    void repeatedTriggersAllReplace() {
-        assertEquals("❤❤", replacer.apply("<3<3"));
-    }
-
-    @Test
-    void disabledEmojiIsIgnored() {
-        assertEquals(":off:", replacer.apply(":off:"));
-    }
-
-    @Test
-    void textWithoutTokensIsUnchanged() {
-        assertEquals("none", replacer.apply("none"));
-    }
-
-    @Test
-    void nullMessageBecomesEmpty() {
-        assertEquals("", replacer.apply(null));
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("messages")
+    void applyReplacesEveryEnabledForm(String label, String message, String expected) {
+        assertEquals(expected, replacer.apply(message), label);
     }
 
     @Test
