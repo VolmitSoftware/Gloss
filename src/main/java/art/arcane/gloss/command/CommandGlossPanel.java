@@ -119,29 +119,6 @@ public final class CommandGlossPanel {
     DirectorMiniMenu.deliver(sender, lines);
   }
 
-  @Director(name = "reload", description = "Reload persistent panel files", descriptionKey = "command.help.panel.reload")
-  public void reload(
-      @Param(name = "sender", contextual = true)
-      CommandSender sender
-  ) {
-    if (!checkPermission(sender)) {
-      return;
-    }
-    service().reload().whenComplete((result, failure) -> {
-      if (failure != null) {
-        reportFailure(sender, "reload", failure);
-        return;
-      }
-      sendLater(sender, GlossMessages.PANELS_RELOADED,
-          MessageArgs.builder()
-              .untrusted("loaded", result.loaded())
-              .untrusted("retained", result.retained())
-              .untrusted("removed", result.removed())
-              .untrusted("failures", result.failures().size())
-              .build());
-    });
-  }
-
   @Director(name = "near", description = "List panels near your current position", descriptionKey = "command.help.panel.near")
   public void near(
       @Param(name = "radius", description = "Horizontal search radius", descriptionKey = "command.help.arg.panel_radius", defaultValue = "64")

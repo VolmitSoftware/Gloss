@@ -19,7 +19,8 @@ import java.util.Set;
 
 class GlossCommandTreeTest {
     private static final List<List<String>> EXPECTED_PATHS = List.of(
-            List.of("debugdump"),
+            List.of("debug"),
+            List.of("debug", "dump"),
             List.of("hologram"),
             List.of("hologram", "create"),
             List.of("hologram", "delete"),
@@ -65,7 +66,6 @@ class GlossCommandTreeTest {
             List.of("indicators"),
             List.of("indicators", "reset"),
             List.of("status"),
-            List.of("reload"),
             List.of("menu"),
             List.of("menu", "list"),
             List.of("menu", "create"),
@@ -85,7 +85,6 @@ class GlossCommandTreeTest {
             List.of("menu", "copy"),
             List.of("panel"),
             List.of("panel", "list"),
-            List.of("panel", "reload"),
             List.of("panel", "near"),
             List.of("panel", "info"),
             List.of("panel", "create"),
@@ -150,6 +149,7 @@ class GlossCommandTreeTest {
             List.of("import", "legacy")
     );
     private static final Set<List<String>> GROUP_PATHS = Set.of(
+            List.of("debug"),
             List.of("hologram"), List.of("board"), List.of("emoji"), List.of("animations"),
             List.of("bubbles"), List.of("tablist"), List.of("motd"), List.of("drops"),
             List.of("indicators"),
@@ -163,6 +163,8 @@ class GlossCommandTreeTest {
 
         Assertions.assertEquals("gloss", root.getDescriptor().getName());
         Assertions.assertFalse(root.getChildren().isEmpty());
+        Assertions.assertNull(findExactChild(root, "reload"));
+        Assertions.assertNull(findExactChild(findExactChild(root, "panel"), "reload"));
     }
 
     @Test
@@ -226,8 +228,8 @@ class GlossCommandTreeTest {
         DirectorMiniMenu.DirectorHelpPage submenu = DirectorMiniMenu.resolveHelp(
                 engine, List.of("panel")).orElseThrow();
 
-        Assertions.assertEquals(19, root.entries().size());
-        Assertions.assertEquals(21, DirectorMiniMenu.render(
+        Assertions.assertEquals(18, root.entries().size());
+        Assertions.assertEquals(20, DirectorMiniMenu.render(
                 root, GlossCommandService.menuTheme(), GlossLocalization.globalDirectorResolver()).size());
         Assertions.assertEquals(DirectorMiniMenu.MAX_ENTRIES_PER_PAGE, submenu.entries().size());
         Assertions.assertEquals(DirectorMiniMenu.MAX_ENTRIES_PER_PAGE + 3, DirectorMiniMenu.render(

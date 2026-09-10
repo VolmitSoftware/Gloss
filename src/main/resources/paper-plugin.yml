@@ -114,7 +114,7 @@ permissions:
       gloss.bubbles.style: true
       gloss.indicators.show: true
   gloss.admin:
-    description: Allows reloading Gloss, viewing status and restoring shipped defaults.
+    description: Allows viewing status and restoring shipped defaults.
     default: op
     children:
       gloss.emoji.reset: true

@@ -33,11 +33,11 @@ String volmLibCoordinate = providers.gradleProperty('volmLibCoordinate')
 String authTokenProperty = providers.gradleProperty('authToken').orNull
 String jitpackAuthToken = authTokenProperty ?: providers.gradleProperty('jitpackAuthToken').orNull
 List<String> languageLocales = fileTree('src/main/resources/languages') {
-    include('*.yml')
-}.files.collect { File source -> source.name.substring(0, source.name.length() - 4) }.sort()
+    include('*.toml')
+}.files.collect { File source -> source.name.substring(0, source.name.length() - 5) }.sort()
 def languageSourceManifestTask = tasks.register('generateLanguageSourceManifest', WriteProperties) {
     destinationFile.set(layout.buildDirectory.file('generated/language-source/gloss-language-source.properties'))
-    property('revision', '6d1e9299598d4ef166ae87b35e48393b0ef8d3c1')
+    property('revision', 'master')
     property('locales', languageLocales.join(','))
 }
 

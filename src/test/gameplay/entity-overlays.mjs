@@ -254,14 +254,25 @@ export default {
           'A target inside level-five Insight range but outside Gloss radius is missing')
         evidence.range = textAt(0, 21)
       })
-      await context.step('Exclusive Insight policy hides global overlays and survives Gloss reload', async () => {
+      await context.step('Exclusive Insight policy hides global overlays and survives document hotload', async () => {
         await restriction(true)
         await waitFor(() => /Speed/.test(textAt(0, 21)) && near(0, 5).length === 0
           && !displays().some(entity => /x3/.test(entity.text)), 'Exclusive Insight policy did not suppress nearby overlays', 15000)
-        await command('/gloss reload', /reload/i)
-        await waitFor(() => /Speed/.test(textAt(0, 21)) && near(0, 5).length === 0,
-          'Gloss reload lost the exclusive Insight policy')
+        await overlaySettings({ healthSegments: 7 })
+        await waitFor(() => {
+          const text = textAt(0, 21)
+          const health = text.split('\n').find(line => line.includes('20/20')) ?? ''
+          return (health.match(/\|/g) ?? []).length === 7 && /Speed/.test(text)
+            && near(0, 5).length === 0 && !displays().some(entity => /x3/.test(entity.text))
+        }, 'Hotloading overlay settings lost the exclusive Insight policy or did not update the health bar', 15000)
         evidence.exclusive = displays()
+        await overlaySettings({ healthSegments: defaults.healthSegments })
+        await waitFor(() => {
+          const health = textAt(0, 21).split('\n').find(line => line.includes('20/20')) ?? ''
+          return (health.match(/\|/g) ?? []).length === defaults.healthSegments
+            && /Speed/.test(textAt(0, 21)) && near(0, 5).length === 0
+            && !displays().some(entity => /x3/.test(entity.text))
+        }, 'Restoring health segments lost the exclusive Insight policy', 15000)
         await inspect(false)
         await waitFor(() => !displays().some(entity => /ATK.*ARM/.test(entity.text)), 'Unlearned viewer retained an exclusive overlay', 15000)
       })

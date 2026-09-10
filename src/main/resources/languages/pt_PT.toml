@@ -1,0 +1,828 @@
+# Gloss — pt_PT
+#
+# === Editar o ficheiro ===
+# plugins/Gloss/languages/pt_PT.toml
+# Pode editar este ficheiro diretamente. As alterações locais são preservadas; as entradas em falta ou inválidas usam o inglês incorporado.
+# /gloss language server edit pt_PT
+#
+# === Prefixo ===
+# O prefixo &8[&dGloss&8] faz parte de cada mensagem: altera-o nas mensagens correspondentes.
+#
+# === Formatação ===
+# Cores: &0-&f, &k-&r, &#RRGGBB.
+#
+# === Variáveis ===
+# Mantenha os nomes das variáveis e use apenas as que pertencem a cada mensagem.
+#   {absorbed}  Entradas importadas fundidas com os dados existentes
+#   {active}  Número de fornecedores ativos
+#   {actual}  Revisão atual
+#   {after}  Valor da mensagem após a edição
+#   {argument}  Argumento de comando inesperado
+#   {axis}  Eixo de coordenadas ou de rotação
+#   {bees}  Número de abelhas no recipiente
+#   {before}  Valor da mensagem antes da edição
+#   {billboard}  Modo de orientação do elemento visual
+#   {blocks}  Número de elementos visuais de blocos
+#   {board}  Identificador do quadro ou painel
+#   {bottles}  Número de frascos no recipiente
+#   {bubbles}  Número de balões de conversa ativos
+#   {cells}  Número de células do menu
+#   {color}  Cor do elemento visual ou do item
+#   {command}  Caminho do comando
+#   {conflicts}  Número de conflitos de importação
+#   {copied}  Número de entradas copiadas
+#   {count}  Número de objetos ou mensagens correspondentes
+#   {disc}  Disco de música no recipiente
+#   {distance}  Distância até ao alvo
+#   {drops}  Número de itens largados apresentados
+#   {enabled}  Estado de ativação ou número de entradas ativas
+#   {entities}  Número de entidades
+#   {error}  Erro de validação ou da operação
+#   {errors}  Número de erros
+#   {expected}  Revisão esperada ao guardar a edição
+#   {experience}  Quantidade de experiência ganha
+#   {failed}  Número de operações falhadas
+#   {from}  Valor de origem ou início de um intervalo
+#   {fuel}  Combustível restante no recipiente
+#   {group}  Categoria do editor de idioma
+#   {hologram}  Identificador do holograma
+#   {honey}  Nível atual de mel
+#   {id}  Identificador do objeto
+#   {imported}  Número de entradas importadas
+#   {indicators}  Número de indicadores de dano
+#   {interactPermission}  Permissão necessária para interagir
+#   {interactionRange}  Distância máxima de interação
+#   {item}  Nome ou material do item
+#   {key}  Chave da mensagem ou da configuração
+#   {kind}  Tipo de objeto ou fornecedor
+#   {kinds}  Tipos de objetos ou fornecedores disponíveis
+#   {labels}  Número de etiquetas de texto
+#   {legacy}  Identificador da origem da importação
+#   {level}  Nível apresentado
+#   {limit}  Limite permitido
+#   {line}  Número da linha na mensagem
+#   {locale}  Código do idioma
+#   {maximum}  Valor máximo permitido
+#   {maximumBees}  Número máximo de abelhas
+#   {maximumHoney}  Nível máximo de mel
+#   {menu}  Identificador do menu
+#   {message}  Mensagem de resposta ou diagnóstico
+#   {migrated}  Número de entradas convertidas
+#   {minimum}  Valor mínimo permitido
+#   {mode}  Modo de operação ou apresentação selecionado
+#   {name}  Nome do objeto
+#   {oldBoard}  Identificador do quadro anterior
+#   {operation}  Nome da operação
+#   {options}  Opções de comando disponíveis
+#   {overlaid}  Número de chaves de configuração aplicadas
+#   {page}  Número da página atual
+#   {pages}  Número total de páginas
+#   {panels}  Número de painéis
+#   {parameter}  Nome do parâmetro do comando
+#   {path}  Caminho do ficheiro ou diretório
+#   {pending}  Estado das alterações pendentes de publicação
+#   {percent}  Valor percentual
+#   {permission}  Permissão necessária
+#   {personal}  Código do idioma pessoal
+#   {pitch}  Ângulo vertical em graus
+#   {player}  Nome do jogador
+#   {plugin}  Nome do plugin
+#   {priority}  Prioridade de seleção ou apresentação
+#   {provider}  Nome do fornecedor
+#   {providers}  Lista ou número de fornecedores
+#   {radius}  Raio de pesquisa
+#   {ready}  Número de entradas prontas a importar
+#   {reason}  Motivo do erro ou da decisão
+#   {resume}  Número de entradas cuja importação pode ser retomada
+#   {revision}  Revisão do documento
+#   {roll}  Ângulo de rotação longitudinal em graus
+#   {rotation}  Rotação do elemento visual
+#   {scale}  Escala do elemento visual ou da pré-visualização
+#   {seconds}  Tempo em segundos
+#   {session}  Identificador da sessão do editor
+#   {severity}  Gravidade do diagnóstico
+#   {skipped}  Número de entradas ignoradas
+#   {slots}  Número de espaços para itens
+#   {source}  Origem da importação ou fornecedor da configuração
+#   {special}  Número de elementos visuais especiais
+#   {state}  Estado atual
+#   {style}  Estilo de apresentação
+#   {subject}  Objeto da sessão do editor web
+#   {target}  Plugin que recebe a seleção do idioma
+#   {temporary}  Número de objetos temporários
+#   {text}  Texto apresentado
+#   {title}  Título apresentado
+#   {to}  Valor de destino ou fim de um intervalo
+#   {total}  Número total de entradas
+#   {type}  Tipo de valor ou objeto esperado
+#   {url}  Endereço web
+#   {usage}  Sintaxe do comando
+#   {uuid}  Identificador único do objeto ou jogador
+#   {value}  Valor atual da mensagem ou do parâmetro
+#   {variables}  Variáveis permitidas na mensagem
+#   {variants}  Número ou lista de variantes de apresentação
+#   {viewPermission}  Permissão necessária para ver
+#   {viewRange}  Distância máxima de visualização
+#   {warnings}  Número de avisos
+#   {when}  Condição de apresentação
+#   {world}  Nome do mundo
+#   {x}  Coordenada X
+#   {y}  Coordenada Y
+#   {yaw}  Ângulo horizontal em graus
+#   {z}  Coordenada Z
+
+[command.help]
+debug = "Comandos de diagnóstico"
+debugdump = "Criar um relatório de diagnóstico e carregá-lo opcionalmente"
+debugdump_upload = "Carregar o relatório para mclo.gs"
+root = "Grupo de comandos Gloss"
+hologram = "Criar e gerir hologramas"
+"hologram.create" = "Criar um holograma na tua posição"
+"hologram.create.id" = "ID único do holograma"
+"hologram.delete" = "Eliminar um holograma"
+"hologram.delete.id" = "ID do holograma a eliminar"
+"hologram.addline" = "Acrescentar uma linha a um holograma"
+"hologram.addline.id" = "ID do holograma"
+"hologram.addline.text" = "Texto da linha; usa aspas para incluir espaços"
+"hologram.setline" = "Substituir uma linha do holograma"
+"hologram.setline.id" = "ID do holograma"
+"hologram.setline.line" = "Número da linha, a começar em 1"
+"hologram.setline.text" = "Texto da linha; usa aspas para incluir espaços"
+"hologram.removeline" = "Remover uma linha do holograma"
+"hologram.removeline.id" = "ID do holograma"
+"hologram.removeline.line" = "Número da linha, a começar em 1"
+"hologram.clear" = "Remover todas as linhas de um holograma"
+"hologram.clear.id" = "ID do holograma"
+"hologram.movehere" = "Mover um holograma para a tua posição"
+"hologram.movehere.id" = "ID do holograma"
+"hologram.move" = "Deslocar um holograma por distâncias relativas em blocos"
+"hologram.move.id" = "ID do holograma"
+"hologram.move.x" = "Deslocamento X relativo em blocos"
+"hologram.move.y" = "Deslocamento Y relativo em blocos"
+"hologram.move.z" = "Deslocamento Z relativo em blocos"
+"hologram.tp" = "Teletransportar-te para um holograma"
+"hologram.tp.id" = "ID do holograma"
+"hologram.list" = "Listar hologramas; clica num para te teletransportares"
+"hologram.info" = "Mostrar a posição e as linhas de um holograma"
+"hologram.info.id" = "ID do holograma"
+"hologram.rendertext" = "Criar um holograma de texto com escala nativa"
+"hologram.rendertext.id" = "ID único do holograma"
+"hologram.rendertext.text" = "Texto a apresentar; usa aspas para incluir espaços"
+"hologram.rendertext.scale" = "Multiplicador de escala do TextDisplay"
+"hologram.orient" = "Definir como um holograma roda para quem o vê"
+"hologram.orient.id" = "ID do holograma"
+"hologram.orient.billboard" = "CENTER, VERTICAL, HORIZONTAL ou FIXED"
+"hologram.orient.yaw" = "Guinada (yaw) em graus, de -180 a 180"
+"hologram.orient.pitch" = "Inclinação (pitch) em graus, de -90 a 90"
+board = "Criar e gerir tabelas de pontuação"
+"board.create" = "Criar uma tabela de pontuação"
+"board.create.id" = "ID único da tabela"
+"board.delete" = "Eliminar uma tabela de pontuação"
+"board.delete.id" = "ID da tabela a eliminar"
+"board.title" = "Definir o título de uma tabela de pontuação"
+"board.title.id" = "ID da tabela"
+"board.title.text" = "Texto do título; usa aspas para incluir espaços"
+"board.addline" = "Acrescentar uma linha a uma tabela de pontuação"
+"board.addline.id" = "ID da tabela"
+"board.addline.text" = "Texto da linha; usa aspas para incluir espaços"
+"board.setline" = "Substituir uma linha da tabela de pontuação"
+"board.setline.id" = "ID da tabela"
+"board.setline.line" = "Número da linha, a começar em 1"
+"board.setline.text" = "Texto da linha; usa aspas para incluir espaços"
+"board.removeline" = "Remover uma linha da tabela de pontuação"
+"board.removeline.id" = "ID da tabela"
+"board.removeline.line" = "Número da linha, a começar em 1"
+"board.show" = "Mostrar-te uma tabela de pontuação"
+"board.show.id" = "ID da tabela"
+"board.hide" = "Ocultar a tua tabela de pontuação"
+"board.select" = "Definir a seleção automática da scoreboard"
+"board.select.id" = "ID da scoreboard"
+"board.select.priority" = "Prioridade de seleção"
+"board.select.when" = "Condição booleana; coloca entre aspas as expressões com espaços"
+"board.list" = "Listar tabelas de pontuação"
+"board.info" = "Mostrar o título, as linhas e as definições de uma tabela de pontuação"
+"board.info.id" = "ID da tabela"
+"board.reset" = "Repor as predefinições de tabelas de pontuação incluídas"
+emoji = "Ferramentas de emojis no chat"
+"emoji.list" = "Listar os emojis ativos; clica num para o inserir no chat"
+"emoji.reset" = "Repor as predefinições de emojis incluídas"
+animations = "Ferramentas de animações"
+"animations.list" = "Listar os nomes das animações"
+"animations.reset" = "Repor as predefinições de animações incluídas"
+bubbles = "Estilos de balões de chat"
+"bubbles.style" = "Escolher o teu estilo de balão de chat, ou clear para seleção automática"
+"bubbles.style.style" = "ID do estilo, ou clear"
+"bubbles.reset" = "Repor as predefinições de estilos de balões incluídas"
+tablist = "Ferramentas da tablist"
+"tablist.reset" = "Repor o documento de tablist incluído"
+motd = "Ferramentas do MOTD"
+"motd.reset" = "Repor o documento de MOTD incluído"
+drops = "Ferramentas de apresentação de itens largados"
+"drops.reset" = "Repor o documento de definições de itens largados incluído"
+indicators = "Ferramentas de indicadores de dano e cura"
+"indicators.reset" = "Repor o documento de indicadores de dano incluído"
+status = "Mostrar contagens de execução resumidas"
+import = "Migrar hologramas legados sem modificar os ficheiros de origem"
+"import.apply" = "Aplicar uma migração de hologramas legados sem substituição"
+"import.holoui" = "Copiar os dados do HoloUi de plugins/holoui, substituindo importações anteriores"
+"import.legacy" = "Migrar os ficheiros de dados do Gloss anteriores à fusão para os envelopes v2"
+"import.preview" = "Pré-visualizar uma migração não destrutiva de hologramas legados"
+item = "Ferramentas de fornecedores de itens personalizados"
+"item.export" = "Exportar o catálogo de itens personalizados para o editor web"
+"item.status" = "Mostrar que fornecedores de itens personalizados estão ativos"
+menu = "Criar, abrir e editar menus de hologramas"
+"menu.addrow" = "Acrescentar uma linha de decoração de texto"
+"menu.back" = "Reabrir a sessão de menu anterior"
+"menu.close" = "Fechar a sessão de menu atualmente aberta"
+"menu.copy" = "Copiar um menu carregado para um novo ID aninhado"
+"menu.create" = "Criar um holograma persistente na tua posição atual"
+"menu.image" = "Substituir o conteúdo do menu por um ficheiro de imagem centrado"
+"menu.insertrow" = "Inserir uma linha de decoração de texto"
+"menu.list" = "Listar todos os menus configurados que podes abrir"
+"menu.move" = "Mover o teu menu aberto para a tua posição atual"
+"menu.new" = "Criar um menu de holograma em branco a partir da base incluída"
+"menu.offsetrow" = "Mover uma linha com deslocamentos absolutos ou ~relativos"
+"menu.open" = "Abrir um menu por ID, ou mostrar a lista de menus quando definido como *"
+"menu.removerow" = "Remover uma linha de componente"
+"menu.seticon" = "Substituir o ícone de uma linha de botão ou decoração"
+"menu.setrow" = "Definir o texto de uma linha de botão ou decoração"
+"menu.style" = "Definir ou limpar uma propriedade de estilo de apresentação da linha"
+panel = "Ferramentas de painéis persistentes do mundo"
+"panel.addrow" = "Acrescentar uma linha de texto ao menu raiz de um painel"
+"panel.align" = "Alinhar os eixos de posição de um painel com outro painel"
+"panel.cancel" = "Descartar a tua edição de painel pendente"
+"panel.copy" = "Copiar um painel persistente com um novo ID"
+"panel.create" = "Criar um painel na tua posição atual"
+"panel.delete" = "Eliminar um painel persistente"
+"panel.edit" = "Iniciar uma sessão de edição de painel pendente"
+"panel.follow" = "Seguir um jogador online com rotação fixed, yaw ou full"
+"panel.here" = "Mover um painel para a tua posição atual"
+"panel.image" = "Substituir o menu raiz do painel por um ficheiro de imagem centrado"
+"panel.info" = "Mostrar o estado completo de um painel"
+"panel.insertrow" = "Inserir uma linha de texto no menu raiz de um painel"
+"panel.list" = "Listar painéis persistentes por página"
+"panel.menu" = "Definir o menu raiz de um painel"
+"panel.move" = "Mover um painel para coordenadas absolutas ou ~relativas"
+"panel.near" = "Listar painéis perto da tua posição atual"
+"panel.offsetrow" = "Mover uma linha do menu raiz do painel com deslocamentos absolutos ou ~relativos"
+"panel.permissions" = "Alterar as permissões de visualização e interação do painel"
+"panel.ranges" = "Definir os alcances de visualização e interação do painel"
+"panel.removerow" = "Remover uma linha do menu raiz do painel"
+"panel.rename" = "Mudar o nome de um painel persistente"
+"panel.rotate" = "Definir yaw, pitch e roll absolutos ou ~relativos"
+"panel.save" = "Guardar a tua edição de painel pendente"
+"panel.scale" = "Definir uma escala de painel absoluta ou ~relativa"
+"panel.seticon" = "Substituir o ícone de uma linha no menu raiz do painel"
+"panel.setrow" = "Definir o texto de uma linha do menu raiz do painel"
+"panel.style" = "Definir ou limpar uma propriedade de estilo de apresentação da linha"
+"panel.teleport" = "Teletransportar-te para um painel persistente"
+"panel.unfollow" = "Fazer com que um painel deixe de seguir um jogador"
+"panel.visibility" = "Definir o modo de visibilidade e os nós de permissão"
+preview = "Ferramentas de documentos de pré-visualização"
+"preview.dump" = "Construir um documento de pré-visualização uma vez e mostrar as suas contagens de elementos"
+"preview.list" = "Listar os documentos de pré-visualização e as suas regras de correspondência"
+"preview.reset" = "Repor as predefinições de pré-visualização incluídas (não remove documentos extra do utilizador que possam sobrepô-las)"
+web = "Abrir e gerir o editor web do Gloss"
+"web.open" = "Abrir um editor Gloss alojado vazio"
+"web.edit" = "Abrir um documento Gloss em tempo real"
+"web.edit.document" = "Abrir este documento em tempo real no editor web"
+"web.workspace" = "Abrir todo o espaço de trabalho Gloss em tempo real"
+"web.sessions" = "Gerir sessões ativas do editor web"
+"web.sessions.list" = "Listar sessões ativas do editor web"
+"web.sessions.pull" = "Consultar agora uma sessão do editor web"
+"web.sessions.revoke" = "Revogar uma ligação de acesso ao editor web"
+"web.sessions.status" = "Mostrar uma sessão do editor web"
+language = "Escolhe o teu idioma ou o idioma predefinido do servidor"
+
+[command.help.arg]
+reset_name = "Nome a repor, ou * para todas as predefinições incluídas"
+panel_axes = "Eixos: x, y, z, xy, xz, yz ou xyz"
+panel_follow_rotation = "Rotação de seguimento: fixed, yaw ou full"
+panel_id = "ID do painel persistente"
+panel_interact_permission = "Permissão de interação, ou -"
+panel_interaction_range = "Alcance de interação positivo"
+panel_menu = "ID do menu raiz; por predefinição usa o ID do painel"
+panel_new_id = "Novo ID de painel persistente"
+panel_pitch = "Pitch absoluto ou ~relativo"
+panel_player = "Jogador-alvo online"
+panel_radius = "Raio de pesquisa horizontal"
+panel_reference = "ID do painel de referência"
+panel_roll = "Roll absoluto ou ~relativo"
+panel_root_menu = "ID do menu raiz"
+panel_scale = "Escala absoluta ou ~relativa"
+panel_view_permission = "Permissão de visualização, ou -"
+panel_view_range = "Alcance de visualização positivo"
+panel_visibility = "Modo de visibilidade: public, permission ou hidden"
+panel_x = "X absoluto ou ~relativo"
+panel_y = "Y absoluto ou ~relativo"
+panel_yaw = "Yaw absoluto ou ~relativo"
+panel_z = "Z absoluto ou ~relativo"
+content_menu = "ID do menu carregado"
+web_subject = "ID do documento Gloss em tempo real"
+hologram_id = "ID do novo holograma e do menu raiz"
+hologram_text = "Texto MiniMessage opcional"
+image_path = "Ficheiro dentro da pasta de imagens do Gloss"
+import_source = "Origem legada de hologramas"
+menu = "ID do menu a abrir (* mostra todos os menus)"
+new_panel_id = "Novo ID de painel persistente"
+new_menu = "ID do novo menu aninhado"
+list_page = "Página da lista, a começar em 1"
+previews_dump_name = "Nome do documento a construir"
+previews_name = "Nome do documento a repor, ou * para todos os documentos incluídos"
+row_icon_type = "Tipo de ícone"
+row_icon_value = "Conteúdo do ícone ou ID de registo"
+row_index = "Linha de componente, a começar em 1"
+row_style_property = "Propriedade de estilo de apresentação"
+row_style_value = "Valor do estilo, ou * para limpar"
+row_text = "Texto MiniMessage da linha"
+row_x = "X absoluto ou ~relativo da linha"
+row_y = "Y absoluto ou ~relativo da linha"
+row_z = "Z absoluto ou ~relativo da linha"
+source_menu = "ID do menu de origem carregado"
+web_session = "ID da sessão do editor web"
+
+[command.error]
+no_permission = "&8[&dGloss&8] &cNão tens permissão."
+no_permission_use = "&8[&dGloss&8] &cNão tens permissão para usar esse comando."
+usage = "&7Utilização: &f/{command} help"
+
+[command.hologram]
+exists = "&8[&dGloss&8] &cO holograma '&f{id}&c' já existe."
+missing = "&8[&dGloss&8] &cNão existe nenhum holograma chamado '&f{id}&c'."
+created = "&8[&dGloss&8] &aHolograma &f{id}&a criado."
+deleted = "&8[&dGloss&8] &aHolograma &f{id}&a eliminado."
+line_added = "&8[&dGloss&8] &aLinha &f{line}&a adicionada a &f{id}&a."
+line_set = "&8[&dGloss&8] &aLinha &f{line}&a definida em &f{id}&a."
+line_removed = "&8[&dGloss&8] &aLinha &f{line}&a removida de &f{id}&a."
+line_out_of_range = "&8[&dGloss&8] &cA linha {line} está fora do intervalo; &f{id}&c tem {count} linhas."
+cleared = "&8[&dGloss&8] &aTodas as linhas de &f{id}&a foram limpas."
+moved = "&8[&dGloss&8] &aHolograma &f{id}&a movido para a tua posição."
+offset = "&8[&dGloss&8] &aHolograma &f{id}&a deslocado em &f{x}&a, &f{y}&a, &f{z}&a."
+teleported = "&8[&dGloss&8] &aTeletransportado para &f{id}&a."
+list_empty = "&8[&dGloss&8] &7Ainda não existem hologramas."
+rendered = "&8[&dGloss&8] &aHolograma de texto &f{id}&a criado com escala &f{scale}&a."
+text_empty = "&8[&dGloss&8] &cO texto não pode estar vazio."
+scale_out_of_range = "&8[&dGloss&8] &cA escala {value} está fora do intervalo; deve estar entre &f{minimum}&c e &f{maximum}&c."
+oriented = "&8[&dGloss&8] &a&f{id}&a definido com billboard &f{billboard}&a, yaw &f{yaw}&a, pitch &f{pitch}&a."
+billboard_unknown = "&8[&dGloss&8] &cBillboard desconhecido '&f{billboard}&c'. Usa um de &f{options}&c."
+angle_out_of_range = "&8[&dGloss&8] &cO valor {axis} {value} está fora do intervalo; tem de estar entre &f-{limit}&c e &f{limit}&c graus."
+
+[command.hologram.list]
+hover = "Clica para te teletransportares"
+lines = "{count} linhas"
+
+[command.hologram.info]
+header = "&8[&dGloss&8] &d{id} &7em &f{world} {x}, {y}, {z}"
+line = " &8{line}. &f{text}"
+orientation = " &8escala &f{scale} &8billboard &f{billboard} &8yaw &f{yaw} &8pitch &f{pitch}"
+
+[command.board]
+exists = "&8[&dGloss&8] &cA tabela '&f{id}&c' já existe."
+missing = "&8[&dGloss&8] &cNão existe nenhuma tabela chamada '&f{id}&c'."
+created = "&8[&dGloss&8] &aTabela &f{id}&a criada."
+deleted = "&8[&dGloss&8] &aTabela &f{id}&a eliminada."
+title_set = "&8[&dGloss&8] &aTítulo de &f{id}&a definido."
+line_added = "&8[&dGloss&8] &aLinha &f{line}&a adicionada a &f{id}&a."
+line_set = "&8[&dGloss&8] &aLinha &f{line}&a definida em &f{id}&a."
+line_removed = "&8[&dGloss&8] &aLinha &f{line}&a removida de &f{id}&a."
+line_out_of_range = "&8[&dGloss&8] &cA linha {line} está fora do intervalo; &f{id}&c tem {count} linhas."
+shown = "&8[&dGloss&8] &aA mostrar a tabela &f{id}&a."
+hidden = "&8[&dGloss&8] &aA tua tabela de pontuação está oculta."
+select_set = "&8[&dGloss&8] &aPrioridade de seleção da scoreboard &f{id}&a definida para &f{priority}&a."
+select_invalid = "&8[&dGloss&8] &cCondição da scoreboard inválida: &f{error}&c."
+list_empty = "&8[&dGloss&8] &7Ainda não existem tabelas."
+
+[command.board.list]
+hover = "Clica para veres os detalhes"
+
+[command.board.info]
+header = "&8[&dGloss&8] &d{id} &7com o título &f{title}"
+meta = "&7Prioridade: &f{priority} | Quando: &f{when} | Variantes: &f{variants}"
+line = " &8{line}. &f{text}"
+
+[command.emoji]
+empty = "&8[&dGloss&8] &7Não há emojis ativos."
+hover = "Clica para inserir no chat"
+
+[command.animations]
+empty = "&8[&dGloss&8] &7Não há animações carregadas."
+header = "&8[&dGloss&8] &fAnimações: &d{count}"
+entry = "&8- &d{name}"
+
+[command.list]
+page = "&7Página &f{page}&7/&f{pages} &8- &7a mostrar &f{from}&7-&f{to} &7de &f{total}"
+next = "&7Página seguinte: &f{command}"
+
+[command.status]
+holograms = "&7Hologramas: &f{count} &8({temporary} temporários, {entities} entidades)"
+boards = "&7Tabelas de pontuação: &f{count}"
+emoji = "&7Emojis: &f{enabled}&8/&f{total}"
+animations = "&7Animações: &f{count}"
+effects = "&7Balões: &f{bubbles} &8| &7Indicadores: &f{indicators} &8| &7Drops: &f{drops}"
+
+[command.reset]
+done = "&8[&dGloss&8] &aForam repostas &f{count}&a predefinições de {kind} incluídas."
+none = "&8[&dGloss&8] &cNenhuma predefinição de {kind} incluída corresponde a '&f{name}&c'."
+
+[command.bubbles]
+style_set = "&8[&dGloss&8] &aEstilo de balão de chat definido como &f{style}&a."
+style_cleared = "&8[&dGloss&8] &aEstilo de balão de chat limpo; aplica-se a seleção automática."
+style_unknown = "&8[&dGloss&8] &cNão existe nenhum estilo de balão chamado '&f{style}&c'."
+
+[command.import]
+config_unreadable = "&8[&dGloss&8] &cNão foi possível carregar o gloss.toml: &f{reason}"
+
+[command.import.holoui]
+missing = "&8[&dGloss&8] &cNão foi encontrada nenhuma pasta de dados holoui ao lado da pasta de dados do Gloss."
+done = "&8[&dGloss&8] &aImportação do HoloUi concluída: &f{copied}&a copiados, &f{skipped}&a ignorados, &f{overlaid}&a chaves de configuração, &f{errors}&a erros."
+
+[command.import.legacy]
+done = "&8[&dGloss&8] &aMigração legada concluída: &f{migrated}&a migrados, &f{absorbed}&a absorvidos, &f{overlaid}&a chaves de configuração, &f{errors}&a erros."
+
+[director.help]
+no_subcommands = "Não existem subcomandos nesta página."
+no_description = "Nenhuma descrição fornecida"
+command_group = "Grupo de comandos. Clique para abrir."
+category = "Categoria de comandos"
+no_parameters = "Sem parâmetros. Clique para preencher previamente o comando."
+parameters_hover = "Passe o cursor sobre os parâmetros para saber mais."
+
+[director.help.navigation]
+back = "Voltar"
+page = "Página"
+
+[director.help.navigation.parent]
+hover = "Voltar ao grupo de comandos principal"
+
+[director.help.navigation.previous]
+hover = "Página anterior"
+
+[director.help.navigation.next]
+hover = "Página seguinte"
+
+[director.help.parameter]
+required = "Este parâmetro é obrigatório."
+optional = "Este parâmetro é opcional."
+default = "Predefinição \"{value}\" se não for definido."
+type = "Este parâmetro é do tipo {type}."
+
+[director.runtime]
+usage = "Utilização: {usage}"
+
+[director.runtime.error]
+invalid_origin = "Este comando não pode ser executado a partir desta origem."
+unknown_parameter = "Chave de parâmetro desconhecida: {key}"
+unexpected_argument = "Argumento inesperado \"{argument}\". Os parâmetros opcionais devem ser indicados por chave, por ex. seed=123"
+unclosed_group = "Falta o \"]\" de fecho para o parâmetro {key}"
+conversion_failed = "Não foi possível converter \"{value}\" em {type} para {parameter}"
+default_parse_failed = "Não foi possível interpretar o valor predefinido do parâmetro {parameter}"
+missing_argument = "Falta o argumento \"{parameter}\" ({type})"
+execution_failed = "Falha ao executar o comando {command}: {reason}"
+
+[gloss.error]
+menu_name_required = "O nome do menu não pode estar vazio"
+hologram_id_required = "O ID do holograma não pode estar vazio"
+panel_id_required = "O ID do painel não pode estar vazio"
+web_subject_required = "O ID do documento do editor web não pode estar vazio"
+web_session_required = "O ID da sessão do editor web não pode estar vazio"
+panel_player_required = "O jogador de destino não pode estar vazio"
+row_icon_type_required = "O tipo de ícone não pode estar vazio"
+row_style_property_required = "A propriedade do estilo não pode estar vazia"
+import_source_required = "A origem da importação antiga não pode estar vazia"
+import_source_unknown = "Origem da importação antiga desconhecida: {source}"
+
+[gloss.message]
+permission_denied = "&8[&dGloss&8]: &cNão tens a permissão &f{permission}&c."
+unknown_command = "&8[&dGloss&8]: &cComando desconhecido \"&f{command}&c\"."
+
+[gloss.message.hologram]
+created = "&8[&dGloss&8]: &aHolograma &f{hologram}&a criado com o menu raiz &f{menu}&a na tua posição."
+already_exists = "&8[&dGloss&8]: &cJá existe um holograma, painel ou menu chamado &f{hologram}&c."
+failed = "&8[&dGloss&8]: &cNão foi possível criar o holograma &f{hologram}&c. Não foi guardada qualquer alteração."
+durability_uncertain = "&8[&dGloss&8]: &eNão foi possível finalizar com segurança a transação do holograma &f{hologram}&e. Reinicia o Gloss antes de o verificares ou voltares a tentar."
+
+[gloss.message.menu]
+none = "&8[&dGloss&8]: &7Não há menus disponíveis."
+player_only = "&8[&dGloss&8]: &cSó os jogadores podem abrir menus."
+no_previous = "&8[&dGloss&8]: &cNão há menu anterior disponível."
+closed = "&8[&dGloss&8]: &aMenu fechado."
+moved = "&8[&dGloss&8]: &aMenu movido."
+none_open = "&8[&dGloss&8]: &cNão há nenhum menu aberto."
+unavailable = "&8[&dGloss&8]: &c\"{menu}\" não está disponível."
+permission_denied = "&8[&dGloss&8]: &cNão tens permissão para abrir \"{menu}\"."
+open_failed = "&8[&dGloss&8]: &cNão foi possível abrir o menu \"{menu}\"."
+
+[gloss.message.menu.list]
+header = "Menus"
+entry = "Clique para abrir {menu}."
+
+[gloss.message.menu.content]
+updated = "&8[&dGloss&8]: &aAplicada a operação {operation} ao menu &f{menu}&a, revisão {revision}."
+created = "&8[&dGloss&8]: &aCriado o menu &f{menu}&a, revisão {revision}. Abre-o com /gloss menu open &f{menu}&a ou coloca-o com /gloss panel create &f{menu}&a."
+copied = "&8[&dGloss&8]: &aCopiado o menu &f{source}&a para &f{menu}&a, revisão {revision}."
+revision_conflict = "&8[&dGloss&8]: &cO menu &f{menu}&c mudou durante a escrita (esperada {expected}, atual {actual}). Repete o comando."
+already_exists = "&8[&dGloss&8]: &cO menu &f{menu}&c já existe."
+invalid = "&8[&dGloss&8]: &cValor de conteúdo do menu inválido: &f{reason}&c."
+failed = "&8[&dGloss&8]: &cFalhou a operação no conteúdo do menu &f{menu}&c: {reason}"
+
+[gloss.message.command]
+player_only = "&8[&dGloss&8]: &cEste comando só está disponível para jogadores."
+
+[gloss.message.web]
+header = "Editor web"
+open_hover = "Clica para abrir o editor web do Gloss."
+open = "&8[&dGloss&8]: &7Editor web: &f{url}"
+preparing = "&8[&dGloss&8]: &7A preparar uma sessão segura de sincronização para &f{subject}&7..."
+unavailable = "&8[&dGloss&8]: &cA edição web em tempo real está indisponível. Verifica a configuração da sincronização e a ligação ao relay."
+open_failed = "&8[&dGloss&8]: &cNão foi possível abrir &f{kind}={subject}&c no editor web em tempo real: {reason}"
+open_console = "&8[&dGloss&8]: &7Ligação de acesso ao editor para &f{subject}&7: &f{url}"
+capability_warning = "&8[&dGloss&8]: &eEste URL permite publicar alterações no servidor até ser revogado ou expirar. Mantém-no secreto."
+open_label = "Abrir editor"
+copy_label = "Copiar ligação"
+revoke_label = "Revogar"
+link_hover = "Abre o editor, copia a ligação de acesso ou revoga a sessão {session}."
+
+[gloss.message.web.sessions]
+list_empty = "&8[&dGloss&8]: &7Não há sessões de sincronização do editor ativas."
+status = "&8[&dGloss&8]: &f&f{session} &7{kind}=&f{subject} expira em=&f{seconds}s publicação=&f{revision} pendente=&f{pending}"
+revoked = "&8[&dGloss&8]: &aRevogada a sessão de sincronização &f{session}&a."
+pulled = "&8[&dGloss&8]: &aConsultada a sessão de sincronização &f{session}&a."
+unknown = "&8[&dGloss&8]: &cSessão de sincronização &f{session}&c desconhecida ou expirada."
+failed = "&8[&dGloss&8]: &cFalhou a operação de sincronização da sessão &f{session}&c: {reason}"
+
+[gloss.message.import]
+preview_started = "&8[&dGloss&8]: &7A analisar &f{source}&7 para pré-visualizar a migração sem alterar dados..."
+apply_started = "&8[&dGloss&8]: &7A analisar e migrar de &f{source}&7 sem substituir dados..."
+source_missing = "&8[&dGloss&8]: &7Não foi encontrada a origem &f{source}&7 em &f{path}&7."
+preview_summary = "&8[&dGloss&8]: &fPré-visualização de &f{source}&7: &a{ready} prontos, &d{resume} retomáveis, &e{conflicts} conflitos, &c{errors} erros, {warnings} avisos. Origem: &f{path}"
+preview_entry = "&8- &f&f{legacy} -> &f{board} estado=&f{state} avisos=&f{warnings}"
+apply_summary = "&8[&dGloss&8]: &fMigração de &f{source}&7: &a{imported} importados, &e{skipped} ignorados, &c{failed} falhados; a análise encontrou {errors} erros e {warnings} avisos."
+apply_entry = "&8- &f&f{legacy} estado=&f{state} motivo=&f{reason}"
+issue = "&8- &f{legacy} &7{severity}: &f{reason}"
+busy = "&8[&dGloss&8]: &cJá está em curso outra migração de hologramas antigos."
+failed = "&8[&dGloss&8]: &cFalhou a migração de hologramas antigos de &f{source}&c: {reason}"
+
+[gloss.message.config]
+reloaded = "&2Configuração \"{name}\" recarregada."
+
+[gloss.message.hotload]
+singular = "&2Recarregado em tempo real: {kinds} ({count} alteração)."
+plural = "&2Recarregado em tempo real: {kinds} ({count} alterações)."
+
+[gloss.message.preview_scale]
+adjusting = "&7Tamanho da pré-visualização: &f{percent}% &8- &7mantém Agachar + desloca para redimensionar; toca duas vezes em Agachar para guardar"
+hidden = "&7Pré-visualização &coculta &8- &7desloca para cima para restaurar"
+size = "&7Tamanho da pré-visualização: &f{percent}%"
+saved_hidden = "&7Pré-visualização guardada como &coculta &8- &7toca duas vezes em Agachar + desloca para cima num recipiente para restaurar"
+saved = "&7Tamanho da pré-visualização guardado: &f{percent}%"
+
+[gloss.message.drops]
+bundle_more = "+{count} outros"
+
+[gloss.message.items]
+disabled = "&8[&dGloss&8]: &7Os itens personalizados estão desativados. Define customItems como true em gloss.toml."
+
+[gloss.message.items.status]
+header = "Itens personalizados"
+summary = "{active}/{total} fornecedores ativos"
+entry = "Fornecedor {provider} do plugin {plugin}."
+hint = "Clica para exportar o catálogo para o editor web."
+
+[gloss.message.items.state]
+ready = "pronto, {count} IDs"
+loading = "presente, ainda a carregar"
+inactive = "presente, sem adaptador"
+missing = "não instalado"
+
+[gloss.message.items.export]
+started = "&8[&dGloss&8]: &7A exportar o catálogo de itens personalizados..."
+done = "&8[&dGloss&8]: &aGravados {count} itens de {providers} fornecedores em &f{path}&a."
+empty = "&8[&dGloss&8]: &7Não foram encontrados itens personalizados. Foi gravado um catálogo vazio em &f{path}&7."
+failed = "&8[&dGloss&8]: &cFalhou a gravação do catálogo de itens personalizados. Consulta os registos."
+busy = "&8[&dGloss&8]: &cJá está em curso uma exportação do catálogo."
+
+[gloss.message.previews.list]
+header = "Documentos de pré-visualização"
+empty = "&7Não há documentos de pré-visualização carregados."
+entry = "blocos={blocks} entidades={entities} especiais={special} prioridade={priority}"
+
+[gloss.message.previews.reset]
+started = "&8[&dGloss&8]: &7A repor os documentos de pré-visualização \"&f{name}&7\"..."
+done = "&8[&dGloss&8]: &aRepostos {count} documentos de pré-visualização incluídos. Os documentos adicionais que os substituem não foram removidos."
+none = "&8[&dGloss&8]: &c\"{name}\" não é um documento de pré-visualização incluído; nada foi reposto."
+
+[gloss.message.previews.dump]
+unknown = "&8[&dGloss&8]: &c\"{name}\" não é um documento de pré-visualização carregado."
+result = "&8[&dGloss&8]: &a&a{name}&7: &f{total}&7 elementos (painéis={panels}, células={cells}, espaços={slots}, etiquetas={labels})."
+no_errors = "&8[&dGloss&8]: &aNão há erros de compilação."
+error_line = "&8[&dGloss&8]: &c{message}"
+error_more = "&8[&dGloss&8]: &7Mais {count} (consulta o registo da consola)."
+
+[gloss.message.panels]
+created = "&8[&dGloss&8]: &aCriado o painel &f{board}&a, revisão {revision}."
+deleted = "&8[&dGloss&8]: &aEliminado o painel &f{board}&a."
+renamed = "&8[&dGloss&8]: &aRenomeado &f{oldBoard}&a para &f{board}&a, revisão {revision}."
+copied = "&8[&dGloss&8]: &aCopiado &f{source}&a para &f{board}&a."
+updated = "&8[&dGloss&8]: &aAplicada a operação {operation} a &f{board}&a, revisão {revision}."
+teleported = "&8[&dGloss&8]: &aTeletransportado para &f{board}&a."
+unknown = "&8[&dGloss&8]: &cPainel &f{board}&c desconhecido."
+already_exists = "&8[&dGloss&8]: &cO painel &f{board}&c já existe."
+invalid = "&8[&dGloss&8]: &cValor do painel inválido: &f{reason}&c."
+menu_unavailable = "&8[&dGloss&8]: &cO menu principal &f{menu}&c não está carregado."
+player_unavailable = "&8[&dGloss&8]: &cO jogador de destino &f{player}&c não está online."
+world_unavailable = "&8[&dGloss&8]: &cO mundo do painel &f{world}&c não está carregado com o UUID guardado."
+revision_conflict = "&8[&dGloss&8]: &cO painel &f{board}&c mudou durante a edição (esperada {expected}, atual {actual}). Reabre a sessão de edição."
+failed = "&8[&dGloss&8]: &cFalhou a operação no painel &f{board}&c: {reason}"
+
+[gloss.message.panels.list]
+header = "&8[&dGloss&8]: &fPainéis persistentes: &d{count}"
+empty = "&8[&dGloss&8]: &7Não há painéis persistentes carregados."
+entry = "&8- &f&f{board} menu=&f{menu} revisão=&f{revision}"
+
+[gloss.message.panels.near]
+header = "&8[&dGloss&8]: &fPainéis num raio de &d{radius}&f blocos: &d{count}"
+empty = "&8[&dGloss&8]: &7Não há painéis dentro desse raio."
+entry = "&8- &f&f{board} distância=&f{distance} menu=&f{menu}"
+
+[gloss.message.panels.info]
+header = "&8[&dGloss&8]: &fPainel &d{board} ({state})"
+identity = "&7uuid=&f{uuid} revisão=&f{revision} menu=&f{menu}"
+transform = "&7mundo=&f{world} posição=&f{x}, {y}, {z} rotação=&f{yaw}, {pitch}, {roll} escala=&f{scale}"
+visibility = "&7visibilidade=&f{mode} permissão de visualização=&f{viewPermission} permissão de interação=&f{interactPermission} distâncias=&f{viewRange}/{interactionRange}"
+follow = "&7seguimento=&f{mode} jogador=&f{player} rotação=&f{rotation}"
+
+[gloss.message.panels.edit]
+started = "&8[&dGloss&8]: &aA editar &f{board}&a a partir da revisão {revision}. As alterações ficam pendentes até serem guardadas."
+already_active = "&8[&dGloss&8]: &cJá estás a editar &f{board}&c. Guarda ou cancela primeiro."
+none = "&8[&dGloss&8]: &cNão tens uma edição de painel pendente."
+busy = "&8[&dGloss&8]: &cO painel &f{board}&c está a ser guardado."
+staged = "&8[&dGloss&8]: &aPreparada a operação {operation} para &f{board}&a. Usa /gloss panel save para a guardar."
+saved = "&8[&dGloss&8]: &aGuardado &f{board}&a, revisão {revision}."
+cancelled = "&8[&dGloss&8]: &aCanceladas as alterações pendentes de &f{board}&a."
+identity_blocked = "&8[&dGloss&8]: &cGuarda ou cancela as alterações pendentes de &f{board}&c antes de o renomeares ou eliminares."
+
+[gloss.preview.state]
+idle = "Inativo"
+brewing = "Preparação {percent}%"
+needs_blaze_powder = "Requer pó de blaze"
+waiting = "Em espera"
+no_ingredient = "Sem ingrediente"
+empty = "Vazio"
+smelting_item = "Fundição de {item} {percent}%"
+smelting = "Fundição {percent}%"
+blasting_item = "Fundição de {item} no alto-forno {percent}%"
+blasting = "Fundição no alto-forno {percent}%"
+smoking_item = "Defumação de {item} {percent}%"
+smoking = "Defumação {percent}%"
+heating = "A aquecer"
+needs_fuel = "Requer combustível"
+no_input = "Sem entrada"
+surge_suffix = "  +{seconds}s"
+disc_playing = "A reproduzir: {disc}"
+disc_loaded = "Carregado: {disc}"
+no_disc = "Sem disco de música"
+
+[gloss.preview.stat]
+fuel_level = "Combustível {fuel}/{maximum}"
+no_fuel = "Sem combustível"
+bottles = "Frascos {bottles}/{maximum}"
+fuel_seconds = "Combustível {seconds}s"
+fuel_ready = "Combustível pronto"
+xp_gain = "XP +{experience}"
+xp_zero = "XP 0"
+bees_and_honey = "Abelhas {bees}/{maximumBees}   Mel {honey}/{maximumHoney}"
+cauldron_empty = "Vazio {level}/{maximum}"
+cauldron_level = "Nível {level}/{maximum}"
+
+[gloss.preview.theme.title]
+chest = "&6&lBaú"
+trapped_chest = "&c&lBaú Armadilhado"
+ender_chest = "&5&lBaú do Ender"
+barrel = "&e&lBarril"
+dispenser = "&7&lDistribuidor"
+dropper = "&8&lEjetor"
+hopper = "&8&lFunil"
+furnace = "&6&lFornalha"
+smoker = "&e&lDefumador"
+blast_furnace = "&b&lAlto-Forno"
+beehive = "&e&lColmeia Artificial"
+bee_nest = "&e&lColmeia"
+cauldron = "&7&lCaldeirão"
+water_cauldron = "&9&lCaldeirão de Água"
+lava_cauldron = "&6&lCaldeirão de Lava"
+powder_snow_cauldron = "&f&lCaldeirão de Neve em Pó"
+jukebox = "&d&lJukebox"
+brewing_stand = "&d&lFermentador"
+chiseled_bookshelf = "&6&lEstante de Livros Esculpida"
+hopper_minecart = "&8&lCarrinho de Mina com Funil"
+chest_minecart = "&6&lCarrinho de Mina com Baú"
+mobile = "&7&l{name}"
+shulker = "&l{color} Caixa de Shulker"
+copper_chest = "&6&l{name}"
+shelf = "&6&l{name}"
+container = "&6&lRecipiente"
+
+[language.menu]
+your_language = "O teu idioma"
+reset_your_language = "Repor o teu idioma"
+server_default = "Idioma predefinido do servidor"
+edit_messages = "Editar mensagens do idioma"
+use_server_default = "Usar o idioma predefinido do servidor"
+current = "Atual: {locale}"
+current_with_personal = "Atual: {locale} (O teu: {personal})"
+your_description = "Altera apenas as mensagens que vês."
+reset_description = "Usa o idioma predefinido do servidor."
+server_description = "Altera o idioma predefinido do servidor."
+edit_description = "Abre o editor de mensagens de cada idioma."
+select_description = "Clica para selecionar este idioma."
+remove_personal_description = "Remove a tua escolha pessoal de idioma."
+no_controls = "Não tens acesso às opções de idioma."
+command = "Comando: {command}"
+selected = "selecionado"
+all-volmit-plugins = "Todos os plugins Volmit"
+
+[language.error]
+stopping = "A escolha de idioma não está disponível enquanto o plugin está a parar."
+editor-player-only = "Abra o editor de idiomas dentro do jogo."
+no-providers = "Não há fornecedores de idiomas Volmit disponíveis."
+numeric-page = "Introduza um número de página."
+personal-player-only = "As preferências do idioma do jogador devem ser selecionadas no jogo."
+personal-permission = "Você não tem permissão para selecionar seu idioma."
+plugin-personal-permission = "Não tem permissão para escolher o seu idioma em {plugin}."
+plugin-server-permission = "Não tem permissão para alterar o idioma do servidor em {plugin}."
+server-locale-required = "Escolha um código como en_US para o idioma predefinido do servidor."
+unavailable-for-all = "O idioma {locale} não está disponível para todos os plugins selecionados."
+
+[language.usage]
+editor = "Uso: /{command} language server edit [locale]"
+selection = "Uso: /{command} language self [locale|reset] or server [locale]"
+volmit-selection = "Uso: /volmit plugins languages [locale]"
+
+[language.selection]
+preparing = "A preparar o idioma {locale} para {target}..."
+save-failed = "{plugin}: não foi possível guardar a escolha de idioma; consulte a consola do servidor."
+english-fallback = "{plugin}: {locale} não está disponível; será usado inglês (en_US)."
+personal-selected = "{plugin}: o seu idioma agora é {locale}."
+server-selected = "{plugin}: o idioma do servidor agora é {locale}."
+server-default-selected = "{plugin}: o seu idioma segue agora o idioma predefinido do servidor."
+
+[language.editor]
+loading = "A carregar as mensagens de {locale}..."
+
+[language.editor.section]
+languages = "Idiomas"
+search = "Procurar"
+search-title = "{locale} / Procurar"
+group-title = "{locale} / {group}"
+
+[language.editor.prompt]
+search = "Pesquise uma chave de mensagem ou texto. Escreva cancel para voltar."
+value = "Escreva um novo valor para {key} no chat."
+current = "Valor atual: {value}"
+variables = "Variáveis: {variables}"
+guidance = "Use \\n para mudar de linha, \\\\ para uma barra invertida, ou escreva cancel para voltar."
+
+[language.editor.input]
+expired = "O prazo de introdução de texto no editor de idiomas expirou."
+too-long = "O texto pode ter no máximo {maximum} caracteres."
+unable-to-save = "Não foi possível guardar: {reason}"
+
+[language.editor.navigation]
+back = "&eVoltar&r"
+close = "&cFechar&r"
+previous-page = "&ePágina anterior&r"
+next-page = "&ePágina seguinte&r"
+
+[language.editor.search]
+messages = "Pesquisar mensagens"
+messages-lore = "Clique para pesquisar todas as mensagens."
+clear = "Limpar a pesquisa"
+
+[language.editor.message]
+current-value = "&7Valor atual:&r"
+variables = "&8{variables}&r"
+edit-plural = "&7Clique para editar uma forma plural.&r"
+edit-lines = "&7Clique para editar linhas individuais.&r"
+edit-chat = "&7Clique para editar no chat.&r"
+
+[language.editor.locale]
+open = "&8Clique para abrir este idioma.&r"
+
+[language.editor.category]
+message-count = "&7{count} mensagens&r"
+open = "&8Clique para abrir esta categoria.&r"
+
+[language.editor.error]
+no-permission = "Não tem permissão para editar os idiomas de {plugin}."
+unable-to-edit = "Não foi possível editar: {reason}"
+
+[language.editor.saved]
+summary = "{locale} guardado. As escolhas de idioma não foram alteradas."
+change = "{key}: «{before}» foi alterado para «{after}»."
+
+[language.editor.part]
+line = "Linha {line}"
+
+[language.editor.value]
+none = "Nenhum"
+empty = "(vazio)"

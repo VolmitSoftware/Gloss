@@ -1,0 +1,828 @@
+# Gloss — he_IL
+#
+# === עריכת הקובץ ===
+# plugins/Gloss/languages/he_IL.toml
+# אפשר לערוך קובץ זה ישירות. שינויים מקומיים נשמרים; ערכים חסרים או לא תקינים משתמשים באנגלית המובנית.
+# /gloss language server edit he_IL
+#
+# === קידומת ===
+# קידומת: &8[&dGloss&8] / &8[&dGloss&8]:
+#
+# === עיצוב ===
+# צבעים: &0-&f, &k-&r, &#RRGGBB.
+#
+# === משתנים ===
+# יש לשמור על שמות המשתנים ולהשתמש רק במשתנים הקיימים בכל הודעה.
+#   {absorbed}  רשומות שיובאו ומוזגו בנתונים קיימים
+#   {active}  מספר הספקים הפעילים
+#   {actual}  הגרסה הנוכחית
+#   {after}  ערך ההודעה לאחר העריכה
+#   {argument}  ארגומנט פקודה לא צפוי
+#   {axis}  ציר קואורדינטות או סיבוב
+#   {bees}  מספר הדבורים במכל
+#   {before}  ערך ההודעה לפני העריכה
+#   {billboard}  מצב כיוון התצוגה
+#   {blocks}  מספר רכיבי תצוגת הבלוקים
+#   {board}  מזהה הלוח או הפאנל
+#   {bottles}  מספר הבקבוקים במכל
+#   {bubbles}  מספר בועות הצ׳אט הפעילות
+#   {cells}  מספר תאי התפריט
+#   {color}  צבע התצוגה או הפריט
+#   {command}  נתיב הפקודה
+#   {conflicts}  מספר התנגשויות הייבוא
+#   {copied}  מספר הרשומות שהועתקו
+#   {count}  מספר העצמים או ההודעות התואמים
+#   {disc}  תקליט המוזיקה במכל
+#   {distance}  המרחק ליעד
+#   {drops}  מספר תצוגות הפריטים שנפלו
+#   {enabled}  מצב ההפעלה או מספר הרשומות הפעילות
+#   {entities}  מספר הישויות
+#   {error}  שגיאת אימות או פעולה
+#   {errors}  מספר השגיאות
+#   {expected}  הגרסה הצפויה בשמירת העריכה
+#   {experience}  כמות הניסיון שהתקבלה
+#   {failed}  מספר הפעולות שנכשלו
+#   {from}  ערך המקור או תחילת הטווח
+#   {fuel}  הדלק שנותר במכל
+#   {group}  קטגוריית עורך השפות
+#   {hologram}  מזהה ההולוגרמה
+#   {honey}  רמת הדבש הנוכחית
+#   {id}  מזהה העצם
+#   {imported}  מספר הרשומות שיובאו
+#   {indicators}  מספר מחווני הנזק
+#   {interactPermission}  ההרשאה הנדרשת לאינטראקציה
+#   {interactionRange}  המרחק המרבי לאינטראקציה
+#   {item}  שם הפריט או החומר
+#   {key}  מפתח הודעה או הגדרה
+#   {kind}  סוג העצם או הספק
+#   {kinds}  סוגי העצמים או הספקים הזמינים
+#   {labels}  מספר תוויות הטקסט
+#   {legacy}  מזהה במקור הייבוא
+#   {level}  הרמה המוצגת
+#   {limit}  הגבול המותר
+#   {line}  מספר השורה בהודעה
+#   {locale}  קוד השפה
+#   {maximum}  הערך המרבי המותר
+#   {maximumBees}  מספר הדבורים המרבי
+#   {maximumHoney}  רמת הדבש המרבית
+#   {menu}  מזהה התפריט
+#   {message}  הודעת משוב או אבחון
+#   {migrated}  מספר הרשומות שהומרו
+#   {minimum}  הערך המזערי המותר
+#   {mode}  מצב הפעולה או התצוגה הנבחר
+#   {name}  שם העצם
+#   {oldBoard}  מזהה הלוח הקודם
+#   {operation}  שם הפעולה
+#   {options}  אפשרויות הפקודה הזמינות
+#   {overlaid}  מספר מפתחות ההגדרה שהוחלו
+#   {page}  מספר העמוד הנוכחי
+#   {pages}  מספר העמודים הכולל
+#   {panels}  מספר הפאנלים
+#   {parameter}  שם פרמטר הפקודה
+#   {path}  נתיב הקובץ או התיקייה
+#   {pending}  מצב פרסום השינויים הממתינים
+#   {percent}  ערך באחוזים
+#   {permission}  ההרשאה הנדרשת
+#   {personal}  קוד השפה האישי
+#   {pitch}  זווית אנכית במעלות
+#   {player}  שם השחקן
+#   {plugin}  שם התוסף
+#   {priority}  עדיפות בחירה או ציור
+#   {provider}  שם הספק
+#   {providers}  רשימת הספקים או מספרם
+#   {radius}  רדיוס החיפוש
+#   {ready}  מספר הרשומות המוכנות לייבוא
+#   {reason}  הסיבה לשגיאה או להחלטה
+#   {resume}  מספר רשומות הייבוא שניתן לחדש
+#   {revision}  גרסת המסמך
+#   {roll}  זווית גלגול במעלות
+#   {rotation}  סיבוב התצוגה
+#   {scale}  קנה המידה של התצוגה או התצוגה המקדימה
+#   {seconds}  משך בשניות
+#   {session}  מזהה הפעלת העורך
+#   {severity}  חומרת האבחון
+#   {skipped}  מספר הרשומות שדולגו
+#   {slots}  מספר משבצות הפריטים
+#   {source}  מקור הייבוא או ספק ההגדרות
+#   {special}  מספר רכיבי התצוגה המיוחדים
+#   {state}  המצב הנוכחי
+#   {style}  סגנון התצוגה
+#   {subject}  העצם הנערך בהפעלת עורך הרשת
+#   {target}  התוסף שמקבל את בחירת השפה
+#   {temporary}  מספר העצמים הזמניים
+#   {text}  הטקסט המוצג
+#   {title}  הכותרת המוצגת
+#   {to}  ערך היעד או סוף הטווח
+#   {total}  מספר הרשומות הכולל
+#   {type}  סוג הערך או העצם הצפוי
+#   {url}  כתובת האינטרנט
+#   {usage}  תחביר הפקודה
+#   {uuid}  מזהה ייחודי של עצם או שחקן
+#   {value}  ערך ההודעה או הפרמטר הנוכחי
+#   {variables}  מצייני המקום המותרים בהודעה
+#   {variants}  מספר גרסאות התצוגה או רשימתן
+#   {viewPermission}  ההרשאה הנדרשת לצפייה
+#   {viewRange}  מרחק הצפייה המרבי
+#   {warnings}  מספר האזהרות
+#   {when}  תנאי התצוגה
+#   {world}  שם העולם
+#   {x}  קואורדינטת X
+#   {y}  קואורדינטת Y
+#   {yaw}  זווית אופקית במעלות
+#   {z}  קואורדינטת Z
+
+[command.help]
+debug = "פקודות אבחון"
+debugdump = "יצירת דוח אבחון והעלאתו לפי בחירה"
+debugdump_upload = "העלאת הדוח אל mclo.gs"
+root = "קבוצת הפקודות של Gloss"
+hologram = "יצירה וניהול של הולוגרמות"
+"hologram.create" = "יצירת הולוגרמה במיקום שלך"
+"hologram.create.id" = "מזהה הולוגרמה ייחודי"
+"hologram.delete" = "מחיקת הולוגרמה"
+"hologram.delete.id" = "מזהה ההולוגרמה למחיקה"
+"hologram.addline" = "הוספת שורה לסוף הולוגרמה"
+"hologram.addline.id" = "מזהה ההולוגרמה"
+"hologram.addline.text" = "טקסט השורה; יש לעטוף במירכאות כדי לכלול רווחים"
+"hologram.setline" = "החלפת שורה בהולוגרמה"
+"hologram.setline.id" = "מזהה ההולוגרמה"
+"hologram.setline.line" = "מספר השורה, החל מ-1"
+"hologram.setline.text" = "טקסט השורה; יש לעטוף במירכאות כדי לכלול רווחים"
+"hologram.removeline" = "הסרת שורה מהולוגרמה"
+"hologram.removeline.id" = "מזהה ההולוגרמה"
+"hologram.removeline.line" = "מספר השורה, החל מ-1"
+"hologram.clear" = "הסרת כל השורות מהולוגרמה"
+"hologram.clear.id" = "מזהה ההולוגרמה"
+"hologram.movehere" = "העברת הולוגרמה למיקום שלך"
+"hologram.movehere.id" = "מזהה ההולוגרמה"
+"hologram.move" = "הזזת הולוגרמה במרחקי בלוקים יחסיים"
+"hologram.move.id" = "מזהה ההולוגרמה"
+"hologram.move.x" = "היסט X יחסי בבלוקים"
+"hologram.move.y" = "היסט Y יחסי בבלוקים"
+"hologram.move.z" = "היסט Z יחסי בבלוקים"
+"hologram.tp" = "השתגרות אל הולוגרמה"
+"hologram.tp.id" = "מזהה ההולוגרמה"
+"hologram.list" = "הצגת רשימת ההולוגרמות; לחצו על אחת כדי להשתגר"
+"hologram.info" = "הצגת המיקום והשורות של הולוגרמה"
+"hologram.info.id" = "מזהה ההולוגרמה"
+"hologram.rendertext" = "יצירת הולוגרמת טקסט עם שינוי גודל מובנה"
+"hologram.rendertext.id" = "מזהה הולוגרמה ייחודי"
+"hologram.rendertext.text" = "הטקסט להצגה; יש לעטוף במירכאות כדי לכלול רווחים"
+"hologram.rendertext.scale" = "מכפיל הגודל של TextDisplay"
+"hologram.orient" = "הגדרת האופן שבו הולוגרמה מסתובבת אל הצופים"
+"hologram.orient.id" = "מזהה ההולוגרמה"
+"hologram.orient.billboard" = "CENTER, VERTICAL, HORIZONTAL או FIXED"
+"hologram.orient.yaw" = "זווית סיבוב (yaw) במעלות, בין -180 ל-180"
+"hologram.orient.pitch" = "זווית הטיה (pitch) במעלות, בין -90 ל-90"
+board = "יצירה וניהול של לוחות תוצאות"
+"board.create" = "יצירת לוח תוצאות"
+"board.create.id" = "מזהה לוח ייחודי"
+"board.delete" = "מחיקת לוח תוצאות"
+"board.delete.id" = "מזהה הלוח למחיקה"
+"board.title" = "הגדרת כותרת ללוח תוצאות"
+"board.title.id" = "מזהה הלוח"
+"board.title.text" = "טקסט הכותרת; יש לעטוף במירכאות כדי לכלול רווחים"
+"board.addline" = "הוספת שורה לסוף לוח תוצאות"
+"board.addline.id" = "מזהה הלוח"
+"board.addline.text" = "טקסט השורה; יש לעטוף במירכאות כדי לכלול רווחים"
+"board.setline" = "החלפת שורה בלוח תוצאות"
+"board.setline.id" = "מזהה הלוח"
+"board.setline.line" = "מספר השורה, החל מ-1"
+"board.setline.text" = "טקסט השורה; יש לעטוף במירכאות כדי לכלול רווחים"
+"board.removeline" = "הסרת שורה מלוח תוצאות"
+"board.removeline.id" = "מזהה הלוח"
+"board.removeline.line" = "מספר השורה, החל מ-1"
+"board.show" = "הצגת לוח תוצאות לעצמך"
+"board.show.id" = "מזהה הלוח"
+"board.hide" = "הסתרת לוח התוצאות שלך"
+"board.select" = "הגדרת בחירה אוטומטית של לוח תוצאות"
+"board.select.id" = "מזהה לוח התוצאות"
+"board.select.priority" = "עדיפות הבחירה"
+"board.select.when" = "תנאי בוליאני; יש להקיף במירכאות ביטויים המכילים רווחים"
+"board.list" = "הצגת רשימת לוחות התוצאות"
+"board.info" = "הצגת הכותרת, השורות וההגדרות של לוח תוצאות"
+"board.info.id" = "מזהה הלוח"
+"board.reset" = "שחזור ברירות המחדל המובנות של לוחות התוצאות"
+emoji = "כלי אימוג'י לצ'אט"
+"emoji.list" = "הצגת האימוג'ים המופעלים; לחצו על אחד כדי להוסיף אותו לצ'אט"
+"emoji.reset" = "שחזור ברירות המחדל המובנות של האימוג'ים"
+animations = "כלי אנימציות"
+"animations.list" = "הצגת שמות האנימציות"
+"animations.reset" = "שחזור ברירות המחדל המובנות של האנימציות"
+bubbles = "סגנונות בועות צ'אט"
+"bubbles.style" = "בחירת סגנון בועת הצ'אט שלך, או clear לבחירה אוטומטית"
+"bubbles.style.style" = "מזהה הסגנון, או clear"
+"bubbles.reset" = "שחזור ברירות המחדל המובנות של סגנונות הבועות"
+tablist = "כלי רשימת הטאב"
+"tablist.reset" = "שחזור מסמך רשימת הטאב המובנה"
+motd = "כלי MOTD"
+"motd.reset" = "שחזור מסמך ה-MOTD המובנה"
+drops = "כלים להצגת פריטים מושלכים"
+"drops.reset" = "שחזור מסמך הגדרות הפריטים המושלכים המובנה"
+indicators = "כלים למחווני נזק וריפוי"
+"indicators.reset" = "שחזור מסמך מחווני הנזק המובנה"
+status = "הצגת ספירות זמן ריצה תמציתיות"
+import = "העברת הולוגרמות מדור קודם בלי לשנות את קובצי המקור"
+"import.apply" = "החלת העברת הולוגרמות מדור קודם ללא דריסה"
+"import.holoui" = "העתקת נתוני HoloUi מתוך plugins/holoui, תוך דריסת ייבואים קודמים"
+"import.legacy" = "העברת קובצי נתונים של Gloss מלפני המיזוג למעטפות v2"
+"import.preview" = "תצוגה מקדימה של העברת הולוגרמות מדור קודם שאינה הרסנית"
+item = "כלי ספקי פריטים מותאמים אישית"
+"item.export" = "ייצוא קטלוג הפריטים המותאמים אישית עבור העורך המקוון"
+"item.status" = "הצגת ספקי הפריטים המותאמים אישית הפעילים"
+menu = "יצירה, פתיחה ועריכה של תפריטי הולוגרמה"
+"menu.addrow" = "הוספת שורת קישוט טקסט לסוף"
+"menu.back" = "פתיחה מחדש של הפעלת התפריט הקודמת"
+"menu.close" = "סגירת הפעלת התפריט הנוכחית"
+"menu.copy" = "העתקת תפריט טעון למזהה מקונן חדש"
+"menu.create" = "יצירת הולוגרמה קבועה במיקום הנוכחי שלך"
+"menu.image" = "החלפת תוכן התפריט בקובץ תמונה אחד ממורכז"
+"menu.insertrow" = "הכנסת שורת קישוט טקסט"
+"menu.list" = "הצגת כל התפריטים המוגדרים שניתן לפתוח"
+"menu.move" = "העברת התפריט הפתוח למיקום הנוכחי שלך"
+"menu.new" = "יצירת תפריט הולוגרמה ריק מקו הבסיס המובנה"
+"menu.offsetrow" = "הזזת שורה בהיסטים מוחלטים או ~יחסיים"
+"menu.open" = "פתיחת תפריט לפי מזהה, או הצגת רשימת התפריטים כאשר מוגדר *"
+"menu.removerow" = "הסרת שורת רכיב"
+"menu.seticon" = "החלפת אייקון של שורת כפתור או קישוט"
+"menu.setrow" = "הגדרת הטקסט של שורת כפתור או קישוט"
+"menu.style" = "הגדרה או איפוס של מאפיין סגנון תצוגה אחד של שורה"
+panel = "כלי פאנלים קבועים בעולם"
+"panel.addrow" = "הוספת שורת טקסט לסוף תפריט השורש של פאנל"
+"panel.align" = "יישור צירי המיקום של פאנל לפאנל אחר"
+"panel.cancel" = "ביטול עריכת הפאנל הממתינה שלך"
+"panel.copy" = "העתקת פאנל קבוע תחת מזהה חדש"
+"panel.create" = "יצירת פאנל במיקום הנוכחי שלך"
+"panel.delete" = "מחיקת פאנל קבוע"
+"panel.edit" = "התחלת הפעלת עריכה ממתינה של פאנל"
+"panel.follow" = "מעקב אחרי שחקן מחובר עם סיבוב fixed, yaw או full"
+"panel.here" = "העברת פאנל למיקום הנוכחי שלך"
+"panel.image" = "החלפת תפריט השורש של הפאנל בקובץ תמונה אחד ממורכז"
+"panel.info" = "הצגת המצב המלא של פאנל אחד"
+"panel.insertrow" = "הכנסת שורת טקסט לתפריט השורש של פאנל"
+"panel.list" = "הצגת רשימת הפאנלים הקבועים לפי עמוד"
+"panel.menu" = "הגדרת תפריט השורש של פאנל"
+"panel.move" = "העברת פאנל לקואורדינטות מוחלטות או ~יחסיות"
+"panel.near" = "הצגת פאנלים ליד המיקום הנוכחי שלך"
+"panel.offsetrow" = "הזזת שורה בתפריט השורש של פאנל בהיסטים מוחלטים או ~יחסיים"
+"panel.permissions" = "שינוי הרשאות הצפייה והאינטראקציה של פאנל"
+"panel.ranges" = "הגדרת טווחי הצפייה והאינטראקציה של פאנל"
+"panel.removerow" = "הסרת שורה מתפריט השורש של פאנל"
+"panel.rename" = "שינוי שם של פאנל קבוע"
+"panel.rotate" = "הגדרת yaw, pitch ו-roll מוחלטים או ~יחסיים"
+"panel.save" = "שמירת עריכת הפאנל הממתינה שלך"
+"panel.scale" = "הגדרת קנה מידה מוחלט או ~יחסי לפאנל"
+"panel.seticon" = "החלפת אייקון שורה בתפריט השורש של הפאנל"
+"panel.setrow" = "הגדרת טקסט על שורה בתפריט השורש של פאנל"
+"panel.style" = "הגדרה או איפוס של מאפיין סגנון תצוגה אחד של שורה"
+"panel.teleport" = "השתגרות אל פאנל קבוע"
+"panel.unfollow" = "הפסקת מעקב של פאנל אחרי שחקן"
+"panel.visibility" = "הגדרת מצב נראות וצמתי הרשאה"
+preview = "כלי מסמכי תצוגה מקדימה"
+"preview.dump" = "בניית מסמך תצוגה מקדימה פעם אחת והדפסת ספירות הרכיבים שלו"
+"preview.list" = "הצגת מסמכי התצוגה המקדימה וכללי ההתאמה שלהם"
+"preview.reset" = "שחזור ברירות המחדל המובנות של התצוגה המקדימה (לא מסיר מסמכי משתמש נוספים שעלולים להאפיל עליהן)"
+web = "פתיחה וניהול של עורך האינטרנט של Gloss"
+"web.open" = "פתיחת עורך Gloss מקוון ריק"
+"web.edit" = "פתיחת מסמך Gloss אחד בסנכרון חי"
+"web.edit.document" = "פתיחת המסמך החי הזה בעורך האינטרנט"
+"web.workspace" = "פתיחת כל סביבת העבודה החיה של Gloss"
+"web.sessions" = "ניהול הפעלות פעילות של עורך האינטרנט"
+"web.sessions.list" = "הצגת הפעלות פעילות של עורך האינטרנט"
+"web.sessions.pull" = "בדיקת עדכונים של הפעלת עורך אינטרנט כעת"
+"web.sessions.revoke" = "ביטול הרשאת גישה לעורך האינטרנט"
+"web.sessions.status" = "הצגת הפעלה אחת של עורך האינטרנט"
+language = "בחירת השפה שלך או שפת ברירת המחדל של השרת"
+
+[command.help.arg]
+reset_name = "השם לאיפוס, או * לכל ברירות המחדל המובנות"
+panel_axes = "צירים: x, y, z, xy, xz, yz או xyz"
+panel_follow_rotation = "סיבוב מעקב: fixed, yaw או full"
+panel_id = "מזהה פאנל קבוע"
+panel_interact_permission = "הרשאת אינטראקציה, או -"
+panel_interaction_range = "טווח אינטראקציה חיובי"
+panel_menu = "מזהה תפריט השורש; ברירת המחדל היא מזהה הפאנל"
+panel_new_id = "מזהה פאנל קבוע חדש"
+panel_pitch = "pitch מוחלט או ~יחסי"
+panel_player = "שחקן יעד מחובר"
+panel_radius = "רדיוס חיפוש אופקי"
+panel_reference = "מזהה פאנל הייחוס"
+panel_roll = "roll מוחלט או ~יחסי"
+panel_root_menu = "מזהה תפריט השורש"
+panel_scale = "קנה מידה מוחלט או ~יחסי"
+panel_view_permission = "הרשאת צפייה, או -"
+panel_view_range = "טווח צפייה חיובי"
+panel_visibility = "מצב נראות: public, permission או hidden"
+panel_x = "X מוחלט או ~יחסי"
+panel_y = "Y מוחלט או ~יחסי"
+panel_yaw = "yaw מוחלט או ~יחסי"
+panel_z = "Z מוחלט או ~יחסי"
+content_menu = "מזהה תפריט טעון"
+web_subject = "מזהה מסמך Gloss בסנכרון חי"
+hologram_id = "המזהה של ההולוגרמה החדשה ושל תפריט השורש"
+hologram_text = "טקסט MiniMessage אופציונלי"
+image_path = "קובץ בתוך תיקיית התמונות של Gloss"
+import_source = "מקור הולוגרמות מדור קודם"
+menu = "מזהה התפריט לפתיחה (* מציג את כל התפריטים)"
+new_panel_id = "מזהה פאנל קבוע חדש"
+new_menu = "מזהה תפריט מקונן חדש"
+list_page = "עמוד הרשימה, החל מ-1"
+previews_dump_name = "שם המסמך לבנייה"
+previews_name = "שם המסמך לאיפוס, או * לכל המסמכים המובנים"
+row_icon_type = "סוג האייקון"
+row_icon_value = "תוכן האייקון או מזהה רישום"
+row_index = "שורת הרכיב, החל מ-1"
+row_style_property = "מאפיין סגנון תצוגה"
+row_style_value = "ערך הסגנון, או * לאיפוס"
+row_text = "טקסט שורה בפורמט MiniMessage"
+row_x = "X של השורה, מוחלט או ~יחסי"
+row_y = "Y של השורה, מוחלט או ~יחסי"
+row_z = "Z של השורה, מוחלט או ~יחסי"
+source_menu = "מזהה תפריט המקור הטעון"
+web_session = "מזהה הפעלה של עורך האינטרנט"
+
+[command.error]
+no_permission = "&8[&dGloss&8] &cאין לך הרשאה."
+no_permission_use = "&8[&dGloss&8] &cאין לך הרשאה להשתמש בפקודה הזו."
+usage = "&7שימוש: &f/{command} help"
+
+[command.hologram]
+exists = "&8[&dGloss&8] &cההולוגרמה '&f{id}&c' כבר קיימת."
+missing = "&8[&dGloss&8] &cאין הולוגרמה בשם '&f{id}&c'."
+created = "&8[&dGloss&8] &aההולוגרמה &f{id}&a נוצרה."
+deleted = "&8[&dGloss&8] &aההולוגרמה &f{id}&a נמחקה."
+line_added = "&8[&dGloss&8] &aהשורה &f{line}&a נוספה אל &f{id}&a."
+line_set = "&8[&dGloss&8] &aהשורה &f{line}&a הוגדרה ב-&f{id}&a."
+line_removed = "&8[&dGloss&8] &aהשורה &f{line}&a הוסרה מ-&f{id}&a."
+line_out_of_range = "&8[&dGloss&8] &cהשורה {line} מחוץ לטווח; ל-&f{id}&c יש {count} שורות."
+cleared = "&8[&dGloss&8] &aכל השורות ב-&f{id}&a נוקו."
+moved = "&8[&dGloss&8] &aההולוגרמה &f{id}&a הועברה למיקום שלך."
+offset = "&8[&dGloss&8] &aההולוגרמה &f{id}&a הוזזה ב-&f{x}&a, &f{y}&a, &f{z}&a."
+teleported = "&8[&dGloss&8] &aהשתגרת אל &f{id}&a."
+list_empty = "&8[&dGloss&8] &7עדיין אין הולוגרמות."
+rendered = "&8[&dGloss&8] &aהולוגרמת הטקסט &f{id}&a נוצרה בגודל &f{scale}&a."
+text_empty = "&8[&dGloss&8] &cהטקסט לא יכול להיות ריק."
+scale_out_of_range = "&8[&dGloss&8] &cהגודל {value} מחוץ לטווח; עליו להיות בין &f{minimum}&c ל-&f{maximum}&c."
+oriented = "&8[&dGloss&8] &aההולוגרמה &f{id}&a הוגדרה ל-billboard &f{billboard}&a, yaw &f{yaw}&a, pitch &f{pitch}&a."
+billboard_unknown = "&8[&dGloss&8] &cערך billboard לא מוכר '&f{billboard}&c'. השתמש באחד מהערכים &f{options}&c."
+angle_out_of_range = "&8[&dGloss&8] &cהערך {axis} {value} מחוץ לטווח; עליו להיות בין &f-{limit}&c ל-&f{limit}&c מעלות."
+
+[command.hologram.list]
+hover = "לחצו כדי להשתגר"
+lines = "{count} שורות"
+
+[command.hologram.info]
+header = "&8[&dGloss&8] &d{id} &7ב-&f{world} {x}, {y}, {z}"
+line = " &8{line}. &f{text}"
+orientation = " &8גודל &f{scale} &8billboard &f{billboard} &8yaw &f{yaw} &8pitch &f{pitch}"
+
+[command.board]
+exists = "&8[&dGloss&8] &cהלוח '&f{id}&c' כבר קיים."
+missing = "&8[&dGloss&8] &cאין לוח בשם '&f{id}&c'."
+created = "&8[&dGloss&8] &aהלוח &f{id}&a נוצר."
+deleted = "&8[&dGloss&8] &aהלוח &f{id}&a נמחק."
+title_set = "&8[&dGloss&8] &aהכותרת של &f{id}&a הוגדרה."
+line_added = "&8[&dGloss&8] &aהשורה &f{line}&a נוספה אל &f{id}&a."
+line_set = "&8[&dGloss&8] &aהשורה &f{line}&a הוגדרה ב-&f{id}&a."
+line_removed = "&8[&dGloss&8] &aהשורה &f{line}&a הוסרה מ-&f{id}&a."
+line_out_of_range = "&8[&dGloss&8] &cהשורה {line} מחוץ לטווח; ל-&f{id}&c יש {count} שורות."
+shown = "&8[&dGloss&8] &aהלוח &f{id}&a מוצג כעת."
+hidden = "&8[&dGloss&8] &aלוח התוצאות שלך מוסתר."
+select_set = "&8[&dGloss&8] &aעדיפות הבחירה של לוח התוצאות &f{id}&a הוגדרה ל־&f{priority}&a."
+select_invalid = "&8[&dGloss&8] &cתנאי לא תקין של לוח התוצאות: &f{error}&c."
+list_empty = "&8[&dGloss&8] &7עדיין אין לוחות."
+
+[command.board.list]
+hover = "לחצו לפרטים"
+
+[command.board.info]
+header = "&8[&dGloss&8] &d{id} &7עם הכותרת &f{title}"
+meta = "&7עדיפות: &f{priority}&7 | תנאי: &f{when}&7 | גרסאות: &f{variants}&7"
+line = " &8{line}. &f{text}"
+
+[command.emoji]
+empty = "&8[&dGloss&8] &7אין אימוג'ים מופעלים."
+hover = "לחצו כדי להוסיף לצ'אט"
+
+[command.animations]
+empty = "&8[&dGloss&8] &7אין אנימציות טעונות."
+header = "&8[&dGloss&8] &fאנימציות: &d{count}"
+entry = "&8- &d{name}"
+
+[command.list]
+page = "&7עמוד &f{page}&7/&f{pages} &8- &7מציג &f{from}&7-&f{to} &7מתוך &f{total}"
+next = "&7העמוד הבא: &f{command}"
+
+[command.status]
+holograms = "&7הולוגרמות: &f{count} &8({temporary} זמניות, {entities} ישויות)"
+boards = "&7לוחות: &f{count}"
+emoji = "&7אימוג'ים: &f{enabled}&8/&f{total}"
+animations = "&7אנימציות: &f{count}"
+effects = "&7בועות: &f{bubbles} &8| &7מחוונים: &f{indicators} &8| &7דרופים: &f{drops}"
+
+[command.reset]
+done = "&8[&dGloss&8] &aשוחזרו &f{count}&a ברירות מחדל מובנות של {kind}."
+none = "&8[&dGloss&8] &cאין ברירות מחדל מובנות של {kind} התואמות ל-'&f{name}&c'."
+
+[command.bubbles]
+style_set = "&8[&dGloss&8] &aסגנון בועת הצ'אט הוגדר ל-&f{style}&a."
+style_cleared = "&8[&dGloss&8] &aסגנון בועת הצ'אט אופס; הבחירה האוטומטית חלה."
+style_unknown = "&8[&dGloss&8] &cאין סגנון בועה בשם '&f{style}&c'."
+
+[command.import]
+config_unreadable = "&8[&dGloss&8] &cלא ניתן לטעון את gloss.toml: &f{reason}"
+
+[command.import.holoui]
+missing = "&8[&dGloss&8] &cלא נמצאה תיקיית נתונים של holoui לצד תיקיית הנתונים של Gloss."
+done = "&8[&dGloss&8] &aייבוא HoloUi הסתיים: &f{copied}&a הועתקו, &f{skipped}&a דולגו, &f{overlaid}&a מפתחות תצורה, &f{errors}&a שגיאות."
+
+[command.import.legacy]
+done = "&8[&dGloss&8] &aההעברה מדור קודם הסתיימה: &f{migrated}&a הועברו, &f{absorbed}&a נקלטו, &f{overlaid}&a מפתחות תצורה, &f{errors}&a שגיאות."
+
+[director.help]
+no_subcommands = "אין פקודות משנה בעמוד זה."
+no_description = "לא סופק תיאור"
+command_group = "קבוצת פקודות. לחצו כדי לפתוח."
+category = "קטגוריית פקודות"
+no_parameters = "אין פרמטרים. לחצו כדי למלא את הפקודה מראש."
+parameters_hover = "רחפו מעל הפרמטרים כדי ללמוד עוד."
+
+[director.help.navigation]
+back = "חזרה"
+page = "עמוד"
+
+[director.help.navigation.parent]
+hover = "חזרה לקבוצת פקודות האב"
+
+[director.help.navigation.previous]
+hover = "העמוד הקודם"
+
+[director.help.navigation.next]
+hover = "העמוד הבא"
+
+[director.help.parameter]
+required = "פרמטר זה הוא חובה."
+optional = "פרמטר זה הוא אופציונלי."
+default = "ברירת המחדל היא \"{value}\" אם לא הוגדר."
+type = "פרמטר זה הוא מסוג {type}."
+
+[director.runtime]
+usage = "שימוש: {usage}"
+
+[director.runtime.error]
+invalid_origin = "לא ניתן להריץ פקודה זו ממקור זה."
+unknown_parameter = "מפתח פרמטר לא ידוע: {key}"
+unexpected_argument = "ארגומנט לא צפוי \"{argument}\". פרמטרים אופציונליים חייבים להינתן עם מפתח, לדוגמה seed=123"
+unclosed_group = "חסר סוגר \"]\" עבור הפרמטר {key}"
+conversion_failed = "לא ניתן להמיר את \"{value}\" ל-{type} עבור {parameter}"
+default_parse_failed = "לא ניתן לנתח את ערך ברירת המחדל של הפרמטר {parameter}"
+missing_argument = "חסר ארגומנט \"{parameter}\" ({type})"
+execution_failed = "הפעלת הפקודה {command} נכשלה: {reason}"
+
+[gloss.error]
+menu_name_required = "שם התפריט לא יכול להיות ריק"
+hologram_id_required = "מזהה ההולוגרמה אינו יכול להיות ריק"
+panel_id_required = "מזהה הלוח אינו יכול להיות ריק"
+web_subject_required = "מזהה המסמך בעורך האינטרנט אינו יכול להיות ריק"
+web_session_required = "מזהה ההפעלה של עורך האינטרנט אינו יכול להיות ריק"
+panel_player_required = "יש לציין שחקן יעד"
+row_icon_type_required = "יש לציין סוג סמל"
+row_style_property_required = "יש לציין מאפיין עיצוב"
+import_source_required = "יש לציין מקור לייבוא הנתונים הישנים"
+import_source_unknown = "מקור לא מוכר לייבוא נתונים ישנים: {source}"
+
+[gloss.message]
+permission_denied = "&8[&dGloss&8]: &cאין לך את ההרשאה &f{permission}&c."
+unknown_command = "&8[&dGloss&8]: &cפקודה לא ידועה \"&f{command}&c\"."
+
+[gloss.message.hologram]
+created = "&8[&dGloss&8]: &aההולוגרמה &f{hologram}&a נוצרה במיקום שלך עם תפריט השורש &f{menu}&a."
+already_exists = "&8[&dGloss&8]: &cכבר יש הולוגרמה, פאנל או תפריט בשם &f{hologram}&c."
+failed = "&8[&dGloss&8]: &cלא ניתן ליצור את ההולוגרמה &f{hologram}&c. אף שינוי לא נשמר."
+durability_uncertain = "&8[&dGloss&8]: &eלא ניתן היה להשלים בבטחה את תהליך היצירה של ההולוגרמה &f{hologram}&e. יש להפעיל מחדש את Gloss לפני שבודקים אותה או מנסים ליצור אותה שוב."
+
+[gloss.message.menu]
+none = "&8[&dGloss&8]: &7אין תפריטים זמינים."
+player_only = "&8[&dGloss&8]: &cרק שחקנים יכולים לפתוח תפריטים."
+no_previous = "&8[&dGloss&8]: &cאין תפריט קודם זמין."
+closed = "&8[&dGloss&8]: &aהתפריט נסגר."
+moved = "&8[&dGloss&8]: &aהתפריט הועבר."
+none_open = "&8[&dGloss&8]: &cאין תפריט פתוח כעת."
+unavailable = "&8[&dGloss&8]: &c\"{menu}\" אינו זמין."
+permission_denied = "&8[&dGloss&8]: &cאין לך הרשאה לפתוח את \"{menu}\"."
+open_failed = "&8[&dGloss&8]: &cפתיחת התפריט \"{menu}\" נכשלה."
+
+[gloss.message.menu.list]
+header = "תפריטים"
+entry = "לחצו כדי לפתוח את {menu}."
+
+[gloss.message.menu.content]
+updated = "&8[&dGloss&8]: &aהפעולה {operation} הוחלה על התפריט &f{menu}&a בגרסה {revision}."
+created = "&8[&dGloss&8]: &aהתפריט &f{menu}&a נוצר בגרסה {revision}. לפתיחה: /gloss menu open {menu}, ולהצבה: /gloss panel create {menu}."
+copied = "&8[&dGloss&8]: &aהתפריט &f{source}&a הועתק אל &f{menu}&a בגרסה {revision}."
+revision_conflict = "&8[&dGloss&8]: &cהתפריט &f{menu}&c השתנה במהלך הכתיבה (הגרסה הצפויה: {expected}, הנוכחית: {actual}). יש להפעיל את הפקודה שוב."
+already_exists = "&8[&dGloss&8]: &cהתפריט &f{menu}&c כבר קיים."
+invalid = "&8[&dGloss&8]: &cערך לא תקין בתוכן התפריט: &f{reason}&c."
+failed = "&8[&dGloss&8]: &cהפעולה בתוכן התפריט &f{menu}&c נכשלה: {reason}"
+
+[gloss.message.command]
+player_only = "&8[&dGloss&8]: &cפקודה זו זמינה רק לשחקנים."
+
+[gloss.message.web]
+header = "עורך אינטרנט"
+open_hover = "לחצו כדי לפתוח את עורך האינטרנט של Gloss."
+open = "&8[&dGloss&8]: &7עורך האינטרנט: &f{url}&7"
+preparing = "&8[&dGloss&8]: &7מתבצעת הכנה של הפעלת סנכרון מאובטחת לעורך עבור &f{subject}&7..."
+unavailable = "&8[&dGloss&8]: &cעריכה חיה באינטרנט אינה זמינה. יש לבדוק את הגדרות סנכרון העורך ואת החיבור לשרת הממסר."
+open_failed = "&8[&dGloss&8]: &cלא ניתן לפתוח את &f{kind}&c=&f{subject}&c בעורך האינטרנט החי: {reason}"
+open_console = "&8[&dGloss&8]: &7קישור עם הרשאת עריכה עבור &f{subject}&7: &f{url}&7"
+capability_warning = "&8[&dGloss&8]: &eכתובת זו מאפשרת לפרסם שינויים בשרת עד לביטול ההרשאה או לתפוגתה. יש לשמור אותה בסוד."
+open_label = "פתיחת העורך"
+copy_label = "העתקת קישור"
+revoke_label = "ביטול הרשאה"
+link_hover = "פתחו את העורך, העתיקו את קישור ההרשאה שלו או בטלו את ההפעלה {session}."
+
+[gloss.message.web.sessions]
+list_empty = "&8[&dGloss&8]: &7אין הפעלות סנכרון פעילות של העורך."
+status = "&8[&dGloss&8]: &7&f{session}&7 {kind}=&f{subject}&7 תפוגה בעוד=&f{seconds}&7 שניות גרסה שפורסמה=&f{revision}&7 בהמתנה=&f{pending}&7"
+revoked = "&8[&dGloss&8]: &aבוטלה הרשאת הפעלת סנכרון העורך &f{session}&a."
+pulled = "&8[&dGloss&8]: &aבוצעה בדיקת עדכונים עבור הפעלת סנכרון העורך &f{session}&a."
+unknown = "&8[&dGloss&8]: &cהפעלת סנכרון העורך &f{session}&c אינה מוכרת או שפג תוקפה."
+failed = "&8[&dGloss&8]: &cפעולת סנכרון העורך עבור &f{session}&c נכשלה: {reason}"
+
+[gloss.message.import]
+preview_started = "&8[&dGloss&8]: &7מתבצעת סריקה של &f{source}&7 לתצוגה מקדימה של ההעברה ללא שינוי הנתונים..."
+apply_started = "&8[&dGloss&8]: &7מתבצעות סריקה והעברה מ־&f{source}&7 ללא דריסת נתונים קיימים..."
+source_missing = "&8[&dGloss&8]: &7לא נמצא מקור &f{source}&7 בנתיב &f{path}&7."
+preview_summary = "&8[&dGloss&8]: &7תצוגה מקדימה של &f{source}&7: מוכנים &a{ready}&7, ניתנים להמשך &d{resume}&7, התנגשויות &e{conflicts}&7, שגיאות &c{errors}&7, אזהרות {warnings}. מקור: &f{path}&7"
+preview_entry = "&8- &7&f{legacy}&7 -> &f{board}&7 מצב=&f{state}&7 אזהרות=&f{warnings}&7"
+apply_summary = "&8[&dGloss&8]: &7העברה מ־&f{source}&7: יובאו &a{imported}&7, דולגו &e{skipped}&7, נכשלו &c{failed}&7; הסריקה דיווחה על {errors} שגיאות ועל {warnings} אזהרות."
+apply_entry = "&8- &7&f{legacy}&7 מצב=&f{state}&7 סיבה=&f{reason}&7"
+issue = "&8- &f{legacy} &7{severity}: &f{reason}"
+busy = "&8[&dGloss&8]: &cהעברה אחרת של הולוגרמות ישנות כבר מתבצעת."
+failed = "&8[&dGloss&8]: &cהעברת ההולוגרמות הישנות מ־&f{source}&c נכשלה: {reason}"
+
+[gloss.message.config]
+reloaded = "&2התצורה \"{name}\" נטענה מחדש."
+
+[gloss.message.hotload]
+singular = "&2נטענו מחדש {kinds} ({count} שינוי)."
+plural = "&2נטענו מחדש {kinds} ({count} שינויים)."
+
+[gloss.message.preview_scale]
+adjusting = "&7גודל תצוגה מקדימה: &f{percent}% &8- &7החזיקו התגנבות + גללו לשינוי; הקישו פעמיים על התגנבות לשמירה"
+hidden = "&7התצוגה המקדימה &cמוסתרת &8- &7גללו למעלה כדי לשחזר"
+size = "&7גודל תצוגה מקדימה: &f{percent}%"
+saved_hidden = "&7התצוגה המקדימה נשמרה כ-&cמוסתרת &8- &7הקישו פעמיים על התגנבות + גללו למעלה מעל כלי קיבול כדי לשחזר"
+saved = "&7גודל התצוגה המקדימה נשמר: &f{percent}%"
+
+[gloss.message.drops]
+bundle_more = "+{count} נוספים"
+
+[gloss.message.items]
+disabled = "&8[&dGloss&8]: &7פריטים מותאמים אישית מושבתים. יש להגדיר customItems לערך true בקובץ gloss.toml."
+
+[gloss.message.items.status]
+header = "פריטים מותאמים אישית"
+summary = "{active}/{total} ספקים פעילים"
+entry = "הספק {provider} מהתוסף {plugin}."
+hint = "לחצו כדי לייצא את הקטלוג לעורך האינטרנט."
+
+[gloss.message.items.state]
+ready = "מוכן, {count} מזהים"
+loading = "קיים, עדיין בטעינה"
+inactive = "קיים, ללא מתאם"
+missing = "לא מותקן"
+
+[gloss.message.items.export]
+started = "&8[&dGloss&8]: &7מתבצע ייצוא של קטלוג הפריטים המותאמים אישית..."
+done = "&8[&dGloss&8]: &aנכתבו {count} פריטים מ־{providers} ספקים אל &f{path}&a."
+empty = "&8[&dGloss&8]: &7לא נמצאו פריטים מותאמים אישית. קטלוג ריק נכתב אל &f{path}&7."
+failed = "&8[&dGloss&8]: &cכתיבת קטלוג הפריטים המותאמים אישית נכשלה. יש לבדוק את היומנים."
+busy = "&8[&dGloss&8]: &cייצוא קטלוג כבר מתבצע."
+
+[gloss.message.previews.list]
+header = "מסמכי תצוגה מקדימה"
+empty = "&7לא נטענו מסמכי תצוגה מקדימה."
+entry = "בלוקים={blocks} ישויות={entities} רכיבים מיוחדים={special} עדיפות={priority}"
+
+[gloss.message.previews.reset]
+started = "&8[&dGloss&8]: &7מתבצע איפוס של מסמכי התצוגה המקדימה \"&f{name}&7\"..."
+done = "&8[&dGloss&8]: &aשוחזרו {count} מסמכי תצוגה מקדימה המצורפים לתוסף. מסמכי משתמש נוספים שמחליפים אותם בתצוגה לא הוסרו."
+none = "&8[&dGloss&8]: &c\"{name}\" אינו מסמך תצוגה מקדימה המצורף לתוסף; דבר לא אופס."
+
+[gloss.message.previews.dump]
+unknown = "&8[&dGloss&8]: &c\"{name}\" אינו מסמך תצוגה מקדימה שנטען."
+result = "&8[&dGloss&8]: &7&a{name}&7: &f{total}&7 רכיבים (לוחות={panels}, תאים={cells}, משבצות={slots}, תוויות={labels})."
+no_errors = "&8[&dGloss&8]: &aאין שגיאות בנייה."
+error_line = "&8[&dGloss&8]: &c{message}"
+error_more = "&8[&dGloss&8]: &7ועוד {count} (ראו ביומן המסוף)."
+
+[gloss.message.panels]
+created = "&8[&dGloss&8]: &aהלוח &f{board}&a נוצר בגרסה {revision}."
+deleted = "&8[&dGloss&8]: &aהלוח &f{board}&a נמחק."
+renamed = "&8[&dGloss&8]: &aהשם &f{oldBoard}&a שונה ל־&f{board}&a בגרסה {revision}."
+copied = "&8[&dGloss&8]: &a&f{source}&a הועתק אל &f{board}&a."
+updated = "&8[&dGloss&8]: &aהפעולה {operation} הוחלה על &f{board}&a בגרסה {revision}."
+teleported = "&8[&dGloss&8]: &aבוצע שיגור אל &f{board}&a."
+unknown = "&8[&dGloss&8]: &cלוח לא מוכר: &f{board}&c."
+already_exists = "&8[&dGloss&8]: &cהלוח &f{board}&c כבר קיים."
+invalid = "&8[&dGloss&8]: &cערך לא תקין בלוח: &f{reason}&c."
+menu_unavailable = "&8[&dGloss&8]: &cתפריט השורש &f{menu}&c לא נטען."
+player_unavailable = "&8[&dGloss&8]: &cשחקן היעד &f{player}&c אינו מחובר."
+world_unavailable = "&8[&dGloss&8]: &cהעולם &f{world}&c של הלוח לא נטען עם ה־UUID השמור."
+revision_conflict = "&8[&dGloss&8]: &cהלוח &f{board}&c השתנה בזמן העריכה (הגרסה הצפויה: {expected}, הנוכחית: {actual}). יש לפתוח מחדש את הפעלת העריכה."
+failed = "&8[&dGloss&8]: &cהפעולה בלוח &f{board}&c נכשלה: {reason}"
+
+[gloss.message.panels.list]
+header = "&8[&dGloss&8]: &fלוחות הנשמרים בקביעות: &d{count}&f"
+empty = "&8[&dGloss&8]: &7לא נטענו לוחות הנשמרים בקביעות."
+entry = "&8- &7&f{board}&7 תפריט=&f{menu}&7 גרסה=&f{revision}&7"
+
+[gloss.message.panels.near]
+header = "&8[&dGloss&8]: &fלוחות ברדיוס של &d{radius}&f בלוקים: &d{count}&f"
+empty = "&8[&dGloss&8]: &7אין לוחות ברדיוס הזה."
+entry = "&8- &7&f{board}&7 מרחק=&f{distance}&7 תפריט=&f{menu}&7"
+
+[gloss.message.panels.info]
+header = "&8[&dGloss&8]: &fלוח &d{board}&f (&7{state}&f)"
+identity = "&7UUID=&f{uuid}&7 גרסה=&f{revision}&7 תפריט=&f{menu}&7"
+transform = "&7עולם=&f{world}&7 מיקום=&f{x}&7, &f{y}&7, &f{z}&7 סיבוב=&f{yaw}&7, &f{pitch}&7, &f{roll}&7 קנה מידה=&f{scale}&7"
+visibility = "&7נראות=&f{mode}&7 הרשאת צפייה=&f{viewPermission}&7 הרשאת אינטראקציה=&f{interactPermission}&7 טווחים=&f{viewRange}&7/&f{interactionRange}&7"
+follow = "&7מעקב=&f{mode}&7 שחקן=&f{player}&7 סיבוב=&f{rotation}&7"
+
+[gloss.message.panels.edit]
+started = "&8[&dGloss&8]: &aהתחילה עריכה של &f{board}&a מגרסה {revision}. השינויים מוחזקים זמנית עד לשמירה."
+already_active = "&8[&dGloss&8]: &cכבר מתבצעת עריכה של &f{board}&c. יש לשמור או לבטל תחילה."
+none = "&8[&dGloss&8]: &cאין לך עריכת לוח המוחזקת זמנית."
+busy = "&8[&dGloss&8]: &cהלוח &f{board}&c נשמר כעת."
+staged = "&8[&dGloss&8]: &aהפעולה {operation} עבור &f{board}&a הוחזקה זמנית. לשמירה קבועה יש להשתמש ב־/gloss panel save."
+saved = "&8[&dGloss&8]: &a&f{board}&a נשמר בגרסה {revision}."
+cancelled = "&8[&dGloss&8]: &aבוטלו השינויים הזמניים של &f{board}&a."
+identity_blocked = "&8[&dGloss&8]: &cיש לשמור או לבטל את העריכה הזמנית של &f{board}&c לפני שינוי שמו או מחיקתו."
+
+[gloss.preview.state]
+idle = "לא פעיל"
+brewing = "רקיחה {percent}%"
+needs_blaze_powder = "נדרשת אבקת להבון"
+waiting = "ממתין"
+no_ingredient = "אין מרכיב"
+empty = "ריק"
+smelting_item = "התכה: {item} {percent}%"
+smelting = "התכה {percent}%"
+blasting_item = "התכה בכבשן: {item} {percent}%"
+blasting = "התכה בכבשן {percent}%"
+smoking_item = "עישון מזון: {item} {percent}%"
+smoking = "עישון מזון {percent}%"
+heating = "מתחמם"
+needs_fuel = "נדרש דלק"
+no_input = "אין קלט"
+surge_suffix = "  +{seconds}s"
+disc_playing = "מתנגן: {disc}"
+disc_loaded = "נטען: {disc}"
+no_disc = "אין דיסק מוזיקה"
+
+[gloss.preview.stat]
+fuel_level = "דלק {fuel}/{maximum}"
+no_fuel = "אין דלק"
+bottles = "בקבוקים {bottles}/{maximum}"
+fuel_seconds = "דלק {seconds}s"
+fuel_ready = "הדלק מוכן"
+xp_gain = "XP +{experience}"
+xp_zero = "XP 0"
+bees_and_honey = "דבורים {bees}/{maximumBees}   דבש {honey}/{maximumHoney}"
+cauldron_empty = "ריק {level}/{maximum}"
+cauldron_level = "מפלס {level}/{maximum}"
+
+[gloss.preview.theme.title]
+chest = "&6&lתיבה"
+trapped_chest = "&c&lתיבה ממולכדת"
+ender_chest = "&5&lתיבת אנדר"
+barrel = "&e&lחבית"
+dispenser = "&7&lזורקן"
+dropper = "&8&lפולטן"
+hopper = "&8&lמשפך"
+furnace = "&6&lתנור"
+smoker = "&e&lמעשן"
+blast_furnace = "&b&lכבשן"
+beehive = "&e&lכוורת"
+bee_nest = "&e&lקן דבורים"
+cauldron = "&7&lקדרה"
+water_cauldron = "&9&lקדרת מים"
+lava_cauldron = "&6&lקדרת לבה"
+powder_snow_cauldron = "&f&lקדירת אבקת שלג"
+jukebox = "&d&lתיבת נגינה"
+brewing_stand = "&d&lעמדת רקיחה"
+chiseled_bookshelf = "&6&lמדף ספרים מפוסל"
+hopper_minecart = "&8&lקרונית עם משפך"
+chest_minecart = "&6&lקרונית עם תיבה"
+mobile = "&7&l{name}"
+shulker = "&l{color} תיבת שולקר"
+copper_chest = "&6&l{name}"
+shelf = "&6&l{name}"
+container = "&6&lמכל"
+
+[language.menu]
+your_language = "השפה שלך"
+reset_your_language = "איפוס השפה שלך"
+server_default = "ברירת המחדל של השרת"
+edit_messages = "עריכת הודעות השפה"
+use_server_default = "שימוש בברירת המחדל של השרת"
+current = "נוכחית: {locale}"
+current_with_personal = "נוכחית: {locale} (שלך: {personal})"
+your_description = "שנה רק את ההודעות שאתה רואה."
+reset_description = "השתמש בשפת ברירת המחדל של השרת."
+server_description = "שנה את שפת ברירת המחדל של השרת."
+edit_description = "פתח את עורך ההודעות לכל שפה."
+select_description = "לחץ כדי לבחור בשפה זו."
+remove_personal_description = "הסר את בחירת השפה האישית שלך."
+no_controls = "אין לך גישה להגדרות שפה."
+command = "פקודה: {command}"
+selected = "נבחר"
+all-volmit-plugins = "כל תוספי Volmit"
+
+[language.error]
+stopping = "בחירת שפה אינה זמינה בזמן שהתוסף מפסיק."
+editor-player-only = "פתח את עורך השפה במשחק."
+no-providers = "אין ספקי שפה זמינים של Volmit."
+numeric-page = "יש להזין מספר עמוד."
+personal-player-only = "יש לבחור העדפות שפה של שחקן במשחק."
+personal-permission = "אין לך רשות לבחור את השפה שלך."
+plugin-personal-permission = "אין לך הרשאה לבחור שפה אישית עבור {plugin}."
+plugin-server-permission = "אין לך הרשאה לשנות את שפת השרת עבור {plugin}."
+server-locale-required = "יש לבחור קוד שפה כגון en_US כשפת ברירת המחדל של השרת."
+unavailable-for-all = "השפה {locale} אינה זמינה לכל התוספים שנבחרו."
+
+[language.usage]
+editor = "שימוש: /{command} language server edit [locale]"
+selection = "שימוש: /{command} language self [locale|reset] or server [locale]"
+volmit-selection = "שימוש: /volmit plugins languages [locale]"
+
+[language.selection]
+preparing = "מכין את השפה {locale} עבור {target}..."
+save-failed = "{plugin}: לא ניתן לשמור את בחירת השפה; יש לבדוק את מסוף השרת."
+english-fallback = "{plugin}: השפה {locale} אינה זמינה; נעשה שימוש באנגלית (en_US)."
+personal-selected = "{plugin}: השפה שלך עכשיו {locale}."
+server-selected = "{plugin}: שפת השרת עכשיו {locale}."
+server-default-selected = "{plugin}: השפה שלך תואמת כעת לשפת ברירת המחדל של השרת."
+
+[language.editor]
+loading = "טוען הודעות עבור {locale}..."
+
+[language.editor.section]
+languages = "שפות"
+search = "חיפוש"
+search-title = "{locale} / חיפוש"
+group-title = "{locale} / {group}"
+
+[language.editor.prompt]
+search = "יש לחפש מפתח הודעה או טקסט. לחזרה, יש להקליד cancel."
+value = "יש להקליד בצ׳אט ערך חדש עבור {key}."
+current = "ערך נוכחי: {value}"
+variables = "משתנים: {variables}"
+guidance = "יש להשתמש ב־\\n לשורה חדשה וב־\\\\ ללוכסן הפוך, או להקליד cancel כדי לחזור."
+
+[language.editor.input]
+expired = "זמן ההזנה בעורך השפה פג."
+too-long = "הקלט יכול להכיל לכל היותר {maximum} תווים."
+unable-to-save = "לא ניתן לשמור: {reason}"
+
+[language.editor.navigation]
+back = "&eחזרה&r"
+close = "&cסגור&r"
+previous-page = "&eהעמוד הקודם&r"
+next-page = "&eדף הבא&r"
+
+[language.editor.search]
+messages = "חיפוש הודעות"
+messages-lore = "לחיצה לחיפוש בכל ההודעות."
+clear = "ניקוי החיפוש"
+
+[language.editor.message]
+current-value = "&7ערך נוכחי:&r"
+variables = "&8{variables}&r"
+edit-plural = "&7לחיצה לעריכת צורת רבים.&r"
+edit-lines = "&7לחיצה לעריכת שורות בודדות.&r"
+edit-chat = "&7לחיצה לעריכה בצ׳אט.&r"
+
+[language.editor.locale]
+open = "&8לחץ לפתוח את השפה.&r"
+
+[language.editor.category]
+message-count = "&7{count} הודעות&r"
+open = "&8לחץ לפתוח קטגוריה זו.&r"
+
+[language.editor.error]
+no-permission = "אין לך הרשאה לערוך את השפות של {plugin}."
+unable-to-edit = "לא ניתן לערוך: {reason}"
+
+[language.editor.saved]
+summary = "{locale} נשמרה. בחירות השפה לא השתנו."
+change = "{key}: הערך ״{before}״ הוחלף ב־״{after}״."
+
+[language.editor.part]
+line = "שורה {line}"
+
+[language.editor.value]
+none = "אין"
+empty = "(ריק)"

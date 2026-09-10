@@ -1,0 +1,828 @@
+# Gloss — ru_RU
+#
+# === Редактирование файла ===
+# plugins/Gloss/languages/ru_RU.toml
+# Этот файл можно редактировать напрямую. Локальные изменения сохраняются; для отсутствующих или неверных записей используется встроенный английский текст.
+# /gloss language server edit ru_RU
+#
+# === Префикс ===
+# Префикс: &8[&dGloss&8] / &8[&dGloss&8]:
+#
+# === Форматирование ===
+# Цвета: &0-&f, &k-&r, &#RRGGBB.
+#
+# === Переменные ===
+# Не меняйте имена переменных и используйте только переменные исходного сообщения.
+#   {absorbed}  Число импортированных записей, объединённых с существующими
+#   {active}  Число активных поставщиков
+#   {actual}  Текущая редакция
+#   {after}  Значение сообщения после изменения
+#   {argument}  Неожиданный аргумент команды
+#   {axis}  Ось координат или вращения
+#   {bees}  Число пчёл в контейнере
+#   {before}  Значение сообщения до изменения
+#   {billboard}  Режим ориентации отображения
+#   {blocks}  Число элементов отображения блоков
+#   {board}  Идентификатор доски или панели
+#   {bottles}  Число бутылок в контейнере
+#   {bubbles}  Число активных облачков чата
+#   {cells}  Число ячеек меню
+#   {color}  Цвет отображения или предмета
+#   {command}  Путь команды
+#   {conflicts}  Число конфликтов импорта
+#   {copied}  Число скопированных записей
+#   {count}  Число подходящих объектов или сообщений
+#   {disc}  Музыкальная пластинка в контейнере
+#   {distance}  Расстояние до цели
+#   {drops}  Число отображаемых выпавших предметов
+#   {enabled}  Состояние включения или число включённых записей
+#   {entities}  Число сущностей
+#   {error}  Ошибка проверки или операции
+#   {errors}  Число ошибок
+#   {expected}  Ожидаемая редакция при сохранении
+#   {experience}  Количество полученного опыта
+#   {failed}  Число неудачных операций
+#   {from}  Исходное значение или начало диапазона
+#   {fuel}  Оставшееся топливо в контейнере
+#   {group}  Категория редактора переводов
+#   {hologram}  Идентификатор голограммы
+#   {honey}  Текущий уровень мёда
+#   {id}  Идентификатор объекта
+#   {imported}  Число импортированных записей
+#   {indicators}  Число индикаторов урона
+#   {interactPermission}  Разрешение для взаимодействия
+#   {interactionRange}  Максимальная дальность взаимодействия
+#   {item}  Название или материал предмета
+#   {key}  Ключ сообщения или настройки
+#   {kind}  Тип объекта или поставщика
+#   {kinds}  Доступные типы объектов или поставщиков
+#   {labels}  Число текстовых меток
+#   {legacy}  Идентификатор в источнике импорта
+#   {level}  Отображаемый уровень
+#   {limit}  Допустимый предел
+#   {line}  Номер строки в сообщении
+#   {locale}  Код языка
+#   {maximum}  Максимально допустимое значение
+#   {maximumBees}  Максимальное число пчёл
+#   {maximumHoney}  Максимальный уровень мёда
+#   {menu}  Идентификатор меню
+#   {message}  Сообщение обратной связи или диагностики
+#   {migrated}  Число преобразованных записей
+#   {minimum}  Минимально допустимое значение
+#   {mode}  Выбранный режим работы или отображения
+#   {name}  Название объекта
+#   {oldBoard}  Идентификатор прежней доски
+#   {operation}  Название операции
+#   {options}  Доступные параметры команды
+#   {overlaid}  Число применённых ключей настройки
+#   {page}  Номер текущей страницы
+#   {pages}  Общее число страниц
+#   {panels}  Число панелей
+#   {parameter}  Название параметра команды
+#   {path}  Путь к файлу или каталогу
+#   {pending}  Состояние ожидающей публикации
+#   {percent}  Значение в процентах
+#   {permission}  Требуемое разрешение
+#   {personal}  Личный код языка
+#   {pitch}  Вертикальный угол в градусах
+#   {player}  Имя игрока
+#   {plugin}  Название плагина
+#   {priority}  Приоритет выбора или отрисовки
+#   {provider}  Название поставщика
+#   {providers}  Список или число поставщиков
+#   {radius}  Радиус поиска
+#   {ready}  Число записей, готовых к импорту
+#   {reason}  Причина ошибки или решения
+#   {resume}  Число записей с возобновляемым импортом
+#   {revision}  Редакция документа
+#   {roll}  Угол крена в градусах
+#   {rotation}  Вращение отображения
+#   {scale}  Масштаб отображения или предпросмотра
+#   {seconds}  Время в секундах
+#   {session}  Идентификатор сеанса редактора
+#   {severity}  Уровень важности диагностики
+#   {skipped}  Число пропущенных записей
+#   {slots}  Число ячеек для предметов
+#   {source}  Источник импорта или поставщик настроек
+#   {special}  Число специальных элементов отображения
+#   {state}  Текущее состояние
+#   {style}  Стиль отображения
+#   {subject}  Объект сеанса веб-редактора
+#   {target}  Плагин, для которого выбирается язык
+#   {temporary}  Число временных объектов
+#   {text}  Отображаемый текст
+#   {title}  Отображаемый заголовок
+#   {to}  Конечное значение или конец диапазона
+#   {total}  Общее число записей
+#   {type}  Ожидаемый тип значения или объекта
+#   {url}  Веб-адрес
+#   {usage}  Синтаксис команды
+#   {uuid}  Уникальный идентификатор объекта или игрока
+#   {value}  Текущее значение сообщения или параметра
+#   {variables}  Допустимые переменные сообщения
+#   {variants}  Число или список вариантов отображения
+#   {viewPermission}  Разрешение для просмотра
+#   {viewRange}  Максимальная дальность просмотра
+#   {warnings}  Число предупреждений
+#   {when}  Условие отображения
+#   {world}  Название мира
+#   {x}  Координата X
+#   {y}  Координата Y
+#   {yaw}  Горизонтальный угол в градусах
+#   {z}  Координата Z
+
+[command.help]
+debug = "Команды диагностики"
+debugdump = "Создать диагностический отчёт и при желании загрузить его"
+debugdump_upload = "Загрузить отчёт на mclo.gs"
+root = "Группа команд Gloss"
+hologram = "Создание голограмм и управление ими"
+"hologram.create" = "Создать голограмму в текущей позиции"
+"hologram.create.id" = "Уникальный ID голограммы"
+"hologram.delete" = "Удалить голограмму"
+"hologram.delete.id" = "ID удаляемой голограммы"
+"hologram.addline" = "Добавить строку к голограмме"
+"hologram.addline.id" = "ID голограммы"
+"hologram.addline.text" = "Текст строки; заключите в кавычки, чтобы использовать пробелы"
+"hologram.setline" = "Заменить строку голограммы"
+"hologram.setline.id" = "ID голограммы"
+"hologram.setline.line" = "Номер строки, начиная с 1"
+"hologram.setline.text" = "Текст строки; заключите в кавычки, чтобы использовать пробелы"
+"hologram.removeline" = "Удалить строку голограммы"
+"hologram.removeline.id" = "ID голограммы"
+"hologram.removeline.line" = "Номер строки, начиная с 1"
+"hologram.clear" = "Удалить все строки голограммы"
+"hologram.clear.id" = "ID голограммы"
+"hologram.movehere" = "Переместить голограмму в текущую позицию"
+"hologram.movehere.id" = "ID голограммы"
+"hologram.move" = "Сместить голограмму на относительное число блоков"
+"hologram.move.id" = "ID голограммы"
+"hologram.move.x" = "Относительное смещение по X в блоках"
+"hologram.move.y" = "Относительное смещение по Y в блоках"
+"hologram.move.z" = "Относительное смещение по Z в блоках"
+"hologram.tp" = "Телепортироваться к голограмме"
+"hologram.tp.id" = "ID голограммы"
+"hologram.list" = "Список голограмм; нажмите, чтобы телепортироваться"
+"hologram.info" = "Показать позицию и строки голограммы"
+"hologram.info.id" = "ID голограммы"
+"hologram.rendertext" = "Создать текстовую голограмму с нативным масштабированием"
+"hologram.rendertext.id" = "Уникальный ID голограммы"
+"hologram.rendertext.text" = "Отображаемый текст; заключите в кавычки, если он содержит пробелы"
+"hologram.rendertext.scale" = "Множитель масштаба TextDisplay"
+"hologram.orient" = "Задать, как голограмма поворачивается к зрителям"
+"hologram.orient.id" = "ID голограммы"
+"hologram.orient.billboard" = "CENTER, VERTICAL, HORIZONTAL или FIXED"
+"hologram.orient.yaw" = "Рыскание (yaw) в градусах, от -180 до 180"
+"hologram.orient.pitch" = "Тангаж (pitch) в градусах, от -90 до 90"
+board = "Создание скорбордов и управление ими"
+"board.create" = "Создать скорборд"
+"board.create.id" = "Уникальный ID скорборда"
+"board.delete" = "Удалить скорборд"
+"board.delete.id" = "ID удаляемого скорборда"
+"board.title" = "Задать заголовок скорборда"
+"board.title.id" = "ID скорборда"
+"board.title.text" = "Текст заголовка; заключите в кавычки, чтобы использовать пробелы"
+"board.addline" = "Добавить строку к скорборду"
+"board.addline.id" = "ID скорборда"
+"board.addline.text" = "Текст строки; заключите в кавычки, чтобы использовать пробелы"
+"board.setline" = "Заменить строку скорборда"
+"board.setline.id" = "ID скорборда"
+"board.setline.line" = "Номер строки, начиная с 1"
+"board.setline.text" = "Текст строки; заключите в кавычки, чтобы использовать пробелы"
+"board.removeline" = "Удалить строку скорборда"
+"board.removeline.id" = "ID скорборда"
+"board.removeline.line" = "Номер строки, начиная с 1"
+"board.show" = "Показать себе скорборд"
+"board.show.id" = "ID скорборда"
+"board.hide" = "Скрыть свой скорборд"
+"board.select" = "Настроить автоматический выбор табло"
+"board.select.id" = "Идентификатор табло"
+"board.select.priority" = "Приоритет выбора"
+"board.select.when" = "Логическое условие; выражения с пробелами заключайте в кавычки"
+"board.list" = "Список скорбордов"
+"board.info" = "Показать заголовок, строки и настройки скорборда"
+"board.info.id" = "ID скорборда"
+"board.reset" = "Восстановить стандартные скорборды"
+emoji = "Инструменты эмодзи для чата"
+"emoji.list" = "Список включённых эмодзи; нажмите, чтобы вставить в чат"
+"emoji.reset" = "Восстановить стандартные эмодзи"
+animations = "Инструменты анимаций"
+"animations.list" = "Список названий анимаций"
+"animations.reset" = "Восстановить стандартные анимации"
+bubbles = "Стили облачков чата"
+"bubbles.style" = "Выбрать стиль облачков чата; clear — автоматический выбор"
+"bubbles.style.style" = "ID стиля или clear"
+"bubbles.reset" = "Восстановить стандартные стили облачков"
+tablist = "Инструменты таблиста"
+"tablist.reset" = "Восстановить стандартный документ таблиста"
+motd = "Инструменты MOTD"
+"motd.reset" = "Восстановить стандартный документ MOTD"
+drops = "Инструменты отображения выпавших предметов"
+"drops.reset" = "Восстановить стандартный документ настроек выпавших предметов"
+indicators = "Инструменты индикаторов урона и лечения"
+"indicators.reset" = "Восстановить стандартный документ настроек индикаторов урона"
+status = "Показать краткую сводку счётчиков"
+import = "Перенести устаревшие голограммы без изменения исходных файлов"
+"import.apply" = "Применить перенос устаревших голограмм без перезаписи"
+"import.holoui" = "Скопировать данные HoloUi из plugins/holoui, перезаписав предыдущие импорты"
+"import.legacy" = "Перенести файлы данных Gloss, созданные до объединения, в конверты v2"
+"import.preview" = "Предпросмотр неразрушающего переноса устаревших голограмм"
+item = "Инструменты провайдеров пользовательских предметов"
+"item.export" = "Экспортировать каталог пользовательских предметов для веб-редактора"
+"item.status" = "Показать, какие провайдеры пользовательских предметов активны"
+menu = "Создание, открытие и редактирование меню-голограмм"
+"menu.addrow" = "Добавить декоративную текстовую строку"
+"menu.back" = "Снова открыть предыдущую сессию меню"
+"menu.close" = "Закрыть текущую сессию меню"
+"menu.copy" = "Скопировать загруженное меню под новый вложенный ID"
+"menu.create" = "Создать постоянную голограмму в текущей позиции"
+"menu.image" = "Заменить содержимое меню одним изображением по центру"
+"menu.insertrow" = "Вставить декоративную текстовую строку"
+"menu.list" = "Показать все настроенные меню, которые можно открыть"
+"menu.move" = "Переместить открытое меню в текущую позицию"
+"menu.new" = "Создать пустое меню-голограмму из стандартной заготовки"
+"menu.offsetrow" = "Переместить строку с абсолютными или ~относительными смещениями"
+"menu.open" = "Открыть меню по ID; * показывает список меню"
+"menu.removerow" = "Удалить строку компонента"
+"menu.seticon" = "Заменить иконку строки кнопки или декорации"
+"menu.setrow" = "Задать текст строки кнопки или декорации"
+"menu.style" = "Задать или сбросить одно свойство стиля отображения строки"
+panel = "Инструменты постоянных панелей в мире"
+"panel.addrow" = "Добавить текстовую строку в корневое меню панели"
+"panel.align" = "Выровнять оси позиции панели по другой панели"
+"panel.cancel" = "Отменить черновую правку панели"
+"panel.copy" = "Скопировать постоянную панель под новым ID"
+"panel.create" = "Создать панель в текущей позиции"
+"panel.delete" = "Удалить постоянную панель"
+"panel.edit" = "Начать сессию черновой правки панели"
+"panel.follow" = "Следовать за игроком в сети с поворотом fixed, yaw или full"
+"panel.here" = "Переместить панель в текущую позицию"
+"panel.image" = "Заменить корневое меню панели одним изображением по центру"
+"panel.info" = "Показать полное состояние панели"
+"panel.insertrow" = "Вставить текстовую строку в корневое меню панели"
+"panel.list" = "Список постоянных панелей по страницам"
+"panel.menu" = "Задать корневое меню панели"
+"panel.move" = "Переместить панель на абсолютные или ~относительные координаты"
+"panel.near" = "Список панелей рядом с текущей позицией"
+"panel.offsetrow" = "Переместить строку корневого меню панели с абсолютными или ~относительными смещениями"
+"panel.permissions" = "Изменить разрешения просмотра и взаимодействия панели"
+"panel.ranges" = "Задать дальности обзора и взаимодействия панели"
+"panel.removerow" = "Удалить строку корневого меню панели"
+"panel.rename" = "Переименовать постоянную панель"
+"panel.rotate" = "Задать абсолютные или ~относительные рыскание, тангаж и крен"
+"panel.save" = "Сохранить черновую правку панели"
+"panel.scale" = "Задать абсолютный или ~относительный масштаб панели"
+"panel.seticon" = "Заменить иконку строки в корневом меню панели"
+"panel.setrow" = "Задать текст строки корневого меню панели"
+"panel.style" = "Задать или сбросить одно свойство стиля отображения строки"
+"panel.teleport" = "Телепортироваться к постоянной панели"
+"panel.unfollow" = "Прекратить следование панели за игроком"
+"panel.visibility" = "Задать режим видимости и ноды разрешений"
+preview = "Инструменты документов предпросмотра"
+"preview.dump" = "Собрать документ предпросмотра один раз и вывести число его элементов"
+"preview.list" = "Список документов предпросмотра и их правил соответствия"
+"preview.reset" = "Восстановить стандартные документы предпросмотра (не удаляет пользовательские документы, которые могут их перекрывать)"
+web = "Открыть веб-редактор Gloss и управлять им"
+"web.open" = "Открыть пустой размещённый в сети редактор Gloss"
+"web.edit" = "Открыть один синхронизируемый документ Gloss"
+"web.edit.document" = "Открыть этот синхронизируемый документ в веб-редакторе"
+"web.workspace" = "Открыть всё синхронизируемое рабочее пространство Gloss"
+"web.sessions" = "Управлять активными сеансами веб-редактора"
+"web.sessions.list" = "Вывести активные сеансы веб-редактора"
+"web.sessions.pull" = "Опросить сеанс веб-редактора сейчас"
+"web.sessions.revoke" = "Отозвать право доступа к веб-редактору"
+"web.sessions.status" = "Показать один сеанс веб-редактора"
+language = "Выберите свой язык или язык сервера по умолчанию"
+
+[command.help.arg]
+reset_name = "Имя для сброса или * для всех стандартных значений"
+panel_axes = "Оси: x, y, z, xy, xz, yz или xyz"
+panel_follow_rotation = "Режим поворота при следовании: fixed, yaw или full"
+panel_id = "ID постоянной панели"
+panel_interact_permission = "Разрешение на взаимодействие или -"
+panel_interaction_range = "Положительная дальность взаимодействия"
+panel_menu = "ID корневого меню; по умолчанию — ID панели"
+panel_new_id = "Новый ID постоянной панели"
+panel_pitch = "Абсолютный или ~относительный тангаж"
+panel_player = "Целевой игрок в сети"
+panel_radius = "Горизонтальный радиус поиска"
+panel_reference = "ID опорной панели"
+panel_roll = "Абсолютный или ~относительный крен"
+panel_root_menu = "ID корневого меню"
+panel_scale = "Абсолютный или ~относительный масштаб"
+panel_view_permission = "Разрешение на просмотр или -"
+panel_view_range = "Положительная дальность обзора"
+panel_visibility = "Режим видимости: public, permission или hidden"
+panel_x = "Абсолютная или ~относительная координата X"
+panel_y = "Абсолютная или ~относительная координата Y"
+panel_yaw = "Абсолютное или ~относительное рыскание"
+panel_z = "Абсолютная или ~относительная координата Z"
+content_menu = "ID загруженного меню"
+web_subject = "Идентификатор синхронизируемого документа Gloss"
+hologram_id = "ID новой голограммы и корневого меню"
+hologram_text = "Необязательный текст MiniMessage"
+image_path = "Файл внутри папки изображений Gloss"
+import_source = "Источник устаревших голограмм"
+menu = "ID открываемого меню (* показывает все меню)"
+new_panel_id = "Новый ID постоянной панели"
+new_menu = "ID нового вложенного меню"
+list_page = "Страница списка, начиная с 1"
+previews_dump_name = "Имя собираемого документа"
+previews_name = "Имя документа для сброса или * для всех стандартных документов"
+row_icon_type = "Тип иконки"
+row_icon_value = "Содержимое иконки или ID из реестра"
+row_index = "Номер строки компонента, начиная с 1"
+row_style_property = "Свойство стиля отображения"
+row_style_value = "Значение стиля или * для сброса"
+row_text = "Текст строки в формате MiniMessage"
+row_x = "Абсолютная или ~относительная координата X строки"
+row_y = "Абсолютная или ~относительная координата Y строки"
+row_z = "Абсолютная или ~относительная координата Z строки"
+source_menu = "ID загруженного исходного меню"
+web_session = "Идентификатор сеанса веб-редактора"
+
+[command.error]
+no_permission = "&8[&dGloss&8] &cУ вас нет разрешения."
+no_permission_use = "&8[&dGloss&8] &cУ вас нет разрешения на использование этой команды."
+usage = "&7Использование: &f/{command} help"
+
+[command.hologram]
+exists = "&8[&dGloss&8] &cГолограмма '&f{id}&c' уже существует."
+missing = "&8[&dGloss&8] &cНет голограммы с именем '&f{id}&c'."
+created = "&8[&dGloss&8] &aСоздана голограмма &f{id}&a."
+deleted = "&8[&dGloss&8] &aУдалена голограмма &f{id}&a."
+line_added = "&8[&dGloss&8] &aДобавлена строка &f{line}&a в &f{id}&a."
+line_set = "&8[&dGloss&8] &aЗадана строка &f{line}&a в &f{id}&a."
+line_removed = "&8[&dGloss&8] &aУдалена строка &f{line}&a из &f{id}&a."
+line_out_of_range = "&8[&dGloss&8] &cСтрока {line} вне диапазона; строк в &f{id}&c: {count}."
+cleared = "&8[&dGloss&8] &aОчищены все строки в &f{id}&a."
+moved = "&8[&dGloss&8] &aГолограмма &f{id}&a перемещена в вашу позицию."
+offset = "&8[&dGloss&8] &aГолограмма &f{id}&a смещена на &f{x}&a, &f{y}&a, &f{z}&a."
+teleported = "&8[&dGloss&8] &aВы телепортированы к &f{id}&a."
+list_empty = "&8[&dGloss&8] &7Голограмм пока нет."
+rendered = "&8[&dGloss&8] &aТекстовая голограмма &f{id}&a создана с масштабом &f{scale}&a."
+text_empty = "&8[&dGloss&8] &cТекст не может быть пустым."
+scale_out_of_range = "&8[&dGloss&8] &cМасштаб {value} вне диапазона; он должен быть от &f{minimum}&c до &f{maximum}&c."
+oriented = "&8[&dGloss&8] &aГолограмме &f{id}&a задан billboard &f{billboard}&a, yaw &f{yaw}&a, pitch &f{pitch}&a."
+billboard_unknown = "&8[&dGloss&8] &cНеизвестный billboard '&f{billboard}&c'. Используйте одно из &f{options}&c."
+angle_out_of_range = "&8[&dGloss&8] &cЗначение {axis} {value} вне диапазона; оно должно быть от &f-{limit}&c до &f{limit}&c градусов."
+
+[command.hologram.list]
+hover = "Нажмите, чтобы телепортироваться"
+lines = "строк: {count}"
+
+[command.hologram.info]
+header = "&8[&dGloss&8] &d{id} &7в &f{world} {x}, {y}, {z}"
+line = " &8{line}. &f{text}"
+orientation = " &8масштаб &f{scale} &8billboard &f{billboard} &8yaw &f{yaw} &8pitch &f{pitch}"
+
+[command.board]
+exists = "&8[&dGloss&8] &cСкорборд '&f{id}&c' уже существует."
+missing = "&8[&dGloss&8] &cНет скорборда с именем '&f{id}&c'."
+created = "&8[&dGloss&8] &aСоздан скорборд &f{id}&a."
+deleted = "&8[&dGloss&8] &aУдалён скорборд &f{id}&a."
+title_set = "&8[&dGloss&8] &aЗадан заголовок &f{id}&a."
+line_added = "&8[&dGloss&8] &aДобавлена строка &f{line}&a в &f{id}&a."
+line_set = "&8[&dGloss&8] &aЗадана строка &f{line}&a в &f{id}&a."
+line_removed = "&8[&dGloss&8] &aУдалена строка &f{line}&a из &f{id}&a."
+line_out_of_range = "&8[&dGloss&8] &cСтрока {line} вне диапазона; строк в &f{id}&c: {count}."
+shown = "&8[&dGloss&8] &aПоказан скорборд &f{id}&a."
+hidden = "&8[&dGloss&8] &aВаш скорборд скрыт."
+select_set = "&8[&dGloss&8] &aДля табло &f{id}&a установлен приоритет выбора &f{priority}&a."
+select_invalid = "&8[&dGloss&8] &cНедопустимое условие табло: &f{error}&c."
+list_empty = "&8[&dGloss&8] &7Скорбордов пока нет."
+
+[command.board.list]
+hover = "Нажмите для подробностей"
+
+[command.board.info]
+header = "&8[&dGloss&8] &d{id} &7с заголовком &f{title}"
+meta = "&7Приоритет: &f{priority}&7 | Условие: &f{when}&7 | Варианты: &f{variants}&7"
+line = " &8{line}. &f{text}"
+
+[command.emoji]
+empty = "&8[&dGloss&8] &7Нет включённых эмодзи."
+hover = "Нажмите, чтобы вставить в чат"
+
+[command.animations]
+empty = "&8[&dGloss&8] &7Анимации не загружены."
+header = "&8[&dGloss&8] &fАнимации: &d{count}"
+entry = "&8- &d{name}"
+
+[command.list]
+page = "&7Страница &f{page}&7/&f{pages} &8- &7показаны &f{from}&7-&f{to} &7из &f{total}"
+next = "&7Следующая страница: &f{command}"
+
+[command.status]
+holograms = "&7Голограммы: &f{count} &8(временных: {temporary}, сущностей: {entities})"
+boards = "&7Скорборды: &f{count}"
+emoji = "&7Эмодзи: &f{enabled}&8/&f{total}"
+animations = "&7Анимации: &f{count}"
+effects = "&7Облачка: &f{bubbles} &8| &7Индикаторы: &f{indicators} &8| &7Дропы: &f{drops}"
+
+[command.reset]
+done = "&8[&dGloss&8] &aВосстановлено &f{count}&a стандартных значений {kind}."
+none = "&8[&dGloss&8] &cНет стандартных значений {kind}, соответствующих '&f{name}&c'."
+
+[command.bubbles]
+style_set = "&8[&dGloss&8] &aСтиль облачков чата установлен: &f{style}&a."
+style_cleared = "&8[&dGloss&8] &aСтиль облачков чата сброшен; применяется автоматический выбор."
+style_unknown = "&8[&dGloss&8] &cНет стиля облачков с именем '&f{style}&c'."
+
+[command.import]
+config_unreadable = "&8[&dGloss&8] &cНе удалось загрузить gloss.toml: &f{reason}"
+
+[command.import.holoui]
+missing = "&8[&dGloss&8] &cРядом с папкой данных Gloss не найдена папка данных holoui."
+done = "&8[&dGloss&8] &aИмпорт HoloUi завершён: скопировано &f{copied}&a, пропущено &f{skipped}&a, ключей конфигурации &f{overlaid}&a, ошибок &f{errors}&a."
+
+[command.import.legacy]
+done = "&8[&dGloss&8] &aПеренос устаревших данных завершён: перенесено &f{migrated}&a, поглощено &f{absorbed}&a, ключей конфигурации &f{overlaid}&a, ошибок &f{errors}&a."
+
+[director.help]
+no_subcommands = "На этой странице нет подкоманд."
+no_description = "Описание не указано"
+command_group = "Группа команд. Нажмите, чтобы открыть."
+category = "Категория команд"
+no_parameters = "Параметров нет. Нажмите, чтобы предварительно заполнить команду."
+parameters_hover = "Наведите курсор на параметры, чтобы узнать больше."
+
+[director.help.navigation]
+back = "Назад"
+page = "Страница"
+
+[director.help.navigation.parent]
+hover = "Вернуться к родительской группе команд"
+
+[director.help.navigation.previous]
+hover = "Предыдущая страница"
+
+[director.help.navigation.next]
+hover = "Следующая страница"
+
+[director.help.parameter]
+required = "Этот параметр является обязательным."
+optional = "Этот параметр является необязательным."
+default = "Если не задан, используется значение \"{value}\"."
+type = "Этот параметр имеет тип {type}."
+
+[director.runtime]
+usage = "Использование: {usage}"
+
+[director.runtime.error]
+invalid_origin = "Эту команду нельзя выполнить из данного источника."
+unknown_parameter = "Неизвестный ключ параметра: {key}"
+unexpected_argument = "Неожиданный аргумент \"{argument}\". Необязательные параметры должны задаваться с ключом, например seed=123"
+unclosed_group = "Отсутствует закрывающая \"]\" для параметра {key}"
+conversion_failed = "Невозможно преобразовать \"{value}\" в {type} для {parameter}"
+default_parse_failed = "Невозможно разобрать значение по умолчанию параметра {parameter}"
+missing_argument = "Отсутствует аргумент \"{parameter}\" ({type})"
+execution_failed = "Не удалось выполнить команду {command}: {reason}"
+
+[gloss.error]
+menu_name_required = "Название меню не может быть пустым"
+hologram_id_required = "ID голограммы не может быть пустым"
+panel_id_required = "Идентификатор панели не может быть пустым"
+web_subject_required = "Идентификатор документа веб-редактора не может быть пустым"
+web_session_required = "Идентификатор сеанса веб-редактора не может быть пустым"
+panel_player_required = "Необходимо указать целевого игрока"
+row_icon_type_required = "Необходимо указать тип значка"
+row_style_property_required = "Необходимо указать свойство стиля"
+import_source_required = "Необходимо указать источник импорта старых данных"
+import_source_unknown = "Неизвестный источник импорта старых данных: {source}"
+
+[gloss.message]
+permission_denied = "&8[&dGloss&8]: &cУ вас нет разрешения &f{permission}&c."
+unknown_command = "&8[&dGloss&8]: &cНеизвестная команда \"&f{command}&c\"."
+
+[gloss.message.hologram]
+created = "&8[&dGloss&8]: &aВ вашей позиции создана голограмма &f{hologram}&a с корневым меню &f{menu}&a."
+already_exists = "&8[&dGloss&8]: &cГолограмма, панель или меню с именем &f{hologram}&c уже существует."
+failed = "&8[&dGloss&8]: &cНе удалось создать голограмму &f{hologram}&c. Изменения не сохранены."
+durability_uncertain = "&8[&dGloss&8]: &eНе удалось безопасно завершить транзакцию голограммы &f{hologram}&e. Перезапустите Gloss перед проверкой или повторной попыткой."
+
+[gloss.message.menu]
+none = "&8[&dGloss&8]: &7Нет доступных меню."
+player_only = "&8[&dGloss&8]: &cТолько игроки могут открывать меню."
+no_previous = "&8[&dGloss&8]: &cПредыдущее меню недоступно."
+closed = "&8[&dGloss&8]: &aМеню закрыто."
+moved = "&8[&dGloss&8]: &aМеню перемещено."
+none_open = "&8[&dGloss&8]: &cСейчас ни одно меню не открыто."
+unavailable = "&8[&dGloss&8]: &c\"{menu}\" недоступно."
+permission_denied = "&8[&dGloss&8]: &cУ вас нет разрешения открыть \"{menu}\"."
+open_failed = "&8[&dGloss&8]: &cНе удалось открыть меню \"{menu}\"."
+
+[gloss.message.menu.list]
+header = "Меню"
+entry = "Нажмите, чтобы открыть {menu}."
+
+[gloss.message.menu.content]
+updated = "&8[&dGloss&8]: &aОперация {operation} применена к меню &f{menu}&a, ревизия {revision}."
+created = "&8[&dGloss&8]: &aСоздано меню &f{menu}&a, ревизия {revision}. Откройте его командой /gloss menu open {menu} или разместите командой /gloss panel create {menu}."
+copied = "&8[&dGloss&8]: &aМеню &f{source}&a скопировано в &f{menu}&a, ревизия {revision}."
+revision_conflict = "&8[&dGloss&8]: &cМеню &f{menu}&c изменилось во время записи (ожидалась ревизия {expected}, текущая — {actual}). Повторите команду."
+already_exists = "&8[&dGloss&8]: &cМеню &f{menu}&c уже существует."
+invalid = "&8[&dGloss&8]: &cНедопустимое значение содержимого меню: &f{reason}&c."
+failed = "&8[&dGloss&8]: &cОшибка операции с содержимым меню &f{menu}&c: {reason}"
+
+[gloss.message.command]
+player_only = "&8[&dGloss&8]: &cЭта команда доступна только игрокам."
+
+[gloss.message.web]
+header = "Веб-редактор"
+open_hover = "Нажмите, чтобы открыть веб-редактор Gloss."
+open = "&8[&dGloss&8]: &7Веб-редактор: &f{url}&7"
+preparing = "&8[&dGloss&8]: &7Подготовка защищённого сеанса синхронизации редактора для &f{subject}&7..."
+unavailable = "&8[&dGloss&8]: &cРедактирование сервера через веб недоступно. Проверьте настройки синхронизации редактора и соединение с ретранслятором."
+open_failed = "&8[&dGloss&8]: &cНе удалось открыть &f{kind}&c=&f{subject}&c в веб-редакторе с синхронизацией: {reason}"
+open_console = "&8[&dGloss&8]: &7Ссылка с правом редактирования &f{subject}&7: &f{url}&7"
+capability_warning = "&8[&dGloss&8]: &eЭтот URL позволяет публиковать изменения на сервере до отзыва доступа или истечения срока действия. Храните его в секрете."
+open_label = "Открыть редактор"
+copy_label = "Копировать ссылку"
+revoke_label = "Отозвать доступ"
+link_hover = "Откройте редактор, скопируйте ссылку с правом редактирования или отзовите доступ к сеансу {session}."
+
+[gloss.message.web.sessions]
+list_empty = "&8[&dGloss&8]: &7Нет активных сеансов синхронизации редактора."
+status = "&8[&dGloss&8]: &7&f{session}&7 {kind}=&f{subject}&7 истекает через=&f{seconds}&7с опубликованная ревизия=&f{revision}&7 ожидает=&f{pending}&7"
+revoked = "&8[&dGloss&8]: &aДоступ к сеансу синхронизации редактора &f{session}&a отозван."
+pulled = "&8[&dGloss&8]: &aВыполнен опрос сеанса синхронизации редактора &f{session}&a."
+unknown = "&8[&dGloss&8]: &cСеанс синхронизации редактора &f{session}&c неизвестен или истёк."
+failed = "&8[&dGloss&8]: &cОшибка синхронизации редактора для сеанса &f{session}&c: {reason}"
+
+[gloss.message.import]
+preview_started = "&8[&dGloss&8]: &7Сканирование &f{source}&7 для предварительного просмотра переноса без изменения данных..."
+apply_started = "&8[&dGloss&8]: &7Сканирование и перенос из &f{source}&7 без перезаписи существующих данных..."
+source_missing = "&8[&dGloss&8]: &7Источник &f{source}&7 не найден по пути &f{path}&7."
+preview_summary = "&8[&dGloss&8]: &7Предпросмотр &f{source}&7: готово &a{ready}&7, можно возобновить &d{resume}&7, конфликтов &e{conflicts}&7, ошибок &c{errors}&7, предупреждений {warnings}. Источник: &f{path}&7"
+preview_entry = "&8- &7&f{legacy}&7 -> &f{board}&7 состояние=&f{state}&7 предупреждений=&f{warnings}&7"
+apply_summary = "&8[&dGloss&8]: &7Перенос &f{source}&7: импортировано &a{imported}&7, пропущено &e{skipped}&7, не удалось &c{failed}&7; при сканировании обнаружено ошибок: {errors}, предупреждений: {warnings}."
+apply_entry = "&8- &7&f{legacy}&7 состояние=&f{state}&7 причина=&f{reason}&7"
+issue = "&8- &f{legacy} &7{severity}: &f{reason}"
+busy = "&8[&dGloss&8]: &cУже выполняется другой перенос старых голограмм."
+failed = "&8[&dGloss&8]: &cНе удалось перенести старые голограммы из &f{source}&c: {reason}"
+
+[gloss.message.config]
+reloaded = "&2Конфигурация \"{name}\" перезагружена."
+
+[gloss.message.hotload]
+singular = "&2Горячая перезагрузка: {kinds} ({count} изменение)."
+plural = "&2Горячая перезагрузка: {kinds} ({count} изменений)."
+
+[gloss.message.preview_scale]
+adjusting = "&7Размер предпросмотра: &f{percent}% &8- &7удерживайте Красться + прокручивайте для изменения; дважды нажмите Красться для сохранения"
+hidden = "&7Предпросмотр &cскрыт &8- &7прокрутите вверх для восстановления"
+size = "&7Размер предпросмотра: &f{percent}%"
+saved_hidden = "&7Предпросмотр сохранён как &cскрытый &8- &7дважды нажмите Красться + прокрутите вверх над контейнером для восстановления"
+saved = "&7Размер предпросмотра сохранён: &f{percent}%"
+
+[gloss.message.drops]
+bundle_more = "+{count} ещё"
+
+[gloss.message.items]
+disabled = "&8[&dGloss&8]: &7Пользовательские предметы отключены. Установите customItems в true в gloss.toml."
+
+[gloss.message.items.status]
+header = "Пользовательские предметы"
+summary = "Активных поставщиков: {active}/{total}"
+entry = "Поставщик {provider} из плагина {plugin}."
+hint = "Нажмите, чтобы экспортировать каталог для веб-редактора."
+
+[gloss.message.items.state]
+ready = "готов, идентификаторов: {count}"
+loading = "найден, ещё загружается"
+inactive = "найден, нет адаптера"
+missing = "не установлен"
+
+[gloss.message.items.export]
+started = "&8[&dGloss&8]: &7Экспорт каталога пользовательских предметов..."
+done = "&8[&dGloss&8]: &aЗаписано предметов: {count}, поставщиков: {providers}, путь: &f{path}&a."
+empty = "&8[&dGloss&8]: &7Пользовательские предметы не найдены. Пустой каталог записан в &f{path}&7."
+failed = "&8[&dGloss&8]: &cНе удалось записать каталог пользовательских предметов. Проверьте журнал."
+busy = "&8[&dGloss&8]: &cЭкспорт каталога уже выполняется."
+
+[gloss.message.previews.list]
+header = "Документы предпросмотра"
+empty = "&7Нет загруженных документов предпросмотра."
+entry = "блоки={blocks} сущности={entities} особые элементы={special} приоритет={priority}"
+
+[gloss.message.previews.reset]
+started = "&8[&dGloss&8]: &7Сброс документов предпросмотра «&f{name}&7»..."
+done = "&8[&dGloss&8]: &aВосстановлено встроенных документов предпросмотра: {count}. Дополнительные пользовательские документы, перекрывающие их, не удалены."
+none = "&8[&dGloss&8]: &c«{name}» не является встроенным документом предпросмотра; ничего не сброшено."
+
+[gloss.message.previews.dump]
+unknown = "&8[&dGloss&8]: &cДокумент предпросмотра «{name}» не загружен."
+result = "&8[&dGloss&8]: &7&a{name}&7: элементов — &f{total}&7 (панели={panels}, ячейки={cells}, слоты={slots}, подписи={labels})."
+no_errors = "&8[&dGloss&8]: &aОшибок сборки нет."
+error_line = "&8[&dGloss&8]: &c{message}"
+error_more = "&8[&dGloss&8]: &7Ещё {count} (см. журнал консоли)."
+
+[gloss.message.panels]
+created = "&8[&dGloss&8]: &aСоздана панель &f{board}&a, ревизия {revision}."
+deleted = "&8[&dGloss&8]: &aПанель &f{board}&a удалена."
+renamed = "&8[&dGloss&8]: &a&f{oldBoard}&a переименована в &f{board}&a, ревизия {revision}."
+copied = "&8[&dGloss&8]: &a&f{source}&a скопирована в &f{board}&a."
+updated = "&8[&dGloss&8]: &aОперация {operation} применена к &f{board}&a, ревизия {revision}."
+teleported = "&8[&dGloss&8]: &aВы телепортированы к &f{board}&a."
+unknown = "&8[&dGloss&8]: &cНеизвестная панель &f{board}&c."
+already_exists = "&8[&dGloss&8]: &cПанель &f{board}&c уже существует."
+invalid = "&8[&dGloss&8]: &cНедопустимое значение панели: &f{reason}&c."
+menu_unavailable = "&8[&dGloss&8]: &cКорневое меню &f{menu}&c не загружено."
+player_unavailable = "&8[&dGloss&8]: &cЦелевой игрок &f{player}&c не в сети."
+world_unavailable = "&8[&dGloss&8]: &cМир панели &f{world}&c с сохранённым UUID не загружен."
+revision_conflict = "&8[&dGloss&8]: &cПанель &f{board}&c изменилась во время редактирования (ожидалась ревизия {expected}, текущая — {actual}). Откройте сеанс редактирования заново."
+failed = "&8[&dGloss&8]: &cОшибка операции с панелью &f{board}&c: {reason}"
+
+[gloss.message.panels.list]
+header = "&8[&dGloss&8]: &fПостоянные панели: &d{count}&f"
+empty = "&8[&dGloss&8]: &7Нет загруженных постоянных панелей."
+entry = "&8- &7&f{board}&7 меню=&f{menu}&7 ревизия=&f{revision}&7"
+
+[gloss.message.panels.near]
+header = "&8[&dGloss&8]: &fПанели в радиусе &d{radius}&f блоков: &d{count}&f"
+empty = "&8[&dGloss&8]: &7В этом радиусе нет панелей."
+entry = "&8- &7&f{board}&7 расстояние=&f{distance}&7 меню=&f{menu}&7"
+
+[gloss.message.panels.info]
+header = "&8[&dGloss&8]: &fПанель &d{board}&f (&7{state}&f)"
+identity = "&7UUID=&f{uuid}&7 ревизия=&f{revision}&7 меню=&f{menu}&7"
+transform = "&7мир=&f{world}&7 позиция=&f{x}&7, &f{y}&7, &f{z}&7 поворот=&f{yaw}&7, &f{pitch}&7, &f{roll}&7 масштаб=&f{scale}&7"
+visibility = "&7видимость=&f{mode}&7 право просмотра=&f{viewPermission}&7 право взаимодействия=&f{interactPermission}&7 дальность=&f{viewRange}&7/&f{interactionRange}&7"
+follow = "&7следование=&f{mode}&7 игрок=&f{player}&7 поворот=&f{rotation}&7"
+
+[gloss.message.panels.edit]
+started = "&8[&dGloss&8]: &aРедактирование &f{board}&a начиная с ревизии {revision}. Изменения остаются черновыми до сохранения."
+already_active = "&8[&dGloss&8]: &cВы уже редактируете &f{board}&c. Сначала сохраните или отмените изменения."
+none = "&8[&dGloss&8]: &cУ вас нет черновика изменений панели."
+busy = "&8[&dGloss&8]: &cПанель &f{board}&c сейчас сохраняется."
+staged = "&8[&dGloss&8]: &aОперация {operation} добавлена в черновик для &f{board}&a. Сохраните изменения командой /gloss panel save."
+saved = "&8[&dGloss&8]: &a&f{board}&a сохранена, ревизия {revision}."
+cancelled = "&8[&dGloss&8]: &aЧерновые изменения &f{board}&a отменены."
+identity_blocked = "&8[&dGloss&8]: &cСохраните или отмените черновик изменений &f{board}&c перед переименованием или удалением."
+
+[gloss.preview.state]
+idle = "Неактивно"
+brewing = "Варка {percent}%"
+needs_blaze_powder = "Нужен огненный порошок"
+waiting = "Ожидание"
+no_ingredient = "Нет ингредиента"
+empty = "Пусто"
+smelting_item = "Плавка: {item} {percent}%"
+smelting = "Плавка {percent}%"
+blasting_item = "Плавка в плавильной печи: {item} {percent}%"
+blasting = "Плавка в плавильной печи {percent}%"
+smoking_item = "Копчение: {item} {percent}%"
+smoking = "Копчение {percent}%"
+heating = "Нагрев"
+needs_fuel = "Нужно топливо"
+no_input = "Нет входного предмета"
+surge_suffix = "  +{seconds}s"
+disc_playing = "Воспроизводится: {disc}"
+disc_loaded = "Загружено: {disc}"
+no_disc = "Нет пластинки"
+
+[gloss.preview.stat]
+fuel_level = "Топливо {fuel}/{maximum}"
+no_fuel = "Нет топлива"
+bottles = "Бутылки {bottles}/{maximum}"
+fuel_seconds = "Топливо {seconds}s"
+fuel_ready = "Топливо готово"
+xp_gain = "XP +{experience}"
+xp_zero = "XP 0"
+bees_and_honey = "Пчёлы {bees}/{maximumBees}   Мёд {honey}/{maximumHoney}"
+cauldron_empty = "Пусто {level}/{maximum}"
+cauldron_level = "Уровень {level}/{maximum}"
+
+[gloss.preview.theme.title]
+chest = "&6&lСундук"
+trapped_chest = "&c&lСундук-ловушка"
+ender_chest = "&5&lЭндер-сундук"
+barrel = "&e&lБочка"
+dispenser = "&7&lРаздатчик"
+dropper = "&8&lВыбрасыватель"
+hopper = "&8&lВоронка"
+furnace = "&6&lПечь"
+smoker = "&e&lКоптильня"
+blast_furnace = "&b&lПлавильная печь"
+beehive = "&e&lУлей"
+bee_nest = "&e&lПчелиное гнездо"
+cauldron = "&7&lКотёл"
+water_cauldron = "&9&lКотёл с водой"
+lava_cauldron = "&6&lКотёл с лавой"
+powder_snow_cauldron = "&f&lКотёл с рыхлым снегом"
+jukebox = "&d&lПроигрыватель"
+brewing_stand = "&d&lЗельеварка"
+chiseled_bookshelf = "&6&lРезная книжная полка"
+hopper_minecart = "&8&lЗагрузочная вагонетка"
+chest_minecart = "&6&lГрузовая вагонетка"
+mobile = "&7&l{name}"
+shulker = "&l{color} Шалкеровый ящик"
+copper_chest = "&6&l{name}"
+shelf = "&6&l{name}"
+container = "&6&lКонтейнер"
+
+[language.menu]
+your_language = "Ваш язык"
+reset_your_language = "Сбросить выбор языка"
+server_default = "Язык сервера по умолчанию"
+edit_messages = "Изменить языковые сообщения"
+use_server_default = "Использовать язык сервера по умолчанию"
+current = "Текущий: {locale}"
+current_with_personal = "Текущий: {locale} (Ваш: {personal})"
+your_description = "Изменить только сообщения, которые видите вы."
+reset_description = "Использовать язык сервера по умолчанию."
+server_description = "Изменить язык сервера по умолчанию."
+edit_description = "Открыть редактор сообщений для каждого языка."
+select_description = "Нажмите, чтобы выбрать этот язык."
+remove_personal_description = "Удалить ваш личный выбор языка."
+no_controls = "У вас нет доступа к настройкам языка."
+command = "Команда: {command}"
+selected = "выбранный"
+all-volmit-plugins = "Все плагины Volmit"
+
+[language.error]
+stopping = "Выбор языка недоступен, пока плагин останавливается."
+editor-player-only = "Откройте редактор языка в игре."
+no-providers = "Нет доступных языковых провайдеров Volmit."
+numeric-page = "Введите номер страницы числом."
+personal-player-only = "Личный язык игрока нужно выбрать в игре."
+personal-permission = "У вас нет разрешения на выбор языка."
+plugin-personal-permission = "У вас нет разрешения выбирать свой язык для {plugin}."
+plugin-server-permission = "У вас нет разрешения менять язык сервера для {plugin}."
+server-locale-required = "Выберите код языка, например en_US, для языка сервера по умолчанию."
+unavailable-for-all = "Язык {locale} доступен не для всех выбранных плагинов."
+
+[language.usage]
+editor = "Использование: /{command} language server edit [locale]"
+selection = "Использование: /{command} language self [locale|reset] or server [locale]"
+volmit-selection = "Использование: /volmit plugins languages [locale]"
+
+[language.selection]
+preparing = "Подготовка языка {locale} для {target}..."
+save-failed = "{plugin}: не удалось сохранить выбор языка; проверьте консоль сервера."
+english-fallback = "{plugin}: {locale} недоступен; используется английский (en_US)."
+personal-selected = "{plugin}: Ваш язык сейчас {locale}."
+server-selected = "{plugin}: Язык сервера теперь {locale}."
+server-default-selected = "{plugin}: теперь ваш язык соответствует языку сервера по умолчанию."
+
+[language.editor]
+loading = "Загрузка сообщений для {locale}..."
+
+[language.editor.section]
+languages = "Языки"
+search = "Поиск"
+search-title = "{locale} / Поиск"
+group-title = "{locale} / {group}"
+
+[language.editor.prompt]
+search = "Найдите ключ или текст сообщения. Введите cancel, чтобы вернуться."
+value = "Введите в чат новое значение для {key}."
+current = "Текущее значение: {value}"
+variables = "Переменные: {variables}"
+guidance = "Используйте \\n для новой строки, \\\\ для обратной косой черты или введите cancel, чтобы вернуться."
+
+[language.editor.input]
+expired = "Время ввода в редакторе языка истекло."
+too-long = "Ввод должен содержать не более {maximum} символов."
+unable-to-save = "Не удалось сохранить: {reason}"
+
+[language.editor.navigation]
+back = "&eНазад&r"
+close = "&cЗакрыть&r"
+previous-page = "&eПредыдущая страница&r"
+next-page = "&eСледующая страница&r"
+
+[language.editor.search]
+messages = "Поиск сообщений"
+messages-lore = "Нажмите для поиска среди всех сообщений."
+clear = "Сбросить поиск"
+
+[language.editor.message]
+current-value = "&7Текущее значение:&r"
+variables = "&8{variables}&r"
+edit-plural = "&7Нажмите, чтобы изменить форму множественного числа.&r"
+edit-lines = "&7Нажмите, чтобы изменить отдельные строки.&r"
+edit-chat = "&7Нажмите, чтобы изменить текст в чате.&r"
+
+[language.editor.locale]
+open = "&8Нажмите, чтобы открыть этот язык.&r"
+
+[language.editor.category]
+message-count = "&7{count} сообщения&r"
+open = "&8Нажмите, чтобы открыть эту категорию.&r"
+
+[language.editor.error]
+no-permission = "У вас нет разрешения редактировать языки {plugin}."
+unable-to-edit = "Не удалось отредактировать: {reason}"
+
+[language.editor.saved]
+summary = "{locale} сохранён. Выбранные языки не изменились."
+change = "{key}: «{before}» заменено на «{after}»."
+
+[language.editor.part]
+line = "Строка {line}"
+
+[language.editor.value]
+none = "Нет"
+empty = "(пусто)"

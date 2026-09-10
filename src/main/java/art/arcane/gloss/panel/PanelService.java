@@ -1,6 +1,7 @@
 package art.arcane.gloss.panel;
 
 import art.arcane.gloss.Gloss;
+import art.arcane.gloss.doc.DocumentDelta;
 import art.arcane.gloss.doc.DocumentRevisionConflictException;
 import art.arcane.gloss.doc.ExecutorStorageTaskRunner;
 import art.arcane.gloss.doc.StorageTaskRunner;
@@ -10,6 +11,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 import java.io.IOException;
 import java.nio.file.FileAlreadyExistsException;
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
@@ -28,6 +30,10 @@ import java.util.logging.Logger;
 public final class PanelService {
   private static final long SHUTDOWN_TIMEOUT_SECONDS = 30L;
   private static final long FORCE_SHUTDOWN_TIMEOUT_SECONDS = 5L;
+  private static final WorkResult<DocumentDelta> UNCHANGED = new WorkResult<>(DocumentDelta.EMPTY, false,
+      () -> {
+      }, listeners -> {
+      });
   private final PanelStore store;
   private final StorageTaskRunner taskRunner;
   private final Logger logger;
@@ -43,6 +49,7 @@ public final class PanelService {
   private Lifecycle lifecycle;
   private PendingOperation<?> activeOperation;
   private StorageTaskRunner.StorageTaskHandle activeTask;
+  private CompletableFuture<DocumentDelta> pendingPoll;
   private volatile double maximumViewRange;
 
   public PanelService(JavaPlugin plugin) {
@@ -86,8 +93,17 @@ public final class PanelService {
     return startupFuture;
   }
 
-  public CompletableFuture<PanelLoadResult> reload() {
-    return enqueue("reload persistent panels", this::loadBoards);
+  public CompletableFuture<DocumentDelta> poll() {
+    CompletableFuture<DocumentDelta> requested;
+    synchronized (lifecycleLock) {
+      if (pendingPoll != null && !pendingPoll.isDone()) {
+        return pendingPoll;
+      }
+      requested = new CompletableFuture<>();
+      pendingPoll = requested;
+    }
+    enqueue(new PendingOperation<>("hotload persistent panels", this::pollBoards, requested));
+    return requested;
   }
 
   public PanelLoadResult publishExternalReload() throws IOException {
@@ -112,7 +128,7 @@ public final class PanelService {
     PanelDefinition requiredDefinition = Objects.requireNonNull(definition, "definition");
     return enqueue("create panel '" + requiredDefinition.id() + "'", () -> {
       PanelDefinition created = store.create(requiredDefinition);
-      return new WorkResult<>(created, () -> publishCreatedIndex(created),
+      return new WorkResult<>(created, true, () -> publishCreatedIndex(created),
           notificationListeners -> notifyCreated(created, notificationListeners));
     });
   }
@@ -126,7 +142,7 @@ public final class PanelService {
           .orElseThrow(() -> new NoSuchElementException("unknown panel: " + canonicalId));
       PanelDefinition updated = store.update(canonicalId, expectedRevision, requiredUpdate);
       PanelUpdate publication = new PanelUpdate(previous, updated);
-      return new WorkResult<>(updated, () -> publishUpdatedIndex(publication),
+      return new WorkResult<>(updated, true, () -> publishUpdatedIndex(publication),
           notificationListeners -> notifyUpdated(publication, notificationListeners));
     });
   }
@@ -135,7 +151,7 @@ public final class PanelService {
     String canonicalId = PanelIds.canonicalize(id);
     return enqueue("delete panel '" + canonicalId + "'", () -> {
       PanelDefinition deleted = store.delete(canonicalId, expectedRevision);
-      return new WorkResult<>(deleted, () -> publishDeletedIndex(deleted),
+      return new WorkResult<>(deleted, true, () -> publishDeletedIndex(deleted),
           notificationListeners -> notifyDeleted(deleted, notificationListeners));
     });
   }
@@ -148,7 +164,7 @@ public final class PanelService {
           .orElseThrow(() -> new NoSuchElementException("unknown panel: " + canonicalId));
       PanelDefinition renamed = store.rename(canonicalId, canonicalNewId, expectedRevision);
       PanelUpdate publication = new PanelUpdate(previous, renamed);
-      return new WorkResult<>(renamed, () -> publishUpdatedIndex(publication),
+      return new WorkResult<>(renamed, true, () -> publishUpdatedIndex(publication),
           notificationListeners -> notifyUpdated(publication, notificationListeners));
     });
   }
@@ -316,14 +332,62 @@ public final class PanelService {
     if (interrupted) {
       Thread.currentThread().interrupt();
     }
+    store.close();
   }
 
   private WorkResult<PanelLoadResult> loadBoards() throws IOException {
     PanelLoadResult result = store.load();
     List<PanelDefinition> loadedBoards = store.list();
     PanelReload publication = new PanelReload(result, loadedBoards);
-    return new WorkResult<>(result, () -> publishReloadedIndex(publication),
+    return new WorkResult<>(result, true, () -> publishReloadedIndex(publication),
         notificationListeners -> notifyReloaded(publication, notificationListeners));
+  }
+
+  private WorkResult<DocumentDelta> pollBoards() throws IOException {
+    DocumentDelta delta = store.poll();
+    if (delta.isEmpty()) {
+      return UNCHANGED;
+    }
+    List<PanelUpdate> updates = new ArrayList<>(delta.loaded().size());
+    List<PanelDefinition> removals = new ArrayList<>(delta.removed().size());
+    for (String id : delta.loaded()) {
+      PanelDefinition updated = store.get(id).orElseThrow();
+      updates.add(new PanelUpdate(spatialIndex.get(id).orElse(null), updated));
+    }
+    for (String id : delta.removed()) {
+      spatialIndex.get(id).ifPresent(removals::add);
+    }
+    PanelHotload publication = new PanelHotload(updates, removals);
+    return new WorkResult<>(delta, true, () -> publishHotloadedIndex(publication),
+        notificationListeners -> notifyHotloaded(publication, notificationListeners));
+  }
+
+  private void publishHotloadedIndex(PanelHotload publication) {
+    for (PanelDefinition removed : publication.removals()) {
+      spatialIndex.remove(removed.uuid());
+    }
+    for (PanelUpdate update : publication.updates()) {
+      spatialIndex.upsert(update.updated());
+    }
+    refreshMaximumViewRange();
+  }
+
+  private void notifyHotloaded(PanelHotload publication, List<PanelServiceListener> notificationListeners) {
+    for (PanelDefinition removed : publication.removals()) {
+      notifyDeleted(removed, notificationListeners);
+    }
+    for (PanelUpdate update : publication.updates()) {
+      if (update.previous() == null) {
+        notifyCreated(update.updated(), notificationListeners);
+      } else {
+        notifyUpdated(update, notificationListeners);
+      }
+    }
+    Gloss plugin = Gloss.instance;
+    if (isRunning() && plugin != null && plugin.getPanelService() == this && plugin.watchdog() != null) {
+      plugin.watchdog().recordHotload(PanelRepository.DIRECTORY_NAME,
+          publication.updates().size() + publication.removals().size());
+    }
   }
 
   private void publishCreatedIndex(PanelDefinition board) {
@@ -481,6 +545,9 @@ public final class PanelService {
 
   private WorkResult<?> persistAndPublish(PendingOperation<?> operation) throws Exception {
     WorkResult<?> result = operation.work().execute();
+    if (!result.publish()) {
+      return result;
+    }
     beforeIndexPublication.run();
     List<PanelServiceListener> notificationListeners =
         publish(operation, result.indexPublication());
@@ -590,7 +657,7 @@ public final class PanelService {
     WorkResult<T> execute() throws Exception;
   }
 
-  private record WorkResult<T>(T value, Runnable indexPublication,
+  private record WorkResult<T>(T value, boolean publish, Runnable indexPublication,
                                Consumer<List<PanelServiceListener>> notification) {
     private WorkResult {
       value = Objects.requireNonNull(value, "value");
@@ -608,6 +675,13 @@ public final class PanelService {
   }
 
   private record PanelUpdate(PanelDefinition previous, PanelDefinition updated) {
+  }
+
+  private record PanelHotload(List<PanelUpdate> updates, List<PanelDefinition> removals) {
+    private PanelHotload {
+      updates = List.copyOf(updates);
+      removals = List.copyOf(removals);
+    }
   }
 
   private record PanelReload(PanelLoadResult result, List<PanelDefinition> boards) {

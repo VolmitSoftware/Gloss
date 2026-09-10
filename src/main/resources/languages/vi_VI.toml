@@ -1,0 +1,828 @@
+# Gloss — vi_VI
+#
+# === Chỉnh sửa tệp ===
+# plugins/Gloss/languages/vi_VI.toml
+# Bạn có thể chỉnh sửa trực tiếp tệp này. Thay đổi cục bộ được giữ lại; mục thiếu hoặc không hợp lệ dùng bản tiếng Anh tích hợp.
+# /gloss language server edit vi_VI
+#
+# === Tiền tố ===
+# Tiền tố: &8[&dGloss&8] / &8[&dGloss&8]:
+#
+# === Định dạng ===
+# Màu sắc: &0-&f, &k-&r, &#RRGGBB.
+#
+# === Biến ===
+# Giữ nguyên tên biến và chỉ dùng những biến có sẵn trong từng thông báo.
+#   {absorbed}  Số mục nhập đã gộp vào dữ liệu hiện có
+#   {active}  Số nhà cung cấp đang hoạt động
+#   {actual}  Phiên bản sửa đổi hiện tại
+#   {after}  Giá trị thông báo sau khi sửa
+#   {argument}  Đối số lệnh không mong đợi
+#   {axis}  Trục tọa độ hoặc trục xoay
+#   {bees}  Số ong trong vật chứa
+#   {before}  Giá trị thông báo trước khi sửa
+#   {billboard}  Chế độ hướng của phần hiển thị
+#   {blocks}  Số thành phần hiển thị khối
+#   {board}  Mã định danh bảng hoặc bảng điều khiển
+#   {bottles}  Số chai trong vật chứa
+#   {bubbles}  Số bong bóng trò chuyện đang hoạt động
+#   {cells}  Số ô trong trình đơn
+#   {color}  Màu hiển thị hoặc màu vật phẩm
+#   {command}  Đường dẫn lệnh
+#   {conflicts}  Số xung đột khi nhập
+#   {copied}  Số mục đã sao chép
+#   {count}  Số đối tượng hoặc thông báo khớp
+#   {disc}  Đĩa nhạc trong vật chứa
+#   {distance}  Khoảng cách tới mục tiêu
+#   {drops}  Số vật phẩm rơi đang hiển thị
+#   {enabled}  Trạng thái bật hoặc số mục đã bật
+#   {entities}  Số thực thể
+#   {error}  Lỗi xác thực hoặc thao tác
+#   {errors}  Số lỗi
+#   {expected}  Phiên bản sửa đổi dự kiến khi lưu
+#   {experience}  Lượng kinh nghiệm nhận được
+#   {failed}  Số thao tác thất bại
+#   {from}  Giá trị nguồn hoặc đầu khoảng
+#   {fuel}  Nhiên liệu còn lại trong vật chứa
+#   {group}  Danh mục của trình sửa ngôn ngữ
+#   {hologram}  Mã định danh ảnh nổi
+#   {honey}  Mức mật ong hiện tại
+#   {id}  Mã định danh đối tượng
+#   {imported}  Số mục đã nhập
+#   {indicators}  Số chỉ báo sát thương
+#   {interactPermission}  Quyền cần để tương tác
+#   {interactionRange}  Khoảng cách tương tác tối đa
+#   {item}  Tên hoặc vật liệu của vật phẩm
+#   {key}  Khóa thông báo hoặc cấu hình
+#   {kind}  Loại đối tượng hoặc nhà cung cấp
+#   {kinds}  Các loại đối tượng hoặc nhà cung cấp có sẵn
+#   {labels}  Số nhãn văn bản
+#   {legacy}  Mã định danh trong nguồn nhập
+#   {level}  Cấp độ được hiển thị
+#   {limit}  Giới hạn cho phép
+#   {line}  Số dòng trong thông báo
+#   {locale}  Mã ngôn ngữ
+#   {maximum}  Giá trị tối đa cho phép
+#   {maximumBees}  Số ong tối đa
+#   {maximumHoney}  Mức mật ong tối đa
+#   {menu}  Mã định danh trình đơn
+#   {message}  Thông báo phản hồi hoặc chẩn đoán
+#   {migrated}  Số mục đã chuyển đổi
+#   {minimum}  Giá trị tối thiểu cho phép
+#   {mode}  Chế độ thao tác hoặc hiển thị đã chọn
+#   {name}  Tên đối tượng
+#   {oldBoard}  Mã định danh bảng trước đó
+#   {operation}  Tên thao tác
+#   {options}  Các tùy chọn lệnh có sẵn
+#   {overlaid}  Số khóa cấu hình đã áp dụng
+#   {page}  Số trang hiện tại
+#   {pages}  Tổng số trang
+#   {panels}  Số bảng điều khiển
+#   {parameter}  Tên tham số lệnh
+#   {path}  Đường dẫn tệp hoặc thư mục
+#   {pending}  Trạng thái xuất bản đang chờ
+#   {percent}  Giá trị phần trăm
+#   {permission}  Quyền cần thiết
+#   {personal}  Mã ngôn ngữ cá nhân
+#   {pitch}  Góc dọc tính bằng độ
+#   {player}  Tên người chơi
+#   {plugin}  Tên plugin
+#   {priority}  Độ ưu tiên lựa chọn hoặc kết xuất
+#   {provider}  Tên nhà cung cấp
+#   {providers}  Danh sách hoặc số nhà cung cấp
+#   {radius}  Bán kính tìm kiếm
+#   {ready}  Số mục sẵn sàng nhập
+#   {reason}  Lý do lỗi hoặc quyết định
+#   {resume}  Số mục nhập có thể tiếp tục
+#   {revision}  Phiên bản sửa đổi tài liệu
+#   {roll}  Góc nghiêng quanh hướng nhìn tính bằng độ
+#   {rotation}  Độ xoay phần hiển thị
+#   {scale}  Tỷ lệ hiển thị hoặc xem trước
+#   {seconds}  Thời gian tính bằng giây
+#   {session}  Mã định danh phiên chỉnh sửa
+#   {severity}  Mức độ nghiêm trọng của chẩn đoán
+#   {skipped}  Số mục đã bỏ qua
+#   {slots}  Số ô vật phẩm
+#   {source}  Nguồn nhập hoặc nhà cung cấp cấu hình
+#   {special}  Số thành phần hiển thị đặc biệt
+#   {state}  Trạng thái hiện tại
+#   {style}  Kiểu hiển thị
+#   {subject}  Đối tượng của phiên chỉnh sửa web
+#   {target}  Plugin nhận lựa chọn ngôn ngữ
+#   {temporary}  Số đối tượng tạm thời
+#   {text}  Văn bản được hiển thị
+#   {title}  Tiêu đề được hiển thị
+#   {to}  Giá trị đích hoặc cuối khoảng
+#   {total}  Tổng số mục
+#   {type}  Loại giá trị hoặc đối tượng dự kiến
+#   {url}  Địa chỉ web
+#   {usage}  Cú pháp lệnh
+#   {uuid}  Mã định danh duy nhất của đối tượng hoặc người chơi
+#   {value}  Giá trị thông báo hoặc tham số hiện tại
+#   {variables}  Các biến được phép dùng trong thông báo
+#   {variants}  Số lượng hoặc danh sách biến thể hiển thị
+#   {viewPermission}  Quyền cần để xem
+#   {viewRange}  Khoảng cách xem tối đa
+#   {warnings}  Số cảnh báo
+#   {when}  Điều kiện hiển thị
+#   {world}  Tên thế giới
+#   {x}  Tọa độ X
+#   {y}  Tọa độ Y
+#   {yaw}  Góc ngang tính bằng độ
+#   {z}  Tọa độ Z
+
+[command.help]
+debug = "Lệnh chẩn đoán"
+debugdump = "Tạo báo cáo chẩn đoán và tải lên nếu muốn"
+debugdump_upload = "Tải báo cáo lên mclo.gs"
+root = "Nhóm lệnh Gloss"
+hologram = "Tạo và quản lý hologram"
+"hologram.create" = "Tạo hologram tại vị trí của bạn"
+"hologram.create.id" = "ID hologram duy nhất"
+"hologram.delete" = "Xóa một hologram"
+"hologram.delete.id" = "ID hologram cần xóa"
+"hologram.addline" = "Thêm một dòng vào cuối hologram"
+"hologram.addline.id" = "ID hologram"
+"hologram.addline.text" = "Văn bản dòng; đặt trong dấu ngoặc kép để chứa khoảng trắng"
+"hologram.setline" = "Thay thế một dòng của hologram"
+"hologram.setline.id" = "ID hologram"
+"hologram.setline.line" = "Số dòng, bắt đầu từ 1"
+"hologram.setline.text" = "Văn bản dòng; đặt trong dấu ngoặc kép để chứa khoảng trắng"
+"hologram.removeline" = "Xóa một dòng của hologram"
+"hologram.removeline.id" = "ID hologram"
+"hologram.removeline.line" = "Số dòng, bắt đầu từ 1"
+"hologram.clear" = "Xóa mọi dòng khỏi hologram"
+"hologram.clear.id" = "ID hologram"
+"hologram.movehere" = "Di chuyển hologram đến vị trí của bạn"
+"hologram.movehere.id" = "ID hologram"
+"hologram.move" = "Dời hologram theo khoảng cách khối tương đối"
+"hologram.move.id" = "ID hologram"
+"hologram.move.x" = "Độ dời X tương đối tính bằng khối"
+"hologram.move.y" = "Độ dời Y tương đối tính bằng khối"
+"hologram.move.z" = "Độ dời Z tương đối tính bằng khối"
+"hologram.tp" = "Dịch chuyển tức thời bạn đến hologram"
+"hologram.tp.id" = "ID hologram"
+"hologram.list" = "Liệt kê hologram; nhấp để dịch chuyển tức thời"
+"hologram.info" = "Hiển thị vị trí và các dòng của hologram"
+"hologram.info.id" = "ID hologram"
+"hologram.rendertext" = "Tạo hologram văn bản với tỷ lệ hiển thị gốc"
+"hologram.rendertext.id" = "ID hologram duy nhất"
+"hologram.rendertext.text" = "Văn bản cần hiển thị; đặt trong dấu ngoặc kép nếu có khoảng trắng"
+"hologram.rendertext.scale" = "Hệ số tỷ lệ TextDisplay"
+"hologram.orient" = "Đặt cách hologram xoay về phía người xem"
+"hologram.orient.id" = "ID hologram"
+"hologram.orient.billboard" = "CENTER, VERTICAL, HORIZONTAL hoặc FIXED"
+"hologram.orient.yaw" = "Góc xoay ngang (yaw) tính bằng độ, từ -180 đến 180"
+"hologram.orient.pitch" = "Góc xoay dọc (pitch) tính bằng độ, từ -90 đến 90"
+board = "Tạo và quản lý bảng điểm"
+"board.create" = "Tạo một bảng điểm"
+"board.create.id" = "ID bảng điểm duy nhất"
+"board.delete" = "Xóa một bảng điểm"
+"board.delete.id" = "ID bảng điểm cần xóa"
+"board.title" = "Đặt tiêu đề bảng điểm"
+"board.title.id" = "ID bảng điểm"
+"board.title.text" = "Văn bản tiêu đề; đặt trong dấu ngoặc kép để chứa khoảng trắng"
+"board.addline" = "Thêm một dòng vào cuối bảng điểm"
+"board.addline.id" = "ID bảng điểm"
+"board.addline.text" = "Văn bản dòng; đặt trong dấu ngoặc kép để chứa khoảng trắng"
+"board.setline" = "Thay thế một dòng của bảng điểm"
+"board.setline.id" = "ID bảng điểm"
+"board.setline.line" = "Số dòng, bắt đầu từ 1"
+"board.setline.text" = "Văn bản dòng; đặt trong dấu ngoặc kép để chứa khoảng trắng"
+"board.removeline" = "Xóa một dòng của bảng điểm"
+"board.removeline.id" = "ID bảng điểm"
+"board.removeline.line" = "Số dòng, bắt đầu từ 1"
+"board.show" = "Hiển thị bảng điểm cho chính bạn"
+"board.show.id" = "ID bảng điểm"
+"board.hide" = "Ẩn bảng điểm của bạn"
+"board.select" = "Thiết lập lựa chọn bảng điểm tự động"
+"board.select.id" = "ID bảng điểm"
+"board.select.priority" = "Mức ưu tiên lựa chọn"
+"board.select.when" = "Điều kiện logic; đặt biểu thức chứa khoảng trắng trong dấu ngoặc kép"
+"board.list" = "Liệt kê bảng điểm"
+"board.info" = "Hiển thị tiêu đề, các dòng và cài đặt của bảng điểm"
+"board.info.id" = "ID bảng điểm"
+"board.reset" = "Khôi phục bảng điểm mặc định đi kèm"
+emoji = "Công cụ emoji trong chat"
+"emoji.list" = "Liệt kê emoji đã bật; nhấp để chèn vào chat"
+"emoji.reset" = "Khôi phục emoji mặc định đi kèm"
+animations = "Công cụ hoạt ảnh"
+"animations.list" = "Liệt kê tên hoạt ảnh"
+"animations.reset" = "Khôi phục hoạt ảnh mặc định đi kèm"
+bubbles = "Kiểu bong bóng chat"
+"bubbles.style" = "Chọn kiểu bong bóng chat của bạn, hoặc clear để chọn tự động"
+"bubbles.style.style" = "ID kiểu, hoặc clear"
+"bubbles.reset" = "Khôi phục kiểu bong bóng mặc định đi kèm"
+tablist = "Công cụ tablist"
+"tablist.reset" = "Khôi phục tài liệu tablist đi kèm"
+motd = "Công cụ MOTD"
+"motd.reset" = "Khôi phục tài liệu MOTD đi kèm"
+drops = "Công cụ hiển thị vật phẩm rơi"
+"drops.reset" = "Khôi phục tài liệu cài đặt vật phẩm rơi đi kèm"
+indicators = "Công cụ chỉ báo sát thương và hồi máu"
+"indicators.reset" = "Khôi phục tài liệu cài đặt chỉ báo sát thương đi kèm"
+status = "Hiển thị số liệu thời gian chạy ngắn gọn"
+import = "Di chuyển hologram cũ mà không sửa đổi tệp nguồn"
+"import.apply" = "Áp dụng di chuyển hologram cũ không ghi đè"
+"import.holoui" = "Sao chép dữ liệu HoloUi từ plugins/holoui, ghi đè các lần nhập trước"
+"import.legacy" = "Di chuyển các tệp dữ liệu Gloss trước hợp nhất sang định dạng gói v2"
+"import.preview" = "Xem trước di chuyển hologram cũ không phá hủy"
+item = "Công cụ nhà cung cấp vật phẩm tùy chỉnh"
+"item.export" = "Xuất danh mục vật phẩm tùy chỉnh cho trình chỉnh sửa web"
+"item.status" = "Hiển thị những nhà cung cấp vật phẩm tùy chỉnh đang hoạt động"
+menu = "Tạo, mở và chỉnh sửa menu hologram"
+"menu.addrow" = "Thêm một hàng trang trí văn bản vào cuối"
+"menu.back" = "Mở lại phiên menu trước của bạn"
+"menu.close" = "Đóng phiên menu đang mở của bạn"
+"menu.copy" = "Sao chép menu đã nạp sang ID lồng nhau mới"
+"menu.create" = "Tạo hologram cố định tại vị trí hiện tại của bạn"
+"menu.image" = "Thay nội dung menu bằng một tệp hình ảnh căn giữa"
+"menu.insertrow" = "Chèn một hàng trang trí văn bản"
+"menu.list" = "Liệt kê tất cả menu đã cấu hình mà bạn có thể mở"
+"menu.move" = "Di chuyển menu đang mở đến vị trí hiện tại của bạn"
+"menu.new" = "Tạo menu hologram trống từ bản cơ sở đi kèm"
+"menu.offsetrow" = "Dời một hàng với độ dời tuyệt đối hoặc ~tương đối"
+"menu.open" = "Mở menu theo ID, hoặc hiển thị danh sách menu khi đặt là *"
+"menu.removerow" = "Xóa một hàng thành phần"
+"menu.seticon" = "Thay biểu tượng của hàng nút hoặc hàng trang trí"
+"menu.setrow" = "Đặt văn bản của hàng nút hoặc hàng trang trí"
+"menu.style" = "Đặt hoặc xóa một thuộc tính kiểu hiển thị của hàng"
+panel = "Công cụ panel cố định trong thế giới"
+"panel.addrow" = "Thêm một hàng văn bản vào cuối menu gốc của panel"
+"panel.align" = "Căn các trục vị trí của panel theo panel khác"
+"panel.cancel" = "Hủy chỉnh sửa tạm của panel"
+"panel.copy" = "Sao chép panel cố định sang ID mới"
+"panel.create" = "Tạo panel tại vị trí hiện tại của bạn"
+"panel.delete" = "Xóa panel cố định"
+"panel.edit" = "Bắt đầu phiên chỉnh sửa tạm cho panel"
+"panel.follow" = "Theo dõi người chơi trực tuyến với chế độ xoay fixed, yaw, hoặc full"
+"panel.here" = "Di chuyển panel đến vị trí hiện tại của bạn"
+"panel.image" = "Thay menu gốc của panel bằng một tệp hình ảnh căn giữa"
+"panel.info" = "Hiển thị trạng thái đầy đủ của một panel"
+"panel.insertrow" = "Chèn một hàng văn bản vào menu gốc của panel"
+"panel.list" = "Liệt kê panel cố định theo trang"
+"panel.menu" = "Đặt menu gốc của panel"
+"panel.move" = "Di chuyển panel đến tọa độ tuyệt đối hoặc ~tương đối"
+"panel.near" = "Liệt kê panel gần vị trí hiện tại của bạn"
+"panel.offsetrow" = "Dời một hàng trong menu gốc của panel với độ dời tuyệt đối hoặc ~tương đối"
+"panel.permissions" = "Thay đổi quyền xem và tương tác của panel"
+"panel.ranges" = "Đặt phạm vi xem và tương tác của panel"
+"panel.removerow" = "Xóa một hàng trong menu gốc của panel"
+"panel.rename" = "Đổi tên panel cố định"
+"panel.rotate" = "Đặt yaw, pitch và roll tuyệt đối hoặc ~tương đối"
+"panel.save" = "Lưu chỉnh sửa tạm của panel"
+"panel.scale" = "Đặt tỷ lệ panel tuyệt đối hoặc ~tương đối"
+"panel.seticon" = "Thay biểu tượng hàng trong menu gốc của panel"
+"panel.setrow" = "Đặt văn bản trên một hàng của menu gốc panel"
+"panel.style" = "Đặt hoặc xóa một thuộc tính kiểu hiển thị của hàng"
+"panel.teleport" = "Dịch chuyển tức thời đến panel cố định"
+"panel.unfollow" = "Dừng panel theo dõi người chơi"
+"panel.visibility" = "Đặt chế độ hiển thị và node quyền"
+preview = "Công cụ tài liệu xem trước"
+"preview.dump" = "Dựng một tài liệu xem trước một lần và in số lượng phần tử của nó"
+"preview.list" = "Liệt kê tài liệu xem trước và quy tắc khớp của chúng"
+"preview.reset" = "Khôi phục mặc định xem trước đi kèm (không xóa tài liệu người dùng bổ sung có thể che khuất chúng)"
+web = "Mở và quản lý trình chỉnh sửa web Gloss"
+"web.open" = "Mở trình chỉnh sửa Gloss trống được lưu trữ trên web"
+"web.edit" = "Mở một tài liệu Gloss đang đồng bộ trực tiếp"
+"web.edit.document" = "Mở tài liệu đang đồng bộ này trong trình chỉnh sửa web"
+"web.workspace" = "Mở toàn bộ không gian làm việc Gloss đang đồng bộ trực tiếp"
+"web.sessions" = "Quản lý các phiên trình chỉnh sửa web đang hoạt động"
+"web.sessions.list" = "Liệt kê các phiên trình chỉnh sửa web đang hoạt động"
+"web.sessions.pull" = "Kiểm tra cập nhật của một phiên trình chỉnh sửa web ngay"
+"web.sessions.revoke" = "Thu hồi quyền truy cập trình chỉnh sửa web"
+"web.sessions.status" = "Hiển thị một phiên trình chỉnh sửa web"
+language = "Chọn ngôn ngữ của bạn hoặc ngôn ngữ mặc định của máy chủ"
+
+[command.help.arg]
+reset_name = "Tên cần đặt lại, hoặc * cho mọi mặc định đi kèm"
+panel_axes = "Trục: x, y, z, xy, xz, yz, hoặc xyz"
+panel_follow_rotation = "Chế độ xoay khi theo dõi: fixed, yaw, hoặc full"
+panel_id = "ID panel cố định"
+panel_interact_permission = "Quyền tương tác, hoặc -"
+panel_interaction_range = "Phạm vi tương tác dương"
+panel_menu = "ID menu gốc; mặc định là ID panel"
+panel_new_id = "ID panel cố định mới"
+panel_pitch = "Pitch tuyệt đối hoặc ~tương đối"
+panel_player = "Người chơi mục tiêu đang trực tuyến"
+panel_radius = "Bán kính tìm kiếm theo phương ngang"
+panel_reference = "ID panel tham chiếu"
+panel_roll = "Roll tuyệt đối hoặc ~tương đối"
+panel_root_menu = "ID menu gốc"
+panel_scale = "Tỷ lệ tuyệt đối hoặc ~tương đối"
+panel_view_permission = "Quyền xem, hoặc -"
+panel_view_range = "Phạm vi xem dương"
+panel_visibility = "Chế độ hiển thị: public, permission, hoặc hidden"
+panel_x = "X tuyệt đối hoặc ~tương đối"
+panel_y = "Y tuyệt đối hoặc ~tương đối"
+panel_yaw = "Yaw tuyệt đối hoặc ~tương đối"
+panel_z = "Z tuyệt đối hoặc ~tương đối"
+content_menu = "ID menu đã nạp"
+web_subject = "ID tài liệu Gloss đang đồng bộ trực tiếp"
+hologram_id = "ID của hologram mới và menu gốc"
+hologram_text = "Văn bản MiniMessage tùy chọn"
+image_path = "Tệp nằm trong thư mục hình ảnh của Gloss"
+import_source = "Nguồn hologram cũ"
+menu = "ID menu cần mở (* hiển thị tất cả menu)"
+new_panel_id = "ID panel cố định mới"
+new_menu = "ID menu lồng nhau mới"
+list_page = "Trang danh sách, bắt đầu từ 1"
+previews_dump_name = "Tên tài liệu cần dựng"
+previews_name = "Tên tài liệu cần đặt lại, hoặc * cho mọi tài liệu đi kèm"
+row_icon_type = "Loại biểu tượng"
+row_icon_value = "Nội dung biểu tượng hoặc ID registry"
+row_index = "Hàng thành phần, bắt đầu từ 1"
+row_style_property = "Thuộc tính kiểu hiển thị"
+row_style_value = "Giá trị kiểu, hoặc * để xóa"
+row_text = "Văn bản MiniMessage của hàng"
+row_x = "X của hàng, tuyệt đối hoặc ~tương đối"
+row_y = "Y của hàng, tuyệt đối hoặc ~tương đối"
+row_z = "Z của hàng, tuyệt đối hoặc ~tương đối"
+source_menu = "ID menu nguồn đã nạp"
+web_session = "ID phiên của trình chỉnh sửa web"
+
+[command.error]
+no_permission = "&8[&dGloss&8] &cBạn không có quyền."
+no_permission_use = "&8[&dGloss&8] &cBạn không có quyền sử dụng lệnh đó."
+usage = "&7Cách dùng: &f/{command} help"
+
+[command.hologram]
+exists = "&8[&dGloss&8] &cHologram '&f{id}&c' đã tồn tại."
+missing = "&8[&dGloss&8] &cKhông có hologram nào tên '&f{id}&c'."
+created = "&8[&dGloss&8] &aĐã tạo hologram &f{id}&a."
+deleted = "&8[&dGloss&8] &aĐã xóa hologram &f{id}&a."
+line_added = "&8[&dGloss&8] &aĐã thêm dòng &f{line}&a vào &f{id}&a."
+line_set = "&8[&dGloss&8] &aĐã đặt dòng &f{line}&a trên &f{id}&a."
+line_removed = "&8[&dGloss&8] &aĐã xóa dòng &f{line}&a khỏi &f{id}&a."
+line_out_of_range = "&8[&dGloss&8] &cDòng {line} nằm ngoài phạm vi; &f{id}&c có {count} dòng."
+cleared = "&8[&dGloss&8] &aĐã xóa tất cả các dòng trên &f{id}&a."
+moved = "&8[&dGloss&8] &aĐã di chuyển &f{id}&a đến vị trí của bạn."
+offset = "&8[&dGloss&8] &aĐã dời &f{id}&a theo &f{x}&a, &f{y}&a, &f{z}&a."
+teleported = "&8[&dGloss&8] &aĐã dịch chuyển tức thời đến &f{id}&a."
+list_empty = "&8[&dGloss&8] &7Chưa có hologram nào."
+rendered = "&8[&dGloss&8] &aĐã tạo hologram văn bản &f{id}&a với tỷ lệ &f{scale}&a."
+text_empty = "&8[&dGloss&8] &cVăn bản không được để trống."
+scale_out_of_range = "&8[&dGloss&8] &cTỷ lệ {value} nằm ngoài phạm vi; phải từ &f{minimum}&c đến &f{maximum}&c."
+oriented = "&8[&dGloss&8] &aĐã đặt &f{id}&a với billboard &f{billboard}&a, yaw &f{yaw}&a, pitch &f{pitch}&a."
+billboard_unknown = "&8[&dGloss&8] &cBillboard không hợp lệ '&f{billboard}&c'. Hãy dùng một trong &f{options}&c."
+angle_out_of_range = "&8[&dGloss&8] &cGiá trị {axis} {value} nằm ngoài phạm vi; phải từ &f-{limit}&c đến &f{limit}&c độ."
+
+[command.hologram.list]
+hover = "Nhấp để dịch chuyển tức thời"
+lines = "{count} dòng"
+
+[command.hologram.info]
+header = "&8[&dGloss&8] &d{id} &7tại &f{world} {x}, {y}, {z}"
+line = " &8{line}. &f{text}"
+orientation = " &8tỷ lệ &f{scale} &8billboard &f{billboard} &8yaw &f{yaw} &8pitch &f{pitch}"
+
+[command.board]
+exists = "&8[&dGloss&8] &cBảng điểm '&f{id}&c' đã tồn tại."
+missing = "&8[&dGloss&8] &cKhông có bảng điểm nào tên '&f{id}&c'."
+created = "&8[&dGloss&8] &aĐã tạo bảng điểm &f{id}&a."
+deleted = "&8[&dGloss&8] &aĐã xóa bảng điểm &f{id}&a."
+title_set = "&8[&dGloss&8] &aĐã đặt tiêu đề của &f{id}&a."
+line_added = "&8[&dGloss&8] &aĐã thêm dòng &f{line}&a vào &f{id}&a."
+line_set = "&8[&dGloss&8] &aĐã đặt dòng &f{line}&a trên &f{id}&a."
+line_removed = "&8[&dGloss&8] &aĐã xóa dòng &f{line}&a khỏi &f{id}&a."
+line_out_of_range = "&8[&dGloss&8] &cDòng {line} nằm ngoài phạm vi; &f{id}&c có {count} dòng."
+shown = "&8[&dGloss&8] &aĐang hiển thị bảng điểm &f{id}&a."
+hidden = "&8[&dGloss&8] &aBảng điểm của bạn đã được ẩn."
+select_set = "&8[&dGloss&8] &aĐã đặt mức ưu tiên lựa chọn của bảng điểm &f{id}&a thành &f{priority}&a."
+select_invalid = "&8[&dGloss&8] &cĐiều kiện bảng điểm không hợp lệ: &f{error}&c."
+list_empty = "&8[&dGloss&8] &7Chưa có bảng điểm nào."
+
+[command.board.list]
+hover = "Nhấp để xem chi tiết"
+
+[command.board.info]
+header = "&8[&dGloss&8] &d{id} &7có tiêu đề &f{title}"
+meta = "&7Ưu tiên: &f{priority}&7 | Điều kiện: &f{when}&7 | Biến thể: &f{variants}&7"
+line = " &8{line}. &f{text}"
+
+[command.emoji]
+empty = "&8[&dGloss&8] &7Không có emoji nào được bật."
+hover = "Nhấp để chèn vào chat"
+
+[command.animations]
+empty = "&8[&dGloss&8] &7Không có hoạt ảnh nào được nạp."
+header = "&8[&dGloss&8] &fHoạt ảnh: &d{count}"
+entry = "&8- &d{name}"
+
+[command.list]
+page = "&7Trang &f{page}&7/&f{pages} &8- &7hiển thị &f{from}&7-&f{to} &7trên &f{total}"
+next = "&7Trang tiếp theo: &f{command}"
+
+[command.status]
+holograms = "&7Hologram: &f{count} &8({temporary} tạm thời, {entities} thực thể)"
+boards = "&7Bảng điểm: &f{count}"
+emoji = "&7Emoji: &f{enabled}&8/&f{total}"
+animations = "&7Hoạt ảnh: &f{count}"
+effects = "&7Bong bóng: &f{bubbles} &8| &7Chỉ báo: &f{indicators} &8| &7Vật rơi: &f{drops}"
+
+[command.reset]
+done = "&8[&dGloss&8] &aĐã khôi phục &f{count}&a mặc định {kind} đi kèm."
+none = "&8[&dGloss&8] &cKhông có mặc định {kind} đi kèm nào khớp với '&f{name}&c'."
+
+[command.bubbles]
+style_set = "&8[&dGloss&8] &aĐã đặt kiểu bong bóng chat thành &f{style}&a."
+style_cleared = "&8[&dGloss&8] &aĐã xóa kiểu bong bóng chat; sẽ tự động chọn."
+style_unknown = "&8[&dGloss&8] &cKhông có kiểu bong bóng nào tên '&f{style}&c'."
+
+[command.import]
+config_unreadable = "&8[&dGloss&8] &cKhông thể tải gloss.toml: &f{reason}"
+
+[command.import.holoui]
+missing = "&8[&dGloss&8] &cKhông tìm thấy thư mục dữ liệu holoui bên cạnh thư mục dữ liệu Gloss."
+done = "&8[&dGloss&8] &aNhập HoloUi hoàn tất: &f{copied}&a đã sao chép, &f{skipped}&a đã bỏ qua, &f{overlaid}&a khóa cấu hình, &f{errors}&a lỗi."
+
+[command.import.legacy]
+done = "&8[&dGloss&8] &aDi chuyển dữ liệu cũ hoàn tất: &f{migrated}&a đã di chuyển, &f{absorbed}&a đã hấp thụ, &f{overlaid}&a khóa cấu hình, &f{errors}&a lỗi."
+
+[director.help]
+no_subcommands = "Không có lệnh con trên trang này."
+no_description = "Không có mô tả"
+command_group = "Nhóm lệnh. Nhấp để mở."
+category = "Danh mục lệnh"
+no_parameters = "Không có tham số. Nhấp để điền sẵn lệnh."
+parameters_hover = "Di chuột qua các tham số để tìm hiểu thêm."
+
+[director.help.navigation]
+back = "Quay lại"
+page = "Trang"
+
+[director.help.navigation.parent]
+hover = "Quay lại nhóm lệnh cha"
+
+[director.help.navigation.previous]
+hover = "Trang trước"
+
+[director.help.navigation.next]
+hover = "Trang sau"
+
+[director.help.parameter]
+required = "Tham số này là bắt buộc."
+optional = "Tham số này là tùy chọn."
+default = "Mặc định là \"{value}\" nếu không được chỉ định."
+type = "Tham số này có kiểu {type}."
+
+[director.runtime]
+usage = "Cách dùng: {usage}"
+
+[director.runtime.error]
+invalid_origin = "Không thể chạy lệnh này từ nguồn này."
+unknown_parameter = "Khóa tham số không xác định: {key}"
+unexpected_argument = "Đối số không mong đợi \"{argument}\". Các tham số tùy chọn phải được chỉ định bằng khóa, ví dụ seed=123"
+unclosed_group = "Thiếu dấu \"]\" đóng cho tham số {key}"
+conversion_failed = "Không thể chuyển \"{value}\" thành {type} cho {parameter}"
+default_parse_failed = "Không thể phân tích giá trị mặc định của tham số {parameter}"
+missing_argument = "Thiếu đối số \"{parameter}\" ({type})"
+execution_failed = "Không thể thực thi lệnh {command}: {reason}"
+
+[gloss.error]
+menu_name_required = "Tên menu không được để trống"
+hologram_id_required = "ID hologram không được để trống"
+panel_id_required = "ID bảng hiển thị không được để trống"
+web_subject_required = "ID tài liệu của trình chỉnh sửa web không được để trống"
+web_session_required = "ID phiên của trình chỉnh sửa web không được để trống"
+panel_player_required = "Người chơi đích không được để trống"
+row_icon_type_required = "Loại biểu tượng không được để trống"
+row_style_property_required = "Thuộc tính kiểu không được để trống"
+import_source_required = "Nguồn nhập dữ liệu cũ không được để trống"
+import_source_unknown = "Nguồn nhập dữ liệu cũ không xác định: {source}"
+
+[gloss.message]
+permission_denied = "&8[&dGloss&8]: &cBạn không có quyền &f{permission}&c."
+unknown_command = "&8[&dGloss&8]: &cLệnh không xác định \"&f{command}&c\"."
+
+[gloss.message.hologram]
+created = "&8[&dGloss&8]: &aĐã tạo hologram &f{hologram}&a với menu gốc &f{menu}&a tại vị trí của bạn."
+already_exists = "&8[&dGloss&8]: &cHologram, panel hoặc menu có tên &f{hologram}&c đã tồn tại."
+failed = "&8[&dGloss&8]: &cKhông thể tạo hologram &f{hologram}&c. Không có thay đổi nào được lưu."
+durability_uncertain = "&8[&dGloss&8]: &eKhông thể hoàn tất giao tác tạo hologram &f{hologram}&e một cách an toàn. Hãy khởi động lại Gloss trước khi kiểm tra hologram hoặc thử tạo lại."
+
+[gloss.message.menu]
+none = "&8[&dGloss&8]: &7Không có menu khả dụng."
+player_only = "&8[&dGloss&8]: &cChỉ người chơi mới có thể mở menu."
+no_previous = "&8[&dGloss&8]: &cKhông có menu trước đó."
+closed = "&8[&dGloss&8]: &aĐã đóng menu."
+moved = "&8[&dGloss&8]: &aĐã di chuyển menu."
+none_open = "&8[&dGloss&8]: &cHiện không có menu nào đang mở."
+unavailable = "&8[&dGloss&8]: &c\"{menu}\" không khả dụng."
+permission_denied = "&8[&dGloss&8]: &cBạn không có quyền mở \"{menu}\"."
+open_failed = "&8[&dGloss&8]: &cKhông thể mở menu \"{menu}\"."
+
+[gloss.message.menu.list]
+header = "Menu"
+entry = "Nhấp để mở {menu}."
+
+[gloss.message.menu.content]
+updated = "&8[&dGloss&8]: &aĐã áp dụng thao tác {operation} cho menu &f{menu}&a ở bản sửa đổi {revision}."
+created = "&8[&dGloss&8]: &aĐã tạo menu &f{menu}&a ở bản sửa đổi {revision}. Mở bằng /gloss menu open {menu} hoặc đặt bằng /gloss panel create {menu}."
+copied = "&8[&dGloss&8]: &aĐã sao chép menu &f{source}&a thành &f{menu}&a ở bản sửa đổi {revision}."
+revision_conflict = "&8[&dGloss&8]: &cMenu &f{menu}&c đã thay đổi trong lúc ghi (dự kiến {expected}, hiện tại {actual}). Hãy chạy lại lệnh."
+already_exists = "&8[&dGloss&8]: &cMenu &f{menu}&c đã tồn tại."
+invalid = "&8[&dGloss&8]: &cGiá trị nội dung menu không hợp lệ: &f{reason}&c."
+failed = "&8[&dGloss&8]: &cThao tác với nội dung menu &f{menu}&c thất bại: {reason}"
+
+[gloss.message.command]
+player_only = "&8[&dGloss&8]: &cLệnh này chỉ dành cho người chơi."
+
+[gloss.message.web]
+header = "Trình chỉnh sửa web"
+open_hover = "Nhấp để mở trình chỉnh sửa web Gloss."
+open = "&8[&dGloss&8]: &7Trình chỉnh sửa web: &f{url}&7"
+preparing = "&8[&dGloss&8]: &7Đang chuẩn bị phiên đồng bộ trình chỉnh sửa bảo mật cho &f{subject}&7..."
+unavailable = "&8[&dGloss&8]: &cKhông thể chỉnh sửa trực tiếp qua web. Hãy kiểm tra cấu hình đồng bộ trình chỉnh sửa và kết nối đến máy chủ chuyển tiếp."
+open_failed = "&8[&dGloss&8]: &cKhông thể mở &f{kind}&c=&f{subject}&c trong trình chỉnh sửa web trực tiếp: {reason}"
+open_console = "&8[&dGloss&8]: &7Liên kết cấp quyền chỉnh sửa cho &f{subject}&7: &f{url}&7"
+capability_warning = "&8[&dGloss&8]: &eURL này cho phép đưa thay đổi lên máy chủ cho đến khi bị thu hồi hoặc hết hạn. Hãy giữ bí mật liên kết."
+open_label = "Mở trình chỉnh sửa"
+copy_label = "Sao chép liên kết"
+revoke_label = "Thu hồi quyền"
+link_hover = "Mở trình chỉnh sửa, sao chép liên kết cấp quyền hoặc thu hồi phiên {session}."
+
+[gloss.message.web.sessions]
+list_empty = "&8[&dGloss&8]: &7Không có phiên đồng bộ trình chỉnh sửa nào đang hoạt động."
+status = "&8[&dGloss&8]: &7&f{session}&7 {kind}=&f{subject}&7 hết hạn sau=&f{seconds}&7giây bản đã phát hành=&f{revision}&7 đang chờ=&f{pending}&7"
+revoked = "&8[&dGloss&8]: &aĐã thu hồi phiên đồng bộ trình chỉnh sửa &f{session}&a."
+pulled = "&8[&dGloss&8]: &aĐã kiểm tra cập nhật của phiên đồng bộ trình chỉnh sửa &f{session}&a."
+unknown = "&8[&dGloss&8]: &cPhiên đồng bộ trình chỉnh sửa &f{session}&c không xác định hoặc đã hết hạn."
+failed = "&8[&dGloss&8]: &cThao tác đồng bộ trình chỉnh sửa cho phiên &f{session}&c thất bại: {reason}"
+
+[gloss.message.import]
+preview_started = "&8[&dGloss&8]: &7Đang quét &f{source}&7 để xem trước việc chuyển đổi mà không thay đổi dữ liệu..."
+apply_started = "&8[&dGloss&8]: &7Đang quét và chuyển đổi từ &f{source}&7 mà không ghi đè dữ liệu hiện có..."
+source_missing = "&8[&dGloss&8]: &7Không tìm thấy nguồn &f{source}&7 tại &f{path}&7."
+preview_summary = "&8[&dGloss&8]: &7Xem trước &f{source}&7: &a{ready}&7 sẵn sàng, &d{resume}&7 có thể tiếp tục, &e{conflicts}&7 xung đột, &c{errors}&7 lỗi, {warnings} cảnh báo. Nguồn: &f{path}&7"
+preview_entry = "&8- &7&f{legacy}&7 -> &f{board}&7 trạng thái=&f{state}&7 cảnh báo=&f{warnings}&7"
+apply_summary = "&8[&dGloss&8]: &7Chuyển đổi &f{source}&7: đã nhập &a{imported}&7, bỏ qua &e{skipped}&7, thất bại &c{failed}&7; quá trình quét báo {errors} lỗi và {warnings} cảnh báo."
+apply_entry = "&8- &7&f{legacy}&7 trạng thái=&f{state}&7 lý do=&f{reason}&7"
+issue = "&8- &f{legacy} &7{severity}: &f{reason}"
+busy = "&8[&dGloss&8]: &cMột quá trình chuyển đổi hologram cũ khác đang chạy."
+failed = "&8[&dGloss&8]: &cChuyển đổi hologram cũ từ &f{source}&c thất bại: {reason}"
+
+[gloss.message.config]
+reloaded = "&2Cấu hình \"{name}\" đã được tải lại."
+
+[gloss.message.hotload]
+singular = "&2Đã tải lại nóng {kinds} ({count} thay đổi)."
+plural = "&2Đã tải lại nóng {kinds} ({count} thay đổi)."
+
+[gloss.message.preview_scale]
+adjusting = "&7Kích thước xem trước: &f{percent}% &8- &7giữ Cúi + cuộn để đổi kích thước; nhấn Cúi hai lần để lưu"
+hidden = "&7Xem trước đã &cẩn &8- &7cuộn lên để khôi phục"
+size = "&7Kích thước xem trước: &f{percent}%"
+saved_hidden = "&7Xem trước được lưu ở trạng thái &cẩn &8- &7nhấn Cúi hai lần + cuộn lên trên vật chứa để khôi phục"
+saved = "&7Đã lưu kích thước xem trước: &f{percent}%"
+
+[gloss.message.drops]
+bundle_more = "+{count} loại nữa"
+
+[gloss.message.items]
+disabled = "&8[&dGloss&8]: &7Vật phẩm tùy chỉnh đang tắt. Đặt customItems thành true trong gloss.toml."
+
+[gloss.message.items.status]
+header = "Vật phẩm tùy chỉnh"
+summary = "{active}/{total} nguồn cung cấp đang hoạt động"
+entry = "Nguồn cung cấp {provider} từ plugin {plugin}."
+hint = "Nhấp để xuất danh mục cho trình chỉnh sửa web."
+
+[gloss.message.items.state]
+ready = "sẵn sàng, {count} ID"
+loading = "đã có, vẫn đang tải"
+inactive = "đã có, không có bộ kết nối"
+missing = "chưa cài đặt"
+
+[gloss.message.items.export]
+started = "&8[&dGloss&8]: &7Đang xuất danh mục vật phẩm tùy chỉnh..."
+done = "&8[&dGloss&8]: &aĐã ghi {count} vật phẩm từ {providers} nguồn cung cấp vào &f{path}&a."
+empty = "&8[&dGloss&8]: &7Không tìm thấy vật phẩm tùy chỉnh. Đã ghi danh mục trống vào &f{path}&7."
+failed = "&8[&dGloss&8]: &cKhông thể ghi danh mục vật phẩm tùy chỉnh. Hãy kiểm tra nhật ký."
+busy = "&8[&dGloss&8]: &cMột quá trình xuất danh mục đang chạy."
+
+[gloss.message.previews.list]
+header = "Tài liệu xem trước"
+empty = "&7Chưa tải tài liệu xem trước nào."
+entry = "khối={blocks} thực thể={entities} phần tử đặc biệt={special} ưu tiên={priority}"
+
+[gloss.message.previews.reset]
+started = "&8[&dGloss&8]: &7Đang đặt lại tài liệu xem trước \"&f{name}&7\"..."
+done = "&8[&dGloss&8]: &aĐã khôi phục {count} tài liệu xem trước đi kèm. Các tài liệu bổ sung của người dùng che khuất chúng không bị xóa."
+none = "&8[&dGloss&8]: &c\"{name}\" không phải tài liệu xem trước đi kèm; không có gì được đặt lại."
+
+[gloss.message.previews.dump]
+unknown = "&8[&dGloss&8]: &c\"{name}\" không phải tài liệu xem trước đã tải."
+result = "&8[&dGloss&8]: &7&a{name}&7: &f{total}&7 phần tử (bảng hiển thị={panels}, ô={cells}, ô vật phẩm={slots}, nhãn={labels})."
+no_errors = "&8[&dGloss&8]: &aKhông có lỗi dựng tài liệu."
+error_line = "&8[&dGloss&8]: &c{message}"
+error_more = "&8[&dGloss&8]: &7Còn {count} mục nữa (xem nhật ký bảng điều khiển)."
+
+[gloss.message.panels]
+created = "&8[&dGloss&8]: &aĐã tạo bảng hiển thị &f{board}&a ở bản sửa đổi {revision}."
+deleted = "&8[&dGloss&8]: &aĐã xóa bảng hiển thị &f{board}&a."
+renamed = "&8[&dGloss&8]: &aĐã đổi tên &f{oldBoard}&a thành &f{board}&a ở bản sửa đổi {revision}."
+copied = "&8[&dGloss&8]: &aĐã sao chép &f{source}&a thành &f{board}&a."
+updated = "&8[&dGloss&8]: &aĐã áp dụng thao tác {operation} cho &f{board}&a ở bản sửa đổi {revision}."
+teleported = "&8[&dGloss&8]: &aĐã dịch chuyển đến &f{board}&a."
+unknown = "&8[&dGloss&8]: &cBảng hiển thị &f{board}&c không xác định."
+already_exists = "&8[&dGloss&8]: &cBảng hiển thị &f{board}&c đã tồn tại."
+invalid = "&8[&dGloss&8]: &cGiá trị bảng hiển thị không hợp lệ: &f{reason}&c."
+menu_unavailable = "&8[&dGloss&8]: &cChưa tải menu gốc &f{menu}&c."
+player_unavailable = "&8[&dGloss&8]: &cNgười chơi đích &f{player}&c không trực tuyến."
+world_unavailable = "&8[&dGloss&8]: &cChưa tải thế giới &f{world}&c của bảng hiển thị với UUID đã lưu."
+revision_conflict = "&8[&dGloss&8]: &cBảng hiển thị &f{board}&c đã thay đổi trong lúc bạn chỉnh sửa (dự kiến {expected}, hiện tại {actual}). Hãy mở lại phiên chỉnh sửa."
+failed = "&8[&dGloss&8]: &cThao tác với bảng hiển thị &f{board}&c thất bại: {reason}"
+
+[gloss.message.panels.list]
+header = "&8[&dGloss&8]: &fBảng hiển thị được lưu lâu dài: &d{count}&f"
+empty = "&8[&dGloss&8]: &7Chưa tải bảng hiển thị được lưu lâu dài nào."
+entry = "&8- &7&f{board}&7 menu=&f{menu}&7 bản sửa đổi=&f{revision}&7"
+
+[gloss.message.panels.near]
+header = "&8[&dGloss&8]: &fBảng hiển thị trong bán kính &d{radius}&f khối: &d{count}&f"
+empty = "&8[&dGloss&8]: &7Không có bảng hiển thị nào trong bán kính đó."
+entry = "&8- &7&f{board}&7 khoảng cách=&f{distance}&7 menu=&f{menu}&7"
+
+[gloss.message.panels.info]
+header = "&8[&dGloss&8]: &fBảng hiển thị &d{board}&f (&7{state}&f)"
+identity = "&7UUID=&f{uuid}&7 bản sửa đổi=&f{revision}&7 menu=&f{menu}&7"
+transform = "&7thế giới=&f{world}&7 vị trí=&f{x}&7, &f{y}&7, &f{z}&7 góc xoay=&f{yaw}&7, &f{pitch}&7, &f{roll}&7 tỷ lệ=&f{scale}&7"
+visibility = "&7chế độ hiển thị=&f{mode}&7 quyền xem=&f{viewPermission}&7 quyền tương tác=&f{interactPermission}&7 phạm vi=&f{viewRange}&7/&f{interactionRange}&7"
+follow = "&7bám theo=&f{mode}&7 người chơi=&f{player}&7 góc xoay=&f{rotation}&7"
+
+[gloss.message.panels.edit]
+started = "&8[&dGloss&8]: &aĐang chỉnh sửa &f{board}&a từ bản sửa đổi {revision}. Thay đổi được giữ tạm cho đến khi lưu."
+already_active = "&8[&dGloss&8]: &cBạn đang chỉnh sửa &f{board}&c. Hãy lưu hoặc hủy trước."
+none = "&8[&dGloss&8]: &cBạn không có bản chỉnh sửa bảng hiển thị đang giữ tạm."
+busy = "&8[&dGloss&8]: &cBảng hiển thị &f{board}&c đang được lưu."
+staged = "&8[&dGloss&8]: &aĐã giữ tạm thao tác {operation} cho &f{board}&a. Dùng /gloss panel save để lưu."
+saved = "&8[&dGloss&8]: &aĐã lưu &f{board}&a ở bản sửa đổi {revision}."
+cancelled = "&8[&dGloss&8]: &aĐã hủy các chỉnh sửa đang giữ tạm của &f{board}&a."
+identity_blocked = "&8[&dGloss&8]: &cHãy lưu hoặc hủy bản chỉnh sửa đang giữ tạm của &f{board}&c trước khi đổi tên hoặc xóa."
+
+[gloss.preview.state]
+idle = "Không hoạt động"
+brewing = "Đang pha {percent}%"
+needs_blaze_powder = "Cần bột quỷ lửa"
+waiting = "Đang chờ"
+no_ingredient = "Không có nguyên liệu"
+empty = "Trống"
+smelting_item = "Đang nung {item} {percent}%"
+smelting = "Đang nung {percent}%"
+blasting_item = "Đang luyện {item} trong lò luyện kim {percent}%"
+blasting = "Đang luyện trong lò luyện kim {percent}%"
+smoking_item = "Đang hun khói {item} {percent}%"
+smoking = "Đang hun khói {percent}%"
+heating = "Đang làm nóng"
+needs_fuel = "Cần nhiên liệu"
+no_input = "Không có đầu vào"
+surge_suffix = "  +{seconds}s"
+disc_playing = "Đang phát: {disc}"
+disc_loaded = "Đã nạp: {disc}"
+no_disc = "Không có đĩa nhạc"
+
+[gloss.preview.stat]
+fuel_level = "Nhiên liệu {fuel}/{maximum}"
+no_fuel = "Không có nhiên liệu"
+bottles = "Chai {bottles}/{maximum}"
+fuel_seconds = "Nhiên liệu {seconds}s"
+fuel_ready = "Nhiên liệu sẵn sàng"
+xp_gain = "XP +{experience}"
+xp_zero = "XP 0"
+bees_and_honey = "Ong {bees}/{maximumBees}   Mật ong {honey}/{maximumHoney}"
+cauldron_empty = "Trống {level}/{maximum}"
+cauldron_level = "Mức {level}/{maximum}"
+
+[gloss.preview.theme.title]
+chest = "&6&lRương"
+trapped_chest = "&c&lRương gài bẫy"
+ender_chest = "&5&lRương Ender"
+barrel = "&e&lThùng"
+dispenser = "&7&lMáy phân phát"
+dropper = "&8&lMáy thả"
+hopper = "&8&lCái phễu"
+furnace = "&6&lLò nung"
+smoker = "&e&lLò hun khói"
+blast_furnace = "&b&lLò luyện kim"
+beehive = "&e&lTổ ong nhân tạo"
+bee_nest = "&e&lTổ ong tự nhiên"
+cauldron = "&7&lVạc"
+water_cauldron = "&9&lVạc nước"
+lava_cauldron = "&6&lVạc dung nham"
+powder_snow_cauldron = "&f&lVạc bột tuyết"
+jukebox = "&d&lHộp chơi nhạc"
+brewing_stand = "&d&lGiàn pha thuốc"
+chiseled_bookshelf = "&6&lKệ sách được đục"
+hopper_minecart = "&8&lXe mỏ có phễu"
+chest_minecart = "&6&lXe mỏ có rương"
+mobile = "&7&l{name}"
+shulker = "&l{color} Hộp Shulker"
+copper_chest = "&6&l{name}"
+shelf = "&6&l{name}"
+container = "&6&lThùng chứa"
+
+[language.menu]
+your_language = "Ngôn ngữ của bạn"
+reset_your_language = "Đặt lại ngôn ngữ của bạn"
+server_default = "Ngôn ngữ mặc định của máy chủ"
+edit_messages = "Chỉnh sửa thông báo ngôn ngữ"
+use_server_default = "Dùng ngôn ngữ mặc định của máy chủ"
+current = "Hiện tại: {locale}"
+current_with_personal = "Hiện tại: {locale} (Của bạn: {personal})"
+your_description = "Chỉ thay đổi những thông báo bạn thấy."
+reset_description = "Dùng ngôn ngữ mặc định của máy chủ."
+server_description = "Thay đổi ngôn ngữ mặc định của máy chủ."
+edit_description = "Mở trình chỉnh sửa thông báo cho từng ngôn ngữ."
+select_description = "Nhấp để chọn ngôn ngữ này."
+remove_personal_description = "Xóa lựa chọn ngôn ngữ cá nhân của bạn."
+no_controls = "Bạn không có quyền dùng các tùy chọn ngôn ngữ."
+command = "Câu lệnh: {command}"
+selected = "Đã chọn"
+all-volmit-plugins = "Tất cả plugin Volmit"
+
+[language.error]
+stopping = "Không có khả năng chọn ngôn ngữ trong khi bổ sung đang dừng."
+editor-player-only = "Mở trình soạn thảo ngôn ngữ trong trò chơi."
+no-providers = "Không có nhà cung cấp ngôn ngữ Volmit nào khả dụng."
+numeric-page = "Nhập số trang bằng chữ số."
+personal-player-only = "Bạn phải chọn ngôn ngữ cá nhân trong trò chơi."
+personal-permission = "Bạn không có quyền chọn ngôn ngữ của mình."
+plugin-personal-permission = "Bạn không có quyền chọn ngôn ngữ cá nhân cho {plugin}."
+plugin-server-permission = "Bạn không có quyền thay đổi ngôn ngữ máy chủ cho {plugin}."
+server-locale-required = "Chọn mã ngôn ngữ như en_US làm ngôn ngữ mặc định của máy chủ."
+unavailable-for-all = "Ngôn ngữ {locale} không khả dụng cho tất cả plugin đã chọn."
+
+[language.usage]
+editor = "Cách dùng: /{command} language server edit [locale]"
+selection = "Cách dùng: /{command} language self [locale|reset] or server [locale]"
+volmit-selection = "Cách dùng: /volmit plugins languages [locale]"
+
+[language.selection]
+preparing = "Đang chuẩn bị ngôn ngữ {locale} cho {target}..."
+save-failed = "{plugin}: không thể lưu lựa chọn ngôn ngữ; hãy kiểm tra bảng điều khiển máy chủ."
+english-fallback = "{plugin}: {locale} không khả dụng; sẽ dùng tiếng Anh (en_US)."
+personal-selected = "{plugin}: ngôn ngữ của bạn hiện là {locale}."
+server-selected = "{plugin}: ngôn ngữ máy chủ hiện là {locale}."
+server-default-selected = "{plugin}: ngôn ngữ của bạn hiện theo ngôn ngữ mặc định của máy chủ."
+
+[language.editor]
+loading = "Đang tải tin nhắn cho {locale}..."
+
+[language.editor.section]
+languages = "Ngôn ngữ"
+search = "Tìm kiếm"
+search-title = "{locale} / Tìm kiếm"
+group-title = "{locale} / {group}"
+
+[language.editor.prompt]
+search = "Tìm khóa hoặc nội dung tin nhắn. Nhập cancel để quay lại."
+value = "Nhập giá trị mới cho {key} trong trò chuyện."
+current = "Giá trị hiện tại: {value}"
+variables = "Biến: {variables}"
+guidance = "Dùng \\n để xuống dòng, \\\\ để nhập dấu gạch chéo ngược, hoặc nhập cancel để quay lại."
+
+[language.editor.input]
+expired = "Đã hết thời gian nhập trong trình chỉnh sửa ngôn ngữ."
+too-long = "Nội dung nhập chỉ được có tối đa {maximum} ký tự."
+unable-to-save = "Không thể lưu: {reason}"
+
+[language.editor.navigation]
+back = "&eQuay lại&r"
+close = "&cĐóng&r"
+previous-page = "&eTrang trước&r"
+next-page = "&eTrang kế&r"
+
+[language.editor.search]
+messages = "Tìm tin nhắn"
+messages-lore = "Nhấn vào để tìm kiếm mọi tin nhắn."
+clear = "Xóa tìm kiếm"
+
+[language.editor.message]
+current-value = "&7Giá trị hiện có:&r"
+variables = "&8{variables}&r"
+edit-plural = "&7Nhấp để chỉnh sửa một dạng số nhiều.&r"
+edit-lines = "&7Nhấp để chỉnh sửa từng dòng.&r"
+edit-chat = "&7Nhấp để chỉnh sửa trong trò chuyện.&r"
+
+[language.editor.locale]
+open = "&8Nhấn vào để mở ngôn ngữ này.&r"
+
+[language.editor.category]
+message-count = "&7{count} tin nhắn&r"
+open = "&8Nhấn vào để mở phân loại này.&r"
+
+[language.editor.error]
+no-permission = "Bạn không có quyền chỉnh sửa ngôn ngữ của {plugin}."
+unable-to-edit = "Không thể chỉnh sửa: {reason}"
+
+[language.editor.saved]
+summary = "Đã lưu {locale}. Các lựa chọn ngôn ngữ không thay đổi."
+change = "{key}: “{before}” đã đổi thành “{after}”."
+
+[language.editor.part]
+line = "Dòng {line}"
+
+[language.editor.value]
+none = "Không có"
+empty = "(trống)"

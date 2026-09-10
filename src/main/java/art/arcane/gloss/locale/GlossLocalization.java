@@ -6,13 +6,15 @@ import art.arcane.volmlib.util.director.DirectorTextResolver;
 import art.arcane.volmlib.util.localization.PluginLanguageService;
 import art.arcane.volmlib.util.localization.PluginLanguageEditor;
 import art.arcane.volmlib.util.localization.LanguageFileEditor;
+import art.arcane.volmlib.util.localization.LanguageReferenceRenderer;
+import art.arcane.volmlib.util.localization.TomlLanguageEditor;
+import art.arcane.volmlib.util.localization.TomlLanguageParser;
 import art.arcane.volmlib.util.localization.MessageValue;
-import art.arcane.volmlib.util.localization.TextValue;
-import art.arcane.volmlib.util.localization.PluralValue;
 import art.arcane.volmlib.util.localization.LanguageAudience;
 import art.arcane.volmlib.util.localization.RemoteLanguageCatalog;
 import art.arcane.volmlib.util.format.ColorFormatter;
 import art.arcane.volmlib.util.io.FileWatcher;
+import art.arcane.volmlib.util.io.AtomicFileIO;
 import art.arcane.volmlib.util.localization.LocaleOverlay;
 import art.arcane.volmlib.util.localization.LocalizationCandidate;
 import art.arcane.volmlib.util.localization.LocalizationIssue;
@@ -24,7 +26,6 @@ import art.arcane.volmlib.util.localization.MessageArgumentKind;
 import art.arcane.volmlib.util.localization.MessageArgs;
 import art.arcane.volmlib.util.localization.MessageCatalog;
 import art.arcane.volmlib.util.localization.MessageKey;
-import art.arcane.volmlib.util.localization.PluralKey;
 import art.arcane.volmlib.util.localization.PluralSelector;
 import art.arcane.volmlib.util.localization.ResolvedText;
 import art.arcane.volmlib.util.localization.TextKey;
@@ -33,9 +34,6 @@ import art.arcane.volmlib.util.plugin.ComponentMessenger;
 import art.arcane.volmlib.util.plugin.ComponentText;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
-import org.bukkit.configuration.ConfigurationSection;
-import org.bukkit.configuration.InvalidConfigurationException;
-import org.bukkit.configuration.file.YamlConfiguration;
 
 import java.io.File;
 import java.io.IOException;
@@ -48,7 +46,6 @@ import java.nio.file.LinkOption;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -63,9 +60,7 @@ public final class GlossLocalization implements AutoCloseable {
   private static final int MAX_REPORTED_ISSUES = 12;
   private static final MessageCatalog CATALOG = GlossMessages.catalog();
 
-  private static final char YAML_PATH_SEPARATOR = '/';
-
-  private final File languageFile;
+  private volatile File languageFile;
   private final File dataFolder;
   private volatile PluginLanguageService languages;
   private final Logger logger;
@@ -84,15 +79,17 @@ public final class GlossLocalization implements AutoCloseable {
 
   GlossLocalization(File dataFolder, Logger logger, String configuredLocale, LongSupplier clock) {
     this.dataFolder = dataFolder;
-    this.languageFile = new File(dataFolder, "language.yml");
     this.logger = logger;
     this.clock = Objects.requireNonNull(clock, "clock");
     this.manager = new LocalizationManager(LocalizationCandidate.english(CATALOG, PluralSelector.oneOther()));
     this.configuredLocale = normalizeLocale(configuredLocale);
+    this.languageFile = localePath(this.configuredLocale).toFile();
     this.activeLocale = CATALOG.englishLocale();
-    ensureDefaultFile();
+    ensureEnglishFile();
     reload();
-    this.watcher = new FileWatcher(languageFile);
+    if (this.watcher == null) {
+      this.watcher = new FileWatcher(languageFile);
+    }
     this.nextContentReconciliationNanos = this.clock.getAsLong() + CONTENT_RECONCILIATION_NANOS;
   }
 
@@ -106,7 +103,7 @@ public final class GlossLocalization implements AutoCloseable {
 
   public PluginLanguageService enableLanguages(Gloss plugin) {
     languages = new PluginLanguageService(new PluginLanguageService.Options(
-        dataFolder.toPath().resolve("language-preferences.properties"),
+        dataFolder.toPath().resolve("languages/language-preferences.properties"),
         VolmitLocales::all,
         () -> configuredLocale,
         manager::snapshot,
@@ -131,6 +128,7 @@ public final class GlossLocalization implements AutoCloseable {
     manager.install(snapshot);
     configuredLocale = locale;
     activeLocale = locale;
+    watchLocale(locale);
   }
 
   LocalizationSnapshot snapshot() {
@@ -141,7 +139,7 @@ public final class GlossLocalization implements AutoCloseable {
     return service.snapshot();
   }
 
-  public boolean update() {
+  public synchronized boolean update() {
     FileWatcher current = watcher;
     if (current == null) {
       return false;
@@ -159,7 +157,7 @@ public final class GlossLocalization implements AutoCloseable {
     try {
       snapshot = captureSnapshot();
     } catch (IOException failure) {
-      throw new IllegalStateException("Could not capture a stable language.yml snapshot", failure);
+      throw new IllegalStateException("Could not capture a stable language snapshot", failure);
     }
     if (snapshot == null) {
       pendingAutomaticSnapshot = null;
@@ -194,8 +192,15 @@ public final class GlossLocalization implements AutoCloseable {
   }
 
   public synchronized boolean reload() {
+    ensureEnglishFile();
     if (!languageFile.exists()) {
-      ensureDefaultFile();
+      try {
+        install(configuredLocale, loadSelectedSnapshot(configuredLocale));
+        return true;
+      } catch (Exception failure) {
+        logger.log(Level.SEVERE, "Language reload failed for " + configuredLocale, failure);
+        return false;
+      }
     }
 
     LanguageSnapshot snapshot;
@@ -214,6 +219,7 @@ public final class GlossLocalization implements AutoCloseable {
 
   public synchronized boolean selectLocale(String locale) {
     configuredLocale = normalizeLocale(locale);
+    watchLocale(configuredLocale);
     return reload();
   }
 
@@ -390,34 +396,21 @@ public final class GlossLocalization implements AutoCloseable {
   }
 
   private synchronized LocalizationSnapshot saveEditor(PluginLanguageEditor.Edit edit) throws Exception {
-    LocalizationCandidate base = loadBaseCandidate(Files.readString(languageFile.toPath()), edit.locale());
-    Path path = overridePath(edit.locale());
+    LocaleOverlay proposed = LocaleOverlay.builder("language editor", edit.locale())
+        .put(edit.key(), edit.value()).build();
+    LocalizationSnapshot.create(new LocalizationCandidate(CATALOG, List.of(proposed), PluralSelector.oneOther()));
+    Path path = localePath(edit.locale());
     LocalizationSnapshot prepared = LanguageFileEditor.update(path, raw -> {
-      YamlConfiguration yaml = new YamlConfiguration();
-      yaml.options().pathSeparator(YAML_PATH_SEPARATOR);
-      try {
-          yaml.loadFromString(raw);
-      } catch (InvalidConfigurationException exception) {
-          throw new IOException("Could not parse language overrides: " + path, exception);
-      }
-      LocalizationSnapshot current = withOverride(base, parseEditorOverlay(yaml, edit.locale()));
+      LocalizationSnapshot current = LocalizationSnapshot.create(new LocalizationCandidate(CATALOG,
+          List.of(parseLanguageOverlay(raw, path.toString(), edit.locale())), PluralSelector.oneOther()));
       MessageKey key = CATALOG.key(edit.key());
       if (key == null || !current.value(key).equals(edit.expected())) {
         throw new IOException("Language message changed while it was being edited: " + edit.key());
       }
-      yaml.set("locale", edit.locale());
-      String messagePath = "messages/" + edit.key();
-      yaml.set(messagePath, null);
-      MessageValue value = edit.value();
-      if (value instanceof TextValue text) {
-        yaml.set(messagePath, text.template());
-      } else if (value instanceof PluralValue plural) {
-        yaml.createSection(messagePath, plural.forms());
-      } else {
-        throw new IllegalArgumentException("Unsupported language message shape: " + edit.key());
-      }
-      LocalizationSnapshot updated = withOverride(base, parseEditorOverlay(yaml, edit.locale()));
-      return new LanguageFileEditor.Prepared<>(yaml.saveToString(), updated);
+      String updatedContent = TomlLanguageEditor.upsert(raw, edit.key(), edit.value()).content();
+      LocalizationSnapshot updated = LocalizationSnapshot.create(new LocalizationCandidate(CATALOG,
+          List.of(parseLanguageOverlay(updatedContent, path.toString(), edit.locale())), PluralSelector.oneOther()));
+      return new LanguageFileEditor.Prepared<>(updatedContent, updated);
     });
     if (configuredLocale.equals(edit.locale())) {
       manager.install(prepared);
@@ -425,166 +418,99 @@ public final class GlossLocalization implements AutoCloseable {
     return prepared;
   }
 
-  private Path overridePath(String locale) {
+  private Path localePath(String locale) {
     if (!locale.matches("[A-Za-z0-9_-]{2,32}")) {
       throw new IllegalArgumentException("Invalid language locale: " + locale);
     }
-    return dataFolder.toPath().resolve("languages/overrides").resolve(locale + ".yml");
+    return dataFolder.toPath().resolve("languages").resolve(locale + ".toml");
   }
 
-  private LocaleOverlay parseEditorOverlay(YamlConfiguration yaml, String locale) {
-    if (yaml.contains("locale") && !locale.equals(yaml.getString("locale"))) {
-      throw new IllegalArgumentException("Language override must declare locale: " + locale);
-    }
-    LocaleOverlay.Builder overlay = LocaleOverlay.builder(overridePath(locale).toString(), locale);
-    ConfigurationSection messages = yaml.getConfigurationSection("messages");
-    if (messages != null) {
-      appendMessages(messages, overlay);
-    }
-    return overlay.build();
-  }
-
-  private LocalizationSnapshot withOverride(LocalizationCandidate base, LocaleOverlay override) {
-    List<LocaleOverlay> overlays = new ArrayList<>(base.overlays().size() + 1);
-    overlays.add(override);
-    overlays.addAll(base.overlays());
-    return LocalizationSnapshot.create(new LocalizationCandidate(CATALOG, overlays, PluralSelector.oneOther()));
-  }
-
-  private LocalizationCandidate loadCandidate(String rawContent, String selectedLocale) throws Exception {
-    LocalizationCandidate base = loadBaseCandidate(rawContent, selectedLocale);
-    Path path = overridePath(selectedLocale);
-    if (!Files.exists(path)) {
-      return base;
-    }
-    if (!Files.isRegularFile(path) || Files.size(path) > MAX_LANGUAGE_BYTES) {
-      throw new IOException("Language override is not a regular file within the size limit: " + path);
-    }
-    YamlConfiguration yaml = new YamlConfiguration();
-    yaml.options().pathSeparator(YAML_PATH_SEPARATOR);
-    yaml.loadFromString(Files.readString(path));
-    List<LocaleOverlay> overlays = new ArrayList<>(base.overlays().size() + 1);
-    overlays.add(parseEditorOverlay(yaml, selectedLocale));
-    overlays.addAll(base.overlays());
-    return new LocalizationCandidate(CATALOG, overlays, PluralSelector.oneOther());
-  }
-
-  private LocalizationCandidate loadBaseCandidate(String rawContent, String selectedLocale) throws Exception {
-    YamlConfiguration yaml = new YamlConfiguration();
-    yaml.options().pathSeparator(YAML_PATH_SEPARATOR);
-    yaml.loadFromString(rawContent);
-    LocaleOverlay.Builder overlay = LocaleOverlay.builder(languageFile.getPath(), selectedLocale);
-    ConfigurationSection messages = yaml.getConfigurationSection("messages");
-    if (messages != null) {
-      appendMessages(messages, overlay);
-    }
-
-    List<LocaleOverlay> overlays = new ArrayList<>();
-    overlays.add(overlay.build());
-    LocaleOverlay bundled = loadLanguageOverlay(selectedLocale);
-    if (bundled != null) {
-      overlays.add(bundled);
-    }
-    return new LocalizationCandidate(CATALOG, overlays, PluralSelector.oneOther());
+  private LocalizationCandidate loadCandidate(String rawContent, String selectedLocale) {
+    return new LocalizationCandidate(CATALOG,
+        List.of(parseRuntimeLanguageOverlay(rawContent, localePath(selectedLocale).toString(), selectedLocale)),
+        PluralSelector.oneOther());
   }
 
   private LocaleOverlay loadLanguageOverlay(String locale) throws Exception {
-    if (VolmitLocales.ENGLISH.equals(locale)) {
-      return null;
-    }
     if (!locale.matches("[A-Za-z0-9_-]{2,32}")) {
       throw new IllegalArgumentException("Invalid language locale: " + locale);
     }
-    Path file = dataFolder.toPath().resolve("languages").resolve(locale + ".yml");
+    Path file = dataFolder.toPath().resolve("languages").resolve(locale + ".toml");
     if (!Files.isRegularFile(file) && VolmitLocales.isBundled(locale)) {
       throw new IOException("Language file is not installed: " + locale);
     }
-    return Files.isRegularFile(file) ? parseLanguageOverlay(Files.readString(file), file.toString(), locale) : null;
+    if (!Files.isRegularFile(file)) {
+      return null;
+    }
+    if (Files.size(file) > MAX_LANGUAGE_BYTES) {
+      logger.warning("Using English for language file exceeding the size limit: " + file);
+      return null;
+    }
+    return parseRuntimeLanguageOverlay(Files.readString(file), file.toString(), locale);
   }
 
   LocalizationSnapshot loadSelectedSnapshot(String locale) throws Exception {
-    Path file = dataFolder.toPath().resolve("languages").resolve(locale + ".yml");
+    Path file = dataFolder.toPath().resolve("languages").resolve(locale + ".toml");
     if (!VolmitLocales.ENGLISH.equals(locale) && !Files.isRegularFile(file) && VolmitLocales.isBundled(locale)) {
       try (RemoteLanguageCatalog remote = RemoteLanguageCatalog.load(new RemoteLanguageCatalog.Options(
           "Gloss",
           URI.create("https://raw.githubusercontent.com/VolmitSoftware/Gloss/"),
-          "src/main/resources/languages", ".yml", "gloss-language-source.properties",
-          dataFolder.toPath().resolve(".language-cache"), GlossLocalization.class.getClassLoader()))) {
+          "src/main/resources/languages", ".toml", "gloss-language-source.properties",
+          GlossLocalization.class.getClassLoader()))) {
         remote.readOrInstall(locale, file, (selected, content) ->
             LocalizationSnapshot.create(new LocalizationCandidate(CATALOG,
-                List.of(parseLanguageOverlay(content, file.toString(), selected)), PluralSelector.oneOther())));
+                List.of(parseRuntimeLanguageOverlay(content, file.toString(), selected)), PluralSelector.oneOther())));
       }
     }
-    return LocalizationSnapshot.create(loadCandidate(Files.readString(languageFile.toPath()), locale));
+    ensureEnglishFile();
+    LocaleOverlay overlay = loadLanguageOverlay(locale);
+    return LocalizationSnapshot.create(new LocalizationCandidate(CATALOG,
+        overlay == null ? List.of() : List.of(overlay), PluralSelector.oneOther()));
   }
 
-  private LocaleOverlay parseLanguageOverlay(String content, String source, String locale) throws Exception {
-    YamlConfiguration yaml = new YamlConfiguration();
-    yaml.options().pathSeparator(YAML_PATH_SEPARATOR);
-    yaml.loadFromString(content);
-    if (!locale.equals(yaml.getString("locale"))) {
-      throw new IllegalArgumentException(source + " must declare locale: " + locale);
+  private LocaleOverlay parseRuntimeLanguageOverlay(String content, String source, String locale) {
+    try {
+      return parseLanguageOverlay(content, source, locale);
+    } catch (Exception failure) {
+      logger.log(Level.WARNING, "Using English for unreadable language file " + source, failure);
+      return LocaleOverlay.builder(source, locale).build();
     }
+  }
+
+  private LocaleOverlay parseLanguageOverlay(String content, String source, String locale) throws IOException {
     LocaleOverlay.Builder overlay = LocaleOverlay.builder(source, locale);
-    ConfigurationSection messages = yaml.getConfigurationSection("messages");
-    if (messages != null) {
-      appendMessages(messages, overlay);
+    for (Map.Entry<String, MessageValue> entry : TomlLanguageParser.parseValidValues(content, CATALOG).entrySet()) {
+      overlay.put(entry.getKey(), entry.getValue());
     }
     return overlay.build();
   }
 
-  private void appendMessages(ConfigurationSection messages, LocaleOverlay.Builder overlay) {
-    Map<String, Map<String, String>> pluralForms = new LinkedHashMap<>();
-    for (String path : messages.getKeys(true)) {
-      if (messages.isConfigurationSection(path)) {
-        continue;
-      }
-
-      Object value = messages.get(path);
-      String id = path.replace(YAML_PATH_SEPARATOR, '.');
-      if (!(value instanceof String template)) {
-        throw new IllegalArgumentException("Language value must be text: " + id);
-      }
-
-      MessageKey key = CATALOG.key(id);
-      if (key instanceof TextKey) {
-        overlay.text(id, template);
-        continue;
-      }
-
-      int separator = id.lastIndexOf('.');
-      String pluralId = separator < 0 ? "" : id.substring(0, separator);
-      if (CATALOG.key(pluralId) instanceof PluralKey) {
-        String category = id.substring(separator + 1);
-        pluralForms.computeIfAbsent(pluralId, ignored -> new LinkedHashMap<>()).put(category, template);
-        continue;
-      }
-
-      overlay.text(id, template);
+  private void ensureEnglishFile() {
+    Path path = localePath(VolmitLocales.ENGLISH);
+    if (Files.exists(path)) {
+      return;
     }
-
-    for (Map.Entry<String, Map<String, String>> entry : pluralForms.entrySet()) {
-      overlay.plural(entry.getKey(), entry.getValue());
+    try {
+      Files.createDirectories(path.getParent());
+      AtomicFileIO.writeString(path, LanguageReferenceRenderer.render(CATALOG, GlossLanguageReference.header()));
+    } catch (IOException failure) {
+      logger.log(Level.SEVERE, "Unable to create the English language file", failure);
     }
   }
 
-  private void ensureDefaultFile() {
-    if (languageFile.exists()) {
+  private void watchLocale(String locale) {
+    File selected = localePath(locale).toFile();
+    if (selected.equals(languageFile) && watcher != null) {
       return;
     }
-
-    try {
-      Files.createDirectories(languageFile.toPath().getParent());
-      YamlConfiguration yaml = new YamlConfiguration();
-      yaml.options().header(
-          "Gloss message overrides. Set the active language with the leading language key in gloss.toml.\n"
-              + "Add only the message keys you want to replace below messages; downloaded translations and English fill the rest."
-      );
-      yaml.createSection("messages");
-      yaml.save(languageFile);
-    } catch (Exception exception) {
-      logger.log(Level.SEVERE, "Unable to create the default language file", exception);
+    FileWatcher previous = watcher;
+    if (previous != null) {
+      previous.close();
     }
+    languageFile = selected;
+    watcher = new FileWatcher(selected);
+    observedHash = null;
+    pendingAutomaticSnapshot = null;
   }
 
   private static String normalizeLocale(String locale) {

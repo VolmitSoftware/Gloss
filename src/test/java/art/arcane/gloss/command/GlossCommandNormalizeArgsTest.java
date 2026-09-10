@@ -37,7 +37,6 @@ class GlossCommandNormalizeArgsTest {
     assertFalse(GlossCommandService.isScopedPositionalRoot(new String[]{"tablist", "reset"}));
     assertFalse(GlossCommandService.isScopedPositionalRoot(new String[]{"motd", "reset"}));
     assertFalse(GlossCommandService.isScopedPositionalRoot(new String[]{"status"}));
-    assertFalse(GlossCommandService.isScopedPositionalRoot(new String[]{"reload"}));
   }
 
   @Test

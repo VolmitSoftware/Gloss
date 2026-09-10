@@ -33,6 +33,7 @@ import art.arcane.volmlib.util.localization.LocalizationSnapshot;
 import art.arcane.gloss.menu.MenuSessionManager;
 import art.arcane.gloss.motd.MotdService;
 import art.arcane.gloss.panel.PanelRuntimeManager;
+import art.arcane.gloss.panel.PanelRepository;
 import art.arcane.gloss.panel.PanelService;
 import art.arcane.gloss.particle.ParticleService;
 import art.arcane.gloss.persistence.GlossPersistenceCoordinator;
@@ -338,7 +339,7 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
             menuCatalog = new MenuCatalog(getDataFolder());
             imageAssets = new ImageAssets(getDataFolder());
             panelService = new PanelService(this);
-            enableService("panels", this::startPanelService, panelService::shutdown);
+            enableService("panels", this::startPanelService, this::stopPanelService);
             startPreviewRegistry();
             itemProviders = new ItemProviderRegistry(this);
             enableService("item-providers", itemProviders::activateAll, itemProviders::shutdown);
@@ -434,9 +435,8 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
     }
 
     /**
-     * Operator-facing reload (/gloss reload). Cycles every service unconditionally: the operator is
-     * asking for everything on disk to be re-read, not just the parts gloss.toml happens to
-     * mention.
+     * Data imports cycle every service so imported documents are re-read even when gloss.toml
+     * settings have not changed.
      */
     public void reloadAll() {
         configReloadGeneration.incrementAndGet();
@@ -651,7 +651,7 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
     private void startLocaleWatcher() {
         watchdog.register(LOCALE_WATCHDOG_ENTRY, () -> {
             if (localization.update()) {
-                watchdog.recordHotload("language.yml", 1);
+                watchdog.recordHotload("languages/" + localization.languageFile().getName(), 1);
             }
         });
     }
@@ -988,6 +988,12 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
             return;
         }
         panelService.start();
+        watchdog.register(PanelRepository.DIRECTORY_NAME, panelService::poll);
+    }
+
+    private void stopPanelService() {
+        watchdog.unregister(PanelRepository.DIRECTORY_NAME);
+        panelService.shutdown();
     }
 
     /**

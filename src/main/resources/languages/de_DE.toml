@@ -1,0 +1,828 @@
+# Gloss — de_DE
+#
+# === Datei bearbeiten ===
+# plugins/Gloss/languages/de_DE.toml
+# Diese Datei kann direkt bearbeitet werden. Lokale Änderungen bleiben erhalten; fehlende oder ungültige Einträge verwenden das eingebaute Englisch.
+# /gloss language server edit de_DE
+#
+# === Präfix ===
+# Das Präfix &8[&dGloss&8] steht direkt in den Nachrichten; ändere es in jeder betroffenen Nachricht.
+#
+# === Formatierung ===
+# Farben: &0-&f, &k-&r, &#RRGGBB.
+#
+# === Variablen ===
+# Variablennamen unverändert lassen und nur die Variablen der jeweiligen Nachricht verwenden.
+#   {absorbed}  Übernommene Einträge
+#   {active}  Aktive Anbieter
+#   {actual}  Aktuelle Revision
+#   {after}  Wert nach der Änderung
+#   {argument}  Befehlsargument
+#   {axis}  Drehachse
+#   {bees}  Anzahl der Bienen
+#   {before}  Wert vor der Änderung
+#   {billboard}  Ausrichtungsmodus zum Spieler
+#   {blocks}  Anzahl der Blöcke
+#   {board}  Panel- oder Scoreboard-ID
+#   {bottles}  Anzahl der Flaschen
+#   {bubbles}  Anzahl der Sprechblasen
+#   {cells}  Anzahl der Zellen
+#   {color}  Farbe des Gegenstands
+#   {command}  Befehl oder Befehlspfad
+#   {conflicts}  Anzahl der Konflikte
+#   {copied}  Kopierte Einträge
+#   {count}  Anzahl der Einträge
+#   {disc}  Eingelegte Schallplatte
+#   {distance}  Entfernung in Blöcken
+#   {drops}  Anzahl der Anzeigen fallengelassener Gegenstände
+#   {enabled}  Anzahl aktivierter Einträge
+#   {entities}  Anzahl der Entitäten
+#   {error}  Fehlerbeschreibung
+#   {errors}  Anzahl der Fehler
+#   {expected}  Erwartete Revision
+#   {experience}  Gewonnene Erfahrung
+#   {failed}  Anzahl fehlgeschlagener Vorgänge
+#   {from}  Erster angezeigter Eintrag
+#   {fuel}  Verbleibender Brennstoff
+#   {group}  Nachrichtenkategorie
+#   {hologram}  Hologramm-ID
+#   {honey}  Honigstand
+#   {id}  Kennung des verwalteten Objekts
+#   {imported}  Importierte Einträge
+#   {indicators}  Anzahl der Schadensanzeigen
+#   {interactPermission}  Interaktionsberechtigung
+#   {interactionRange}  Maximale Interaktionsentfernung
+#   {item}  Verarbeiteter Gegenstand
+#   {key}  Nachrichten- oder Parameterschlüssel
+#   {kind}  Dokument- oder Standardwerttyp
+#   {kinds}  Geänderte Dateitypen
+#   {labels}  Anzahl der Beschriftungen
+#   {legacy}  Kennung in der Importquelle
+#   {level}  Aktueller Füllstand
+#   {limit}  Erlaubter absoluter Grenzwert
+#   {line}  Zeilennummer
+#   {locale}  Sprachkennung
+#   {maximum}  Maximalwert oder Kapazität
+#   {maximumBees}  Maximale Bienenanzahl
+#   {maximumHoney}  Maximaler Honigstand
+#   {menu}  Menü-ID
+#   {message}  Nachrichtentext
+#   {migrated}  Migrierte Einträge
+#   {minimum}  Erlaubter Mindestwert
+#   {mode}  Sichtbarkeits- oder Folgemodus
+#   {name}  Name des Objekts oder Dokuments
+#   {oldBoard}  Bisherige Panel-ID
+#   {operation}  Ausgeführter Vorgang
+#   {options}  Erlaubte Werte
+#   {overlaid}  Übernommene Konfigurationsschlüssel
+#   {page}  Aktuelle Seite
+#   {pages}  Anzahl der Seiten
+#   {panels}  Anzahl der Panels
+#   {parameter}  Parametername
+#   {path}  Datei- oder Quellpfad
+#   {pending}  Status ausstehender Änderungen
+#   {percent}  Fortschritt in Prozent
+#   {permission}  Erforderliche Berechtigung
+#   {personal}  Persönliche Sprache
+#   {pitch}  Vertikale Drehung
+#   {player}  Spielername
+#   {plugin}  Pluginname
+#   {priority}  Auswahlpriorität
+#   {provider}  Name des Gegenstandsanbieters
+#   {providers}  Anzahl der Anbieter
+#   {radius}  Suchradius in Blöcken
+#   {ready}  Importbereite Einträge
+#   {reason}  Ergebnis- oder Fehlergrund
+#   {resume}  Fortsetzbare Migrationseinträge
+#   {revision}  Dokumentrevision
+#   {roll}  Drehung um die Blickachse
+#   {rotation}  Drehmodus beim Folgen
+#   {scale}  Darstellungsskalierung
+#   {seconds}  Dauer oder Frist in Sekunden
+#   {session}  ID der Bearbeitungssitzung
+#   {severity}  Schweregrad des Problems
+#   {skipped}  Übersprungene Einträge
+#   {slots}  Anzahl der Plätze
+#   {source}  Kopier- oder Importquelle
+#   {special}  Anzahl der Spezialelemente
+#   {state}  Panel- oder Importstatus
+#   {style}  Name des Sprechblasenstils
+#   {subject}  ID des bearbeiteten Dokuments
+#   {target}  Plugin für die Sprachauswahl
+#   {temporary}  Anzahl temporärer Hologramme
+#   {text}  Zeileninhalt
+#   {title}  Scoreboard-Titel
+#   {to}  Letzter angezeigter Eintrag
+#   {total}  Gesamtzahl der Einträge
+#   {type}  Parametertyp
+#   {url}  Webadresse
+#   {usage}  Befehlssyntax
+#   {uuid}  Vollständige UUID
+#   {value}  Aktueller, voreingestellter oder eingegebener Wert
+#   {variables}  Variablen der Nachricht
+#   {variants}  Scoreboard-Varianten
+#   {viewPermission}  Sichtberechtigung
+#   {viewRange}  Maximale Sichtweite
+#   {warnings}  Anzahl der Warnungen
+#   {when}  Auswahlbedingung
+#   {world}  Weltname
+#   {x}  X-Koordinate
+#   {y}  Y-Koordinate
+#   {yaw}  Horizontale Drehung
+#   {z}  Z-Koordinate
+
+[command.help]
+debug = "Diagnosebefehle"
+debugdump = "Einen Diagnosebericht erstellen und optional hochladen"
+debugdump_upload = "Den Bericht zu mclo.gs hochladen"
+root = "Gloss-Befehlsgruppe"
+hologram = "Hologramme erstellen und verwalten"
+"hologram.create" = "Ein Hologramm an deiner Position erstellen"
+"hologram.create.id" = "Eindeutige Hologramm-ID"
+"hologram.delete" = "Ein Hologramm löschen"
+"hologram.delete.id" = "Zu löschende Hologramm-ID"
+"hologram.addline" = "Eine Zeile an ein Hologramm anhängen"
+"hologram.addline.id" = "Hologramm-ID"
+"hologram.addline.text" = "Zeilentext; für Leerzeichen in Anführungszeichen setzen"
+"hologram.setline" = "Eine Hologrammzeile ersetzen"
+"hologram.setline.id" = "Hologramm-ID"
+"hologram.setline.line" = "Zeilennummer, beginnend bei 1"
+"hologram.setline.text" = "Zeilentext; für Leerzeichen in Anführungszeichen setzen"
+"hologram.removeline" = "Eine Hologrammzeile entfernen"
+"hologram.removeline.id" = "Hologramm-ID"
+"hologram.removeline.line" = "Zeilennummer, beginnend bei 1"
+"hologram.clear" = "Alle Zeilen eines Hologramms entfernen"
+"hologram.clear.id" = "Hologramm-ID"
+"hologram.movehere" = "Ein Hologramm an deine Position verschieben"
+"hologram.movehere.id" = "Hologramm-ID"
+"hologram.move" = "Ein Hologramm um relative Blockabstände versetzen"
+"hologram.move.id" = "Hologramm-ID"
+"hologram.move.x" = "Relativer X-Versatz in Blöcken"
+"hologram.move.y" = "Relativer Y-Versatz in Blöcken"
+"hologram.move.z" = "Relativer Z-Versatz in Blöcken"
+"hologram.tp" = "Dich zu einem Hologramm teleportieren"
+"hologram.tp.id" = "Hologramm-ID"
+"hologram.list" = "Hologramme auflisten; zum Teleportieren eines anklicken"
+"hologram.info" = "Position und Zeilen eines Hologramms anzeigen"
+"hologram.info.id" = "Hologramm-ID"
+"hologram.rendertext" = "Erstelle ein TextDisplay-Hologramm mit nativer Skalierung"
+"hologram.rendertext.id" = "Eindeutige Hologramm-ID"
+"hologram.rendertext.text" = "Anzuzeigender Text; für Leerzeichen in Anführungszeichen setzen"
+"hologram.rendertext.scale" = "TextDisplay-Skalierungsfaktor"
+"hologram.orient" = "Festlegen, wie sich ein Hologramm zu den Betrachtern dreht"
+"hologram.orient.id" = "Hologramm-ID"
+"hologram.orient.billboard" = "CENTER, VERTICAL, HORIZONTAL oder FIXED"
+"hologram.orient.yaw" = "Blickrichtung (Yaw) in Grad, -180 bis 180"
+"hologram.orient.pitch" = "Neigung (Pitch) in Grad, -90 bis 90"
+board = "Scoreboards erstellen und verwalten"
+"board.create" = "Ein Scoreboard erstellen"
+"board.create.id" = "Eindeutige Scoreboard-ID"
+"board.delete" = "Ein Scoreboard löschen"
+"board.delete.id" = "Zu löschende Scoreboard-ID"
+"board.title" = "Den Titel eines Scoreboards setzen"
+"board.title.id" = "Scoreboard-ID"
+"board.title.text" = "Titeltext; für Leerzeichen in Anführungszeichen setzen"
+"board.addline" = "Eine Zeile an ein Scoreboard anhängen"
+"board.addline.id" = "Scoreboard-ID"
+"board.addline.text" = "Zeilentext; für Leerzeichen in Anführungszeichen setzen"
+"board.setline" = "Eine Scoreboard-Zeile ersetzen"
+"board.setline.id" = "Scoreboard-ID"
+"board.setline.line" = "Zeilennummer, beginnend bei 1"
+"board.setline.text" = "Zeilentext; für Leerzeichen in Anführungszeichen setzen"
+"board.removeline" = "Eine Scoreboard-Zeile entfernen"
+"board.removeline.id" = "Scoreboard-ID"
+"board.removeline.line" = "Zeilennummer, beginnend bei 1"
+"board.show" = "Dir selbst ein Scoreboard anzeigen"
+"board.show.id" = "Scoreboard-ID"
+"board.hide" = "Dein Scoreboard ausblenden"
+"board.select" = "Automatische Scoreboard-Auswahl festlegen"
+"board.select.id" = "Scoreboard-ID"
+"board.select.priority" = "Auswahlpriorität"
+"board.select.when" = "Boolesche Bedingung; Ausdrücke mit Leerzeichen in Anführungszeichen setzen"
+"board.list" = "Scoreboards auflisten"
+"board.info" = "Titel, Zeilen und Einstellungen eines Scoreboards anzeigen"
+"board.info.id" = "Scoreboard-ID"
+"board.reset" = "Mitgelieferte Scoreboard-Standards wiederherstellen"
+emoji = "Emoji-Chat-Werkzeuge"
+"emoji.list" = "Aktivierte Emojis auflisten; zum Einfügen in den Chat eines anklicken"
+"emoji.reset" = "Mitgelieferte Emoji-Standards wiederherstellen"
+animations = "Animationswerkzeuge"
+"animations.list" = "Animationsnamen auflisten"
+"animations.reset" = "Mitgelieferte Animationsstandards wiederherstellen"
+bubbles = "Sprechblasenstile"
+"bubbles.style" = "Deinen Sprechblasenstil wählen, oder clear für automatische Auswahl"
+"bubbles.style.style" = "Stil-ID oder clear"
+"bubbles.reset" = "Mitgelieferte Sprechblasenstil-Standards wiederherstellen"
+tablist = "Tablisten-Werkzeuge"
+"tablist.reset" = "Das mitgelieferte Tablisten-Dokument wiederherstellen"
+motd = "MOTD-Werkzeuge"
+"motd.reset" = "Das mitgelieferte MOTD-Dokument wiederherstellen"
+drops = "Werkzeuge für die Darstellung fallengelassener Items"
+"drops.reset" = "Das mitgelieferte Dokument für Item-Drop-Einstellungen wiederherstellen"
+indicators = "Werkzeuge für Schadens- und Heilungsanzeigen"
+"indicators.reset" = "Das mitgelieferte Dokument für Schadensanzeigen wiederherstellen"
+status = "Knappe Laufzeitzähler anzeigen"
+import = "Legacy-Hologramme migrieren, ohne Quelldateien zu verändern"
+"import.apply" = "Eine Legacy-Hologramm-Migration ohne Überschreiben anwenden"
+"import.holoui" = "HoloUi-Daten aus plugins/holoui kopieren; frühere Importe werden überschrieben"
+"import.legacy" = "Gloss-Datendateien von vor der Zusammenführung in die v2-Envelopes migrieren"
+"import.preview" = "Eine zerstörungsfreie Legacy-Hologramm-Migration als Vorschau anzeigen"
+item = "Werkzeuge für Custom-Item-Provider"
+"item.export" = "Den Custom-Item-Katalog für den Web-Editor exportieren"
+"item.status" = "Anzeigen, welche Custom-Item-Provider aktiv sind"
+menu = "Hologramm-Menüs erstellen, öffnen und bearbeiten"
+"menu.addrow" = "Eine Textdekorationszeile anhängen"
+"menu.back" = "Vorherige Menüsitzung erneut öffnen"
+"menu.close" = "Aktuelle Menüsitzung schließen"
+"menu.copy" = "Ein geladenes Menü unter eine neue verschachtelte ID kopieren"
+"menu.create" = "Ein persistentes Hologramm an deiner aktuellen Position erstellen"
+"menu.image" = "Menüinhalt durch eine zentrierte Bilddatei ersetzen"
+"menu.insertrow" = "Eine Textdekorationszeile einfügen"
+"menu.list" = "Alle konfigurierten Menüs auflisten, die du öffnen kannst"
+"menu.move" = "Verschiebe dein geöffnetes Menü an deine aktuelle Position"
+"menu.new" = "Ein leeres Hologramm-Menü aus der mitgelieferten Vorlage erstellen"
+"menu.offsetrow" = "Eine Zeile mit absoluten oder ~relativen Versätzen verschieben"
+"menu.open" = "Ein Menü per ID öffnen; bei * die Menüliste anzeigen"
+"menu.removerow" = "Eine Komponentenzeile entfernen"
+"menu.seticon" = "Das Icon einer Button- oder Dekorationszeile ersetzen"
+"menu.setrow" = "Den Text einer Button- oder Dekorationszeile setzen"
+"menu.style" = "Eine Anzeigestil-Eigenschaft einer Zeile setzen oder zurücksetzen"
+panel = "Werkzeuge für persistente Welt-Panels"
+"panel.addrow" = "Eine Textzeile an das Hauptmenü eines Panels anhängen"
+"panel.align" = "Positionsachsen eines Panels an einem anderen Panel ausrichten"
+"panel.cancel" = "Deine vorgemerkte Panel-Bearbeitung verwerfen"
+"panel.copy" = "Ein persistentes Panel unter einer neuen ID kopieren"
+"panel.create" = "Ein Panel an deiner aktuellen Position erstellen"
+"panel.delete" = "Ein persistentes Panel löschen"
+"panel.edit" = "Eine vorgemerkte Panel-Bearbeitungssitzung starten"
+"panel.follow" = "Einem Online-Spieler mit Rotation fixed, yaw oder full folgen"
+"panel.here" = "Ein Panel an deine aktuelle Position verschieben"
+"panel.image" = "Das Panel-Hauptmenü durch eine zentrierte Bilddatei ersetzen"
+"panel.info" = "Den vollständigen Zustand eines Panels anzeigen"
+"panel.insertrow" = "Eine Textzeile in das Hauptmenü eines Panels einfügen"
+"panel.list" = "Persistente Panels seitenweise auflisten"
+"panel.menu" = "Das Hauptmenü eines Panels setzen"
+"panel.move" = "Ein Panel zu absoluten oder ~relativen Koordinaten verschieben"
+"panel.near" = "Panels nahe deiner aktuellen Position auflisten"
+"panel.offsetrow" = "Eine Zeile im Panel-Hauptmenü mit absoluten oder ~relativen Versätzen verschieben"
+"panel.permissions" = "Sicht- und Interaktionsberechtigungen eines Panels ändern"
+"panel.ranges" = "Sicht- und Interaktionsreichweiten eines Panels setzen"
+"panel.removerow" = "Eine Zeile aus dem Panel-Hauptmenü entfernen"
+"panel.rename" = "Ein persistentes Panel umbenennen"
+"panel.rotate" = "Yaw, Pitch und Roll absolut oder ~relativ setzen"
+"panel.save" = "Deine vorgemerkte Panel-Bearbeitung speichern"
+"panel.scale" = "Eine absolute oder ~relative Panel-Skalierung setzen"
+"panel.seticon" = "Ein Zeilen-Icon im Panel-Hauptmenü ersetzen"
+"panel.setrow" = "Text einer Zeile im Panel-Hauptmenü setzen"
+"panel.style" = "Eine Anzeigestil-Eigenschaft einer Zeile setzen oder zurücksetzen"
+"panel.teleport" = "Zu einem persistenten Panel teleportieren"
+"panel.unfollow" = "Ein Panel nicht mehr einem Spieler folgen lassen"
+"panel.visibility" = "Sichtbarkeitsmodus und Berechtigungsknoten setzen"
+preview = "Werkzeuge für Vorschaudokumente"
+"preview.dump" = "Ein Vorschaudokument einmal erstellen und seine Elementanzahlen ausgeben"
+"preview.list" = "Vorschaudokumente und ihre Zuordnungsregeln auflisten"
+"preview.reset" = "Mitgelieferte Vorschau-Standards wiederherstellen (entfernt keine zusätzlichen Benutzerdokumente, die sie überdecken können)"
+web = "Den Gloss-Webeditor öffnen und verwalten"
+"web.open" = "Einen leeren gehosteten Gloss-Editor öffnen"
+"web.edit" = "Ein aktuelles Gloss-Dokument öffnen"
+"web.edit.document" = "Dieses aktuelle Dokument im Webeditor öffnen"
+"web.workspace" = "Den vollständigen aktuellen Gloss-Arbeitsbereich öffnen"
+"web.sessions" = "Aktive Webeditor-Sitzungen verwalten"
+"web.sessions.list" = "Aktive Webeditor-Sitzungen auflisten"
+"web.sessions.pull" = "Eine Webeditor-Sitzung jetzt abfragen"
+"web.sessions.revoke" = "Einen Webeditor-Zugang widerrufen"
+"web.sessions.status" = "Eine Webeditor-Sitzung anzeigen"
+language = "Wähle deine Sprache oder die Standardsprache des Servers"
+
+[command.help.arg]
+reset_name = "Zurückzusetzender Name, oder * für alle mitgelieferten Standards"
+panel_axes = "Achsen: x, y, z, xy, xz, yz oder xyz"
+panel_follow_rotation = "Folge-Rotation: fixed, yaw oder full"
+panel_id = "Persistente Panel-ID"
+panel_interact_permission = "Interaktionsberechtigung oder -"
+panel_interaction_range = "Positive Interaktionsreichweite"
+panel_menu = "Hauptmenü-ID; standardmäßig die Panel-ID"
+panel_new_id = "Neue persistente Panel-ID"
+panel_pitch = "Absoluter oder ~relativer Pitch"
+panel_player = "Online-Zielspieler"
+panel_radius = "Horizontaler Suchradius"
+panel_reference = "Referenz-Panel-ID"
+panel_roll = "Absoluter oder ~relativer Roll"
+panel_root_menu = "Hauptmenü-ID"
+panel_scale = "Absolute oder ~relative Skalierung"
+panel_view_permission = "Sichtberechtigung oder -"
+panel_view_range = "Positive Sichtweite"
+panel_visibility = "Sichtbarkeitsmodus: public, permission oder hidden"
+panel_x = "Absolute oder ~relative X-Koordinate"
+panel_y = "Absolute oder ~relative Y-Koordinate"
+panel_yaw = "Absoluter oder ~relativer Yaw"
+panel_z = "Absolute oder ~relative Z-Koordinate"
+content_menu = "ID eines geladenen Menüs"
+web_subject = "ID des aktuellen Gloss-Dokuments"
+hologram_id = "ID des neuen Hologramms und des Hauptmenüs"
+hologram_text = "Optionaler MiniMessage-Text"
+image_path = "Datei unterhalb des Gloss-Bilderordners"
+import_source = "Legacy-Hologrammquelle"
+menu = "Zu öffnende Menü-ID (* zeigt alle Menüs)"
+new_panel_id = "Neue persistente Panel-ID"
+new_menu = "Neue verschachtelte Menü-ID"
+list_page = "Seite der Liste, beginnend bei 1"
+previews_dump_name = "Name des zu erstellenden Dokuments"
+previews_name = "Zurückzusetzender Dokumentname, oder * für alle mitgelieferten Dokumente"
+row_icon_type = "Icon-Typ"
+row_icon_value = "Icon-Inhalt oder Registry-ID"
+row_index = "Komponentenzeile, beginnend bei 1"
+row_style_property = "Anzeigestil-Eigenschaft"
+row_style_value = "Stilwert, oder * zum Zurücksetzen"
+row_text = "MiniMessage-Zeilentext"
+row_x = "Absolute oder ~relative X-Koordinate der Zeile"
+row_y = "Absolute oder ~relative Y-Koordinate der Zeile"
+row_z = "Absolute oder ~relative Z-Koordinate der Zeile"
+source_menu = "ID eines geladenen Quellmenüs"
+web_session = "Sitzungs-ID des Webeditors"
+
+[command.error]
+no_permission = "&8[&dGloss&8] &cDir fehlt die Berechtigung."
+no_permission_use = "&8[&dGloss&8] &cDir fehlt die Berechtigung für diesen Befehl."
+usage = "&7Verwendung: &f/{command} help"
+
+[command.hologram]
+exists = "&8[&dGloss&8] &cHologramm '&f{id}&c' existiert bereits."
+missing = "&8[&dGloss&8] &cKein Hologramm namens '&f{id}&c'."
+created = "&8[&dGloss&8] &aHologramm &f{id}&a erstellt."
+deleted = "&8[&dGloss&8] &aHologramm &f{id}&a gelöscht."
+line_added = "&8[&dGloss&8] &aZeile &f{line}&a zu &f{id}&a hinzugefügt."
+line_set = "&8[&dGloss&8] &aZeile &f{line}&a auf &f{id}&a gesetzt."
+line_removed = "&8[&dGloss&8] &aZeile &f{line}&a aus &f{id}&a entfernt."
+line_out_of_range = "&8[&dGloss&8] &cZeile {line} liegt außerhalb des Bereichs; &f{id}&c hat {count} Zeilen."
+cleared = "&8[&dGloss&8] &aAlle Zeilen von &f{id}&a entfernt."
+moved = "&8[&dGloss&8] &aHologramm &f{id}&a an deine Position verschoben."
+offset = "&8[&dGloss&8] &aHologramm &f{id}&a um &f{x}&a, &f{y}&a, &f{z}&a verschoben."
+teleported = "&8[&dGloss&8] &aZu &f{id}&a teleportiert."
+list_empty = "&8[&dGloss&8] &7Es gibt noch keine Hologramme."
+rendered = "&8[&dGloss&8] &aTexthologramm &f{id}&a mit Skalierung &f{scale}&a erstellt."
+text_empty = "&8[&dGloss&8] &cText darf nicht leer sein."
+scale_out_of_range = "&8[&dGloss&8] &cDie Skalierung {value} liegt außerhalb des Bereichs; sie muss zwischen &f{minimum}&c und &f{maximum}&c liegen."
+oriented = "&8[&dGloss&8] &aBillboard von &f{id}&a auf &f{billboard}&a gesetzt, Yaw &f{yaw}&a, Pitch &f{pitch}&a."
+billboard_unknown = "&8[&dGloss&8] &cUnbekanntes Billboard '&f{billboard}&c'. Verwende eines von &f{options}&c."
+angle_out_of_range = "&8[&dGloss&8] &cDer Wert {axis} {value} liegt außerhalb des Bereichs; er muss zwischen &f-{limit}&c und &f{limit}&c Grad liegen."
+
+[command.hologram.list]
+hover = "Zum Teleportieren klicken"
+lines = "{count} Zeilen"
+
+[command.hologram.info]
+header = "&8[&dGloss&8] &d{id} &7bei &f{world} {x}, {y}, {z}"
+line = " &8{line}. &f{text}"
+orientation = " &8Skalierung &f{scale} &8billboard &f{billboard} &8yaw &f{yaw} &8pitch &f{pitch}"
+
+[command.board]
+exists = "&8[&dGloss&8] &cScoreboard '&f{id}&c' existiert bereits."
+missing = "&8[&dGloss&8] &cKein Scoreboard namens '&f{id}&c'."
+created = "&8[&dGloss&8] &aScoreboard &f{id}&a erstellt."
+deleted = "&8[&dGloss&8] &aScoreboard &f{id}&a gelöscht."
+title_set = "&8[&dGloss&8] &aTitel von &f{id}&a gesetzt."
+line_added = "&8[&dGloss&8] &aZeile &f{line}&a zu &f{id}&a hinzugefügt."
+line_set = "&8[&dGloss&8] &aZeile &f{line}&a auf &f{id}&a gesetzt."
+line_removed = "&8[&dGloss&8] &aZeile &f{line}&a aus &f{id}&a entfernt."
+line_out_of_range = "&8[&dGloss&8] &cZeile {line} liegt außerhalb des Bereichs; &f{id}&c hat {count} Zeilen."
+shown = "&8[&dGloss&8] &aScoreboard &f{id}&a wird angezeigt."
+hidden = "&8[&dGloss&8] &aDein Scoreboard ist ausgeblendet."
+select_set = "&8[&dGloss&8] &aAuswahlpriorität von Scoreboard &f{id}&a auf &f{priority}&a gesetzt."
+select_invalid = "&8[&dGloss&8] &cUngültige Scoreboard-Bedingung: &f{error}&c."
+list_empty = "&8[&dGloss&8] &7Es gibt noch keine Scoreboards."
+
+[command.board.list]
+hover = "Für Details klicken"
+
+[command.board.info]
+header = "&8[&dGloss&8] &d{id} &7mit Titel &f{title}"
+meta = "&7Priorität: &f{priority} &8| &7Bedingung: &f{when} &8| &7Varianten: &f{variants}"
+line = " &8{line}. &f{text}"
+
+[command.emoji]
+empty = "&8[&dGloss&8] &7Es sind keine Emojis aktiviert."
+hover = "Zum Einfügen in den Chat klicken"
+
+[command.animations]
+empty = "&8[&dGloss&8] &7Es sind keine Animationen geladen."
+header = "&8[&dGloss&8] &fAnimationen: &d{count}"
+entry = "&8- &d{name}"
+
+[command.list]
+page = "&7Seite &f{page}&7/&f{pages} &8- &7zeigt &f{from}&7-&f{to} &7von &f{total}"
+next = "&7Nächste Seite: &f{command}"
+
+[command.status]
+holograms = "&7Hologramme: &f{count} &8({temporary} temporär, {entities} Entities)"
+boards = "&7Scoreboards: &f{count}"
+emoji = "&7Emojis: &f{enabled}&8/&f{total}"
+animations = "&7Animationen: &f{count}"
+effects = "&7Sprechblasen: &f{bubbles} &8| &7Indikatoren: &f{indicators} &8| &7Drops: &f{drops}"
+
+[command.reset]
+done = "&8[&dGloss&8] &aWiederhergestellt: &f{count}&a mitgelieferte {kind}-Standards."
+none = "&8[&dGloss&8] &cKeine mitgelieferten {kind}-Standards passen zu '&f{name}&c'."
+
+[command.bubbles]
+style_set = "&8[&dGloss&8] &aSprechblasenstil auf &f{style}&a gesetzt."
+style_cleared = "&8[&dGloss&8] &aSprechblasenstil zurückgesetzt; automatische Auswahl greift."
+style_unknown = "&8[&dGloss&8] &cKein Sprechblasenstil namens '&f{style}&c'."
+
+[command.import]
+config_unreadable = "&8[&dGloss&8] &cgloss.toml konnte nicht geladen werden: &f{reason}"
+
+[command.import.holoui]
+missing = "&8[&dGloss&8] &cKein holoui-Datenordner neben dem Gloss-Datenordner gefunden."
+done = "&8[&dGloss&8] &aHoloUi-Import abgeschlossen: &f{copied}&a kopiert, &f{skipped}&a übersprungen, &f{overlaid}&a Konfigurationsschlüssel, &f{errors}&a Fehler."
+
+[command.import.legacy]
+done = "&8[&dGloss&8] &aLegacy-Migration abgeschlossen: &f{migrated}&a migriert, &f{absorbed}&a übernommen, &f{overlaid}&a Konfigurationsschlüssel, &f{errors}&a Fehler."
+
+[director.help]
+no_subcommands = "Auf dieser Seite gibt es keine Unterbefehle."
+no_description = "Keine Beschreibung vorhanden"
+command_group = "Befehlsgruppe. Zum Öffnen klicken."
+category = "Befehlskategorie"
+no_parameters = "Keine Parameter. Klicken, um den Befehl vorab auszufüllen."
+parameters_hover = "Bewege den Mauszeiger über die Parameter, um mehr zu erfahren."
+
+[director.help.navigation]
+back = "Zurück"
+page = "Seite"
+
+[director.help.navigation.parent]
+hover = "Zur übergeordneten Befehlsgruppe zurückkehren"
+
+[director.help.navigation.previous]
+hover = "Vorherige Seite"
+
+[director.help.navigation.next]
+hover = "Nächste Seite"
+
+[director.help.parameter]
+required = "Dieser Parameter ist erforderlich."
+optional = "Dieser Parameter ist optional."
+default = "Standardmäßig \"{value}\", wenn nicht angegeben."
+type = "Dieser Parameter hat den Typ {type}."
+
+[director.runtime]
+usage = "Verwendung: {usage}"
+
+[director.runtime.error]
+invalid_origin = "Dieser Befehl kann von diesem Ursprung aus nicht ausgeführt werden."
+unknown_parameter = "Unbekannter Parameterschlüssel: {key}"
+unexpected_argument = "Unerwartetes Argument \"{argument}\". Optionale Parameter müssen als Schlüssel angegeben werden, z. B. seed=123"
+unclosed_group = "Fehlende schließende \"]\" für Parameter {key}"
+conversion_failed = "\"{value}\" kann für {parameter} nicht in {type} konvertiert werden"
+default_parse_failed = "Der Standardwert für Parameter {parameter} kann nicht gelesen werden"
+missing_argument = "Fehlendes Argument \"{parameter}\" ({type})"
+execution_failed = "Befehl {command} konnte nicht ausgeführt werden: {reason}"
+
+[gloss.error]
+menu_name_required = "Der Menüname darf nicht leer sein"
+hologram_id_required = "Die Hologramm-ID darf nicht leer sein"
+panel_id_required = "Die Panel-ID darf nicht leer sein"
+web_subject_required = "Die Dokument-ID des Webeditors darf nicht leer sein"
+web_session_required = "Die Sitzungs-ID des Webeditors darf nicht leer sein"
+panel_player_required = "Der Zielspieler darf nicht leer sein"
+row_icon_type_required = "Der Symboltyp darf nicht leer sein"
+row_style_property_required = "Die Stileigenschaft darf nicht leer sein"
+import_source_required = "Die Importquelle für das alte Format darf nicht leer sein"
+import_source_unknown = "Unbekannte Importquelle für das alte Format: {source}"
+
+[gloss.message]
+permission_denied = "&8[&dGloss&8]: &cDir fehlt die Berechtigung &f{permission}&c."
+unknown_command = "&8[&dGloss&8]: &cUnbekannter Befehl \"&f{command}&c\"."
+
+[gloss.message.hologram]
+created = "&8[&dGloss&8]: &aHologramm &f{hologram}&a mit Hauptmenü &f{menu}&a an deiner Position erstellt."
+already_exists = "&8[&dGloss&8]: &cEin Hologramm, Panel oder Menü mit dem Namen &f{hologram}&c existiert bereits."
+failed = "&8[&dGloss&8]: &cHologramm &f{hologram}&c konnte nicht erstellt werden. Es wurden keine Änderungen übernommen."
+durability_uncertain = "&8[&dGloss&8]: &eDie Transaktion für Hologramm &f{hologram}&e konnte nicht sicher abgeschlossen werden. Starte Gloss neu, bevor du es überprüfst oder die Erstellung erneut versuchst."
+
+[gloss.message.menu]
+none = "&8[&dGloss&8]: &7Keine Menüs verfügbar."
+player_only = "&8[&dGloss&8]: &cMenüs können nur von Spielern geöffnet werden."
+no_previous = "&8[&dGloss&8]: &cKein vorheriges Menü verfügbar."
+closed = "&8[&dGloss&8]: &aMenü geschlossen."
+moved = "&8[&dGloss&8]: &aMenü verschoben."
+none_open = "&8[&dGloss&8]: &cDerzeit ist kein Menü geöffnet."
+unavailable = "&8[&dGloss&8]: &c\"{menu}\" ist nicht verfügbar."
+permission_denied = "&8[&dGloss&8]: &cDu hast keine Berechtigung, \"{menu}\" zu öffnen."
+open_failed = "&8[&dGloss&8]: &cMenü \"{menu}\" konnte nicht geöffnet werden."
+
+[gloss.message.menu.list]
+header = "Menüs"
+entry = "Klicke, um {menu} zu öffnen."
+
+[gloss.message.menu.content]
+updated = "&8[&dGloss&8]: &a{operation} auf Menü &f{menu}&a in Revision {revision} angewendet."
+created = "&8[&dGloss&8]: &aMenü &f{menu}&a in Revision {revision} erstellt. Öffne es mit /gloss menu open {menu} oder platziere es mit /gloss panel create {menu}."
+copied = "&8[&dGloss&8]: &aMenü &f{source}&a nach &f{menu}&a in Revision {revision} kopiert."
+revision_conflict = "&8[&dGloss&8]: &cMenü &f{menu}&c wurde während des Schreibens geändert (erwartet: {expected}, aktuell: {actual}). Wiederhole den Befehl."
+already_exists = "&8[&dGloss&8]: &cMenü &f{menu}&c existiert bereits."
+invalid = "&8[&dGloss&8]: &cUngültiger Wert für den Menüinhalt: &f{reason}&c."
+failed = "&8[&dGloss&8]: &cBearbeitung des Inhalts von Menü &f{menu}&c fehlgeschlagen: {reason}"
+
+[gloss.message.command]
+player_only = "&8[&dGloss&8]: &cDieser Befehl ist nur für Spieler verfügbar."
+
+[gloss.message.web]
+header = "Webeditor"
+open_hover = "Klicken, um den Gloss-Webeditor zu öffnen."
+open = "&8[&dGloss&8]: &7Webeditor: &f{url}"
+preparing = "&8[&dGloss&8]: &7Sichere Sitzung zur Editorsynchronisierung für &f{subject}&7 wird vorbereitet..."
+unavailable = "&8[&dGloss&8]: &cDie direkte Webbearbeitung ist nicht verfügbar. Prüfe die Synchronisierungseinstellungen und die Verbindung zum Relay."
+open_failed = "&8[&dGloss&8]: &c&f{kind}={subject}&c konnte nicht im Live-Webeditor geöffnet werden: {reason}"
+open_console = "&8[&dGloss&8]: &7Editor-Zugangslink für &f{subject}&7: &f{url}"
+capability_warning = "&8[&dGloss&8]: &eMit dieser URL können bis zum Widerruf oder Ablauf Änderungen auf dem Server veröffentlicht werden. Halte sie geheim."
+open_label = "Editor öffnen"
+copy_label = "Link kopieren"
+revoke_label = "Widerrufen"
+link_hover = "Öffne den Editor, kopiere seinen Zugangslink oder widerrufe Sitzung {session}."
+
+[gloss.message.web.sessions]
+list_empty = "&8[&dGloss&8]: &7Es sind keine Sitzungen zur Editorsynchronisierung aktiv."
+status = "&8[&dGloss&8]: &f{session} &7{kind}=&f{subject} &7Ablauf=&f{seconds}s &7Veröffentlichung=&f{revision} &7ausstehend=&f{pending}"
+revoked = "&8[&dGloss&8]: &aEditorsynchronisierungssitzung &f{session}&a widerrufen."
+pulled = "&8[&dGloss&8]: &aEditorsynchronisierungssitzung &f{session}&a abgefragt."
+unknown = "&8[&dGloss&8]: &cUnbekannte oder abgelaufene Editorsynchronisierungssitzung &f{session}&c."
+failed = "&8[&dGloss&8]: &cEditorsynchronisierung für &f{session}&c fehlgeschlagen: {reason}"
+
+[gloss.message.import]
+preview_started = "&8[&dGloss&8]: &7&f{source}&7 wird für eine unverändernde Migrationsvorschau geprüft..."
+apply_started = "&8[&dGloss&8]: &7&f{source}&7 wird geprüft und ohne Überschreiben migriert..."
+source_missing = "&8[&dGloss&8]: &7Keine Quelle &f{source}&7 unter &f{path}&7 gefunden."
+preview_summary = "&8[&dGloss&8]: &fVorschau für {source}&7: &a{ready} bereit&7, &d{resume} fortsetzbar&7, &e{conflicts} Konflikte&7, &c{errors} Fehler&7, {warnings} Warnungen. Quelle: &f{path}"
+preview_entry = "&8- &f{legacy} &7-> &f{board} &7Status=&f{state} &7Warnungen=&f{warnings}"
+apply_summary = "&8[&dGloss&8]: &fMigration von {source}&7: &a{imported} importiert&7, &e{skipped} übersprungen&7, &c{failed} fehlgeschlagen&7; die Prüfung meldete {errors} Fehler und {warnings} Warnungen."
+apply_entry = "&8- &f{legacy} &7Status=&f{state} &7Grund=&f{reason}"
+issue = "&8- &f{legacy} &7{severity}: &f{reason}"
+busy = "&8[&dGloss&8]: &cEine andere Migration alter Hologramme läuft bereits."
+failed = "&8[&dGloss&8]: &cMigration alter Hologramme aus &f{source}&c fehlgeschlagen: {reason}"
+
+[gloss.message.config]
+reloaded = "&2Konfiguration \"{name}\" neu geladen."
+
+[gloss.message.hotload]
+singular = "&2Automatisch neu geladen: {kinds} ({count} Änderung)."
+plural = "&2Automatisch neu geladen: {kinds} ({count} Änderungen)."
+
+[gloss.message.preview_scale]
+adjusting = "&7Vorschaugröße: &f{percent}% &8- &7Schleichen halten + scrollen zum Ändern; Schleichen doppeltippen zum Speichern"
+hidden = "&7Vorschau &cverborgen &8- &7Zum Wiederherstellen nach oben scrollen"
+size = "&7Vorschaugröße: &f{percent}%"
+saved_hidden = "&7Vorschau als &cverborgen gespeichert &8- &7Auf einem Behälter Schleichen doppeltippen + nach oben scrollen zum Wiederherstellen"
+saved = "&7Vorschaugröße gespeichert: &f{percent}%"
+
+[gloss.message.drops]
+bundle_more = "+{count} weitere"
+
+[gloss.message.items]
+disabled = "&8[&dGloss&8]: &7Benutzerdefinierte Gegenstände sind deaktiviert. Setze &fcustomItems&7 in gloss.toml auf true."
+
+[gloss.message.items.status]
+header = "Benutzerdefinierte Gegenstände"
+summary = "{active}/{total} Anbieter aktiv"
+entry = "Anbieter {provider} aus Plugin {plugin}."
+hint = "Klicken, um den Katalog für den Webeditor zu exportieren."
+
+[gloss.message.items.state]
+ready = "bereit, {count} IDs"
+loading = "vorhanden, wird noch geladen"
+inactive = "vorhanden, kein Adapter"
+missing = "nicht installiert"
+
+[gloss.message.items.export]
+started = "&8[&dGloss&8]: &7Katalog benutzerdefinierter Gegenstände wird exportiert..."
+done = "&8[&dGloss&8]: &a{count} Gegenstände von {providers} Anbietern nach &f{path}&a geschrieben."
+empty = "&8[&dGloss&8]: &7Keine benutzerdefinierten Gegenstände gefunden. Ein leerer Katalog wurde nach &f{path}&7 geschrieben."
+failed = "&8[&dGloss&8]: &cDer Katalog benutzerdefinierter Gegenstände konnte nicht geschrieben werden. Prüfe die Protokolle."
+busy = "&8[&dGloss&8]: &cEin Katalogexport läuft bereits."
+
+[gloss.message.previews.list]
+header = "Vorschaudokumente"
+empty = "&7Keine Vorschaudokumente geladen."
+entry = "Blöcke={blocks} Entitäten={entities} Spezialelemente={special} Priorität={priority}"
+
+[gloss.message.previews.reset]
+started = "&8[&dGloss&8]: &7Vorschaudokumente „&f{name}&7“ werden zurückgesetzt..."
+done = "&8[&dGloss&8]: &a{count} mitgelieferte Vorschaudokumente wiederhergestellt. Zusätzliche Benutzerdokumente, die sie überlagern, wurden nicht entfernt."
+none = "&8[&dGloss&8]: &c„{name}“ ist kein mitgeliefertes Vorschaudokument; nichts wurde zurückgesetzt."
+
+[gloss.message.previews.dump]
+unknown = "&8[&dGloss&8]: &c„{name}“ ist kein geladenes Vorschaudokument."
+result = "&8[&dGloss&8]: &a{name}&7: &f{total}&7 Elemente (Panels={panels}, Zellen={cells}, Plätze={slots}, Beschriftungen={labels})."
+no_errors = "&8[&dGloss&8]: &aKeine Aufbaufehler."
+error_line = "&8[&dGloss&8]: &c{message}"
+error_more = "&8[&dGloss&8]: &7+{count} weitere (siehe Konsolenprotokoll)."
+
+[gloss.message.panels]
+created = "&8[&dGloss&8]: &aPanel &f{board}&a in Revision {revision} erstellt."
+deleted = "&8[&dGloss&8]: &aPanel &f{board}&a gelöscht."
+renamed = "&8[&dGloss&8]: &a&f{oldBoard}&a in &f{board}&a umbenannt, Revision {revision}."
+copied = "&8[&dGloss&8]: &a&f{source}&a nach &f{board}&a kopiert."
+updated = "&8[&dGloss&8]: &a{operation} auf &f{board}&a in Revision {revision} angewendet."
+teleported = "&8[&dGloss&8]: &aZu &f{board}&a teleportiert."
+unknown = "&8[&dGloss&8]: &cUnbekanntes Panel &f{board}&c."
+already_exists = "&8[&dGloss&8]: &cPanel &f{board}&c existiert bereits."
+invalid = "&8[&dGloss&8]: &cUngültiger Panelwert: &f{reason}&c."
+menu_unavailable = "&8[&dGloss&8]: &cHauptmenü &f{menu}&c ist nicht geladen."
+player_unavailable = "&8[&dGloss&8]: &cZielspieler &f{player}&c ist nicht online."
+world_unavailable = "&8[&dGloss&8]: &cPanelwelt &f{world}&c ist nicht mit der gespeicherten UUID geladen."
+revision_conflict = "&8[&dGloss&8]: &cPanel &f{board}&c wurde während der Bearbeitung geändert (erwartet: {expected}, aktuell: {actual}). Öffne die Bearbeitungssitzung erneut."
+failed = "&8[&dGloss&8]: &cPanelvorgang für &f{board}&c fehlgeschlagen: {reason}"
+
+[gloss.message.panels.list]
+header = "&8[&dGloss&8]: &fDauerhafte Panels: &d{count}"
+empty = "&8[&dGloss&8]: &7Keine dauerhaften Panels geladen."
+entry = "&8- &f{board} &7Menü=&f{menu} &7Revision=&f{revision}"
+
+[gloss.message.panels.near]
+header = "&8[&dGloss&8]: &fPanels im Umkreis von &d{radius}&f Blöcken: &d{count}"
+empty = "&8[&dGloss&8]: &7Keine Panels in diesem Umkreis."
+entry = "&8- &f{board} &7Entfernung=&f{distance} &7Menü=&f{menu}"
+
+[gloss.message.panels.info]
+header = "&8[&dGloss&8]: &fPanel &d{board} &7({state})"
+identity = "&7UUID=&f{uuid} &7Revision=&f{revision} &7Menü=&f{menu}"
+transform = "&7Welt=&f{world} &7Position=&f{x}, {y}, {z} &7Drehung=&f{yaw}, {pitch}, {roll} &7Skalierung=&f{scale}"
+visibility = "&7Sichtbarkeit=&f{mode} &7Sichtberechtigung=&f{viewPermission} &7Interaktionsberechtigung=&f{interactPermission} &7Reichweiten=&f{viewRange}/{interactionRange}"
+follow = "&7Folgen=&f{mode} &7Spieler=&f{player} &7Drehung=&f{rotation}"
+
+[gloss.message.panels.edit]
+started = "&8[&dGloss&8]: &a&f{board}&a wird ab Revision {revision} bearbeitet. Änderungen bleiben bis zum Speichern vorgemerkt."
+already_active = "&8[&dGloss&8]: &cDu bearbeitest bereits &f{board}&c. Speichere oder brich zuerst ab."
+none = "&8[&dGloss&8]: &cDu hast keine vorgemerkte Panelbearbeitung."
+busy = "&8[&dGloss&8]: &cPanel &f{board}&c wird gerade gespeichert."
+staged = "&8[&dGloss&8]: &a{operation} für &f{board}&a vorgemerkt. Speichere mit /gloss panel save."
+saved = "&8[&dGloss&8]: &a&f{board}&a in Revision {revision} gespeichert."
+cancelled = "&8[&dGloss&8]: &aVorgemerkte Änderungen für &f{board}&a verworfen."
+identity_blocked = "&8[&dGloss&8]: &cSpeichere oder verwerfe die vorgemerkten Änderungen für &f{board}&c vor dem Umbenennen oder Löschen."
+
+[gloss.preview.state]
+idle = "Inaktiv"
+brewing = "Brauen {percent}%"
+needs_blaze_powder = "Benötigt Lohenstaub"
+waiting = "Wartet"
+no_ingredient = "Keine Zutat"
+empty = "Leer"
+smelting_item = "Schmelzen: {item} {percent}%"
+smelting = "Schmelzen {percent}%"
+blasting_item = "Hochofenschmelzen: {item} {percent}%"
+blasting = "Hochofenschmelzen {percent}%"
+smoking_item = "Räuchern: {item} {percent}%"
+smoking = "Räuchern {percent}%"
+heating = "Erhitzen"
+needs_fuel = "Benötigt Brennstoff"
+no_input = "Keine Eingabe"
+surge_suffix = "  +{seconds}s"
+disc_playing = "Wiedergabe: {disc}"
+disc_loaded = "Eingelegt: {disc}"
+no_disc = "Keine Schallplatte"
+
+[gloss.preview.stat]
+fuel_level = "Brennstoff {fuel}/{maximum}"
+no_fuel = "Kein Brennstoff"
+bottles = "Flaschen {bottles}/{maximum}"
+fuel_seconds = "Brennstoff {seconds}s"
+fuel_ready = "Brennstoff bereit"
+xp_gain = "XP +{experience}"
+xp_zero = "XP 0"
+bees_and_honey = "Bienen {bees}/{maximumBees}   Honig {honey}/{maximumHoney}"
+cauldron_empty = "Leer {level}/{maximum}"
+cauldron_level = "Füllstand {level}/{maximum}"
+
+[gloss.preview.theme.title]
+chest = "&6&lTruhe"
+trapped_chest = "&c&lRedstone-Truhe"
+ender_chest = "&5&lEndertruhe"
+barrel = "&e&lFass"
+dispenser = "&7&lWerfer"
+dropper = "&8&lSpender"
+hopper = "&8&lTrichter"
+furnace = "&6&lOfen"
+smoker = "&e&lRäucherofen"
+blast_furnace = "&b&lSchmelzofen"
+beehive = "&e&lBienenstock"
+bee_nest = "&e&lBienennest"
+cauldron = "&7&lKessel"
+water_cauldron = "&9&lWasserkessel"
+lava_cauldron = "&6&lLavakessel"
+powder_snow_cauldron = "&f&lPulverschneekessel"
+jukebox = "&d&lPlattenspieler"
+brewing_stand = "&d&lBraustand"
+chiseled_bookshelf = "&6&lGearbeitetes Bücherregal"
+hopper_minecart = "&8&lTrichterlore"
+chest_minecart = "&6&lGüterlore"
+mobile = "&7&l{name}"
+shulker = "&l{color} Shulker-Kiste"
+copper_chest = "&6&l{name}"
+shelf = "&6&l{name}"
+container = "&6&lBehälter"
+
+[language.menu]
+your_language = "Ihre Sprache"
+reset_your_language = "Eigene Sprachauswahl zurücksetzen"
+server_default = "Serverstandard"
+edit_messages = "Sprachnachrichten bearbeiten"
+use_server_default = "Serverstandard verwenden"
+current = "Aktuell: {locale}"
+current_with_personal = "Aktuell: {locale} (Ihre: {personal})"
+your_description = "Ändern Sie nur die Nachrichten, die Sie sehen."
+reset_description = "Verwenden Sie die Standardsprache des Servers."
+server_description = "Ändern Sie die Standardsprache des Servers."
+edit_description = "Öffnen Sie den Nachrichteneditor für jede Sprache."
+select_description = "Klicken Sie, um diese Sprache auszuwählen."
+remove_personal_description = "Entfernen Sie Ihre persönliche Sprachauswahl."
+no_controls = "Für Sie sind keine Spracheinstellungen verfügbar."
+command = "Befehl: {command}"
+selected = "ausgewählt"
+all-volmit-plugins = "Alle Volmit-Plugins"
+
+[language.error]
+stopping = "Sprachauswahl ist nicht verfügbar, während das Plugin stoppt."
+editor-player-only = "Öffnen Sie den Spracheditor im Spiel."
+no-providers = "Es sind keine Volmit-Sprachanbieter verfügbar."
+numeric-page = "Gib die Seitennummer als Zahl ein."
+personal-player-only = "Die Spracheinstellungen der Spieler müssen im Spiel ausgewählt werden."
+personal-permission = "Sie haben keine Berechtigung, Ihre Sprache auszuwählen."
+plugin-personal-permission = "Du darfst deine Sprache für {plugin} nicht ändern."
+plugin-server-permission = "Du darfst die Serversprache für {plugin} nicht ändern."
+server-locale-required = "Wähle einen Sprachcode wie en_US als Serverstandard."
+unavailable-for-all = "Die Sprache {locale} ist nicht für alle ausgewählten Plugins verfügbar."
+
+[language.usage]
+editor = "Syntax: /{command} language server edit [locale]"
+selection = "Syntax: /{command} language self [locale|reset] or server [locale]"
+volmit-selection = "Syntax: /volmit plugins languages [locale]"
+
+[language.selection]
+preparing = "Sprache {locale} wird für {target} vorbereitet..."
+save-failed = "{plugin}: Die Sprachauswahl konnte nicht gespeichert werden; prüfe die Serverkonsole."
+english-fallback = "{plugin}: {locale} ist nicht verfügbar; Englisch (en_US) wird verwendet."
+personal-selected = "{plugin}: Deine Sprache ist jetzt {locale}."
+server-selected = "{plugin}: Serversprache ist jetzt {locale}."
+server-default-selected = "{plugin}: Deine Sprache folgt jetzt dem Serverstandard."
+
+[language.editor]
+loading = "Nachrichten für {locale} werden geladen..."
+
+[language.editor.section]
+languages = "Sprachen"
+search = "Suche"
+search-title = "{locale} / Suche"
+group-title = "{locale} / {group}"
+
+[language.editor.prompt]
+search = "Suche nach Nachrichtenschlüssel oder Text. Gib cancel ein, um zurückzukehren."
+value = "Gib im Chat einen neuen Wert für {key} ein."
+current = "Aktueller Wert: {value}"
+variables = "Variablen: {variables}"
+guidance = "Verwende \\n für Zeilenumbrüche und \\\\ für einen Backslash oder gib cancel ein, um zurückzukehren."
+
+[language.editor.input]
+expired = "Die Eingabe im Spracheditor ist abgelaufen."
+too-long = "Die Eingabe darf höchstens {maximum} Zeichen enthalten."
+unable-to-save = "Speichern fehlgeschlagen: {reason}"
+
+[language.editor.navigation]
+back = "&eZurück&r"
+close = "&cSchließen&r"
+previous-page = "&eVorherige Seite&r"
+next-page = "&eNächste Seite&r"
+
+[language.editor.search]
+messages = "Nachrichten durchsuchen"
+messages-lore = "Klicken, um alle Nachrichten zu durchsuchen."
+clear = "Suche zurücksetzen"
+
+[language.editor.message]
+current-value = "&7Aktueller Wert:&r"
+variables = "&8{variables}&r"
+edit-plural = "&7Klicken, um eine Pluralform zu bearbeiten.&r"
+edit-lines = "&7Klicken, um einzelne Zeilen zu bearbeiten.&r"
+edit-chat = "&7Klicken, um im Chat zu bearbeiten.&r"
+
+[language.editor.locale]
+open = "&8Klicken, um diese Sprache zu öffnen.&r"
+
+[language.editor.category]
+message-count = "&7{count} Nachrichten&r"
+open = "&8Klicken, um diese Kategorie zu öffnen.&r"
+
+[language.editor.error]
+no-permission = "Du darfst die Sprachdateien von {plugin} nicht bearbeiten."
+unable-to-edit = "Bearbeiten fehlgeschlagen: {reason}"
+
+[language.editor.saved]
+summary = "{locale} gespeichert. Die Sprachauswahl bleibt unverändert."
+change = "{key}: „{before}“ wurde in „{after}“ geändert."
+
+[language.editor.part]
+line = "Zeile {line}"
+
+[language.editor.value]
+none = "Keine"
+empty = "(leer)"

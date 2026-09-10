@@ -25,6 +25,7 @@ public class CommandGloss {
     private CommandGlossItem item;
     private CommandGlossWeb web;
     private CommandGlossImport legacyImport;
+    private CommandGlossDebug debug;
 
     public CommandGloss(Gloss plugin) {
         this.plugin = plugin;
@@ -43,6 +44,7 @@ public class CommandGloss {
         this.item = new CommandGlossItem();
         this.web = new CommandGlossWeb(plugin);
         this.legacyImport = new CommandGlossImport();
+        this.debug = new CommandGlossDebug(plugin);
     }
 
     /** Runs on the tree the director cache kept, never on one a racing builder threw away. */
@@ -56,14 +58,6 @@ public class CommandGloss {
         if (panel != null) {
             panel.shutdown();
         }
-    }
-
-    @Director(name = "debugdump", sync = true, description = "Create and optionally upload a diagnostic report", descriptionKey = "command.help.debugdump")
-    public void debugdump(
-        @Param(name = "upload", defaultValue = "true", description = "Upload the report to mclo.gs", descriptionKey = "command.help.debugdump_upload") boolean upload,
-        @Param(name = "sender", contextual = true) CommandSender sender
-    ) {
-        plugin.debugDump().request(sender, upload);
     }
 
     @Director(name = "language", sync = true, descriptionKey = "command.help.language", description = "Choose your language or the server default")
@@ -92,15 +86,5 @@ public class CommandGloss {
                 MessageArgument.trusted("bubbles", plugin.bubbles().activeCount()),
                 MessageArgument.trusted("indicators", plugin.indicators().activeCount()),
                 MessageArgument.trusted("drops", plugin.drops().activeCount()));
-    }
-
-    @Director(name = "reload", sync = true, descriptionKey = "command.help.reload", description = "Reload Gloss configuration and services")
-    public void reload(@Param(name = "sender", contextual = true) CommandSender sender) {
-        if (GlossCommandMessages.denied(sender, "gloss.admin")) {
-            return;
-        }
-
-        plugin.reloadAll();
-        GlossCommandMessages.send(sender, GlossMessages.RELOAD_DONE);
     }
 }

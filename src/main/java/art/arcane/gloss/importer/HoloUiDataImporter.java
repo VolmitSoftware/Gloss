@@ -40,8 +40,8 @@ import java.util.stream.Stream;
  * {@code panels/**} (byte-compatible contract), {@code previews/*.json} copy with their
  * {@code lang()} keys rewritten from {@code holoui.preview.*} to {@code gloss.preview.*} unless
  * the rewritten bytes are identical to a shipped default (those re-extract anyway; the receipt
- * disposition detail notes the rewrite), {@code preview-scales.json} and
- * {@code language.yml} copy verbatim, and {@code settings.json} overlays its flat keys onto the
+ * disposition detail notes the rewrite), {@code preview-scales.json} copies verbatim,
+ * and {@code settings.json} overlays its flat keys onto the
  * just-loaded {@link GlossConfigFile} before re-serializing {@code gloss.toml} through the loader
  * so comments regenerate. Editor sync sessions, transactions, and backups are secrets and never
  * copy; {@code custom-items.json} is regenerable and never copies either.
@@ -121,7 +121,6 @@ public final class HoloUiDataImporter {
         copyTree(new File(source, "boards"), new File(dataFolder, "panels"), CATEGORY_PANELS, "boards/", true, force, entries);
         copyPreviews(source, force, entries);
         copyRootFile(source, "preview-scales.json", force, entries);
-        copyRootFile(source, "language.yml", force, entries);
         recordSecrets(source, entries);
         overlaySettings(source, config, entries);
         writeReceipt(source, force, entries);

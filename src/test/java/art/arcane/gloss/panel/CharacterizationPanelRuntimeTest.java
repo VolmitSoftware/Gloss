@@ -4,7 +4,9 @@ import art.arcane.gloss.Gloss;
 import art.arcane.gloss.config.menu.MenuCatalog;
 import art.arcane.gloss.menu.CharacterizationSupport;
 import art.arcane.gloss.doc.StorageTaskRunner;
+import art.arcane.gloss.doc.DocumentDelta;
 import art.arcane.gloss.persistence.GlossPersistenceCoordinator;
+import com.google.gson.Gson;
 import org.bukkit.Location;
 import org.bukkit.NamespacedKey;
 import org.bukkit.World;
@@ -19,9 +21,14 @@ import java.io.File;
 import java.lang.reflect.Constructor;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayDeque;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.Assert.assertEquals;
@@ -39,6 +46,7 @@ import static org.junit.Assert.assertTrue;
 public class CharacterizationPanelRuntimeTest {
   private static final UUID WORLD_UUID = UUID.fromString("00000000-0000-0000-0000-000000000501");
   private static final UUID VIEWER = UUID.fromString("00000000-0000-0000-0000-000000000502");
+  private static final Gson GSON = new Gson();
 
   @Rule
   public final TemporaryFolder temp = new TemporaryFolder();
@@ -50,6 +58,8 @@ public class CharacterizationPanelRuntimeTest {
   private QueuedRunner runner;
   private PanelService service;
   private PanelRuntimeManager runtime;
+  private Path panelDirectory;
+  private final AtomicLong clock = new AtomicLong();
 
   @Before
   public void bootHeadlessRuntime() throws Exception {
@@ -73,8 +83,10 @@ public class CharacterizationPanelRuntimeTest {
     CharacterizationSupport.setField(gloss, "menuCatalog", menuCatalog);
 
     runner = new QueuedRunner();
+    Path panelData = temp.newFolder("panels").toPath();
+    panelDirectory = panelData.resolve("panels");
     service = new PanelService(new PanelService.Dependencies(
-        new PanelRepository(temp.newFolder("panels")), runner,
+        new PanelRepository(panelData, clock::get), runner,
         CharacterizationSupport.mutedLogger(), new GlossPersistenceCoordinator(), () -> {
     }));
     runtime = new PanelRuntimeManager(gloss, service);
@@ -86,6 +98,9 @@ public class CharacterizationPanelRuntimeTest {
   public void restoreStatics() throws Exception {
     if (runtime != null) {
       runtime.shutdown();
+    }
+    if (service != null) {
+      service.shutdown();
     }
     if (menuCatalog != null) {
       menuCatalog.shutdown();
@@ -151,6 +166,63 @@ public class CharacterizationPanelRuntimeTest {
 
     assertEquals(0, runtime.visibleBoardCount());
     assertNull(runtime.findClickTarget(player));
+  }
+
+  @Test
+  public void diskChangesUpdateLiveMembershipAndRetainInvalidEdits() throws Exception {
+    Player player = player(new AtomicReference<>(at(10.0D, 64.0D, 0.0D)));
+    Object state = viewerState(player);
+    tick(state);
+    assertEquals(0, runtime.visibleBoardCount());
+
+    PanelDefinition original = PanelDefinition.create("watched", "boundary",
+        PanelTransform.at("example:world", WORLD_UUID, 0.0D, 64.0D, 0.0D, 0.0D));
+    Path file = panelDirectory.resolve("watched.json");
+    Files.createDirectories(panelDirectory);
+    Files.writeString(file, GSON.toJson(original));
+    assertTrue(pollPanels().isEmpty());
+    assertEquals(List.of("watched"), pollPanels().loaded());
+    tick(state);
+    assertEquals(1, runtime.visibleBoardCount());
+
+    PanelDefinition moved = original.withTransform(
+        PanelTransform.at("example:world", WORLD_UUID, 200.0D, 64.0D, 0.0D, 0.0D)).withRevision(2L);
+    Files.writeString(file, GSON.toJson(moved));
+    assertTrue(pollPanels().isEmpty());
+    tick(state);
+    assertEquals(1, runtime.visibleBoardCount());
+    assertEquals(List.of("watched"), pollPanels().loaded());
+    tick(state);
+    assertEquals(0, runtime.visibleBoardCount());
+
+    PanelDefinition restored = original.withRevision(3L);
+    Files.writeString(file, GSON.toJson(restored));
+    assertTrue(pollPanels().isEmpty());
+    assertEquals(List.of("watched"), pollPanels().loaded());
+    tick(state);
+    assertEquals(1, runtime.visibleBoardCount());
+
+    Files.writeString(file, "{");
+    assertTrue(pollPanels().isEmpty());
+    assertTrue(pollPanels().isEmpty());
+    tick(state);
+    assertEquals(restored, service.get("watched").orElseThrow());
+    assertEquals(1, runtime.visibleBoardCount());
+
+    Files.delete(file);
+    assertTrue(pollPanels().isEmpty());
+    tick(state);
+    assertEquals(1, runtime.visibleBoardCount());
+    assertEquals(List.of("watched"), pollPanels().removed());
+    tick(state);
+    assertEquals(0, runtime.visibleBoardCount());
+  }
+
+  private DocumentDelta pollPanels() {
+    clock.addAndGet(TimeUnit.SECONDS.toNanos(6L));
+    CompletableFuture<DocumentDelta> result = service.poll();
+    runner.runAll();
+    return result.join();
   }
 
   // ---------------------------------------------------------------------

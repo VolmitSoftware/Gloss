@@ -1,0 +1,828 @@
+# Gloss — fi_FI
+#
+# === Tiedoston muokkaus ===
+# plugins/Gloss/languages/fi_FI.toml
+# Voit muokata tätä tiedostoa suoraan. Paikalliset muutokset säilyvät; puuttuvat tai virheelliset kohdat käyttävät sisäänrakennettua englantia.
+# /gloss language server edit fi_FI
+#
+# === Etuliite ===
+# Etuliite &8[&dGloss&8] on osa jokaista viestiä: muuta sitä haluamissasi viesteissä.
+#
+# === Muotoilu ===
+# Värit: &0-&f, &k-&r, &#RRGGBB.
+#
+# === Muuttujat ===
+# Säilytä muuttujien nimet ja käytä vain kunkin viestin omia muuttujia.
+#   {absorbed}  Olemassa oleviin tietoihin yhdistetyt tuontimerkinnät
+#   {active}  Aktiivisten tarjoajien määrä
+#   {actual}  Nykyinen versio
+#   {after}  Viestin arvo muokkauksen jälkeen
+#   {argument}  Odottamaton komentoargumentti
+#   {axis}  Koordinaatti- tai kiertoakseli
+#   {bees}  Säiliössä olevien mehiläisten määrä
+#   {before}  Viestin arvo ennen muokkausta
+#   {billboard}  Näyttökohteen suuntaustila
+#   {blocks}  Lohkonäyttöelementtien määrä
+#   {board}  Taulun tai paneelin tunniste
+#   {bottles}  Säiliössä olevien pullojen määrä
+#   {bubbles}  Aktiivisten puhekuplien määrä
+#   {cells}  Valikon solujen määrä
+#   {color}  Näytön tai esineen väri
+#   {command}  Komentopolku
+#   {conflicts}  Tuontiristiriitojen määrä
+#   {copied}  Kopioitujen merkintöjen määrä
+#   {count}  Vastaavien kohteiden tai viestien määrä
+#   {disc}  Säiliössä oleva musiikkilevy
+#   {distance}  Etäisyys kohteeseen
+#   {drops}  Näytettävien pudotettujen esineiden määrä
+#   {enabled}  Käyttötila tai käytössä olevien merkintöjen määrä
+#   {entities}  Entiteettien määrä
+#   {error}  Validointi- tai toimintavirhe
+#   {errors}  Virheiden määrä
+#   {expected}  Muokkausta tallennettaessa odotettu versio
+#   {experience}  Saadun kokemuksen määrä
+#   {failed}  Epäonnistuneiden toimintojen määrä
+#   {from}  Lähdearvo tai alueen alku
+#   {fuel}  Säiliön jäljellä oleva polttoaine
+#   {group}  Kielieditorin luokka
+#   {hologram}  Hologrammin tunniste
+#   {honey}  Nykyinen hunajataso
+#   {id}  Kohteen tunniste
+#   {imported}  Tuotujen merkintöjen määrä
+#   {indicators}  Vahinkoilmaisimien määrä
+#   {interactPermission}  Vuorovaikutukseen vaadittu oikeus
+#   {interactionRange}  Suurin vuorovaikutusetäisyys
+#   {item}  Esineen nimi tai materiaali
+#   {key}  Viestin tai asetuksen avain
+#   {kind}  Kohteen tai tarjoajan tyyppi
+#   {kinds}  Saatavilla olevat kohde- tai tarjoajatyypit
+#   {labels}  Tekstimerkintöjen määrä
+#   {legacy}  Tuonnin lähteen tunniste
+#   {level}  Näytettävä taso
+#   {limit}  Sallittu raja
+#   {line}  Rivinumero viestissä
+#   {locale}  Kielitunnus
+#   {maximum}  Suurin sallittu arvo
+#   {maximumBees}  Mehiläisten enimmäismäärä
+#   {maximumHoney}  Suurin hunajataso
+#   {menu}  Valikon tunniste
+#   {message}  Palaute- tai diagnostiikkaviesti
+#   {migrated}  Muunnettujen merkintöjen määrä
+#   {minimum}  Pienin sallittu arvo
+#   {mode}  Valittu toiminta- tai näyttötila
+#   {name}  Kohteen nimi
+#   {oldBoard}  Edellisen taulun tunniste
+#   {operation}  Toiminnon nimi
+#   {options}  Käytettävissä olevat komentovaihtoehdot
+#   {overlaid}  Käytettyjen asetusavainten määrä
+#   {page}  Nykyinen sivunumero
+#   {pages}  Sivujen kokonaismäärä
+#   {panels}  Paneelien määrä
+#   {parameter}  Komennon parametrin nimi
+#   {path}  Tiedoston tai hakemiston polku
+#   {pending}  Odottavien julkaisumuutosten tila
+#   {percent}  Prosenttiarvo
+#   {permission}  Vaadittu oikeus
+#   {personal}  Henkilökohtainen kielitunnus
+#   {pitch}  Pystykulma asteina
+#   {player}  Pelaajan nimi
+#   {plugin}  Lisäosan nimi
+#   {priority}  Valinnan tai piirtämisen tärkeysjärjestys
+#   {provider}  Tarjoajan nimi
+#   {providers}  Tarjoajien luettelo tai määrä
+#   {radius}  Hakusäde
+#   {ready}  Tuontiin valmiiden merkintöjen määrä
+#   {reason}  Virheen tai päätöksen syy
+#   {resume}  Jatkettavien tuontimerkintöjen määrä
+#   {revision}  Asiakirjan versio
+#   {roll}  Kallistuskulma asteina
+#   {rotation}  Näyttökohteen kierto
+#   {scale}  Näyttökohteen tai esikatselun mittakaava
+#   {seconds}  Aika sekunteina
+#   {session}  Editori-istunnon tunniste
+#   {severity}  Diagnostiikan vakavuustaso
+#   {skipped}  Ohitettujen merkintöjen määrä
+#   {slots}  Esinepaikkojen määrä
+#   {source}  Tuonnin lähde tai asetusten tarjoaja
+#   {special}  Erikoisnäyttöelementtien määrä
+#   {state}  Nykyinen tila
+#   {style}  Näyttötyyli
+#   {subject}  Verkkoeditori-istunnon kohde
+#   {target}  Kielivalinnan vastaanottava lisäosa
+#   {temporary}  Tilapäisten kohteiden määrä
+#   {text}  Näytettävä teksti
+#   {title}  Näytettävä otsikko
+#   {to}  Kohdearvo tai alueen loppu
+#   {total}  Merkintöjen kokonaismäärä
+#   {type}  Odotettu arvo- tai kohdetyyppi
+#   {url}  Verkko-osoite
+#   {usage}  Komennon syntaksi
+#   {uuid}  Kohteen tai pelaajan yksilöllinen tunniste
+#   {value}  Viestin tai parametrin nykyinen arvo
+#   {variables}  Viestin sallitut paikkamerkit
+#   {variants}  Näyttövaihtoehtojen määrä tai luettelo
+#   {viewPermission}  Katseluun vaadittu oikeus
+#   {viewRange}  Suurin katseluetäisyys
+#   {warnings}  Varoitusten määrä
+#   {when}  Näyttämisen ehto
+#   {world}  Maailman nimi
+#   {x}  X-koordinaatti
+#   {y}  Y-koordinaatti
+#   {yaw}  Vaakakulma asteina
+#   {z}  Z-koordinaatti
+
+[command.help]
+debug = "Diagnostiikkakomennot"
+debugdump = "Luo diagnostiikkaraportti ja lähetä se halutessasi"
+debugdump_upload = "Lähetä raportti mclo.gs-palveluun"
+root = "Gloss-komentoryhmä"
+hologram = "Luo ja hallitse hologrammeja"
+"hologram.create" = "Luo hologrammi sijaintiisi"
+"hologram.create.id" = "Yksilöllinen hologrammin tunnus"
+"hologram.delete" = "Poista hologrammi"
+"hologram.delete.id" = "Poistettavan hologrammin tunnus"
+"hologram.addline" = "Lisää rivi hologrammin loppuun"
+"hologram.addline.id" = "Hologrammin tunnus"
+"hologram.addline.text" = "Rivin teksti; käytä lainausmerkkejä, jos siinä on välilyöntejä"
+"hologram.setline" = "Korvaa hologrammin rivi"
+"hologram.setline.id" = "Hologrammin tunnus"
+"hologram.setline.line" = "Rivin numero, alkaen 1:stä"
+"hologram.setline.text" = "Rivin teksti; käytä lainausmerkkejä, jos siinä on välilyöntejä"
+"hologram.removeline" = "Poista hologrammin rivi"
+"hologram.removeline.id" = "Hologrammin tunnus"
+"hologram.removeline.line" = "Rivin numero, alkaen 1:stä"
+"hologram.clear" = "Poista kaikki rivit hologrammista"
+"hologram.clear.id" = "Hologrammin tunnus"
+"hologram.movehere" = "Siirrä hologrammi sijaintiisi"
+"hologram.movehere.id" = "Hologrammin tunnus"
+"hologram.move" = "Siirrä hologrammia suhteellisten kuutioetäisyyksien verran"
+"hologram.move.id" = "Hologrammin tunnus"
+"hologram.move.x" = "Suhteellinen X-siirtymä kuutioina"
+"hologram.move.y" = "Suhteellinen Y-siirtymä kuutioina"
+"hologram.move.z" = "Suhteellinen Z-siirtymä kuutioina"
+"hologram.tp" = "Teleporttaa itsesi hologrammin luo"
+"hologram.tp.id" = "Hologrammin tunnus"
+"hologram.list" = "Luettele hologrammit; teleporttaa napsauttamalla"
+"hologram.info" = "Näytä hologrammin sijainti ja rivit"
+"hologram.info.id" = "Hologrammin tunnus"
+"hologram.rendertext" = "Luo natiivisti skaalattu tekstihologrammi"
+"hologram.rendertext.id" = "Yksilöllinen hologrammin tunnus"
+"hologram.rendertext.text" = "Näytettävä teksti; käytä lainausmerkkejä, jos siinä on välilyöntejä"
+"hologram.rendertext.scale" = "TextDisplay-skaalauskerroin"
+"hologram.orient" = "Määritä, miten hologrammi kääntyy katsojaa kohti"
+"hologram.orient.id" = "Hologrammin tunnus"
+"hologram.orient.billboard" = "CENTER, VERTICAL, HORIZONTAL tai FIXED"
+"hologram.orient.yaw" = "Suuntakulma (yaw) asteina, -180 – 180"
+"hologram.orient.pitch" = "Nousukulma (pitch) asteina, -90 – 90"
+board = "Luo ja hallitse tulostauluja"
+"board.create" = "Luo tulostaulu"
+"board.create.id" = "Yksilöllinen tulostaulun tunnus"
+"board.delete" = "Poista tulostaulu"
+"board.delete.id" = "Poistettavan tulostaulun tunnus"
+"board.title" = "Aseta tulostaulun otsikko"
+"board.title.id" = "Tulostaulun tunnus"
+"board.title.text" = "Otsikkoteksti; käytä lainausmerkkejä, jos siinä on välilyöntejä"
+"board.addline" = "Lisää rivi tulostaulun loppuun"
+"board.addline.id" = "Tulostaulun tunnus"
+"board.addline.text" = "Rivin teksti; käytä lainausmerkkejä, jos siinä on välilyöntejä"
+"board.setline" = "Korvaa tulostaulun rivi"
+"board.setline.id" = "Tulostaulun tunnus"
+"board.setline.line" = "Rivin numero, alkaen 1:stä"
+"board.setline.text" = "Rivin teksti; käytä lainausmerkkejä, jos siinä on välilyöntejä"
+"board.removeline" = "Poista tulostaulun rivi"
+"board.removeline.id" = "Tulostaulun tunnus"
+"board.removeline.line" = "Rivin numero, alkaen 1:stä"
+"board.show" = "Näytä tulostaulu itsellesi"
+"board.show.id" = "Tulostaulun tunnus"
+"board.hide" = "Piilota tulostaulusi"
+"board.select" = "Aseta tulostaulun automaattinen valinta"
+"board.select.id" = "Tulostaulun tunnus"
+"board.select.priority" = "Valinnan prioriteetti"
+"board.select.when" = "Totuusarvoehto; kirjoita välilyöntejä sisältävät lausekkeet lainausmerkkeihin"
+"board.list" = "Luettele tulostaulut"
+"board.info" = "Näytä tulostaulun otsikko, rivit ja asetukset"
+"board.info.id" = "Tulostaulun tunnus"
+"board.reset" = "Palauta mukana toimitetut tulostauluoletukset"
+emoji = "Emojien chat-työkalut"
+"emoji.list" = "Luettele käytössä olevat emojit; lisää chattiin napsauttamalla"
+"emoji.reset" = "Palauta mukana toimitetut emojioletukset"
+animations = "Animaatiotyökalut"
+"animations.list" = "Luettele animaatioiden nimet"
+"animations.reset" = "Palauta mukana toimitetut animaatio-oletukset"
+bubbles = "Puhekuplien tyylit"
+"bubbles.style" = "Valitse puhekuplasi tyyli; clear palauttaa automaattisen valinnan"
+"bubbles.style.style" = "Tyylin tunnus tai clear"
+"bubbles.reset" = "Palauta mukana toimitetut puhekuplatyylien oletukset"
+tablist = "Pelaajalistan työkalut"
+"tablist.reset" = "Palauta mukana toimitettu pelaajalistadokumentti"
+motd = "MOTD-työkalut"
+"motd.reset" = "Palauta mukana toimitettu MOTD-dokumentti"
+drops = "Pudonneiden esineiden esitystyökalut"
+"drops.reset" = "Palauta mukana toimitettu pudonneiden esineiden asetusdokumentti"
+indicators = "Vahinko- ja parannusilmaisimien työkalut"
+"indicators.reset" = "Palauta mukana toimitettu vahinkoilmaisimien asetusdokumentti"
+status = "Näytä tiiviit ajonaikaiset lukumäärät"
+import = "Siirrä vanhat hologrammit muokkaamatta lähdetiedostoja"
+"import.apply" = "Suorita vanhojen hologrammien siirto ilman ylikirjoitusta"
+"import.holoui" = "Kopioi HoloUi-tiedot kansiosta plugins/holoui ja ylikirjoita aiemmat tuonnit"
+"import.legacy" = "Siirrä yhdistymistä edeltävät Gloss-datatiedostot v2-kuoriin"
+"import.preview" = "Esikatsele vanhojen hologrammien siirtoa muuttamatta mitään"
+item = "Mukautettujen esineiden tarjoajien työkalut"
+"item.export" = "Vie mukautettujen esineiden katalogi verkkoeditoria varten"
+"item.status" = "Näytä, mitkä mukautettujen esineiden tarjoajat ovat aktiivisia"
+menu = "Luo, avaa ja muokkaa hologrammivalikkoja"
+"menu.addrow" = "Lisää tekstikoristerivi loppuun"
+"menu.back" = "Avaa edellinen valikkoistunto uudelleen"
+"menu.close" = "Sulje nykyinen valikkoistunto"
+"menu.copy" = "Kopioi ladattu valikko uudelle sisäkkäiselle tunnukselle"
+"menu.create" = "Luo pysyvä hologrammi nykyiseen sijaintiisi"
+"menu.image" = "Korvaa valikon sisältö yhdellä keskitetyllä kuvatiedostolla"
+"menu.insertrow" = "Lisää tekstikoristerivi väliin"
+"menu.list" = "Luettele kaikki määritetyt valikot, jotka voit avata"
+"menu.move" = "Siirrä avoin valikko nykyiseen sijaintiisi"
+"menu.new" = "Luo tyhjä hologrammivalikko mukana toimitetusta pohjasta"
+"menu.offsetrow" = "Siirrä riviä absoluuttisilla tai ~suhteellisilla siirtymillä"
+"menu.open" = "Avaa valikko tunnuksella; * näyttää valikkoluettelon"
+"menu.removerow" = "Poista komponenttirivi"
+"menu.seticon" = "Korvaa painike- tai koristerivin kuvake"
+"menu.setrow" = "Aseta painike- tai koristerivin teksti"
+"menu.style" = "Aseta tai tyhjennä yksi rivin näyttötyylin ominaisuus"
+panel = "Pysyvien maailmapaneelien työkalut"
+"panel.addrow" = "Lisää tekstirivi paneelin juurivalikon loppuun"
+"panel.align" = "Kohdista paneelin sijaintiakselit toiseen paneeliin"
+"panel.cancel" = "Hylkää valmisteltu paneelimuokkaus"
+"panel.copy" = "Kopioi pysyvä paneeli uudelle tunnukselle"
+"panel.create" = "Luo paneeli nykyiseen sijaintiisi"
+"panel.delete" = "Poista pysyvä paneeli"
+"panel.edit" = "Aloita valmisteltu paneelin muokkausistunto"
+"panel.follow" = "Seuraa paikalla olevaa pelaajaa kierrolla fixed, yaw tai full"
+"panel.here" = "Siirrä paneeli nykyiseen sijaintiisi"
+"panel.image" = "Korvaa paneelin juurivalikko yhdellä keskitetyllä kuvatiedostolla"
+"panel.info" = "Näytä yhden paneelin koko tila"
+"panel.insertrow" = "Lisää tekstirivi paneelin juurivalikkoon"
+"panel.list" = "Luettele pysyvät paneelit sivuittain"
+"panel.menu" = "Aseta paneelin juurivalikko"
+"panel.move" = "Siirrä paneeli absoluuttisiin tai ~suhteellisiin koordinaatteihin"
+"panel.near" = "Luettele paneelit nykyisen sijaintisi lähellä"
+"panel.offsetrow" = "Siirrä paneelin juurivalikon riviä absoluuttisilla tai ~suhteellisilla siirtymillä"
+"panel.permissions" = "Muuta paneelin katselu- ja vuorovaikutusoikeuksia"
+"panel.ranges" = "Aseta paneelin katselu- ja vuorovaikutusetäisyydet"
+"panel.removerow" = "Poista paneelin juurivalikon rivi"
+"panel.rename" = "Nimeä pysyvä paneeli uudelleen"
+"panel.rotate" = "Aseta absoluuttinen tai ~suhteellinen suuntakulma, pystykulma ja kallistus"
+"panel.save" = "Tallenna valmisteltu paneelimuokkaus"
+"panel.scale" = "Aseta paneelin absoluuttinen tai ~suhteellinen skaala"
+"panel.seticon" = "Korvaa rivin kuvake paneelin juurivalikossa"
+"panel.setrow" = "Aseta paneelin juurivalikon rivin teksti"
+"panel.style" = "Aseta tai tyhjennä yksi rivin näyttötyylin ominaisuus"
+"panel.teleport" = "Teleporttaa pysyvän paneelin luo"
+"panel.unfollow" = "Lopeta paneelin pelaajaseuranta"
+"panel.visibility" = "Aseta näkyvyystila ja oikeusnoodit"
+preview = "Esikatseludokumenttien työkalut"
+"preview.dump" = "Koosta esikatseludokumentti kerran ja tulosta sen elementtimäärät"
+"preview.list" = "Luettele esikatseludokumentit ja niiden osumasäännöt"
+"preview.reset" = "Palauta mukana toimitetut esikatseluoletukset (ei poista ylimääräisiä käyttäjän dokumentteja, jotka voivat peittää ne)"
+web = "Avaa ja hallitse Glossin verkkoeditoria"
+"web.open" = "Avaa tyhjä palvelussa toimiva Gloss-editori"
+"web.edit" = "Avaa yksi reaaliaikainen Gloss-asiakirja"
+"web.edit.document" = "Avaa tämä reaaliaikainen asiakirja verkkoeditorissa"
+"web.workspace" = "Avaa koko reaaliaikainen Gloss-työtila"
+"web.sessions" = "Hallitse verkkoeditorin aktiivisia istuntoja"
+"web.sessions.list" = "Luettele verkkoeditorin aktiiviset istunnot"
+"web.sessions.pull" = "Tarkista verkkoeditorin istunto nyt"
+"web.sessions.revoke" = "Peru verkkoeditorin käyttölinkki"
+"web.sessions.status" = "Näytä yksi verkkoeditorin istunto"
+language = "Valitse oma kielesi tai palvelimen oletuskieli"
+
+[command.help.arg]
+reset_name = "Palautettava nimi, tai * kaikille mukana toimitetuille oletuksille"
+panel_axes = "Akselit: x, y, z, xy, xz, yz tai xyz"
+panel_follow_rotation = "Seurannan kierto: fixed, yaw tai full"
+panel_id = "Pysyvän paneelin tunnus"
+panel_interact_permission = "Vuorovaikutusoikeus tai -"
+panel_interaction_range = "Positiivinen vuorovaikutusetäisyys"
+panel_menu = "Juurivalikon tunnus; oletuksena paneelin tunnus"
+panel_new_id = "Uusi pysyvän paneelin tunnus"
+panel_pitch = "Absoluuttinen tai ~suhteellinen pystykulma"
+panel_player = "Paikalla oleva kohdepelaaja"
+panel_radius = "Vaakasuuntainen hakusäde"
+panel_reference = "Viitepaneelin tunnus"
+panel_roll = "Absoluuttinen tai ~suhteellinen kallistus"
+panel_root_menu = "Juurivalikon tunnus"
+panel_scale = "Absoluuttinen tai ~suhteellinen skaala"
+panel_view_permission = "Katseluoikeus tai -"
+panel_view_range = "Positiivinen katseluetäisyys"
+panel_visibility = "Näkyvyystila: public, permission tai hidden"
+panel_x = "Absoluuttinen tai ~suhteellinen X"
+panel_y = "Absoluuttinen tai ~suhteellinen Y"
+panel_yaw = "Absoluuttinen tai ~suhteellinen suuntakulma"
+panel_z = "Absoluuttinen tai ~suhteellinen Z"
+content_menu = "Ladatun valikon tunnus"
+web_subject = "Reaaliaikaisen Gloss-asiakirjan tunnus"
+hologram_id = "Uuden hologrammin ja juurivalikon tunnus"
+hologram_text = "Valinnainen MiniMessage-teksti"
+image_path = "Tiedosto Glossin kuvakansion alla"
+import_source = "Vanha hologrammilähde"
+menu = "Avattavan valikon tunnus (* näyttää kaikki valikot)"
+new_panel_id = "Uusi pysyvän paneelin tunnus"
+new_menu = "Uuden sisäkkäisen valikon tunnus"
+list_page = "Luettelon sivu, alkaen 1:stä"
+previews_dump_name = "Koostettavan dokumentin nimi"
+previews_name = "Palautettavan dokumentin nimi, tai * kaikille mukana toimitetuille dokumenteille"
+row_icon_type = "Kuvakkeen tyyppi"
+row_icon_value = "Kuvakkeen sisältö tai rekisteritunnus"
+row_index = "Komponenttirivi, alkaen 1:stä"
+row_style_property = "Näyttötyylin ominaisuus"
+row_style_value = "Tyyliarvo, tai * tyhjentää"
+row_text = "Rivin MiniMessage-teksti"
+row_x = "Rivin absoluuttinen tai ~suhteellinen X"
+row_y = "Rivin absoluuttinen tai ~suhteellinen Y"
+row_z = "Rivin absoluuttinen tai ~suhteellinen Z"
+source_menu = "Ladatun lähdevalikon tunnus"
+web_session = "Verkkoeditorin istuntotunnus"
+
+[command.error]
+no_permission = "&8[&dGloss&8] &cSinulla ei ole oikeutta."
+no_permission_use = "&8[&dGloss&8] &cSinulla ei ole oikeutta käyttää tuota komentoa."
+usage = "&7Käyttö: &f/{command} help"
+
+[command.hologram]
+exists = "&8[&dGloss&8] &cHologrammi '&f{id}&c' on jo olemassa."
+missing = "&8[&dGloss&8] &cHologrammia nimeltä '&f{id}&c' ei ole."
+created = "&8[&dGloss&8] &aHologrammi &f{id}&a luotu."
+deleted = "&8[&dGloss&8] &aHologrammi &f{id}&a poistettu."
+line_added = "&8[&dGloss&8] &aRivi &f{line}&a lisätty hologrammiin &f{id}&a."
+line_set = "&8[&dGloss&8] &aRivi &f{line}&a asetettu hologrammiin &f{id}&a."
+line_removed = "&8[&dGloss&8] &aRivi &f{line}&a poistettu hologrammista &f{id}&a."
+line_out_of_range = "&8[&dGloss&8] &cRivi {line} on sallitun alueen ulkopuolella; hologrammissa &f{id}&c on {count} riviä."
+cleared = "&8[&dGloss&8] &aKaikki rivit tyhjennetty hologrammista &f{id}&a."
+moved = "&8[&dGloss&8] &aHologrammi &f{id}&a siirretty sijaintiisi."
+offset = "&8[&dGloss&8] &aHologrammia &f{id}&a siirretty &f{x}&a, &f{y}&a, &f{z}&a."
+teleported = "&8[&dGloss&8] &aTeleportattu hologrammin &f{id}&a luo."
+list_empty = "&8[&dGloss&8] &7Hologrammeja ei ole vielä."
+rendered = "&8[&dGloss&8] &aTekstihologrammi &f{id}&a luotiin skaalalla &f{scale}&a."
+text_empty = "&8[&dGloss&8] &cTeksti ei voi olla tyhjä."
+scale_out_of_range = "&8[&dGloss&8] &cSkaala {value} on alueen ulkopuolella; sen on oltava välillä &f{minimum}&c–&f{maximum}&c."
+oriented = "&8[&dGloss&8] &aHologrammille &f{id}&a asetettiin billboard &f{billboard}&a, yaw &f{yaw}&a, pitch &f{pitch}&a."
+billboard_unknown = "&8[&dGloss&8] &cTuntematon billboard '&f{billboard}&c'. Käytä jotakin näistä: &f{options}&c."
+angle_out_of_range = "&8[&dGloss&8] &cArvo {axis} {value} on sallitun alueen ulkopuolella; sen on oltava välillä &f-{limit}&c ja &f{limit}&c astetta."
+
+[command.hologram.list]
+hover = "Teleporttaa napsauttamalla"
+lines = "{count} riviä"
+
+[command.hologram.info]
+header = "&8[&dGloss&8] &d{id} &7sijainnissa &f{world} {x}, {y}, {z}"
+line = " &8{line}. &f{text}"
+orientation = " &8skaala &f{scale} &8billboard &f{billboard} &8yaw &f{yaw} &8pitch &f{pitch}"
+
+[command.board]
+exists = "&8[&dGloss&8] &cTulostaulu '&f{id}&c' on jo olemassa."
+missing = "&8[&dGloss&8] &cTulostaulua nimeltä '&f{id}&c' ei ole."
+created = "&8[&dGloss&8] &aTulostaulu &f{id}&a luotu."
+deleted = "&8[&dGloss&8] &aTulostaulu &f{id}&a poistettu."
+title_set = "&8[&dGloss&8] &aTulostaulun &f{id}&a otsikko asetettu."
+line_added = "&8[&dGloss&8] &aRivi &f{line}&a lisätty tulostauluun &f{id}&a."
+line_set = "&8[&dGloss&8] &aRivi &f{line}&a asetettu tulostauluun &f{id}&a."
+line_removed = "&8[&dGloss&8] &aRivi &f{line}&a poistettu tulostaulusta &f{id}&a."
+line_out_of_range = "&8[&dGloss&8] &cRivi {line} on sallitun alueen ulkopuolella; tulostaulussa &f{id}&c on {count} riviä."
+shown = "&8[&dGloss&8] &aNäytetään tulostaulu &f{id}&a."
+hidden = "&8[&dGloss&8] &aTulostaulusi on piilotettu."
+select_set = "&8[&dGloss&8] &aTulostaulun &f{id}&a valinnan prioriteetiksi asetettiin &f{priority}&a."
+select_invalid = "&8[&dGloss&8] &cVirheellinen tulostaulun ehto: &f{error}&c."
+list_empty = "&8[&dGloss&8] &7Tulostauluja ei ole vielä."
+
+[command.board.list]
+hover = "Näytä tiedot napsauttamalla"
+
+[command.board.info]
+header = "&8[&dGloss&8] &d{id} &7otsikolla &f{title}"
+meta = "&7Prioriteetti: &f{priority} | Ehto: &f{when} | Vaihtoehdot: &f{variants}"
+line = " &8{line}. &f{text}"
+
+[command.emoji]
+empty = "&8[&dGloss&8] &7Yhtään emojia ei ole käytössä."
+hover = "Lisää chattiin napsauttamalla"
+
+[command.animations]
+empty = "&8[&dGloss&8] &7Yhtään animaatiota ei ole ladattu."
+header = "&8[&dGloss&8] &fAnimaatiot: &d{count}"
+entry = "&8- &d{name}"
+
+[command.list]
+page = "&7Sivu &f{page}&7/&f{pages} &8- &7näytetään &f{from}&7-&f{to} &7yhteensä &f{total}"
+next = "&7Seuraava sivu: &f{command}"
+
+[command.status]
+holograms = "&7Hologrammit: &f{count} &8({temporary} tilapäistä, {entities} entiteettiä)"
+boards = "&7Tulostaulut: &f{count}"
+emoji = "&7Emojit: &f{enabled}&8/&f{total}"
+animations = "&7Animaatiot: &f{count}"
+effects = "&7Kuplat: &f{bubbles} &8| &7Ilmaisimet: &f{indicators} &8| &7Pudotukset: &f{drops}"
+
+[command.reset]
+done = "&8[&dGloss&8] &aPalautettu &f{count}&a mukana toimitettua {kind}-oletusta."
+none = "&8[&dGloss&8] &cYksikään mukana toimitettu {kind}-oletus ei vastaa nimeä '&f{name}&c'."
+
+[command.bubbles]
+style_set = "&8[&dGloss&8] &aPuhekuplan tyyliksi asetettu &f{style}&a."
+style_cleared = "&8[&dGloss&8] &aPuhekuplan tyyli tyhjennetty; automaattinen valinta on käytössä."
+style_unknown = "&8[&dGloss&8] &cPuhekuplatyyliä nimeltä '&f{style}&c' ei ole."
+
+[command.import]
+config_unreadable = "&8[&dGloss&8] &cTiedostoa gloss.toml ei voitu ladata: &f{reason}"
+
+[command.import.holoui]
+missing = "&8[&dGloss&8] &cGlossin datakansion vierestä ei löytynyt holoui-datakansiota."
+done = "&8[&dGloss&8] &aHoloUi-tuonti valmis: &f{copied}&a kopioitu, &f{skipped}&a ohitettu, &f{overlaid}&a asetusavainta, &f{errors}&a virhettä."
+
+[command.import.legacy]
+done = "&8[&dGloss&8] &aVanhan datan siirto valmis: &f{migrated}&a siirretty, &f{absorbed}&a sulautettu, &f{overlaid}&a asetusavainta, &f{errors}&a virhettä."
+
+[director.help]
+no_subcommands = "Tällä sivulla ei ole alikomentoja."
+no_description = "Kuvausta ei ole annettu"
+command_group = "Komentoryhmä. Avaa napsauttamalla."
+category = "Komentokategoria"
+no_parameters = "Ei parametreja. Esitäytä komento napsauttamalla."
+parameters_hover = "Vie hiiri parametrien päälle saadaksesi lisätietoja."
+
+[director.help.navigation]
+back = "Takaisin"
+page = "Sivu"
+
+[director.help.navigation.parent]
+hover = "Palaa ylempään komentoryhmään"
+
+[director.help.navigation.previous]
+hover = "Edellinen sivu"
+
+[director.help.navigation.next]
+hover = "Seuraava sivu"
+
+[director.help.parameter]
+required = "Tämä parametri on pakollinen."
+optional = "Tämä parametri on valinnainen."
+default = "Oletusarvo on \"{value}\", jos sitä ei määritetä."
+type = "Tämän parametrin tyyppi on {type}."
+
+[director.runtime]
+usage = "Käyttö: {usage}"
+
+[director.runtime.error]
+invalid_origin = "Tätä komentoa ei voi suorittaa tästä lähteestä."
+unknown_parameter = "Tuntematon parametriavain: {key}"
+unexpected_argument = "Odottamaton argumentti \"{argument}\". Valinnaiset parametrit on annettava avaimella, esim. seed=123"
+unclosed_group = "Sulkeva \"]\" puuttuu parametrilta {key}"
+conversion_failed = "Arvoa \"{value}\" ei voi muuntaa tyypiksi {type} parametrille {parameter}"
+default_parse_failed = "Parametrin {parameter} oletusarvoa ei voi jäsentää"
+missing_argument = "Puuttuva argumentti \"{parameter}\" ({type})"
+execution_failed = "Komennon {command} suoritus epäonnistui: {reason}"
+
+[gloss.error]
+menu_name_required = "Valikon nimi ei voi olla tyhjä"
+hologram_id_required = "Hologrammin tunnus ei voi olla tyhjä"
+panel_id_required = "Paneelin tunnus ei voi olla tyhjä"
+web_subject_required = "Verkkoeditorin asiakirjatunnus ei voi olla tyhjä"
+web_session_required = "Verkkoeditorin istuntotunnus ei voi olla tyhjä"
+panel_player_required = "Kohdepelaaja ei voi olla tyhjä"
+row_icon_type_required = "Kuvakkeen tyyppi ei voi olla tyhjä"
+row_style_property_required = "Tyylin ominaisuus ei voi olla tyhjä"
+import_source_required = "Vanhojen tietojen tuontilähde ei voi olla tyhjä"
+import_source_unknown = "Tuntematon vanhojen tietojen tuontilähde: {source}"
+
+[gloss.message]
+permission_denied = "&8[&dGloss&8]: &cSinulla ei ole oikeutta &f{permission}&c."
+unknown_command = "&8[&dGloss&8]: &cTuntematon komento \"&f{command}&c\"."
+
+[gloss.message.hologram]
+created = "&8[&dGloss&8]: &aHologrammi &f{hologram}&a ja sen juurivalikko &f{menu}&a luotiin sijaintiisi."
+already_exists = "&8[&dGloss&8]: &cHologrammi, paneeli tai valikko nimeltä &f{hologram}&c on jo olemassa."
+failed = "&8[&dGloss&8]: &cHologrammia &f{hologram}&c ei voitu luoda. Mitään muutoksia ei säilytetty."
+durability_uncertain = "&8[&dGloss&8]: &eHologrammin &f{hologram}&e luontitapahtumaa ei voitu viimeistellä turvallisesti. Käynnistä Gloss uudelleen ennen kuin tarkastelet hologrammia tai yrität luoda sen uudelleen."
+
+[gloss.message.menu]
+none = "&8[&dGloss&8]: &7Valikkoja ei ole saatavilla."
+player_only = "&8[&dGloss&8]: &cVain pelaajat voivat avata valikkoja."
+no_previous = "&8[&dGloss&8]: &cEdellistä valikkoa ei ole saatavilla."
+closed = "&8[&dGloss&8]: &aValikko suljettu."
+moved = "&8[&dGloss&8]: &aValikko siirretty."
+none_open = "&8[&dGloss&8]: &cMikään valikko ei ole auki."
+unavailable = "&8[&dGloss&8]: &c\"{menu}\" ei ole saatavilla."
+permission_denied = "&8[&dGloss&8]: &cSinulla ei ole lupaa avata valikkoa \"{menu}\"."
+open_failed = "&8[&dGloss&8]: &cValikkoa \"{menu}\" ei voitu avata."
+
+[gloss.message.menu.list]
+header = "Valikot"
+entry = "Avaa {menu} napsauttamalla."
+
+[gloss.message.menu.content]
+updated = "&8[&dGloss&8]: &aToiminto {operation} kohdistettiin valikkoon &f{menu}&a, versio {revision}."
+created = "&8[&dGloss&8]: &aValikko &f{menu}&a luotiin, versio {revision}. Avaa se komennolla /gloss menu open &f{menu}&a tai sijoita komennolla /gloss panel create &f{menu}&a."
+copied = "&8[&dGloss&8]: &aValikko &f{source}&a kopioitiin valikoksi &f{menu}&a, versio {revision}."
+revision_conflict = "&8[&dGloss&8]: &cValikko &f{menu}&c muuttui kirjoituksen aikana (odotettu {expected}, nykyinen {actual}). Toista komento."
+already_exists = "&8[&dGloss&8]: &cValikko &f{menu}&c on jo olemassa."
+invalid = "&8[&dGloss&8]: &cVirheellinen valikon sisältöarvo: &f{reason}&c."
+failed = "&8[&dGloss&8]: &cValikon &f{menu}&c sisältötoiminto epäonnistui: {reason}"
+
+[gloss.message.command]
+player_only = "&8[&dGloss&8]: &cTämä komento on vain pelaajien käytettävissä."
+
+[gloss.message.web]
+header = "Verkkoeditori"
+open_hover = "Avaa Glossin verkkoeditori napsauttamalla."
+open = "&8[&dGloss&8]: &7Verkkoeditori: &f{url}"
+preparing = "&8[&dGloss&8]: &7Valmistellaan suojattua synkronointi-istuntoa kohteelle &f{subject}&7..."
+unavailable = "&8[&dGloss&8]: &cReaaliaikainen verkkomuokkaus ei ole käytettävissä. Tarkista synkronointiasetukset ja yhteys välityspalvelimeen."
+open_failed = "&8[&dGloss&8]: &cKohdetta &f{kind}={subject}&c ei voitu avata reaaliaikaisessa verkkoeditorissa: {reason}"
+open_console = "&8[&dGloss&8]: &7Editorin käyttölinkki kohteelle &f{subject}&7: &f{url}"
+capability_warning = "&8[&dGloss&8]: &eTällä URL-osoitteella voi julkaista muutoksia palvelimelle, kunnes käyttöoikeus perutaan tai vanhenee. Pidä osoite salassa."
+open_label = "Avaa editori"
+copy_label = "Kopioi linkki"
+revoke_label = "Peru käyttöoikeus"
+link_hover = "Avaa editori, kopioi käyttölinkki tai peru istunto {session}."
+
+[gloss.message.web.sessions]
+list_empty = "&8[&dGloss&8]: &7Editorilla ei ole aktiivisia synkronointi-istuntoja."
+status = "&8[&dGloss&8]: &f&f{session} &7{kind}=&f{subject} vanhenee=&f{seconds}s julkaisu=&f{revision} odottavia=&f{pending}"
+revoked = "&8[&dGloss&8]: &aSynkronointi-istunto &f{session}&a peruttiin."
+pulled = "&8[&dGloss&8]: &aSynkronointi-istunto &f{session}&a tarkistettiin."
+unknown = "&8[&dGloss&8]: &cTuntematon tai vanhentunut synkronointi-istunto &f{session}&c."
+failed = "&8[&dGloss&8]: &cIstunnon &f{session}&c synkronointitoiminto epäonnistui: {reason}"
+
+[gloss.message.import]
+preview_started = "&8[&dGloss&8]: &7Tutkitaan lähdettä &f{source}&7 siirron esikatselua varten muuttamatta tietoja..."
+apply_started = "&8[&dGloss&8]: &7Tutkitaan ja siirretään lähteestä &f{source}&7 korvaamatta tietoja..."
+source_missing = "&8[&dGloss&8]: &7Lähdettä &f{source}&7 ei löytynyt polusta &f{path}&7."
+preview_summary = "&8[&dGloss&8]: &fLähteen &f{source}&7 esikatselu: &a{ready} valmista, &d{resume} jatkettavaa, &e{conflicts} ristiriitaa, &c{errors} virhettä, {warnings} varoitusta. Lähde: &f{path}"
+preview_entry = "&8- &f&f{legacy} -> &f{board} tila=&f{state} varoituksia=&f{warnings}"
+apply_summary = "&8[&dGloss&8]: &fLähteen &f{source}&7 siirto: &a{imported} tuotua, &e{skipped} ohitettua, &c{failed} epäonnistunutta; tarkistus havaitsi {errors} virhettä ja {warnings} varoitusta."
+apply_entry = "&8- &f&f{legacy} tila=&f{state} syy=&f{reason}"
+issue = "&8- &f{legacy} &7{severity}: &f{reason}"
+busy = "&8[&dGloss&8]: &cToinen vanhojen hologrammien siirto on jo käynnissä."
+failed = "&8[&dGloss&8]: &cVanhojen hologrammien siirto lähteestä &f{source}&c epäonnistui: {reason}"
+
+[gloss.message.config]
+reloaded = "&2Asetus \"{name}\" ladattiin uudelleen."
+
+[gloss.message.hotload]
+singular = "&2Pikaladattiin {kinds} ({count} muutos)."
+plural = "&2Pikaladattiin {kinds} ({count} muutosta)."
+
+[gloss.message.preview_scale]
+adjusting = "&7Esikatselun koko: &f{percent}% &8- &7pidä hiipiminen painettuna + vieritä muuttaaksesi; tallenna kaksoisnapauttamalla hiipimistä"
+hidden = "&7Esikatselu &cpiilotettu &8- &7palauta vierittämällä ylöspäin"
+size = "&7Esikatselun koko: &f{percent}%"
+saved_hidden = "&7Esikatselu tallennettu &cpiilotettuna &8- &7palauta kaksoisnapauttamalla hiipimistä + vierittämällä säiliön päällä ylöspäin"
+saved = "&7Esikatselun koko tallennettu: &f{percent}%"
+
+[gloss.message.drops]
+bundle_more = "+{count} muuta"
+
+[gloss.message.items]
+disabled = "&8[&dGloss&8]: &7Mukautetut esineet on poistettu käytöstä. Aseta customItems arvoksi true tiedostossa gloss.toml."
+
+[gloss.message.items.status]
+header = "Mukautetut esineet"
+summary = "{active}/{total} tarjoajaa aktiivisena"
+entry = "Tarjoaja {provider} lisäosasta {plugin}."
+hint = "Vie luettelo verkkoeditoriin napsauttamalla."
+
+[gloss.message.items.state]
+ready = "valmis, {count} tunnusta"
+loading = "saatavilla, lataus kesken"
+inactive = "saatavilla, ei sovitinta"
+missing = "ei asennettu"
+
+[gloss.message.items.export]
+started = "&8[&dGloss&8]: &7Viedään mukautettujen esineiden luetteloa..."
+done = "&8[&dGloss&8]: &aKirjoitettiin {count} esinettä {providers} tarjoajalta polkuun &f{path}&a."
+empty = "&8[&dGloss&8]: &7Mukautettuja esineitä ei löytynyt. Tyhjä luettelo kirjoitettiin polkuun &f{path}&7."
+failed = "&8[&dGloss&8]: &cMukautettujen esineiden luetteloa ei voitu kirjoittaa. Tarkista lokit."
+busy = "&8[&dGloss&8]: &cLuettelon vienti on jo käynnissä."
+
+[gloss.message.previews.list]
+header = "Esikatseluasiakirjat"
+empty = "&7Esikatseluasiakirjoja ei ole ladattu."
+entry = "lohkoja={blocks} olioita={entities} erikoisia={special} prioriteetti={priority}"
+
+[gloss.message.previews.reset]
+started = "&8[&dGloss&8]: &7Palautetaan esikatseluasiakirjat \"&f{name}&7\"..."
+done = "&8[&dGloss&8]: &aPalautettiin {count} mukana toimitettua esikatseluasiakirjaa. Niitä korvaavia käyttäjän lisäasiakirjoja ei poistettu."
+none = "&8[&dGloss&8]: &c\"{name}\" ei ole mukana toimitettu esikatseluasiakirja; mitään ei palautettu."
+
+[gloss.message.previews.dump]
+unknown = "&8[&dGloss&8]: &c\"{name}\" ei ole ladattu esikatseluasiakirja."
+result = "&8[&dGloss&8]: &a&a{name}&7: &f{total}&7 elementtiä (paneeleja={panels}, soluja={cells}, paikkoja={slots}, tekstejä={labels})."
+no_errors = "&8[&dGloss&8]: &aEi koontivirheitä."
+error_line = "&8[&dGloss&8]: &c{message}"
+error_more = "&8[&dGloss&8]: &7Vielä {count} (katso konsolin loki)."
+
+[gloss.message.panels]
+created = "&8[&dGloss&8]: &aPaneeli &f{board}&a luotiin, versio {revision}."
+deleted = "&8[&dGloss&8]: &aPaneeli &f{board}&a poistettiin."
+renamed = "&8[&dGloss&8]: &a&f{oldBoard}&a nimettiin uudelleen nimelle &f{board}&a, versio {revision}."
+copied = "&8[&dGloss&8]: &a&f{source}&a kopioitiin kohteeksi &f{board}&a."
+updated = "&8[&dGloss&8]: &aToiminto {operation} kohdistettiin paneeliin &f{board}&a, versio {revision}."
+teleported = "&8[&dGloss&8]: &aSiirryttiin paneeliin &f{board}&a."
+unknown = "&8[&dGloss&8]: &cTuntematon paneeli &f{board}&c."
+already_exists = "&8[&dGloss&8]: &cPaneeli &f{board}&c on jo olemassa."
+invalid = "&8[&dGloss&8]: &cVirheellinen paneelin arvo: &f{reason}&c."
+menu_unavailable = "&8[&dGloss&8]: &cPäävalikkoa &f{menu}&c ei ole ladattu."
+player_unavailable = "&8[&dGloss&8]: &cKohdepelaaja &f{player}&c ei ole paikalla."
+world_unavailable = "&8[&dGloss&8]: &cPaneelin maailmaa &f{world}&c ei ole ladattu tallennetulla UUID-tunnuksella."
+revision_conflict = "&8[&dGloss&8]: &cPaneeli &f{board}&c muuttui muokkauksen aikana (odotettu {expected}, nykyinen {actual}). Avaa muokkausistunto uudelleen."
+failed = "&8[&dGloss&8]: &cPaneelin &f{board}&c toiminto epäonnistui: {reason}"
+
+[gloss.message.panels.list]
+header = "&8[&dGloss&8]: &fPysyviä paneeleja: &d{count}"
+empty = "&8[&dGloss&8]: &7Pysyviä paneeleja ei ole ladattu."
+entry = "&8- &f&f{board} valikko=&f{menu} versio=&f{revision}"
+
+[gloss.message.panels.near]
+header = "&8[&dGloss&8]: &fPaneeleja &d{radius}&f lohkon säteellä: &d{count}"
+empty = "&8[&dGloss&8]: &7Tällä säteellä ei ole paneeleja."
+entry = "&8- &f&f{board} etäisyys=&f{distance} valikko=&f{menu}"
+
+[gloss.message.panels.info]
+header = "&8[&dGloss&8]: &fPaneeli &d{board} ({state})"
+identity = "&7uuid=&f{uuid} versio=&f{revision} valikko=&f{menu}"
+transform = "&7maailma=&f{world} sijainti=&f{x}, {y}, {z} kierto=&f{yaw}, {pitch}, {roll} mittakaava=&f{scale}"
+visibility = "&7näkyvyys=&f{mode} katseluoikeus=&f{viewPermission} vuorovaikutusoikeus=&f{interactPermission} etäisyydet=&f{viewRange}/{interactionRange}"
+follow = "&7seuranta=&f{mode} pelaaja=&f{player} kierto=&f{rotation}"
+
+[gloss.message.panels.edit]
+started = "&8[&dGloss&8]: &aMuokataan paneelia &f{board}&a versiosta {revision}. Muutokset odottavat tallennusta."
+already_active = "&8[&dGloss&8]: &cMuokkaat jo paneelia &f{board}&c. Tallenna tai peru ensin."
+none = "&8[&dGloss&8]: &cSinulla ei ole tallennusta odottavaa paneelimuokkausta."
+busy = "&8[&dGloss&8]: &cPaneelia &f{board}&c tallennetaan parhaillaan."
+staged = "&8[&dGloss&8]: &aToiminto {operation} valmisteltiin paneelille &f{board}&a. Tallenna komennolla /gloss panel save."
+saved = "&8[&dGloss&8]: &a&f{board}&a tallennettiin, versio {revision}."
+cancelled = "&8[&dGloss&8]: &aPaneelin &f{board}&a odottavat muutokset peruttiin."
+identity_blocked = "&8[&dGloss&8]: &cTallenna tai peru paneelin &f{board}&c odottavat muutokset ennen uudelleennimeämistä tai poistamista."
+
+[gloss.preview.state]
+idle = "Toimeton"
+brewing = "Valmistus {percent}%"
+needs_blaze_powder = "Tarvitsee roihujauhetta"
+waiting = "Odottaa"
+no_ingredient = "Ei ainesosaa"
+empty = "Tyhjä"
+smelting_item = "Sulattaa: {item} {percent}%"
+smelting = "Sulattaa {percent}%"
+blasting_item = "Masuunisulatus: {item} {percent}%"
+blasting = "Masuunisulatus {percent}%"
+smoking_item = "Savustus: {item} {percent}%"
+smoking = "Savustus {percent}%"
+heating = "Kuumenee"
+needs_fuel = "Tarvitsee polttoainetta"
+no_input = "Ei syötettä"
+surge_suffix = "  +{seconds}s"
+disc_playing = "Toistaa: {disc}"
+disc_loaded = "Ladattu: {disc}"
+no_disc = "Ei musiikkilevyä"
+
+[gloss.preview.stat]
+fuel_level = "Polttoaine {fuel}/{maximum}"
+no_fuel = "Ei polttoainetta"
+bottles = "Pullot {bottles}/{maximum}"
+fuel_seconds = "Polttoaine {seconds}s"
+fuel_ready = "Polttoaine valmis"
+xp_gain = "XP +{experience}"
+xp_zero = "XP 0"
+bees_and_honey = "Mehiläiset {bees}/{maximumBees}   Hunaja {honey}/{maximumHoney}"
+cauldron_empty = "Tyhjä {level}/{maximum}"
+cauldron_level = "Taso {level}/{maximum}"
+
+[gloss.preview.theme.title]
+chest = "&6&lArkku"
+trapped_chest = "&c&lAnsoitettu arkku"
+ender_chest = "&5&lEnder-arkku"
+barrel = "&e&lTynnyri"
+dispenser = "&7&lJakelulaite"
+dropper = "&8&lPudottaja"
+hopper = "&8&lSuppilo"
+furnace = "&6&lUuni"
+smoker = "&e&lSavustin"
+blast_furnace = "&b&lMasuuni"
+beehive = "&e&lKeinotekoinen mehiläispesä"
+bee_nest = "&e&lLuonnollinen mehiläispesä"
+cauldron = "&7&lPata"
+water_cauldron = "&9&lVesipata"
+lava_cauldron = "&6&lLaavapata"
+powder_snow_cauldron = "&f&lPuuterilumipata"
+jukebox = "&d&lLevysoitin"
+brewing_stand = "&d&lHautumateline"
+chiseled_bookshelf = "&6&lTäytettävä kirjahylly"
+hopper_minecart = "&8&lSuppilokaivosvaunu"
+chest_minecart = "&6&lArkullinen kaivosvaunu"
+mobile = "&7&l{name}"
+shulker = "&l{color} Shulker-laatikko"
+copper_chest = "&6&l{name}"
+shelf = "&6&l{name}"
+container = "&6&lSäiliö"
+
+[language.menu]
+your_language = "Oma kielesi"
+reset_your_language = "Palauta oma kielesi"
+server_default = "Palvelimen oletuskieli"
+edit_messages = "Muokkaa kieliviestejä"
+use_server_default = "Käytä palvelimen oletuskieltä"
+current = "Nykyinen: {locale}"
+current_with_personal = "Nykyinen: {locale} (Omasi: {personal})"
+your_description = "Vaihda vain näkemäsi viestit."
+reset_description = "Käytä palvelimen oletuskieltä."
+server_description = "Vaihda palvelimen oletuskieli."
+edit_description = "Avaa kielikohtainen viestieditori."
+select_description = "Napsauta valitaksesi tämän kielen."
+remove_personal_description = "Poista henkilökohtainen kielivalintasi."
+no_controls = "Sinulla ei ole käytettävissä kieliasetuksia."
+command = "Komento: {command}"
+selected = "valittu"
+all-volmit-plugins = "Kaikki Volmit-lisäosat"
+
+[language.error]
+stopping = "Kielivalintaa ei ole saatavilla, kun plugin pysähtyy."
+editor-player-only = "Avaa kielieditori pelissä."
+no-providers = "Yhtään Volmit-kielipalvelua ei ole saatavilla."
+numeric-page = "Anna sivunumero numerona."
+personal-player-only = "Pelaajan kieliasetukset on valittava pelissä."
+personal-permission = "Sinulla ei ole lupaa valita kieltäsi."
+plugin-personal-permission = "Sinulla ei ole oikeutta valita kieltäsi lisäosalle {plugin}."
+plugin-server-permission = "Sinulla ei ole oikeutta muuttaa lisäosan {plugin} palvelinkieltä."
+server-locale-required = "Valitse palvelimen oletuskieleksi kielikoodi, kuten en_US."
+unavailable-for-all = "Kieli {locale} ei ole saatavilla kaikille valituille lisäosille."
+
+[language.usage]
+editor = "Käyttö: /{command} language server edit [locale]"
+selection = "Käyttö: /{command} language self [locale|reset] or server [locale]"
+volmit-selection = "Käyttö: /volmit plugins languages [locale]"
+
+[language.selection]
+preparing = "Valmistellaan kieltä {locale} kohteelle {target}..."
+save-failed = "{plugin}: kielivalintaa ei voitu tallentaa; tarkista palvelinkonsoli."
+english-fallback = "{plugin}: {locale} ei ole saatavilla; käytetään englantia (en_US)."
+personal-selected = "{plugin}: kieli on nyt {locale}."
+server-selected = "{plugin}: palvelinkieli on nyt {locale}."
+server-default-selected = "{plugin}: kielesi noudattaa nyt palvelimen oletuskieltä."
+
+[language.editor]
+loading = "Ladataan kielen {locale} viestejä..."
+
+[language.editor.section]
+languages = "Kielet"
+search = "Etsi"
+search-title = "{locale} / Etsi"
+group-title = "{locale} / {group}"
+
+[language.editor.prompt]
+search = "Hae viestin avainta tai tekstiä. Palaa kirjoittamalla cancel."
+value = "Kirjoita avaimen {key} uusi arvo chattiin."
+current = "Nykyinen arvo: {value}"
+variables = "Muuttujat: {variables}"
+guidance = "Käytä \\n rivinvaihtoon ja \\\\ kenoviivaan tai palaa kirjoittamalla cancel."
+
+[language.editor.input]
+expired = "Kielieditorin syöttöaika päättyi."
+too-long = "Syöte saa sisältää enintään {maximum} merkkiä."
+unable-to-save = "Tallennus epäonnistui: {reason}"
+
+[language.editor.navigation]
+back = "&eTakaisin&r"
+close = "&cSulje&r"
+previous-page = "&eEdellinen sivu&r"
+next-page = "&eSeuraava sivu&r"
+
+[language.editor.search]
+messages = "Hae viestejä"
+messages-lore = "Napsauta hakeaksesi kaikista viesteistä."
+clear = "Tyhjennä haku"
+
+[language.editor.message]
+current-value = "&7Nykyinen arvo:&r"
+variables = "&8{variables}&r"
+edit-plural = "&7Muokkaa monikkomuotoa napsauttamalla.&r"
+edit-lines = "&7Muokkaa yksittäisiä rivejä napsauttamalla.&r"
+edit-chat = "&7Muokkaa chatissa napsauttamalla.&r"
+
+[language.editor.locale]
+open = "&8Avaa tämä kieli napsauttamalla.&r"
+
+[language.editor.category]
+message-count = "&7{count} viestiä&r"
+open = "&8Avaa tämä luokka napsauttamalla.&r"
+
+[language.editor.error]
+no-permission = "Sinulla ei ole oikeutta muokata lisäosan {plugin} kieliä."
+unable-to-edit = "Muokkaus epäonnistui: {reason}"
+
+[language.editor.saved]
+summary = "{locale} tallennettu. Kielivalinnat säilyvät ennallaan."
+change = "{key}: ”{before}” muutettiin arvoon ”{after}”."
+
+[language.editor.part]
+line = "Rivi {line}"
+
+[language.editor.value]
+none = "Ei ole"
+empty = "(tyhjä)"

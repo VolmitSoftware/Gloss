@@ -24,7 +24,7 @@ public class GlossCommandDiscoveryTest {
   public void diagnosticCompletionUsesItsDedicatedPermissionWithoutBaseAccess() {
     GlossCommandService service = new GlossCommandService(null);
 
-    assertEquals(List.of("debugdump"), service.tabComplete(
+    assertEquals(List.of("debug"), service.tabComplete(
         languagePlayer(Set.of("gloss.debugdump")), "gloss", new String[]{"debug"}));
     assertEquals(List.of(), service.tabComplete(
         languagePlayer(Set.of()), "gloss", new String[]{"debug"}));
@@ -68,6 +68,7 @@ public class GlossCommandDiscoveryTest {
     assertFalse(suggestions.contains("menus"));
     assertFalse(suggestions.contains("previews"));
     assertFalse(suggestions.contains("items"));
+    assertFalse(suggestions.contains("reload"));
   }
 
   @Test
@@ -80,7 +81,7 @@ public class GlossCommandDiscoveryTest {
         .map(node -> node.getDescriptor().getName())
         .collect(Collectors.toUnmodifiableSet());
     assertEquals(Set.of(
-        "list", "reload", "near", "info", "create", "delete", "rename", "copy",
+        "list", "near", "info", "create", "delete", "rename", "copy",
         "move", "here", "teleport", "rotate", "scale", "align", "menu", "ranges",
         "visibility", "permissions", "follow", "unfollow", "edit", "save", "cancel",
         "addrow", "insertrow", "setrow", "removerow", "offsetrow", "seticon", "style",

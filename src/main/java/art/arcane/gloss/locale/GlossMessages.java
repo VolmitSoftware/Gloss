@@ -1,6 +1,7 @@
 package art.arcane.gloss.locale;
 
 import art.arcane.volmlib.util.director.DirectorMessages;
+import art.arcane.volmlib.util.localization.BukkitLanguageMessages;
 import art.arcane.volmlib.util.localization.MessageCatalog;
 import art.arcane.volmlib.util.localization.MessageKey;
 import art.arcane.volmlib.util.localization.TextKey;
@@ -16,6 +17,7 @@ public final class GlossMessages {
 
     private static final List<MessageKey> KEYS = new ArrayList<>();
 
+    public static final TextKey DEBUG_DESCRIPTION = text("command.help.debug", "Diagnostic commands");
     public static final TextKey DEBUG_DUMP_DESCRIPTION = text("command.help.debugdump", "Create and optionally upload a diagnostic report");
     public static final TextKey DEBUG_DUMP_UPLOAD = text("command.help.debugdump_upload", "Upload the report to mclo.gs");
     public static final TextKey HELP_ROOT = text("command.help.root", "Gloss command root");
@@ -109,7 +111,6 @@ public final class GlossMessages {
     public static final TextKey HELP_ARG_RESET_NAME = text("command.help.arg.reset_name", "Name to reset, or * for every shipped default");
     public static final TextKey HELP_LANGUAGE = text("command.help.language", "Choose your language or the server default");
     public static final TextKey HELP_STATUS = text("command.help.status", "Show terse runtime counts");
-    public static final TextKey HELP_RELOAD = text("command.help.reload", "Reload Gloss configuration and services");
 
     public static final TextKey HELP_ARG_PANEL_AXES = text("command.help.arg.panel_axes", "Axes: x, y, z, xy, xz, yz, or xyz");
     public static final TextKey HELP_ARG_PANEL_FOLLOW_ROTATION = text("command.help.arg.panel_follow_rotation", "Follow rotation: fixed, yaw, or full");
@@ -200,7 +201,6 @@ public final class GlossMessages {
     public static final TextKey HELP_PANEL_OFFSETROW = text("command.help.panel.offsetrow", "Move a panel root-menu row with absolute or ~relative offsets");
     public static final TextKey HELP_PANEL_PERMISSIONS = text("command.help.panel.permissions", "Change panel view and interaction permissions");
     public static final TextKey HELP_PANEL_RANGES = text("command.help.panel.ranges", "Set panel view and interaction ranges");
-    public static final TextKey HELP_PANEL_RELOAD = text("command.help.panel.reload", "Reload persistent panel files");
     public static final TextKey HELP_PANEL_REMOVEROW = text("command.help.panel.removerow", "Remove a panel root-menu row");
     public static final TextKey HELP_PANEL_RENAME = text("command.help.panel.rename", "Rename a persistent panel");
     public static final TextKey HELP_PANEL_ROTATE = text("command.help.panel.rotate", "Set absolute or ~relative yaw, pitch, and roll");
@@ -304,7 +304,6 @@ public final class GlossMessages {
     public static final TextKey IMPORT_LEGACY_DONE = text("command.import.legacy.done", PREFIX + "&aLegacy migration finished: &f{migrated}&a migrated, &f{absorbed}&a absorbed, &f{overlaid}&a config keys, &f{errors}&a errors.");
     public static final TextKey IMPORT_CONFIG_UNREADABLE = text("command.import.config_unreadable", PREFIX + "&cgloss.toml could not be loaded: &f{reason}");
 
-    public static final TextKey RELOAD_DONE = text("command.reload.done", PREFIX + "&aReloaded Gloss configuration and services.");
 
     public static final TextKey ERROR_MENU_NAME_REQUIRED = text("gloss.error.menu_name_required", "Menu name cannot be empty");
     public static final TextKey ERROR_HOLOGRAM_ID_REQUIRED = text("gloss.error.hologram_id_required", "Hologram id cannot be empty");
@@ -387,7 +386,6 @@ public final class GlossMessages {
     public static final TextKey PANELS_LIST_HEADER = text("gloss.message.panels.list.header", COLON_PREFIX + "&fPersistent panels: &d{count}");
     public static final TextKey PANELS_LIST_EMPTY = text("gloss.message.panels.list.empty", COLON_PREFIX + "&7No persistent panels are loaded.");
     public static final TextKey PANELS_LIST_ENTRY = text("gloss.message.panels.list.entry", "&8- &f{board} &7menu=&f{menu} &7revision=&f{revision}");
-    public static final TextKey PANELS_RELOADED = text("gloss.message.panels.reloaded", COLON_PREFIX + "&aReloaded panels: {loaded} loaded, {retained} retained, {removed} removed, {failures} failed.");
     public static final TextKey PANELS_NEAR_HEADER = text("gloss.message.panels.near.header", COLON_PREFIX + "&fPanels within &d{radius}&f blocks: &d{count}");
     public static final TextKey PANELS_NEAR_EMPTY = text("gloss.message.panels.near.empty", COLON_PREFIX + "&7No panels are within that radius.");
     public static final TextKey PANELS_NEAR_ENTRY = text("gloss.message.panels.near.entry", "&8- &f{board} &7distance=&f{distance} &7menu=&f{menu}");
@@ -498,6 +496,7 @@ public final class GlossMessages {
     public static MessageCatalog catalog() {
         return MessageCatalog.builder(ENGLISH_LOCALE)
                 .addAll(DirectorMessages.keys())
+                .addAll(BukkitLanguageMessages.keys())
                 .addAll(KEYS)
                 .build();
     }

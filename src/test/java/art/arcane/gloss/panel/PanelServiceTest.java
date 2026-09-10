@@ -1,6 +1,7 @@
 package art.arcane.gloss.panel;
 
 import art.arcane.gloss.doc.DocumentRevisionConflictException;
+import art.arcane.gloss.doc.DocumentDelta;
 import art.arcane.gloss.doc.ExecutorStorageTaskRunner;
 import art.arcane.gloss.doc.StorageTaskRunner;
 import art.arcane.gloss.persistence.GlossPersistenceCoordinator;
@@ -27,6 +28,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.UnaryOperator;
 import java.util.logging.Level;
@@ -262,17 +264,18 @@ public class PanelServiceTest {
   }
 
   @Test
-  public void externalCreationWaitsUntilAnActiveReloadPublishesItsSnapshot() throws Exception {
+  public void externalCreationWaitsUntilAnActiveHotloadPublishesItsSnapshot() throws Exception {
     File pluginData = temp.newFolder("external-create-reload-race");
     ManualTaskRunner runner = new ManualTaskRunner();
     GlossPersistenceCoordinator coordinator = new GlossPersistenceCoordinator();
     AtomicInteger publications = new AtomicInteger();
+    AtomicLong clock = new AtomicLong();
     CountDownLatch reloadReadyToPublish = new CountDownLatch(1);
     CountDownLatch releaseReloadPublication = new CountDownLatch(1);
     Logger logger = Logger.getLogger(PanelServiceTest.class.getName() + ".external-create-race");
     logger.setLevel(Level.OFF);
     PanelService service = new PanelService(new PanelService.Dependencies(
-        new PanelRepository(pluginData), runner, logger, coordinator, () -> {
+        new PanelRepository(pluginData.toPath(), clock::get), runner, logger, coordinator, () -> {
           if (publications.incrementAndGet() != 2) {
             return;
           }
@@ -289,7 +292,16 @@ public class PanelServiceTest {
     service.start();
     runner.runNext();
 
-    CompletableFuture<PanelLoadResult> reload = service.reload();
+    PanelDefinition watched = board("spawn/watched", 9.0D, 7.0D);
+    Path watchedFile = pluginData.toPath().resolve("panels/spawn/watched.json");
+    Files.createDirectories(watchedFile.getParent());
+    Files.writeString(watchedFile, GSON.toJson(watched) + System.lineSeparator());
+    clock.addAndGet(TimeUnit.SECONDS.toNanos(6L));
+    CompletableFuture<DocumentDelta> captured = service.poll();
+    runner.runNext();
+    assertTrue(captured.join().isEmpty());
+    clock.addAndGet(TimeUnit.SECONDS.toNanos(6L));
+    CompletableFuture<DocumentDelta> reload = service.poll();
     Thread reloadThread = new Thread(runner::runNext);
     reloadThread.start();
     assertTrue(reloadReadyToPublish.await(5L, TimeUnit.SECONDS));
@@ -321,7 +333,8 @@ public class PanelServiceTest {
     assertFalse(reloadThread.isAlive());
     assertFalse(external.isAlive());
     assertNull(externalFailure.get());
-    assertTrue(reload.join().successful());
+    assertEquals(List.of(watched.id()), reload.join().loaded());
+    assertEquals(watched, service.get(watched.id()).orElseThrow());
     assertEquals(created, service.get(created.id()).orElseThrow());
   }
 
@@ -342,7 +355,7 @@ public class PanelServiceTest {
     runner.runAll();
     assertTrue(service.list().isEmpty());
 
-    CompletableFuture<PanelLoadResult> rejectedReload = service.reload();
+    CompletableFuture<DocumentDelta> rejectedReload = service.poll();
     CompletableFuture<PanelDefinition> rejectedCreate = service.create(board("rejected", 0.0D, 0.0D));
     assertThrows(CancellationException.class, rejectedReload::join);
     assertThrows(CancellationException.class, rejectedCreate::join);
@@ -598,6 +611,15 @@ public class PanelServiceTest {
     }
 
     @Override
+    public DocumentDelta poll() {
+      return DocumentDelta.EMPTY;
+    }
+
+    @Override
+    public void close() {
+    }
+
+    @Override
     public Optional<PanelDefinition> get(String id) {
       return Optional.empty();
     }
@@ -667,6 +689,16 @@ public class PanelServiceTest {
     @Override
     public PanelLoadResult load() throws IOException {
       return delegate.load();
+    }
+
+    @Override
+    public DocumentDelta poll() throws IOException {
+      return delegate.poll();
+    }
+
+    @Override
+    public void close() {
+      delegate.close();
     }
 
     @Override

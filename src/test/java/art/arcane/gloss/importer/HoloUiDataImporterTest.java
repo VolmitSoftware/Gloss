@@ -81,7 +81,6 @@ class HoloUiDataImporterTest {
         write(source.resolve("previews/chest.json"), resourceBytes("/previews/chest.json"));
         write(source.resolve("previews/custom.json"), "{\"match\": {\"blocks\": [\"LECTERN\"]}}".getBytes(StandardCharsets.UTF_8));
         write(source.resolve("preview-scales.json"), "{\"scales\": {}}".getBytes(StandardCharsets.UTF_8));
-        write(source.resolve("language.yml"), "language: en_US\n".getBytes(StandardCharsets.UTF_8));
         write(source.resolve("settings.json"), SETTINGS_JSON.getBytes(StandardCharsets.UTF_8));
         write(source.resolve("editor-sync-sessions.json"), "{\"sessions\": \"secret\"}".getBytes(StandardCharsets.UTF_8));
         write(source.resolve("editor-sync-transactions/txn.json"), "{}".getBytes(StandardCharsets.UTF_8));
@@ -111,7 +110,6 @@ class HoloUiDataImporterTest {
         assertFalse(Files.exists(dataFolder.resolve("boards")));
         assertTrue(Files.isRegularFile(dataFolder.resolve("previews/custom.json")));
         assertTrue(Files.isRegularFile(dataFolder.resolve("preview-scales.json")));
-        assertTrue(Files.isRegularFile(dataFolder.resolve("language.yml")));
         assertTrue(Files.isRegularFile(dataFolder.resolve(HoloUiDataImporter.RECEIPT_FILE_NAME)));
         assertEquals(before, snapshot(source));
     }

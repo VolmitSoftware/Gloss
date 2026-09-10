@@ -1,0 +1,828 @@
+# Gloss — nl_NL
+#
+# === Bestand bewerken ===
+# plugins/Gloss/languages/nl_NL.toml
+# Je kunt dit bestand rechtstreeks bewerken. Lokale wijzigingen blijven behouden; ontbrekende of ongeldige vermeldingen gebruiken het ingebouwde Engels.
+# /gloss language server edit nl_NL
+#
+# === Voorvoegsel ===
+# Het voorvoegsel &8[&dGloss&8] staat in elk bericht zelf: pas het in de betreffende berichten aan.
+#
+# === Opmaak ===
+# Kleuren: &0-&f, &k-&r, &#RRGGBB.
+#
+# === Variabelen ===
+# Behoud de namen van variabelen en gebruik alleen de variabelen die bij het bericht horen.
+#   {absorbed}  Geïmporteerde vermeldingen samengevoegd met bestaande gegevens
+#   {active}  Aantal actieve providers
+#   {actual}  Huidige revisie
+#   {after}  Berichtwaarde na bewerking
+#   {argument}  Onverwacht opdrachtargument
+#   {axis}  Coördinaat- of rotatieas
+#   {bees}  Aantal bijen in de container
+#   {before}  Berichtwaarde vóór bewerking
+#   {billboard}  Oriëntatiemodus van de weergave
+#   {blocks}  Aantal blokweergave-elementen
+#   {board}  Identificatie van het bord of paneel
+#   {bottles}  Aantal flessen in de container
+#   {bubbles}  Aantal actieve chatballonnen
+#   {cells}  Aantal menucellen
+#   {color}  Kleur van de weergave of het voorwerp
+#   {command}  Opdrachtpad
+#   {conflicts}  Aantal importconflicten
+#   {copied}  Aantal gekopieerde vermeldingen
+#   {count}  Aantal overeenkomende objecten of berichten
+#   {disc}  Muziekplaat in de container
+#   {distance}  Afstand tot het doel
+#   {drops}  Aantal weergegeven gevallen voorwerpen
+#   {enabled}  Inschakelstatus of aantal ingeschakelde vermeldingen
+#   {entities}  Aantal entiteiten
+#   {error}  Validatie- of bewerkingsfout
+#   {errors}  Aantal fouten
+#   {expected}  Verwachte revisie bij het opslaan van een bewerking
+#   {experience}  Hoeveelheid verdiende ervaring
+#   {failed}  Aantal mislukte bewerkingen
+#   {from}  Bronwaarde of begin van een bereik
+#   {fuel}  Resterende brandstof in de container
+#   {group}  Categorie van de taaleditor
+#   {hologram}  Identificatie van het hologram
+#   {honey}  Huidig honingniveau
+#   {id}  Objectidentificatie
+#   {imported}  Aantal geïmporteerde vermeldingen
+#   {indicators}  Aantal schade-indicatoren
+#   {interactPermission}  Vereiste toestemming voor interactie
+#   {interactionRange}  Maximale interactieafstand
+#   {item}  Naam of materiaal van het voorwerp
+#   {key}  Bericht- of configuratiesleutel
+#   {kind}  Type object of provider
+#   {kinds}  Beschikbare object- of providertypen
+#   {labels}  Aantal tekstlabels
+#   {legacy}  Identificatie van de importbron
+#   {level}  Weergegeven niveau
+#   {limit}  Toegestane limiet
+#   {line}  Regelnummer binnen een bericht
+#   {locale}  Taalcode
+#   {maximum}  Maximaal toegestane waarde
+#   {maximumBees}  Maximaal aantal bijen
+#   {maximumHoney}  Maximaal honingniveau
+#   {menu}  Menu-identificatie
+#   {message}  Feedback- of diagnosebericht
+#   {migrated}  Aantal geconverteerde vermeldingen
+#   {minimum}  Minimaal toegestane waarde
+#   {mode}  Geselecteerde bewerkings- of weergavemodus
+#   {name}  Objectnaam
+#   {oldBoard}  Identificatie van het vorige bord
+#   {operation}  Naam van de bewerking
+#   {options}  Beschikbare opdrachtopties
+#   {overlaid}  Aantal toegepaste configuratiesleutels
+#   {page}  Huidig paginanummer
+#   {pages}  Totaal aantal pagina’s
+#   {panels}  Aantal panelen
+#   {parameter}  Naam van de opdrachtparameter
+#   {path}  Bestands- of mappad
+#   {pending}  Status van wijzigingen die op publicatie wachten
+#   {percent}  Percentagewaarde
+#   {permission}  Vereiste toestemming
+#   {personal}  Persoonlijke taalcode
+#   {pitch}  Verticale hoek in graden
+#   {player}  Spelersnaam
+#   {plugin}  Pluginnaam
+#   {priority}  Selectie- of weergaveprioriteit
+#   {provider}  Providernaam
+#   {providers}  Lijst of aantal providers
+#   {radius}  Zoekstraal
+#   {ready}  Aantal vermeldingen klaar voor import
+#   {reason}  Reden voor een fout of beslissing
+#   {resume}  Aantal hervatbare importvermeldingen
+#   {revision}  Documentrevisie
+#   {roll}  Rolhoek in graden
+#   {rotation}  Rotatie van de weergave
+#   {scale}  Schaal van de weergave of het voorbeeld
+#   {seconds}  Tijd in seconden
+#   {session}  Identificatie van de editorsessie
+#   {severity}  Ernst van de diagnose
+#   {skipped}  Aantal overgeslagen vermeldingen
+#   {slots}  Aantal voorwerpslots
+#   {source}  Importbron of configuratieprovider
+#   {special}  Aantal speciale weergave-elementen
+#   {state}  Huidige toestand
+#   {style}  Weergavestijl
+#   {subject}  Onderwerp van de webeditorsessie
+#   {target}  Plugin waarop de taalkeuze wordt toegepast
+#   {temporary}  Aantal tijdelijke objecten
+#   {text}  Weergegeven tekst
+#   {title}  Weergegeven titel
+#   {to}  Doelwaarde of einde van een bereik
+#   {total}  Totaal aantal vermeldingen
+#   {type}  Verwacht waarde- of objecttype
+#   {url}  Webadres
+#   {usage}  Opdrachtsyntaxis
+#   {uuid}  Unieke identificatie van het object of de speler
+#   {value}  Huidige bericht- of parameterwaarde
+#   {variables}  Toegestane plaatshouders in het bericht
+#   {variants}  Aantal of lijst van weergavevarianten
+#   {viewPermission}  Vereiste toestemming om te bekijken
+#   {viewRange}  Maximale kijkafstand
+#   {warnings}  Aantal waarschuwingen
+#   {when}  Weergavevoorwaarde
+#   {world}  Wereldnaam
+#   {x}  X-coördinaat
+#   {y}  Y-coördinaat
+#   {yaw}  Horizontale hoek in graden
+#   {z}  Z-coördinaat
+
+[command.help]
+debug = "Diagnosecommando’s"
+debugdump = "Maak een diagnostisch rapport en upload het desgewenst"
+debugdump_upload = "Upload het rapport naar mclo.gs"
+root = "Gloss-opdrachtgroep"
+hologram = "Hologrammen maken en beheren"
+"hologram.create" = "Een hologram op je locatie maken"
+"hologram.create.id" = "Uniek hologram-ID"
+"hologram.delete" = "Een hologram verwijderen"
+"hologram.delete.id" = "ID van het te verwijderen hologram"
+"hologram.addline" = "Een regel aan een hologram toevoegen"
+"hologram.addline.id" = "Hologram-ID"
+"hologram.addline.text" = "Regeltekst; gebruik aanhalingstekens voor spaties"
+"hologram.setline" = "Een hologramregel vervangen"
+"hologram.setline.id" = "Hologram-ID"
+"hologram.setline.line" = "Regelnummer, beginnend bij 1"
+"hologram.setline.text" = "Regeltekst; gebruik aanhalingstekens voor spaties"
+"hologram.removeline" = "Een hologramregel verwijderen"
+"hologram.removeline.id" = "Hologram-ID"
+"hologram.removeline.line" = "Regelnummer, beginnend bij 1"
+"hologram.clear" = "Alle regels uit een hologram verwijderen"
+"hologram.clear.id" = "Hologram-ID"
+"hologram.movehere" = "Een hologram naar je locatie verplaatsen"
+"hologram.movehere.id" = "Hologram-ID"
+"hologram.move" = "Een hologram verschuiven met relatieve blokafstanden"
+"hologram.move.id" = "Hologram-ID"
+"hologram.move.x" = "Relatieve X-verschuiving in blokken"
+"hologram.move.y" = "Relatieve Y-verschuiving in blokken"
+"hologram.move.z" = "Relatieve Z-verschuiving in blokken"
+"hologram.tp" = "Jezelf naar een hologram teleporteren"
+"hologram.tp.id" = "Hologram-ID"
+"hologram.list" = "Hologrammen weergeven; klik op één om te teleporteren"
+"hologram.info" = "De locatie en regels van een hologram tonen"
+"hologram.info.id" = "Hologram-ID"
+"hologram.rendertext" = "Maak een teksthologram met native schaling"
+"hologram.rendertext.id" = "Uniek hologram-ID"
+"hologram.rendertext.text" = "Weer te geven tekst; gebruik aanhalingstekens voor spaties"
+"hologram.rendertext.scale" = "TextDisplay-schaalfactor"
+"hologram.orient" = "Instellen hoe een hologram naar kijkers toe draait"
+"hologram.orient.id" = "Hologram-ID"
+"hologram.orient.billboard" = "CENTER, VERTICAL, HORIZONTAL of FIXED"
+"hologram.orient.yaw" = "Gierhoek (yaw) in graden, -180 tot 180"
+"hologram.orient.pitch" = "Stamphoek (pitch) in graden, -90 tot 90"
+board = "Scoreborden maken en beheren"
+"board.create" = "Een scorebord maken"
+"board.create.id" = "Uniek scorebord-ID"
+"board.delete" = "Een scorebord verwijderen"
+"board.delete.id" = "ID van het te verwijderen scorebord"
+"board.title" = "Een scorebordtitel instellen"
+"board.title.id" = "Scorebord-ID"
+"board.title.text" = "Titeltekst; gebruik aanhalingstekens voor spaties"
+"board.addline" = "Een regel aan een scorebord toevoegen"
+"board.addline.id" = "Scorebord-ID"
+"board.addline.text" = "Regeltekst; gebruik aanhalingstekens voor spaties"
+"board.setline" = "Een scorebordregel vervangen"
+"board.setline.id" = "Scorebord-ID"
+"board.setline.line" = "Regelnummer, beginnend bij 1"
+"board.setline.text" = "Regeltekst; gebruik aanhalingstekens voor spaties"
+"board.removeline" = "Een scorebordregel verwijderen"
+"board.removeline.id" = "Scorebord-ID"
+"board.removeline.line" = "Regelnummer, beginnend bij 1"
+"board.show" = "Een scorebord aan jezelf tonen"
+"board.show.id" = "Scorebord-ID"
+"board.hide" = "Je scorebord verbergen"
+"board.select" = "Automatische scoreboardselectie instellen"
+"board.select.id" = "Scoreboard-ID"
+"board.select.priority" = "Selectieprioriteit"
+"board.select.when" = "Booleaanse voorwaarde; plaats uitdrukkingen met spaties tussen aanhalingstekens"
+"board.list" = "Scoreborden weergeven"
+"board.info" = "De titel, regels en instellingen van een scorebord tonen"
+"board.info.id" = "Scorebord-ID"
+"board.reset" = "Meegeleverde standaardscoreborden herstellen"
+emoji = "Emoji-chathulpmiddelen"
+"emoji.list" = "Ingeschakelde emoji weergeven; klik op één om deze in de chat in te voegen"
+"emoji.reset" = "Meegeleverde standaard-emoji herstellen"
+animations = "Animatiehulpmiddelen"
+"animations.list" = "Animatienamen weergeven"
+"animations.reset" = "Meegeleverde standaardanimaties herstellen"
+bubbles = "Stijlen voor chat-tekstballonnen"
+"bubbles.style" = "Je chat-tekstballonstijl kiezen, of clear voor automatische selectie"
+"bubbles.style.style" = "Stijl-ID, of clear"
+"bubbles.reset" = "Meegeleverde standaard-tekstballonstijlen herstellen"
+tablist = "Tablist-hulpmiddelen"
+"tablist.reset" = "Het meegeleverde tablist-document herstellen"
+motd = "MOTD-hulpmiddelen"
+"motd.reset" = "Het meegeleverde MOTD-document herstellen"
+drops = "Hulpmiddelen voor de weergave van gedropte items"
+"drops.reset" = "Het meegeleverde document met instellingen voor gedropte items herstellen"
+indicators = "Hulpmiddelen voor schade- en genezingsindicatoren"
+"indicators.reset" = "Het meegeleverde document met schade-indicatorinstellingen herstellen"
+status = "Beknopte runtime-aantallen tonen"
+import = "Verouderde hologrammen migreren zonder bronbestanden te wijzigen"
+"import.apply" = "Een migratie van verouderde hologrammen zonder overschrijven toepassen"
+"import.holoui" = "HoloUi-gegevens uit plugins/holoui kopiëren en eerdere imports overschrijven"
+"import.legacy" = "Gloss-gegevensbestanden van vóór de samenvoeging naar de v2-enveloppen migreren"
+"import.preview" = "Een niet-destructieve migratie van verouderde hologrammen vooraf bekijken"
+item = "Hulpmiddelen voor providers van aangepaste items"
+"item.export" = "De catalogus met aangepaste items exporteren voor de webeditor"
+"item.status" = "Tonen welke providers van aangepaste items actief zijn"
+menu = "Hologrammenu's maken, openen en bewerken"
+"menu.addrow" = "Een tekstdecoratierij toevoegen"
+"menu.back" = "Je vorige menusessie opnieuw openen"
+"menu.close" = "Je huidige menusessie sluiten"
+"menu.copy" = "Een geladen menu naar een nieuw genest ID kopiëren"
+"menu.create" = "Een permanent hologram op je huidige positie maken"
+"menu.image" = "Menu-inhoud vervangen door één gecentreerd afbeeldingsbestand"
+"menu.insertrow" = "Een tekstdecoratierij invoegen"
+"menu.list" = "Alle geconfigureerde menu's weergeven die je kunt openen"
+"menu.move" = "Je geopende menu naar je huidige positie verplaatsen"
+"menu.new" = "Een leeg hologrammenu maken op basis van de meegeleverde basis"
+"menu.offsetrow" = "Een rij verplaatsen met absolute of ~relatieve verschuivingen"
+"menu.open" = "Een menu op ID openen, of de menulijst tonen bij *"
+"menu.removerow" = "Een componentrij verwijderen"
+"menu.seticon" = "Het pictogram van een knop- of decoratierij vervangen"
+"menu.setrow" = "De tekst van een knop- of decoratierij instellen"
+"menu.style" = "Eén weergavestijl-eigenschap van een rij instellen of wissen"
+panel = "Hulpmiddelen voor permanente wereldpanelen"
+"panel.addrow" = "Een tekstrij toevoegen aan het hoofdmenu van een paneel"
+"panel.align" = "Positieassen van een paneel uitlijnen op een ander paneel"
+"panel.cancel" = "Je voorbereide paneelbewerking verwerpen"
+"panel.copy" = "Een permanent paneel onder een nieuw ID kopiëren"
+"panel.create" = "Een paneel op je huidige positie maken"
+"panel.delete" = "Een permanent paneel verwijderen"
+"panel.edit" = "Een voorbereide paneelbewerkingssessie starten"
+"panel.follow" = "Een online speler volgen met rotatie fixed, yaw of full"
+"panel.here" = "Een paneel naar je huidige positie verplaatsen"
+"panel.image" = "Het hoofdmenu van het paneel vervangen door één gecentreerd afbeeldingsbestand"
+"panel.info" = "De volledige status van één paneel tonen"
+"panel.insertrow" = "Een tekstrij invoegen in het hoofdmenu van een paneel"
+"panel.list" = "Permanente panelen per pagina weergeven"
+"panel.menu" = "Het hoofdmenu van een paneel instellen"
+"panel.move" = "Een paneel naar absolute of ~relatieve coördinaten verplaatsen"
+"panel.near" = "Panelen bij je huidige positie weergeven"
+"panel.offsetrow" = "Een hoofdmenurij van een paneel verplaatsen met absolute of ~relatieve verschuivingen"
+"panel.permissions" = "Weergave- en interactiemachtigingen van een paneel wijzigen"
+"panel.ranges" = "Weergave- en interactiebereik van een paneel instellen"
+"panel.removerow" = "Een hoofdmenurij van een paneel verwijderen"
+"panel.rename" = "Een permanent paneel hernoemen"
+"panel.rotate" = "Absolute of ~relatieve yaw, pitch en roll instellen"
+"panel.save" = "Je voorbereide paneelbewerking opslaan"
+"panel.scale" = "Een absolute of ~relatieve paneelschaal instellen"
+"panel.seticon" = "Een rijpictogram in het hoofdmenu van het paneel vervangen"
+"panel.setrow" = "Tekst op een hoofdmenurij van een paneel instellen"
+"panel.style" = "Eén weergavestijl-eigenschap van een rij instellen of wissen"
+"panel.teleport" = "Naar een permanent paneel teleporteren"
+"panel.unfollow" = "Het volgen van een speler door een paneel beëindigen"
+"panel.visibility" = "Zichtbaarheidsmodus en machtigingsnodes instellen"
+preview = "Hulpmiddelen voor voorbeelddocumenten"
+"preview.dump" = "Een voorbeelddocument eenmalig bouwen en de elementaantallen tonen"
+"preview.list" = "Voorbeelddocumenten en hun matchregels weergeven"
+"preview.reset" = "Meegeleverde standaardvoorbeelden herstellen (verwijdert geen extra gebruikersdocumenten die ze kunnen overschaduwen)"
+web = "De Gloss-webeditor openen en beheren"
+"web.open" = "Een lege gehoste Gloss-editor openen"
+"web.edit" = "Eén live Gloss-document openen"
+"web.edit.document" = "Dit live document openen in de webeditor"
+"web.workspace" = "De volledige live Gloss-werkruimte openen"
+"web.sessions" = "Actieve webeditorsessies beheren"
+"web.sessions.list" = "Actieve webeditorsessies weergeven"
+"web.sessions.pull" = "Een webeditorsessie nu controleren"
+"web.sessions.revoke" = "Toegang via een webeditorlink intrekken"
+"web.sessions.status" = "Eén webeditorsessie tonen"
+language = "Kies je taal of de standaardtaal van de server"
+
+[command.help.arg]
+reset_name = "Naam om te herstellen, of * voor elke meegeleverde standaard"
+panel_axes = "Assen: x, y, z, xy, xz, yz of xyz"
+panel_follow_rotation = "Volgrotatie: fixed, yaw of full"
+panel_id = "ID van het permanente paneel"
+panel_interact_permission = "Interactiemachtiging, of -"
+panel_interaction_range = "Positief interactiebereik"
+panel_menu = "ID van het hoofdmenu; standaard het paneel-ID"
+panel_new_id = "Nieuw ID voor het permanente paneel"
+panel_pitch = "Absolute of ~relatieve pitch"
+panel_player = "Online doelspeler"
+panel_radius = "Horizontale zoekradius"
+panel_reference = "ID van het referentiepaneel"
+panel_roll = "Absolute of ~relatieve roll"
+panel_root_menu = "ID van het hoofdmenu"
+panel_scale = "Absolute of ~relatieve schaal"
+panel_view_permission = "Weergavemachtiging, of -"
+panel_view_range = "Positief weergavebereik"
+panel_visibility = "Zichtbaarheidsmodus: public, permission of hidden"
+panel_x = "Absolute of ~relatieve X"
+panel_y = "Absolute of ~relatieve Y"
+panel_yaw = "Absolute of ~relatieve yaw"
+panel_z = "Absolute of ~relatieve Z"
+content_menu = "ID van het geladen menu"
+web_subject = "ID van een live Gloss-document"
+hologram_id = "ID van het nieuwe hologram en hoofdmenu"
+hologram_text = "Optionele MiniMessage-tekst"
+image_path = "Bestand in de Gloss-afbeeldingenmap"
+import_source = "Bron van verouderde hologrammen"
+menu = "ID van het te openen menu (* toont alle menu's)"
+new_panel_id = "Nieuw ID voor het permanente paneel"
+new_menu = "ID van het nieuwe geneste menu"
+list_page = "Paginanummer van de lijst, beginnend bij 1"
+previews_dump_name = "Naam van het te bouwen document"
+previews_name = "Naam van het te herstellen document, of * voor elk meegeleverd document"
+row_icon_type = "Pictogramtype"
+row_icon_value = "Pictograminhoud of register-ID"
+row_index = "Componentrij, beginnend bij 1"
+row_style_property = "Weergavestijl-eigenschap"
+row_style_value = "Stijlwaarde, of * om te wissen"
+row_text = "MiniMessage-rijtekst"
+row_x = "Absolute of ~relatieve rij-X"
+row_y = "Absolute of ~relatieve rij-Y"
+row_z = "Absolute of ~relatieve rij-Z"
+source_menu = "ID van het geladen bronmenu"
+web_session = "Sessie-ID voor de webeditor"
+
+[command.error]
+no_permission = "&8[&dGloss&8] &cJe hebt hier geen toestemming voor."
+no_permission_use = "&8[&dGloss&8] &cJe hebt geen toestemming om die opdracht te gebruiken."
+usage = "&7Gebruik: &f/{command} help"
+
+[command.hologram]
+exists = "&8[&dGloss&8] &cHologram '&f{id}&c' bestaat al."
+missing = "&8[&dGloss&8] &cGeen hologram met de naam '&f{id}&c'."
+created = "&8[&dGloss&8] &aHologram &f{id}&a gemaakt."
+deleted = "&8[&dGloss&8] &aHologram &f{id}&a verwijderd."
+line_added = "&8[&dGloss&8] &aRegel &f{line}&a toegevoegd aan &f{id}&a."
+line_set = "&8[&dGloss&8] &aRegel &f{line}&a ingesteld op &f{id}&a."
+line_removed = "&8[&dGloss&8] &aRegel &f{line}&a verwijderd uit &f{id}&a."
+line_out_of_range = "&8[&dGloss&8] &cRegel {line} valt buiten het bereik; &f{id}&c heeft {count} regels."
+cleared = "&8[&dGloss&8] &aAlle regels van &f{id}&a gewist."
+moved = "&8[&dGloss&8] &aHologram &f{id}&a naar je locatie verplaatst."
+offset = "&8[&dGloss&8] &aHologram &f{id}&a verplaatst met &f{x}&a, &f{y}&a, &f{z}&a."
+teleported = "&8[&dGloss&8] &aGeteleporteerd naar &f{id}&a."
+list_empty = "&8[&dGloss&8] &7Er bestaan nog geen hologrammen."
+rendered = "&8[&dGloss&8] &aTeksthologram &f{id}&a gemaakt met schaal &f{scale}&a."
+text_empty = "&8[&dGloss&8] &cTekst mag niet leeg zijn."
+scale_out_of_range = "&8[&dGloss&8] &cSchaal {value} valt buiten het bereik; deze moet tussen &f{minimum}&c en &f{maximum}&c liggen."
+oriented = "&8[&dGloss&8] &a&f{id}&a ingesteld op billboard &f{billboard}&a, yaw &f{yaw}&a, pitch &f{pitch}&a."
+billboard_unknown = "&8[&dGloss&8] &cOnbekende billboard '&f{billboard}&c'. Gebruik een van &f{options}&c."
+angle_out_of_range = "&8[&dGloss&8] &cDe waarde {axis} {value} valt buiten het bereik; die moet tussen &f-{limit}&c en &f{limit}&c graden liggen."
+
+[command.hologram.list]
+hover = "Klik om te teleporteren"
+lines = "{count} regels"
+
+[command.hologram.info]
+header = "&8[&dGloss&8] &d{id} &7op &f{world} {x}, {y}, {z}"
+line = " &8{line}. &f{text}"
+orientation = " &8schaal &f{scale} &8billboard &f{billboard} &8yaw &f{yaw} &8pitch &f{pitch}"
+
+[command.board]
+exists = "&8[&dGloss&8] &cScorebord '&f{id}&c' bestaat al."
+missing = "&8[&dGloss&8] &cGeen scorebord met de naam '&f{id}&c'."
+created = "&8[&dGloss&8] &aScorebord &f{id}&a gemaakt."
+deleted = "&8[&dGloss&8] &aScorebord &f{id}&a verwijderd."
+title_set = "&8[&dGloss&8] &aTitel van &f{id}&a ingesteld."
+line_added = "&8[&dGloss&8] &aRegel &f{line}&a toegevoegd aan &f{id}&a."
+line_set = "&8[&dGloss&8] &aRegel &f{line}&a ingesteld op &f{id}&a."
+line_removed = "&8[&dGloss&8] &aRegel &f{line}&a verwijderd uit &f{id}&a."
+line_out_of_range = "&8[&dGloss&8] &cRegel {line} valt buiten het bereik; &f{id}&c heeft {count} regels."
+shown = "&8[&dGloss&8] &aScorebord &f{id}&a wordt getoond."
+hidden = "&8[&dGloss&8] &aJe scorebord is verborgen."
+select_set = "&8[&dGloss&8] &aSelectieprioriteit van scoreboard &f{id}&a ingesteld op &f{priority}&a."
+select_invalid = "&8[&dGloss&8] &cOngeldige scoreboardvoorwaarde: &f{error}&c."
+list_empty = "&8[&dGloss&8] &7Er bestaan nog geen scoreborden."
+
+[command.board.list]
+hover = "Klik voor details"
+
+[command.board.info]
+header = "&8[&dGloss&8] &d{id} &7met titel &f{title}"
+meta = "&7Prioriteit: &f{priority} | Wanneer: &f{when} | Varianten: &f{variants}"
+line = " &8{line}. &f{text}"
+
+[command.emoji]
+empty = "&8[&dGloss&8] &7Er zijn geen emoji ingeschakeld."
+hover = "Klik om in de chat in te voegen"
+
+[command.animations]
+empty = "&8[&dGloss&8] &7Er zijn geen animaties geladen."
+header = "&8[&dGloss&8] &fAnimaties: &d{count}"
+entry = "&8- &d{name}"
+
+[command.list]
+page = "&7Pagina &f{page}&7/&f{pages} &8- &7toont &f{from}&7-&f{to} &7van &f{total}"
+next = "&7Volgende pagina: &f{command}"
+
+[command.status]
+holograms = "&7Hologrammen: &f{count} &8({temporary} tijdelijk, {entities} entiteiten)"
+boards = "&7Scoreborden: &f{count}"
+emoji = "&7Emoji: &f{enabled}&8/&f{total}"
+animations = "&7Animaties: &f{count}"
+effects = "&7Tekstballonnen: &f{bubbles} &8| &7Indicatoren: &f{indicators} &8| &7Drops: &f{drops}"
+
+[command.reset]
+done = "&8[&dGloss&8] &aHersteld: &f{count}&a meegeleverde standaardwaarden voor {kind}."
+none = "&8[&dGloss&8] &cGeen meegeleverde standaardwaarden voor {kind} komen overeen met '&f{name}&c'."
+
+[command.bubbles]
+style_set = "&8[&dGloss&8] &aChat-tekstballonstijl ingesteld op &f{style}&a."
+style_cleared = "&8[&dGloss&8] &aChat-tekstballonstijl gewist; automatische selectie is van toepassing."
+style_unknown = "&8[&dGloss&8] &cGeen tekstballonstijl met de naam '&f{style}&c'."
+
+[command.import]
+config_unreadable = "&8[&dGloss&8] &cgloss.toml kon niet worden geladen: &f{reason}"
+
+[command.import.holoui]
+missing = "&8[&dGloss&8] &cGeen holoui-gegevensmap gevonden naast de Gloss-gegevensmap."
+done = "&8[&dGloss&8] &aHoloUi-import voltooid: &f{copied}&a gekopieerd, &f{skipped}&a overgeslagen, &f{overlaid}&a configuratiesleutels, &f{errors}&a fouten."
+
+[command.import.legacy]
+done = "&8[&dGloss&8] &aMigratie van verouderde gegevens voltooid: &f{migrated}&a gemigreerd, &f{absorbed}&a opgenomen, &f{overlaid}&a configuratiesleutels, &f{errors}&a fouten."
+
+[director.help]
+no_subcommands = "Geen subopdrachten op deze pagina."
+no_description = "Geen beschrijving opgegeven"
+command_group = "Opdrachtgroep. Klik om te openen."
+category = "Commandocategorie"
+no_parameters = "Geen parameters. Klik om de opdracht vooraf in te vullen."
+parameters_hover = "Beweeg de muis over de parameters voor meer informatie."
+
+[director.help.navigation]
+back = "Terug"
+page = "Pagina"
+
+[director.help.navigation.parent]
+hover = "Terug naar de bovenliggende opdrachtgroep"
+
+[director.help.navigation.previous]
+hover = "Vorige pagina"
+
+[director.help.navigation.next]
+hover = "Volgende pagina"
+
+[director.help.parameter]
+required = "Deze parameter is verplicht."
+optional = "Deze parameter is optioneel."
+default = "Standaard \"{value}\" indien niet opgegeven."
+type = "Deze parameter is van het type {type}."
+
+[director.runtime]
+usage = "Gebruik: {usage}"
+
+[director.runtime.error]
+invalid_origin = "Deze opdracht kan niet vanuit deze bron worden uitgevoerd."
+unknown_parameter = "Onbekende parametersleutel: {key}"
+unexpected_argument = "Onverwacht argument \"{argument}\". Optionele parameters moeten met een sleutel worden opgegeven, bijv. seed=123"
+unclosed_group = "Ontbrekende sluitende \"]\" voor parameter {key}"
+conversion_failed = "Kan \"{value}\" voor {parameter} niet naar {type} converteren"
+default_parse_failed = "Kan de standaardwaarde voor parameter {parameter} niet verwerken"
+missing_argument = "Ontbrekend argument \"{parameter}\" ({type})"
+execution_failed = "Opdracht {command} kon niet worden uitgevoerd: {reason}"
+
+[gloss.error]
+menu_name_required = "Menunaam mag niet leeg zijn"
+hologram_id_required = "Het hologram-ID mag niet leeg zijn"
+panel_id_required = "Paneel-ID mag niet leeg zijn"
+web_subject_required = "Document-ID voor de webeditor mag niet leeg zijn"
+web_session_required = "Sessie-ID voor de webeditor mag niet leeg zijn"
+panel_player_required = "Doelspeler mag niet leeg zijn"
+row_icon_type_required = "Icoontype mag niet leeg zijn"
+row_style_property_required = "Stijleigenschap mag niet leeg zijn"
+import_source_required = "Bron voor import van oude gegevens mag niet leeg zijn"
+import_source_unknown = "Onbekende bron voor import van oude gegevens: {source}"
+
+[gloss.message]
+permission_denied = "&8[&dGloss&8]: &cJe hebt de machtiging &f{permission}&c niet."
+unknown_command = "&8[&dGloss&8]: &cOnbekende opdracht \"&f{command}&c\"."
+
+[gloss.message.hologram]
+created = "&8[&dGloss&8]: &aHologram &f{hologram}&a met hoofdmenu &f{menu}&a op je positie gemaakt."
+already_exists = "&8[&dGloss&8]: &cEr bestaat al een hologram, paneel of menu met de naam &f{hologram}&c."
+failed = "&8[&dGloss&8]: &cHologram &f{hologram}&c kon niet worden gemaakt. Er zijn geen wijzigingen bewaard."
+durability_uncertain = "&8[&dGloss&8]: &eDe transactie voor hologram &f{hologram}&e kon niet veilig worden voltooid. Start Gloss opnieuw voordat je het controleert of opnieuw probeert aan te maken."
+
+[gloss.message.menu]
+none = "&8[&dGloss&8]: &7Er zijn geen menu's beschikbaar."
+player_only = "&8[&dGloss&8]: &cAlleen spelers kunnen menu's openen."
+no_previous = "&8[&dGloss&8]: &cEr is geen vorig menu beschikbaar."
+closed = "&8[&dGloss&8]: &aMenu gesloten."
+moved = "&8[&dGloss&8]: &aMenu verplaatst."
+none_open = "&8[&dGloss&8]: &cEr is momenteel geen menu geopend."
+unavailable = "&8[&dGloss&8]: &c\"{menu}\" is niet beschikbaar."
+permission_denied = "&8[&dGloss&8]: &cJe hebt geen toestemming om \"{menu}\" te openen."
+open_failed = "&8[&dGloss&8]: &cMenu \"{menu}\" kon niet worden geopend."
+
+[gloss.message.menu.list]
+header = "Menu's"
+entry = "Klik om {menu} te openen."
+
+[gloss.message.menu.content]
+updated = "&8[&dGloss&8]: &a{operation} toegepast op menu &f{menu}&a, revisie {revision}."
+created = "&8[&dGloss&8]: &aMenu &f{menu}&a gemaakt, revisie {revision}. Open het met /gloss menu open &f{menu}&a of plaats het met /gloss panel create &f{menu}&a."
+copied = "&8[&dGloss&8]: &aMenu &f{source}&a gekopieerd naar &f{menu}&a, revisie {revision}."
+revision_conflict = "&8[&dGloss&8]: &cMenu &f{menu}&c veranderde tijdens het schrijven (verwacht {expected}, huidig {actual}). Herhaal het commando."
+already_exists = "&8[&dGloss&8]: &cMenu &f{menu}&c bestaat al."
+invalid = "&8[&dGloss&8]: &cOngeldige waarde voor menu-inhoud: &f{reason}&c."
+failed = "&8[&dGloss&8]: &cBewerking van menu-inhoud voor &f{menu}&c mislukt: {reason}"
+
+[gloss.message.command]
+player_only = "&8[&dGloss&8]: &cDeze opdracht is alleen beschikbaar voor spelers."
+
+[gloss.message.web]
+header = "Webeditor"
+open_hover = "Klik om de Gloss-webeditor te openen."
+open = "&8[&dGloss&8]: &7Webeditor: &f{url}"
+preparing = "&8[&dGloss&8]: &7Beveiligde synchronisatiesessie voor &f{subject}&7 voorbereiden..."
+unavailable = "&8[&dGloss&8]: &cLive bewerken via de webeditor is niet beschikbaar. Controleer de synchronisatie-instellingen en de verbinding met de relay."
+open_failed = "&8[&dGloss&8]: &cKan &f{kind}={subject}&c niet openen in de live webeditor: {reason}"
+open_console = "&8[&dGloss&8]: &7Toegangslink voor de editor van &f{subject}&7: &f{url}"
+capability_warning = "&8[&dGloss&8]: &eMet deze URL kunnen wijzigingen op de server worden gepubliceerd totdat de toegang wordt ingetrokken of verloopt. Houd de URL geheim."
+open_label = "Editor openen"
+copy_label = "Link kopiëren"
+revoke_label = "Intrekken"
+link_hover = "Open de editor, kopieer de toegangslink of trek sessie {session} in."
+
+[gloss.message.web.sessions]
+list_empty = "&8[&dGloss&8]: &7Er zijn geen actieve synchronisatiesessies voor de editor."
+status = "&8[&dGloss&8]: &f&f{session} &7{kind}=&f{subject} verloopt over=&f{seconds}s publicatie=&f{revision} wachtend=&f{pending}"
+revoked = "&8[&dGloss&8]: &aSynchronisatiesessie &f{session}&a ingetrokken."
+pulled = "&8[&dGloss&8]: &aSynchronisatiesessie &f{session}&a gecontroleerd."
+unknown = "&8[&dGloss&8]: &cSynchronisatiesessie &f{session}&c is onbekend of verlopen."
+failed = "&8[&dGloss&8]: &cSynchronisatiebewerking voor sessie &f{session}&c mislukt: {reason}"
+
+[gloss.message.import]
+preview_started = "&8[&dGloss&8]: &7&f{source}&7 scannen voor een migratievoorbeeld zonder gegevens te wijzigen..."
+apply_started = "&8[&dGloss&8]: &7&f{source}&7 scannen en migreren zonder bestaande gegevens te overschrijven..."
+source_missing = "&8[&dGloss&8]: &7Geen bron &f{source}&7 gevonden op &f{path}&7."
+preview_summary = "&8[&dGloss&8]: &fVoorbeeld voor &f{source}&7: &a{ready} gereed, &d{resume} hervatbaar, &e{conflicts} conflicten, &c{errors} fouten, {warnings} waarschuwingen. Bron: &f{path}"
+preview_entry = "&8- &f&f{legacy} -> &f{board} status=&f{state} waarschuwingen=&f{warnings}"
+apply_summary = "&8[&dGloss&8]: &fMigratie van &f{source}&7: &a{imported} geïmporteerd, &e{skipped} overgeslagen, &c{failed} mislukt; de scan meldde {errors} fouten en {warnings} waarschuwingen."
+apply_entry = "&8- &f&f{legacy} status=&f{state} reden=&f{reason}"
+issue = "&8- &f{legacy} &7{severity}: &f{reason}"
+busy = "&8[&dGloss&8]: &cEr loopt al een andere migratie van oude hologrammen."
+failed = "&8[&dGloss&8]: &cMigratie van oude hologrammen uit &f{source}&c mislukt: {reason}"
+
+[gloss.message.config]
+reloaded = "&2Configuratie \"{name}\" opnieuw geladen."
+
+[gloss.message.hotload]
+singular = "&2Hot-reload uitgevoerd voor {kinds} ({count} wijziging)."
+plural = "&2Hot-reload uitgevoerd voor {kinds} ({count} wijzigingen)."
+
+[gloss.message.preview_scale]
+adjusting = "&7Voorbeeldgrootte: &f{percent}% &8- &7houd Sluipen ingedrukt + scroll om te wijzigen; tik Sluipen tweemaal om op te slaan"
+hidden = "&7Voorbeeld &cverborgen &8- &7scroll omhoog om te herstellen"
+size = "&7Voorbeeldgrootte: &f{percent}%"
+saved_hidden = "&7Voorbeeld opgeslagen als &cverborgen &8- &7tik Sluipen tweemaal + scroll omhoog op een container om te herstellen"
+saved = "&7Voorbeeldgrootte opgeslagen: &f{percent}%"
+
+[gloss.message.drops]
+bundle_more = "+{count} meer"
+
+[gloss.message.items]
+disabled = "&8[&dGloss&8]: &7Aangepaste voorwerpen zijn uitgeschakeld. Stel customItems in op true in gloss.toml."
+
+[gloss.message.items.status]
+header = "Aangepaste voorwerpen"
+summary = "{active}/{total} aanbieders actief"
+entry = "Aanbieder {provider} van plugin {plugin}."
+hint = "Klik om de catalogus voor de webeditor te exporteren."
+
+[gloss.message.items.state]
+ready = "gereed, {count} ID's"
+loading = "aanwezig, wordt nog geladen"
+inactive = "aanwezig, geen adapter"
+missing = "niet geïnstalleerd"
+
+[gloss.message.items.export]
+started = "&8[&dGloss&8]: &7Catalogus met aangepaste voorwerpen exporteren..."
+done = "&8[&dGloss&8]: &a{count} voorwerpen van {providers} aanbieders geschreven naar &f{path}&a."
+empty = "&8[&dGloss&8]: &7Geen aangepaste voorwerpen gevonden. Een lege catalogus is geschreven naar &f{path}&7."
+failed = "&8[&dGloss&8]: &cKan de catalogus met aangepaste voorwerpen niet schrijven. Controleer de logboeken."
+busy = "&8[&dGloss&8]: &cEr loopt al een export van de catalogus."
+
+[gloss.message.previews.list]
+header = "Voorbeelddocumenten"
+empty = "&7Er zijn geen voorbeelddocumenten geladen."
+entry = "blokken={blocks} entiteiten={entities} speciaal={special} prioriteit={priority}"
+
+[gloss.message.previews.reset]
+started = "&8[&dGloss&8]: &7Voorbeelddocumenten \"&f{name}&7\" herstellen..."
+done = "&8[&dGloss&8]: &a{count} meegeleverde voorbeelddocumenten hersteld. Extra gebruikersdocumenten die deze vervangen zijn niet verwijderd."
+none = "&8[&dGloss&8]: &c\"{name}\" is geen meegeleverd voorbeelddocument; niets hersteld."
+
+[gloss.message.previews.dump]
+unknown = "&8[&dGloss&8]: &c\"{name}\" is geen geladen voorbeelddocument."
+result = "&8[&dGloss&8]: &a&a{name}&7: &f{total}&7 elementen (panelen={panels}, cellen={cells}, vakken={slots}, labels={labels})."
+no_errors = "&8[&dGloss&8]: &aGeen fouten bij het opbouwen."
+error_line = "&8[&dGloss&8]: &c{message}"
+error_more = "&8[&dGloss&8]: &7Nog {count} (zie het consolelogboek)."
+
+[gloss.message.panels]
+created = "&8[&dGloss&8]: &aPaneel &f{board}&a gemaakt, revisie {revision}."
+deleted = "&8[&dGloss&8]: &aPaneel &f{board}&a verwijderd."
+renamed = "&8[&dGloss&8]: &a&f{oldBoard}&a hernoemd naar &f{board}&a, revisie {revision}."
+copied = "&8[&dGloss&8]: &a&f{source}&a gekopieerd naar &f{board}&a."
+updated = "&8[&dGloss&8]: &a{operation} toegepast op &f{board}&a, revisie {revision}."
+teleported = "&8[&dGloss&8]: &aGeteleporteerd naar &f{board}&a."
+unknown = "&8[&dGloss&8]: &cOnbekend paneel &f{board}&c."
+already_exists = "&8[&dGloss&8]: &cPaneel &f{board}&c bestaat al."
+invalid = "&8[&dGloss&8]: &cOngeldige paneelwaarde: &f{reason}&c."
+menu_unavailable = "&8[&dGloss&8]: &cHoofdmenu &f{menu}&c is niet geladen."
+player_unavailable = "&8[&dGloss&8]: &cDoelspeler &f{player}&c is niet online."
+world_unavailable = "&8[&dGloss&8]: &cPaneelwereld &f{world}&c is niet geladen met de opgeslagen UUID."
+revision_conflict = "&8[&dGloss&8]: &cPaneel &f{board}&c veranderde tijdens het bewerken (verwacht {expected}, huidig {actual}). Open de bewerksessie opnieuw."
+failed = "&8[&dGloss&8]: &cPaneelbewerking voor &f{board}&c mislukt: {reason}"
+
+[gloss.message.panels.list]
+header = "&8[&dGloss&8]: &fOpgeslagen panelen: &d{count}"
+empty = "&8[&dGloss&8]: &7Er zijn geen opgeslagen panelen geladen."
+entry = "&8- &f&f{board} menu=&f{menu} revisie=&f{revision}"
+
+[gloss.message.panels.near]
+header = "&8[&dGloss&8]: &fPanelen binnen &d{radius}&f blokken: &d{count}"
+empty = "&8[&dGloss&8]: &7Er zijn geen panelen binnen die straal."
+entry = "&8- &f&f{board} afstand=&f{distance} menu=&f{menu}"
+
+[gloss.message.panels.info]
+header = "&8[&dGloss&8]: &fPaneel &d{board} ({state})"
+identity = "&7uuid=&f{uuid} revisie=&f{revision} menu=&f{menu}"
+transform = "&7wereld=&f{world} positie=&f{x}, {y}, {z} rotatie=&f{yaw}, {pitch}, {roll} schaal=&f{scale}"
+visibility = "&7zichtbaarheid=&f{mode} kijkrechten=&f{viewPermission} interactierechten=&f{interactPermission} afstanden=&f{viewRange}/{interactionRange}"
+follow = "&7volgen=&f{mode} speler=&f{player} rotatie=&f{rotation}"
+
+[gloss.message.panels.edit]
+started = "&8[&dGloss&8]: &a&f{board}&a bewerken vanaf revisie {revision}. Wijzigingen blijven in behandeling totdat je opslaat."
+already_active = "&8[&dGloss&8]: &cJe bewerkt &f{board}&c al. Sla eerst op of annuleer."
+none = "&8[&dGloss&8]: &cJe hebt geen paneelbewerking in behandeling."
+busy = "&8[&dGloss&8]: &cPaneel &f{board}&c wordt momenteel opgeslagen."
+staged = "&8[&dGloss&8]: &a{operation} klaargezet voor &f{board}&a. Gebruik /gloss panel save om op te slaan."
+saved = "&8[&dGloss&8]: &a&f{board}&a opgeslagen, revisie {revision}."
+cancelled = "&8[&dGloss&8]: &aWijzigingen in behandeling voor &f{board}&a geannuleerd."
+identity_blocked = "&8[&dGloss&8]: &cSla de wijzigingen voor &f{board}&c op of annuleer ze voordat je het paneel hernoemt of verwijdert."
+
+[gloss.preview.state]
+idle = "Inactief"
+brewing = "Brouwen {percent}%"
+needs_blaze_powder = "Blazepoeder vereist"
+waiting = "Wachten"
+no_ingredient = "Geen ingrediënt"
+empty = "Leeg"
+smelting_item = "Smelten: {item} {percent}%"
+smelting = "Smelten {percent}%"
+blasting_item = "Hoogovensmelten: {item} {percent}%"
+blasting = "Hoogovensmelten {percent}%"
+smoking_item = "Roken: {item} {percent}%"
+smoking = "Roken {percent}%"
+heating = "Verwarmen"
+needs_fuel = "Brandstof vereist"
+no_input = "Geen invoer"
+surge_suffix = "  +{seconds}s"
+disc_playing = "Afspelen: {disc}"
+disc_loaded = "Geladen: {disc}"
+no_disc = "Geen muziekplaat"
+
+[gloss.preview.stat]
+fuel_level = "Brandstof {fuel}/{maximum}"
+no_fuel = "Geen brandstof"
+bottles = "Flessen {bottles}/{maximum}"
+fuel_seconds = "Brandstof {seconds}s"
+fuel_ready = "Brandstof gereed"
+xp_gain = "XP +{experience}"
+xp_zero = "XP 0"
+bees_and_honey = "Bijen {bees}/{maximumBees}   Honing {honey}/{maximumHoney}"
+cauldron_empty = "Leeg {level}/{maximum}"
+cauldron_level = "Niveau {level}/{maximum}"
+
+[gloss.preview.theme.title]
+chest = "&6&lKist"
+trapped_chest = "&c&lKist met valstrik"
+ender_chest = "&5&lEnderkist"
+barrel = "&e&lVat"
+dispenser = "&7&lDispenser"
+dropper = "&8&lDropper"
+hopper = "&8&lTrechter"
+furnace = "&6&lOven"
+smoker = "&e&lRoker"
+blast_furnace = "&b&lHoogoven"
+beehive = "&e&lBijenkorf"
+bee_nest = "&e&lBijennest"
+cauldron = "&7&lKetel"
+water_cauldron = "&9&lKetel met water"
+lava_cauldron = "&6&lKetel met lava"
+powder_snow_cauldron = "&f&lKetel met poedersneeuw"
+jukebox = "&d&lPlatenspeler"
+brewing_stand = "&d&lBrouwstandaard"
+chiseled_bookshelf = "&6&lBewerkte boekenkast"
+hopper_minecart = "&8&lMijnkar met trechter"
+chest_minecart = "&6&lMijnkar met kist"
+mobile = "&7&l{name}"
+shulker = "&l{color} Shulkerdoos"
+copper_chest = "&6&l{name}"
+shelf = "&6&l{name}"
+container = "&6&lContainer"
+
+[language.menu]
+your_language = "Jouw taal"
+reset_your_language = "Jouw taalkeuze herstellen"
+server_default = "Standaardtaal van de server"
+edit_messages = "Taalberichten bewerken"
+use_server_default = "Standaardtaal van de server gebruiken"
+current = "Huidig: {locale}"
+current_with_personal = "Huidig: {locale} (Jouw keuze: {personal})"
+your_description = "Wijzig alleen de berichten die jij ziet."
+reset_description = "Gebruik de standaardtaal van de server."
+server_description = "Wijzig de standaardtaal van de server."
+edit_description = "Open de berichteneditor voor elke taal."
+select_description = "Klik om deze taal te selecteren."
+remove_personal_description = "Verwijder jouw persoonlijke taalkeuze."
+no_controls = "Je hebt geen toegang tot taalinstellingen."
+command = "Commando: {command}"
+selected = "geselecteerd"
+all-volmit-plugins = "Alle Volmit-plugins"
+
+[language.error]
+stopping = "Taalselectie is niet beschikbaar terwijl de plugin stopt."
+editor-player-only = "Open de taalbewerker in het spel."
+no-providers = "Er zijn geen Volmit-taalaanbieders beschikbaar."
+numeric-page = "Voer een paginanummer in."
+personal-player-only = "Spelertaalvoorkeuren moeten in het spel worden geselecteerd."
+personal-permission = "U hebt geen toestemming om uw taal te selecteren."
+plugin-personal-permission = "Je hebt geen toestemming om je taal voor {plugin} te kiezen."
+plugin-server-permission = "Je hebt geen toestemming om de servertaal voor {plugin} te wijzigen."
+server-locale-required = "Kies een taalcode zoals en_US voor de standaardtaal van de server."
+unavailable-for-all = "De taal {locale} is niet voor alle geselecteerde plugins beschikbaar."
+
+[language.usage]
+editor = "Gebruik: /{command} language server edit [locale]"
+selection = "Gebruik: /{command} language self [locale|reset] or server [locale]"
+volmit-selection = "Gebruik: /volmit plugins languages [locale]"
+
+[language.selection]
+preparing = "Taal {locale} wordt voorbereid voor {target}..."
+save-failed = "{plugin}: de taalkeuze kon niet worden opgeslagen; controleer de serverconsole."
+english-fallback = "{plugin}: {locale} is niet beschikbaar; Engels (en_US) wordt gebruikt."
+personal-selected = "{plugin}: uw taal is nu {locale}."
+server-selected = "{plugin}: servertaal is nu {locale}."
+server-default-selected = "{plugin}: je taal volgt nu de standaardtaal van de server."
+
+[language.editor]
+loading = "Berichten voor {locale} laden..."
+
+[language.editor.section]
+languages = "Talen"
+search = "Zoeken"
+search-title = "{locale} / Zoeken"
+group-title = "{locale} / {group}"
+
+[language.editor.prompt]
+search = "Zoek op berichtsleutel of tekst. Typ cancel om terug te gaan."
+value = "Typ in de chat een nieuwe waarde voor {key}."
+current = "Huidige waarde: {value}"
+variables = "Variabelen: {variables}"
+guidance = "Gebruik \\n voor een nieuwe regel, \\\\ voor een backslash, of typ cancel om terug te gaan."
+
+[language.editor.input]
+expired = "De invoer voor de taalbewerker is verlopen."
+too-long = "De invoer mag maximaal {maximum} tekens bevatten."
+unable-to-save = "Opslaan mislukt: {reason}"
+
+[language.editor.navigation]
+back = "&eTerug&r"
+close = "&cSluiten&r"
+previous-page = "&eVorige pagina&r"
+next-page = "&eVolgende pagina&r"
+
+[language.editor.search]
+messages = "Berichten doorzoeken"
+messages-lore = "Klik om alle berichten te doorzoeken."
+clear = "Zoekopdracht wissen"
+
+[language.editor.message]
+current-value = "&7Huidige waarde:&r"
+variables = "&8{variables}&r"
+edit-plural = "&7Klik om een meervoudsvorm te bewerken.&r"
+edit-lines = "&7Klik om afzonderlijke regels te bewerken.&r"
+edit-chat = "&7Klik om in de chat te bewerken.&r"
+
+[language.editor.locale]
+open = "&8Klik om deze taal te openen.&r"
+
+[language.editor.category]
+message-count = "&7{count} berichten&r"
+open = "&8Klik om deze categorie te openen.&r"
+
+[language.editor.error]
+no-permission = "Je hebt geen toestemming om de talen van {plugin} te bewerken."
+unable-to-edit = "Bewerken mislukt: {reason}"
+
+[language.editor.saved]
+summary = "{locale} opgeslagen. De taalkeuzes blijven ongewijzigd."
+change = "{key}: “{before}” is gewijzigd in “{after}”."
+
+[language.editor.part]
+line = "Regel {line}"
+
+[language.editor.value]
+none = "Geen"
+empty = "(leeg)"

@@ -269,7 +269,15 @@ public final class HologramService {
     }
 
     public TemporaryHologram createTemporary(String id, Location initial, long durationMs) {
+        return createTemporary(id, initial, durationMs, null);
+    }
+
+    public TemporaryHologram createTemporary(String id, Location initial, long durationMs,
+                                               Predicate<Player> viewerCondition) {
         TemporaryHologramDisplay temporary = new TemporaryHologramDisplay(this, id, initial, durationMs);
+        if (viewerCondition != null) {
+            temporary.setViewerCondition(viewerCondition);
+        }
         temporaries.add(temporary);
         return temporary;
     }

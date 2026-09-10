@@ -108,6 +108,7 @@ final class CharacterizationHarness implements AutoCloseable {
     static final class PlayerHandle {
         final UUID uuid = UUID.randomUUID();
         final String name;
+        final Map<UUID, Boolean> playerVisibility = new ConcurrentHashMap<>();
         final Map<UUID, Boolean> perceived = new ConcurrentHashMap<>();
         final Map<UUID, Integer> showCalls = new ConcurrentHashMap<>();
         final Map<UUID, Integer> hideCalls = new ConcurrentHashMap<>();
@@ -215,6 +216,7 @@ final class CharacterizationHarness implements AutoCloseable {
             publishAnimationClips();
 
             this.service = new HologramService(gloss);
+            setDeclaredField(gloss, Gloss.class, "holograms", service);
         } catch (Exception failure) {
             throw new IllegalStateException("Failed to build characterization harness", failure);
         }
@@ -732,11 +734,12 @@ final class CharacterizationHarness implements AutoCloseable {
             case "isOnline" -> handle.online;
             case "isValid" -> handle.online;
             case "hasPermission" -> true;
+            case "canSee" -> handle.playerVisibility.getOrDefault(((Player) args[0]).getUniqueId(), true);
+            case "getEyeLocation" -> handle.location.clone().add(0.0D, 1.62D, 0.0D);
             case "getLocation" -> {
                 handle.locationRead.run();
                 yield handle.location.clone();
             }
-            case "getEyeLocation" -> handle.location.clone().add(0, 1.62D, 0);
             case "spawnParticle" -> {
                 handle.particleLocations.add(((Location) args[1]).clone());
                 yield null;

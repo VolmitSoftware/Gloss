@@ -1,5 +1,7 @@
 package art.arcane.gloss.panel;
 
+import art.arcane.gloss.doc.DocumentDelta;
+
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
@@ -10,6 +12,10 @@ interface PanelStore {
   Path directory();
 
   PanelLoadResult load() throws IOException;
+
+  DocumentDelta poll() throws IOException;
+
+  void close();
 
   Optional<PanelDefinition> get(String id);
 

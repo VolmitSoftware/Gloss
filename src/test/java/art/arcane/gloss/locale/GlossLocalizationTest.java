@@ -13,7 +13,8 @@ import art.arcane.volmlib.util.localization.MessageKey;
 import art.arcane.volmlib.util.localization.VolmitLocales;
 import art.arcane.volmlib.util.plugin.ComponentText;
 import org.bukkit.ChatColor;
-import org.bukkit.configuration.file.YamlConfiguration;
+import art.arcane.volmlib.util.localization.TomlLanguageParser;
+import art.arcane.volmlib.util.localization.TomlLanguageWriter;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
@@ -26,13 +27,17 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Handler;
 import java.util.logging.LogRecord;
 import java.util.logging.Logger;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -70,7 +75,7 @@ public class GlossLocalizationTest {
     File dataFolder = temporaryFolder.newFolder();
     Path installed = Files.createDirectories(dataFolder.toPath().resolve("languages"));
     for (String locale : VolmitLocales.nonEnglish()) {
-      Files.copy(Path.of("src/main/resources/languages", locale + ".yml"), installed.resolve(locale + ".yml"));
+      Files.copy(Path.of("src/main/resources/languages", locale + ".toml"), installed.resolve(locale + ".toml"));
     }
     localization = new GlossLocalization(dataFolder, logger, VolmitLocales.ENGLISH);
   }
@@ -81,14 +86,13 @@ public class GlossLocalizationTest {
   }
 
   @Test
-  public void editorPersistsEnglishAndPreservesGlobalOverrides() throws Exception {
-    YamlConfiguration overrides = loadLanguageFile();
-    overrides.options().pathSeparator('/');
-    overrides.set("messages/" + GlossMessages.HELP_ROOT.id(), "Global root");
-    overrides.save(localization.languageFile());
+  public void editorPersistsEnglishAndPreservesOtherMessages() throws Exception {
+    Map<String, String> english = loadLanguageFile();
+
+    english.put(GlossMessages.MENU_CLOSED.id(), "Global closed");
+    saveLanguageFile(localization.languageFile().toPath(), english);
     PluginLanguageEditor.Options editor = localization.editorOptions();
     MessageValue original = editor.loader().load("en_US").value(GlossMessages.HELP_ROOT);
-    byte[] global = Files.readAllBytes(localization.languageFile().toPath());
     TextValue replacement = new TextValue("Edited command root");
 
     LocalizationSnapshot edited = editor.writer().write(new PluginLanguageEditor.Edit(
@@ -97,17 +101,17 @@ public class GlossLocalizationTest {
     assertEquals(replacement, edited.value(GlossMessages.HELP_ROOT));
     assertEquals(replacement, localization.snapshot().value(GlossMessages.HELP_ROOT));
     assertEquals(replacement, editor.loader().load("en_US").value(GlossMessages.HELP_ROOT));
-    assertArrayEquals(global, Files.readAllBytes(localization.languageFile().toPath()));
+    assertEquals("Global closed", localization.text(GlossMessages.MENU_CLOSED));
     assertTrue(Files.isRegularFile(localization.languageFile().toPath().getParent()
-            .resolve("languages/overrides/en_US.yml")));
+            .resolve("en_US.toml")));
     assertTrue(localization.reload());
     assertEquals(replacement, localization.snapshot().value(GlossMessages.HELP_ROOT));
   }
 
   @Test
   public void editorLeavesActiveSelectionUnchangedForAnotherLocale() throws Exception {
-    Path installed = localization.languageFile().toPath().getParent().resolve("languages/fr_FR.yml");
-    Files.writeString(installed, "locale: fr_FR\nmessages:\n  command.help.root: Racine\n");
+    Path installed = localization.languageFile().toPath().getParent().resolve("fr_FR.toml");
+    Files.writeString(installed, "[command.help]\nroot = \"Racine\"\n");
     PluginLanguageEditor.Options editor = localization.editorOptions();
     MessageValue english = localization.snapshot().value(GlossMessages.HELP_ROOT);
     MessageValue french = editor.loader().load("fr_FR").value(GlossMessages.HELP_ROOT);
@@ -124,11 +128,11 @@ public class GlossLocalizationTest {
   public void editorRejectsInvalidAndStaleValuesWithoutChangingFiles() throws Exception {
     PluginLanguageEditor.Options editor = localization.editorOptions();
     MessageValue original = editor.loader().load("en_US").value(GlossMessages.HELP_ROOT);
-    Path file = localization.languageFile().toPath().getParent().resolve("languages/overrides/en_US.yml");
+    Path file = localization.languageFile().toPath().getParent().resolve("en_US.toml");
 
     assertThrows(IllegalArgumentException.class, () -> editor.writer().write(new PluginLanguageEditor.Edit(
             "en_US", GlossMessages.HELP_ROOT.id(), original, new TextValue("{unexpected}"))));
-    assertFalse(Files.exists(file));
+    assertTrue(Files.exists(file));
     editor.writer().write(new PluginLanguageEditor.Edit(
             "en_US", GlossMessages.HELP_ROOT.id(), original, new TextValue("First edit")));
     byte[] first = Files.readAllBytes(file);
@@ -138,29 +142,29 @@ public class GlossLocalizationTest {
   }
 
   @Test
-  public void generatesSparseOverrideFileWithEnglishInTheTypedCatalog() throws Exception {
-    YamlConfiguration yaml = loadLanguageFile();
+  public void generatesCompleteEditableEnglishCatalog() throws Exception {
+    Map<String, String> values = loadLanguageFile();
 
-    assertFalse(yaml.contains("locale"));
-    assertTrue(yaml.isConfigurationSection("messages"));
-    assertTrue(Files.readString(localization.languageFile().toPath()).contains("language key in gloss.toml"));
+    assertEquals(GlossMessages.catalog().byId().keySet(), values.keySet());
+    assertTrue(Files.readString(localization.languageFile().toPath()).contains("[command.help]"));
+    assertTrue(Files.readString(localization.languageFile().toPath()).contains("languages/en_US.toml"));
     assertEquals("Open a menu by id, or show the menu list when set to *", GlossMessages.HELP_MENU_OPEN.english());
   }
 
   @Test
-  public void englishSelectionRestoresTheCatalogAndPreservesOverridesWithoutDownloading() throws Exception {
+  public void englishSelectionPreservesEachLocaleFileWithoutDownloading() throws Exception {
     assertTrue(localization.selectLocale("de_DE"));
-    YamlConfiguration yaml = loadLanguageFile();
-    yaml.set("messages." + GlossMessages.MENU_CLOSED.id(), "Locally closed");
-    yaml.save(localization.languageFile());
+    Map<String, String> values = loadLanguageFile();
+    values.put(GlossMessages.MENU_CLOSED.id(), "Locally closed");
+    saveLanguageFile(localization.languageFile().toPath(), values);
 
     LocalizationSnapshot snapshot = localization.loadSelectedSnapshot(VolmitLocales.ENGLISH);
     localization.install(VolmitLocales.ENGLISH, snapshot);
 
     assertEquals(VolmitLocales.ENGLISH, localization.activeLocale());
     assertEquals(GlossMessages.HELP_MENU_OPEN.english(), localization.text(GlossMessages.HELP_MENU_OPEN));
-    assertEquals("Locally closed", localization.text(GlossMessages.MENU_CLOSED));
-    assertFalse(Files.exists(localization.languageFile().toPath().getParent().resolve("languages/en_US.yml")));
+    assertEquals(GlossMessages.MENU_CLOSED.english(), localization.text(GlossMessages.MENU_CLOSED));
+    assertTrue(Files.exists(localization.languageFile().toPath().getParent().resolve("en_US.toml")));
   }
 
   @Test
@@ -174,6 +178,30 @@ public class GlossLocalizationTest {
   }
 
   @Test
+  public void everyLanguageHeaderDocumentsTheCatalogVariables() throws Exception {
+    Set<String> expected = new HashSet<>();
+    for (MessageKey key : localization.snapshot().catalog().keys()) {
+      expected.addAll(key.placeholders());
+      expected.addAll(key.optionalPlaceholders());
+    }
+    List<String> locales = new ArrayList<>(VolmitLocales.nonEnglish());
+    locales.add(VolmitLocales.ENGLISH);
+    Pattern placeholder = Pattern.compile("(?<!\\{)\\{([A-Za-z][A-Za-z0-9_]*)\\}(?!\\})");
+    for (String locale : locales) {
+      Path path = localization.languageFile().toPath().getParent().resolve(locale + ".toml");
+      String header = Files.readString(path).lines().takeWhile(line -> line.startsWith("#"))
+          .collect(Collectors.joining("\n"));
+      assertEquals(locale, 4L, header.lines().filter(line -> line.startsWith("# === ")).count());
+      Set<String> documented = new HashSet<>();
+      Matcher matcher = placeholder.matcher(header);
+      while (matcher.find()) {
+        documented.add(matcher.group(1));
+      }
+      assertEquals(locale, expected, documented);
+    }
+  }
+
+  @Test
   public void repositoryMessagesUsePurpleBrandingWithDarkGreyStructure() throws Exception {
     assertTrue(GlossMessages.PERMISSION_DENIED.english().startsWith("&8[&dGloss&8]: &c"));
     assertTrue(GlossMessages.MENU_CLOSED.english().startsWith("&8[&dGloss&8]: &a"));
@@ -182,7 +210,7 @@ public class GlossLocalizationTest {
     assertTrue(GlossMessages.PANELS_NEAR_HEADER.english().contains("&d{count}"));
 
     for (String locale : VolmitLocales.nonEnglish()) {
-      String messages = Files.readString(Path.of("src/main/resources/languages", locale + ".yml"));
+      String messages = Files.readString(Path.of("src/main/resources/languages", locale + ".toml"));
       assertTrue(locale, messages.contains("&8[&dGloss&8]: "));
       assertFalse(locale, messages.contains("&7[&bGloss&7]: "));
       assertFalse(locale, messages.contains("&b{count}"));
@@ -196,7 +224,7 @@ public class GlossLocalizationTest {
   @Test
   public void repositoryResourceSetExactlyMatchesSharedManifest() throws Exception {
     Set<String> expected = VolmitLocales.nonEnglish().stream()
-        .map(locale -> locale + ".yml")
+        .map(locale -> locale + ".toml")
         .collect(Collectors.toUnmodifiableSet());
     try (Stream<Path> paths = Files.list(Path.of("src/main/resources/languages"))) {
       Set<String> actual = paths
@@ -205,7 +233,7 @@ public class GlossLocalizationTest {
           .collect(Collectors.toUnmodifiableSet());
       assertEquals(expected, actual);
     }
-    assertFalse(expected.contains(VolmitLocales.ENGLISH + ".yml"));
+    assertFalse(expected.contains(VolmitLocales.ENGLISH + ".toml"));
   }
 
   @Test
@@ -214,7 +242,7 @@ public class GlossLocalizationTest {
     assertTrue(GlossMessages.WEB_OPEN.english().contains("{url}"));
 
     for (String locale : VolmitLocales.nonEnglish()) {
-      Path resource = Path.of("src/main/resources/languages", locale + ".yml");
+      Path resource = Path.of("src/main/resources/languages", locale + ".toml");
       String messages = Files.readString(resource);
       assertTrue(locale, messages.contains("{url}"));
       assertFalse(locale, messages.contains("holoui.volmit.com"));
@@ -236,10 +264,11 @@ public class GlossLocalizationTest {
   }
 
   @Test
-  public void appliesExternalOverrideWithNamedArguments() throws Exception {
-    YamlConfiguration yaml = loadLanguageFile();
-    yaml.set("messages." + GlossMessages.MENU_UNAVAILABLE.id(), "&cMenu indisponible: {menu}");
-    yaml.save(localization.languageFile());
+  public void appliesDirectLocaleEditsWithNamedArguments() throws Exception {
+    assertTrue(localization.selectLocale("fr_FR"));
+    Map<String, String> values = loadLanguageFile();
+    values.put(GlossMessages.MENU_UNAVAILABLE.id(), "&cMenu indisponible: {menu}");
+    saveLanguageFile(localization.languageFile().toPath(), values);
 
     assertTrue(localization.selectLocale("fr_FR"));
     String rendered = localization.legacy(
@@ -252,10 +281,10 @@ public class GlossLocalizationTest {
   }
 
   @Test
-  public void customLocaleUsesOverridesOverEnglish() throws Exception {
-    YamlConfiguration yaml = loadLanguageFile();
-    yaml.set("messages." + GlossMessages.MENU_UNAVAILABLE.id(), "Custom {menu}");
-    yaml.save(localization.languageFile());
+  public void customLocaleUsesDirectMessagesOverEnglish() throws Exception {
+    Map<String, String> values = loadLanguageFile();
+    values.put(GlossMessages.MENU_UNAVAILABLE.id(), "Custom {menu}");
+    saveLanguageFile(localization.languageFile().toPath().getParent().resolve("pirate_SEA.toml"), values);
 
     assertTrue(localization.selectLocale("pirate_SEA"));
     assertEquals("pirate_SEA", localization.activeLocale());
@@ -267,20 +296,20 @@ public class GlossLocalizationTest {
   }
 
   @Test
-  public void rejectsInvalidReloadAndRetainsLastGoodSnapshot() throws Exception {
-    YamlConfiguration yaml = loadLanguageFile();
-    yaml.set("messages." + GlossMessages.PREVIEW_SCALE_SIZE.id(), "Taille {percent}%");
-    yaml.save(localization.languageFile());
+  public void invalidMessageFallsBackWithoutRejectingReload() throws Exception {
+    Map<String, String> values = loadLanguageFile();
+    values.put(GlossMessages.PREVIEW_SCALE_SIZE.id(), "Taille {percent}%");
+    saveLanguageFile(localization.languageFile().toPath(), values);
     assertTrue(localization.reload());
 
     MessageArgs arguments = MessageArgs.builder().untrusted("percent", 125).build();
     assertEquals("Taille 125%", localization.text(GlossMessages.PREVIEW_SCALE_SIZE, arguments));
 
-    yaml.set("messages." + GlossMessages.PREVIEW_SCALE_SIZE.id(), "Argument absent");
-    yaml.save(localization.languageFile());
+    values.put(GlossMessages.PREVIEW_SCALE_SIZE.id(), "Argument absent");
+    saveLanguageFile(localization.languageFile().toPath(), values);
 
-    assertFalse(localization.reload());
-    assertEquals("Taille 125%", localization.text(GlossMessages.PREVIEW_SCALE_SIZE, arguments));
+    assertTrue(localization.reload());
+    assertEquals(GlossMessages.PREVIEW_SCALE_SIZE.english().replace("{percent}", "125"), localization.text(GlossMessages.PREVIEW_SCALE_SIZE, arguments));
   }
 
   @Test
@@ -291,9 +320,9 @@ public class GlossLocalizationTest {
     logger.setUseParentHandlers(false);
     localization = new GlossLocalization(
         temporaryFolder.newFolder("clocked-localization"), logger, VolmitLocales.ENGLISH, clock::get);
-    YamlConfiguration yaml = loadLanguageFile();
-    yaml.set("messages." + GlossMessages.MENU_UNAVAILABLE.id(), "Alpha {menu}");
-    yaml.save(localization.languageFile());
+    Map<String, String> values = loadLanguageFile();
+    values.put(GlossMessages.MENU_UNAVAILABLE.id(), "Alpha {menu}");
+    saveLanguageFile(localization.languageFile().toPath(), values);
     MessageArgs arguments = MessageArgs.builder().untrusted("menu", "market").build();
 
     clock.addAndGet(TimeUnit.SECONDS.toNanos(9L));
@@ -303,8 +332,8 @@ public class GlossLocalizationTest {
     assertEquals("Alpha market", localization.text(GlossMessages.MENU_UNAVAILABLE, arguments));
 
     FileTime appliedTime = Files.getLastModifiedTime(localization.languageFile().toPath());
-    yaml.set("messages." + GlossMessages.MENU_UNAVAILABLE.id(), "Bravo {menu}");
-    yaml.save(localization.languageFile());
+    values.put(GlossMessages.MENU_UNAVAILABLE.id(), "Bravo {menu}");
+    saveLanguageFile(localization.languageFile().toPath(), values);
     Files.setLastModifiedTime(localization.languageFile().toPath(), appliedTime);
 
     clock.addAndGet(TimeUnit.SECONDS.toNanos(9L));
@@ -322,9 +351,9 @@ public class GlossLocalizationTest {
 
   @Test
   public void resolvesDirectorLabelsAndDoesNotRenderUntrustedFormatting() throws Exception {
-    YamlConfiguration yaml = loadLanguageFile();
-    yaml.set("messages.director.help.navigation.back", "&aRetour");
-    yaml.save(localization.languageFile());
+    Map<String, String> values = loadLanguageFile();
+        values.put("director.help.navigation.back", "&aRetour");
+    saveLanguageFile(localization.languageFile().toPath(), values);
     assertTrue(localization.reload());
 
     assertEquals("Retour", localization.directorResolver().resolve(DirectorHelpMessages.BACK));
@@ -462,11 +491,84 @@ public class GlossLocalizationTest {
     assertTrue(hover.contains("session12345"));
   }
 
-  private YamlConfiguration loadLanguageFile() throws Exception {
-    File file = localization.languageFile();
-    YamlConfiguration yaml = new YamlConfiguration();
-    yaml.load(file);
-    return yaml;
+  @Test
+  public void editorUpdatesNestedRepositoryMessagesWithoutDuplicatingKeys() throws Exception {
+    Path file = localization.languageFile().toPath().getParent().resolve("fr_FR.toml");
+    String originalHeader = Files.readString(file).lines().takeWhile(line -> line.startsWith("#"))
+        .collect(Collectors.joining("\n"));
+    PluginLanguageEditor.Options editor = localization.editorOptions();
+    LocalizationSnapshot original = editor.loader().load("fr_FR");
+    TextValue replacement = new TextValue("Racine modifiee");
+    LocalizationSnapshot edited = editor.writer().write(new PluginLanguageEditor.Edit(
+        "fr_FR", GlossMessages.HELP_ROOT.id(), original.value(GlossMessages.HELP_ROOT), replacement));
+    assertEquals(replacement, edited.value(GlossMessages.HELP_ROOT));
+    assertEquals(replacement, editor.loader().load("fr_FR").value(GlossMessages.HELP_ROOT));
+    assertEquals(original.value(GlossMessages.MENU_CLOSED), edited.value(GlossMessages.MENU_CLOSED));
+    assertTrue(Files.readString(file).startsWith(originalHeader));
+  }
+
+  @Test
+  public void partialLocaleKeepsValidMessagesAndFallsBackForInvalidEntries() throws Exception {
+    Path file = localization.languageFile().toPath().getParent().resolve("fr_FR.toml");
+    String raw = "[command.help]\nroot = \"Racine\"\nstatus = \"{broken\"\n"
+        + "[gloss.message.menu]\nunavailable = \"Sans variable\"\nclosed = 42\n";
+    Files.writeString(file, raw);
+
+    LocalizationSnapshot snapshot = localization.loadSelectedSnapshot("fr_FR");
+
+    assertEquals(new TextValue("Racine"), snapshot.value(GlossMessages.HELP_ROOT));
+    assertEquals(GlossMessages.MENU_UNAVAILABLE.englishValue(), snapshot.value(GlossMessages.MENU_UNAVAILABLE));
+    assertEquals(GlossMessages.MENU_CLOSED.englishValue(), snapshot.value(GlossMessages.MENU_CLOSED));
+    assertEquals(GlossMessages.HELP_STATUS.englishValue(), snapshot.value(GlossMessages.HELP_STATUS));
+    assertEquals(raw, Files.readString(file));
+  }
+
+  @Test
+  public void editorAddsAChildMessageBesideItsTranslatedParent() throws Exception {
+    Path file = localization.languageFile().toPath().getParent().resolve("fr_FR.toml");
+    Files.writeString(file, "# Local messages\n[command.help]\nweb = \"Editeur web\"\n");
+    PluginLanguageEditor.Options editor = localization.editorOptions();
+    LocalizationSnapshot current = editor.loader().load("fr_FR");
+    TextValue replacement = new TextValue("Ouvrir l'editeur");
+    LocalizationSnapshot edited = editor.writer().write(new PluginLanguageEditor.Edit(
+        "fr_FR", GlossMessages.HELP_WEB_OPEN.id(), current.value(GlossMessages.HELP_WEB_OPEN), replacement));
+    assertEquals(new TextValue("Editeur web"), edited.value(GlossMessages.HELP_WEB));
+    assertEquals(replacement, editor.loader().load("fr_FR").value(GlossMessages.HELP_WEB_OPEN));
+    assertTrue(Files.readString(file).startsWith("# Local messages"));
+    assertTrue(Files.readString(file).contains("\"web.open\" = "));
+  }
+
+  @Test
+  public void generatedEnglishContainsTheCatalogAndPreservesDirectEdits() throws Exception {
+    Path file = localization.languageFile().toPath().getParent().resolve("en_US.toml");
+    LocalizationSnapshot english = localization.loadSelectedSnapshot("en_US");
+    for (MessageKey key : english.catalog().keys()) {
+      assertEquals(key.id(), key.englishValue(), english.value(key));
+    }
+    String raw = Files.readString(file);
+    assertTrue(raw.contains("Prefixes"));
+    assertTrue(raw.contains("{menu}"));
+    Files.writeString(file, "[command.help]\nroot = \"Local English\"\n");
+    assertTrue(localization.reload());
+    assertEquals("Local English", localization.text(GlossMessages.HELP_ROOT));
+    assertTrue(localization.reload());
+    assertEquals("Local English", localization.text(GlossMessages.HELP_ROOT));
+  }
+
+  @Test
+  public void malformedLocaleFallsBackToEnglish() throws Exception {
+    Path file = localization.languageFile().toPath().getParent().resolve("fr_FR.toml");
+    Files.writeString(file, "[command.help\n");
+    LocalizationSnapshot snapshot = localization.loadSelectedSnapshot("fr_FR");
+    assertEquals(GlossMessages.HELP_ROOT.englishValue(), snapshot.value(GlossMessages.HELP_ROOT));
+  }
+
+  private Map<String, String> loadLanguageFile() throws Exception {
+    return TomlLanguageParser.parseText(Files.readString(localization.languageFile().toPath()));
+  }
+
+  private void saveLanguageFile(Path file, Map<String, String> values) throws IOException {
+    Files.writeString(file, TomlLanguageWriter.renderText(values, List.of()));
   }
 
 }

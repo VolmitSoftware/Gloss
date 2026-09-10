@@ -1,0 +1,828 @@
+# Gloss — ja-JP
+#
+# === ファイルの編集 ===
+# plugins/Gloss/languages/ja-JP.toml
+# このファイルを直接編集できます。ローカルの変更は保持され、不足または無効な項目には内蔵の英語を使用します。
+# /gloss language server edit ja-JP
+#
+# === 接頭辞 ===
+# 接頭辞: &8[&dGloss&8] / &8[&dGloss&8]:
+#
+# === 書式 ===
+# 色: &0-&f, &k-&r, &#RRGGBB.
+#
+# === 変数 ===
+# 変数名を変更せず、各メッセージに元からある変数だけを使用してください。
+#   {absorbed}  既存データに統合したインポート項目数
+#   {active}  有効なプロバイダー数
+#   {actual}  現在のリビジョン
+#   {after}  編集後のメッセージ値
+#   {argument}  予期しないコマンド引数
+#   {axis}  座標軸または回転軸
+#   {bees}  容器内のハチの数
+#   {before}  編集前のメッセージ値
+#   {billboard}  表示の向きの追従モード
+#   {blocks}  ブロック表示要素数
+#   {board}  ボードまたはパネルの識別子
+#   {bottles}  容器内の瓶の数
+#   {bubbles}  有効なチャット吹き出し数
+#   {cells}  メニューのセル数
+#   {color}  表示またはアイテムの色
+#   {command}  コマンドのパス
+#   {conflicts}  インポートの競合数
+#   {copied}  コピーした項目数
+#   {count}  一致するオブジェクトまたはメッセージ数
+#   {disc}  容器内のレコード
+#   {distance}  対象までの距離
+#   {drops}  表示するドロップアイテム数
+#   {enabled}  有効状態または有効な項目数
+#   {entities}  エンティティ数
+#   {error}  検証または操作のエラー
+#   {errors}  エラー数
+#   {expected}  編集保存時に期待するリビジョン
+#   {experience}  獲得した経験値
+#   {failed}  失敗した操作数
+#   {from}  元の値または範囲の開始
+#   {fuel}  容器に残っている燃料
+#   {group}  言語エディターの分類
+#   {hologram}  ホログラムの識別子
+#   {honey}  現在のハチミツ量
+#   {id}  オブジェクトの識別子
+#   {imported}  インポートした項目数
+#   {indicators}  ダメージ表示数
+#   {interactPermission}  操作に必要な権限
+#   {interactionRange}  操作できる最大距離
+#   {item}  アイテム名または素材
+#   {key}  メッセージまたは設定のキー
+#   {kind}  オブジェクトまたはプロバイダーの種類
+#   {kinds}  使用可能なオブジェクトまたはプロバイダーの種類
+#   {labels}  テキストラベル数
+#   {legacy}  インポート元の識別子
+#   {level}  表示するレベル
+#   {limit}  許容上限
+#   {line}  メッセージ内の行番号
+#   {locale}  言語コード
+#   {maximum}  許容最大値
+#   {maximumBees}  ハチの最大数
+#   {maximumHoney}  ハチミツ量の上限
+#   {menu}  メニューの識別子
+#   {message}  応答または診断のメッセージ
+#   {migrated}  変換した項目数
+#   {minimum}  許容最小値
+#   {mode}  選択した操作または表示モード
+#   {name}  オブジェクト名
+#   {oldBoard}  以前のボード識別子
+#   {operation}  操作名
+#   {options}  使用可能なコマンドオプション
+#   {overlaid}  適用した設定キー数
+#   {page}  現在のページ番号
+#   {pages}  総ページ数
+#   {panels}  パネル数
+#   {parameter}  コマンドパラメーター名
+#   {path}  ファイルまたはフォルダーのパス
+#   {pending}  保留中の公開状態
+#   {percent}  割合の値
+#   {permission}  必要な権限
+#   {personal}  個人の言語コード
+#   {pitch}  垂直角度
+#   {player}  プレイヤー名
+#   {plugin}  プラグイン名
+#   {priority}  選択または描画の優先度
+#   {provider}  プロバイダー名
+#   {providers}  プロバイダーの一覧または数
+#   {radius}  検索半径
+#   {ready}  インポート可能な項目数
+#   {reason}  エラーまたは判断の理由
+#   {resume}  インポートを再開できる項目数
+#   {revision}  文書のリビジョン
+#   {roll}  ロール角度
+#   {rotation}  表示の回転
+#   {scale}  表示またはプレビューの倍率
+#   {seconds}  時間（秒）
+#   {session}  編集セッションの識別子
+#   {severity}  診断の重大度
+#   {skipped}  スキップした項目数
+#   {slots}  アイテムスロット数
+#   {source}  インポート元または設定プロバイダー
+#   {special}  特殊表示要素数
+#   {state}  現在の状態
+#   {style}  表示スタイル
+#   {subject}  Webエディターで編集する対象
+#   {target}  言語選択を適用するプラグイン
+#   {temporary}  一時オブジェクト数
+#   {text}  表示するテキスト
+#   {title}  表示するタイトル
+#   {to}  変更先の値または範囲の終了
+#   {total}  総項目数
+#   {type}  期待する値またはオブジェクトの種類
+#   {url}  Webアドレス
+#   {usage}  コマンド構文
+#   {uuid}  オブジェクトまたはプレイヤーの一意な識別子
+#   {value}  現在のメッセージまたはパラメーター値
+#   {variables}  メッセージで使用可能な変数
+#   {variants}  表示バリエーションの数または一覧
+#   {viewPermission}  表示に必要な権限
+#   {viewRange}  最大表示距離
+#   {warnings}  警告数
+#   {when}  表示条件
+#   {world}  ワールド名
+#   {x}  X座標
+#   {y}  Y座標
+#   {yaw}  水平角度
+#   {z}  Z座標
+
+[command.help]
+debug = "診断コマンド"
+debugdump = "診断レポートを作成し、必要に応じてアップロードする"
+debugdump_upload = "レポートを mclo.gs にアップロードする"
+root = "Glossコマンドグループ"
+hologram = "ホログラムを作成・管理する"
+"hologram.create" = "現在位置にホログラムを作成する"
+"hologram.create.id" = "一意のホログラムID"
+"hologram.delete" = "ホログラムを削除する"
+"hologram.delete.id" = "削除するホログラムのID"
+"hologram.addline" = "ホログラムに行を追加する"
+"hologram.addline.id" = "ホログラムID"
+"hologram.addline.text" = "行のテキスト。スペースを含める場合は引用符で囲む"
+"hologram.setline" = "ホログラムの行を置き換える"
+"hologram.setline.id" = "ホログラムID"
+"hologram.setline.line" = "行番号(1から開始)"
+"hologram.setline.text" = "行のテキスト。スペースを含める場合は引用符で囲む"
+"hologram.removeline" = "ホログラムの行を削除する"
+"hologram.removeline.id" = "ホログラムID"
+"hologram.removeline.line" = "行番号(1から開始)"
+"hologram.clear" = "ホログラムの全行を削除する"
+"hologram.clear.id" = "ホログラムID"
+"hologram.movehere" = "ホログラムを現在位置に移動する"
+"hologram.movehere.id" = "ホログラムID"
+"hologram.move" = "ホログラムを相対ブロック距離で移動する"
+"hologram.move.id" = "ホログラムID"
+"hologram.move.x" = "ブロック単位の相対Xオフセット"
+"hologram.move.y" = "ブロック単位の相対Yオフセット"
+"hologram.move.z" = "ブロック単位の相対Zオフセット"
+"hologram.tp" = "ホログラムにテレポートする"
+"hologram.tp.id" = "ホログラムID"
+"hologram.list" = "ホログラムを一覧表示する。クリックでテレポート"
+"hologram.info" = "ホログラムの位置と行を表示する"
+"hologram.info.id" = "ホログラムID"
+"hologram.rendertext" = "ネイティブ拡大を使用するテキストホログラムを作成"
+"hologram.rendertext.id" = "一意のホログラムID"
+"hologram.rendertext.text" = "表示するテキスト。空白を含む場合は引用符で囲む"
+"hologram.rendertext.scale" = "TextDisplay の拡大倍率"
+"hologram.orient" = "ホログラムが視点に向く回転方法を設定する"
+"hologram.orient.id" = "ホログラムID"
+"hologram.orient.billboard" = "CENTER、VERTICAL、HORIZONTAL、FIXED のいずれか"
+"hologram.orient.yaw" = "水平方向の角度 (yaw)、-180 から 180 度"
+"hologram.orient.pitch" = "垂直方向の角度 (pitch)、-90 から 90 度"
+board = "スコアボードを作成・管理する"
+"board.create" = "スコアボードを作成する"
+"board.create.id" = "一意のボードID"
+"board.delete" = "スコアボードを削除する"
+"board.delete.id" = "削除するボードのID"
+"board.title" = "スコアボードのタイトルを設定する"
+"board.title.id" = "ボードID"
+"board.title.text" = "タイトルのテキスト。スペースを含める場合は引用符で囲む"
+"board.addline" = "スコアボードに行を追加する"
+"board.addline.id" = "ボードID"
+"board.addline.text" = "行のテキスト。スペースを含める場合は引用符で囲む"
+"board.setline" = "スコアボードの行を置き換える"
+"board.setline.id" = "ボードID"
+"board.setline.line" = "行番号(1から開始)"
+"board.setline.text" = "行のテキスト。スペースを含める場合は引用符で囲む"
+"board.removeline" = "スコアボードの行を削除する"
+"board.removeline.id" = "ボードID"
+"board.removeline.line" = "行番号(1から開始)"
+"board.show" = "自分にスコアボードを表示する"
+"board.show.id" = "ボードID"
+"board.hide" = "自分のスコアボードを非表示にする"
+"board.select" = "スコアボードの自動選択を設定する"
+"board.select.id" = "ボード ID"
+"board.select.priority" = "選択優先度"
+"board.select.when" = "真偽値の条件。スペースを含む式は引用符で囲む"
+"board.list" = "スコアボードを一覧表示する"
+"board.info" = "スコアボードのタイトル・行・設定を表示する"
+"board.info.id" = "ボードID"
+"board.reset" = "同梱のスコアボードデフォルトを復元する"
+emoji = "絵文字チャットツール"
+"emoji.list" = "有効な絵文字を一覧表示する。クリックでチャットに挿入"
+"emoji.reset" = "同梱の絵文字デフォルトを復元する"
+animations = "アニメーションツール"
+"animations.list" = "アニメーション名を一覧表示する"
+"animations.reset" = "同梱のアニメーションデフォルトを復元する"
+bubbles = "チャット吹き出しスタイル"
+"bubbles.style" = "チャット吹き出しのスタイルを選択する。clearで自動選択"
+"bubbles.style.style" = "スタイルID、またはclear"
+"bubbles.reset" = "同梱の吹き出しスタイルデフォルトを復元する"
+tablist = "タブリストツール"
+"tablist.reset" = "同梱のタブリストドキュメントを復元する"
+motd = "MOTDツール"
+"motd.reset" = "同梱のMOTDドキュメントを復元する"
+drops = "ドロップアイテム表示ツール"
+"drops.reset" = "同梱のドロップアイテム設定ドキュメントを復元する"
+indicators = "ダメージ・回復インジケーターのツール"
+"indicators.reset" = "同梱のダメージインジケーター設定ドキュメントを復元する"
+status = "実行時のカウントを簡潔に表示する"
+import = "ソースファイルを変更せずにレガシーホログラムを移行する"
+"import.apply" = "上書きなしのレガシーホログラム移行を適用する"
+"import.holoui" = "plugins/holouiからHoloUiデータをコピーする。以前のインポートは上書き"
+"import.legacy" = "統合前のGlossデータファイルをv2エンベロープに移行する"
+"import.preview" = "非破壊のレガシーホログラム移行をプレビューする"
+item = "カスタムアイテムプロバイダーツール"
+"item.export" = "Webエディター用にカスタムアイテムカタログをエクスポートする"
+"item.status" = "有効なカスタムアイテムプロバイダーを表示する"
+menu = "ホログラムメニューを作成・オープン・編集する"
+"menu.addrow" = "テキスト装飾行を追加する"
+"menu.back" = "前のメニューセッションを再度開く"
+"menu.close" = "現在開いているメニューセッションを閉じる"
+"menu.copy" = "読み込み済みメニューを新しいネストIDへコピーする"
+"menu.create" = "現在位置に永続ホログラムを作成する"
+"menu.image" = "メニュー内容を中央配置の画像ファイル1つに置き換える"
+"menu.insertrow" = "テキスト装飾行を挿入する"
+"menu.list" = "開くことができる設定済みメニューを一覧表示する"
+"menu.move" = "開いているメニューを現在位置に移動する"
+"menu.new" = "同梱のベースラインから空のホログラムメニューを作成する"
+"menu.offsetrow" = "行を絶対または~相対オフセットで移動する"
+"menu.open" = "IDでメニューを開く。*でメニュー一覧を表示する"
+"menu.removerow" = "コンポーネント行を削除する"
+"menu.seticon" = "ボタンまたは装飾行のアイコンを置き換える"
+"menu.setrow" = "ボタンまたは装飾行のテキストを設定する"
+"menu.style" = "行の表示スタイルプロパティを1つ設定またはクリアする"
+panel = "永続ワールドパネルツール"
+"panel.addrow" = "パネルのルートメニューにテキスト行を追加する"
+"panel.align" = "パネルの位置軸を別のパネルに揃える"
+"panel.cancel" = "ステージ中のパネル編集を破棄する"
+"panel.copy" = "永続パネルを新しいIDでコピーする"
+"panel.create" = "現在位置にパネルを作成する"
+"panel.delete" = "永続パネルを削除する"
+"panel.edit" = "ステージ式のパネル編集セッションを開始する"
+"panel.follow" = "オンラインプレイヤーをfixed, yaw, fullの回転で追従する"
+"panel.here" = "パネルを現在位置に移動する"
+"panel.image" = "パネルのルートメニューを中央配置の画像ファイル1つに置き換える"
+"panel.info" = "パネルの完全な状態を表示する"
+"panel.insertrow" = "パネルのルートメニューにテキスト行を挿入する"
+"panel.list" = "永続パネルをページごとに一覧表示する"
+"panel.menu" = "パネルのルートメニューを設定する"
+"panel.move" = "パネルを絶対または~相対座標に移動する"
+"panel.near" = "現在位置付近のパネルを一覧表示する"
+"panel.offsetrow" = "パネルのルートメニュー行を絶対または~相対オフセットで移動する"
+"panel.permissions" = "パネルの表示・操作権限を変更する"
+"panel.ranges" = "パネルの表示・操作範囲を設定する"
+"panel.removerow" = "パネルのルートメニュー行を削除する"
+"panel.rename" = "永続パネルの名前を変更する"
+"panel.rotate" = "絶対または~相対のヨー・ピッチ・ロールを設定する"
+"panel.save" = "ステージ中のパネル編集を保存する"
+"panel.scale" = "パネルのスケールを絶対または~相対で設定する"
+"panel.seticon" = "パネルのルートメニューの行アイコンを置き換える"
+"panel.setrow" = "パネルのルートメニュー行のテキストを設定する"
+"panel.style" = "行の表示スタイルプロパティを1つ設定またはクリアする"
+"panel.teleport" = "永続パネルにテレポートする"
+"panel.unfollow" = "パネルのプレイヤー追従を停止する"
+"panel.visibility" = "可視性モードと権限ノードを設定する"
+preview = "プレビュードキュメントツール"
+"preview.dump" = "プレビュードキュメントを1回ビルドして要素数を表示する"
+"preview.list" = "プレビュードキュメントとそのマッチルールを一覧表示する"
+"preview.reset" = "同梱のプレビューデフォルトを復元する(それらを覆い隠す可能性のある追加のユーザードキュメントは削除しない)"
+web = "Gloss の Web エディターを開いて管理する"
+"web.open" = "ホストされた空の Gloss エディターを開く"
+"web.edit" = "稼働中の Gloss ドキュメントを1つ開く"
+"web.edit.document" = "この稼働中のドキュメントを Web エディターで開く"
+"web.workspace" = "稼働中の Gloss ワークスペース全体を開く"
+"web.sessions" = "有効な Web エディターのセッションを管理する"
+"web.sessions.list" = "有効な Web エディターのセッションを一覧表示する"
+"web.sessions.pull" = "Web エディターのセッションを今すぐ照会する"
+"web.sessions.revoke" = "Web エディターの編集権限を失効させる"
+"web.sessions.status" = "Web エディターのセッションを1つ表示する"
+language = "自分の言語またはサーバーの既定言語を選択"
+
+[command.help.arg]
+reset_name = "リセットする名前。*で同梱デフォルトすべて"
+panel_axes = "軸: x, y, z, xy, xz, yz, xyz のいずれか"
+panel_follow_rotation = "追従回転: fixed, yaw, full のいずれか"
+panel_id = "永続パネルID"
+panel_interact_permission = "操作権限、または -"
+panel_interaction_range = "正の操作範囲"
+panel_menu = "ルートメニューID。デフォルトはパネルID"
+panel_new_id = "新しい永続パネルID"
+panel_pitch = "絶対または~相対ピッチ"
+panel_player = "オンラインの対象プレイヤー"
+panel_radius = "水平方向の検索半径"
+panel_reference = "基準パネルID"
+panel_roll = "絶対または~相対ロール"
+panel_root_menu = "ルートメニューID"
+panel_scale = "絶対または~相対スケール"
+panel_view_permission = "表示権限、または -"
+panel_view_range = "正の表示範囲"
+panel_visibility = "可視性モード: public, permission, hidden のいずれか"
+panel_x = "絶対または~相対X"
+panel_y = "絶対または~相対Y"
+panel_yaw = "絶対または~相対ヨー"
+panel_z = "絶対または~相対Z"
+content_menu = "読み込み済みメニューID"
+web_subject = "稼働中の Gloss ドキュメント ID"
+hologram_id = "新しいホログラムとルートメニューの ID"
+hologram_text = "任意の MiniMessage テキスト"
+image_path = "Glossのimagesフォルダ内のファイル"
+import_source = "レガシーホログラムの移行元"
+menu = "開くメニューのID(*ですべてのメニューを表示)"
+new_panel_id = "新しい永続パネルID"
+new_menu = "新しいネストメニューID"
+list_page = "一覧のページ番号(1から開始)"
+previews_dump_name = "ビルドするドキュメント名"
+previews_name = "リセットするドキュメント名。*で同梱ドキュメントすべて"
+row_icon_type = "アイコンの種類"
+row_icon_value = "アイコンの内容またはレジストリID"
+row_index = "コンポーネント行番号(1から開始)"
+row_style_property = "表示スタイルのプロパティ"
+row_style_value = "スタイル値。*でクリア"
+row_text = "MiniMessage形式の行テキスト"
+row_x = "絶対または~相対の行X"
+row_y = "絶対または~相対の行Y"
+row_z = "絶対または~相対の行Z"
+source_menu = "読み込み済みのコピー元メニューID"
+web_session = "Web エディターのセッション ID"
+
+[command.error]
+no_permission = "&8[&dGloss&8] &c権限がありません。"
+no_permission_use = "&8[&dGloss&8] &cそのコマンドを使用する権限がありません。"
+usage = "&7使用法: &f/{command} help"
+
+[command.hologram]
+exists = "&8[&dGloss&8] &cホログラム '&f{id}&c' は既に存在します。"
+missing = "&8[&dGloss&8] &c'&f{id}&c' という名前のホログラムはありません。"
+created = "&8[&dGloss&8] &aホログラム &f{id}&a を作成しました。"
+deleted = "&8[&dGloss&8] &aホログラム &f{id}&a を削除しました。"
+line_added = "&8[&dGloss&8] &a行 &f{line}&a を &f{id}&a に追加しました。"
+line_set = "&8[&dGloss&8] &a&f{id}&a の行 &f{line}&a を設定しました。"
+line_removed = "&8[&dGloss&8] &a&f{id}&a から行 &f{line}&a を削除しました。"
+line_out_of_range = "&8[&dGloss&8] &c行 {line} は範囲外です。&f{id}&c の行数は {count} です。"
+cleared = "&8[&dGloss&8] &a&f{id}&a の全行をクリアしました。"
+moved = "&8[&dGloss&8] &a&f{id}&a を現在位置に移動しました。"
+offset = "&8[&dGloss&8] &a&f{id}&a を &f{x}&a, &f{y}&a, &f{z}&a 移動しました。"
+teleported = "&8[&dGloss&8] &a&f{id}&a にテレポートしました。"
+list_empty = "&8[&dGloss&8] &7ホログラムはまだありません。"
+rendered = "&8[&dGloss&8] &aテキストホログラム &f{id}&a を倍率 &f{scale}&a で作成しました。"
+text_empty = "&8[&dGloss&8] &cテキストを空にはできません。"
+scale_out_of_range = "&8[&dGloss&8] &c倍率 {value} は範囲外です。&f{minimum}&c から &f{maximum}&c の間にしてください。"
+oriented = "&8[&dGloss&8] &a&f{id}&a のビルボードを &f{billboard}&a、yaw &f{yaw}&a、pitch &f{pitch}&a に設定しました。"
+billboard_unknown = "&8[&dGloss&8] &c不明なビルボード '&f{billboard}&c' です。&f{options}&c のいずれかを指定してください。"
+angle_out_of_range = "&8[&dGloss&8] &c{axis} の値 {value} は範囲外です。&f-{limit}&c 度から &f{limit}&c 度の間で指定してください。"
+
+[command.hologram.list]
+hover = "クリックでテレポート"
+lines = "{count} 行"
+
+[command.hologram.info]
+header = "&8[&dGloss&8] &d{id} &7位置: &f{world} {x}, {y}, {z}"
+line = " &8{line}. &f{text}"
+orientation = " &8倍率 &f{scale} &8billboard &f{billboard} &8yaw &f{yaw} &8pitch &f{pitch}"
+
+[command.board]
+exists = "&8[&dGloss&8] &cボード '&f{id}&c' は既に存在します。"
+missing = "&8[&dGloss&8] &c'&f{id}&c' という名前のボードはありません。"
+created = "&8[&dGloss&8] &aボード &f{id}&a を作成しました。"
+deleted = "&8[&dGloss&8] &aボード &f{id}&a を削除しました。"
+title_set = "&8[&dGloss&8] &a&f{id}&a のタイトルを設定しました。"
+line_added = "&8[&dGloss&8] &a行 &f{line}&a を &f{id}&a に追加しました。"
+line_set = "&8[&dGloss&8] &a&f{id}&a の行 &f{line}&a を設定しました。"
+line_removed = "&8[&dGloss&8] &a&f{id}&a から行 &f{line}&a を削除しました。"
+line_out_of_range = "&8[&dGloss&8] &c行 {line} は範囲外です。&f{id}&c の行数は {count} です。"
+shown = "&8[&dGloss&8] &aボード &f{id}&a を表示しています。"
+hidden = "&8[&dGloss&8] &aスコアボードを非表示にしました。"
+select_set = "&8[&dGloss&8] &aボード &f{id}&a の選択優先度を &f{priority}&a に設定しました。"
+select_invalid = "&8[&dGloss&8] &c無効なボード条件: &f{error}&c。"
+list_empty = "&8[&dGloss&8] &7ボードはまだありません。"
+
+[command.board.list]
+hover = "クリックで詳細を表示"
+
+[command.board.info]
+header = "&8[&dGloss&8] &d{id} &7タイトル: &f{title}"
+meta = "&7優先度: &f{priority}&7 | 条件: &f{when}&7 | バリエーション: &f{variants}&7"
+line = " &8{line}. &f{text}"
+
+[command.emoji]
+empty = "&8[&dGloss&8] &7有効な絵文字はありません。"
+hover = "クリックでチャットに挿入"
+
+[command.animations]
+empty = "&8[&dGloss&8] &7読み込まれたアニメーションはありません。"
+header = "&8[&dGloss&8] &fアニメーション: &d{count}"
+entry = "&8- &d{name}"
+
+[command.list]
+page = "&7ページ &f{page}&7/&f{pages} &8- &7表示中 &f{from}&7-&f{to} &7/ 全 &f{total}"
+next = "&7次のページ: &f{command}"
+
+[command.status]
+holograms = "&7ホログラム: &f{count} &8({temporary} 一時, {entities} エンティティ)"
+boards = "&7ボード: &f{count}"
+emoji = "&7絵文字: &f{enabled}&8/&f{total}"
+animations = "&7アニメーション: &f{count}"
+effects = "&7吹き出し: &f{bubbles} &8| &7インジケーター: &f{indicators} &8| &7ドロップ: &f{drops}"
+
+[command.reset]
+done = "&8[&dGloss&8] &a同梱の {kind} デフォルト &f{count}&a 件を復元しました。"
+none = "&8[&dGloss&8] &c'&f{name}&c' に一致する同梱の {kind} デフォルトはありません。"
+
+[command.bubbles]
+style_set = "&8[&dGloss&8] &aチャット吹き出しスタイルを &f{style}&a に設定しました。"
+style_cleared = "&8[&dGloss&8] &aチャット吹き出しスタイルをクリアしました。自動選択が適用されます。"
+style_unknown = "&8[&dGloss&8] &c'&f{style}&c' という名前の吹き出しスタイルはありません。"
+
+[command.import]
+config_unreadable = "&8[&dGloss&8] &cgloss.toml を読み込めませんでした: &f{reason}"
+
+[command.import.holoui]
+missing = "&8[&dGloss&8] &cGlossデータフォルダの隣に holoui データフォルダが見つかりません。"
+done = "&8[&dGloss&8] &aHoloUiインポートが完了しました: コピー &f{copied}&a 件、スキップ &f{skipped}&a 件、設定キー &f{overlaid}&a 件、エラー &f{errors}&a 件。"
+
+[command.import.legacy]
+done = "&8[&dGloss&8] &aレガシー移行が完了しました: 移行 &f{migrated}&a 件、吸収 &f{absorbed}&a 件、設定キー &f{overlaid}&a 件、エラー &f{errors}&a 件。"
+
+[director.help]
+no_subcommands = "このページにサブコマンドはありません。"
+no_description = "説明はありません"
+command_group = "コマンドグループ。クリックして開きます。"
+category = "コマンド分類"
+no_parameters = "パラメーターはありません。クリックしてコマンドを入力します。"
+parameters_hover = "パラメータにカーソルを合わせると詳細が表示されます。"
+
+[director.help.navigation]
+back = "戻る"
+page = "ページ"
+
+[director.help.navigation.parent]
+hover = "親コマンドグループに戻る"
+
+[director.help.navigation.previous]
+hover = "前のページ"
+
+[director.help.navigation.next]
+hover = "次のページ"
+
+[director.help.parameter]
+required = "このパラメータは必須です。"
+optional = "このパラメータは任意です。"
+default = "未指定の場合は \"{value}\" になります。"
+type = "このパラメータの型は {type} です。"
+
+[director.runtime]
+usage = "使用法: {usage}"
+
+[director.runtime.error]
+invalid_origin = "この実行元からはコマンドを実行できません。"
+unknown_parameter = "不明なパラメーターキー: {key}"
+unexpected_argument = "予期しない引数 \"{argument}\"。オプションのパラメーターはキー付きで指定してください。例: seed=123"
+unclosed_group = "パラメータ {key} の閉じ \"]\" がありません"
+conversion_failed = "\"{value}\" を {parameter} 用の {type} に変換できません"
+default_parse_failed = "パラメーター {parameter} のデフォルト値を解析できません"
+missing_argument = "引数 \"{parameter}\" ({type}) が必要です"
+execution_failed = "コマンド {command} の実行に失敗しました: {reason}"
+
+[gloss.error]
+menu_name_required = "メニュー名は空にできません"
+hologram_id_required = "ホログラム ID は空にできません"
+panel_id_required = "パネル ID は空にできません"
+web_subject_required = "Web エディターのドキュメント ID は空にできません"
+web_session_required = "Web エディターのセッション ID は空にできません"
+panel_player_required = "対象プレイヤーは空にできません"
+row_icon_type_required = "アイコンの種類は空にできません"
+row_style_property_required = "スタイルのプロパティは空にできません"
+import_source_required = "旧形式のインポート元は空にできません"
+import_source_unknown = "不明な旧形式のインポート元: {source}"
+
+[gloss.message]
+permission_denied = "&8[&dGloss&8]: &c権限 &f{permission}&c がありません."
+unknown_command = "&8[&dGloss&8]: &c不明なコマンド \"&f{command}&c\"."
+
+[gloss.message.hologram]
+created = "&8[&dGloss&8]: &a現在位置に、ルートメニュー &f{menu}&a を使用するホログラム &f{hologram}&a を作成しました。"
+already_exists = "&8[&dGloss&8]: &c&f{hologram}&c という名前のホログラム、パネル、またはメニューは既に存在します。"
+failed = "&8[&dGloss&8]: &cホログラム &f{hologram}&c を作成できませんでした。変更は保存されていません。"
+durability_uncertain = "&8[&dGloss&8]: &eホログラム &f{hologram}&e のトランザクションを安全に完了できませんでした。確認または再試行する前に Gloss を再起動してください。"
+
+[gloss.message.menu]
+none = "&8[&dGloss&8]: &7利用可能なメニューはありません."
+player_only = "&8[&dGloss&8]: &cメニューを開けるのはプレイヤーだけです."
+no_previous = "&8[&dGloss&8]: &c前のメニューはありません."
+closed = "&8[&dGloss&8]: &aメニューを閉じました."
+moved = "&8[&dGloss&8]: &aメニューを移動しました。"
+none_open = "&8[&dGloss&8]: &c現在開いているメニューはありません."
+unavailable = "&8[&dGloss&8]: &c\"{menu}\"は利用できません."
+permission_denied = "&8[&dGloss&8]: &c\"{menu}\"を開く権限がありません."
+open_failed = "&8[&dGloss&8]: &cメニュー\"{menu}\"を開けませんでした."
+
+[gloss.message.menu.list]
+header = "メニュー"
+entry = "クリックすると {menu} が開きます。"
+
+[gloss.message.menu.content]
+updated = "&8[&dGloss&8]: &aメニュー &f{menu}&a に {operation} を適用しました。リビジョン: {revision}。"
+created = "&8[&dGloss&8]: &aメニュー &f{menu}&a をリビジョン {revision} で作成しました。/gloss menu open {menu} で開くか、/gloss panel create {menu} で配置できます。"
+copied = "&8[&dGloss&8]: &aメニュー &f{source}&a を &f{menu}&a にコピーしました。リビジョン: {revision}。"
+revision_conflict = "&8[&dGloss&8]: &c書き込み中にメニュー &f{menu}&c が変更されました（想定 {expected}、現在 {actual}）。コマンドを再実行してください。"
+already_exists = "&8[&dGloss&8]: &cメニュー &f{menu}&c は既に存在します。"
+invalid = "&8[&dGloss&8]: &c無効なメニュー内容の値: &f{reason}&c。"
+failed = "&8[&dGloss&8]: &cメニュー &f{menu}&c の内容操作に失敗しました: {reason}"
+
+[gloss.message.command]
+player_only = "&8[&dGloss&8]: &cこのコマンドはプレイヤーのみ使用できます."
+
+[gloss.message.web]
+header = "Web エディター"
+open_hover = "クリックして Gloss の Web エディターを開きます。"
+open = "&8[&dGloss&8]: &7Web エディター: &f{url}&7"
+preparing = "&8[&dGloss&8]: &7&f{subject}&7 の安全なエディター同期セッションを準備しています..."
+unavailable = "&8[&dGloss&8]: &cライブ Web 編集は利用できません。エディター同期の設定と中継サーバーへの接続を確認してください。"
+open_failed = "&8[&dGloss&8]: &cライブ Web エディターで &f{kind}&c=&f{subject}&c を開けませんでした: {reason}"
+open_console = "&8[&dGloss&8]: &7&f{subject}&7 の編集権限リンク: &f{url}&7"
+capability_warning = "&8[&dGloss&8]: &eこの URL は失効または期限切れまでサーバーに変更を公開できます。秘密として扱ってください。"
+open_label = "エディターを開く"
+copy_label = "リンクをコピー"
+revoke_label = "失効させる"
+link_hover = "エディターを開く、編集権限リンクをコピーする、またはセッション {session} を失効させます。"
+
+[gloss.message.web.sessions]
+list_empty = "&8[&dGloss&8]: &7有効なエディター同期セッションはありません。"
+status = "&8[&dGloss&8]: &7&f{session}&7 {kind}=&f{subject}&7 有効期限=&f{seconds}&7秒 公開リビジョン=&f{revision}&7 保留=&f{pending}&7"
+revoked = "&8[&dGloss&8]: &aエディター同期セッション &f{session}&a を失効させました。"
+pulled = "&8[&dGloss&8]: &aエディター同期セッション &f{session}&a を照会しました。"
+unknown = "&8[&dGloss&8]: &cエディター同期セッション &f{session}&c は不明または期限切れです。"
+failed = "&8[&dGloss&8]: &cセッション &f{session}&c のエディター同期操作に失敗しました: {reason}"
+
+[gloss.message.import]
+preview_started = "&8[&dGloss&8]: &7変更を加えずに移行をプレビューするため、&f{source}&7 を走査しています..."
+apply_started = "&8[&dGloss&8]: &7&f{source}&7 を走査し、上書きせずに移行しています..."
+source_missing = "&8[&dGloss&8]: &7&f{path}&7 に &f{source}&7 の移行元が見つかりません。"
+preview_summary = "&8[&dGloss&8]: &7&f{source}&7 のプレビュー: 準備完了 &a{ready}&7、再開可能 &d{resume}&7、競合 &e{conflicts}&7、エラー &c{errors}&7、警告 {warnings}。移行元: &f{path}&7"
+preview_entry = "&8- &7&f{legacy}&7 -> &f{board}&7 状態=&f{state}&7 警告=&f{warnings}&7"
+apply_summary = "&8[&dGloss&8]: &7&f{source}&7 の移行: インポート &a{imported}&7、スキップ &e{skipped}&7、失敗 &c{failed}&7。走査でエラー {errors} 件、警告 {warnings} 件が報告されました。"
+apply_entry = "&8- &7&f{legacy}&7 状態=&f{state}&7 理由=&f{reason}&7"
+issue = "&8- &f{legacy} &7{severity}: &f{reason}"
+busy = "&8[&dGloss&8]: &c別の旧形式ホログラムの移行が実行中です。"
+failed = "&8[&dGloss&8]: &c&f{source}&c からの旧形式ホログラムの移行に失敗しました: {reason}"
+
+[gloss.message.config]
+reloaded = "&2設定 \"{name}\" を再読み込みしました."
+
+[gloss.message.hotload]
+singular = "&2{kinds} をホットリロードしました（変更 {count} 件）."
+plural = "&2{kinds} をホットリロードしました（変更 {count} 件）."
+
+[gloss.message.preview_scale]
+adjusting = "&7プレビューサイズ: &f{percent}% &8- &7スニークを押しながらスクロールで変更、スニークをダブルタップ押して保存"
+hidden = "&7プレビューは&c非表示 &8- &7上にスクロールして復元"
+size = "&7プレビューサイズ: &f{percent}%"
+saved_hidden = "&7プレビューを&c非表示で保存 &8- &7コンテナ上でスニークをダブルタップ押して上にスクロールすると復元"
+saved = "&7プレビューサイズを保存: &f{percent}%"
+
+[gloss.message.drops]
+bundle_more = "他 {count} 種"
+
+[gloss.message.items]
+disabled = "&8[&dGloss&8]: &7カスタムアイテムは無効です。gloss.toml の customItems を true に設定してください。"
+
+[gloss.message.items.status]
+header = "カスタムアイテム"
+summary = "有効なプロバイダー: {active}/{total}"
+entry = "プラグイン {plugin} のプロバイダー {provider}。"
+hint = "クリックして Web エディター用のカタログをエクスポートします。"
+
+[gloss.message.items.state]
+ready = "準備完了、ID {count} 件"
+loading = "検出済み、読み込み中"
+inactive = "検出済み、アダプターなし"
+missing = "未インストール"
+
+[gloss.message.items.export]
+started = "&8[&dGloss&8]: &7カスタムアイテムのカタログをエクスポートしています..."
+done = "&8[&dGloss&8]: &a{providers} 個のプロバイダーから {count} 個のアイテムを &f{path}&a に書き込みました。"
+empty = "&8[&dGloss&8]: &7カスタムアイテムが見つかりません。空のカタログを &f{path}&7 に書き込みました。"
+failed = "&8[&dGloss&8]: &cカスタムアイテムのカタログを書き込めませんでした。ログを確認してください。"
+busy = "&8[&dGloss&8]: &cカタログのエクスポートが既に実行中です。"
+
+[gloss.message.previews.list]
+header = "プレビュードキュメント"
+empty = "&7読み込まれたプレビュードキュメントはありません。"
+entry = "ブロック={blocks} エンティティ={entities} 特殊={special} 優先度={priority}"
+
+[gloss.message.previews.reset]
+started = "&8[&dGloss&8]: &7プレビュードキュメント「&f{name}&7」をリセットしています..."
+done = "&8[&dGloss&8]: &a同梱のプレビュードキュメント {count} 件を復元しました。それらを上書き表示する追加のユーザードキュメントは削除していません。"
+none = "&8[&dGloss&8]: &c「{name}」は同梱のプレビュードキュメントではありません。リセットしませんでした。"
+
+[gloss.message.previews.dump]
+unknown = "&8[&dGloss&8]: &c「{name}」は読み込まれたプレビュードキュメントではありません。"
+result = "&8[&dGloss&8]: &7&a{name}&7: 要素 &f{total}&7 個（パネル={panels}、セル={cells}、スロット={slots}、ラベル={labels}）。"
+no_errors = "&8[&dGloss&8]: &aビルドエラーはありません。"
+error_line = "&8[&dGloss&8]: &c{message}"
+error_more = "&8[&dGloss&8]: &7ほか {count} 件（コンソールログを参照）。"
+
+[gloss.message.panels]
+created = "&8[&dGloss&8]: &aパネル &f{board}&a をリビジョン {revision} で作成しました。"
+deleted = "&8[&dGloss&8]: &aパネル &f{board}&a を削除しました。"
+renamed = "&8[&dGloss&8]: &a&f{oldBoard}&a を &f{board}&a に改名しました。リビジョン: {revision}。"
+copied = "&8[&dGloss&8]: &a&f{source}&a を &f{board}&a にコピーしました。"
+updated = "&8[&dGloss&8]: &a&f{board}&a に {operation} を適用しました。リビジョン: {revision}。"
+teleported = "&8[&dGloss&8]: &a&f{board}&a にテレポートしました。"
+unknown = "&8[&dGloss&8]: &c不明なパネル &f{board}&c。"
+already_exists = "&8[&dGloss&8]: &cパネル &f{board}&c は既に存在します。"
+invalid = "&8[&dGloss&8]: &c無効なパネルの値: &f{reason}&c。"
+menu_unavailable = "&8[&dGloss&8]: &cルートメニュー &f{menu}&c が読み込まれていません。"
+player_unavailable = "&8[&dGloss&8]: &c対象プレイヤー &f{player}&c はオンラインではありません。"
+world_unavailable = "&8[&dGloss&8]: &c保存された UUID のパネルワールド &f{world}&c が読み込まれていません。"
+revision_conflict = "&8[&dGloss&8]: &c編集中にパネル &f{board}&c が変更されました（想定 {expected}、現在 {actual}）。編集セッションを開き直してください。"
+failed = "&8[&dGloss&8]: &cパネル &f{board}&c の操作に失敗しました: {reason}"
+
+[gloss.message.panels.list]
+header = "&8[&dGloss&8]: &f永続パネル: &d{count}&f"
+empty = "&8[&dGloss&8]: &7読み込まれた永続パネルはありません。"
+entry = "&8- &7&f{board}&7 メニュー=&f{menu}&7 リビジョン=&f{revision}&7"
+
+[gloss.message.panels.near]
+header = "&8[&dGloss&8]: &f&d{radius}&f ブロック以内のパネル: &d{count}&f"
+empty = "&8[&dGloss&8]: &7この半径内にパネルはありません。"
+entry = "&8- &7&f{board}&7 距離=&f{distance}&7 メニュー=&f{menu}&7"
+
+[gloss.message.panels.info]
+header = "&8[&dGloss&8]: &fパネル &d{board}&f（&7{state}&f）"
+identity = "&7UUID=&f{uuid}&7 リビジョン=&f{revision}&7 メニュー=&f{menu}&7"
+transform = "&7ワールド=&f{world}&7 位置=&f{x}&7, &f{y}&7, &f{z}&7 回転=&f{yaw}&7, &f{pitch}&7, &f{roll}&7 倍率=&f{scale}&7"
+visibility = "&7可視性=&f{mode}&7 表示権限=&f{viewPermission}&7 操作権限=&f{interactPermission}&7 範囲=&f{viewRange}&7/&f{interactionRange}&7"
+follow = "&7追従=&f{mode}&7 プレイヤー=&f{player}&7 回転=&f{rotation}&7"
+
+[gloss.message.panels.edit]
+started = "&8[&dGloss&8]: &aリビジョン {revision} から &f{board}&a を編集しています。変更は保存するまで保留されます。"
+already_active = "&8[&dGloss&8]: &c既に &f{board}&c を編集中です。先に保存またはキャンセルしてください。"
+none = "&8[&dGloss&8]: &c保留中のパネル編集はありません。"
+busy = "&8[&dGloss&8]: &cパネル &f{board}&c は現在保存中です。"
+staged = "&8[&dGloss&8]: &a&f{board}&a の {operation} を保留しました。/gloss panel save で保存してください。"
+saved = "&8[&dGloss&8]: &a&f{board}&a をリビジョン {revision} で保存しました。"
+cancelled = "&8[&dGloss&8]: &a&f{board}&a の保留中の編集をキャンセルしました。"
+identity_blocked = "&8[&dGloss&8]: &c&f{board}&c を改名または削除する前に、保留中の編集を保存またはキャンセルしてください。"
+
+[gloss.preview.state]
+idle = "待機"
+brewing = "醸造中 {percent}%"
+needs_blaze_powder = "ブレイズパウダーが必要"
+waiting = "待機中"
+no_ingredient = "材料なし"
+empty = "空"
+smelting_item = "{item}を精錬中 {percent}%"
+smelting = "精錬中 {percent}%"
+blasting_item = "溶鉱炉で{item}を精錬中 {percent}%"
+blasting = "溶鉱炉で精錬中 {percent}%"
+smoking_item = "{item}を燻製中 {percent}%"
+smoking = "燻製中 {percent}%"
+heating = "加熱中"
+needs_fuel = "燃料が必要"
+no_input = "入力なし"
+surge_suffix = "  +{seconds}s"
+disc_playing = "再生中: {disc}"
+disc_loaded = "セット済み: {disc}"
+no_disc = "レコードなし"
+
+[gloss.preview.stat]
+fuel_level = "燃料 {fuel}/{maximum}"
+no_fuel = "燃料なし"
+bottles = "瓶 {bottles}/{maximum}"
+fuel_seconds = "燃料 {seconds}s"
+fuel_ready = "燃料準備完了"
+xp_gain = "XP +{experience}"
+xp_zero = "XP 0"
+bees_and_honey = "ミツバチ {bees}/{maximumBees}   ハチミツ {honey}/{maximumHoney}"
+cauldron_empty = "空 {level}/{maximum}"
+cauldron_level = "レベル {level}/{maximum}"
+
+[gloss.preview.theme.title]
+chest = "&6&lチェスト"
+trapped_chest = "&c&lトラップチェスト"
+ender_chest = "&5&lエンダーチェスト"
+barrel = "&e&l樽"
+dispenser = "&7&lディスペンサー"
+dropper = "&8&lドロッパー"
+hopper = "&8&lホッパー"
+furnace = "&6&lかまど"
+smoker = "&e&l燻製器"
+blast_furnace = "&b&l溶鉱炉"
+beehive = "&e&l養蜂箱"
+bee_nest = "&e&lミツバチの巣"
+cauldron = "&7&l大釜"
+water_cauldron = "&9&l水入りの大釜"
+lava_cauldron = "&6&l溶岩入りの大釜"
+powder_snow_cauldron = "&f&l粉雪入りの大釜"
+jukebox = "&d&lジュークボックス"
+brewing_stand = "&d&l醸造台"
+chiseled_bookshelf = "&6&l模様入りの本棚"
+hopper_minecart = "&8&lホッパー付きのトロッコ"
+chest_minecart = "&6&lチェスト付きのトロッコ"
+mobile = "&7&l{name}"
+shulker = "&l{color} シュルカーボックス"
+copper_chest = "&6&l{name}"
+shelf = "&6&l{name}"
+container = "&6&lコンテナ"
+
+[language.menu]
+your_language = "あなたの言語"
+reset_your_language = "自分の言語をリセット"
+server_default = "サーバーのデフォルト"
+edit_messages = "言語メッセージを編集"
+use_server_default = "サーバーのデフォルトを使用"
+current = "現在: {locale}"
+current_with_personal = "現在: {locale} (あなた: {personal})"
+your_description = "表示されるメッセージだけを変更します。"
+reset_description = "サーバーのデフォルト言語を使用します。"
+server_description = "サーバーのデフォルト言語を変更します。"
+edit_description = "言語ごとのメッセージエディターを開きます。"
+select_description = "クリックしてこの言語を選択します。"
+remove_personal_description = "個人の言語選択を削除します。"
+no_controls = "利用できる言語設定はありません。"
+command = "コマンド: {command}"
+selected = "選択済み"
+all-volmit-plugins = "すべてのVolmitプラグイン"
+
+[language.error]
+stopping = "プラグインを停止している間は言語を選択できません。"
+editor-player-only = "ゲーム内で言語エディターを開いてください。"
+no-providers = "利用できるVolmit言語プロバイダーがありません。"
+numeric-page = "ページ番号を数字で入力してください。"
+personal-player-only = "プレイヤーの個人言語はゲーム内で選択してください。"
+personal-permission = "個人言語を選択する権限がありません。"
+plugin-personal-permission = "{plugin}の個人言語を選択する権限がありません。"
+plugin-server-permission = "{plugin}のサーバー言語を変更する権限がありません。"
+server-locale-required = "サーバーの既定の言語としてen_USなどの言語コードを選択してください。"
+unavailable-for-all = "選択したすべてのプラグインで言語{locale}を利用できるわけではありません。"
+
+[language.usage]
+editor = "使い方: /{command} language server edit [locale]"
+selection = "使い方: /{command} language self [locale|reset] or server [locale]"
+volmit-selection = "使い方: /volmit plugins languages [locale]"
+
+[language.selection]
+preparing = "{target}の言語{locale}を準備しています..."
+save-failed = "{plugin}: 言語の選択を保存できませんでした。サーバーコンソールを確認してください。"
+english-fallback = "{plugin}: {locale}は利用できないため、英語（en_US）を使用します。"
+personal-selected = "{plugin}: 個人言語を{locale}に変更しました。"
+server-selected = "{plugin}: サーバー言語を{locale}に変更しました。"
+server-default-selected = "{plugin}: 個人言語はサーバーの既定の言語に従うようになりました。"
+
+[language.editor]
+loading = "{locale}のメッセージを読み込んでいます..."
+
+[language.editor.section]
+languages = "言語"
+search = "検索"
+search-title = "{locale} / 検索"
+group-title = "{locale} / {group}"
+
+[language.editor.prompt]
+search = "メッセージキーまたは本文を検索してください。cancelと入力すると戻ります。"
+value = "{key}の新しい値をチャットに入力してください。"
+current = "現在の値: {value}"
+variables = "変数: {variables}"
+guidance = "改行には\\n、バックスラッシュには\\\\を使ってください。cancelと入力すると戻ります。"
+
+[language.editor.input]
+expired = "言語エディターの入力時間が切れました。"
+too-long = "入力は{maximum}文字以内にしてください。"
+unable-to-save = "保存できませんでした: {reason}"
+
+[language.editor.navigation]
+back = "&e戻る&r"
+close = "&c閉じる&r"
+previous-page = "&e前のページ&r"
+next-page = "&e次のページ&r"
+
+[language.editor.search]
+messages = "メッセージを検索"
+messages-lore = "クリックしてすべてのメッセージを検索します。"
+clear = "検索をクリア"
+
+[language.editor.message]
+current-value = "&7現在の値:&r"
+variables = "&8{variables}&r"
+edit-plural = "&7クリックして複数形を編集します。&r"
+edit-lines = "&7クリックして各行を編集します。&r"
+edit-chat = "&7クリックしてチャットで編集します。&r"
+
+[language.editor.locale]
+open = "&8クリックしてこの言語を開きます。&r"
+
+[language.editor.category]
+message-count = "&7{count}件のメッセージ&r"
+open = "&8クリックしてこのグループを開きます。&r"
+
+[language.editor.error]
+no-permission = "{plugin}の言語を編集する権限がありません。"
+unable-to-edit = "編集できませんでした: {reason}"
+
+[language.editor.saved]
+summary = "{locale}を保存しました。言語の選択は変更されていません。"
+change = "{key}: 「{before}」を「{after}」に変更しました。"
+
+[language.editor.part]
+line = "行{line}"
+
+[language.editor.value]
+none = "なし"
+empty = "(空)"

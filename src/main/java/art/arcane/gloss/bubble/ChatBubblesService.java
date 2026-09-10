@@ -309,16 +309,12 @@ public final class ChatBubblesService implements Listener {
         TemporaryHologram hologram = null;
         BubbleRecord record = null;
         try {
-            hologram = plugin.holograms().createTemporary(id, captured.clone(), style.maxAliveMs());
+            hologram = plugin.holograms().createTemporary(id, captured.clone(), style.maxAliveMs(),
+                viewer -> (!style.hideOwn() || !senderId.equals(viewer.getUniqueId()))
+                    && viewer.canSee(sender) && style.show().matches(plugin, viewer));
             hologram.setStyle(style.style());
             hologram.setBox(style.box());
-            if (!style.show().isAlwaysVisible()) {
-                plugin.holograms().setViewerCondition(hologram, viewer -> style.show().matches(plugin, viewer));
-            }
             hologram.setParticleLayers(style.particleLayers());
-            if (style.hideOwn()) {
-                hologram.viewers().add(senderId);
-            }
 
             record = new BubbleRecord(hologram, captured, offset, resolved.motion(), resolved.shimmer(),
                 style.followPlayer(), startedAtMs, style.maxAliveMs(), startedAtMs + style.maxAliveMs(), lines.size(),

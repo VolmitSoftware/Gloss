@@ -1,0 +1,828 @@
+# Gloss — tr_TR
+#
+# === Dosyayı düzenleme ===
+# plugins/Gloss/languages/tr_TR.toml
+# Bu dosyayı doğrudan düzenleyebilirsiniz. Yerel değişiklikler korunur; eksik veya geçersiz girdiler yerleşik İngilizce metni kullanır.
+# /gloss language server edit tr_TR
+#
+# === Önek ===
+# &8[&dGloss&8] öneki her iletinin içindedir: ilgili iletilerde ayrı ayrı düzenleyin.
+#
+# === Biçimlendirme ===
+# Renkler: &0-&f, &k-&r, &#RRGGBB.
+#
+# === Değişkenler ===
+# Değişken adlarını değiştirmeyin ve yalnızca ilgili iletinin değişkenlerini kullanın.
+#   {absorbed}  Mevcut verilerle birleştirilen içe aktarılmış kayıtlar
+#   {active}  Etkin sağlayıcı sayısı
+#   {actual}  Geçerli belge sürümü
+#   {after}  Düzenlemeden sonraki ileti değeri
+#   {argument}  Beklenmeyen komut argümanı
+#   {axis}  Koordinat veya dönüş ekseni
+#   {bees}  Kaptaki arı sayısı
+#   {before}  Düzenlemeden önceki ileti değeri
+#   {billboard}  Görüntülenen nesnenin bakış yönü modu
+#   {blocks}  Blok gösterim öğesi sayısı
+#   {board}  Pano veya panel kimliği
+#   {bottles}  Kaptaki şişe sayısı
+#   {bubbles}  Etkin sohbet balonu sayısı
+#   {cells}  Menü hücresi sayısı
+#   {color}  Görüntülenen nesnenin veya eşyanın rengi
+#   {command}  Komut yolu
+#   {conflicts}  İçe aktarma çakışması sayısı
+#   {copied}  Kopyalanan kayıt sayısı
+#   {count}  Eşleşen nesne veya ileti sayısı
+#   {disc}  Kaptaki müzik diski
+#   {distance}  Hedefe uzaklık
+#   {drops}  Görüntülenen düşmüş eşya sayısı
+#   {enabled}  Etkinlik durumu veya etkin kayıt sayısı
+#   {entities}  Varlık sayısı
+#   {error}  Doğrulama veya işlem hatası
+#   {errors}  Hata sayısı
+#   {expected}  Düzenleme kaydedilirken beklenen sürüm
+#   {experience}  Kazanılan deneyim
+#   {failed}  Başarısız işlem sayısı
+#   {from}  Kaynak değer veya aralığın başlangıcı
+#   {fuel}  Kapta kalan yakıt
+#   {group}  Dil düzenleyicisi kategorisi
+#   {hologram}  Hologram kimliği
+#   {honey}  Geçerli bal seviyesi
+#   {id}  Nesne kimliği
+#   {imported}  İçe aktarılan kayıt sayısı
+#   {indicators}  Hasar göstergesi sayısı
+#   {interactPermission}  Etkileşim için gereken izin
+#   {interactionRange}  En yüksek etkileşim uzaklığı
+#   {item}  Eşya adı veya malzemesi
+#   {key}  İleti veya yapılandırma anahtarı
+#   {kind}  Nesne veya sağlayıcı türü
+#   {kinds}  Kullanılabilir nesne veya sağlayıcı türleri
+#   {labels}  Metin etiketi sayısı
+#   {legacy}  İçe aktarma kaynağındaki kimlik
+#   {level}  Görüntülenen seviye
+#   {limit}  İzin verilen sınır
+#   {line}  İletideki satır numarası
+#   {locale}  Dil kodu
+#   {maximum}  İzin verilen en yüksek değer
+#   {maximumBees}  En yüksek arı sayısı
+#   {maximumHoney}  En yüksek bal seviyesi
+#   {menu}  Menü kimliği
+#   {message}  Geri bildirim veya tanılama iletisi
+#   {migrated}  Dönüştürülen kayıt sayısı
+#   {minimum}  İzin verilen en düşük değer
+#   {mode}  Seçilen işlem veya görüntüleme modu
+#   {name}  Nesne adı
+#   {oldBoard}  Önceki pano kimliği
+#   {operation}  İşlem adı
+#   {options}  Kullanılabilir komut seçenekleri
+#   {overlaid}  Uygulanan yapılandırma anahtarı sayısı
+#   {page}  Geçerli sayfa numarası
+#   {pages}  Toplam sayfa sayısı
+#   {panels}  Panel sayısı
+#   {parameter}  Komut parametresinin adı
+#   {path}  Dosya veya dizin yolu
+#   {pending}  Bekleyen yayımlamanın durumu
+#   {percent}  Yüzde değeri
+#   {permission}  Gereken izin
+#   {personal}  Kişisel dil kodu
+#   {pitch}  Derece cinsinden dikey açı
+#   {player}  Oyuncu adı
+#   {plugin}  Eklenti adı
+#   {priority}  Seçim veya görüntüleme önceliği
+#   {provider}  Sağlayıcı adı
+#   {providers}  Sağlayıcı listesi veya sayısı
+#   {radius}  Arama yarıçapı
+#   {ready}  İçe aktarılmaya hazır kayıt sayısı
+#   {reason}  Hatanın veya kararın nedeni
+#   {resume}  İçe aktarımı sürdürülebilecek kayıt sayısı
+#   {revision}  Belge sürümü
+#   {roll}  Derece cinsinden yatış açısı
+#   {rotation}  Görüntülenen nesnenin dönüşü
+#   {scale}  Görüntüleme veya önizleme ölçeği
+#   {seconds}  Saniye cinsinden süre
+#   {session}  Düzenleyici oturum kimliği
+#   {severity}  Tanılama iletisinin önem düzeyi
+#   {skipped}  Atlanan kayıt sayısı
+#   {slots}  Eşya yuvası sayısı
+#   {source}  İçe aktarma kaynağı veya yapılandırma sağlayıcısı
+#   {special}  Özel gösterim öğesi sayısı
+#   {state}  Geçerli durum
+#   {style}  Görüntüleme stili
+#   {subject}  Web düzenleyicisi oturumunun konusu
+#   {target}  Dil seçiminin uygulanacağı eklenti
+#   {temporary}  Geçici nesne sayısı
+#   {text}  Görüntülenen metin
+#   {title}  Görüntülenen başlık
+#   {to}  Hedef değer veya aralığın sonu
+#   {total}  Toplam kayıt sayısı
+#   {type}  Beklenen değer veya nesne türü
+#   {url}  Web adresi
+#   {usage}  Komut sözdizimi
+#   {uuid}  Benzersiz nesne veya oyuncu kimliği
+#   {value}  İletinin veya parametrenin geçerli değeri
+#   {variables}  İletide izin verilen değişkenler
+#   {variants}  Görüntüleme çeşidi sayısı veya listesi
+#   {viewPermission}  Görmek için gereken izin
+#   {viewRange}  En yüksek görüş uzaklığı
+#   {warnings}  Uyarı sayısı
+#   {when}  Görüntüleme koşulu
+#   {world}  Dünya adı
+#   {x}  X koordinatı
+#   {y}  Y koordinatı
+#   {yaw}  Derece cinsinden yatay açı
+#   {z}  Z koordinatı
+
+[command.help]
+debug = "Tanılama komutları"
+debugdump = "Tanılama raporu oluştur ve isteğe bağlı olarak yükle"
+debugdump_upload = "Raporu mclo.gs üzerine yükle"
+root = "Gloss komut grubu"
+hologram = "Hologram oluştur ve yönet"
+"hologram.create" = "Bulunduğunuz konumda bir hologram oluştur"
+"hologram.create.id" = "Benzersiz hologram ID'si"
+"hologram.delete" = "Bir hologramı sil"
+"hologram.delete.id" = "Silinecek hologram ID'si"
+"hologram.addline" = "Bir hologramın sonuna satır ekle"
+"hologram.addline.id" = "Hologram ID'si"
+"hologram.addline.text" = "Satır metni; boşluk içerecekse tırnak içine al"
+"hologram.setline" = "Bir hologram satırını değiştir"
+"hologram.setline.id" = "Hologram ID'si"
+"hologram.setline.line" = "Satır numarası, 1'den başlar"
+"hologram.setline.text" = "Satır metni; boşluk içerecekse tırnak içine al"
+"hologram.removeline" = "Bir hologram satırını kaldır"
+"hologram.removeline.id" = "Hologram ID'si"
+"hologram.removeline.line" = "Satır numarası, 1'den başlar"
+"hologram.clear" = "Bir hologramdaki tüm satırları kaldır"
+"hologram.clear.id" = "Hologram ID'si"
+"hologram.movehere" = "Bir hologramı bulunduğunuz konuma taşı"
+"hologram.movehere.id" = "Hologram ID'si"
+"hologram.move" = "Bir hologramı göreli blok mesafeleriyle kaydır"
+"hologram.move.id" = "Hologram ID'si"
+"hologram.move.x" = "Blok cinsinden göreli X kaydırması"
+"hologram.move.y" = "Blok cinsinden göreli Y kaydırması"
+"hologram.move.z" = "Blok cinsinden göreli Z kaydırması"
+"hologram.tp" = "Bir holograma ışınlan"
+"hologram.tp.id" = "Hologram ID'si"
+"hologram.list" = "Hologramları listele; ışınlanmak için birine tıkla"
+"hologram.info" = "Bir hologramın konumunu ve satırlarını göster"
+"hologram.info.id" = "Hologram ID'si"
+"hologram.rendertext" = "Yerel ölçeklendirmeli bir metin hologramı oluştur"
+"hologram.rendertext.id" = "Benzersiz hologram ID'si"
+"hologram.rendertext.text" = "Gösterilecek metin; boşluk içeriyorsa tırnak içine al"
+"hologram.rendertext.scale" = "TextDisplay ölçek çarpanı"
+"hologram.orient" = "Bir hologramın izleyiciye nasıl döneceğini ayarla"
+"hologram.orient.id" = "Hologram ID'si"
+"hologram.orient.billboard" = "CENTER, VERTICAL, HORIZONTAL veya FIXED"
+"hologram.orient.yaw" = "Yatay dönüş (yaw), derece cinsinden -180 ile 180 arası"
+"hologram.orient.pitch" = "Dikey dönüş (pitch), derece cinsinden -90 ile 90 arası"
+board = "Skor tahtası oluştur ve yönet"
+"board.create" = "Bir skor tahtası oluştur"
+"board.create.id" = "Benzersiz skor tahtası ID'si"
+"board.delete" = "Bir skor tahtasını sil"
+"board.delete.id" = "Silinecek skor tahtası ID'si"
+"board.title" = "Bir skor tahtasının başlığını ayarla"
+"board.title.id" = "Skor tahtası ID'si"
+"board.title.text" = "Başlık metni; boşluk içerecekse tırnak içine al"
+"board.addline" = "Bir skor tahtasının sonuna satır ekle"
+"board.addline.id" = "Skor tahtası ID'si"
+"board.addline.text" = "Satır metni; boşluk içerecekse tırnak içine al"
+"board.setline" = "Bir skor tahtası satırını değiştir"
+"board.setline.id" = "Skor tahtası ID'si"
+"board.setline.line" = "Satır numarası, 1'den başlar"
+"board.setline.text" = "Satır metni; boşluk içerecekse tırnak içine al"
+"board.removeline" = "Bir skor tahtası satırını kaldır"
+"board.removeline.id" = "Skor tahtası ID'si"
+"board.removeline.line" = "Satır numarası, 1'den başlar"
+"board.show" = "Bir skor tahtasını kendine göster"
+"board.show.id" = "Skor tahtası ID'si"
+"board.hide" = "Skor tahtanızı gizle"
+"board.select" = "Otomatik skor tablosu seçimini ayarla"
+"board.select.id" = "Skor tablosu kimliği"
+"board.select.priority" = "Seçim önceliği"
+"board.select.when" = "Mantıksal koşul; boşluk içeren ifadeleri tırnak içine alın"
+"board.list" = "Skor tahtalarını listele"
+"board.info" = "Bir skor tahtasının başlığını, satırlarını ve ayarlarını göster"
+"board.info.id" = "Skor tahtası ID'si"
+"board.reset" = "Yerleşik skor tahtası varsayılanlarını geri yükle"
+emoji = "Emoji sohbet araçları"
+"emoji.list" = "Etkin emojileri listele; sohbete eklemek için birine tıkla"
+"emoji.reset" = "Yerleşik emoji varsayılanlarını geri yükle"
+animations = "Animasyon araçları"
+"animations.list" = "Animasyon adlarını listele"
+"animations.reset" = "Yerleşik animasyon varsayılanlarını geri yükle"
+bubbles = "Sohbet balonu stilleri"
+"bubbles.style" = "Sohbet balonu stilini seç; otomatik seçim için clear kullan"
+"bubbles.style.style" = "Stil ID'si veya clear"
+"bubbles.reset" = "Yerleşik balon stili varsayılanlarını geri yükle"
+tablist = "Tab listesi araçları"
+"tablist.reset" = "Yerleşik tab listesi belgesini geri yükle"
+motd = "MOTD araçları"
+"motd.reset" = "Yerleşik MOTD belgesini geri yükle"
+drops = "Yere düşen eşya gösterimi araçları"
+"drops.reset" = "Yerleşik yere düşen eşya ayarları belgesini geri yükle"
+indicators = "Hasar ve iyileştirme göstergesi araçları"
+"indicators.reset" = "Yerleşik hasar göstergesi ayarları belgesini geri yükle"
+status = "Kısa çalışma zamanı sayımlarını göster"
+import = "Eski hologramları kaynak dosyaları değiştirmeden taşı"
+"import.apply" = "Üzerine yazmayan bir eski hologram taşımasını uygula"
+"import.holoui" = "HoloUi verilerini plugins/holoui klasöründen kopyala; önceki içe aktarmaların üzerine yazar"
+"import.legacy" = "Birleşme öncesi Gloss veri dosyalarını v2 zarflarına taşı"
+"import.preview" = "Yıkıcı olmayan bir eski hologram taşımasını önizle"
+item = "Özel eşya sağlayıcı araçları"
+"item.export" = "Özel eşya kataloğunu web editörü için dışa aktar"
+"item.status" = "Hangi özel eşya sağlayıcılarının etkin olduğunu göster"
+menu = "Hologram menüleri oluştur, aç ve düzenle"
+"menu.addrow" = "Sona bir metin süsleme satırı ekle"
+"menu.back" = "Önceki menü oturumunu yeniden aç"
+"menu.close" = "Geçerli menü oturumunu kapat"
+"menu.copy" = "Yüklü bir menüyü yeni bir iç içe ID'ye kopyala"
+"menu.create" = "Mevcut konumunuzda kalıcı bir hologram oluşturun"
+"menu.image" = "Menü içeriğini ortalanmış tek bir görsel dosyasıyla değiştir"
+"menu.insertrow" = "Araya bir metin süsleme satırı ekle"
+"menu.list" = "Açabileceğiniz tüm yapılandırılmış menüleri listele"
+"menu.move" = "Açık menüyü mevcut konumuna taşı"
+"menu.new" = "Yerleşik taban şablonundan boş bir hologram menüsü oluştur"
+"menu.offsetrow" = "Bir satırı mutlak veya ~göreli kaydırmalarla taşı"
+"menu.open" = "Menüyü ID ile aç; * tüm menüleri gösterir"
+"menu.removerow" = "Bir bileşen satırını kaldır"
+"menu.seticon" = "Bir düğme veya süsleme satırı simgesini değiştir"
+"menu.setrow" = "Bir düğme veya süsleme satırının metnini ayarla"
+"menu.style" = "Bir satırın görüntüleme stili özelliğini ayarla veya temizle"
+panel = "Kalıcı dünya paneli araçları"
+"panel.addrow" = "Bir panelin kök menüsünün sonuna metin satırı ekle"
+"panel.align" = "Bir panelin konum eksenlerini başka bir panele hizala"
+"panel.cancel" = "Taslak panel düzenlemenizi iptal et"
+"panel.copy" = "Kalıcı bir paneli yeni bir ID ile kopyala"
+"panel.create" = "Mevcut konumunuzda bir panel oluştur"
+"panel.delete" = "Kalıcı bir paneli sil"
+"panel.edit" = "Taslak panel düzenleme oturumu başlat"
+"panel.follow" = "Çevrimiçi bir oyuncuyu fixed, yaw veya full dönüşüyle takip et"
+"panel.here" = "Bir paneli mevcut konumunuza taşı"
+"panel.image" = "Panel kök menüsünü ortalanmış tek bir görsel dosyasıyla değiştir"
+"panel.info" = "Bir panelin tüm durumunu göster"
+"panel.insertrow" = "Bir panelin kök menüsünde araya metin satırı ekle"
+"panel.list" = "Kalıcı panelleri sayfa sayfa listele"
+"panel.menu" = "Bir panelin kök menüsünü ayarla"
+"panel.move" = "Bir paneli mutlak veya ~göreli koordinatlara taşı"
+"panel.near" = "Mevcut konumunuzun yakınındaki panelleri listele"
+"panel.offsetrow" = "Bir panel kök menü satırını mutlak veya ~göreli kaydırmalarla taşı"
+"panel.permissions" = "Panel görüntüleme ve etkileşim izinlerini değiştir"
+"panel.ranges" = "Panel görüş ve etkileşim menzillerini ayarla"
+"panel.removerow" = "Bir panel kök menü satırını kaldır"
+"panel.rename" = "Kalıcı bir paneli yeniden adlandır"
+"panel.rotate" = "Mutlak veya ~göreli yaw, pitch ve roll ayarla"
+"panel.save" = "Taslak panel düzenlemenizi kaydet"
+"panel.scale" = "Mutlak veya ~göreli panel ölçeği ayarla"
+"panel.seticon" = "Panel kök menüsündeki bir satır simgesini değiştir"
+"panel.setrow" = "Bir panel kök menü satırının metnini ayarla"
+"panel.style" = "Bir satırın görüntüleme stili özelliğini ayarla veya temizle"
+"panel.teleport" = "Kalıcı bir panele ışınlan"
+"panel.unfollow" = "Bir panelin oyuncuyu takip etmesini durdur"
+"panel.visibility" = "Görünürlük modunu ve izin düğümlerini ayarla"
+preview = "Önizleme belgesi araçları"
+"preview.dump" = "Bir önizleme belgesini bir kez oluşturup öğe sayılarını yazdır"
+"preview.list" = "Önizleme belgelerini ve eşleşme kurallarını listele"
+"preview.reset" = "Yerleşik önizleme varsayılanlarını geri yükle (onları gölgeleyebilecek ek kullanıcı belgelerini kaldırmaz)"
+web = "Gloss web düzenleyicisini aç ve yönet"
+"web.open" = "Boş, barındırılan bir Gloss düzenleyicisi aç"
+"web.edit" = "Bir canlı Gloss belgesi aç"
+"web.edit.document" = "Bu canlı belgeyi web düzenleyicisinde aç"
+"web.workspace" = "Canlı Gloss çalışma alanının tamamını aç"
+"web.sessions" = "Etkin web düzenleyicisi oturumlarını yönet"
+"web.sessions.list" = "Etkin web düzenleyicisi oturumlarını listele"
+"web.sessions.pull" = "Bir web düzenleyicisi oturumunu şimdi sorgula"
+"web.sessions.revoke" = "Web düzenleyicisinin erişim bağlantısını iptal et"
+"web.sessions.status" = "Bir web düzenleyicisi oturumunu göster"
+language = "Kendi dilinizi veya sunucunun varsayılan dilini seçin"
+
+[command.help.arg]
+reset_name = "Sıfırlanacak ad veya tüm yerleşik varsayılanlar için *"
+panel_axes = "Eksenler: x, y, z, xy, xz, yz veya xyz"
+panel_follow_rotation = "Takip dönüşü: fixed, yaw veya full"
+panel_id = "Kalıcı panel ID'si"
+panel_interact_permission = "Etkileşim izni veya -"
+panel_interaction_range = "Pozitif etkileşim menzili"
+panel_menu = "Kök menü ID'si; varsayılanı panel ID'sidir"
+panel_new_id = "Yeni kalıcı panel ID'si"
+panel_pitch = "Mutlak veya ~göreli pitch"
+panel_player = "Çevrimiçi hedef oyuncu"
+panel_radius = "Yatay arama yarıçapı"
+panel_reference = "Referans panel ID'si"
+panel_roll = "Mutlak veya ~göreli roll"
+panel_root_menu = "Kök menü ID'si"
+panel_scale = "Mutlak veya ~göreli ölçek"
+panel_view_permission = "Görüntüleme izni veya -"
+panel_view_range = "Pozitif görüş menzili"
+panel_visibility = "Görünürlük modu: public, permission veya hidden"
+panel_x = "Mutlak veya ~göreli X"
+panel_y = "Mutlak veya ~göreli Y"
+panel_yaw = "Mutlak veya ~göreli yaw"
+panel_z = "Mutlak veya ~göreli Z"
+content_menu = "Yüklü menü ID'si"
+web_subject = "Canlı Gloss belgesi kimliği"
+hologram_id = "Yeni hologramın ve kök menünün ID'si"
+hologram_text = "İsteğe bağlı MiniMessage metni"
+image_path = "Gloss görseller klasörünün altındaki dosya"
+import_source = "Eski hologram kaynağı"
+menu = "Açılacak menü ID'si (* tüm menüleri gösterir)"
+new_panel_id = "Yeni kalıcı panel ID'si"
+new_menu = "Yeni iç içe menü ID'si"
+list_page = "1'den başlayan liste sayfası"
+previews_dump_name = "Oluşturulacak belge adı"
+previews_name = "Sıfırlanacak belge adı veya tüm yerleşik belgeler için *"
+row_icon_type = "Simge türü"
+row_icon_value = "Simge içeriği veya kayıt ID'si"
+row_index = "1'den başlayan bileşen satırı"
+row_style_property = "Görüntüleme stili özelliği"
+row_style_value = "Stil değeri veya temizlemek için *"
+row_text = "MiniMessage satır metni"
+row_x = "Mutlak veya ~göreli satır X"
+row_y = "Mutlak veya ~göreli satır Y"
+row_z = "Mutlak veya ~göreli satır Z"
+source_menu = "Yüklü kaynak menü ID'si"
+web_session = "Web düzenleyicisi oturum kimliği"
+
+[command.error]
+no_permission = "&8[&dGloss&8] &cİzniniz yok."
+no_permission_use = "&8[&dGloss&8] &cBu komutu kullanma izniniz yok."
+usage = "&7Kullanım: &f/{command} help"
+
+[command.hologram]
+exists = "&8[&dGloss&8] &c'&f{id}&c' hologramı zaten var."
+missing = "&8[&dGloss&8] &c'&f{id}&c' adında bir hologram yok."
+created = "&8[&dGloss&8] &a&f{id}&a hologramı oluşturuldu."
+deleted = "&8[&dGloss&8] &a&f{id}&a hologramı silindi."
+line_added = "&8[&dGloss&8] &a&f{id}&a hologramına &f{line}&a numaralı satır eklendi."
+line_set = "&8[&dGloss&8] &a&f{id}&a hologramında &f{line}&a numaralı satır ayarlandı."
+line_removed = "&8[&dGloss&8] &a&f{id}&a hologramından &f{line}&a numaralı satır kaldırıldı."
+line_out_of_range = "&8[&dGloss&8] &c{line} numaralı satır aralık dışında; &f{id}&c hologramında {count} satır var."
+cleared = "&8[&dGloss&8] &a&f{id}&a hologramındaki tüm satırlar temizlendi."
+moved = "&8[&dGloss&8] &a&f{id}&a hologramı bulunduğunuz konuma taşındı."
+offset = "&8[&dGloss&8] &a&f{id}&a hologramı &f{x}&a, &f{y}&a, &f{z}&a kadar kaydırıldı."
+teleported = "&8[&dGloss&8] &a&f{id}&a hologramına ışınlandınız."
+list_empty = "&8[&dGloss&8] &7Henüz hiç hologram yok."
+rendered = "&8[&dGloss&8] &a&f{id}&a metin hologramı &f{scale}&a ölçeğinde oluşturuldu."
+text_empty = "&8[&dGloss&8] &cMetin boş olamaz."
+scale_out_of_range = "&8[&dGloss&8] &c{value} ölçeği aralık dışında; &f{minimum}&c ile &f{maximum}&c arasında olmalı."
+oriented = "&8[&dGloss&8] &a&f{id}&a için billboard &f{billboard}&a, yaw &f{yaw}&a, pitch &f{pitch}&a olarak ayarlandı."
+billboard_unknown = "&8[&dGloss&8] &cBilinmeyen billboard '&f{billboard}&c'. Şunlardan birini kullan: &f{options}&c."
+angle_out_of_range = "&8[&dGloss&8] &c{axis} değeri {value} aralık dışında; &f-{limit}&c ile &f{limit}&c derece arasında olmalı."
+
+[command.hologram.list]
+hover = "Işınlanmak için tıklayın"
+lines = "{count} satır"
+
+[command.hologram.info]
+header = "&8[&dGloss&8] &d{id} &7konumu: &f{world} {x}, {y}, {z}"
+line = " &8{line}. &f{text}"
+orientation = " &8ölçek &f{scale} &8billboard &f{billboard} &8yaw &f{yaw} &8pitch &f{pitch}"
+
+[command.board]
+exists = "&8[&dGloss&8] &c'&f{id}&c' skor tahtası zaten var."
+missing = "&8[&dGloss&8] &c'&f{id}&c' adında bir skor tahtası yok."
+created = "&8[&dGloss&8] &a&f{id}&a skor tahtası oluşturuldu."
+deleted = "&8[&dGloss&8] &a&f{id}&a skor tahtası silindi."
+title_set = "&8[&dGloss&8] &a&f{id}&a skor tahtasının başlığı ayarlandı."
+line_added = "&8[&dGloss&8] &a&f{id}&a skor tahtasına &f{line}&a numaralı satır eklendi."
+line_set = "&8[&dGloss&8] &a&f{id}&a skor tahtasında &f{line}&a numaralı satır ayarlandı."
+line_removed = "&8[&dGloss&8] &a&f{id}&a skor tahtasından &f{line}&a numaralı satır kaldırıldı."
+line_out_of_range = "&8[&dGloss&8] &c{line} numaralı satır aralık dışında; &f{id}&c skor tahtasında {count} satır var."
+shown = "&8[&dGloss&8] &a&f{id}&a skor tahtası gösteriliyor."
+hidden = "&8[&dGloss&8] &aSkor tahtanız gizlendi."
+select_set = "&8[&dGloss&8] &a&f{id}&a skor tablosunun seçim önceliği &f{priority}&a olarak ayarlandı."
+select_invalid = "&8[&dGloss&8] &cGeçersiz skor tablosu koşulu: &f{error}&c."
+list_empty = "&8[&dGloss&8] &7Henüz hiç skor tahtası yok."
+
+[command.board.list]
+hover = "Ayrıntılar için tıklayın"
+
+[command.board.info]
+header = "&8[&dGloss&8] &d{id} &7başlığı: &f{title}"
+meta = "&7Öncelik: &f{priority} | Koşul: &f{when} | Çeşitler: &f{variants}"
+line = " &8{line}. &f{text}"
+
+[command.emoji]
+empty = "&8[&dGloss&8] &7Etkin emoji yok."
+hover = "Sohbete eklemek için tıklayın"
+
+[command.animations]
+empty = "&8[&dGloss&8] &7Yüklü animasyon yok."
+header = "&8[&dGloss&8] &fAnimasyonlar: &d{count}"
+entry = "&8- &d{name}"
+
+[command.list]
+page = "&7Sayfa &f{page}&7/&f{pages} &8- &7gösterilen &f{from}&7-&f{to} &7/ &f{total}"
+next = "&7Sonraki sayfa: &f{command}"
+
+[command.status]
+holograms = "&7Hologramlar: &f{count} &8({temporary} geçici, {entities} varlık)"
+boards = "&7Skor tahtaları: &f{count}"
+emoji = "&7Emoji: &f{enabled}&8/&f{total}"
+animations = "&7Animasyonlar: &f{count}"
+effects = "&7Balonlar: &f{bubbles} &8| &7Göstergeler: &f{indicators} &8| &7Düşen eşyalar: &f{drops}"
+
+[command.reset]
+done = "&8[&dGloss&8] &a&f{count}&a yerleşik {kind} varsayılanı geri yüklendi."
+none = "&8[&dGloss&8] &c'&f{name}&c' ile eşleşen yerleşik {kind} varsayılanı yok."
+
+[command.bubbles]
+style_set = "&8[&dGloss&8] &aSohbet balonu stili &f{style}&a olarak ayarlandı."
+style_cleared = "&8[&dGloss&8] &aSohbet balonu stili temizlendi; otomatik seçim geçerli."
+style_unknown = "&8[&dGloss&8] &c'&f{style}&c' adında bir balon stili yok."
+
+[command.import]
+config_unreadable = "&8[&dGloss&8] &cgloss.toml yüklenemedi: &f{reason}"
+
+[command.import.holoui]
+missing = "&8[&dGloss&8] &cGloss veri klasörünün yanında holoui veri klasörü bulunamadı."
+done = "&8[&dGloss&8] &aHoloUi içe aktarımı tamamlandı: &f{copied}&a kopyalandı, &f{skipped}&a atlandı, &f{overlaid}&a yapılandırma anahtarı, &f{errors}&a hata."
+
+[command.import.legacy]
+done = "&8[&dGloss&8] &aEski veri taşıma tamamlandı: &f{migrated}&a taşındı, &f{absorbed}&a birleştirildi, &f{overlaid}&a yapılandırma anahtarı, &f{errors}&a hata."
+
+[director.help]
+no_subcommands = "Bu sayfada alt komut yok."
+no_description = "Açıklama sağlanmadı"
+command_group = "Komut grubu. Açmak için tıklayın."
+category = "Komut kategorisi"
+no_parameters = "Parametre yok. Komutu önceden doldurmak için tıklayın."
+parameters_hover = "Daha fazla bilgi için imleci parametrelerin üzerine getirin."
+
+[director.help.navigation]
+back = "Geri"
+page = "Sayfa"
+
+[director.help.navigation.parent]
+hover = "Üst komut grubuna dön"
+
+[director.help.navigation.previous]
+hover = "Önceki sayfa"
+
+[director.help.navigation.next]
+hover = "Sonraki sayfa"
+
+[director.help.parameter]
+required = "Bu parametre zorunludur."
+optional = "Bu parametre isteğe bağlıdır."
+default = "Belirtilmezse varsayılan değer \"{value}\" olur."
+type = "Bu parametrenin türü {type}."
+
+[director.runtime]
+usage = "Kullanım: {usage}"
+
+[director.runtime.error]
+invalid_origin = "Bu komut bu kaynaktan çalıştırılamaz."
+unknown_parameter = "Bilinmeyen parametre anahtarı: {key}"
+unexpected_argument = "Beklenmeyen bağımsız değişken \"{argument}\". İsteğe bağlı parametreler anahtarla belirtilmelidir, ör. seed=123"
+unclosed_group = "{key} parametresi için kapatan \"]\" eksik"
+conversion_failed = "\"{value}\", {parameter} için {type} türüne dönüştürülemiyor"
+default_parse_failed = "{parameter} parametresinin varsayılan değeri ayrıştırılamıyor"
+missing_argument = "Eksik bağımsız değişken \"{parameter}\" ({type})"
+execution_failed = "{command} komutu çalıştırılamadı: {reason}"
+
+[gloss.error]
+menu_name_required = "Menü adı boş olamaz"
+hologram_id_required = "Hologram ID'si boş olamaz"
+panel_id_required = "Panel kimliği boş olamaz"
+web_subject_required = "Web düzenleyicisi belge kimliği boş olamaz"
+web_session_required = "Web düzenleyicisi oturum kimliği boş olamaz"
+panel_player_required = "Hedef oyuncu boş olamaz"
+row_icon_type_required = "Simge türü boş olamaz"
+row_style_property_required = "Stil özelliği boş olamaz"
+import_source_required = "Eski veri içe aktarma kaynağı boş olamaz"
+import_source_unknown = "Bilinmeyen eski veri içe aktarma kaynağı: {source}"
+
+[gloss.message]
+permission_denied = "&8[&dGloss&8]: &cŞu izne sahip değilsiniz: &f{permission}&c."
+unknown_command = "&8[&dGloss&8]: &cBilinmeyen komut \"&f{command}&c\"."
+
+[gloss.message.hologram]
+created = "&8[&dGloss&8]: &a&f{hologram}&a hologramı, &f{menu}&a kök menüsüyle mevcut konumunuzda oluşturuldu."
+already_exists = "&8[&dGloss&8]: &c&f{hologram}&c adında bir hologram, panel veya menü zaten var."
+failed = "&8[&dGloss&8]: &c&f{hologram}&c hologramı oluşturulamadı. Hiçbir değişiklik saklanmadı."
+durability_uncertain = "&8[&dGloss&8]: &e&f{hologram}&e hologramının işlemi güvenli bir şekilde tamamlanamadı. İncelemeden veya yeniden denemeden önce Gloss'yi yeniden başlatın."
+
+[gloss.message.menu]
+none = "&8[&dGloss&8]: &7Kullanılabilir menü yok."
+player_only = "&8[&dGloss&8]: &cMenüleri yalnızca oyuncular açabilir."
+no_previous = "&8[&dGloss&8]: &cÖnceki menü bulunmuyor."
+closed = "&8[&dGloss&8]: &aMenü kapatıldı."
+moved = "&8[&dGloss&8]: &aMenü taşındı."
+none_open = "&8[&dGloss&8]: &cŞu anda açık menü yok."
+unavailable = "&8[&dGloss&8]: &c\"{menu}\" kullanılamıyor."
+permission_denied = "&8[&dGloss&8]: &c\"{menu}\" menüsünü açma izniniz yok."
+open_failed = "&8[&dGloss&8]: &c\"{menu}\" menüsü açılamadı."
+
+[gloss.message.menu.list]
+header = "Menüler"
+entry = "{menu} menüsünü açmak için tıklayın."
+
+[gloss.message.menu.content]
+updated = "&8[&dGloss&8]: &a&f{menu}&a menüsüne {operation} uygulandı, revizyon {revision}."
+created = "&8[&dGloss&8]: &a&f{menu}&a menüsü oluşturuldu, revizyon {revision}. /gloss menu open &f{menu}&a ile açın veya /gloss panel create &f{menu}&a ile yerleştirin."
+copied = "&8[&dGloss&8]: &a&f{source}&a menüsü &f{menu}&a olarak kopyalandı, revizyon {revision}."
+revision_conflict = "&8[&dGloss&8]: &c&f{menu}&c menüsü yazma sırasında değişti (beklenen {expected}, mevcut {actual}). Komutu yeniden çalıştırın."
+already_exists = "&8[&dGloss&8]: &c&f{menu}&c menüsü zaten var."
+invalid = "&8[&dGloss&8]: &cGeçersiz menü içeriği değeri: &f{reason}&c."
+failed = "&8[&dGloss&8]: &c&f{menu}&c menüsünün içerik işlemi başarısız: {reason}"
+
+[gloss.message.command]
+player_only = "&8[&dGloss&8]: &cBu komut yalnızca oyuncular tarafından kullanılabilir."
+
+[gloss.message.web]
+header = "Web düzenleyicisi"
+open_hover = "Gloss web düzenleyicisini açmak için tıklayın."
+open = "&8[&dGloss&8]: &7Web düzenleyicisi: &f{url}"
+preparing = "&8[&dGloss&8]: &7&f{subject}&7 için güvenli düzenleyici eşitleme oturumu hazırlanıyor..."
+unavailable = "&8[&dGloss&8]: &cCanlı web düzenlemesi kullanılamıyor. Düzenleyici eşitleme ayarlarını ve aktarma sunucusu bağlantısını kontrol edin."
+open_failed = "&8[&dGloss&8]: &c&f{kind}={subject}&c canlı web düzenleyicisinde açılamadı: {reason}"
+open_console = "&8[&dGloss&8]: &7&f{subject}&7 için düzenleyici erişim bağlantısı: &f{url}"
+capability_warning = "&8[&dGloss&8]: &eBu URL, iptal edilene veya süresi dolana kadar sunucuya değişiklik yayımlayabilir. Gizli tutun."
+open_label = "Düzenleyiciyi aç"
+copy_label = "Bağlantıyı kopyala"
+revoke_label = "Erişimi iptal et"
+link_hover = "Düzenleyiciyi açın, erişim bağlantısını kopyalayın veya {session} oturumunu iptal edin."
+
+[gloss.message.web.sessions]
+list_empty = "&8[&dGloss&8]: &7Etkin düzenleyici eşitleme oturumu yok."
+status = "&8[&dGloss&8]: &f&f{session} &7{kind}=&f{subject} kalan süre=&f{seconds}s yayın=&f{revision} bekleyen=&f{pending}"
+revoked = "&8[&dGloss&8]: &a&f{session}&a düzenleyici eşitleme oturumu iptal edildi."
+pulled = "&8[&dGloss&8]: &a&f{session}&a düzenleyici eşitleme oturumu sorgulandı."
+unknown = "&8[&dGloss&8]: &c&f{session}&c düzenleyici eşitleme oturumu bilinmiyor veya süresi dolmuş."
+failed = "&8[&dGloss&8]: &c&f{session}&c oturumunun eşitleme işlemi başarısız: {reason}"
+
+[gloss.message.import]
+preview_started = "&8[&dGloss&8]: &7Verileri değiştirmeden geçiş önizlemesi için &f{source}&7 taranıyor..."
+apply_started = "&8[&dGloss&8]: &7&f{source}&7 taranıyor ve mevcut verilerin üzerine yazılmadan aktarılıyor..."
+source_missing = "&8[&dGloss&8]: &7&f{path}&7 konumunda &f{source}&7 kaynağı bulunamadı."
+preview_summary = "&8[&dGloss&8]: &f&f{source}&7 önizlemesi: &a{ready} hazır, &d{resume} sürdürülebilir, &e{conflicts} çakışma, &c{errors} hata, {warnings} uyarı. Kaynak: &f{path}"
+preview_entry = "&8- &f&f{legacy} -> &f{board} durum=&f{state} uyarılar=&f{warnings}"
+apply_summary = "&8[&dGloss&8]: &f&f{source}&7 geçişi: &a{imported} içe aktarıldı, &e{skipped} atlandı, &c{failed} başarısız; taramada {errors} hata ve {warnings} uyarı bildirildi."
+apply_entry = "&8- &f&f{legacy} durum=&f{state} neden=&f{reason}"
+issue = "&8- &f{legacy} &7{severity}: &f{reason}"
+busy = "&8[&dGloss&8]: &cBaşka bir eski hologram geçişi zaten sürüyor."
+failed = "&8[&dGloss&8]: &c&f{source}&c kaynağından eski hologram geçişi başarısız: {reason}"
+
+[gloss.message.config]
+reloaded = "&2\"{name}\" yapılandırması yeniden yüklendi."
+
+[gloss.message.hotload]
+singular = "&2Canlı yeniden yüklendi: {kinds} ({count} değişiklik)."
+plural = "&2Canlı yeniden yüklendi: {kinds} ({count} değişiklik)."
+
+[gloss.message.preview_scale]
+adjusting = "&7Önizleme boyutu: &f{percent}% &8- &7Eğil tuşunu basılı tut + boyut için kaydır; kaydetmek için Eğil tuşuna iki kez bas"
+hidden = "&7Önizleme &cgizli &8- &7geri getirmek için yukarı kaydır"
+size = "&7Önizleme boyutu: &f{percent}%"
+saved_hidden = "&7Önizleme &cgizli olarak kaydedildi &8- &7geri getirmek için bir kapta Eğil tuşuna iki kez bas + yukarı kaydır"
+saved = "&7Önizleme boyutu kaydedildi: &f{percent}%"
+
+[gloss.message.drops]
+bundle_more = "+{count} daha"
+
+[gloss.message.items]
+disabled = "&8[&dGloss&8]: &7Özel eşyalar devre dışı. gloss.toml dosyasında customItems değerini true yapın."
+
+[gloss.message.items.status]
+header = "Özel eşyalar"
+summary = "{active}/{total} sağlayıcı etkin"
+entry = "{plugin} eklentisinden {provider} sağlayıcısı."
+hint = "Kataloğu web düzenleyicisi için dışa aktarmak üzere tıklayın."
+
+[gloss.message.items.state]
+ready = "hazır, {count} kimlik"
+loading = "mevcut, yükleniyor"
+inactive = "mevcut, bağdaştırıcı yok"
+missing = "yüklü değil"
+
+[gloss.message.items.export]
+started = "&8[&dGloss&8]: &7Özel eşya kataloğu dışa aktarılıyor..."
+done = "&8[&dGloss&8]: &a{providers} sağlayıcıdan {count} eşya &f{path}&a konumuna yazıldı."
+empty = "&8[&dGloss&8]: &7Özel eşya bulunamadı. &f{path}&7 konumuna boş bir katalog yazıldı."
+failed = "&8[&dGloss&8]: &cÖzel eşya kataloğu yazılamadı. Günlükleri kontrol edin."
+busy = "&8[&dGloss&8]: &cKatalog dışa aktarımı zaten sürüyor."
+
+[gloss.message.previews.list]
+header = "Önizleme belgeleri"
+empty = "&7Yüklü önizleme belgesi yok."
+entry = "bloklar={blocks} varlıklar={entities} özel={special} öncelik={priority}"
+
+[gloss.message.previews.reset]
+started = "&8[&dGloss&8]: &7\"&f{name}&7\" önizleme belgeleri sıfırlanıyor..."
+done = "&8[&dGloss&8]: &aBirlikte gelen {count} önizleme belgesi geri yüklendi. Bunların yerine geçen ek kullanıcı belgeleri kaldırılmadı."
+none = "&8[&dGloss&8]: &c\"{name}\" birlikte gelen bir önizleme belgesi değil; hiçbir şey sıfırlanmadı."
+
+[gloss.message.previews.dump]
+unknown = "&8[&dGloss&8]: &c\"{name}\" yüklü bir önizleme belgesi değil."
+result = "&8[&dGloss&8]: &a&a{name}&7: &f{total}&7 öğe (paneller={panels}, hücreler={cells}, yuvalar={slots}, etiketler={labels})."
+no_errors = "&8[&dGloss&8]: &aOluşturma hatası yok."
+error_line = "&8[&dGloss&8]: &c{message}"
+error_more = "&8[&dGloss&8]: &7{count} tane daha (konsol günlüğüne bakın)."
+
+[gloss.message.panels]
+created = "&8[&dGloss&8]: &a&f{board}&a paneli oluşturuldu, revizyon {revision}."
+deleted = "&8[&dGloss&8]: &a&f{board}&a paneli silindi."
+renamed = "&8[&dGloss&8]: &a&f{oldBoard}&a adı &f{board}&a olarak değiştirildi, revizyon {revision}."
+copied = "&8[&dGloss&8]: &a&f{source}&a, &f{board}&a olarak kopyalandı."
+updated = "&8[&dGloss&8]: &a&f{board}&a paneline {operation} uygulandı, revizyon {revision}."
+teleported = "&8[&dGloss&8]: &a&f{board}&a konumuna ışınlanıldı."
+unknown = "&8[&dGloss&8]: &cBilinmeyen panel &f{board}&c."
+already_exists = "&8[&dGloss&8]: &c&f{board}&c paneli zaten var."
+invalid = "&8[&dGloss&8]: &cGeçersiz panel değeri: &f{reason}&c."
+menu_unavailable = "&8[&dGloss&8]: &c&f{menu}&c kök menüsü yüklü değil."
+player_unavailable = "&8[&dGloss&8]: &cHedef oyuncu &f{player}&c çevrimiçi değil."
+world_unavailable = "&8[&dGloss&8]: &cPanelin &f{world}&c dünyası kayıtlı UUID ile yüklü değil."
+revision_conflict = "&8[&dGloss&8]: &c&f{board}&c paneli düzenleme sırasında değişti (beklenen {expected}, mevcut {actual}). Düzenleme oturumunu yeniden açın."
+failed = "&8[&dGloss&8]: &c&f{board}&c panelinin işlemi başarısız: {reason}"
+
+[gloss.message.panels.list]
+header = "&8[&dGloss&8]: &fKalıcı paneller: &d{count}"
+empty = "&8[&dGloss&8]: &7Yüklü kalıcı panel yok."
+entry = "&8- &f&f{board} menü=&f{menu} revizyon=&f{revision}"
+
+[gloss.message.panels.near]
+header = "&8[&dGloss&8]: &f&d{radius}&f blok içindeki paneller: &d{count}"
+empty = "&8[&dGloss&8]: &7Bu yarıçap içinde panel yok."
+entry = "&8- &f&f{board} uzaklık=&f{distance} menü=&f{menu}"
+
+[gloss.message.panels.info]
+header = "&8[&dGloss&8]: &fPanel &d{board} ({state})"
+identity = "&7uuid=&f{uuid} revizyon=&f{revision} menü=&f{menu}"
+transform = "&7dünya=&f{world} konum=&f{x}, {y}, {z} dönüş=&f{yaw}, {pitch}, {roll} ölçek=&f{scale}"
+visibility = "&7görünürlük=&f{mode} görüntüleme izni=&f{viewPermission} etkileşim izni=&f{interactPermission} mesafeler=&f{viewRange}/{interactionRange}"
+follow = "&7takip=&f{mode} oyuncu=&f{player} dönüş=&f{rotation}"
+
+[gloss.message.panels.edit]
+started = "&8[&dGloss&8]: &a&f{board}&a, {revision} revizyonundan düzenleniyor. Değişiklikler kaydedilene kadar bekletilir."
+already_active = "&8[&dGloss&8]: &c&f{board}&c panelini zaten düzenliyorsunuz. Önce kaydedin veya iptal edin."
+none = "&8[&dGloss&8]: &cBekleyen panel düzenlemeniz yok."
+busy = "&8[&dGloss&8]: &c&f{board}&c paneli şu anda kaydediliyor."
+staged = "&8[&dGloss&8]: &a&f{board}&a için {operation} hazırlandı. Kalıcı olarak kaydetmek için /gloss panel save kullanın."
+saved = "&8[&dGloss&8]: &a&f{board}&a kaydedildi, revizyon {revision}."
+cancelled = "&8[&dGloss&8]: &a&f{board}&a için bekleyen düzenlemeler iptal edildi."
+identity_blocked = "&8[&dGloss&8]: &c&f{board}&c panelini yeniden adlandırmadan veya silmeden önce bekleyen düzenlemeyi kaydedin ya da iptal edin."
+
+[gloss.preview.state]
+idle = "Boşta"
+brewing = "Üretiliyor {percent}%"
+needs_blaze_powder = "Blaze tozu gerekli"
+waiting = "Bekliyor"
+no_ingredient = "Malzeme yok"
+empty = "Boş"
+smelting_item = "Eritiliyor: {item} {percent}%"
+smelting = "Eritiliyor {percent}%"
+blasting_item = "Maden eritme ocağında eritiliyor: {item} {percent}%"
+blasting = "Maden eritme ocağında eritiliyor {percent}%"
+smoking_item = "Tütsüleniyor: {item} {percent}%"
+smoking = "Tütsüleniyor {percent}%"
+heating = "Isınıyor"
+needs_fuel = "Yakıt gerekli"
+no_input = "Girdi yok"
+surge_suffix = "  +{seconds}s"
+disc_playing = "Çalıyor: {disc}"
+disc_loaded = "Yüklendi: {disc}"
+no_disc = "Müzik diski yok"
+
+[gloss.preview.stat]
+fuel_level = "Yakıt {fuel}/{maximum}"
+no_fuel = "Yakıt yok"
+bottles = "Şişeler {bottles}/{maximum}"
+fuel_seconds = "Yakıt {seconds}s"
+fuel_ready = "Yakıt hazır"
+xp_gain = "XP +{experience}"
+xp_zero = "XP 0"
+bees_and_honey = "Arılar {bees}/{maximumBees}   Bal {honey}/{maximumHoney}"
+cauldron_empty = "Boş {level}/{maximum}"
+cauldron_level = "Seviye {level}/{maximum}"
+
+[gloss.preview.theme.title]
+chest = "&6&lSandık"
+trapped_chest = "&c&lTuzaklı Sandık"
+ender_chest = "&5&lEnder Sandığı"
+barrel = "&e&lFıçı"
+dispenser = "&7&lFırlatıcı"
+dropper = "&8&lBırakıcı"
+hopper = "&8&lHuni"
+furnace = "&6&lOcak"
+smoker = "&e&lDuman Fırını"
+blast_furnace = "&b&lMaden Eritme Ocağı"
+beehive = "&e&lArı Kovanı"
+bee_nest = "&e&lArı Yuvası"
+cauldron = "&7&lKazan"
+water_cauldron = "&9&lSu Kazanı"
+lava_cauldron = "&6&lLav Kazanı"
+powder_snow_cauldron = "&f&lTozlaşmış Kar Kazanı"
+jukebox = "&d&lMüzik Kutusu"
+brewing_stand = "&d&lİksir Tezgâhı"
+chiseled_bookshelf = "&6&lYontulmuş Kitaplık"
+hopper_minecart = "&8&lHunili Vagon"
+chest_minecart = "&6&lSandıklı Vagon"
+mobile = "&7&l{name}"
+shulker = "&l{color} Shulker Kutusu"
+copper_chest = "&6&l{name}"
+shelf = "&6&l{name}"
+container = "&6&lKapsayıcı"
+
+[language.menu]
+your_language = "Diliniz"
+reset_your_language = "Dil seçiminizi sıfırla"
+server_default = "Sunucu varsayılanı"
+edit_messages = "Dil mesajlarını düzenle"
+use_server_default = "Sunucu varsayılanını kullan"
+current = "Geçerli: {locale}"
+current_with_personal = "Geçerli: {locale} (Sizin: {personal})"
+your_description = "Yalnızca gördüğünüz mesajları değiştirin."
+reset_description = "Sunucunun varsayılan dilini kullanın."
+server_description = "Sunucunun varsayılan dilini değiştirin."
+edit_description = "Her dil için mesaj düzenleyicisini açın."
+select_description = "Bu dili seçmek için tıklayın."
+remove_personal_description = "Kişisel dil seçiminizi kaldırın."
+no_controls = "Kullanabileceğiniz dil ayarı yok."
+command = "Komut: {command}"
+selected = "Seçili"
+all-volmit-plugins = "Tüm Volmit eklentileri"
+
+[language.error]
+stopping = "Dil seçimi, eklenti durdurulduğunda kullanılamaz."
+editor-player-only = "Oyundaki dil editörü açın."
+no-providers = "Kullanılabilir Volmit dil sağlayıcısı yok."
+numeric-page = "Sayfa numarasını rakamla girin."
+personal-player-only = "Oyuncu dili tercihleri oyunda seçilmelidir."
+personal-permission = "Dilinizi seçmek için izniniz yok."
+plugin-personal-permission = "{plugin} için kendi dilinizi seçme izniniz yok."
+plugin-server-permission = "{plugin} için sunucu dilini değiştirme izniniz yok."
+server-locale-required = "Sunucunun varsayılan dili için en_US gibi bir dil kodu seçin."
+unavailable-for-all = "{locale} dili, seçilen eklentilerin tümünde kullanılamıyor."
+
+[language.usage]
+editor = "Kullanım: /{command} language server edit [locale]"
+selection = "Kullanım: /{command} language self [locale|reset] or server [locale]"
+volmit-selection = "Kullanım: /volmit plugins languages [locale]"
+
+[language.selection]
+preparing = "{target} için {locale} dili hazırlanıyor..."
+save-failed = "{plugin}: dil seçimi kaydedilemedi; sunucu konsolunu kontrol edin."
+english-fallback = "{plugin}: {locale} kullanılamıyor; İngilizce (en_US) kullanılıyor."
+personal-selected = "{plugin}: Diliniz şimdi {locale}."
+server-selected = "{plugin}: sunucu dili şimdi {locale}."
+server-default-selected = "{plugin}: diliniz artık sunucunun varsayılan dilini kullanıyor."
+
+[language.editor]
+loading = "{locale} mesajları yükleniyor..."
+
+[language.editor.section]
+languages = "Diller"
+search = "Arama"
+search-title = "{locale} / Arama"
+group-title = "{locale} / {group}"
+
+[language.editor.prompt]
+search = "Mesaj anahtarı veya metni arayın. Geri dönmek için cancel yazın."
+value = "Sohbete {key} için yeni bir değer yazın."
+current = "Geçerli değer: {value}"
+variables = "Değişkenler: {variables}"
+guidance = "Yeni satır için \\n, ters eğik çizgi için \\\\ kullanın veya geri dönmek için cancel yazın."
+
+[language.editor.input]
+expired = "Dil düzenleyicisinin giriş süresi doldu."
+too-long = "Girdi en fazla {maximum} karakter içerebilir."
+unable-to-save = "Kaydedilemedi: {reason}"
+
+[language.editor.navigation]
+back = "&eGeri&r"
+close = "&cKapat&r"
+previous-page = "&eÖnceki Sayfa&r"
+next-page = "&eSonraki sayfa&r"
+
+[language.editor.search]
+messages = "Mesajları ara"
+messages-lore = "Tüm mesajları aramak için tıklayın."
+clear = "Aramayı temizle"
+
+[language.editor.message]
+current-value = "&7Mevcut Değer:&r"
+variables = "&8{variables}&r"
+edit-plural = "&7Bir çoğul biçimini düzenlemek için tıklayın.&r"
+edit-lines = "&7Satırları ayrı ayrı düzenlemek için tıklayın.&r"
+edit-chat = "&7Sohbette düzenlemek için tıklayın.&r"
+
+[language.editor.locale]
+open = "&8Bu dili açmak için tıklayın.&r"
+
+[language.editor.category]
+message-count = "&7{count} mesaj&r"
+open = "&8Bu kategoriyi açmak için tıklayın.&r"
+
+[language.editor.error]
+no-permission = "{plugin} dillerini düzenleme izniniz yok."
+unable-to-edit = "Düzenlenemedi: {reason}"
+
+[language.editor.saved]
+summary = "{locale} kaydedildi. Dil seçimleri değişmedi."
+change = "{key}: “{before}” değeri “{after}” olarak değiştirildi."
+
+[language.editor.part]
+line = "Satır {line}"
+
+[language.editor.value]
+none = "Yok"
+empty = "(boş)"

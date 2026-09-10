@@ -1,0 +1,828 @@
+# Gloss — zh_TW
+#
+# === 編輯檔案 ===
+# plugins/Gloss/languages/zh_TW.toml
+# 可直接編輯此檔案。本機修改會保留；缺少或無效的項目使用內建英文文字。
+# /gloss language server edit zh_TW
+#
+# === 前綴 ===
+# 前綴: &8[&dGloss&8] / &8[&dGloss&8]:
+#
+# === 格式 ===
+# 顏色: &0-&f, &k-&r, &#RRGGBB.
+#
+# === 變數 ===
+# 請勿變更變數名稱，僅使用各訊息中原有的變數。
+#   {absorbed}  合併至現有資料的匯入項目數
+#   {active}  作用中提供者數量
+#   {actual}  目前修訂版本
+#   {after}  編輯後的訊息值
+#   {argument}  非預期的指令引數
+#   {axis}  座標軸或旋轉軸
+#   {bees}  容器內蜜蜂數量
+#   {before}  編輯前的訊息值
+#   {billboard}  顯示朝向模式
+#   {blocks}  方塊顯示元素數量
+#   {board}  看板或面板識別碼
+#   {bottles}  容器內瓶子數量
+#   {bubbles}  作用中聊天氣泡數量
+#   {cells}  選單儲存格數量
+#   {color}  顯示或物品顏色
+#   {command}  指令路徑
+#   {conflicts}  匯入衝突數量
+#   {copied}  已複製項目數量
+#   {count}  符合的物件或訊息數量
+#   {disc}  容器內音樂唱片
+#   {distance}  與目標的距離
+#   {drops}  顯示的掉落物品數量
+#   {enabled}  啟用狀態或已啟用項目數量
+#   {entities}  實體數量
+#   {error}  驗證或操作錯誤
+#   {errors}  錯誤數量
+#   {expected}  儲存編輯時的預期修訂版本
+#   {experience}  獲得的經驗值
+#   {failed}  失敗的操作數量
+#   {from}  來源值或範圍起點
+#   {fuel}  容器內剩餘燃料
+#   {group}  語言編輯器類別
+#   {hologram}  全像圖識別碼
+#   {honey}  目前蜂蜜量
+#   {id}  物件識別碼
+#   {imported}  已匯入項目數量
+#   {indicators}  傷害指示器數量
+#   {interactPermission}  互動所需權限
+#   {interactionRange}  最大互動距離
+#   {item}  物品名稱或材質
+#   {key}  訊息或設定鍵
+#   {kind}  物件或提供者類型
+#   {kinds}  可用的物件或提供者類型
+#   {labels}  文字標籤數量
+#   {legacy}  匯入來源中的識別碼
+#   {level}  顯示等級
+#   {limit}  允許的限制
+#   {line}  訊息內的行號
+#   {locale}  語言代碼
+#   {maximum}  允許的最大值
+#   {maximumBees}  蜜蜂數量上限
+#   {maximumHoney}  蜂蜜量上限
+#   {menu}  選單識別碼
+#   {message}  回饋或診斷訊息
+#   {migrated}  已轉換項目數量
+#   {minimum}  允許的最小值
+#   {mode}  所選操作或顯示模式
+#   {name}  物件名稱
+#   {oldBoard}  先前的看板識別碼
+#   {operation}  操作名稱
+#   {options}  可用的指令選項
+#   {overlaid}  已套用設定鍵數量
+#   {page}  目前頁碼
+#   {pages}  總頁數
+#   {panels}  面板數量
+#   {parameter}  指令參數名稱
+#   {path}  檔案或目錄路徑
+#   {pending}  待發佈狀態
+#   {percent}  百分比值
+#   {permission}  所需權限
+#   {personal}  個人語言代碼
+#   {pitch}  垂直角度
+#   {player}  玩家名稱
+#   {plugin}  外掛名稱
+#   {priority}  選擇或繪製優先順序
+#   {provider}  提供者名稱
+#   {providers}  提供者清單或數量
+#   {radius}  搜尋半徑
+#   {ready}  可匯入項目數量
+#   {reason}  錯誤或決定的原因
+#   {resume}  可繼續匯入的項目數量
+#   {revision}  文件修訂版本
+#   {roll}  翻滾角度
+#   {rotation}  顯示旋轉
+#   {scale}  顯示或預覽縮放比例
+#   {seconds}  時間（秒）
+#   {session}  編輯工作階段識別碼
+#   {severity}  診斷嚴重程度
+#   {skipped}  已略過項目數量
+#   {slots}  物品欄位數量
+#   {source}  匯入來源或設定提供者
+#   {special}  特殊顯示元素數量
+#   {state}  目前狀態
+#   {style}  顯示樣式
+#   {subject}  網頁編輯工作階段的物件
+#   {target}  套用語言選擇的外掛
+#   {temporary}  暫存物件數量
+#   {text}  顯示文字
+#   {title}  顯示標題
+#   {to}  目標值或範圍終點
+#   {total}  項目總數
+#   {type}  預期的值或物件類型
+#   {url}  網址
+#   {usage}  指令語法
+#   {uuid}  物件或玩家的唯一識別碼
+#   {value}  目前訊息或參數值
+#   {variables}  訊息允許的預留位置
+#   {variants}  顯示變體數量或清單
+#   {viewPermission}  檢視所需權限
+#   {viewRange}  最大可視距離
+#   {warnings}  警告數量
+#   {when}  顯示條件
+#   {world}  世界名稱
+#   {x}  X 座標
+#   {y}  Y 座標
+#   {yaw}  水平角度
+#   {z}  Z 座標
+
+[command.help]
+debug = "診斷指令"
+debugdump = "建立診斷報告並選擇是否上傳"
+debugdump_upload = "將報告上傳至 mclo.gs"
+root = "Gloss 指令群組"
+hologram = "建立與管理全像圖"
+"hologram.create" = "在你目前位置建立全像圖"
+"hologram.create.id" = "唯一的全像圖 ID"
+"hologram.delete" = "刪除全像圖"
+"hologram.delete.id" = "要刪除的全像圖 ID"
+"hologram.addline" = "在全像圖末尾附加一行"
+"hologram.addline.id" = "全像圖 ID"
+"hologram.addline.text" = "行文字；含空格時請加引號"
+"hologram.setline" = "取代全像圖的一行"
+"hologram.setline.id" = "全像圖 ID"
+"hologram.setline.line" = "行號，從 1 開始"
+"hologram.setline.text" = "行文字；含空格時請加引號"
+"hologram.removeline" = "移除全像圖的一行"
+"hologram.removeline.id" = "全像圖 ID"
+"hologram.removeline.line" = "行號，從 1 開始"
+"hologram.clear" = "移除全像圖的所有行"
+"hologram.clear.id" = "全像圖 ID"
+"hologram.movehere" = "將全像圖移動到你目前位置"
+"hologram.movehere.id" = "全像圖 ID"
+"hologram.move" = "以相對方塊距離偏移全像圖"
+"hologram.move.id" = "全像圖 ID"
+"hologram.move.x" = "X 方向的相對方塊偏移"
+"hologram.move.y" = "Y 方向的相對方塊偏移"
+"hologram.move.z" = "Z 方向的相對方塊偏移"
+"hologram.tp" = "將自己傳送到全像圖"
+"hologram.tp.id" = "全像圖 ID"
+"hologram.list" = "列出全像圖；點擊即可傳送"
+"hologram.info" = "顯示全像圖的位置與各行內容"
+"hologram.info.id" = "全像圖 ID"
+"hologram.rendertext" = "建立使用原生縮放的文字全像圖"
+"hologram.rendertext.id" = "唯一的全像圖 ID"
+"hologram.rendertext.text" = "要顯示的文字；包含空格時請加引號"
+"hologram.rendertext.scale" = "TextDisplay 縮放倍數"
+"hologram.orient" = "設定全像圖朝向觀看者的旋轉方式"
+"hologram.orient.id" = "全像圖 ID"
+"hologram.orient.billboard" = "CENTER、VERTICAL、HORIZONTAL 或 FIXED"
+"hologram.orient.yaw" = "水平朝向角 (yaw)，-180 至 180 度"
+"hologram.orient.pitch" = "俯仰角 (pitch)，-90 至 90 度"
+board = "建立與管理計分板"
+"board.create" = "建立計分板"
+"board.create.id" = "唯一的計分板 ID"
+"board.delete" = "刪除計分板"
+"board.delete.id" = "要刪除的計分板 ID"
+"board.title" = "設定計分板標題"
+"board.title.id" = "計分板 ID"
+"board.title.text" = "標題文字；含空格時請加引號"
+"board.addline" = "在計分板末尾附加一行"
+"board.addline.id" = "計分板 ID"
+"board.addline.text" = "行文字；含空格時請加引號"
+"board.setline" = "取代計分板的一行"
+"board.setline.id" = "計分板 ID"
+"board.setline.line" = "行號，從 1 開始"
+"board.setline.text" = "行文字；含空格時請加引號"
+"board.removeline" = "移除計分板的一行"
+"board.removeline.id" = "計分板 ID"
+"board.removeline.line" = "行號，從 1 開始"
+"board.show" = "向自己顯示計分板"
+"board.show.id" = "計分板 ID"
+"board.hide" = "隱藏你的計分板"
+"board.select" = "設定自動選取計分板的規則"
+"board.select.id" = "計分板 ID"
+"board.select.priority" = "選取優先順序"
+"board.select.when" = "布林條件；含有空格的運算式須以引號括住"
+"board.list" = "列出計分板"
+"board.info" = "顯示計分板的標題、各行內容與設定"
+"board.info.id" = "計分板 ID"
+"board.reset" = "還原內建的計分板預設值"
+emoji = "聊天表情符號工具"
+"emoji.list" = "列出已啟用的表情符號；點擊即可插入聊天"
+"emoji.reset" = "還原內建的表情符號預設值"
+animations = "動畫工具"
+"animations.list" = "列出動畫名稱"
+"animations.reset" = "還原內建的動畫預設值"
+bubbles = "聊天泡泡樣式"
+"bubbles.style" = "選擇你的聊天泡泡樣式，或使用 clear 改為自動選擇"
+"bubbles.style.style" = "樣式 ID，或 clear"
+"bubbles.reset" = "還原內建的聊天泡泡樣式預設值"
+tablist = "Tab 列表工具"
+"tablist.reset" = "還原內建的 Tab 列表文件"
+motd = "MOTD 工具"
+"motd.reset" = "還原內建的 MOTD 文件"
+drops = "掉落物顯示工具"
+"drops.reset" = "還原內建的掉落物設定文件"
+indicators = "傷害與治療指示器工具"
+"indicators.reset" = "還原內建的傷害指示器設定文件"
+status = "顯示簡要的執行階段計數"
+import = "遷移舊版全像圖，且不修改來源檔案"
+"import.apply" = "套用不覆寫的舊版全像圖遷移"
+"import.holoui" = "從 plugins/holoui 複製 HoloUi 資料，並覆寫先前的匯入"
+"import.legacy" = "將合併前的 Gloss 資料檔遷移至 v2 封裝格式"
+"import.preview" = "預覽非破壞性的舊版全像圖遷移"
+item = "自訂物品提供者工具"
+"item.export" = "匯出自訂物品目錄供網頁編輯器使用"
+"item.status" = "顯示哪些自訂物品提供者處於啟用狀態"
+menu = "建立、開啟與編輯全像圖選單"
+"menu.addrow" = "附加一個文字裝飾列"
+"menu.back" = "重新開啟上一個選單工作階段"
+"menu.close" = "關閉目前的選單工作階段"
+"menu.copy" = "將已載入的選單複製為新的巢狀 ID"
+"menu.create" = "在你目前位置建立持久全像圖"
+"menu.image" = "以單一置中圖片檔取代選單內容"
+"menu.insertrow" = "插入一個文字裝飾列"
+"menu.list" = "列出你可以開啟的所有已設定選單"
+"menu.move" = "將開啟的選單移動到目前位置"
+"menu.new" = "依內建基準建立空白全像圖選單"
+"menu.offsetrow" = "以絕對或 ~相對偏移移動列"
+"menu.open" = "依 ID 開啟選單；設為 * 時顯示選單列表"
+"menu.removerow" = "移除一個元件列"
+"menu.seticon" = "取代按鈕或裝飾列的圖示"
+"menu.setrow" = "設定按鈕或裝飾列的文字"
+"menu.style" = "設定或清除單一列的顯示樣式屬性"
+panel = "持久世界面板工具"
+"panel.addrow" = "在面板根選單附加一個文字列"
+"panel.align" = "將面板位置軸向對齊另一個面板"
+"panel.cancel" = "捨棄你暫存的面板編輯"
+"panel.copy" = "以新 ID 複製持久面板"
+"panel.create" = "在你目前位置建立面板"
+"panel.delete" = "刪除持久面板"
+"panel.edit" = "開始暫存式面板編輯工作階段"
+"panel.follow" = "以 fixed、yaw 或 full 旋轉模式跟隨線上玩家"
+"panel.here" = "將面板移動到你目前位置"
+"panel.image" = "以單一置中圖片檔取代面板根選單"
+"panel.info" = "顯示單一面板的完整狀態"
+"panel.insertrow" = "在面板根選單插入一個文字列"
+"panel.list" = "分頁列出持久面板"
+"panel.menu" = "設定面板的根選單"
+"panel.move" = "將面板移動到絕對或 ~相對座標"
+"panel.near" = "列出你目前位置附近的面板"
+"panel.offsetrow" = "以絕對或 ~相對偏移移動面板根選單的列"
+"panel.permissions" = "變更面板的檢視與互動權限"
+"panel.ranges" = "設定面板的檢視與互動範圍"
+"panel.removerow" = "移除面板根選單的列"
+"panel.rename" = "重新命名持久面板"
+"panel.rotate" = "設定絕對或 ~相對的偏航角、俯仰角與翻滾角"
+"panel.save" = "將你暫存的面板編輯永久儲存"
+"panel.scale" = "設定絕對或 ~相對的面板縮放"
+"panel.seticon" = "取代面板根選單中的列圖示"
+"panel.setrow" = "設定面板根選單列的文字"
+"panel.style" = "設定或清除單一列的顯示樣式屬性"
+"panel.teleport" = "傳送到持久面板"
+"panel.unfollow" = "停止面板跟隨玩家"
+"panel.visibility" = "設定可見性模式與權限節點"
+preview = "預覽文件工具"
+"preview.dump" = "建置一次預覽文件並輸出其元素數量"
+"preview.list" = "列出預覽文件及其符合規則"
+"preview.reset" = "還原內建的預覽預設值(不會移除可能覆蓋它們的額外使用者文件)"
+web = "開啟並管理 Gloss 網頁編輯器"
+"web.open" = "開啟代管的空白 Gloss 編輯器"
+"web.edit" = "開啟一個即時 Gloss 文件"
+"web.edit.document" = "在網頁編輯器中開啟此即時文件"
+"web.workspace" = "開啟完整的即時 Gloss 工作區"
+"web.sessions" = "管理使用中的網頁編輯器工作階段"
+"web.sessions.list" = "列出使用中的網頁編輯器工作階段"
+"web.sessions.pull" = "立即查詢網頁編輯器工作階段的更新"
+"web.sessions.revoke" = "撤銷網頁編輯授權"
+"web.sessions.status" = "顯示一個網頁編輯器工作階段"
+language = "選擇你的語言或伺服器預設語言"
+
+[command.help.arg]
+reset_name = "要重設的名稱，或 * 代表所有內建預設值"
+panel_axes = "軸向：x、y、z、xy、xz、yz 或 xyz"
+panel_follow_rotation = "跟隨旋轉模式：fixed、yaw 或 full"
+panel_id = "持久面板 ID"
+panel_interact_permission = "互動權限，或 -"
+panel_interaction_range = "正數的互動範圍"
+panel_menu = "根選單 ID；預設為面板 ID"
+panel_new_id = "新的持久面板 ID"
+panel_pitch = "絕對或 ~相對俯仰角"
+panel_player = "線上的目標玩家"
+panel_radius = "水平搜尋半徑"
+panel_reference = "參考面板 ID"
+panel_roll = "絕對或 ~相對翻滾角"
+panel_root_menu = "根選單 ID"
+panel_scale = "絕對或 ~相對縮放"
+panel_view_permission = "檢視權限，或 -"
+panel_view_range = "正數的檢視範圍"
+panel_visibility = "可見性模式：public、permission 或 hidden"
+panel_x = "絕對或 ~相對 X"
+panel_y = "絕對或 ~相對 Y"
+panel_yaw = "絕對或 ~相對偏航角"
+panel_z = "絕對或 ~相對 Z"
+content_menu = "已載入的選單 ID"
+web_subject = "即時 Gloss 文件 ID"
+hologram_id = "新全像圖及其根選單的 ID"
+hologram_text = "選用的 MiniMessage 文字"
+image_path = "Gloss 圖片資料夾內的檔案"
+import_source = "舊版全像圖來源"
+menu = "要開啟的選單 ID(* 顯示所有選單)"
+new_panel_id = "新的持久面板 ID"
+new_menu = "新的巢狀選單 ID"
+list_page = "列表頁碼，從 1 開始"
+previews_dump_name = "要建置的文件名稱"
+previews_name = "要重設的文件名稱，或 * 代表所有內建文件"
+row_icon_type = "圖示類型"
+row_icon_value = "圖示內容或註冊表 ID"
+row_index = "元件列編號，從 1 開始"
+row_style_property = "顯示樣式屬性"
+row_style_value = "樣式值，或 * 可清除"
+row_text = "MiniMessage 列文字"
+row_x = "絕對或 ~相對的列 X"
+row_y = "絕對或 ~相對的列 Y"
+row_z = "絕對或 ~相對的列 Z"
+source_menu = "已載入的來源選單 ID"
+web_session = "網頁編輯器工作階段 ID"
+
+[command.error]
+no_permission = "&8[&dGloss&8] &c你沒有權限。"
+no_permission_use = "&8[&dGloss&8] &c你沒有權限使用該指令。"
+usage = "&7用法: &f/{command} help"
+
+[command.hologram]
+exists = "&8[&dGloss&8] &c全像圖 '&f{id}&c' 已存在。"
+missing = "&8[&dGloss&8] &c沒有名為 '&f{id}&c' 的全像圖。"
+created = "&8[&dGloss&8] &a已建立全像圖 &f{id}&a。"
+deleted = "&8[&dGloss&8] &a已刪除全像圖 &f{id}&a。"
+line_added = "&8[&dGloss&8] &a已在 &f{id}&a 加入第 &f{line}&a 行。"
+line_set = "&8[&dGloss&8] &a已設定 &f{id}&a 的第 &f{line}&a 行。"
+line_removed = "&8[&dGloss&8] &a已從 &f{id}&a 移除第 &f{line}&a 行。"
+line_out_of_range = "&8[&dGloss&8] &c第 {line} 行超出範圍；&f{id}&c 共有 {count} 行。"
+cleared = "&8[&dGloss&8] &a已清除 &f{id}&a 的所有行。"
+moved = "&8[&dGloss&8] &a已將 &f{id}&a 移動到你的位置。"
+offset = "&8[&dGloss&8] &a已將 &f{id}&a 偏移 &f{x}&a、&f{y}&a、&f{z}&a。"
+teleported = "&8[&dGloss&8] &a已傳送到 &f{id}&a。"
+list_empty = "&8[&dGloss&8] &7目前沒有任何全像圖。"
+rendered = "&8[&dGloss&8] &a已建立文字全像圖 &f{id}&a，縮放倍數為 &f{scale}&a。"
+text_empty = "&8[&dGloss&8] &c文字不能為空。"
+scale_out_of_range = "&8[&dGloss&8] &c縮放倍數 {value} 超出範圍；必須介於 &f{minimum}&c 與 &f{maximum}&c 之間。"
+oriented = "&8[&dGloss&8] &a已將 &f{id}&a 設定為廣告牌 &f{billboard}&a、yaw &f{yaw}&a、pitch &f{pitch}&a。"
+billboard_unknown = "&8[&dGloss&8] &c未知的廣告牌模式 '&f{billboard}&c'。請使用 &f{options}&c 其中之一。"
+angle_out_of_range = "&8[&dGloss&8] &c{axis} 的值 {value} 超出範圍；必須介於 &f-{limit}&c 度與 &f{limit}&c 度之間。"
+
+[command.hologram.list]
+hover = "點擊以傳送"
+lines = "{count} 行"
+
+[command.hologram.info]
+header = "&8[&dGloss&8] &d{id} &7位於 &f{world} {x}, {y}, {z}"
+line = " &8{line}. &f{text}"
+orientation = " &8縮放 &f{scale} &8billboard &f{billboard} &8yaw &f{yaw} &8pitch &f{pitch}"
+
+[command.board]
+exists = "&8[&dGloss&8] &c計分板 '&f{id}&c' 已存在。"
+missing = "&8[&dGloss&8] &c沒有名為 '&f{id}&c' 的計分板。"
+created = "&8[&dGloss&8] &a已建立計分板 &f{id}&a。"
+deleted = "&8[&dGloss&8] &a已刪除計分板 &f{id}&a。"
+title_set = "&8[&dGloss&8] &a已設定 &f{id}&a 的標題。"
+line_added = "&8[&dGloss&8] &a已在 &f{id}&a 加入第 &f{line}&a 行。"
+line_set = "&8[&dGloss&8] &a已設定 &f{id}&a 的第 &f{line}&a 行。"
+line_removed = "&8[&dGloss&8] &a已從 &f{id}&a 移除第 &f{line}&a 行。"
+line_out_of_range = "&8[&dGloss&8] &c第 {line} 行超出範圍；&f{id}&c 共有 {count} 行。"
+shown = "&8[&dGloss&8] &a正在顯示計分板 &f{id}&a。"
+hidden = "&8[&dGloss&8] &a你的計分板已隱藏。"
+select_set = "&8[&dGloss&8] &a已將計分板 &f{id}&a 的選取優先順序設為 &f{priority}&a。"
+select_invalid = "&8[&dGloss&8] &c計分板條件無效：&f{error}&c。"
+list_empty = "&8[&dGloss&8] &7目前沒有任何計分板。"
+
+[command.board.list]
+hover = "點擊以檢視詳細資料"
+
+[command.board.info]
+header = "&8[&dGloss&8] &d{id} &7標題為 &f{title}"
+meta = "&7優先順序：&f{priority}&7 | 條件：&f{when}&7 | 變體：&f{variants}&7"
+line = " &8{line}. &f{text}"
+
+[command.emoji]
+empty = "&8[&dGloss&8] &7沒有已啟用的表情符號。"
+hover = "點擊以插入聊天"
+
+[command.animations]
+empty = "&8[&dGloss&8] &7沒有已載入的動畫。"
+header = "&8[&dGloss&8] &f動畫: &d{count}"
+entry = "&8- &d{name}"
+
+[command.list]
+page = "&7第 &f{page}&7/&f{pages} 頁 &8- &7顯示 &f{from}&7-&f{to} &7/ 共 &f{total}"
+next = "&7下一頁: &f{command}"
+
+[command.status]
+holograms = "&7全像圖: &f{count} &8({temporary} 個暫時性, {entities} 個實體)"
+boards = "&7計分板: &f{count}"
+emoji = "&7表情符號: &f{enabled}&8/&f{total}"
+animations = "&7動畫: &f{count}"
+effects = "&7泡泡: &f{bubbles} &8| &7指示器: &f{indicators} &8| &7掉落物: &f{drops}"
+
+[command.reset]
+done = "&8[&dGloss&8] &a已還原 &f{count}&a 個內建 {kind} 預設值。"
+none = "&8[&dGloss&8] &c沒有符合 '&f{name}&c' 的內建 {kind} 預設值。"
+
+[command.bubbles]
+style_set = "&8[&dGloss&8] &a聊天泡泡樣式已設為 &f{style}&a。"
+style_cleared = "&8[&dGloss&8] &a已清除聊天泡泡樣式；將自動選擇。"
+style_unknown = "&8[&dGloss&8] &c沒有名為 '&f{style}&c' 的泡泡樣式。"
+
+[command.import]
+config_unreadable = "&8[&dGloss&8] &c無法載入 gloss.toml: &f{reason}"
+
+[command.import.holoui]
+missing = "&8[&dGloss&8] &c在 Gloss 資料夾旁找不到 holoui 資料夾。"
+done = "&8[&dGloss&8] &aHoloUi 匯入完成: 已複製 &f{copied}&a 個、略過 &f{skipped}&a 個、&f{overlaid}&a 個設定鍵、&f{errors}&a 個錯誤。"
+
+[command.import.legacy]
+done = "&8[&dGloss&8] &a舊版遷移完成: 已遷移 &f{migrated}&a 個、併入 &f{absorbed}&a 個、&f{overlaid}&a 個設定鍵、&f{errors}&a 個錯誤。"
+
+[director.help]
+no_subcommands = "此頁面沒有子命令。"
+no_description = "未提供說明"
+command_group = "命令群組。點擊以開啟。"
+category = "指令類別"
+no_parameters = "無參數。點擊以預先填入命令。"
+parameters_hover = "將滑鼠懸停在參數上以瞭解更多。"
+
+[director.help.navigation]
+back = "返回"
+page = "頁面"
+
+[director.help.navigation.parent]
+hover = "返回上層命令群組"
+
+[director.help.navigation.previous]
+hover = "上一頁"
+
+[director.help.navigation.next]
+hover = "下一頁"
+
+[director.help.parameter]
+required = "此參數為必填項。"
+optional = "此參數為可選項。"
+default = "未指定時預設為 \"{value}\"。"
+type = "此參數的類型為 {type}。"
+
+[director.runtime]
+usage = "用法: {usage}"
+
+[director.runtime.error]
+invalid_origin = "無法從此來源執行該指令。"
+unknown_parameter = "未知參數鍵: {key}"
+unexpected_argument = "意外參數 \"{argument}\"。選用參數必須使用鍵指定，例如 seed=123"
+unclosed_group = "參數 {key} 缺少閉合的 \"]\""
+conversion_failed = "無法將 \"{value}\" 轉換為 {parameter} 所需的 {type}"
+default_parse_failed = "無法解析參數 {parameter} 的預設值"
+missing_argument = "缺少參數 \"{parameter}\" ({type})"
+execution_failed = "執行指令 {command} 失敗: {reason}"
+
+[gloss.error]
+menu_name_required = "選單名稱不能為空"
+hologram_id_required = "全像圖 ID 不能為空"
+panel_id_required = "面板 ID 不得留空"
+web_subject_required = "網頁編輯器文件 ID 不得留空"
+web_session_required = "網頁編輯器工作階段 ID 不得留空"
+panel_player_required = "目標玩家不得留空"
+row_icon_type_required = "圖示類型不得留空"
+row_style_property_required = "樣式屬性不得留空"
+import_source_required = "舊版資料匯入來源不得留空"
+import_source_unknown = "未知的舊版資料匯入來源：{source}"
+
+[gloss.message]
+permission_denied = "&8[&dGloss&8]: &c你沒有權限 &f{permission}&c."
+unknown_command = "&8[&dGloss&8]: &c未知指令 \"&f{command}&c\"."
+
+[gloss.message.hologram]
+created = "&8[&dGloss&8]: &a已在你的位置建立全像圖 &f{hologram}&a，根選單為 &f{menu}&a。"
+already_exists = "&8[&dGloss&8]: &c名為 &f{hologram}&c 的全像圖、面板或選單已存在。"
+failed = "&8[&dGloss&8]: &c無法建立全像圖 &f{hologram}&c。未保留任何變更。"
+durability_uncertain = "&8[&dGloss&8]: &e無法安全完成全像圖 &f{hologram}&e 的交易。請先重新啟動 Gloss，再檢查或重試。"
+
+[gloss.message.menu]
+none = "&8[&dGloss&8]: &7沒有可用的選單。"
+player_only = "&8[&dGloss&8]: &c只有玩家才能開啟選單。"
+no_previous = "&8[&dGloss&8]: &c沒有上一個選單可用。"
+closed = "&8[&dGloss&8]: &a選單已關閉。"
+moved = "&8[&dGloss&8]: &a選單已移動。"
+none_open = "&8[&dGloss&8]: &c目前沒有開啟的選單。"
+unavailable = "&8[&dGloss&8]: &c\"{menu}\"無法使用。"
+permission_denied = "&8[&dGloss&8]: &c你沒有開啟\"{menu}\"的權限。"
+open_failed = "&8[&dGloss&8]: &c無法開啟選單\"{menu}\"。"
+
+[gloss.message.menu.list]
+header = "選單"
+entry = "點擊開啟 {menu}。"
+
+[gloss.message.menu.content]
+updated = "&8[&dGloss&8]: &a已對選單 &f{menu}&a 套用操作 {operation}，修訂編號為 {revision}。"
+created = "&8[&dGloss&8]: &a已建立選單 &f{menu}&a，修訂編號為 {revision}。使用 /gloss menu open {menu} 開啟，或使用 /gloss panel create {menu} 放置。"
+copied = "&8[&dGloss&8]: &a已將選單 &f{source}&a 複製為 &f{menu}&a，修訂編號為 {revision}。"
+revision_conflict = "&8[&dGloss&8]: &c選單 &f{menu}&c 在寫入期間發生變更（預期修訂編號：{expected}，目前：{actual}）。請重新執行指令。"
+already_exists = "&8[&dGloss&8]: &c選單 &f{menu}&c 已存在。"
+invalid = "&8[&dGloss&8]: &c選單內容值無效：&f{reason}&c。"
+failed = "&8[&dGloss&8]: &c選單 &f{menu}&c 的內容操作失敗：{reason}"
+
+[gloss.message.command]
+player_only = "&8[&dGloss&8]: &c此指令僅供玩家使用。"
+
+[gloss.message.web]
+header = "網頁編輯器"
+open_hover = "點擊開啟 Gloss 網頁編輯器。"
+open = "&8[&dGloss&8]: &7網頁編輯器：&f{url}&7"
+preparing = "&8[&dGloss&8]: &7正在為 &f{subject}&7 準備安全的編輯器同步工作階段..."
+unavailable = "&8[&dGloss&8]: &c無法使用即時網頁編輯。請檢查編輯器同步設定及與中繼伺服器的連線。"
+open_failed = "&8[&dGloss&8]: &c無法在即時網頁編輯器中開啟 &f{kind}&c=&f{subject}&c：{reason}"
+open_console = "&8[&dGloss&8]: &7&f{subject}&7 的編輯授權連結：&f{url}&7"
+capability_warning = "&8[&dGloss&8]: &e此 URL 可在授權遭撤銷或到期前將變更發布至伺服器。請妥善保密。"
+open_label = "開啟編輯器"
+copy_label = "複製連結"
+revoke_label = "撤銷授權"
+link_hover = "開啟編輯器、複製編輯授權連結，或撤銷工作階段 {session}。"
+
+[gloss.message.web.sessions]
+list_empty = "&8[&dGloss&8]: &7沒有使用中的編輯器同步工作階段。"
+status = "&8[&dGloss&8]: &7&f{session}&7 {kind}=&f{subject}&7 距離到期=&f{seconds}&7秒 已發布修訂編號=&f{revision}&7 待處理=&f{pending}&7"
+revoked = "&8[&dGloss&8]: &a已撤銷編輯器同步工作階段 &f{session}&a。"
+pulled = "&8[&dGloss&8]: &a已查詢編輯器同步工作階段 &f{session}&a 的更新。"
+unknown = "&8[&dGloss&8]: &c編輯器同步工作階段 &f{session}&c 不存在或已到期。"
+failed = "&8[&dGloss&8]: &c編輯器同步工作階段 &f{session}&c 的操作失敗：{reason}"
+
+[gloss.message.import]
+preview_started = "&8[&dGloss&8]: &7正在掃描 &f{source}&7 以預覽移轉結果，不會變更現有資料..."
+apply_started = "&8[&dGloss&8]: &7正在掃描並移轉 &f{source}&7，不會覆寫現有資料..."
+source_missing = "&8[&dGloss&8]: &7在 &f{path}&7 找不到 &f{source}&7 來源。"
+preview_summary = "&8[&dGloss&8]: &7&f{source}&7 預覽：&a{ready}&7 項就緒、&d{resume}&7 項可繼續、&e{conflicts}&7 項衝突、&c{errors}&7 個錯誤、{warnings} 則警告。來源：&f{path}&7"
+preview_entry = "&8- &7&f{legacy}&7 -> &f{board}&7 狀態=&f{state}&7 警告=&f{warnings}&7"
+apply_summary = "&8[&dGloss&8]: &7&f{source}&7 移轉：已匯入 &a{imported}&7 項、已略過 &e{skipped}&7 項、失敗 &c{failed}&7 項；掃描發現 {errors} 個錯誤與 {warnings} 則警告。"
+apply_entry = "&8- &7&f{legacy}&7 狀態=&f{state}&7 原因=&f{reason}&7"
+issue = "&8- &f{legacy} &7{severity}: &f{reason}"
+busy = "&8[&dGloss&8]: &c另一個舊版全像圖移轉作業已在執行。"
+failed = "&8[&dGloss&8]: &c從 &f{source}&c 移轉舊版全像圖失敗：{reason}"
+
+[gloss.message.config]
+reloaded = "&2設定 \"{name}\" 已重新載入."
+
+[gloss.message.hotload]
+singular = "&2已熱重載 {kinds}（{count} 項變更）."
+plural = "&2已熱重載 {kinds}（{count} 項變更）."
+
+[gloss.message.preview_scale]
+adjusting = "&7預覽大小：&f{percent}% &8- &7按住潛行並捲動以調整大小；連按兩下潛行以儲存"
+hidden = "&7預覽已&c隱藏 &8- &7向上捲動以還原"
+size = "&7預覽大小：&f{percent}%"
+saved_hidden = "&7預覽已儲存為&c隱藏 &8- &7在容器上連按兩下潛行並向上捲動以還原"
+saved = "&7預覽大小已儲存：&f{percent}%"
+
+[gloss.message.drops]
+bundle_more = "另有 {count} 種"
+
+[gloss.message.items]
+disabled = "&8[&dGloss&8]: &7自訂物品已停用。請在 gloss.toml 中將 customItems 設為 true。"
+
+[gloss.message.items.status]
+header = "自訂物品"
+summary = "{active}/{total} 個提供者已啟用"
+entry = "插件 {plugin} 的提供者 {provider}。"
+hint = "點擊匯出供網頁編輯器使用的目錄。"
+
+[gloss.message.items.state]
+ready = "已就緒，{count} 個 ID"
+loading = "已偵測到，仍在載入"
+inactive = "已偵測到，沒有轉接器"
+missing = "尚未安裝"
+
+[gloss.message.items.export]
+started = "&8[&dGloss&8]: &7正在匯出自訂物品目錄..."
+done = "&8[&dGloss&8]: &a已將 {providers} 個提供者的 {count} 個物品寫入 &f{path}&a。"
+empty = "&8[&dGloss&8]: &7找不到自訂物品。已將空目錄寫入 &f{path}&7。"
+failed = "&8[&dGloss&8]: &c無法寫入自訂物品目錄。請查看記錄。"
+busy = "&8[&dGloss&8]: &c目錄匯出作業已在執行。"
+
+[gloss.message.previews.list]
+header = "預覽文件"
+empty = "&7尚未載入任何預覽文件。"
+entry = "方塊={blocks} 實體={entities} 特殊元素={special} 優先順序={priority}"
+
+[gloss.message.previews.reset]
+started = "&8[&dGloss&8]: &7正在重設預覽文件「&f{name}&7」..."
+done = "&8[&dGloss&8]: &a已還原 {count} 個內建預覽文件。遮蓋這些文件的額外使用者文件並未移除。"
+none = "&8[&dGloss&8]: &c「{name}」不是內建預覽文件；未重設任何內容。"
+
+[gloss.message.previews.dump]
+unknown = "&8[&dGloss&8]: &c「{name}」不是已載入的預覽文件。"
+result = "&8[&dGloss&8]: &7&a{name}&7：共 &f{total}&7 個元素（面板={panels}、儲存格={cells}、欄位={slots}、標籤={labels}）。"
+no_errors = "&8[&dGloss&8]: &a沒有建置錯誤。"
+error_line = "&8[&dGloss&8]: &c{message}"
+error_more = "&8[&dGloss&8]: &7另有 {count} 項（請查看主控台記錄）。"
+
+[gloss.message.panels]
+created = "&8[&dGloss&8]: &a已建立面板 &f{board}&a，修訂編號為 {revision}。"
+deleted = "&8[&dGloss&8]: &a已刪除面板 &f{board}&a。"
+renamed = "&8[&dGloss&8]: &a已將 &f{oldBoard}&a 重新命名為 &f{board}&a，修訂編號為 {revision}。"
+copied = "&8[&dGloss&8]: &a已將 &f{source}&a 複製為 &f{board}&a。"
+updated = "&8[&dGloss&8]: &a已對 &f{board}&a 套用操作 {operation}，修訂編號為 {revision}。"
+teleported = "&8[&dGloss&8]: &a已傳送至 &f{board}&a。"
+unknown = "&8[&dGloss&8]: &c未知的面板 &f{board}&c。"
+already_exists = "&8[&dGloss&8]: &c面板 &f{board}&c 已存在。"
+invalid = "&8[&dGloss&8]: &c面板值無效：&f{reason}&c。"
+menu_unavailable = "&8[&dGloss&8]: &c根選單 &f{menu}&c 尚未載入。"
+player_unavailable = "&8[&dGloss&8]: &c目標玩家 &f{player}&c 不在線上。"
+world_unavailable = "&8[&dGloss&8]: &c尚未載入與已儲存 UUID 相符的面板世界 &f{world}&c。"
+revision_conflict = "&8[&dGloss&8]: &c面板 &f{board}&c 在編輯期間發生變更（預期修訂編號：{expected}，目前：{actual}）。請重新開啟編輯工作階段。"
+failed = "&8[&dGloss&8]: &c面板 &f{board}&c 的操作失敗：{reason}"
+
+[gloss.message.panels.list]
+header = "&8[&dGloss&8]: &f永久儲存的面板：&d{count}&f"
+empty = "&8[&dGloss&8]: &7尚未載入任何永久儲存的面板。"
+entry = "&8- &7&f{board}&7 選單=&f{menu}&7 修訂編號=&f{revision}&7"
+
+[gloss.message.panels.near]
+header = "&8[&dGloss&8]: &f&d{radius}&f 格範圍內的面板：&d{count}&f"
+empty = "&8[&dGloss&8]: &7此範圍內沒有面板。"
+entry = "&8- &7&f{board}&7 距離=&f{distance}&7 選單=&f{menu}&7"
+
+[gloss.message.panels.info]
+header = "&8[&dGloss&8]: &f面板 &d{board}&f（&7{state}&f）"
+identity = "&7UUID=&f{uuid}&7 修訂編號=&f{revision}&7 選單=&f{menu}&7"
+transform = "&7世界=&f{world}&7 位置=&f{x}&7, &f{y}&7, &f{z}&7 旋轉=&f{yaw}&7, &f{pitch}&7, &f{roll}&7 縮放=&f{scale}&7"
+visibility = "&7可見性=&f{mode}&7 檢視權限=&f{viewPermission}&7 互動權限=&f{interactPermission}&7 範圍=&f{viewRange}&7/&f{interactionRange}&7"
+follow = "&7跟隨=&f{mode}&7 玩家=&f{player}&7 旋轉=&f{rotation}&7"
+
+[gloss.message.panels.edit]
+started = "&8[&dGloss&8]: &a正在從修訂編號 {revision} 編輯 &f{board}&a。變更將暫存至儲存時。"
+already_active = "&8[&dGloss&8]: &c你已在編輯 &f{board}&c。請先儲存或取消。"
+none = "&8[&dGloss&8]: &c你沒有暫存的面板編輯。"
+busy = "&8[&dGloss&8]: &c正在儲存面板 &f{board}&c。"
+staged = "&8[&dGloss&8]: &a已暫存 &f{board}&a 的操作 {operation}。請使用 /gloss panel save 儲存。"
+saved = "&8[&dGloss&8]: &a已儲存 &f{board}&a，修訂編號為 {revision}。"
+cancelled = "&8[&dGloss&8]: &a已取消 &f{board}&a 暫存的編輯。"
+identity_blocked = "&8[&dGloss&8]: &c重新命名或刪除 &f{board}&c 前，請先儲存或取消暫存的編輯。"
+
+[gloss.preview.state]
+idle = "閒置"
+brewing = "釀造中 {percent}%"
+needs_blaze_powder = "需要烈焰粉"
+waiting = "等待中"
+no_ingredient = "沒有原料"
+empty = "空"
+smelting_item = "正在熔煉 {item} {percent}%"
+smelting = "正在熔煉 {percent}%"
+blasting_item = "正在高爐熔煉 {item} {percent}%"
+blasting = "正在高爐熔煉 {percent}%"
+smoking_item = "正在煙燻 {item} {percent}%"
+smoking = "正在煙燻 {percent}%"
+heating = "加熱中"
+needs_fuel = "需要燃料"
+no_input = "沒有輸入"
+surge_suffix = "  +{seconds}s"
+disc_playing = "正在播放：{disc}"
+disc_loaded = "已裝入：{disc}"
+no_disc = "沒有唱片"
+
+[gloss.preview.stat]
+fuel_level = "燃料 {fuel}/{maximum}"
+no_fuel = "沒有燃料"
+bottles = "瓶子 {bottles}/{maximum}"
+fuel_seconds = "燃料 {seconds}s"
+fuel_ready = "燃料就緒"
+xp_gain = "XP +{experience}"
+xp_zero = "XP 0"
+bees_and_honey = "蜜蜂 {bees}/{maximumBees}   蜂蜜 {honey}/{maximumHoney}"
+cauldron_empty = "空 {level}/{maximum}"
+cauldron_level = "液位 {level}/{maximum}"
+
+[gloss.preview.theme.title]
+chest = "&6&l儲物箱"
+trapped_chest = "&c&l陷阱儲物箱"
+ender_chest = "&5&l終界箱"
+barrel = "&e&l木桶"
+dispenser = "&7&l發射器"
+dropper = "&8&l投擲器"
+hopper = "&8&l漏斗"
+furnace = "&6&l熔爐"
+smoker = "&e&l煙燻爐"
+blast_furnace = "&b&l高爐"
+beehive = "&e&l蜂箱"
+bee_nest = "&e&l蜂窩"
+cauldron = "&7&l鍋釜"
+water_cauldron = "&9&l裝水的鍋釜"
+lava_cauldron = "&6&l裝熔岩的鍋釜"
+powder_snow_cauldron = "&f&l裝粉雪的鍋釜"
+jukebox = "&d&l唱片機"
+brewing_stand = "&d&l釀造台"
+chiseled_bookshelf = "&6&l浮雕書櫃"
+hopper_minecart = "&8&l漏斗礦車"
+chest_minecart = "&6&l儲物箱礦車"
+mobile = "&7&l{name}"
+shulker = "&l{color} 界伏盒"
+copper_chest = "&6&l{name}"
+shelf = "&6&l{name}"
+container = "&6&l容器"
+
+[language.menu]
+your_language = "您的語言"
+reset_your_language = "重設您的語言"
+server_default = "伺服器預設語言"
+edit_messages = "編輯語言訊息"
+use_server_default = "使用伺服器預設語言"
+current = "目前：{locale}"
+current_with_personal = "目前：{locale}（您的：{personal}）"
+your_description = "只變更您看到的訊息。"
+reset_description = "使用伺服器預設語言。"
+server_description = "變更伺服器預設語言。"
+edit_description = "開啟各語言的訊息編輯器。"
+select_description = "點擊以選擇此語言。"
+remove_personal_description = "移除您的個人語言選擇。"
+no_controls = "您無權使用語言設定。"
+command = "命令: {command}"
+selected = "已選擇"
+all-volmit-plugins = "所有 Volmit 外掛"
+
+[language.error]
+stopping = "外掛停止期間無法選擇語言。"
+editor-player-only = "請在遊戲中開啟語言編輯器。"
+no-providers = "沒有可用的 Volmit 語言提供程式。"
+numeric-page = "請輸入數字頁碼。"
+personal-player-only = "玩家必須在遊戲中選擇個人語言。"
+personal-permission = "你沒有權限選擇個人語言。"
+plugin-personal-permission = "你沒有權限為 {plugin} 選擇個人語言。"
+plugin-server-permission = "你沒有權限變更 {plugin} 的伺服器語言。"
+server-locale-required = "請選擇 en_US 等語言代碼作為伺服器預設語言。"
+unavailable-for-all = "語言 {locale} 並非適用於所有選取的外掛。"
+
+[language.usage]
+editor = "用法: /{command} language server edit [locale]"
+selection = "用法: /{command} language self [locale|reset] or server [locale]"
+volmit-selection = "用法: /volmit plugins languages [locale]"
+
+[language.selection]
+preparing = "正在為 {target} 準備語言 {locale}..."
+save-failed = "{plugin}：無法儲存語言選擇；請檢查伺服器主控台。"
+english-fallback = "{plugin}：{locale} 無法使用；將使用英語（en_US）。"
+personal-selected = "{plugin}：你的語言現在是 {locale}。"
+server-selected = "{plugin}：伺服器語言現在是 {locale}。"
+server-default-selected = "{plugin}：你的語言現在跟隨伺服器預設語言。"
+
+[language.editor]
+loading = "正在載入 {locale} 的訊息..."
+
+[language.editor.section]
+languages = "語言"
+search = "搜尋"
+search-title = "{locale} / 搜尋"
+group-title = "{locale} / {group}"
+
+[language.editor.prompt]
+search = "搜尋訊息鍵或內容。輸入 cancel 返回。"
+value = "請在聊天中輸入 {key} 的新值。"
+current = "目前值： {value}"
+variables = "變數: {variables}"
+guidance = "使用 \\n 表示換行，\\\\ 表示反斜線，或輸入 cancel 返回。"
+
+[language.editor.input]
+expired = "語言編輯器的輸入時間已到期。"
+too-long = "輸入最多可包含 {maximum} 個字元。"
+unable-to-save = "無法儲存：{reason}"
+
+[language.editor.navigation]
+back = "&e返回&r"
+close = "&c關閉&r"
+previous-page = "&e前一頁&r"
+next-page = "&e下一頁&r"
+
+[language.editor.search]
+messages = "搜尋訊息"
+messages-lore = "點擊搜尋所有訊息。"
+clear = "清除搜尋"
+
+[language.editor.message]
+current-value = "&7目前值:&r"
+variables = "&8{variables}&r"
+edit-plural = "&7點擊編輯複數形式。&r"
+edit-lines = "&7點擊逐行編輯。&r"
+edit-chat = "&7點擊在聊天中編輯。&r"
+
+[language.editor.locale]
+open = "&8點擊開啟此語言。&r"
+
+[language.editor.category]
+message-count = "&7{count} 則訊息&r"
+open = "&8點擊開啟此類別。&r"
+
+[language.editor.error]
+no-permission = "你沒有權限編輯 {plugin} 的語言。"
+unable-to-edit = "無法編輯：{reason}"
+
+[language.editor.saved]
+summary = "已儲存 {locale}。語言選擇保持不變。"
+change = "{key}：已將「{before}」改為「{after}」。"
+
+[language.editor.part]
+line = "第 {line} 行"
+
+[language.editor.value]
+none = "無"
+empty = "(空)"

@@ -170,7 +170,9 @@ public final class GlossCommandService implements CommandExecutor, TabCompleter,
         if (isScopedPositionalRoot(routed)) {
             routed = normalizePositionalArgs(routed);
         }
-        if (!(routed.length > 0 && routed[0].equalsIgnoreCase("debugdump"))
+        if (!(routed.length > 0 && routed[0].equalsIgnoreCase("debug")
+            && (routed.length > 1 && routed[1].equalsIgnoreCase("dump")
+                || routed.length == 1 && sender.hasPermission("gloss.debugdump")))
             && !hasBaseCommandAccess(sender)) {
             GlossLocalization.sendGlobal(sender, GlossMessages.COMMAND_NO_PERMISSION_USE);
             playFailureChime(sender);
@@ -204,7 +206,7 @@ public final class GlossCommandService implements CommandExecutor, TabCompleter,
         if (ROOT_COMMAND.equals(commandName) && args.length > 1 && "language".equalsIgnoreCase(args[0])) {
             return plugin.languageSwitcher().complete(sender, Arrays.copyOfRange(args, 1, args.length));
         }
-        if (ROOT_COMMAND.equals(commandName) && args.length > 1 && "debugdump".equalsIgnoreCase(args[0])) {
+        if (ROOT_COMMAND.equals(commandName) && args.length > 1 && "debug".equalsIgnoreCase(args[0])) {
             return sender.hasPermission("gloss.debugdump") ? runDirectorTab(sender, commandName, args) : List.of();
         }
         if (!hasBaseCommandAccess(sender)) {
@@ -215,8 +217,8 @@ public final class GlossCommandService implements CommandExecutor, TabCompleter,
                         && sender.hasPermission("gloss.language.self")) {
                     suggestions.add("language");
                 }
-                if ("debugdump".startsWith(prefix) && sender.hasPermission("gloss.debugdump")) {
-                    suggestions.add("debugdump");
+                if ("debug".startsWith(prefix) && sender.hasPermission("gloss.debugdump")) {
+                    suggestions.add("debug");
                 }
             }
             return List.copyOf(suggestions);

@@ -31,7 +31,7 @@ public class EditorSyncPublicationValidatorTest {
     assertEquals("shop", validated.project().subjectId());
     assertNotEquals(changed.get("baseRevision").getAsString(),
         validated.project().baseRevision());
-    assertEquals("{\"offset\":[0,0,1],\"components\":[]}\n",
+    assertEquals("{\"offset\":[0,0,1],\"components\":[]}" + System.lineSeparator(),
         EditorSyncDocuments.parse(validated.project().json()).getFirst().json());
   }
 

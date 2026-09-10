@@ -73,6 +73,7 @@ plugins/Gloss/
 └── import-backups/<timestamp>/      on a legacy data import that has something to migrate
 ```
 
-Configuration, localization and content documents hotload — edit them on disk and the change applies
+Configuration, localization and content documents hotload. Edit them on disk and the change applies
 in game without a restart. Deleting a folder is safe: Gloss reads what is there and recreates only
-what it writes. `panels/` is the one exception and reloads through `/gloss panel reload`.
+what it writes. Panel files also apply stable edits, additions and deletions automatically, retaining
+the last working definition when an edit is invalid.

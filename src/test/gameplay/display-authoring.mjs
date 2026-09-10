@@ -32,6 +32,9 @@ export default {
       'GLOSS_QA_INSTANCE_PATH must name the current isolated instance')
     const root = path.join(instancePath, 'plugins/Gloss')
     const originals = new Map()
+    let actionBar = ''
+    const onActionBar = message => { actionBar = message.toString().replace(/\u00a7./g, '') }
+    bot.on('actionBar', onActionBar)
     const keys = bot.registry.entitiesByName.text_display.metadataKeys
     const displays = () => Object.values(bot.entities).filter(entity => entity.name === 'text_display'
       && entity.position.y > 190 && Math.abs(entity.position.x) < 20 && Math.abs(entity.position.z) < 20)
@@ -52,16 +55,19 @@ export default {
     const command = (value, pattern = /./) => context.command(value, pattern, 10000)
     const save = async (relative, value) => {
       const file = path.join(root, relative)
-      if (!originals.has(file)) {
-        try { originals.set(file, await readFile(file, 'utf8')) }
-        catch (error) { if (error.code !== 'ENOENT') throw error; originals.set(file, null) }
-      }
+      let current = null
+      try { current = await readFile(file, 'utf8') }
+      catch (error) { if (error.code !== 'ENOENT') throw error }
+      if (!originals.has(file)) originals.set(file, current)
+      const content = typeof value === 'string' ? value : JSON.stringify(value, null, 2)
+      if (content === current) return
+      const kind = relative.split('/')[0]
+      await until(() => !actionBar.includes('Hotloaded'), 'The previous hotload notice did not clear', 10000)
       await mkdir(path.dirname(file), { recursive: true })
-      await writeFile(file, typeof value === 'string' ? value : JSON.stringify(value, null, 2))
-    }
-    const reload = async () => {
-      await command('/gloss reload', /reload/i)
-      await context.sleep(1000)
+      await writeFile(file, content)
+      await until(() => actionBar.includes('Hotloaded') && actionBar.includes(kind),
+        `${relative} did not report a successful automatic hotload`, 20000)
+      context.report.hotloads.push({ file: relative, notice: actionBar })
     }
     const expectStyle = async marker => {
       const entity = await until(() => marked(marker), `${marker} text did not appear`)
@@ -78,6 +84,7 @@ export default {
       return entity
     }
     context.report.styles = []
+    context.report.hotloads = []
     try {
       await context.step('Prepare isolated display controls', async () => {
         bot.chat('/gamemode creative @s')
@@ -99,7 +106,6 @@ export default {
         const holo = { schemaVersion: 3, revision: 1, anchor: { world: 'world', position: [0, 198, 5] },
           lines: ['<aqua>AUTHOR_HOLOGRAM</aqua>'], style, box, particleLayers: [], show: true }
         await save('holograms/authoring-qa.json', holo)
-        await reload()
         const hologram = await expectStyle('AUTHOR_HOLOGRAM')
         context.expect(!text(hologram).includes('<aqua>'), 'Persistent authored text retained literal rich markup')
         const firstWidth = allBoxParts().find(entity =>
@@ -123,18 +129,15 @@ export default {
         drop.presentation.labels.box = box
         drop.revision++
         await save('real-drops/default.json', drop)
-        await reload()
         await command('/summon minecraft:item 3 196 4 {Item:{id:"minecraft:diamond",count:16},NoGravity:1b,PickupDelay:32767s,Tags:["author_drop"]}', /summoned/i)
         const diamond = await expectStyle('Diamond')
         context.expect(text(diamond).includes(bot.username), 'Real Drops label lost its viewer expression', { text: text(diamond) })
         const config = await readFile(path.join(root, 'gloss.toml'), 'utf8')
         await save('gloss.toml', config.replace(/realDrops\s*=\s*true/, 'realDrops = false'))
-        await reload()
         await until(() => Object.values(bot.entities).some(entity => entity.name === 'item'
           && entity.position.y > 190 && Math.abs(entity.position.x - 3) < 2
           && Math.abs(entity.position.z - 4) < 2), 'Disabling boxed Real Drops left the collectible item hidden')
         await save('gloss.toml', config)
-        await reload()
         await expectStyle('Diamond')
         await save('real-drops/default.json', { ...drop, revision: drop.revision + 1, show: false })
         await until(() => !marked('Diamond') && allBoxParts().length === 0,
@@ -146,7 +149,6 @@ export default {
         await save('gloss.toml', config.replace(/preserveCustomNames\s*=\s*false/, 'preserveCustomNames = true'))
         const drop = JSON.parse(await readFile(path.join(root, 'real-drops/default.json'), 'utf8'))
         await save('real-drops/default.json', { ...drop, revision: drop.revision + 1, show: true })
-        await reload()
         const summon = '/summon minecraft:item 3 196 4 {Item:{id:"minecraft:paper",count:1},CustomName:{text:"<red>AUTHOR_LITERAL</red>"},CustomNameVisible:1b,NoGravity:1b,PickupDelay:600s,Tags:["author_literal"]}'
         await command(summon, /summoned/i)
         const literal = await expectStyle('AUTHOR_LITERAL')
@@ -166,7 +168,6 @@ export default {
           .replace(/^nameFormat\s*=.*$/m, 'nameFormat = "AUTHOR_DROP {{ player.name }} {count}x {type}"'))
         const drop = JSON.parse(await readFile(path.join(root, 'real-drops/default.json'), 'utf8'))
         await save('real-drops/default.json', { ...drop, revision: drop.revision + 1, show: true })
-        await reload()
         await command('/summon minecraft:item 3 196 4 {Item:{id:"minecraft:emerald",count:7},NoGravity:1b,PickupDelay:32767s,Tags:["author_drop"]}', /summoned/i)
         const emerald = await expectStyle('Emerald')
         context.expect(text(emerald).includes(bot.username), 'Standalone label lost its viewer expression', { text: text(emerald) })
@@ -185,20 +186,21 @@ export default {
         bubble.style = style
         bubble.box = box
         bubble.hideOwn = false
-        bubble.maxAliveMs = 6000
+        bubble.maxAliveMs = 60000
         bubble.motion = { translation: { x: '0', y: '0', z: '0' }, scale: { x: '1', y: '1', z: '1' },
           rotation: { x: '0', y: '0', z: '0' }, opacity: '1' }
         bubble.shimmer.spawn = false
         bubble.shimmer.flyAway = false
         await save('bubbles/default.json', bubble)
-        await reload()
+        const bubbleStartedAt = Date.now()
         await command('AUTHOR_BUBBLE', /AUTHOR_BUBBLE/)
         const bubbleText = await expectStyle('AUTHOR_BUBBLE')
         context.expect(text(bubbleText).includes('RICH_PREFIX') && !text(bubbleText).includes('<gold>'),
           'Configured bubble prefix did not pass through rich text', { text: text(bubbleText) })
         await save('bubbles/default.json', { ...bubble, revision: bubble.revision + 1, show: false })
-        await reload()
         await until(() => !marked('AUTHOR_BUBBLE') && allBoxParts().length === 0, 'Bubble reload left decoration behind')
+        context.expect(Date.now() - bubbleStartedAt < bubble.maxAliveMs - 1000,
+          'Bubble cleanup was not observed before its natural expiry')
       })
       await context.step('Damage indicators allow authored labels without amount tokens', async () => {
         const indicators = JSON.parse(await readFile(path.join(root, 'damage-indicators/default.json'), 'utf8'))
@@ -210,7 +212,6 @@ export default {
         indicators.damage.presentation.motion = { horizontalSpeed: 0, verticalSpeed: 0, verticalAcceleration: 0, spinDegreesPerSecond: 0 }
         indicators.damage.presentation.transform = { startScale: 1, endScale: 1, fadeStartFraction: 1 }
         await save('damage-indicators/default.json', indicators)
-        await reload()
         await command('/summon husk 1 196 5 {NoAI:1b,Silent:1b,Tags:["author_target"]}', /summoned/i)
         await command('/damage @e[tag=author_target,limit=1] 2 minecraft:generic', /damage/i)
         await expectStyle('AUTHOR_HIT')
@@ -220,7 +221,6 @@ export default {
       await context.step('Menu text boxes share packet styles and retire on close', async () => {
         const fixture = await readFile(new URL('./fixtures/display-authoring-menu.json', import.meta.url), 'utf8')
         await save('menus/authoring-qa.json', fixture)
-        await reload()
         for (let attempt = 0; attempt < 12 && !marked('Authoring probe'); attempt++) {
           bot.chat('/gloss menu open authoring-qa')
           await context.sleep(1000)
@@ -245,7 +245,6 @@ export default {
         await save('previews/authoring-qa.json', fixture)
         await command('/setblock 0 196 4 minecraft:air', /changed|placed|could not/i)
         await command('/setblock 0 196 4 minecraft:chest{Items:[{Slot:0b,id:"minecraft:diamond",count:12}]}', /changed|placed/i)
-        await reload()
         await bot.lookAt(bot.entity.position.clone().set(0.5, 196.5, 4.5), true)
         const label = await until(() => marked('Box label'), 'Authored preview label did not appear')
         const border = () => displays().filter(display =>
@@ -269,16 +268,21 @@ export default {
         await command('/setblock 0 196 4 minecraft:air', /changed|placed/i)
       })
     } finally {
-      for (const [file, content] of originals) {
-        if (content === null) await rm(file, { force: true })
-        else await writeFile(file, content)
-      }
-      bot.creative.stopFlying()
-      if (bot._client.state === 'play') {
-        await command('/kill @e[tag=author_drop]', /killed|found/i)
-        await command('/kill @e[tag=author_target]', /killed|found/i)
-        await command('/kill @e[tag=author_literal]', /killed|found/i)
-        await reload()
+      try {
+        for (const [file, content] of originals) {
+          if (content === null) await rm(file, { force: true })
+          else await writeFile(file, content)
+        }
+        bot.creative.stopFlying()
+        if (bot._client.state === 'play') {
+          await command('/kill @e[tag=author_drop]', /killed|found/i)
+          await command('/kill @e[tag=author_target]', /killed|found/i)
+          await command('/kill @e[tag=author_literal]', /killed|found/i)
+          await until(() => !displays().some(entity => /AUTHOR_|Authoring probe|Box label/.test(text(entity)))
+            && allBoxParts().length === 0, 'Restoring files retained authored text or decoration', 20000)
+        }
+      } finally {
+        bot.removeListener('actionBar', onActionBar)
       }
     }
   }

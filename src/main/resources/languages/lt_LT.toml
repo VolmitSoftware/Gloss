@@ -1,0 +1,828 @@
+# Gloss — lt_LT
+#
+# === Failo redagavimas ===
+# plugins/Gloss/languages/lt_LT.toml
+# Šį failą galima redaguoti tiesiogiai. Vietiniai pakeitimai išsaugomi; trūkstamiems ar netinkamiems įrašams naudojama integruota anglų kalba.
+# /gloss language server edit lt_LT
+#
+# === Priešdėlis ===
+# Priešdėlis &8[&dGloss&8] yra kiekvieno pranešimo dalis: keiskite jį atitinkamuose pranešimuose.
+#
+# === Formatavimas ===
+# Spalvos: &0-&f, &k-&r, &#RRGGBB.
+#
+# === Kintamieji ===
+# Nekeiskite kintamųjų pavadinimų ir naudokite tik konkrečiame pranešime esančius kintamuosius.
+#   {absorbed}  Importuoti įrašai, sujungti su esamais duomenimis
+#   {active}  Aktyvių teikėjų skaičius
+#   {actual}  Dabartinė versija
+#   {after}  Pranešimo reikšmė po redagavimo
+#   {argument}  Netikėtas komandos argumentas
+#   {axis}  Koordinačių arba sukimo ašis
+#   {bees}  Bičių skaičius talpykloje
+#   {before}  Pranešimo reikšmė prieš redagavimą
+#   {billboard}  Rodomo objekto orientavimo režimas
+#   {blocks}  Blokų rodymo elementų skaičius
+#   {board}  Lentos arba skydelio identifikatorius
+#   {bottles}  Butelių skaičius talpykloje
+#   {bubbles}  Aktyvių pokalbių burbulų skaičius
+#   {cells}  Meniu langelių skaičius
+#   {color}  Rodomo elemento arba daikto spalva
+#   {command}  Komandos kelias
+#   {conflicts}  Importavimo konfliktų skaičius
+#   {copied}  Nukopijuotų įrašų skaičius
+#   {count}  Atitinkančių objektų arba pranešimų skaičius
+#   {disc}  Muzikos plokštelė talpykloje
+#   {distance}  Atstumas iki tikslo
+#   {drops}  Rodomų numestų daiktų skaičius
+#   {enabled}  Įjungimo būsena arba įjungtų įrašų skaičius
+#   {entities}  Esybių skaičius
+#   {error}  Tikrinimo arba operacijos klaida
+#   {errors}  Klaidų skaičius
+#   {expected}  Išsaugant pakeitimą tikėtasi šios versijos
+#   {experience}  Gautos patirties kiekis
+#   {failed}  Nepavykusių operacijų skaičius
+#   {from}  Pradinė reikšmė arba intervalo pradžia
+#   {fuel}  Talpykloje likęs kuras
+#   {group}  Kalbos redaktoriaus kategorija
+#   {hologram}  Hologramos identifikatorius
+#   {honey}  Dabartinis medaus lygis
+#   {id}  Objekto identifikatorius
+#   {imported}  Importuotų įrašų skaičius
+#   {indicators}  Žalos indikatorių skaičius
+#   {interactPermission}  Sąveikai reikalingas leidimas
+#   {interactionRange}  Didžiausias sąveikos atstumas
+#   {item}  Daikto pavadinimas arba medžiaga
+#   {key}  Pranešimo arba nustatymo raktas
+#   {kind}  Objekto arba teikėjo tipas
+#   {kinds}  Galimi objektų arba teikėjų tipai
+#   {labels}  Teksto žymų skaičius
+#   {legacy}  Importavimo šaltinio identifikatorius
+#   {level}  Rodomas lygis
+#   {limit}  Leidžiama riba
+#   {line}  Eilutės numeris pranešime
+#   {locale}  Kalbos kodas
+#   {maximum}  Didžiausia leidžiama reikšmė
+#   {maximumBees}  Didžiausias bičių skaičius
+#   {maximumHoney}  Didžiausias medaus lygis
+#   {menu}  Meniu identifikatorius
+#   {message}  Atsakymo arba diagnostikos pranešimas
+#   {migrated}  Konvertuotų įrašų skaičius
+#   {minimum}  Mažiausia leidžiama reikšmė
+#   {mode}  Pasirinktas veikimo arba rodymo režimas
+#   {name}  Objekto pavadinimas
+#   {oldBoard}  Ankstesnės lentos identifikatorius
+#   {operation}  Operacijos pavadinimas
+#   {options}  Galimos komandos parinktys
+#   {overlaid}  Pritaikytų konfigūracijos raktų skaičius
+#   {page}  Dabartinio puslapio numeris
+#   {pages}  Bendras puslapių skaičius
+#   {panels}  Skydelių skaičius
+#   {parameter}  Komandos parametro pavadinimas
+#   {path}  Failo arba katalogo kelias
+#   {pending}  Publikuoti laukiančių pakeitimų būsena
+#   {percent}  Procentinė reikšmė
+#   {permission}  Reikalingas leidimas
+#   {personal}  Asmeninis kalbos kodas
+#   {pitch}  Vertikalus kampas laipsniais
+#   {player}  Žaidėjo vardas
+#   {plugin}  Papildinio pavadinimas
+#   {priority}  Pasirinkimo arba atvaizdavimo prioritetas
+#   {provider}  Teikėjo pavadinimas
+#   {providers}  Teikėjų sąrašas arba skaičius
+#   {radius}  Paieškos spindulys
+#   {ready}  Importuoti paruoštų įrašų skaičius
+#   {reason}  Klaidos arba sprendimo priežastis
+#   {resume}  Įrašų, kurių importavimą galima tęsti, skaičius
+#   {revision}  Dokumento versija
+#   {roll}  Posvyrio kampas laipsniais
+#   {rotation}  Rodomo objekto pasukimas
+#   {scale}  Rodomo objekto arba peržiūros mastelis
+#   {seconds}  Laikas sekundėmis
+#   {session}  Redaktoriaus seanso identifikatorius
+#   {severity}  Diagnostikos svarbos lygis
+#   {skipped}  Praleistų įrašų skaičius
+#   {slots}  Daiktų vietų skaičius
+#   {source}  Importavimo šaltinis arba konfigūracijos teikėjas
+#   {special}  Specialių rodymo elementų skaičius
+#   {state}  Dabartinė būsena
+#   {style}  Rodymo stilius
+#   {subject}  Žiniatinklio redaktoriaus seanso objektas
+#   {target}  Kalbos pasirinkimą gaunantis papildinys
+#   {temporary}  Laikinų objektų skaičius
+#   {text}  Rodomas tekstas
+#   {title}  Rodomas pavadinimas
+#   {to}  Galinė reikšmė arba intervalo pabaiga
+#   {total}  Bendras įrašų skaičius
+#   {type}  Tikėtinas reikšmės arba objekto tipas
+#   {url}  Žiniatinklio adresas
+#   {usage}  Komandos sintaksė
+#   {uuid}  Unikalus objekto arba žaidėjo identifikatorius
+#   {value}  Dabartinė pranešimo arba parametro reikšmė
+#   {variables}  Pranešime leidžiami kintamieji
+#   {variants}  Rodymo variantų skaičius arba sąrašas
+#   {viewPermission}  Peržiūrai reikalingas leidimas
+#   {viewRange}  Didžiausias matymo atstumas
+#   {warnings}  Įspėjimų skaičius
+#   {when}  Rodymo sąlyga
+#   {world}  Pasaulio pavadinimas
+#   {x}  X koordinatė
+#   {y}  Y koordinatė
+#   {yaw}  Horizontalus kampas laipsniais
+#   {z}  Z koordinatė
+
+[command.help]
+debug = "Diagnostikos komandos"
+debugdump = "Sukurti diagnostikos ataskaitą ir pasirinktinai ją įkelti"
+debugdump_upload = "Įkelti ataskaitą į mclo.gs"
+root = "Gloss komandų grupė"
+hologram = "Kurti ir tvarkyti hologramas"
+"hologram.create" = "Sukurti hologramą jūsų vietoje"
+"hologram.create.id" = "Unikalus hologramos ID"
+"hologram.delete" = "Ištrinti hologramą"
+"hologram.delete.id" = "Trinamos hologramos ID"
+"hologram.addline" = "Pridėti eilutę į hologramą"
+"hologram.addline.id" = "Hologramos ID"
+"hologram.addline.text" = "Eilutės tekstas; rašykite kabutėse, jei yra tarpų"
+"hologram.setline" = "Pakeisti hologramos eilutę"
+"hologram.setline.id" = "Hologramos ID"
+"hologram.setline.line" = "Eilutės numeris, pradedant nuo 1"
+"hologram.setline.text" = "Eilutės tekstas; rašykite kabutėse, jei yra tarpų"
+"hologram.removeline" = "Pašalinti hologramos eilutę"
+"hologram.removeline.id" = "Hologramos ID"
+"hologram.removeline.line" = "Eilutės numeris, pradedant nuo 1"
+"hologram.clear" = "Pašalinti visas hologramos eilutes"
+"hologram.clear.id" = "Hologramos ID"
+"hologram.movehere" = "Perkelti hologramą į jūsų vietą"
+"hologram.movehere.id" = "Hologramos ID"
+"hologram.move" = "Paslinkti hologramą santykiniais blokų atstumais"
+"hologram.move.id" = "Hologramos ID"
+"hologram.move.x" = "Santykinis X poslinkis blokais"
+"hologram.move.y" = "Santykinis Y poslinkis blokais"
+"hologram.move.z" = "Santykinis Z poslinkis blokais"
+"hologram.tp" = "Teleportuotis prie hologramos"
+"hologram.tp.id" = "Hologramos ID"
+"hologram.list" = "Rodyti hologramų sąrašą; spustelėkite, kad teleportuotumėtės"
+"hologram.info" = "Rodyti hologramos vietą ir eilutes"
+"hologram.info.id" = "Hologramos ID"
+"hologram.rendertext" = "Sukurti natūraliai keičiamo dydžio teksto hologramą"
+"hologram.rendertext.id" = "Unikalus hologramos ID"
+"hologram.rendertext.text" = "Rodomas tekstas; jei yra tarpų, rašykite kabutėse"
+"hologram.rendertext.scale" = "TextDisplay mastelio daugiklis"
+"hologram.orient" = "Nustatyti, kaip holograma pasisuka į žiūrovus"
+"hologram.orient.id" = "Hologramos ID"
+"hologram.orient.billboard" = "CENTER, VERTICAL, HORIZONTAL arba FIXED"
+"hologram.orient.yaw" = "Posūkio kampas (yaw) laipsniais, nuo -180 iki 180"
+"hologram.orient.pitch" = "Palenkimo kampas (pitch) laipsniais, nuo -90 iki 90"
+board = "Kurti ir tvarkyti rezultatų lenteles"
+"board.create" = "Sukurti rezultatų lentelę"
+"board.create.id" = "Unikalus lentelės ID"
+"board.delete" = "Ištrinti rezultatų lentelę"
+"board.delete.id" = "Trinamos lentelės ID"
+"board.title" = "Nustatyti rezultatų lentelės antraštę"
+"board.title.id" = "Lentelės ID"
+"board.title.text" = "Antraštės tekstas; rašykite kabutėse, jei yra tarpų"
+"board.addline" = "Pridėti eilutę į rezultatų lentelę"
+"board.addline.id" = "Lentelės ID"
+"board.addline.text" = "Eilutės tekstas; rašykite kabutėse, jei yra tarpų"
+"board.setline" = "Pakeisti rezultatų lentelės eilutę"
+"board.setline.id" = "Lentelės ID"
+"board.setline.line" = "Eilutės numeris, pradedant nuo 1"
+"board.setline.text" = "Eilutės tekstas; rašykite kabutėse, jei yra tarpų"
+"board.removeline" = "Pašalinti rezultatų lentelės eilutę"
+"board.removeline.id" = "Lentelės ID"
+"board.removeline.line" = "Eilutės numeris, pradedant nuo 1"
+"board.show" = "Rodyti rezultatų lentelę sau"
+"board.show.id" = "Lentelės ID"
+"board.hide" = "Paslėpti savo rezultatų lentelę"
+"board.select" = "Nustatyti automatinį rezultatų lentos pasirinkimą"
+"board.select.id" = "Rezultatų lentos identifikatorius"
+"board.select.priority" = "Pasirinkimo prioritetas"
+"board.select.when" = "Loginė sąlyga; išraiškas su tarpais rašykite kabutėse"
+"board.list" = "Rodyti rezultatų lentelių sąrašą"
+"board.info" = "Rodyti rezultatų lentelės antraštę, eilutes ir nustatymus"
+"board.info.id" = "Lentelės ID"
+"board.reset" = "Atkurti numatytąsias rezultatų lenteles"
+emoji = "Pokalbių jaustukų įrankiai"
+"emoji.list" = "Rodyti įjungtus jaustukus; spustelėkite, kad įterptumėte į pokalbį"
+"emoji.reset" = "Atkurti numatytuosius jaustukus"
+animations = "Animacijų įrankiai"
+"animations.list" = "Rodyti animacijų pavadinimus"
+"animations.reset" = "Atkurti numatytąsias animacijas"
+bubbles = "Pokalbių burbulų stiliai"
+"bubbles.style" = "Pasirinkti pokalbių burbulo stilių arba clear, kad būtų parenkama automatiškai"
+"bubbles.style.style" = "Stiliaus ID arba clear"
+"bubbles.reset" = "Atkurti numatytuosius burbulų stilius"
+tablist = "Žaidėjų sąrašo įrankiai"
+"tablist.reset" = "Atkurti numatytąjį žaidėjų sąrašo dokumentą"
+motd = "MOTD įrankiai"
+"motd.reset" = "Atkurti numatytąjį MOTD dokumentą"
+drops = "Numestų daiktų vaizdavimo įrankiai"
+"drops.reset" = "Atkurti numatytąjį numestų daiktų nustatymų dokumentą"
+indicators = "Žalos ir gydymo indikatorių įrankiai"
+"indicators.reset" = "Atkurti numatytąjį žalos indikatorių nustatymų dokumentą"
+status = "Rodyti glaustą vykdymo statistiką"
+import = "Perkelti senas hologramas nekeičiant šaltinio failų"
+"import.apply" = "Vykdyti senų hologramų perkėlimą be perrašymo"
+"import.holoui" = "Kopijuoti HoloUi duomenis iš plugins/holoui, perrašant ankstesnius importus"
+"import.legacy" = "Perkelti iki sujungimo sukurtus Gloss duomenų failus į v2 formatą"
+"import.preview" = "Peržiūrėti nedestruktyvų senų hologramų perkėlimą"
+item = "Pasirinktinių daiktų teikėjų įrankiai"
+"item.export" = "Eksportuoti pasirinktinių daiktų katalogą žiniatinklio redaktoriui"
+"item.status" = "Rodyti, kurie pasirinktinių daiktų teikėjai aktyvūs"
+menu = "Kurti, atidaryti ir redaguoti hologramų meniu"
+"menu.addrow" = "Pridėti teksto dekoracijos eilutę"
+"menu.back" = "Iš naujo atidaryti ankstesnę meniu sesiją"
+"menu.close" = "Uždaryti dabartinę meniu sesiją"
+"menu.copy" = "Kopijuoti įkeltą meniu į naują įdėtinį ID"
+"menu.create" = "Sukurti nuolatinę hologramą dabartinėje jūsų vietoje"
+"menu.image" = "Pakeisti meniu turinį vienu centruotu paveikslėlio failu"
+"menu.insertrow" = "Įterpti teksto dekoracijos eilutę"
+"menu.list" = "Rodyti visus sukonfigūruotus meniu, kuriuos galite atidaryti"
+"menu.move" = "Perkelti atidarytą meniu į dabartinę vietą"
+"menu.new" = "Sukurti tuščią hologramos meniu iš numatytojo šablono"
+"menu.offsetrow" = "Perkelti eilutę absoliučiais arba ~santykiniais poslinkiais"
+"menu.open" = "Atidaryti meniu pagal ID; * rodo meniu sąrašą"
+"menu.removerow" = "Pašalinti komponento eilutę"
+"menu.seticon" = "Pakeisti mygtuko arba dekoracijos eilutės piktogramą"
+"menu.setrow" = "Nustatyti mygtuko arba dekoracijos eilutės tekstą"
+"menu.style" = "Nustatyti arba išvalyti vienos eilutės rodymo stiliaus savybę"
+panel = "Nuolatinių pasaulio skydelių įrankiai"
+"panel.addrow" = "Pridėti teksto eilutę į skydelio šakninį meniu"
+"panel.align" = "Lygiuoti skydelio padėties ašis pagal kitą skydelį"
+"panel.cancel" = "Atmesti paruoštus skydelio pakeitimus"
+"panel.copy" = "Kopijuoti nuolatinį skydelį nauju ID"
+"panel.create" = "Sukurti skydelį dabartinėje jūsų vietoje"
+"panel.delete" = "Ištrinti nuolatinį skydelį"
+"panel.edit" = "Pradėti skydelio redagavimo sesiją"
+"panel.follow" = "Sekti prisijungusį žaidėją su fixed, yaw arba full pasukimu"
+"panel.here" = "Perkelti skydelį į dabartinę jūsų vietą"
+"panel.image" = "Pakeisti skydelio šakninį meniu vienu centruotu paveikslėlio failu"
+"panel.info" = "Rodyti visą skydelio būseną"
+"panel.insertrow" = "Įterpti teksto eilutę į skydelio šakninį meniu"
+"panel.list" = "Rodyti nuolatinių skydelių sąrašą puslapiais"
+"panel.menu" = "Nustatyti skydelio šakninį meniu"
+"panel.move" = "Perkelti skydelį į absoliučias arba ~santykines koordinates"
+"panel.near" = "Rodyti skydelius netoli jūsų vietos"
+"panel.offsetrow" = "Perkelti skydelio šakninio meniu eilutę absoliučiais arba ~santykiniais poslinkiais"
+"panel.permissions" = "Keisti skydelio peržiūros ir sąveikos leidimus"
+"panel.ranges" = "Nustatyti skydelio matymo ir sąveikos nuotolius"
+"panel.removerow" = "Pašalinti skydelio šakninio meniu eilutę"
+"panel.rename" = "Pervadinti nuolatinį skydelį"
+"panel.rotate" = "Nustatyti absoliutų arba ~santykinį posūkį, polinkį ir posvyrį"
+"panel.save" = "Išsaugoti paruoštus skydelio pakeitimus"
+"panel.scale" = "Nustatyti absoliutų arba ~santykinį skydelio mastelį"
+"panel.seticon" = "Pakeisti eilutės piktogramą skydelio šakniniame meniu"
+"panel.setrow" = "Nustatyti skydelio šakninio meniu eilutės tekstą"
+"panel.style" = "Nustatyti arba išvalyti vienos eilutės rodymo stiliaus savybę"
+"panel.teleport" = "Teleportuotis prie nuolatinio skydelio"
+"panel.unfollow" = "Sustabdyti skydelio sekimą paskui žaidėją"
+"panel.visibility" = "Nustatyti matomumo režimą ir leidimo mazgus"
+preview = "Peržiūros dokumentų įrankiai"
+"preview.dump" = "Vieną kartą sukurti peržiūros dokumentą ir parodyti jo elementų skaičius"
+"preview.list" = "Rodyti peržiūros dokumentus ir jų atitikimo taisykles"
+"preview.reset" = "Atkurti numatytuosius peržiūros dokumentus (nepašalina papildomų naudotojo dokumentų, kurie gali juos užgožti)"
+web = "Atidaryti ir valdyti Gloss žiniatinklio redaktorių"
+"web.open" = "Atidaryti tuščią talpinamą Gloss redaktorių"
+"web.edit" = "Atidaryti vieną tiesioginį Gloss dokumentą"
+"web.edit.document" = "Atidaryti šį tiesioginį dokumentą žiniatinklio redaktoriuje"
+"web.workspace" = "Atidaryti visą tiesioginę Gloss darbo sritį"
+"web.sessions" = "Valdyti aktyvias žiniatinklio redaktoriaus sesijas"
+"web.sessions.list" = "Išvardyti aktyvias žiniatinklio redaktoriaus sesijas"
+"web.sessions.pull" = "Patikrinti žiniatinklio redaktoriaus sesiją dabar"
+"web.sessions.revoke" = "Atšaukti žiniatinklio redaktoriaus prieigos nuorodą"
+"web.sessions.status" = "Rodyti vieną žiniatinklio redaktoriaus sesiją"
+language = "Pasirinkite savo arba numatytąją serverio kalbą"
+
+[command.help.arg]
+reset_name = "Atkuriamas pavadinimas arba * visoms numatytosioms reikšmėms"
+panel_axes = "Ašys: x, y, z, xy, xz, yz arba xyz"
+panel_follow_rotation = "Sekimo pasukimas: fixed, yaw arba full"
+panel_id = "Nuolatinio skydelio ID"
+panel_interact_permission = "Sąveikos leidimas arba -"
+panel_interaction_range = "Teigiamas sąveikos nuotolis"
+panel_menu = "Šakninio meniu ID; jei nenurodyta, naudojamas skydelio ID"
+panel_new_id = "Naujas nuolatinio skydelio ID"
+panel_pitch = "Absoliutus arba ~santykinis polinkis"
+panel_player = "Prisijungęs tikslinis žaidėjas"
+panel_radius = "Horizontalus paieškos spindulys"
+panel_reference = "Atskaitos skydelio ID"
+panel_roll = "Absoliutus arba ~santykinis posvyris"
+panel_root_menu = "Šakninio meniu ID"
+panel_scale = "Absoliutus arba ~santykinis mastelis"
+panel_view_permission = "Peržiūros leidimas arba -"
+panel_view_range = "Teigiamas matymo nuotolis"
+panel_visibility = "Matomumo režimas: public, permission arba hidden"
+panel_x = "Absoliutus arba ~santykinis X"
+panel_y = "Absoliutus arba ~santykinis Y"
+panel_yaw = "Absoliutus arba ~santykinis posūkis"
+panel_z = "Absoliutus arba ~santykinis Z"
+content_menu = "Įkelto meniu ID"
+web_subject = "Tiesioginio Gloss dokumento identifikatorius"
+hologram_id = "Naujos hologramos ir šakninio meniu ID"
+hologram_text = "Neprivalomas MiniMessage tekstas"
+image_path = "Failas Gloss paveikslėlių aplanke"
+import_source = "Senų hologramų šaltinis"
+menu = "Atidaromo meniu ID (* rodo visus meniu)"
+new_panel_id = "Naujas nuolatinio skydelio ID"
+new_menu = "Naujo įdėtinio meniu ID"
+list_page = "Sąrašo puslapis, pradedant nuo 1"
+previews_dump_name = "Kuriamo dokumento pavadinimas"
+previews_name = "Atkuriamo dokumento pavadinimas arba * visiems numatytiesiems dokumentams"
+row_icon_type = "Piktogramos tipas"
+row_icon_value = "Piktogramos turinys arba registro ID"
+row_index = "Komponento eilutė, pradedant nuo 1"
+row_style_property = "Rodymo stiliaus savybė"
+row_style_value = "Stiliaus reikšmė arba * išvalyti"
+row_text = "MiniMessage eilutės tekstas"
+row_x = "Absoliutus arba ~santykinis eilutės X"
+row_y = "Absoliutus arba ~santykinis eilutės Y"
+row_z = "Absoliutus arba ~santykinis eilutės Z"
+source_menu = "Įkelto šaltinio meniu ID"
+web_session = "Žiniatinklio redaktoriaus sesijos identifikatorius"
+
+[command.error]
+no_permission = "&8[&dGloss&8] &cNeturite leidimo."
+no_permission_use = "&8[&dGloss&8] &cNeturite leidimo naudoti šios komandos."
+usage = "&7Naudojimas: &f/{command} help"
+
+[command.hologram]
+exists = "&8[&dGloss&8] &cHolograma '&f{id}&c' jau egzistuoja."
+missing = "&8[&dGloss&8] &cNėra hologramos pavadinimu '&f{id}&c'."
+created = "&8[&dGloss&8] &aSukurta holograma &f{id}&a."
+deleted = "&8[&dGloss&8] &aIštrinta holograma &f{id}&a."
+line_added = "&8[&dGloss&8] &aPridėta eilutė &f{line}&a į &f{id}&a."
+line_set = "&8[&dGloss&8] &aNustatyta eilutė &f{line}&a hologramoje &f{id}&a."
+line_removed = "&8[&dGloss&8] &aPašalinta eilutė &f{line}&a iš &f{id}&a."
+line_out_of_range = "&8[&dGloss&8] &cEilutė {line} už ribų; &f{id}&c eilučių skaičius: {count}."
+cleared = "&8[&dGloss&8] &aIšvalytos visos &f{id}&a eilutės."
+moved = "&8[&dGloss&8] &aPerkelta &f{id}&a į jūsų vietą."
+offset = "&8[&dGloss&8] &aPaslinkta &f{id}&a per &f{x}&a, &f{y}&a, &f{z}&a."
+teleported = "&8[&dGloss&8] &aTeleportuota prie &f{id}&a."
+list_empty = "&8[&dGloss&8] &7Hologramų dar nėra."
+rendered = "&8[&dGloss&8] &aTeksto holograma &f{id}&a sukurta masteliu &f{scale}&a."
+text_empty = "&8[&dGloss&8] &cTekstas negali būti tuščias."
+scale_out_of_range = "&8[&dGloss&8] &cMastelis {value} nepatenka į intervalą; jis turi būti nuo &f{minimum}&c iki &f{maximum}&c."
+oriented = "&8[&dGloss&8] &aHologramai &f{id}&a nustatyta: billboard &f{billboard}&a, yaw &f{yaw}&a, pitch &f{pitch}&a."
+billboard_unknown = "&8[&dGloss&8] &cNežinomas billboard '&f{billboard}&c'. Naudokite vieną iš &f{options}&c."
+angle_out_of_range = "&8[&dGloss&8] &cReikšmė {axis} {value} yra už ribų; ji turi būti nuo &f-{limit}&c iki &f{limit}&c laipsnių."
+
+[command.hologram.list]
+hover = "Spustelėkite, kad teleportuotumėtės"
+lines = "{count} eil."
+
+[command.hologram.info]
+header = "&8[&dGloss&8] &d{id} &7pasaulyje &f{world} {x}, {y}, {z}"
+line = " &8{line}. &f{text}"
+orientation = " &8mastelis &f{scale} &8billboard &f{billboard} &8yaw &f{yaw} &8pitch &f{pitch}"
+
+[command.board]
+exists = "&8[&dGloss&8] &cLentelė '&f{id}&c' jau egzistuoja."
+missing = "&8[&dGloss&8] &cNėra lentelės pavadinimu '&f{id}&c'."
+created = "&8[&dGloss&8] &aSukurta lentelė &f{id}&a."
+deleted = "&8[&dGloss&8] &aIštrinta lentelė &f{id}&a."
+title_set = "&8[&dGloss&8] &aNustatyta &f{id}&a antraštė."
+line_added = "&8[&dGloss&8] &aPridėta eilutė &f{line}&a į &f{id}&a."
+line_set = "&8[&dGloss&8] &aNustatyta eilutė &f{line}&a lentelėje &f{id}&a."
+line_removed = "&8[&dGloss&8] &aPašalinta eilutė &f{line}&a iš &f{id}&a."
+line_out_of_range = "&8[&dGloss&8] &cEilutė {line} už ribų; &f{id}&c eilučių skaičius: {count}."
+shown = "&8[&dGloss&8] &aRodoma lentelė &f{id}&a."
+hidden = "&8[&dGloss&8] &aJūsų rezultatų lentelė paslėpta."
+select_set = "&8[&dGloss&8] &aRezultatų lentos &f{id}&a pasirinkimo prioritetas nustatytas į &f{priority}&a."
+select_invalid = "&8[&dGloss&8] &cNetinkama rezultatų lentos sąlyga: &f{error}&c."
+list_empty = "&8[&dGloss&8] &7Lentelių dar nėra."
+
+[command.board.list]
+hover = "Spustelėkite, kad pamatytumėte daugiau"
+
+[command.board.info]
+header = "&8[&dGloss&8] &d{id} &7antraštė: &f{title}"
+meta = "&7Prioritetas: &f{priority} | Sąlyga: &f{when} | Variantai: &f{variants}"
+line = " &8{line}. &f{text}"
+
+[command.emoji]
+empty = "&8[&dGloss&8] &7Nėra įjungtų jaustukų."
+hover = "Spustelėkite, kad įterptumėte į pokalbį"
+
+[command.animations]
+empty = "&8[&dGloss&8] &7Nėra įkeltų animacijų."
+header = "&8[&dGloss&8] &fAnimacijos: &d{count}"
+entry = "&8- &d{name}"
+
+[command.list]
+page = "&7Puslapis &f{page}&7/&f{pages} &8- &7rodoma &f{from}&7-&f{to} &7iš &f{total}"
+next = "&7Kitas puslapis: &f{command}"
+
+[command.status]
+holograms = "&7Hologramos: &f{count} &8({temporary} laikinos, {entities} esybės)"
+boards = "&7Lentelės: &f{count}"
+emoji = "&7Jaustukai: &f{enabled}&8/&f{total}"
+animations = "&7Animacijos: &f{count}"
+effects = "&7Burbulai: &f{bubbles} &8| &7Indikatoriai: &f{indicators} &8| &7Iškritimai: &f{drops}"
+
+[command.reset]
+done = "&8[&dGloss&8] &aAtkurta &f{count}&a numatytųjų {kind} įrašų."
+none = "&8[&dGloss&8] &cJokie numatytieji {kind} įrašai neatitinka '&f{name}&c'."
+
+[command.bubbles]
+style_set = "&8[&dGloss&8] &aPokalbių burbulo stilius nustatytas į &f{style}&a."
+style_cleared = "&8[&dGloss&8] &aPokalbių burbulo stilius išvalytas; taikomas automatinis parinkimas."
+style_unknown = "&8[&dGloss&8] &cNėra burbulo stiliaus pavadinimu '&f{style}&c'."
+
+[command.import]
+config_unreadable = "&8[&dGloss&8] &cNepavyko įkelti gloss.toml: &f{reason}"
+
+[command.import.holoui]
+missing = "&8[&dGloss&8] &cŠalia Gloss duomenų aplanko nerastas holoui duomenų aplankas."
+done = "&8[&dGloss&8] &aHoloUi importas baigtas: nukopijuota &f{copied}&a, praleista &f{skipped}&a, konfigūracijos raktų &f{overlaid}&a, klaidų &f{errors}&a."
+
+[command.import.legacy]
+done = "&8[&dGloss&8] &aSenų duomenų perkėlimas baigtas: perkelta &f{migrated}&a, įtraukta &f{absorbed}&a, konfigūracijos raktų &f{overlaid}&a, klaidų &f{errors}&a."
+
+[director.help]
+no_subcommands = "Šiame puslapyje nėra antrinių komandų."
+no_description = "Aprašymas nepateiktas"
+command_group = "Komandų grupė. Spustelėkite, kad atidarytumėte."
+category = "Komandų kategorija"
+no_parameters = "Parametrų nėra. Spustelėkite, kad iš anksto užpildytumėte komandą."
+parameters_hover = "Užveskite pelės žymeklį ant parametrų, kad sužinotumėte daugiau."
+
+[director.help.navigation]
+back = "Atgal"
+page = "Puslapis"
+
+[director.help.navigation.parent]
+hover = "Grįžti į pirminę komandų grupę"
+
+[director.help.navigation.previous]
+hover = "Ankstesnis puslapis"
+
+[director.help.navigation.next]
+hover = "Kitas puslapis"
+
+[director.help.parameter]
+required = "Šis parametras yra privalomas."
+optional = "Šis parametras yra neprivalomas."
+default = "Jei nenurodyta, numatytoji reikšmė yra \"{value}\"."
+type = "Šio parametro tipas yra {type}."
+
+[director.runtime]
+usage = "Naudojimas: {usage}"
+
+[director.runtime.error]
+invalid_origin = "Šios komandos negalima vykdyti iš šio šaltinio."
+unknown_parameter = "Nežinomas parametro raktas: {key}"
+unexpected_argument = "Netikėtas argumentas \"{argument}\". Pasirenkami parametrai turi būti nurodyti su raktu, pvz. seed=123"
+unclosed_group = "Trūksta uždarančio \"]\" parametrui {key}"
+conversion_failed = "Reikšmės \"{value}\" nepavyko konvertuoti į {type} parametrui {parameter}"
+default_parse_failed = "Nepavyko nuskaityti parametro {parameter} numatytosios reikšmės"
+missing_argument = "Trūksta argumento \"{parameter}\" ({type})"
+execution_failed = "Nepavyko įvykdyti komandos {command}: {reason}"
+
+[gloss.error]
+menu_name_required = "Meniu pavadinimas negali būti tuščias"
+hologram_id_required = "Hologramos ID negali būti tuščias"
+panel_id_required = "Skydelio identifikatorius negali būti tuščias"
+web_subject_required = "Žiniatinklio redaktoriaus dokumento identifikatorius negali būti tuščias"
+web_session_required = "Žiniatinklio redaktoriaus sesijos identifikatorius negali būti tuščias"
+panel_player_required = "Tikslinis žaidėjas negali būti tuščias"
+row_icon_type_required = "Piktogramos tipas negali būti tuščias"
+row_style_property_required = "Stiliaus savybė negali būti tuščia"
+import_source_required = "Senųjų duomenų importo šaltinis negali būti tuščias"
+import_source_unknown = "Nežinomas senųjų duomenų importo šaltinis: {source}"
+
+[gloss.message]
+permission_denied = "&8[&dGloss&8]: &cNeturite leidimo &f{permission}&c."
+unknown_command = "&8[&dGloss&8]: &cNežinoma komanda \"&f{command}&c\"."
+
+[gloss.message.hologram]
+created = "&8[&dGloss&8]: &aSukurta holograma &f{hologram}&a su šakniniu meniu &f{menu}&a jūsų vietoje."
+already_exists = "&8[&dGloss&8]: &cHolograma, skydelis arba meniu pavadinimu &f{hologram}&c jau egzistuoja."
+failed = "&8[&dGloss&8]: &cNepavyko sukurti hologramos &f{hologram}&c. Jokie pakeitimai neišsaugoti."
+durability_uncertain = "&8[&dGloss&8]: &eHologramos &f{hologram}&e operacijos nepavyko saugiai užbaigti. Prieš tikrindami hologramą arba bandydami ją sukurti dar kartą, paleiskite Gloss iš naujo."
+
+[gloss.message.menu]
+none = "&8[&dGloss&8]: &7Nėra galimų meniu."
+player_only = "&8[&dGloss&8]: &cMeniu gali atidaryti tik žaidėjai."
+no_previous = "&8[&dGloss&8]: &cAnkstesnio meniu nėra."
+closed = "&8[&dGloss&8]: &aMeniu uždarytas."
+moved = "&8[&dGloss&8]: &aMeniu perkeltas."
+none_open = "&8[&dGloss&8]: &cŠiuo metu joks meniu neatidarytas."
+unavailable = "&8[&dGloss&8]: &c\"{menu}\" nepasiekiamas."
+permission_denied = "&8[&dGloss&8]: &cNeturite leidimo atidaryti \"{menu}\"."
+open_failed = "&8[&dGloss&8]: &cNepavyko atidaryti meniu \"{menu}\"."
+
+[gloss.message.menu.list]
+header = "Meniu"
+entry = "Spustelėkite, kad atidarytumėte {menu}."
+
+[gloss.message.menu.content]
+updated = "&8[&dGloss&8]: &aMeniu &f{menu}&a pritaikyta operacija {operation}, versija {revision}."
+created = "&8[&dGloss&8]: &aSukurtas meniu &f{menu}&a, versija {revision}. Atidarykite su /gloss menu open &f{menu}&a arba padėkite su /gloss panel create &f{menu}&a."
+copied = "&8[&dGloss&8]: &aMeniu &f{source}&a nukopijuotas į &f{menu}&a, versija {revision}."
+revision_conflict = "&8[&dGloss&8]: &cMeniu &f{menu}&c pasikeitė įrašant (tikėtasi {expected}, dabartinė {actual}). Pakartokite komandą."
+already_exists = "&8[&dGloss&8]: &cMeniu &f{menu}&c jau yra."
+invalid = "&8[&dGloss&8]: &cNetinkama meniu turinio reikšmė: &f{reason}&c."
+failed = "&8[&dGloss&8]: &cMeniu &f{menu}&c turinio operacija nepavyko: {reason}"
+
+[gloss.message.command]
+player_only = "&8[&dGloss&8]: &cŠi komanda prieinama tik žaidėjams."
+
+[gloss.message.web]
+header = "Žiniatinklio redaktorius"
+open_hover = "Spustelėkite, kad atidarytumėte Gloss žiniatinklio redaktorių."
+open = "&8[&dGloss&8]: &7Žiniatinklio redaktorius: &f{url}"
+preparing = "&8[&dGloss&8]: &7Ruošiama saugi redaktoriaus sinchronizavimo sesija objektui &f{subject}&7..."
+unavailable = "&8[&dGloss&8]: &cTiesioginis redagavimas žiniatinklyje nepasiekiamas. Patikrinkite sinchronizavimo konfigūraciją ir ryšį su tarpiniu serveriu."
+open_failed = "&8[&dGloss&8]: &cNepavyko atidaryti &f{kind}={subject}&c tiesioginiame žiniatinklio redaktoriuje: {reason}"
+open_console = "&8[&dGloss&8]: &7Redaktoriaus prieigos nuoroda objektui &f{subject}&7: &f{url}"
+capability_warning = "&8[&dGloss&8]: &eŠis URL leidžia skelbti pakeitimus serveryje, kol prieiga atšaukiama arba baigiasi jos galiojimas. Laikykite jį paslaptyje."
+open_label = "Atidaryti redaktorių"
+copy_label = "Kopijuoti nuorodą"
+revoke_label = "Atšaukti prieigą"
+link_hover = "Atidarykite redaktorių, nukopijuokite prieigos nuorodą arba atšaukite sesiją {session}."
+
+[gloss.message.web.sessions]
+list_empty = "&8[&dGloss&8]: &7Aktyvių redaktoriaus sinchronizavimo sesijų nėra."
+status = "&8[&dGloss&8]: &f&f{session} &7{kind}=&f{subject} baigs galioti po=&f{seconds}s publikacija=&f{revision} laukia=&f{pending}"
+revoked = "&8[&dGloss&8]: &aSinchronizavimo sesija &f{session}&a atšaukta."
+pulled = "&8[&dGloss&8]: &aSinchronizavimo sesija &f{session}&a patikrinta."
+unknown = "&8[&dGloss&8]: &cSinchronizavimo sesija &f{session}&c nežinoma arba nebegalioja."
+failed = "&8[&dGloss&8]: &cSesijos &f{session}&c sinchronizavimo operacija nepavyko: {reason}"
+
+[gloss.message.import]
+preview_started = "&8[&dGloss&8]: &7Tikrinamas šaltinis &f{source}&7, kad būtų galima peržiūrėti perkėlimą nekeičiant duomenų..."
+apply_started = "&8[&dGloss&8]: &7Tikrinama ir perkeliama iš &f{source}&7 neperrašant esamų duomenų..."
+source_missing = "&8[&dGloss&8]: &7Šaltinis &f{source}&7 nerastas kelyje &f{path}&7."
+preview_summary = "&8[&dGloss&8]: &f&f{source}&7 peržiūra: &a{ready} paruošta, &d{resume} galima tęsti, &e{conflicts} konfliktų, &c{errors} klaidų, {warnings} įspėjimų. Šaltinis: &f{path}"
+preview_entry = "&8- &f&f{legacy} -> &f{board} būsena=&f{state} įspėjimai=&f{warnings}"
+apply_summary = "&8[&dGloss&8]: &f&f{source}&7 perkėlimas: &a{imported} importuota, &e{skipped} praleista, &c{failed} nepavyko; tikrinant rasta {errors} klaidų ir {warnings} įspėjimų."
+apply_entry = "&8- &f&f{legacy} būsena=&f{state} priežastis=&f{reason}"
+issue = "&8- &f{legacy} &7{severity}: &f{reason}"
+busy = "&8[&dGloss&8]: &cKitas senųjų hologramų perkėlimas jau vyksta."
+failed = "&8[&dGloss&8]: &cSenųjų hologramų perkėlimas iš &f{source}&c nepavyko: {reason}"
+
+[gloss.message.config]
+reloaded = "&2Konfigūracija \"{name}\" įkelta iš naujo."
+
+[gloss.message.hotload]
+singular = "&2Karštai įkelta: {kinds} ({count} pakeitimas)."
+plural = "&2Karštai įkelta: {kinds} ({count} pakeitimai)."
+
+[gloss.message.preview_scale]
+adjusting = "&7Peržiūros dydis: &f{percent}% &8- &7laikykite Pritūpti + slinkite dydžiui keisti; dukart paspauskite Pritūpti, kad išsaugotumėte"
+hidden = "&7Peržiūra &cpaslėpta &8- &7slinkite aukštyn, kad atkurtumėte"
+size = "&7Peržiūros dydis: &f{percent}%"
+saved_hidden = "&7Peržiūra išsaugota kaip &cpaslėpta &8- &7dukart paspauskite Pritūpti + slinkite aukštyn virš konteinerio, kad atkurtumėte"
+saved = "&7Peržiūros dydis išsaugotas: &f{percent}%"
+
+[gloss.message.drops]
+bundle_more = "+{count} kt."
+
+[gloss.message.items]
+disabled = "&8[&dGloss&8]: &7Pasirinktiniai daiktai išjungti. Faile gloss.toml nustatykite customItems reikšmę true."
+
+[gloss.message.items.status]
+header = "Pasirinktiniai daiktai"
+summary = "Aktyvūs tiekėjai: {active}/{total}"
+entry = "Tiekėjas {provider} iš papildinio {plugin}."
+hint = "Spustelėkite, kad eksportuotumėte katalogą žiniatinklio redaktoriui."
+
+[gloss.message.items.state]
+ready = "paruošta, {count} identifikatorių"
+loading = "yra, dar įkeliama"
+inactive = "yra, nėra adapterio"
+missing = "neįdiegta"
+
+[gloss.message.items.export]
+started = "&8[&dGloss&8]: &7Eksportuojamas pasirinktinių daiktų katalogas..."
+done = "&8[&dGloss&8]: &aĮ &f{path}&a įrašyta {count} daiktų iš {providers} tiekėjų."
+empty = "&8[&dGloss&8]: &7Pasirinktinių daiktų nerasta. Tuščias katalogas įrašytas į &f{path}&7."
+failed = "&8[&dGloss&8]: &cNepavyko įrašyti pasirinktinių daiktų katalogo. Patikrinkite žurnalus."
+busy = "&8[&dGloss&8]: &cKatalogo eksportas jau vyksta."
+
+[gloss.message.previews.list]
+header = "Peržiūros dokumentai"
+empty = "&7Peržiūros dokumentų neįkelta."
+entry = "blokai={blocks} objektai={entities} specialūs={special} prioritetas={priority}"
+
+[gloss.message.previews.reset]
+started = "&8[&dGloss&8]: &7Atkuriami peržiūros dokumentai \"&f{name}&7\"..."
+done = "&8[&dGloss&8]: &aAtkurta {count} kartu pateiktų peržiūros dokumentų. Juos pakeičiantys papildomi naudotojo dokumentai nepašalinti."
+none = "&8[&dGloss&8]: &c\"{name}\" nėra kartu pateiktas peržiūros dokumentas; niekas neatkurta."
+
+[gloss.message.previews.dump]
+unknown = "&8[&dGloss&8]: &c\"{name}\" nėra įkeltas peržiūros dokumentas."
+result = "&8[&dGloss&8]: &a&a{name}&7: &f{total}&7 elementų (skydeliai={panels}, langeliai={cells}, vietos={slots}, etiketės={labels})."
+no_errors = "&8[&dGloss&8]: &aSukūrimo klaidų nėra."
+error_line = "&8[&dGloss&8]: &c{message}"
+error_more = "&8[&dGloss&8]: &7Dar {count} (žr. konsolės žurnalą)."
+
+[gloss.message.panels]
+created = "&8[&dGloss&8]: &aSukurtas skydelis &f{board}&a, versija {revision}."
+deleted = "&8[&dGloss&8]: &aSkydelis &f{board}&a ištrintas."
+renamed = "&8[&dGloss&8]: &a&f{oldBoard}&a pervadintas į &f{board}&a, versija {revision}."
+copied = "&8[&dGloss&8]: &a&f{source}&a nukopijuotas į &f{board}&a."
+updated = "&8[&dGloss&8]: &aSkydeliui &f{board}&a pritaikyta operacija {operation}, versija {revision}."
+teleported = "&8[&dGloss&8]: &aTeleportuota prie &f{board}&a."
+unknown = "&8[&dGloss&8]: &cNežinomas skydelis &f{board}&c."
+already_exists = "&8[&dGloss&8]: &cSkydelis &f{board}&c jau yra."
+invalid = "&8[&dGloss&8]: &cNetinkama skydelio reikšmė: &f{reason}&c."
+menu_unavailable = "&8[&dGloss&8]: &cPagrindinis meniu &f{menu}&c neįkeltas."
+player_unavailable = "&8[&dGloss&8]: &cTikslinis žaidėjas &f{player}&c neprisijungęs."
+world_unavailable = "&8[&dGloss&8]: &cSkydelio pasaulis &f{world}&c neįkeltas su išsaugotu UUID."
+revision_conflict = "&8[&dGloss&8]: &cSkydelis &f{board}&c pasikeitė redaguojant (tikėtasi {expected}, dabartinė {actual}). Iš naujo atidarykite redagavimo sesiją."
+failed = "&8[&dGloss&8]: &cSkydelio &f{board}&c operacija nepavyko: {reason}"
+
+[gloss.message.panels.list]
+header = "&8[&dGloss&8]: &fIšsaugoti skydeliai: &d{count}"
+empty = "&8[&dGloss&8]: &7Išsaugotų skydelių neįkelta."
+entry = "&8- &f&f{board} meniu=&f{menu} versija=&f{revision}"
+
+[gloss.message.panels.near]
+header = "&8[&dGloss&8]: &fSkydeliai &d{radius}&f blokų spinduliu: &d{count}"
+empty = "&8[&dGloss&8]: &7Šiuo spinduliu skydelių nėra."
+entry = "&8- &f&f{board} atstumas=&f{distance} meniu=&f{menu}"
+
+[gloss.message.panels.info]
+header = "&8[&dGloss&8]: &fSkydelis &d{board} ({state})"
+identity = "&7uuid=&f{uuid} versija=&f{revision} meniu=&f{menu}"
+transform = "&7pasaulis=&f{world} padėtis=&f{x}, {y}, {z} pasukimas=&f{yaw}, {pitch}, {roll} mastelis=&f{scale}"
+visibility = "&7matomumas=&f{mode} peržiūros leidimas=&f{viewPermission} sąveikos leidimas=&f{interactPermission} atstumai=&f{viewRange}/{interactionRange}"
+follow = "&7sekimas=&f{mode} žaidėjas=&f{player} pasukimas=&f{rotation}"
+
+[gloss.message.panels.edit]
+started = "&8[&dGloss&8]: &aRedaguojamas &f{board}&a nuo versijos {revision}. Pakeitimai laukia išsaugojimo."
+already_active = "&8[&dGloss&8]: &cJau redaguojate &f{board}&c. Pirma išsaugokite arba atšaukite."
+none = "&8[&dGloss&8]: &cNeturite laukiančio skydelio redagavimo."
+busy = "&8[&dGloss&8]: &cSkydelis &f{board}&c šiuo metu išsaugomas."
+staged = "&8[&dGloss&8]: &aOperacija {operation} paruošta skydeliui &f{board}&a. Išsaugokite su /gloss panel save."
+saved = "&8[&dGloss&8]: &a&f{board}&a išsaugotas, versija {revision}."
+cancelled = "&8[&dGloss&8]: &aLaukiantys &f{board}&a pakeitimai atšaukti."
+identity_blocked = "&8[&dGloss&8]: &cPrieš pervadindami arba ištrindami &f{board}&c, išsaugokite arba atšaukite laukiančius pakeitimus."
+
+[gloss.preview.state]
+idle = "Neaktyvus"
+brewing = "Gaminama {percent}%"
+needs_blaze_powder = "Reikia liepsnos pudros"
+waiting = "Laukiama"
+no_ingredient = "Nėra ingrediento"
+empty = "Tuščia"
+smelting_item = "Lydoma: {item} {percent}%"
+smelting = "Lydoma {percent}%"
+blasting_item = "Lydoma aukštakrosnėje: {item} {percent}%"
+blasting = "Lydoma aukštakrosnėje {percent}%"
+smoking_item = "Rūkoma: {item} {percent}%"
+smoking = "Rūkoma {percent}%"
+heating = "Kaitinama"
+needs_fuel = "Reikia kuro"
+no_input = "Nėra įvesties"
+surge_suffix = "  +{seconds}s"
+disc_playing = "Grojama: {disc}"
+disc_loaded = "Įdėta: {disc}"
+no_disc = "Nėra muzikos disko"
+
+[gloss.preview.stat]
+fuel_level = "Kuras {fuel}/{maximum}"
+no_fuel = "Nėra kuro"
+bottles = "Buteliai {bottles}/{maximum}"
+fuel_seconds = "Kuras {seconds}s"
+fuel_ready = "Kuras paruoštas"
+xp_gain = "XP +{experience}"
+xp_zero = "XP 0"
+bees_and_honey = "Bitės {bees}/{maximumBees}   Medus {honey}/{maximumHoney}"
+cauldron_empty = "Tuščia {level}/{maximum}"
+cauldron_level = "Lygis {level}/{maximum}"
+
+[gloss.preview.theme.title]
+chest = "&6&lSkrynia"
+trapped_chest = "&c&lSkrynia-spąstai"
+ender_chest = "&5&lEnderio skrynia"
+barrel = "&e&lStatinė"
+dispenser = "&7&lDalytuvas"
+dropper = "&8&lMėtytuvas"
+hopper = "&8&lPiltuvas"
+furnace = "&6&lKrosnis"
+smoker = "&e&lRūkykla"
+blast_furnace = "&b&lAukštakrosnė"
+beehive = "&e&lAvilys"
+bee_nest = "&e&lBičių lizdas"
+cauldron = "&7&lKatilas"
+water_cauldron = "&9&lVandens katilas"
+lava_cauldron = "&6&lLavos katilas"
+powder_snow_cauldron = "&f&lPuraus sniego katilas"
+jukebox = "&d&lDiskų grotuvas"
+brewing_stand = "&d&lEliksyrų stovas"
+chiseled_bookshelf = "&6&lIšdrožinėta knygų lentyna"
+hopper_minecart = "&8&lVagonėlis su piltuvu"
+chest_minecart = "&6&lVagonėlis su skrynia"
+mobile = "&7&l{name}"
+shulker = "&l{color} Šulkerio dėžė"
+copper_chest = "&6&l{name}"
+shelf = "&6&l{name}"
+container = "&6&lTalpykla"
+
+[language.menu]
+your_language = "Jūsų kalba"
+reset_your_language = "Atkurti jūsų kalbą"
+server_default = "Numatytoji serverio kalba"
+edit_messages = "Redaguoti kalbos pranešimus"
+use_server_default = "Naudoti numatytąją serverio kalbą"
+current = "Dabartinė: {locale}"
+current_with_personal = "Dabartinė: {locale} (Jūsų: {personal})"
+your_description = "Keiskite tik jums rodomus pranešimus."
+reset_description = "Naudokite numatytąją serverio kalbą."
+server_description = "Keiskite numatytąją serverio kalbą."
+edit_description = "Atverkite kiekvienos kalbos pranešimų redaktorių."
+select_description = "Spustelėkite, kad pasirinktumėte šią kalbą."
+remove_personal_description = "Pašalinkite asmeninį kalbos pasirinkimą."
+no_controls = "Jums nepasiekiami kalbos nustatymai."
+command = "Komanda: {command}"
+selected = "pasirinkta"
+all-volmit-plugins = "Visi Volmit papildiniai"
+
+[language.error]
+stopping = "Stabdant papildinį kalbos pasirinkimas nepasiekiamas."
+editor-player-only = "Atverti kalbos rengyklę žaidime."
+no-providers = "Nėra prieinamų Volmit kalbų teikėjų."
+numeric-page = "Įveskite puslapio numerį."
+personal-player-only = "Žaidžiant turi būti pasirinkti žaidėjų kalbos nustatymai."
+personal-permission = "Jūs neturite leidimo pasirinkti savo kalbą."
+plugin-personal-permission = "Neturite leidimo pasirinkti savo kalbos papildiniui {plugin}."
+plugin-server-permission = "Neturite leidimo keisti papildinio {plugin} serverio kalbos."
+server-locale-required = "Pasirinkite numatytosios serverio kalbos kodą, pavyzdžiui, en_US."
+unavailable-for-all = "Kalba {locale} prieinama ne visiems pasirinktiems papildiniams."
+
+[language.usage]
+editor = "Naudojimas: /{command} language server edit [locale]"
+selection = "Naudojimas: /{command} language self [locale|reset] or server [locale]"
+volmit-selection = "Naudojimas: /volmit plugins languages [locale]"
+
+[language.selection]
+preparing = "Ruošiama kalba {locale} papildiniui {target}..."
+save-failed = "{plugin}: nepavyko išsaugoti kalbos pasirinkimo; patikrinkite serverio konsolę."
+english-fallback = "{plugin}: {locale} neprieinama; naudojama anglų kalba (en_US)."
+personal-selected = "{plugin}: dabar jūsų kalba {locale}."
+server-selected = "{plugin}: serverio kalba yra dabar {locale}."
+server-default-selected = "{plugin}: jūsų kalba dabar atitinka numatytąją serverio kalbą."
+
+[language.editor]
+loading = "Įkeliami kalbos {locale} pranešimai..."
+
+[language.editor.section]
+languages = "Kalbos"
+search = "Ieškoti"
+search-title = "{locale} / Ieškoti"
+group-title = "{locale} / {group}"
+
+[language.editor.prompt]
+search = "Ieškokite pranešimo rakto arba teksto. Norėdami grįžti, įveskite cancel."
+value = "Pokalbyje įveskite naują rakto {key} reikšmę."
+current = "Dabartinė reikšmė: {value}"
+variables = "Kintamieji: {variables}"
+guidance = "Naudokite \\n naujai eilutei, \\\\ atvirkštiniam pasvirajam brūkšniui arba įveskite cancel, kad grįžtumėte."
+
+[language.editor.input]
+expired = "Baigėsi kalbos rengyklės įvesties laikas."
+too-long = "Įvestyje gali būti ne daugiau kaip {maximum} simbolių."
+unable-to-save = "Nepavyko išsaugoti: {reason}"
+
+[language.editor.navigation]
+back = "&eAtgal&r"
+close = "&cUždaryti&r"
+previous-page = "&eAnkstesnis puslapis&r"
+next-page = "&eKitas puslapis&r"
+
+[language.editor.search]
+messages = "Ieškoti pranešimų"
+messages-lore = "Spustelėkite norėdami ieškoti visuose pranešimuose."
+clear = "Išvalyti paiešką"
+
+[language.editor.message]
+current-value = "&7Dabartinė reikšmė:&r"
+variables = "&8{variables}&r"
+edit-plural = "&7Spustelėkite norėdami redaguoti daugiskaitos formą.&r"
+edit-lines = "&7Spustelėkite norėdami redaguoti atskiras eilutes.&r"
+edit-chat = "&7Spustelėkite norėdami redaguoti pokalbyje.&r"
+
+[language.editor.locale]
+open = "&8Spauskite norėdami atverti šią kalbą.&r"
+
+[language.editor.category]
+message-count = "&7{count} pranešimai&r"
+open = "&8Spustelėkite norėdami atverti šią kategoriją.&r"
+
+[language.editor.error]
+no-permission = "Neturite leidimo redaguoti papildinio {plugin} kalbų."
+unable-to-edit = "Nepavyko redaguoti: {reason}"
+
+[language.editor.saved]
+summary = "{locale} išsaugota. Kalbų pasirinkimai nepakeisti."
+change = "{key}: „{before}“ pakeista į „{after}“."
+
+[language.editor.part]
+line = "Eilutė {line}"
+
+[language.editor.value]
+none = "Nėra"
+empty = "(tuščia)"
