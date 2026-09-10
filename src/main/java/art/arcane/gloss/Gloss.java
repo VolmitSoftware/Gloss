@@ -573,6 +573,9 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
         if (!previous.holograms().equals(next.holograms())) {
             holograms.reload();
             entityOverlays.reload();
+        } else if (previous.text().functions() != next.text().functions()
+            || previous.particles().enabled() != next.particles().enabled()) {
+            holograms.requestDriverIntervalReconcile();
         }
         if (!previous.boards().equals(next.boards())) {
             boards.reload();

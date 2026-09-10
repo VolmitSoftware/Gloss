@@ -682,27 +682,18 @@ public final class DropNameService implements Listener {
     }
 
     private void driveNativeParticles() {
-        if (!listening || nativeParticleLabels.isEmpty()) {
+        if (!listening || nativeParticleLabels.isEmpty() || !plugin.cfg().particles().enabled()) {
             return;
         }
         long tick = System.currentTimeMillis() / 50L;
         for (NativeParticleLabel state : nativeParticleLabels.values()) {
-            if (!emitsOnTick(state.selection().style().config().particleLayers(), tick)) {
+            if (state.selection().style().config().particleLayers().isEmpty()) {
                 continue;
             }
             Item item = state.item();
             FoliaScheduler.runEntity(plugin, item, () -> emitNativeParticlesOwned(state, tick), 0L,
                 () -> nativeParticleLabels.remove(item.getUniqueId(), state));
         }
-    }
-
-    private static boolean emitsOnTick(List<ParticleLayer> layers, long tick) {
-        for (ParticleLayer layer : layers) {
-            if (tick % layer.emission().intervalTicks() == 0L) {
-                return true;
-            }
-        }
-        return false;
     }
 
     private void emitNativeParticlesOwned(NativeParticleLabel state, long tick) {
@@ -754,21 +745,34 @@ public final class DropNameService implements Listener {
         if (!viewer.isOnline() || !state.selection().visibleTo(plugin, viewer)) {
             return;
         }
+        List<ParticleLayer> layers = state.selection().style().config().particleLayers();
+        boolean due = false;
+        for (ParticleLayer layer : layers) {
+            if (plugin.particles().isDue(viewer, state.item(), layer, tick)) {
+                due = true;
+                break;
+            }
+        }
+        if (!due) {
+            return;
+        }
         NativeParticleFrame shared = viewerText ? null : sharedNativeLabel(state, sharedLabel);
         ParticleText.Rendered rendered = shared == null
             ? plugin.text().renderLegacyParticleText(viewer, state.authored())
             : shared.rendered();
         ParticleFrame frame = nativeLabelFrame(viewer, origin);
-        List<ParticleLayer> layers = state.selection().style().config().particleLayers();
         for (int index = 0; index < layers.size(); index++) {
             ParticleLayer layer = layers.get(index);
+            if (!plugin.particles().isDue(viewer, state.item(), layer, tick)) {
+                continue;
+            }
             List<ParticleRect> targets = shared == null
                 ? nativeLabelTargets(layer, rendered)
                 : shared.targets().get(index);
             if (!layer.target().scope().equals("local") && targets.isEmpty()) {
                 continue;
             }
-            plugin.particles().emit(viewer, frame, layer, targets, tick);
+            plugin.particles().emit(viewer, state.item(), frame, layer, targets, tick);
         }
     }
 

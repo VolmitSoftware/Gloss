@@ -86,36 +86,24 @@ public final class TextDisplayStyle {
     }
     public static ParticleFrame particleFrame(Location anchor, Location eye, HologramPresentation presentation,
                                        IconBillboard billboard) {
-        Vector front = eye.toVector().subtract(anchor.toVector());
-        if (billboard == IconBillboard.FIXED) {
-            front = anchor.getDirection().multiply(-1D);
-        } else if (billboard == IconBillboard.VERTICAL) {
-            front.setY(0D);
-        } else if (billboard == IconBillboard.HORIZONTAL) {
-            double height = front.getY();
-            double horizontal = Math.sqrt(front.getX() * front.getX() + front.getZ() * front.getZ());
-            double yaw = Math.toRadians(anchor.getYaw());
-            front = new Vector(Math.sin(yaw) * horizontal, height, -Math.cos(yaw) * horizontal);
-        }
-        if (front.lengthSquared() < 1.0E-12D) {
-            front = new Vector(0.0D, 0.0D, 1.0D);
-        }
-        front.normalize();
-        Vector referenceUp = Math.abs(front.getY()) > 0.999D
-            ? new Vector(0.0D, 0.0D, 1.0D)
-            : new Vector(0.0D, 1.0D, 0.0D);
-        Vector right = front.clone().crossProduct(referenceUp).normalize();
-        Vector up = right.clone().crossProduct(front).normalize();
-        Vector back = front.clone().multiply(-1.0D);
-        Quaternionf rotation = TextDisplayStyle.rotation(presentation);
-        return new ParticleFrame(anchor, rotateAxis(rotation, new Vector3f(1F, 0F, 0F), right, up, back),
-            rotateAxis(rotation, new Vector3f(0F, 1F, 0F), right, up, back),
-            rotateAxis(rotation, new Vector3f(0F, 0F, 1F), right, up, back));
+        float yaw = switch (billboard) {
+            case FIXED, HORIZONTAL -> -anchor.getYaw();
+            case VERTICAL, CENTER -> 180F - eye.getYaw();
+        };
+        float pitch = switch (billboard) {
+            case FIXED, VERTICAL -> anchor.getPitch();
+            case HORIZONTAL, CENTER -> -eye.getPitch();
+        };
+        Quaternionf rotation = new Quaternionf().rotationYXZ((float) Math.toRadians(yaw),
+            (float) Math.toRadians(pitch), 0F).mul(TextDisplayStyle.rotation(presentation));
+        return new ParticleFrame(anchor, rotateAxis(rotation, new Vector3f(1F, 0F, 0F)),
+            rotateAxis(rotation, new Vector3f(0F, 1F, 0F)),
+            rotateAxis(rotation, new Vector3f(0F, 0F, -1F)));
     }
 
-    private static Vector rotateAxis(Quaternionf rotation, Vector3f axis, Vector right, Vector up, Vector back) {
+    private static Vector rotateAxis(Quaternionf rotation, Vector3f axis) {
         rotation.transform(axis);
-        return right.clone().multiply(axis.x).add(up.clone().multiply(axis.y)).add(back.clone().multiply(axis.z));
+        return new Vector(axis.x, axis.y, axis.z);
     }
 
 }

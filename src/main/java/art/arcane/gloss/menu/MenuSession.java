@@ -315,21 +315,30 @@ public class MenuSession {
   private void emitParticleLayer(ParticleLayer layer, long tick) {
     String scope = layer.target().scope();
     if (scope.equals("projection")) {
+      if (!Gloss.instance.particles().isDue(player, this, layer, tick)) {
+        return;
+      }
       ProjectionGeometry projection = projectionGeometry();
       if (projection != null) {
-        Gloss.instance.particles().emit(player, projection.frame(), layer,
+        Gloss.instance.particles().emit(player, this, projection.frame(), layer,
             List.of(projection.bounds()), tick);
       }
       return;
     }
     if (scope.equals("local")) {
+      if (!Gloss.instance.particles().isDue(player, this, layer, tick)) {
+        return;
+      }
       CollisionPlane plane = transform.createPlane(transform.menuOrigin().toVector(), 0.0F, 0.0F);
-      Gloss.instance.particles().emit(player, frame(plane), layer, List.of(), tick);
+      Gloss.instance.particles().emit(player, this, frame(plane), layer, List.of(), tick);
       return;
     }
     for (MenuComponent<?> component : components) {
       if (layer.target().component() != null
           && !layer.target().component().equals(component.getId().toLowerCase(Locale.ROOT))) {
+        continue;
+      }
+      if (!Gloss.instance.particles().isDue(player, component, layer, tick)) {
         continue;
       }
       CollisionPlane plane = component.particlePlane();
@@ -338,7 +347,7 @@ public class MenuSession {
       }
       List<ParticleRect> targets = componentTargets(component, plane, layer);
       if (!targets.isEmpty()) {
-        Gloss.instance.particles().emit(player, frame(plane), layer, targets, tick);
+        Gloss.instance.particles().emit(player, component, frame(plane), layer, targets, tick);
       }
     }
   }

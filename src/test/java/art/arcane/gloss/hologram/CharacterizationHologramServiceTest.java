@@ -1,5 +1,7 @@
 package art.arcane.gloss.hologram;
 
+import art.arcane.gloss.Gloss;
+import art.arcane.gloss.GlossConfig;
 import art.arcane.gloss.api.Hologram;
 import art.arcane.volmlib.util.scheduling.FoliaScheduler;
 import art.arcane.gloss.hologram.CharacterizationHarness.DisplayHandle;
@@ -8,9 +10,12 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.io.File;
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.ArrayList;
@@ -128,6 +133,57 @@ class CharacterizationHologramServiceTest {
         harness.drainDelayed();
         assertTrue(harness.delayedTasks.isEmpty(), "stopped drivers must not re-arm");
         assertTrue(harness.schedulerErrors.isEmpty());
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void configFlagHotloadReconcilesFastDriverWithoutReplacingDisplays(boolean particlesFlag)
+        throws ReflectiveOperationException {
+        harness.configure(file -> {
+            file.text.functions = false;
+            file.features.particles = false;
+        });
+        PersistentHologram hologram = harness.persistent("config-driver", harness.at(world, 0.5D, 64.0D, 0.5D));
+        hologram.setLines(List.of("{{ time.seconds }}"));
+        hologram.update();
+        harness.startTasks();
+        DisplayHandle display = harness.onlySpawned(world);
+        assertEquals(2L, oneTickTaskCount());
+
+        reloadConfigFlag(particlesFlag, true);
+        assertEquals(3L, oneTickTaskCount(), "enabling a fast partition must start its driver");
+        assertSame(display, harness.onlySpawned(world));
+
+        reloadConfigFlag(particlesFlag, false);
+        harness.drainDelayed();
+        assertEquals(2L, oneTickTaskCount(), "disabling the fast partition must stop its driver");
+        assertSame(display, harness.onlySpawned(world));
+
+        reloadConfigFlag(particlesFlag, true);
+        reloadConfigFlag(particlesFlag, true);
+        assertEquals(3L, oneTickTaskCount(), "reapplying the enabled flag must retain one fast driver");
+        assertSame(hologram, harness.service.get("config-driver"));
+        assertSame(display, harness.onlySpawned(world));
+        assertFalse(display.removed);
+        assertTrue(harness.schedulerErrors.isEmpty(), harness.schedulerErrors.toString());
+    }
+
+    private void reloadConfigFlag(boolean particlesFlag, boolean enabled) throws ReflectiveOperationException {
+        GlossConfig previous = harness.config;
+        harness.configure(file -> {
+            if (particlesFlag) {
+                file.features.particles = enabled;
+            } else {
+                file.text.functions = enabled;
+            }
+        });
+        Method reload = Gloss.class.getDeclaredMethod("reloadServices", GlossConfig.class, GlossConfig.class, boolean.class);
+        reload.setAccessible(true);
+        reload.invoke(harness.gloss, previous, harness.config, false);
+    }
+
+    private long oneTickTaskCount() {
+        return harness.delayedTasks.stream().filter(task -> task.delayTicks() == 1L).count();
     }
 
     @Test

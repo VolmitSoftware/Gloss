@@ -11,9 +11,12 @@ import org.bukkit.entity.Player;
 import org.bukkit.util.Vector;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
+import java.util.WeakHashMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -67,6 +70,7 @@ public final class ParticleService {
     private final Map<ParticleLayer.ParticleSpec, ResolvedParticle> particles;
     private final BoundedCache<SampleKey, List<Vector>> samples;
     private final Map<UUID, Budget> viewerBudgets;
+    private final Map<UUID, Map<Object, Cadence>> viewerCadences;
     private final Budget globalBudget;
 
     public ParticleService(Gloss plugin) {
@@ -74,19 +78,27 @@ public final class ParticleService {
         this.particles = new ConcurrentHashMap<>();
         this.samples = new BoundedCache<>(MAX_SAMPLE_CACHE_ENTRIES);
         this.viewerBudgets = new ConcurrentHashMap<>();
+        this.viewerCadences = new ConcurrentHashMap<>();
         this.globalBudget = new Budget();
     }
 
-    public void emit(Player viewer, ParticleFrame frame, ParticleLayer layer,
+    public boolean isDue(Player viewer, Object source, ParticleLayer layer, long tick) {
+        return cadence(viewer.getUniqueId(), source).isDue(layer, tick);
+    }
+
+    public void emit(Player viewer, Object source, ParticleFrame frame, ParticleLayer layer,
                      List<ParticleRect> targets, long tick) {
-        if (!plugin.cfg().particles().enabled() || !viewer.isOnline()
-            || tick % layer.emission().intervalTicks() != 0L) {
+        if (!plugin.cfg().particles().enabled() || !viewer.isOnline()) {
             return;
         }
         Location origin = frame.origin();
         Location viewerLocation = viewer.getLocation();
         if (origin.getWorld() != viewerLocation.getWorld()
             || origin.distanceSquared(viewerLocation) > square(plugin.cfg().particles().viewRange())) {
+            return;
+        }
+        Cadence cadence = cadence(viewer.getUniqueId(), source);
+        if (!cadence.isDue(layer, tick)) {
             return;
         }
         int cachedLimit = plugin.cfg().particles().maxCachedSamplesPerLayer();
@@ -101,23 +113,28 @@ public final class ParticleService {
         ResolvedParticle resolved = particles.computeIfAbsent(layer.particle(), this::resolve);
         for (int index = 0; index < admitted; index++) {
             Location point = frame.world(selected.get(index), layer.placement());
-            if (resolved.data() == null) {
-                viewer.spawnParticle(resolved.particle(), point, 1);
-            } else {
-                viewer.spawnParticle(resolved.particle(), point, 1, resolved.data());
-            }
+            viewer.spawnParticle(resolved.particle(), point, 1, 0.0D, 0.0D, 0.0D, 0.0D, resolved.data());
         }
+        cadence.emitted(layer, tick);
     }
 
     public void prune(UUID playerId) {
         viewerBudgets.remove(playerId);
+        viewerCadences.remove(playerId);
     }
 
     public void clear() {
         particles.clear();
         samples.clear();
         viewerBudgets.clear();
+        viewerCadences.clear();
         ParticleTextLayout.clearCaches();
+    }
+
+    private Cadence cadence(UUID playerId, Object source) {
+        Objects.requireNonNull(source);
+        return viewerCadences.computeIfAbsent(playerId, ignored -> new WeakHashMap<>())
+            .computeIfAbsent(source, ignored -> new Cadence());
     }
 
     private int reserve(UUID playerId, int requested) {
@@ -196,5 +213,21 @@ public final class ParticleService {
 
     private static double square(double value) {
         return value * value;
+    }
+
+    private static final class Cadence {
+        private final LinkedHashMap<String, Long> emittedTicks = new LinkedHashMap<>(8, 0.75F, true);
+
+        private boolean isDue(ParticleLayer layer, long tick) {
+            Long previous = emittedTicks.get(layer.id());
+            return previous == null || tick < previous || tick - previous >= layer.emission().intervalTicks();
+        }
+
+        private void emitted(ParticleLayer layer, long tick) {
+            emittedTicks.put(layer.id(), tick);
+            if (emittedTicks.size() > ParticleLayer.MAX_LAYERS) {
+                emittedTicks.pollFirstEntry();
+            }
+        }
     }
 }

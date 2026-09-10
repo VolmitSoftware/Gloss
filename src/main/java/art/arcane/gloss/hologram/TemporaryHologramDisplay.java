@@ -531,6 +531,18 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
             || !conditionMatches(viewer)) {
             return;
         }
+        long tick = System.currentTimeMillis() / 50L;
+        List<ParticleLayer> layers = particleLayers;
+        boolean due = false;
+        for (ParticleLayer layer : layers) {
+            if (service.plugin().particles().isDue(viewer, this, layer, tick)) {
+                due = true;
+                break;
+            }
+        }
+        if (!due) {
+            return;
+        }
         ParticleText.Rendered override = renderedParticleText;
         ParticleText.Rendered particleText = snapshot.rendered()
             ? override == null
@@ -538,14 +550,16 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
                 : override
             : service.plugin().text().renderLegacyParticleText(viewer, authoredText(snapshot).authored());
         ParticleFrame frame = particleFrame(viewer, anchor, presentation);
-        long tick = System.currentTimeMillis() / 50L;
         Vector3f scale = TextDisplayStyle.scale(presentation, style);
-        for (ParticleLayer layer : particleLayers) {
+        for (ParticleLayer layer : layers) {
+            if (!service.plugin().particles().isDue(viewer, this, layer, tick)) {
+                continue;
+            }
             List<ParticleRect> targets = particleTargets(layer, particleText, scale);
             if (!layer.target().scope().equals("local") && targets.isEmpty()) {
                 continue;
             }
-            service.plugin().particles().emit(viewer, frame, layer, targets, tick);
+            service.plugin().particles().emit(viewer, this, frame, layer, targets, tick);
         }
     }
 

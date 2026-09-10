@@ -113,6 +113,7 @@ final class CharacterizationHarness implements AutoCloseable {
         final Map<UUID, Integer> showCalls = new ConcurrentHashMap<>();
         final Map<UUID, Integer> hideCalls = new ConcurrentHashMap<>();
         final List<Location> particleLocations = new CopyOnWriteArrayList<>();
+        final List<List<Object>> particleCalls = new CopyOnWriteArrayList<>();
         volatile boolean online = true;
         volatile Location location;
         volatile Runnable locationRead = () -> {};
@@ -742,6 +743,7 @@ final class CharacterizationHarness implements AutoCloseable {
             }
             case "spawnParticle" -> {
                 handle.particleLocations.add(((Location) args[1]).clone());
+                handle.particleCalls.add(Arrays.asList(args.clone()));
                 yield null;
             }
             case "getWorld" -> handle.location.getWorld();
