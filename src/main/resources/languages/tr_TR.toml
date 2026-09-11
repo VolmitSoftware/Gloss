@@ -132,6 +132,7 @@
 #   {z}  Z koordinatı
 
 [command.help]
+version = "Yüklü eklenti sürümünü göster"
 debug = "Tanılama komutları"
 debugdump = "Tanılama raporu oluştur ve isteğe bağlı olarak yükle"
 debugdump_upload = "Raporu mclo.gs üzerine yükle"

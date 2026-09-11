@@ -132,6 +132,7 @@
 #   {z}  Tọa độ Z
 
 [command.help]
+version = "Hiển thị phiên bản plugin đã cài đặt"
 debug = "Lệnh chẩn đoán"
 debugdump = "Tạo báo cáo chẩn đoán và tải lên nếu muốn"
 debugdump_upload = "Tải báo cáo lên mclo.gs"

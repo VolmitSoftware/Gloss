@@ -1,6 +1,7 @@
 package art.arcane.gloss.command;
 
 import art.arcane.volmlib.util.director.compat.DirectorEngineFactory;
+import art.arcane.volmlib.util.director.help.DirectorMiniMenu;
 import art.arcane.volmlib.util.director.runtime.DirectorRuntimeEngine;
 import art.arcane.volmlib.util.director.runtime.DirectorInvocation;
 import art.arcane.volmlib.util.director.runtime.DirectorRuntimeNode;
@@ -20,6 +21,19 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 public class GlossCommandDiscoveryTest {
+  @Test
+  public void versionIsDiscoverableUnderDebugAndHiddenAtTheRoot() {
+    DirectorRuntimeEngine engine = engine();
+    DirectorMiniMenu.DirectorHelpPage debug = DirectorMiniMenu.resolveHelp(engine, List.of("debug")).orElseThrow();
+
+    assertNotNull(child(engine.getRoot(), "version"));
+    assertTrue(debug.entries().stream().anyMatch(node -> node.getDescriptor().getName().equals("version")));
+    assertFalse(engine.tabComplete(new DirectorInvocation(new TestSender(), "gloss", List.of("version")))
+        .contains("version"));
+    assertTrue(engine.tabComplete(new DirectorInvocation(new TestSender(), "gloss", List.of("debug", "ver")))
+        .contains("version"));
+  }
+
   @Test
   public void diagnosticCompletionUsesItsDedicatedPermissionWithoutBaseAccess() {
     GlossCommandService service = new GlossCommandService(null);

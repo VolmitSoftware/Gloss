@@ -207,7 +207,8 @@ public final class GlossCommandService implements CommandExecutor, TabCompleter,
             return plugin.languageSwitcher().complete(sender, Arrays.copyOfRange(args, 1, args.length));
         }
         if (ROOT_COMMAND.equals(commandName) && args.length > 1 && "debug".equalsIgnoreCase(args[0])) {
-            return sender.hasPermission("gloss.debugdump") ? runDirectorTab(sender, commandName, args) : List.of();
+            return hasBaseCommandAccess(sender) || sender.hasPermission("gloss.debugdump")
+                ? runDirectorTab(sender, commandName, args) : List.of();
         }
         if (!hasBaseCommandAccess(sender)) {
             List<String> suggestions = new ArrayList<>(2);

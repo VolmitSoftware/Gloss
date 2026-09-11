@@ -132,6 +132,7 @@
 #   {z}  Z-koordinaatti
 
 [command.help]
+version = "Näytä asennetun lisäosan versio"
 debug = "Diagnostiikkakomennot"
 debugdump = "Luo diagnostiikkaraportti ja lähetä se halutessasi"
 debugdump_upload = "Lähetä raportti mclo.gs-palveluun"

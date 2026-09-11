@@ -132,6 +132,7 @@
 #   {z}  Z-coördinaat
 
 [command.help]
+version = "Toon de geïnstalleerde pluginversie"
 debug = "Diagnosecommando’s"
 debugdump = "Maak een diagnostisch rapport en upload het desgewenst"
 debugdump_upload = "Upload het rapport naar mclo.gs"

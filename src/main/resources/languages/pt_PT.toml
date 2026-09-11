@@ -132,6 +132,7 @@
 #   {z}  Coordenada Z
 
 [command.help]
+version = "Mostrar a versão do plugin instalado"
 debug = "Comandos de diagnóstico"
 debugdump = "Criar um relatório de diagnóstico e carregá-lo opcionalmente"
 debugdump_upload = "Carregar o relatório para mclo.gs"

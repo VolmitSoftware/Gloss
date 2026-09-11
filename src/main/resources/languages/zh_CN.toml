@@ -132,6 +132,7 @@
 #   {z}  Z 坐标
 
 [command.help]
+version = "显示已安装的插件版本"
 debug = "诊断命令"
 debugdump = "创建诊断报告并选择是否上传"
 debugdump_upload = "将报告上传到 mclo.gs"

@@ -17,6 +17,7 @@ public final class GlossMessages {
 
     private static final List<MessageKey> KEYS = new ArrayList<>();
 
+    public static final TextKey VERSION_DESCRIPTION = text("command.help.version", "Show the installed plugin version");
     public static final TextKey DEBUG_DESCRIPTION = text("command.help.debug", "Diagnostic commands");
     public static final TextKey DEBUG_DUMP_DESCRIPTION = text("command.help.debugdump", "Create and optionally upload a diagnostic report");
     public static final TextKey DEBUG_DUMP_UPLOAD = text("command.help.debugdump_upload", "Upload the report to mclo.gs");

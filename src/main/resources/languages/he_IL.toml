@@ -132,6 +132,7 @@
 #   {z}  קואורדינטת Z
 
 [command.help]
+version = "הצגת גרסת התוסף המותקן"
 debug = "פקודות אבחון"
 debugdump = "יצירת דוח אבחון והעלאתו לפי בחירה"
 debugdump_upload = "העלאת הדוח אל mclo.gs"

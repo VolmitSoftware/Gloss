@@ -132,6 +132,7 @@
 #   {z}  Z座標
 
 [command.help]
+version = "インストールされているプラグインのバージョンを表示"
 debug = "診断コマンド"
 debugdump = "診断レポートを作成し、必要に応じてアップロードする"
 debugdump_upload = "レポートを mclo.gs にアップロードする"

@@ -132,6 +132,7 @@
 #   {z}  Z-Koordinate
 
 [command.help]
+version = "Installierte Plugin-Version anzeigen"
 debug = "Diagnosebefehle"
 debugdump = "Einen Diagnosebericht erstellen und optional hochladen"
 debugdump_upload = "Den Bericht zu mclo.gs hochladen"

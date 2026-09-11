@@ -132,6 +132,7 @@
 #   {z}  Z 座標
 
 [command.help]
+version = "顯示已安裝的插件版本"
 debug = "診斷指令"
 debugdump = "建立診斷報告並選擇是否上傳"
 debugdump_upload = "將報告上傳至 mclo.gs"

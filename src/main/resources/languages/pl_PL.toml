@@ -132,6 +132,7 @@
 #   {z}  Współrzędna Z
 
 [command.help]
+version = "Pokaż wersję zainstalowanej wtyczki"
 debug = "Polecenia diagnostyczne"
 debugdump = "Utwórz raport diagnostyczny i opcjonalnie go prześlij"
 debugdump_upload = "Prześlij raport do mclo.gs"

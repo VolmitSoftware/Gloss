@@ -132,6 +132,7 @@
 #   {z}  Z 좌표
 
 [command.help]
+version = "설치된 플러그인 버전 표시"
 debug = "진단 명령어"
 debugdump = "진단 보고서를 생성하고 선택적으로 업로드"
 debugdump_upload = "보고서를 mclo.gs에 업로드"

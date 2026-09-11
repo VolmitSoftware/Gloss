@@ -132,6 +132,7 @@
 #   {z}  Z koordinatė
 
 [command.help]
+version = "Rodyti įdiegto papildinio versiją"
 debug = "Diagnostikos komandos"
 debugdump = "Sukurti diagnostikos ataskaitą ir pasirinktinai ją įkelti"
 debugdump_upload = "Įkelti ataskaitą į mclo.gs"
