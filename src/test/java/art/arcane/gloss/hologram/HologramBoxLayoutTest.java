@@ -3,7 +3,9 @@ package art.arcane.gloss.hologram;
 import art.arcane.gloss.api.HologramBox;
 import art.arcane.gloss.api.HologramPresentation;
 import art.arcane.gloss.api.IconArgbColor;
+import art.arcane.gloss.api.IconDisplayStyle;
 import org.bukkit.util.Transformation;
+import org.joml.Quaternionf;
 import org.joml.Vector3f;
 import org.junit.jupiter.api.Test;
 
@@ -75,6 +77,26 @@ class HologramBoxLayoutTest {
     }
 
     @Test
+    void backgroundAndBorderStayBehindTextAcrossScaleAndRotation() {
+        HologramBox box = new HologramBox(true, 4, 2, null, null);
+        HologramBoxLayout layout = HologramBoxLayout.measure("Sentinel\n20/20 HP\nATK 3 | ARM 2", 16384, box);
+        List<HologramPresentation> presentations = List.of(
+            HologramPresentation.identity(),
+            new HologramPresentation(2, 3, 0.5, 37, 123, 71, 1),
+            new HologramPresentation(0.5, 1.5, 2, 290, 40, 185, 1));
+        List<IconDisplayStyle> styles = List.of(
+            IconDisplayStyle.hologramDefaults(),
+            IconDisplayStyle.hologramDefaults().withScale(0.8F, 0.8F, 0.8F),
+            IconDisplayStyle.hologramDefaults().withScale(0.5F, 1.7F, 2F));
+        assertEquals(5, layout.parts(box).size());
+        for (HologramPresentation presentation : presentations) {
+            for (IconDisplayStyle style : styles) {
+                assertBehindText(layout, box, presentation, style);
+            }
+        }
+    }
+
+    @Test
     void theLayoutKeyMeasuresIdenticallyToTheTextItProjects() {
         HologramBox box = new HologramBox(true, 4, 2, null, null);
         List<String> samples = List.of(
@@ -104,6 +126,30 @@ class HologramBoxLayoutTest {
             HologramBoxLayout.layoutKey("\u00a7lHello"));
         assertNotEquals(HologramBoxLayout.layoutKey("\u00a7aHello"),
             HologramBoxLayout.layoutKey("\u00a7aHellO"));
+    }
+
+    private static void assertBehindText(HologramBoxLayout layout, HologramBox box,
+                                         HologramPresentation presentation, IconDisplayStyle style) {
+        Quaternionf billboard = new Quaternionf().rotationYXZ(2.3F, -0.7F, 0F);
+        Quaternionf presentationRotation = new Quaternionf().rotationXYZ(
+            (float) Math.toRadians(presentation.rotationXDegrees()),
+            (float) Math.toRadians(presentation.rotationYDegrees()),
+            (float) Math.toRadians(presentation.rotationZDegrees()));
+        Vector3f front = new Vector3f(0F, 0F, 1F).rotate(presentationRotation).rotate(billboard);
+        List<Vector3f> nativeBackgroundCorners = List.of(
+            new Vector3f(-0.05F, 0F, -0.00025F),
+            new Vector3f(0.075F, 0F, -0.00025F),
+            new Vector3f(0.075F, 0.25F, -0.00025F),
+            new Vector3f(-0.05F, 0.25F, -0.00025F));
+        for (HologramBoxLayout.Part part : layout.parts(box)) {
+            Transformation transformation = layout.transform(part, presentation, style);
+            for (Vector3f corner : nativeBackgroundCorners) {
+                Vector3f point = new Vector3f(corner).rotate(transformation.getRightRotation())
+                    .mul(transformation.getScale()).rotate(transformation.getLeftRotation())
+                    .add(transformation.getTranslation()).rotate(billboard);
+                assertTrue(point.dot(front) < 0F, "Box quad must stay behind the visible text plane");
+            }
+        }
     }
 
     private static Vector3f center(Transformation transformation) {

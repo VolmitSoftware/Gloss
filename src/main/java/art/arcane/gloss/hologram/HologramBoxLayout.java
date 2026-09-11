@@ -135,7 +135,7 @@ public record HologramBoxLayout(int textWidth, int textHeight, int panelWidth, i
         Vector3f parentScale = TextDisplayStyle.scale(presentation, style);
         Quaternionf rotation = TextDisplayStyle.rotation(presentation);
         Vector3f translation = new Vector3f((0.5F + part.x() - width / 10F) * PIXEL,
-            (textHeight / 2F + part.y() - height / 2F) * PIXEL, 0.002F)
+            (textHeight / 2F + part.y() - height / 2F) * PIXEL, -0.002F)
             .mul(parentScale);
         rotation.transform(translation);
         Vector3f scale = new Vector3f(width / 5F, height / 10F, 1F).mul(parentScale);
