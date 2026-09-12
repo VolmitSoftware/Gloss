@@ -99,6 +99,7 @@
 #   {rotation}  表示の回転
 #   {scale}  表示またはプレビューの倍率
 #   {seconds}  時間（秒）
+#   {section}  言語エディターのセクション
 #   {session}  編集セッションの識別子
 #   {severity}  診断の重大度
 #   {skipped}  スキップした項目数
@@ -116,7 +117,6 @@
 #   {total}  総項目数
 #   {type}  期待する値またはオブジェクトの種類
 #   {url}  Webアドレス
-#   {usage}  コマンド構文
 #   {uuid}  オブジェクトまたはプレイヤーの一意な識別子
 #   {value}  現在のメッセージまたはパラメーター値
 #   {variables}  メッセージで使用可能な変数
@@ -467,9 +467,6 @@ optional = "このパラメータは任意です。"
 default = "未指定の場合は \"{value}\" になります。"
 type = "このパラメータの型は {type} です。"
 
-[director.runtime]
-usage = "使用法: {usage}"
-
 [director.runtime.error]
 invalid_origin = "この実行元からはコマンドを実行できません。"
 unknown_parameter = "不明なパラメーターキー: {key}"
@@ -768,6 +765,7 @@ server-selected = "{plugin}: サーバー言語を{locale}に変更しました�
 server-default-selected = "{plugin}: 個人言語はサーバーの既定の言語に従うようになりました。"
 
 [language.editor]
+title = "{plugin} › {section}"
 loading = "{locale}のメッセージを読み込んでいます..."
 
 [language.editor.section]

@@ -654,7 +654,7 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
     private void startLocaleWatcher() {
         watchdog.register(LOCALE_WATCHDOG_ENTRY, () -> {
             if (localization.update()) {
-                watchdog.recordHotload("languages/" + localization.languageFile().getName(), 1);
+                watchdog.recordHotload("languages", 1);
             }
         });
     }

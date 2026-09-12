@@ -99,6 +99,7 @@
 #   {rotation}  Obrót wyświetlanego obiektu
 #   {scale}  Skala wyświetlania lub podglądu
 #   {seconds}  Czas w sekundach
+#   {section}  Sekcja edytora języków
 #   {session}  Identyfikator sesji edytora
 #   {severity}  Poziom ważności komunikatu diagnostycznego
 #   {skipped}  Liczba pominiętych wpisów
@@ -116,7 +117,6 @@
 #   {total}  Łączna liczba wpisów
 #   {type}  Oczekiwany typ wartości lub obiektu
 #   {url}  Adres internetowy
-#   {usage}  Składnia polecenia
 #   {uuid}  Unikalny identyfikator obiektu lub gracza
 #   {value}  Bieżąca wartość wiadomości lub parametru
 #   {variables}  Dozwolone zmienne wiadomości
@@ -467,9 +467,6 @@ optional = "Ten parametr jest opcjonalny."
 default = "Domyślnie \"{value}\", jeśli nie określono."
 type = "Ten parametr jest typu {type}."
 
-[director.runtime]
-usage = "Użycie: {usage}"
-
 [director.runtime.error]
 invalid_origin = "Tego polecenia nie można wykonać z tego źródła."
 unknown_parameter = "Nieznany klucz parametru: {key}"
@@ -768,6 +765,7 @@ server-selected = "{plugin}: język serwera jest teraz {locale}."
 server-default-selected = "{plugin}: twój język jest teraz zgodny z domyślnym językiem serwera."
 
 [language.editor]
+title = "{plugin} › {section}"
 loading = "Wczytywanie wiadomości w języku {locale}..."
 
 [language.editor.section]

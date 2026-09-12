@@ -99,6 +99,7 @@
 #   {rotation}  Rotatie van de weergave
 #   {scale}  Schaal van de weergave of het voorbeeld
 #   {seconds}  Tijd in seconden
+#   {section}  Onderdeel van de taaleditor
 #   {session}  Identificatie van de editorsessie
 #   {severity}  Ernst van de diagnose
 #   {skipped}  Aantal overgeslagen vermeldingen
@@ -116,7 +117,6 @@
 #   {total}  Totaal aantal vermeldingen
 #   {type}  Verwacht waarde- of objecttype
 #   {url}  Webadres
-#   {usage}  Opdrachtsyntaxis
 #   {uuid}  Unieke identificatie van het object of de speler
 #   {value}  Huidige bericht- of parameterwaarde
 #   {variables}  Toegestane plaatshouders in het bericht
@@ -467,9 +467,6 @@ optional = "Deze parameter is optioneel."
 default = "Standaard \"{value}\" indien niet opgegeven."
 type = "Deze parameter is van het type {type}."
 
-[director.runtime]
-usage = "Gebruik: {usage}"
-
 [director.runtime.error]
 invalid_origin = "Deze opdracht kan niet vanuit deze bron worden uitgevoerd."
 unknown_parameter = "Onbekende parametersleutel: {key}"
@@ -768,6 +765,7 @@ server-selected = "{plugin}: servertaal is nu {locale}."
 server-default-selected = "{plugin}: je taal volgt nu de standaardtaal van de server."
 
 [language.editor]
+title = "{plugin} › {section}"
 loading = "Berichten voor {locale} laden..."
 
 [language.editor.section]

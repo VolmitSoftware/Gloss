@@ -99,6 +99,7 @@
 #   {rotation}  Näyttökohteen kierto
 #   {scale}  Näyttökohteen tai esikatselun mittakaava
 #   {seconds}  Aika sekunteina
+#   {section}  Kielieditorin osio
 #   {session}  Editori-istunnon tunniste
 #   {severity}  Diagnostiikan vakavuustaso
 #   {skipped}  Ohitettujen merkintöjen määrä
@@ -116,7 +117,6 @@
 #   {total}  Merkintöjen kokonaismäärä
 #   {type}  Odotettu arvo- tai kohdetyyppi
 #   {url}  Verkko-osoite
-#   {usage}  Komennon syntaksi
 #   {uuid}  Kohteen tai pelaajan yksilöllinen tunniste
 #   {value}  Viestin tai parametrin nykyinen arvo
 #   {variables}  Viestin sallitut paikkamerkit
@@ -467,9 +467,6 @@ optional = "Tämä parametri on valinnainen."
 default = "Oletusarvo on \"{value}\", jos sitä ei määritetä."
 type = "Tämän parametrin tyyppi on {type}."
 
-[director.runtime]
-usage = "Käyttö: {usage}"
-
 [director.runtime.error]
 invalid_origin = "Tätä komentoa ei voi suorittaa tästä lähteestä."
 unknown_parameter = "Tuntematon parametriavain: {key}"
@@ -768,6 +765,7 @@ server-selected = "{plugin}: palvelinkieli on nyt {locale}."
 server-default-selected = "{plugin}: kielesi noudattaa nyt palvelimen oletuskieltä."
 
 [language.editor]
+title = "{plugin} › {section}"
 loading = "Ladataan kielen {locale} viestejä..."
 
 [language.editor.section]

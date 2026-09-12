@@ -99,6 +99,7 @@
 #   {rotation}  표시 회전
 #   {scale}  표시 또는 미리 보기 배율
 #   {seconds}  시간(초)
+#   {section}  언어 편집기 섹션
 #   {session}  편집 세션 식별자
 #   {severity}  진단 심각도
 #   {skipped}  건너뛴 항목 수
@@ -116,7 +117,6 @@
 #   {total}  전체 항목 수
 #   {type}  예상 값 또는 객체 유형
 #   {url}  웹 주소
-#   {usage}  명령 구문
 #   {uuid}  객체 또는 플레이어의 고유 식별자
 #   {value}  현재 메시지 또는 매개변수 값
 #   {variables}  메시지에 허용되는 변수
@@ -467,9 +467,6 @@ optional = "이 매개변수는 선택 사항입니다."
 default = "지정하지 않으면 기본값은 \"{value}\"입니다."
 type = "이 매개변수의 유형은 {type}입니다."
 
-[director.runtime]
-usage = "사용법: {usage}"
-
 [director.runtime.error]
 invalid_origin = "이 실행 위치에서는 이 명령어를 실행할 수 없습니다."
 unknown_parameter = "알 수 없는 매개변수 키: {key}"
@@ -768,6 +765,7 @@ server-selected = "{plugin}: 서버 언어를 {locale}으로 변경했습니다.
 server-default-selected = "{plugin}: 개인 언어가 이제 서버 기본 언어를 따릅니다."
 
 [language.editor]
+title = "{plugin} › {section}"
 loading = "{locale} 메시지를 불러오는 중..."
 
 [language.editor.section]

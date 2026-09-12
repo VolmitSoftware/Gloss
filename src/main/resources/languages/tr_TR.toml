@@ -99,6 +99,7 @@
 #   {rotation}  Görüntülenen nesnenin dönüşü
 #   {scale}  Görüntüleme veya önizleme ölçeği
 #   {seconds}  Saniye cinsinden süre
+#   {section}  Dil düzenleyicisi bölümü
 #   {session}  Düzenleyici oturum kimliği
 #   {severity}  Tanılama iletisinin önem düzeyi
 #   {skipped}  Atlanan kayıt sayısı
@@ -116,7 +117,6 @@
 #   {total}  Toplam kayıt sayısı
 #   {type}  Beklenen değer veya nesne türü
 #   {url}  Web adresi
-#   {usage}  Komut sözdizimi
 #   {uuid}  Benzersiz nesne veya oyuncu kimliği
 #   {value}  İletinin veya parametrenin geçerli değeri
 #   {variables}  İletide izin verilen değişkenler
@@ -467,9 +467,6 @@ optional = "Bu parametre isteğe bağlıdır."
 default = "Belirtilmezse varsayılan değer \"{value}\" olur."
 type = "Bu parametrenin türü {type}."
 
-[director.runtime]
-usage = "Kullanım: {usage}"
-
 [director.runtime.error]
 invalid_origin = "Bu komut bu kaynaktan çalıştırılamaz."
 unknown_parameter = "Bilinmeyen parametre anahtarı: {key}"
@@ -768,6 +765,7 @@ server-selected = "{plugin}: sunucu dili şimdi {locale}."
 server-default-selected = "{plugin}: diliniz artık sunucunun varsayılan dilini kullanıyor."
 
 [language.editor]
+title = "{plugin} › {section}"
 loading = "{locale} mesajları yükleniyor..."
 
 [language.editor.section]

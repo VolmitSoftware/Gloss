@@ -99,6 +99,7 @@
 #   {rotation}  Độ xoay phần hiển thị
 #   {scale}  Tỷ lệ hiển thị hoặc xem trước
 #   {seconds}  Thời gian tính bằng giây
+#   {section}  Mục trong trình chỉnh sửa ngôn ngữ
 #   {session}  Mã định danh phiên chỉnh sửa
 #   {severity}  Mức độ nghiêm trọng của chẩn đoán
 #   {skipped}  Số mục đã bỏ qua
@@ -116,7 +117,6 @@
 #   {total}  Tổng số mục
 #   {type}  Loại giá trị hoặc đối tượng dự kiến
 #   {url}  Địa chỉ web
-#   {usage}  Cú pháp lệnh
 #   {uuid}  Mã định danh duy nhất của đối tượng hoặc người chơi
 #   {value}  Giá trị thông báo hoặc tham số hiện tại
 #   {variables}  Các biến được phép dùng trong thông báo
@@ -467,9 +467,6 @@ optional = "Tham số này là tùy chọn."
 default = "Mặc định là \"{value}\" nếu không được chỉ định."
 type = "Tham số này có kiểu {type}."
 
-[director.runtime]
-usage = "Cách dùng: {usage}"
-
 [director.runtime.error]
 invalid_origin = "Không thể chạy lệnh này từ nguồn này."
 unknown_parameter = "Khóa tham số không xác định: {key}"
@@ -768,6 +765,7 @@ server-selected = "{plugin}: ngôn ngữ máy chủ hiện là {locale}."
 server-default-selected = "{plugin}: ngôn ngữ của bạn hiện theo ngôn ngữ mặc định của máy chủ."
 
 [language.editor]
+title = "{plugin} › {section}"
 loading = "Đang tải tin nhắn cho {locale}..."
 
 [language.editor.section]

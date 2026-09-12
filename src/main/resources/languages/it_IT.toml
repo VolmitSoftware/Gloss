@@ -99,6 +99,7 @@
 #   {rotation}  Rotazione dell’elemento visualizzato
 #   {scale}  Scala dell’elemento visualizzato o dell’anteprima
 #   {seconds}  Tempo in secondi
+#   {section}  Sezione dell’editor delle lingue
 #   {session}  Identificatore della sessione dell’editor
 #   {severity}  Gravità della diagnostica
 #   {skipped}  Numero di voci saltate
@@ -116,7 +117,6 @@
 #   {total}  Numero totale di voci
 #   {type}  Tipo di valore o oggetto atteso
 #   {url}  Indirizzo web
-#   {usage}  Sintassi del comando
 #   {uuid}  Identificatore univoco dell’oggetto o del giocatore
 #   {value}  Valore attuale del messaggio o del parametro
 #   {variables}  Segnaposto consentiti nel messaggio
@@ -467,9 +467,6 @@ optional = "Questo parametro è facoltativo."
 default = "Il valore predefinito è \"{value}\" se non definito."
 type = "Questo parametro è di tipo {type}."
 
-[director.runtime]
-usage = "Utilizzo: {usage}"
-
 [director.runtime.error]
 invalid_origin = "Questo comando non può essere eseguito da questa origine."
 unknown_parameter = "Chiave di parametro sconosciuta: {key}"
@@ -768,6 +765,7 @@ server-selected = "{plugin}: la lingua del server ora è {locale}."
 server-default-selected = "{plugin}: la tua lingua segue ora la lingua predefinita del server."
 
 [language.editor]
+title = "{plugin} › {section}"
 loading = "Caricamento dei messaggi in {locale}..."
 
 [language.editor.section]

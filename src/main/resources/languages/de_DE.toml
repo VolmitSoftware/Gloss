@@ -99,6 +99,7 @@
 #   {rotation}  Drehmodus beim Folgen
 #   {scale}  Darstellungsskalierung
 #   {seconds}  Dauer oder Frist in Sekunden
+#   {section}  Abschnitt des Spracheneditors
 #   {session}  ID der Bearbeitungssitzung
 #   {severity}  Schweregrad des Problems
 #   {skipped}  Übersprungene Einträge
@@ -116,7 +117,6 @@
 #   {total}  Gesamtzahl der Einträge
 #   {type}  Parametertyp
 #   {url}  Webadresse
-#   {usage}  Befehlssyntax
 #   {uuid}  Vollständige UUID
 #   {value}  Aktueller, voreingestellter oder eingegebener Wert
 #   {variables}  Variablen der Nachricht
@@ -467,9 +467,6 @@ optional = "Dieser Parameter ist optional."
 default = "Standardmäßig \"{value}\", wenn nicht angegeben."
 type = "Dieser Parameter hat den Typ {type}."
 
-[director.runtime]
-usage = "Verwendung: {usage}"
-
 [director.runtime.error]
 invalid_origin = "Dieser Befehl kann von diesem Ursprung aus nicht ausgeführt werden."
 unknown_parameter = "Unbekannter Parameterschlüssel: {key}"
@@ -768,6 +765,7 @@ server-selected = "{plugin}: Serversprache ist jetzt {locale}."
 server-default-selected = "{plugin}: Deine Sprache folgt jetzt dem Serverstandard."
 
 [language.editor]
+title = "{plugin} › {section}"
 loading = "Nachrichten für {locale} werden geladen..."
 
 [language.editor.section]
