@@ -831,7 +831,7 @@ public final class HologramService implements RegistryOwner {
             && driverIntervalTicks > ANIMATION_REFRESH_INTERVAL_TICKS;
     }
 
-    void requestDriverIntervalReconcile() {
+    public void requestDriverIntervalReconcile() {
         if (!driverRunning || !plugin.isEnabled() || !driverReconcileQueued.compareAndSet(false, true)) {
             return;
         }

@@ -6,6 +6,7 @@ import art.arcane.gloss.api.IconArgbColor;
 import art.arcane.gloss.api.IconBillboard;
 import art.arcane.gloss.api.IconDisplayStyle;
 import art.arcane.gloss.api.IconTextAlignment;
+import art.arcane.gloss.api.ParticleLayer;
 import art.arcane.gloss.hologram.CharacterizationHarness.DisplayHandle;
 import art.arcane.gloss.hologram.CharacterizationHarness.PlayerHandle;
 import art.arcane.gloss.hologram.CharacterizationHarness.WorldState;
@@ -14,6 +15,7 @@ import org.bukkit.Color;
 import org.bukkit.Location;
 import org.bukkit.entity.Display;
 import org.bukkit.entity.TextDisplay;
+import org.bukkit.util.Vector;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -208,6 +210,124 @@ class TemporaryHologramStyleTest {
     }
 
     @Test
+    void movingTheViewerWithoutTurningDoesNotRotateParticlePlanes() {
+        Location anchor = harness.at(world, 10, 64, -8);
+        anchor.setYaw(73F);
+        anchor.setPitch(31F);
+        Location eye = harness.at(world, 3, 66, 3);
+        eye.setYaw(135F);
+        eye.setPitch(-27F);
+        Location moved = eye.clone().add(17, -12, -21);
+        for (IconBillboard billboard : IconBillboard.values()) {
+            ParticleFrame before = TextDisplayStyle.particleFrame(anchor, eye,
+                HologramPresentation.identity(), billboard);
+            ParticleFrame after = TextDisplayStyle.particleFrame(anchor, moved,
+                HologramPresentation.identity(), billboard);
+            assertVector(before.right(), after.right());
+            assertVector(before.up(), after.up());
+            assertVector(before.back(), after.back());
+        }
+    }
+
+    @Test
+    void centerParticlePlanesFollowStationaryCameraYaw() {
+        Location anchor = harness.at(world, 0, 64, 0);
+        Location eye = harness.at(world, 3, 66, 3);
+        List<Vector> right = List.of(new Vector(-1, 0, 0), new Vector(0, 0, -1),
+            new Vector(1, 0, 0), new Vector(0, 0, 1));
+        List<Vector> back = List.of(new Vector(0, 0, 1), new Vector(-1, 0, 0),
+            new Vector(0, 0, -1), new Vector(1, 0, 0));
+        for (int index = 0; index < right.size(); index++) {
+            eye.setYaw(index * 90F);
+            ParticleFrame frame = TextDisplayStyle.particleFrame(anchor, eye,
+                HologramPresentation.identity(), IconBillboard.CENTER);
+            assertVector(right.get(index), frame.right());
+            assertVector(new Vector(0, 1, 0), frame.up());
+            assertVector(back.get(index), frame.back());
+        }
+    }
+
+    @Test
+    void centerParticlePlanesRetainCameraYawWhenLookingStraightUpOrDown() {
+        Location anchor = harness.at(world, 0, 64, 0);
+        Location eye = anchor.clone();
+        eye.setYaw(90F);
+        for (int sign : List.of(-1, 1)) {
+            eye.setPitch(sign * 90F);
+            ParticleFrame frame = TextDisplayStyle.particleFrame(anchor, eye,
+                HologramPresentation.identity(), IconBillboard.CENTER);
+            assertVector(new Vector(0, 0, -1), frame.right());
+            assertVector(new Vector(-sign, 0, 0), frame.up());
+            assertVector(new Vector(0, -sign, 0), frame.back());
+        }
+    }
+
+    @Test
+    void verticalParticlePlanesCombineCameraYawWithEntityPitch() {
+        Location anchor = harness.at(world, 0, 64, 0);
+        anchor.setYaw(42F);
+        anchor.setPitch(30F);
+        Location eye = harness.at(world, 3, 66, 3);
+        eye.setYaw(90F);
+        eye.setPitch(-70F);
+        ParticleFrame frame = TextDisplayStyle.particleFrame(anchor, eye,
+            HologramPresentation.identity(), IconBillboard.VERTICAL);
+        assertVector(new Vector(0, 0, -1), frame.right());
+        assertVector(new Vector(0.5, Math.sqrt(3) / 2, 0), frame.up());
+        assertVector(new Vector(-Math.sqrt(3) / 2, 0.5, 0), frame.back());
+    }
+
+    @Test
+    void horizontalParticlePlanesCombineEntityYawWithCameraPitch() {
+        Location anchor = harness.at(world, 0, 64, 0);
+        anchor.setPitch(45F);
+        Location eye = harness.at(world, 3, 66, 3);
+        eye.setYaw(135F);
+        eye.setPitch(60F);
+        ParticleFrame frame = TextDisplayStyle.particleFrame(anchor, eye,
+            HologramPresentation.identity(), IconBillboard.HORIZONTAL);
+        assertVector(new Vector(1, 0, 0), frame.right());
+        assertVector(new Vector(0, 0.5, -Math.sqrt(3) / 2), frame.up());
+        assertVector(new Vector(0, -Math.sqrt(3) / 2, -0.5), frame.back());
+    }
+
+    @Test
+    void presentationTiltsRotateTheTextAxesBeforeApplyingParticleDepth() {
+        Location anchor = harness.at(world, 0, 64, 0);
+        Location eye = harness.at(world, 3, 66, 3);
+        ParticleFrame tiltedX = TextDisplayStyle.particleFrame(anchor, eye,
+            new HologramPresentation(1, 1, 1, 90, 0, 0, 1), IconBillboard.FIXED);
+        assertVector(new Vector(1, 0, 0), tiltedX.right());
+        assertVector(new Vector(0, 0, 1), tiltedX.up());
+        assertVector(new Vector(0, 1, 0), tiltedX.back());
+        ParticleFrame tiltedY = TextDisplayStyle.particleFrame(anchor, eye,
+            new HologramPresentation(1, 1, 1, 0, 90, 0, 1), IconBillboard.CENTER);
+        assertVector(new Vector(0, 0, 1), tiltedY.right());
+        assertVector(new Vector(0, 1, 0), tiltedY.up());
+        assertVector(new Vector(1, 0, 0), tiltedY.back());
+    }
+
+    @Test
+    void frontParticlesSitOnTheReadableSideOfTheText() {
+        Location anchor = harness.at(world, 0, 64, 0);
+        Location eye = harness.at(world, 3, 66, 3);
+        eye.setYaw(37F);
+        eye.setPitch(29F);
+        ParticleFrame center = TextDisplayStyle.particleFrame(anchor, eye,
+            HologramPresentation.identity(), IconBillboard.CENTER);
+        ParticleLayer.Placement front = new ParticleLayer.Placement("front", 0.25, new Vector());
+        ParticleLayer.Placement behind = new ParticleLayer.Placement("behind", 0.25, new Vector());
+        assertVector(anchor.toVector().subtract(eye.getDirection().multiply(0.25)),
+            center.world(new Vector(), front).toVector());
+        assertVector(anchor.toVector().add(eye.getDirection().multiply(0.25)),
+            center.world(new Vector(), behind).toVector());
+        ParticleFrame fixed = TextDisplayStyle.particleFrame(anchor, eye,
+            HologramPresentation.identity(), IconBillboard.FIXED);
+        assertVector(anchor.toVector().add(new Vector(0, 0, 0.25)),
+            fixed.world(new Vector(), front).toVector());
+    }
+
+    @Test
     void destroyedBoxCannotPublishChildrenFromAQueuedSpawn() {
         TextDisplayDecoration box = new TextDisplayDecoration(harness.service, () -> {});
         harness.ownsThread = false;
@@ -242,6 +362,12 @@ class TemporaryHologramStyleTest {
         }
         box.destroy(destination);
         assertTrue(harness.liveSpawned(world).isEmpty());
+    }
+
+    private static void assertVector(Vector expected, Vector actual) {
+        assertEquals(expected.getX(), actual.getX(), 1.0E-6D);
+        assertEquals(expected.getY(), actual.getY(), 1.0E-6D);
+        assertEquals(expected.getZ(), actual.getZ(), 1.0E-6D);
     }
 
     private TemporaryHologramDisplay temporary() {

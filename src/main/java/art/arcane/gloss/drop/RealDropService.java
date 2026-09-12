@@ -1263,9 +1263,6 @@ final class RealDropService {
         boolean itemParticles = false;
         boolean labelParticles = false;
         for (ParticleLayer layer : config.particleLayers()) {
-            if (tick % layer.emission().intervalTicks() != 0L) {
-                continue;
-            }
             if (isLabelParticleScope(layer.target().scope())) {
                 labelParticles |= hasLabel;
             } else {
@@ -1325,6 +1322,18 @@ final class RealDropService {
             return;
         }
         GlossConfig.RealDrops config = emission.config();
+        List<ParticleLayer> layers = config.particleLayers();
+        boolean due = false;
+        for (ParticleLayer layer : layers) {
+            if (isLabelParticleScope(layer.target().scope()) == labelScope
+                && plugin.particles().isDue(viewer, emission.state(), layer, emission.tick())) {
+                due = true;
+                break;
+            }
+        }
+        if (!due) {
+            return;
+        }
         ParticleLabel shared = emission.viewerText() ? null : sharedParticleLabel(emission);
         ParticleText.Rendered label = shared == null
             ? plugin.text().renderLegacyParticleText(viewer, emission.authoredLabel())
@@ -1334,12 +1343,11 @@ final class RealDropService {
             ? TextDisplayStyle.particleFrame(origin, viewer.getEyeLocation(),
                 HologramPresentation.identity(), config.labels().style().billboard())
             : billboardFrame(viewer, origin);
-        List<ParticleLayer> layers = config.particleLayers();
         for (int index = 0; index < layers.size(); index++) {
             ParticleLayer layer = layers.get(index);
             String scope = layer.target().scope();
             if (isLabelParticleScope(scope) != labelScope
-                || emission.tick() % layer.emission().intervalTicks() != 0L) {
+                || !plugin.particles().isDue(viewer, emission.state(), layer, emission.tick())) {
                 continue;
             }
             List<ParticleRect> targets = shared == null
@@ -1348,7 +1356,7 @@ final class RealDropService {
             if (!scope.equals("local") && targets.isEmpty()) {
                 continue;
             }
-            plugin.particles().emit(viewer, frame, layer, targets, emission.tick());
+            plugin.particles().emit(viewer, emission.state(), frame, layer, targets, emission.tick());
         }
     }
 

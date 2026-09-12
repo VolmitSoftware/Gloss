@@ -98,6 +98,7 @@ public final class ContainerPreview {
   private final Vector targetCenter;
   private List<PreviewElement> elements;
   private final List<ParticleLayer> particleLayers;
+  private final Object particleSource = new Object();
   private final boolean showsContents;
   private volatile List<Rendered> rendered = List.of();
   private CompiledPreviewDocument document;
@@ -352,11 +353,14 @@ public final class ContainerPreview {
     ParticleFrame frame = new ParticleFrame(anchor, right, up, back);
     long tick = System.currentTimeMillis() / 50L;
     for (ParticleLayer layer : particleLayers) {
+      if (!Gloss.instance.particles().isDue(player, particleSource, layer, tick)) {
+        continue;
+      }
       List<ParticleRect> targets = previewTargets(layer);
       if (!layer.target().scope().equals("local") && targets.isEmpty()) {
         continue;
       }
-      Gloss.instance.particles().emit(player, frame, layer, targets, tick);
+      Gloss.instance.particles().emit(player, particleSource, frame, layer, targets, tick);
     }
   }
 
