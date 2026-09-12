@@ -6,6 +6,7 @@ import art.arcane.volmlib.util.director.help.DirectorHelpMessages;
 import art.arcane.volmlib.util.director.runtime.DirectorRuntimeMessages;
 import art.arcane.volmlib.util.localization.LocalizationSnapshot;
 import art.arcane.volmlib.util.localization.PluginLanguageEditor;
+import art.arcane.volmlib.util.localization.PluginLanguageService;
 import art.arcane.volmlib.util.localization.TextValue;
 import art.arcane.volmlib.util.localization.MessageValue;
 import art.arcane.volmlib.util.localization.MessageArgs;
@@ -31,6 +32,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Handler;
@@ -347,6 +349,102 @@ public class GlossLocalizationTest {
     localization.update();
     assertFalse(localization.languageFile().exists());
     assertEquals("Bravo market", localization.text(GlossMessages.MENU_UNAVAILABLE, arguments));
+    assertTrue(localization.update());
+    assertFalse(localization.languageFile().exists());
+    assertEquals(GlossMessages.MENU_UNAVAILABLE.english().replace("{menu}", "market"),
+        localization.text(GlossMessages.MENU_UNAVAILABLE, arguments));
+  }
+
+  @Test
+  public void automaticReloadPublishesPersonalLocaleEditsAndMissingEnglishFallback() throws Exception {
+    localization.close();
+    AtomicLong clock = new AtomicLong();
+    localization = new GlossLocalization(temporaryFolder.newFolder("personal-localization"),
+        Logger.getAnonymousLogger(), VolmitLocales.ENGLISH, clock::get);
+    Path personal = localization.languageFile().toPath().getParent().resolve("de_DE.toml");
+    Files.writeString(personal, "[command.help]\nroot = \"Original personal root\"\n");
+    PluginLanguageService selections = localization.enableLanguages(null);
+    UUID player = UUID.randomUUID();
+    selections.selectPlayer(player, "de_DE").get(3, TimeUnit.SECONDS);
+    assertEquals(new TextValue("Original personal root"), selections.snapshot(player).value(GlossMessages.HELP_ROOT));
+
+    Files.writeString(personal, "[command.help]\nroot = \"Updated personal root\"\nstatus = \"Personal status\"\n");
+    clock.addAndGet(TimeUnit.SECONDS.toNanos(9L));
+    localization.update();
+    assertEquals(new TextValue("Original personal root"), selections.snapshot(player).value(GlossMessages.HELP_ROOT));
+    assertTrue(localization.update());
+    assertEquals(new TextValue("Updated personal root"), selections.snapshot(player).value(GlossMessages.HELP_ROOT));
+    assertEquals("en_US", localization.activeLocale());
+    assertEquals(GlossMessages.HELP_ROOT.englishValue(), localization.snapshot().value(GlossMessages.HELP_ROOT));
+
+    Files.writeString(personal, "[command.help]\nstatus = \"Personal status\"\n");
+    clock.addAndGet(TimeUnit.SECONDS.toNanos(9L));
+    localization.update();
+    assertTrue(localization.update());
+    assertEquals(GlossMessages.HELP_ROOT.englishValue(), selections.snapshot(player).value(GlossMessages.HELP_ROOT));
+    assertEquals(new TextValue("Personal status"), selections.snapshot(player).value(GlossMessages.HELP_STATUS));
+    assertEquals("de_DE", selections.playerLocale(player).orElseThrow());
+    assertEquals("en_US", localization.activeLocale());
+  }
+
+  @Test
+  public void malformedPersonalEditKeepsLastGoodMessagesAcrossDefaultLocaleEdits() throws Exception {
+    localization.close();
+    AtomicLong clock = new AtomicLong();
+    localization = new GlossLocalization(temporaryFolder.newFolder("invalid-personal-localization"),
+        Logger.getAnonymousLogger(), VolmitLocales.ENGLISH, clock::get);
+    Path personal = localization.languageFile().toPath().getParent().resolve("de_DE.toml");
+    Files.writeString(personal, "[command.help]\nroot = \"Personal root\"\n");
+    PluginLanguageService selections = localization.enableLanguages(null);
+    UUID player = UUID.randomUUID();
+    selections.selectPlayer(player, "de_DE").get(3, TimeUnit.SECONDS);
+
+    Files.writeString(personal, "[command.help\n");
+    clock.addAndGet(TimeUnit.SECONDS.toNanos(9L));
+    localization.update();
+    assertFalse(localization.update());
+    assertEquals(new TextValue("Personal root"), selections.snapshot(player).value(GlossMessages.HELP_ROOT));
+
+    Files.writeString(localization.languageFile().toPath(), "[command.help]\nroot = \"Changed default root\"\n");
+    clock.addAndGet(TimeUnit.SECONDS.toNanos(9L));
+    localization.update();
+    assertTrue(localization.update());
+    assertEquals(new TextValue("Changed default root"), localization.snapshot().value(GlossMessages.HELP_ROOT));
+    assertEquals(new TextValue("Personal root"), selections.snapshot(player).value(GlossMessages.HELP_ROOT));
+    assertEquals("de_DE", selections.playerLocale(player).orElseThrow());
+    assertEquals("en_US", localization.activeLocale());
+    assertEquals("[command.help\n", Files.readString(personal));
+  }
+
+  @Test
+  public void deletingPersonalLocaleUsesEnglishAndKeepsItsChoiceForRestoration() throws Exception {
+    localization.close();
+    AtomicLong clock = new AtomicLong();
+    localization = new GlossLocalization(temporaryFolder.newFolder("deleted-personal-localization"),
+        Logger.getAnonymousLogger(), VolmitLocales.ENGLISH, clock::get);
+    Path personal = localization.languageFile().toPath().getParent().resolve("de_DE.toml");
+    Files.writeString(personal, "[command.help]\nroot = \"Personal root\"\n");
+    PluginLanguageService selections = localization.enableLanguages(null);
+    UUID player = UUID.randomUUID();
+    selections.selectPlayer(player, "de_DE").get(3, TimeUnit.SECONDS);
+    Files.delete(personal);
+
+    clock.addAndGet(TimeUnit.SECONDS.toNanos(9L));
+    assertFalse(localization.update());
+    assertEquals(new TextValue("Personal root"), selections.snapshot(player).value(GlossMessages.HELP_ROOT));
+    assertTrue(localization.update());
+    assertEquals(GlossMessages.HELP_ROOT.englishValue(), selections.snapshot(player).value(GlossMessages.HELP_ROOT));
+    assertEquals("de_DE", selections.playerLocale(player).orElseThrow());
+    assertEquals("en_US", localization.activeLocale());
+    assertFalse(Files.exists(personal));
+
+    Files.writeString(personal, "[command.help]\nroot = \"Restored personal root\"\n");
+    clock.addAndGet(TimeUnit.SECONDS.toNanos(9L));
+    assertFalse(localization.update());
+    assertTrue(localization.update());
+    assertEquals(new TextValue("Restored personal root"), selections.snapshot(player).value(GlossMessages.HELP_ROOT));
+    assertEquals("de_DE", selections.playerLocale(player).orElseThrow());
+    assertEquals("en_US", localization.activeLocale());
   }
 
   @Test

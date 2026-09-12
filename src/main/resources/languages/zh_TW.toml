@@ -99,7 +99,7 @@
 #   {rotation}  顯示旋轉
 #   {scale}  顯示或預覽縮放比例
 #   {seconds}  時間（秒）
-#   {section}  語言編輯器中顯示的區段
+#   {section}  語言編輯器區段
 #   {session}  編輯工作階段識別碼
 #   {severity}  診斷嚴重程度
 #   {skipped}  已略過項目數量
@@ -117,7 +117,6 @@
 #   {total}  項目總數
 #   {type}  預期的值或物件類型
 #   {url}  網址
-#   {usage}  指令語法
 #   {uuid}  物件或玩家的唯一識別碼
 #   {value}  目前訊息或參數值
 #   {variables}  訊息允許的預留位置
@@ -468,9 +467,6 @@ optional = "此參數為可選項。"
 default = "未指定時預設為 \"{value}\"。"
 type = "此參數的類型為 {type}。"
 
-[director.runtime]
-usage = "用法: {usage}"
-
 [director.runtime.error]
 invalid_origin = "無法從此來源執行該指令。"
 unknown_parameter = "未知參數鍵: {key}"
@@ -769,8 +765,8 @@ server-selected = "{plugin}：伺服器語言現在是 {locale}。"
 server-default-selected = "{plugin}：你的語言現在跟隨伺服器預設語言。"
 
 [language.editor]
+title = "{plugin} › {section}"
 loading = "正在載入 {locale} 的訊息..."
-title = "{plugin} / {section}"
 
 [language.editor.section]
 languages = "語言"
@@ -893,7 +889,6 @@ leaderboard_missing = "&8[&dGloss&8]: &c不存在名為 &f{id}&c 的排行榜文
 leaderboard_reset = "&8[&dGloss&8]: &a排行榜 &f{id}&a 已重設（{state}）。"
 leaderboard_sampled = "&8[&dGloss&8]: &a已為所有線上玩家取樣排行榜 &f{id}&a。"
 
-
 [command.help.channel]
 root = "聊天頻道"
 list = "列出已載入的聊天頻道"
@@ -971,7 +966,6 @@ open = "為玩家開啟箱子選單"
 "open.args" = "以空格分隔的 key=value 參數"
 reset = "還原隨附的箱子選單預設檔案"
 "reset.name" = "要重設的名稱，或用 * 重設全部隨附檔案"
-
 
 # --- lane:rigs ---
 [command.help.rig]

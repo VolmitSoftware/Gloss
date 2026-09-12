@@ -99,7 +99,7 @@
 #   {rotation}  Drehmodus beim Folgen
 #   {scale}  Darstellungsskalierung
 #   {seconds}  Dauer oder Frist in Sekunden
-#   {section}  Im Spracheditor angezeigter Abschnitt
+#   {section}  Abschnitt des Spracheneditors
 #   {session}  ID der Bearbeitungssitzung
 #   {severity}  Schweregrad des Problems
 #   {skipped}  Übersprungene Einträge
@@ -117,7 +117,6 @@
 #   {total}  Gesamtzahl der Einträge
 #   {type}  Parametertyp
 #   {url}  Webadresse
-#   {usage}  Befehlssyntax
 #   {uuid}  Vollständige UUID
 #   {value}  Aktueller, voreingestellter oder eingegebener Wert
 #   {variables}  Variablen der Nachricht
@@ -468,9 +467,6 @@ optional = "Dieser Parameter ist optional."
 default = "Standardmäßig \"{value}\", wenn nicht angegeben."
 type = "Dieser Parameter hat den Typ {type}."
 
-[director.runtime]
-usage = "Verwendung: {usage}"
-
 [director.runtime.error]
 invalid_origin = "Dieser Befehl kann von diesem Ursprung aus nicht ausgeführt werden."
 unknown_parameter = "Unbekannter Parameterschlüssel: {key}"
@@ -769,8 +765,8 @@ server-selected = "{plugin}: Serversprache ist jetzt {locale}."
 server-default-selected = "{plugin}: Deine Sprache folgt jetzt dem Serverstandard."
 
 [language.editor]
+title = "{plugin} › {section}"
 loading = "Nachrichten für {locale} werden geladen..."
-title = "{plugin} / {section}"
 
 [language.editor.section]
 languages = "Sprachen"
@@ -893,7 +889,6 @@ leaderboard_missing = "&8[&dGloss&8]: &cEs gibt kein Bestenlistendokument namens
 leaderboard_reset = "&8[&dGloss&8]: &aBestenliste &f{id}&a zurückgesetzt ({state})."
 leaderboard_sampled = "&8[&dGloss&8]: &aBestenliste &f{id}&a für alle Online-Spieler erfasst."
 
-
 [command.help.channel]
 root = "Chat-Kanäle"
 list = "Geladene Chat-Kanäle auflisten"
@@ -971,7 +966,6 @@ open = "Ein Truhenmenü für einen Spieler öffnen"
 "open.args" = "Argumente als key=value, durch Leerzeichen getrennt"
 reset = "Mitgelieferte Truhenmenü-Standards wiederherstellen"
 "reset.name" = "Name zum Zurücksetzen oder * für alle mitgelieferten Standards"
-
 
 # --- lane:rigs ---
 [command.help.rig]

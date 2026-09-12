@@ -99,7 +99,7 @@
 #   {rotation}  Obrót wyświetlanego obiektu
 #   {scale}  Skala wyświetlania lub podglądu
 #   {seconds}  Czas w sekundach
-#   {section}  Sekcja wyświetlana w edytorze języka
+#   {section}  Sekcja edytora języków
 #   {session}  Identyfikator sesji edytora
 #   {severity}  Poziom ważności komunikatu diagnostycznego
 #   {skipped}  Liczba pominiętych wpisów
@@ -117,7 +117,6 @@
 #   {total}  Łączna liczba wpisów
 #   {type}  Oczekiwany typ wartości lub obiektu
 #   {url}  Adres internetowy
-#   {usage}  Składnia polecenia
 #   {uuid}  Unikalny identyfikator obiektu lub gracza
 #   {value}  Bieżąca wartość wiadomości lub parametru
 #   {variables}  Dozwolone zmienne wiadomości
@@ -468,9 +467,6 @@ optional = "Ten parametr jest opcjonalny."
 default = "Domyślnie \"{value}\", jeśli nie określono."
 type = "Ten parametr jest typu {type}."
 
-[director.runtime]
-usage = "Użycie: {usage}"
-
 [director.runtime.error]
 invalid_origin = "Tego polecenia nie można wykonać z tego źródła."
 unknown_parameter = "Nieznany klucz parametru: {key}"
@@ -769,8 +765,8 @@ server-selected = "{plugin}: język serwera jest teraz {locale}."
 server-default-selected = "{plugin}: twój język jest teraz zgodny z domyślnym językiem serwera."
 
 [language.editor]
+title = "{plugin} › {section}"
 loading = "Wczytywanie wiadomości w języku {locale}..."
-title = "{plugin} / {section}"
 
 [language.editor.section]
 languages = "Języki"
@@ -893,7 +889,6 @@ leaderboard_missing = "&8[&dGloss&8]: &cNie ma rankingu o nazwie &f{id}&c."
 leaderboard_reset = "&8[&dGloss&8]: &aRanking &f{id}&a zresetowany ({state})."
 leaderboard_sampled = "&8[&dGloss&8]: &aRanking &f{id}&a zebrany dla wszystkich graczy online."
 
-
 [command.help.channel]
 root = "Kanały czatu"
 list = "Wypisz wczytane kanały czatu"
@@ -971,7 +966,6 @@ open = "Otwórz menu skrzyni dla gracza"
 "open.args" = "Argumenty klucz=wartość rozdzielone spacjami"
 reset = "Przywróć dołączone domyślne menu skrzyni"
 "reset.name" = "Nazwa do przywrócenia lub * dla wszystkich dołączonych plików"
-
 
 # --- lane:rigs ---
 [command.help.rig]

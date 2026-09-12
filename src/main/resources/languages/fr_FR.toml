@@ -99,7 +99,7 @@
 #   {rotation}  Rotation de l’affichage
 #   {scale}  Échelle de l’affichage ou de l’aperçu
 #   {seconds}  Durée en secondes
-#   {section}  Section affichée dans l’éditeur de langue
+#   {section}  Section de l’éditeur de langues
 #   {session}  Identifiant de la session d’édition
 #   {severity}  Gravité du diagnostic
 #   {skipped}  Nombre d’entrées ignorées
@@ -117,7 +117,6 @@
 #   {total}  Nombre total d’entrées
 #   {type}  Type de valeur ou d’objet attendu
 #   {url}  Adresse web
-#   {usage}  Syntaxe de la commande
 #   {uuid}  Identifiant unique de l’objet ou du joueur
 #   {value}  Valeur actuelle du message ou du paramètre
 #   {variables}  Variables autorisées dans le message
@@ -468,9 +467,6 @@ optional = "Ce paramètre est facultatif."
 default = "Vaut \"{value}\" par défaut si non défini."
 type = "Ce paramètre est de type {type}."
 
-[director.runtime]
-usage = "Utilisation: {usage}"
-
 [director.runtime.error]
 invalid_origin = "Cette commande ne peut pas être exécutée depuis cette origine."
 unknown_parameter = "Clé de paramètre inconnue : {key}"
@@ -769,8 +765,8 @@ server-selected = "{plugin}: la langue du serveur est maintenant {locale}."
 server-default-selected = "{plugin} : votre langue suit désormais la langue par défaut du serveur."
 
 [language.editor]
+title = "{plugin} › {section}"
 loading = "Chargement des messages en {locale}..."
-title = "{plugin} / {section}"
 
 [language.editor.section]
 languages = "Langues"
@@ -893,7 +889,6 @@ leaderboard_missing = "&8[&dGloss&8]: &cAucun classement ne s'appelle &f{id}&c."
 leaderboard_reset = "&8[&dGloss&8]: &aClassement &f{id}&a réinitialisé ({state})."
 leaderboard_sampled = "&8[&dGloss&8]: &aClassement &f{id}&a relevé pour tous les joueurs connectés."
 
-
 [command.help.channel]
 root = "Canaux de discussion"
 list = "Lister les canaux chargés"
@@ -971,7 +966,6 @@ open = "Ouvrir un menu de coffre pour un joueur"
 "open.args" = "Arguments clé=valeur séparés par des espaces"
 reset = "Restaurer les menus de coffre fournis par défaut"
 "reset.name" = "Nom à réinitialiser, ou * pour tous les fichiers fournis"
-
 
 # --- lane:rigs ---
 [command.help.rig]

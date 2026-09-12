@@ -99,7 +99,7 @@
 #   {rotation}  Rotazione dell’elemento visualizzato
 #   {scale}  Scala dell’elemento visualizzato o dell’anteprima
 #   {seconds}  Tempo in secondi
-#   {section}  Sezione mostrata nell’editor di lingua
+#   {section}  Sezione dell’editor delle lingue
 #   {session}  Identificatore della sessione dell’editor
 #   {severity}  Gravità della diagnostica
 #   {skipped}  Numero di voci saltate
@@ -117,7 +117,6 @@
 #   {total}  Numero totale di voci
 #   {type}  Tipo di valore o oggetto atteso
 #   {url}  Indirizzo web
-#   {usage}  Sintassi del comando
 #   {uuid}  Identificatore univoco dell’oggetto o del giocatore
 #   {value}  Valore attuale del messaggio o del parametro
 #   {variables}  Segnaposto consentiti nel messaggio
@@ -468,9 +467,6 @@ optional = "Questo parametro è facoltativo."
 default = "Il valore predefinito è \"{value}\" se non definito."
 type = "Questo parametro è di tipo {type}."
 
-[director.runtime]
-usage = "Utilizzo: {usage}"
-
 [director.runtime.error]
 invalid_origin = "Questo comando non può essere eseguito da questa origine."
 unknown_parameter = "Chiave di parametro sconosciuta: {key}"
@@ -769,8 +765,8 @@ server-selected = "{plugin}: la lingua del server ora è {locale}."
 server-default-selected = "{plugin}: la tua lingua segue ora la lingua predefinita del server."
 
 [language.editor]
+title = "{plugin} › {section}"
 loading = "Caricamento dei messaggi in {locale}..."
-title = "{plugin} / {section}"
 
 [language.editor.section]
 languages = "Lingue"
@@ -893,7 +889,6 @@ leaderboard_missing = "&8[&dGloss&8]: &cNon esiste nessuna classifica chiamata &
 leaderboard_reset = "&8[&dGloss&8]: &aClassifica &f{id}&a azzerata ({state})."
 leaderboard_sampled = "&8[&dGloss&8]: &aClassifica &f{id}&a campionata per tutti i giocatori online."
 
-
 [command.help.channel]
 root = "Canali di chat"
 list = "Elenca i canali di chat caricati"
@@ -971,7 +966,6 @@ open = "Apri un menu a baule per un giocatore"
 "open.args" = "Argomenti chiave=valore separati da spazi"
 reset = "Ripristina i menu a baule predefiniti forniti"
 "reset.name" = "Nome da ripristinare, o * per tutti i file forniti"
-
 
 # --- lane:rigs ---
 [command.help.rig]

@@ -198,6 +198,9 @@ final class CharacterizationHarness implements AutoCloseable {
             setDeclaredField(gloss, JavaPlugin.class, "isEnabled", true);
             setDeclaredField(gloss, JavaPlugin.class, "logger", Logger.getAnonymousLogger());
             setDeclaredField(gloss, JavaPlugin.class, "server", Bukkit.getServer());
+            // Unsafe allocation skips field initializers, and reloadServices walks this list.
+            // motionService() replaces it for the suites that need a real lane service.
+            setDeclaredField(gloss, Gloss.class, "laneServices", List.<GlossService>of());
 
             this.configFile = new GlossConfigFile();
             this.configFile.normalize();

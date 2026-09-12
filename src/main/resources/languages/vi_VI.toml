@@ -99,7 +99,7 @@
 #   {rotation}  Độ xoay phần hiển thị
 #   {scale}  Tỷ lệ hiển thị hoặc xem trước
 #   {seconds}  Thời gian tính bằng giây
-#   {section}  Mục hiển thị trong trình soạn thảo ngôn ngữ
+#   {section}  Mục trong trình chỉnh sửa ngôn ngữ
 #   {session}  Mã định danh phiên chỉnh sửa
 #   {severity}  Mức độ nghiêm trọng của chẩn đoán
 #   {skipped}  Số mục đã bỏ qua
@@ -117,7 +117,6 @@
 #   {total}  Tổng số mục
 #   {type}  Loại giá trị hoặc đối tượng dự kiến
 #   {url}  Địa chỉ web
-#   {usage}  Cú pháp lệnh
 #   {uuid}  Mã định danh duy nhất của đối tượng hoặc người chơi
 #   {value}  Giá trị thông báo hoặc tham số hiện tại
 #   {variables}  Các biến được phép dùng trong thông báo
@@ -468,9 +467,6 @@ optional = "Tham số này là tùy chọn."
 default = "Mặc định là \"{value}\" nếu không được chỉ định."
 type = "Tham số này có kiểu {type}."
 
-[director.runtime]
-usage = "Cách dùng: {usage}"
-
 [director.runtime.error]
 invalid_origin = "Không thể chạy lệnh này từ nguồn này."
 unknown_parameter = "Khóa tham số không xác định: {key}"
@@ -769,8 +765,8 @@ server-selected = "{plugin}: ngôn ngữ máy chủ hiện là {locale}."
 server-default-selected = "{plugin}: ngôn ngữ của bạn hiện theo ngôn ngữ mặc định của máy chủ."
 
 [language.editor]
+title = "{plugin} › {section}"
 loading = "Đang tải tin nhắn cho {locale}..."
-title = "{plugin} / {section}"
 
 [language.editor.section]
 languages = "Ngôn ngữ"
@@ -893,7 +889,6 @@ leaderboard_missing = "&8[&dGloss&8]: &cKhông có bảng xếp hạng nào tên
 leaderboard_reset = "&8[&dGloss&8]: &aĐã đặt lại bảng xếp hạng &f{id}&a ({state})."
 leaderboard_sampled = "&8[&dGloss&8]: &aĐã lấy mẫu bảng xếp hạng &f{id}&a cho mọi người chơi trực tuyến."
 
-
 [command.help.channel]
 root = "Kênh trò chuyện"
 list = "Liệt kê các kênh đã nạp"
@@ -971,7 +966,6 @@ open = "Mở menu rương cho một người chơi"
 "open.args" = "Đối số key=value cách nhau bằng dấu cách"
 reset = "Khôi phục các menu rương mặc định đi kèm"
 "reset.name" = "Tên cần đặt lại, hoặc * cho mọi tệp đi kèm"
-
 
 # --- lane:rigs ---
 [command.help.rig]

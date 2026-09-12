@@ -99,7 +99,7 @@
 #   {rotation}  Modo de rotación durante el seguimiento
 #   {scale}  Escala de visualización
 #   {seconds}  Duración o plazo en segundos
-#   {section}  Sección mostrada en el editor de idiomas
+#   {section}  Sección del editor de idiomas
 #   {session}  Identificador de la sesión de edición
 #   {severity}  Gravedad del problema
 #   {skipped}  Entradas omitidas
@@ -117,7 +117,6 @@
 #   {total}  Número total de elementos
 #   {type}  Tipo del parámetro
 #   {url}  Dirección web
-#   {usage}  Sintaxis del comando
 #   {uuid}  Identificador UUID completo
 #   {value}  Valor actual, predeterminado o introducido
 #   {variables}  Variables del mensaje
@@ -468,9 +467,6 @@ optional = "Este parámetro es opcional."
 default = "Valor predeterminado \"{value}\" si no se define."
 type = "Este parámetro es de tipo {type}."
 
-[director.runtime]
-usage = "Uso: {usage}"
-
 [director.runtime.error]
 invalid_origin = "Este comando no se puede ejecutar desde este origen."
 unknown_parameter = "Clave de parámetro desconocida: {key}"
@@ -769,8 +765,8 @@ server-selected = "{plugin}: el idioma del servidor ahora es {locale}."
 server-default-selected = "{plugin}: tu idioma ahora sigue el idioma predeterminado del servidor."
 
 [language.editor]
+title = "{plugin} › {section}"
 loading = "Cargando los mensajes de {locale}..."
-title = "{plugin} / {section}"
 
 [language.editor.section]
 languages = "Idiomas"
@@ -893,7 +889,6 @@ leaderboard_missing = "&8[&dGloss&8]: &cNo existe ninguna clasificación llamada
 leaderboard_reset = "&8[&dGloss&8]: &aClasificación &f{id}&a reiniciada ({state})."
 leaderboard_sampled = "&8[&dGloss&8]: &aClasificación &f{id}&a muestreada para todos los jugadores conectados."
 
-
 [command.help.channel]
 root = "Canales de chat"
 list = "Listar los canales de chat cargados"
@@ -971,7 +966,6 @@ open = "Abrir un menú de cofre para un jugador"
 "open.args" = "Argumentos clave=valor separados por espacios"
 reset = "Restaurar los valores de menú de cofre incluidos"
 "reset.name" = "Nombre a restablecer, o * para todos los valores incluidos"
-
 
 # --- lane:rigs ---
 [command.help.rig]

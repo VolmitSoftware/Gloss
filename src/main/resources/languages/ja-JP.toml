@@ -99,7 +99,7 @@
 #   {rotation}  表示の回転
 #   {scale}  表示またはプレビューの倍率
 #   {seconds}  時間（秒）
-#   {section}  言語エディターで表示中のセクション
+#   {section}  言語エディターのセクション
 #   {session}  編集セッションの識別子
 #   {severity}  診断の重大度
 #   {skipped}  スキップした項目数
@@ -117,7 +117,6 @@
 #   {total}  総項目数
 #   {type}  期待する値またはオブジェクトの種類
 #   {url}  Webアドレス
-#   {usage}  コマンド構文
 #   {uuid}  オブジェクトまたはプレイヤーの一意な識別子
 #   {value}  現在のメッセージまたはパラメーター値
 #   {variables}  メッセージで使用可能な変数
@@ -468,9 +467,6 @@ optional = "このパラメータは任意です。"
 default = "未指定の場合は \"{value}\" になります。"
 type = "このパラメータの型は {type} です。"
 
-[director.runtime]
-usage = "使用法: {usage}"
-
 [director.runtime.error]
 invalid_origin = "この実行元からはコマンドを実行できません。"
 unknown_parameter = "不明なパラメーターキー: {key}"
@@ -769,8 +765,8 @@ server-selected = "{plugin}: サーバー言語を{locale}に変更しました�
 server-default-selected = "{plugin}: 個人言語はサーバーの既定の言語に従うようになりました。"
 
 [language.editor]
+title = "{plugin} › {section}"
 loading = "{locale}のメッセージを読み込んでいます..."
-title = "{plugin} / {section}"
 
 [language.editor.section]
 languages = "言語"
@@ -893,7 +889,6 @@ leaderboard_missing = "&8[&dGloss&8]: &c&f{id}&c という名前のリーダー�
 leaderboard_reset = "&8[&dGloss&8]: &aリーダーボード &f{id}&a をリセットしました（{state}）。"
 leaderboard_sampled = "&8[&dGloss&8]: &aリーダーボード &f{id}&a をオンラインの全プレイヤーについて取得しました。"
 
-
 [command.help.channel]
 root = "チャットチャンネル"
 list = "読み込まれたチャンネルを一覧表示"
@@ -971,7 +966,6 @@ open = "プレイヤーにチェストメニューを表示"
 "open.args" = "スペース区切りの key=value 引数"
 reset = "同梱のチェストメニュー初期設定を復元"
 "reset.name" = "リセットする名前、または * ですべての同梱初期設定"
-
 
 # --- lane:rigs ---
 [command.help.rig]

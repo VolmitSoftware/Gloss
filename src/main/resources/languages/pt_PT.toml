@@ -99,7 +99,7 @@
 #   {rotation}  Rotação do elemento visual
 #   {scale}  Escala do elemento visual ou da pré-visualização
 #   {seconds}  Tempo em segundos
-#   {section}  Secção apresentada no editor de idiomas
+#   {section}  Secção do editor de idiomas
 #   {session}  Identificador da sessão do editor
 #   {severity}  Gravidade do diagnóstico
 #   {skipped}  Número de entradas ignoradas
@@ -117,7 +117,6 @@
 #   {total}  Número total de entradas
 #   {type}  Tipo de valor ou objeto esperado
 #   {url}  Endereço web
-#   {usage}  Sintaxe do comando
 #   {uuid}  Identificador único do objeto ou jogador
 #   {value}  Valor atual da mensagem ou do parâmetro
 #   {variables}  Variáveis permitidas na mensagem
@@ -468,9 +467,6 @@ optional = "Este parâmetro é opcional."
 default = "Predefinição \"{value}\" se não for definido."
 type = "Este parâmetro é do tipo {type}."
 
-[director.runtime]
-usage = "Utilização: {usage}"
-
 [director.runtime.error]
 invalid_origin = "Este comando não pode ser executado a partir desta origem."
 unknown_parameter = "Chave de parâmetro desconhecida: {key}"
@@ -769,8 +765,8 @@ server-selected = "{plugin}: o idioma do servidor agora é {locale}."
 server-default-selected = "{plugin}: o seu idioma segue agora o idioma predefinido do servidor."
 
 [language.editor]
+title = "{plugin} › {section}"
 loading = "A carregar as mensagens de {locale}..."
-title = "{plugin} / {section}"
 
 [language.editor.section]
 languages = "Idiomas"
@@ -893,7 +889,6 @@ leaderboard_missing = "&8[&dGloss&8]: &cNão existe nenhuma classificação cham
 leaderboard_reset = "&8[&dGloss&8]: &aClassificação &f{id}&a reposta ({state})."
 leaderboard_sampled = "&8[&dGloss&8]: &aClassificação &f{id}&a amostrada para todos os jogadores online."
 
-
 [command.help.channel]
 root = "Canais de conversa"
 list = "Listar os canais carregados"
@@ -971,7 +966,6 @@ open = "Abrir um menu de baú para um jogador"
 "open.args" = "Argumentos chave=valor separados por espaços"
 reset = "Restaurar os menus de baú predefinidos incluídos"
 "reset.name" = "Nome a repor, ou * para todos os ficheiros incluídos"
-
 
 # --- lane:rigs ---
 [command.help.rig]
