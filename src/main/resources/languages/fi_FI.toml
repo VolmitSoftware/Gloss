@@ -826,3 +826,517 @@ line = "Rivi {line}"
 [language.editor.value]
 none = "Ei ole"
 empty = "(tyhjä)"
+
+# Lane message tables. Each lane appends its [gloss.message.<lane>] and [command.help.<group>]
+# tables inside its own anchor so parallel branches never share a line.
+# --- lane:screen ---
+[gloss.message.screen]
+"surfaces.empty" = "&8[&dGloss&8] &7Pintoja ei ole ladattu."
+"surfaces.unknown" = "&8[&dGloss&8]: &cPintaa &f{id}&c ei ole."
+"surfaces.tested" = "&8[&dGloss&8]: &aSuoritettiin &f{id}&a pelaajalle &f{player}&a."
+"nametags.empty" = "&8[&dGloss&8] &7Nimikylttejä ei ole ladattu."
+"nametags.unknown" = "&8[&dGloss&8]: &cNimikylttiä &f{id}&c ei ole."
+"nametags.refreshed" = "&8[&dGloss&8]: &aOtettiin uudelleen käyttöön &d{count}&a nimikylttidokumenttia."
+"hud.header" = "&8[&dGloss&8] &7HUD-varaukset pelaajalle &f{player}&7: &d{count}"
+"hud.empty" = "&8[&dGloss&8] &7Mikään lisäosa ei varaa HUD-paikkaa pelaajalle &f{player}&7."
+"hud.line" = "&8- &f{kind} &7{source} &8| &7{value} &8| &7{count} &8| &7{state}"
+"player.unknown" = "&8[&dGloss&8]: &cPaikalla ei ole pelaajaa nimeltä &f{player}&c."
+
+[command.help.surface]
+root = "Toimintopalkin, pomopalkin ja otsikon pinnat"
+list = "Listaa pintadokumentit"
+info = "Näytä pintadokumentti"
+"info.id" = "Pintadokumentin tunnus"
+reset = "Palauta mukana tulevat pinnat"
+test = "Aja pintakierros yhdelle pelaajalle nyt"
+"test.id" = "Pintadokumentin tunnus"
+"test.player" = "Testattava pelaaja; oletuksena sinä"
+
+[command.help.nametag]
+root = "Katsojakohtaiset nimikylttidokumentit"
+list = "Listaa nimikylttidokumentit"
+info = "Näytä nimikylttidokumentti"
+"info.id" = "Nimikylttidokumentin tunnus"
+reset = "Palauta mukana tulevat nimikyltit"
+refresh = "Ota kaikki nimikyltit uudelleen käyttöön"
+
+[command.help.hud]
+root = "Tarkastele jaettua HUD-kokoajaa"
+who = "Näyttää, mikä lisäosa varaa kunkin HUD-paikan"
+"who.player" = "Tarkasteltava pelaaja; oletuksena sinä"
+
+# --- lane:chat ---
+[gloss.message.chat]
+filtered = "&8[&dGloss&8]: &cChat-suodatin esti viestisi."
+too_fast = "&8[&dGloss&8]: &eOdota hetki ennen seuraavaa viestiä."
+repeat = "&8[&dGloss&8]: &eSanoit juuri saman asian."
+channel_set = "&8[&dGloss&8]: &aPuhut nyt kanavalla &d{name}&a."
+channel_unknown = "&8[&dGloss&8]: &cKanavaa nimeltä &d{name}&c ei ole."
+channel_list = "&8[&dGloss&8]: &7Kanavat: &f{value}"
+msg_usage = "&8[&dGloss&8]: &eKäyttö: &f{command}"
+msg_offline = "&8[&dGloss&8]: &c{player} ei ole paikalla."
+reply_none = "&8[&dGloss&8]: &cSinulla ei ole ketään kenelle vastata."
+msg_self = "&8[&dGloss&8]: &cEt voi lähettää viestiä itsellesi."
+channels_header = "&dKanavat &7({count})"
+channels_empty = "&7Kanavia ei ole ladattu."
+channel_missing = "&8[&dGloss&8]: &cKanavadokumenttia nimeltä &f{id}&c ei ole."
+strings_header = "&dTekstikielet &7({count})"
+strings_empty = "&7Tekstidokumentteja ei ole ladattu."
+strings_missing = "&dPuuttuu kielestä {locale} &7({count})"
+strings_complete = "&8[&dGloss&8]: &a{locale} kattaa kaikki en_US-avaimet."
+leaderboards_header = "&dTulostaulut &7({count})"
+leaderboards_empty = "&7Tulostauluja ei ole ladattu."
+leaderboard_missing = "&8[&dGloss&8]: &cTulostaulua nimeltä &f{id}&c ei ole."
+leaderboard_reset = "&8[&dGloss&8]: &aTulostaulu &f{id}&a nollattu ({state})."
+leaderboard_sampled = "&8[&dGloss&8]: &aTulostaulu &f{id}&a näytteistetty kaikille paikalla oleville."
+
+
+[command.help.channel]
+root = "Chat-kanavat"
+list = "Listaa ladatut chat-kanavat"
+info = "Näytä kanavan laajuus, muoto ja muunnelmat"
+"info.id" = "Kanavadokumentin tunnus"
+reset = "Palauta mukana tulleet kanavadokumentit"
+
+[command.help.strings]
+root = "Kirjoitetut sisältötekstit"
+list = "Listaa ladatut tekstikielet ja niiden merkintämäärät"
+missing = "Listaa avaimet, jotka en_US sisältää mutta kieli ei"
+"missing.locale" = "Kieli, jota verrataan en_US:ään"
+reset = "Palauta mukana tulleet tekstidokumentit"
+
+[command.help.leaderboard]
+root = "Lasketut tulostaulut"
+list = "Listaa ladatut tulostaulut ja niiden merkintämäärät"
+info = "Näytä tulostaulun lähde, järjestys ja merkinnät"
+"info.id" = "Tulostaulun tunnus"
+reset = "Tyhjennä tulostaulun jakso tai kaikkien aikojen arvot"
+"reset.id" = "Tulostaulun tunnus"
+"reset.period" = "all tai current"
+sample = "Näytteistä tulostaulu heti kaikille paikalla oleville"
+"sample.id" = "Tulostaulun tunnus"
+
+# --- lane:forms ---
+[gloss.message.forms]
+icon_unsupported = "&7Ei piirrettävissä arkun ruutuun ({kind})"
+no_dialogs = "&8[&dGloss&8]: &7Dialogeja ei ole määritetty."
+dialog_list_header = "&dDialogit"
+dialog_list_entry = "&7Avaa dialogi &f{id}"
+dialog_info = "&8[&dGloss&8]: &d{id} &8- &7tyyppi &f{kind}&7, painikkeet &f{count}"
+unknown_dialog = "&8[&dGloss&8]: &cDialogia nimeltä {id} ei ole."
+dialog_opened = "&8[&dGloss&8]: &aDialogi {id} avattiin pelaajalle {player}."
+dialog_unsupported = "&8[&dGloss&8]: &cAsiakasohjelmasi ei voi näyttää tuota dialogia."
+no_inventories = "&8[&dGloss&8]: &7Arkkuvalikkoja ei ole määritetty."
+inventory_list_header = "&dArkkuvalikot"
+inventory_list_entry = "&7Avaa arkkuvalikko &f{id}"
+inventory_info = "&8[&dGloss&8]: &d{id} &8- &7koko &f{kind}&7, ruudut &f{count}"
+unknown_inventory = "&8[&dGloss&8]: &cArkkuvalikkoa nimeltä {id} ei ole."
+inventory_opened = "&8[&dGloss&8]: &aArkkuvalikko {id} avattiin pelaajalle {player}."
+bad_args = "&8[&dGloss&8]: &cArgumenttien on oltava avain=arvo -pareja: {value}"
+prompt_timeout = "&8[&dGloss&8]: &7Syöte vanheni."
+prompt_busy = "&8[&dGloss&8]: &cSinulla on jo syöte odottamassa."
+take_missing = "&8[&dGloss&8]: &cSinulla ei ole vaadittuja esineitä."
+economy_denied = "&8[&dGloss&8]: &cSinulla ei ole varaa siihen."
+economy_unavailable = "&8[&dGloss&8]: &cTalouslisäosaa ei ole saatavilla."
+give_dropped = "&8[&dGloss&8]: &7Tavaraluettelosi oli täynnä, joten esineet putosivat jalkoihisi."
+
+[command.help.dialog]
+root = "Tarkastele ja avaa dialogidokumentteja"
+list = "Listaa määritetyt dialogit"
+"list.page" = "Listan sivu, alkaen ykkösestä"
+info = "Näytä dialogin tyyppi, syötteet ja painikkeet"
+"info.id" = "Dialogin tunnus"
+open = "Avaa dialogi pelaajalle"
+"open.id" = "Dialogin tunnus"
+"open.player" = "Pelaaja, jolle avataan; oletuksena sinä"
+"open.args" = "Välilyönnein erotetut avain=arvo-argumentit"
+reset = "Palauta mukana toimitetut dialogien oletukset"
+"reset.name" = "Palautettava nimi tai * kaikille mukana toimitetuille oletuksille"
+
+["command.help.menu.open"]
+args = "Välilyönnein erotetut avain=arvo-argumentit"
+
+[command.help.inventory]
+root = "Tarkastele ja avaa arkkuvalikkoja"
+list = "Listaa määritetyt arkkuvalikot"
+"list.page" = "Listan sivu, alkaen ykkösestä"
+info = "Näytä arkkuvalikon koko ja ruudut"
+"info.id" = "Arkkuvalikon tunnus"
+open = "Avaa arkkuvalikko pelaajalle"
+"open.id" = "Arkkuvalikon tunnus"
+"open.player" = "Pelaaja, jolle avataan; oletuksena sinä"
+"open.args" = "Välilyönnein erotetut avain=arvo-argumentit"
+reset = "Palauta mukana toimitetut arkkuvalikkojen oletukset"
+"reset.name" = "Palautettava nimi tai * kaikille mukana toimitetuille oletuksille"
+
+
+# --- lane:rigs ---
+[command.help.rig]
+root = "Sijoita ja hallitse rig-instansseja"
+list = "Listaa rigit ja sijoitetut instanssit; napsauta teleporttia varten"
+info = "Näytä rig-instanssin rig, sijainti ja tila"
+"info.id" = "Rig-instanssin tunnus"
+place = "Sijoita rig sijaintiisi"
+"place.rig" = "Rig-dokumentin tunnus"
+"place.id" = "Instanssin tunnus; tyhjä valitsee seuraavan vapaan"
+move = "Siirrä rig-instanssia suhteellisilla lohkoetäisyyksillä"
+"move.id" = "Rig-instanssin tunnus"
+"move.x" = "Suhteellinen X-siirtymä lohkoina"
+"move.y" = "Suhteellinen Y-siirtymä lohkoina"
+"move.z" = "Suhteellinen Z-siirtymä lohkoina"
+here = "Siirrä rig-instanssi sijaintiisi"
+"here.id" = "Rig-instanssin tunnus"
+rotate = "Aseta rig-instanssin yaw ja pitch"
+"rotate.id" = "Rig-instanssin tunnus"
+"rotate.yaw" = "Yaw asteina"
+"rotate.pitch" = "Pitch asteina"
+scale = "Aseta rig-instanssin yhtenäinen skaala"
+"scale.id" = "Rig-instanssin tunnus"
+"scale.scale" = "Skaalauskerroin, 0.01–64"
+remove = "Poista rig-instanssi"
+"remove.id" = "Rig-instanssin tunnus"
+state = "Vaihda rig-instanssi graafin tilaan"
+"state.id" = "Rig-instanssin tunnus"
+"state.state" = "Tilan nimi rigin graafista"
+var = "Aseta rig-instanssin muuttuja"
+"var.id" = "Rig-instanssin tunnus"
+"var.name" = "Muuttujan nimi"
+"var.value" = "Luku, true, false tai teksti"
+import = "Tuo Blockbench-malli rigiksi"
+"import.file" = "Polku .bbmodel-tiedostoon Gloss-kansiossa"
+"import.id" = "Rigin tunnus; tyhja kayttaa tiedoston nimea"
+"import.texture" = "Mukautettu esine muodossa provider:id jokaiselle kuutiolle"
+reset = "Palauta mukana toimitetut rig-dokumentit"
+
+["command.help.hologram"]
+page = "Siirra katsoja hologrammin sivulle"
+"page.page" = "Sivun tunnus, next tai prev"
+"page.player" = "Pelaajan nimi; tyhja tarkoittaa sinua"
+motion = "Toista liikeklippi hologrammissa"
+"motion.motion" = "Liikkeen tunnus tai clear pysayttaa sen"
+actions = "Listaa toiminnot jotka hologrammi ajaa klikatessa"
+
+[command.help.motion]
+root = "Tarkastele liikeleikkeitä"
+list = "Listaa liikeleikkeet"
+info = "Näytä liikeleikkeen kesto, toisto, fps ja raidat"
+"info.id" = "Liikkeen tunnus"
+reset = "Palauta mukana toimitetut liikedokumentit"
+
+[gloss.message.rigs]
+rig_unknown = "&8[&dGloss&8] &cRigiä nimeltä '&f{id}&c' ei ole."
+instance_missing = "&8[&dGloss&8] &cRig-instanssia nimeltä '&f{id}&c' ei ole."
+placed = "&8[&dGloss&8] &aRig &f{name}&a sijoitettu nimellä &f{id}&a kohtaan &f{world} {x}, {y}, {z}&a."
+place_failed = "&8[&dGloss&8] &cRigiä &f{name}&c ei voitu sijoittaa: {reason}"
+moved = "&8[&dGloss&8] &aRig-instanssi &f{id}&a siirretty kohtaan &f{world} {x}, {y}, {z}&a."
+rotated = "&8[&dGloss&8] &aRig-instanssi &f{id}&a käännetty: yaw &f{yaw}&a, pitch &f{pitch}&a."
+scaled = "&8[&dGloss&8] &aRig-instanssi &f{id}&a skaalattu arvoon &f{scale}&a."
+scale_out_of_range = "&8[&dGloss&8] &cRigin skaalan on oltava välillä &f{minimum}&c–&f{maximum}&c; saatiin &f{value}&c."
+removed = "&8[&dGloss&8] &aRig-instanssi &f{id}&a poistettu."
+state_set = "&8[&dGloss&8] &aRig-instanssi &f{id}&a on nyt tilassa &f{state}&a."
+state_unknown = "&8[&dGloss&8] &cRig-instanssilla &f{id}&c ei ole tilaa nimeltä '&f{state}&c'."
+var_set = "&8[&dGloss&8] &aMuuttuja &f{name}&a rig-instanssissa &f{id}&a asetettu arvoon &f{value}&a."
+save_failed = "&8[&dGloss&8] &cRig-instanssia &f{id}&c ei voitu tallentaa: {reason}"
+list_empty = "&8[&dGloss&8] &7Rigejä ei ole ladattu."
+list_rigs = "&8[&dGloss&8] &7Rigit (&f{count}&7): &f{value}"
+instances_empty = "&8[&dGloss&8] &7Rig-instansseja ei ole sijoitettu."
+list_hover = "Napsauta teleporttia varten"
+list_entry = "{name} kohdassa {world} {x}, {y}, {z}; tila {state}"
+info_header = "&8[&dGloss&8] &d{id} &7käyttää rigiä &f{name}&7 kohdassa &f{world} {x}, {y}, {z}"
+info_pose = "&8[&dGloss&8] &7Yaw &f{yaw}&7, pitch &f{pitch}&7, skaala &f{scale}&7, tila &f{state}"
+info_parts = "&8[&dGloss&8] &7Osia &f{count}&7, katsojia &f{value}"
+info_var = "&8[&dGloss&8] &7  {name} = &f{value}"
+motion_unknown = "&8[&dGloss&8] &cLiikettä nimeltä '&f{id}&c' ei ole."
+motion_list_empty = "&8[&dGloss&8] &7Liikeleikkeitä ei ole ladattu."
+motion_list = "&8[&dGloss&8] &7Liikeleikkeet (&f{count}&7): &f{value}"
+motion_info = "&8[&dGloss&8] &d{id} &7{value} tickiä, {kind}, {count} fps"
+motion_track = "&8[&dGloss&8] &7  {name} &f{key} &7({count} avainruutua)"
+import_done = "&8[&dGloss&8] &aTuotiin &f{id}&a: &f{value}&a luuta, &f{count}&a osaa, &f{kind}&a animaatiota."
+import_unsupported = "&8[&dGloss&8] &7Ei tuotu: &f{value}&7."
+import_failed = "&8[&dGloss&8] &cTuonti epaonnistui &f{path}&c: {reason}"
+hologram_page_set = "&8[&dGloss&8] &a{player}&a on nyt sivulla &f{page}&a hologrammissa &f{id}&a."
+hologram_page_player_missing = "&8[&dGloss&8] &cPelaaja &f{player}&c ei ole paikalla."
+hologram_page_unknown = "&8[&dGloss&8] &cHologrammilla &f{id}&c ei ole sivua '&f{page}&c'."
+hologram_motion_set = "&8[&dGloss&8] &aHologrammi &f{id}&a toistaa nyt &f{value}&a."
+hologram_motion_cleared = "&8[&dGloss&8] &aHologrammi &f{id}&a ei enaa toista liiketta."
+hologram_actions_empty = "&8[&dGloss&8] &7Hologrammilla &f{id}&7 ei ole toimintoja."
+hologram_actions_header = "&8[&dGloss&8] &7Hologrammin &f{id}&7 toiminnot (&f{count}&7):"
+hologram_actions_entry = "&8[&dGloss&8] &7  &f{kind}&7 kohteessa &f{value}"
+
+# --- lane:world ---
+[gloss.message.world]
+players_only = "&cTämän komennon täytyy suorittaa pelaaja."
+disabled = "&cTämä ominaisuus on pois päältä gloss.toml-tiedostossa."
+
+[gloss.message.world.marker]
+list = "&7Merkit &8({count})&7: &f{value}"
+info = "&7Merkki &f{id} &7sijainnissa &f{world} {x} {y} {z}"
+created = "&aMerkki &f{id} &aluotiin."
+removed = "&aMerkki &f{id} &apoistettiin."
+missing = "&cEi merkkiä nimeltä &f{id}&c."
+here = "&7Olet sijainnissa &f{world} {x} {y} {z}&7."
+
+[gloss.message.world.waypoint]
+saved = "&aReittipiste &f{name} &atallennettiin."
+removed = "&aReittipiste &f{name} &apoistettiin."
+missing = "&cEi reittipistettä nimeltä &f{name}&c."
+list = "&7Reittipisteet &8({count})&7: &f{value}"
+info = "&7Reittipiste &f{id} &7sijainnissa &f{world} {x} {y} {z}"
+full = "&cSinulla on jo enimmäismäärä {count} reittipistettä."
+
+[gloss.message.world.zone]
+list = "&7Alueet &8({count})&7: &f{value}"
+info = "&7Alue &f{id} &7on &f{kind} &7maailmassa &f{world}&7."
+shown = "&aNäytetään alue &f{id}&a."
+hidden = "&7Piilotetaan alue &f{id}&7."
+created = "&aAlue &f{id} &aluotiin."
+removed = "&aAlue &f{id} &apoistettiin."
+missing = "&cEi aluetta nimeltä &f{id}&c."
+
+[gloss.message.world.camera]
+started = "&7Kamera-ajo alkoi."
+refused = "&cKamera-ajo hylättiin."
+stopped = "&7Kamera-ajo pysäytettiin pelaajalle &f{player}&7."
+idle = "&c{player} ei ole kamera-ajossa."
+
+[gloss.message.world.nameplate]
+list = "&7Nimikyltit &8({count})&7: &f{value}"
+info = "&7Nimikyltti &f{id} &7prioriteetti &f{value}&7, &f{count} &7riviä."
+missing = "&cEi nimikylttiä nimeltä &f{id}&c."
+refreshed = "&aNimikyltit päivitettiin."
+
+[gloss.message.world.glow]
+set = "&f{target} &7hehkuu nyt värillä &f{value}&a."
+cleared = "&7Hehku kohteelta &f{target} &7poistettiin."
+missing = "&cPelaaja nimeltä &f{player} &cei ole paikalla."
+
+[command.help.marker]
+root = "Maailmamerkkien työkalut"
+list = "Listaa merkkidokumentit"
+info = "Näytä yksi merkki"
+create = "Kirjoita merkkidokumentti sijaintiisi"
+remove = "Poista merkkidokumentti"
+here = "Tulosta sijaintisi ankkurikoordinaatteina"
+
+[command.help.marker.arg]
+id = "Merkkidokumentin tunnus"
+label = "Merkin yläpuolella näkyvä teksti"
+
+[command.help.waypoint]
+root = "Paikannuspalkin reittipistetyökalut"
+set = "Tallenna sijaintisi henkilökohtaisena reittipisteenä"
+remove = "Poista yksi henkilökohtaisista reittipisteistäsi"
+list = "Listaa henkilökohtaiset reittipisteesi"
+info = "Näytä yksi reittipistedokumentti"
+
+[command.help.waypoint.arg]
+name = "Reittipisteen nimi"
+id = "Reittipistedokumentin tunnus"
+
+[command.help.zone]
+root = "Aluerajojen työkalut"
+list = "Listaa alueet"
+info = "Näytä yksi alue"
+show = "Näytä alueen rajaus itsellesi"
+hide = "Piilota alueen rajaus itseltäsi"
+create = "Kirjoita suorakulmainen aluedokumentti sijaintisi ympärille"
+remove = "Poista aluedokumentti"
+
+[command.help.zone.arg]
+id = "Aluedokumentin tunnus"
+radius = "Puolileveys lohkoina"
+
+[command.help.camera]
+root = "Kamera-ajojen työkalut"
+test = "Lennä esittelyajo ympärilläsi"
+stop = "Päätä kamera-ajo aikaisin"
+
+[command.help.camera.arg]
+seconds = "Ajon pituus sekunteina"
+player = "Pysäytettävä matkustaja; oletuksena sinä"
+
+[command.help.nameplate]
+root = "Pelaajien nimikylttien työkalut"
+list = "Listaa nimikylttidokumentit"
+info = "Näytä yksi nimikylttidokumentti"
+reset = "Palauta mukana tullut nimikylttidokumentti"
+refresh = "Rakenna nimikyltit uudelleen kaikille katsojille"
+
+[command.help.nameplate.arg]
+id = "Nimikylttidokumentin tunnus"
+
+[command.help.glow]
+root = "Olentojen hehkun työkalut"
+set = "Saa pelaaja hehkumaan sinulle"
+clear = "Poista pelaajan hehku sinulta"
+
+[command.help.glow.arg]
+player = "Korostettava pelaaja"
+cleared = "Pelaaja, jonka korostus poistetaan"
+color = "Nimetty tekstiväri"
+ticks = "Tikit, jotka hehku kestää, tai 0 pitämiseen"
+
+# --- lane:behaviors ---
+[command.help.behavior]
+root = "Tarkastele ja laukaise kayttaytymisdokumentteja"
+list = "Listaa ladatut kayttaytymisdokumentit"
+info = "Nayta kayttaytymisdokumentin liipaisimet ja ehdot"
+fire = "Suorita yksi kayttaytymismerkinta nyt"
+reset = "Palauta mukana tulleet kayttaytymisoletukset"
+id = "Kayttaytymisdokumentin tunnus"
+entry = "Merkinnan numero, alkaen yhdesta"
+player = "Pelaaja jolle merkinta suoritetaan, tai * ei kenellekaan"
+
+[command.help.state]
+root = "Lue ja kirjoita tallennettua kayttaytymistilaa"
+get = "Nayta yksi tilan arvo"
+set = "Kirjoita yksi tilan arvo"
+clear = "Palauta yksi tilan arvo oletukseensa"
+dump = "Listaa jokainen maaritelty tila-avain ja sen arvo"
+key = "Maaritelty tila-avain"
+value = "Uusi arvo; laita lainausmerkkeihin jos siina on valilyonteja"
+player = "Pelaaja jolle arvo kuuluu, tai * itsellesi"
+
+[command.help.do]
+root = "Laukaise taman nimiset command-kayttaytymismerkinnat"
+name = "Kayttaytymiskomennon nimi"
+args = "Argumentit avain=arvo-pareina; laita lainausmerkkeihin jos niissa on valilyonteja"
+
+[command.help.expr]
+root = "Laske lauseke ja nayta mika siihen vastasi"
+expression = "Laskettava lauseke; laita lainausmerkkeihin jos siina on valilyonteja"
+
+[command.help.explain]
+root = "Nayta mitka ehdot ajonaika tarkisti ja mika voitti"
+kind = "Selitettava ajonaika, esimerkiksi board tai behavior"
+id = "Selitettavan dokumentin tunnus"
+player = "Pelaaja jolle selitetaan, tai * itsellesi"
+
+[gloss.message.behaviors]
+off = "&8[&dGloss&8]: &eKayttaytymiset on kytketty pois features.behaviors-asetuksesta."
+"list.empty" = "&8[&dGloss&8]: &7Yhtaan kayttaytymisdokumenttia ei ole ladattu."
+missing = "&8[&dGloss&8]: &cKayttaytymisdokumenttia \"{id}\" ei ole."
+"info.header" = "&8[&dGloss&8]: &d{id} &7versio &f{revision} &8| &7merkinnat &f{count} &8| &7kaytossa &f{enabled}"
+"info.entry" = " &8{line}. &f{name} &7kun &f{when} &8| &7oikeus &f{permission}"
+fired = "&8[&dGloss&8]: &aSuoritettiin merkinta &f{line}&a dokumentista &f{id}&a."
+"fire.missing" = "&8[&dGloss&8]: &c{id} ei sisalla merkintaa {line}."
+"do.ran" = "&8[&dGloss&8]: &aLaukaistiin &f{count}&a kayttaytymismerkintaa nimelle &f{name}&a."
+"do.none" = "&8[&dGloss&8]: &7Yksikaan kayttaytymismerkinta ei vastaa komentoon \"{name}\"."
+"state.value" = " &7{key} &8= &f{value}"
+"state.set" = "&8[&dGloss&8]: &a{key} on nyt &f{value}&a."
+"state.cleared" = "&8[&dGloss&8]: &a{key} on taas oletuksessaan."
+"state.unknown" = "&8[&dGloss&8]: &cYksikaan kayttaytymisdokumentti ei maarita tila-avainta \"{key}\"."
+"state.invalid" = "&8[&dGloss&8]: &c\"{value}\" ei ole {type}-arvo."
+"state.empty" = "&8[&dGloss&8]: &7Yksikaan kayttaytymisdokumentti ei maarita tilaa."
+"state.player" = "&8[&dGloss&8]: &cNimea pelaaja: &f{key}&c ei ole globaali avain."
+"player.missing" = "&8[&dGloss&8]: &cPelaajaa \"{player}\" ei ole paikalla."
+"expr.value" = "&8[&dGloss&8]: &f{value} &8({type})"
+"expr.reference" = " &7{name} &8= &f{value} &8lahteesta &7{source}"
+"expr.functions" = " &7funktiot &8= &f{value}"
+"expr.failed" = "&8[&dGloss&8]: &c{reason}"
+"explain.header" = "&8[&dGloss&8]: &d{kind} &f{id} &7pelaajalle &f{player}"
+"explain.line" = " &8{path} &7{when} &8= &f{value}"
+"explain.winner" = " &a> &f{path} &7{when} &8= &f{value}"
+"explain.unknown" = "&8[&dGloss&8]: &cMikaan ei selita kohdetta \"{kind}\"; kokeile {options}."
+"explain.missing" = "&8[&dGloss&8]: &cKohdetta {kind} nimella \"{id}\" ei ole."
+
+# --- lane:authoring ---
+[command.help.pack]
+root = "Asenna ja hallitse Gloss-paketteja"
+install = "Asenna paketti tiedostosta tai HTTPS-osoitteesta"
+update = "Päivitä asennettu paketti sen lähteestä"
+remove = "Poista paketti ja säilytä jokainen asennuksen jälkeen muokattu tiedosto"
+list = "Luettele asennetut paketit"
+info = "Näytä, mitkä tiedostot kuuluvat paketille"
+arg_source = "Pakettitiedosto Glossin datakansiossa tai HTTPS-osoite"
+arg_dry = "Kerro mikä muuttuisi kirjoittamatta mitään"
+arg_id = "Asennetun paketin tunnus"
+
+[command.help.history]
+root = "Luettele asiakirjan tallennetut versiot"
+arg_kind = "Asiakirjakansio, kuten boards tai menus"
+arg_id = "Asiakirjan tunnus"
+arg_page = "Ykkösestä alkava luettelosivu"
+
+[command.help.restore]
+root = "Kirjoita tallennettu versio elävän asiakirjan päälle"
+arg_version = "Versiotunnus komennosta /gloss history"
+
+[command.help.check]
+root = "Tarkista työtilan rikkinäiset viittaukset"
+arg_kind = "Rajaa tarkistus yhteen asiakirjakansioon"
+arg_id = "Rajaa tarkistus yhteen asiakirjaan"
+
+[command.help.export]
+root = "Kopioi asiakirjat pelkkänä JSON-muotona"
+bundle = "Kirjoita koko työtila editorin nippuna"
+arg_kind = "Rajaa vienti yhteen asiakirjakansioon"
+arg_id = "Rajaa vienti yhteen asiakirjaan"
+arg_dir = "Kohdekansio Glossin datakansiossa"
+
+[gloss.message.authoring.pack]
+preview = "&8[&dGloss&8] Paketti &f{id}&7 muuttaisi &f{count}&7 tiedostoa."
+outcome = "&8[&dGloss&8] &7{state} &f{path}&7 {reason}"
+installed = "&8[&dGloss&8] Paketti &f{id}&7 asennettu, &f{count}&7 tiedostoa."
+updated = "&8[&dGloss&8] Paketti &f{id}&7 päivitetty, &f{count}&7 tiedostoa."
+removed = "&8[&dGloss&8] Paketti &f{id}&7 ja &f{count}&7 tiedostoa poistettu."
+unknown = "&8[&dGloss&8] &cTunnuksella &f{id}&c ei ole asennettua pakettia."
+failed = "&8[&dGloss&8] &cPaketti &f{id}&c epäonnistui: {reason}"
+entry = "&8[&dGloss&8] &f{id} &7{value} &8{count} tiedostoa"
+empty = "&8[&dGloss&8] &7Paketteja ei ole asennettu."
+disabled = "&8[&dGloss&8] &cGloss-paketit on kytketty pois gloss.toml-tiedostossa."
+
+[gloss.message.authoring.history]
+empty = "&8[&dGloss&8] &7Kohteesta &f{kind} {id}&7 ei ole tallennettuja versioita."
+entry = "&8[&dGloss&8] &f{revision} &7{source} &8{count} tavua"
+disabled = "&8[&dGloss&8] &cAsiakirjahistoria on kytketty pois gloss.toml-tiedostossa."
+
+[gloss.message.authoring.restore]
+done = "&8[&dGloss&8] &f{kind} {id}&7 palautettu versioon &f{revision}&7."
+unknown = "&8[&dGloss&8] &cKohteesta &f{kind} {id}&c ei löydy versiota &f{revision}&c."
+failed = "&8[&dGloss&8] &cPalautus epäonnistui: {reason}"
+
+[gloss.message.authoring.check]
+clean = "&8[&dGloss&8] &aEi huomautettavaa."
+entry = "&8[&dGloss&8] &7{state} &f{key} &8{kind} {id} {path} &7{message}"
+summary = "&8[&dGloss&8] &f{count}&7 havaintoa."
+
+[gloss.message.authoring.export]
+done = "&8[&dGloss&8] &f{count}&7 asiakirjaa viety kohteeseen &f{path}&7."
+failed = "&8[&dGloss&8] &cVienti epäonnistui: {reason}"
+
+[gloss.message.authoring.import]
+preview = "&8[&dGloss&8] &f{source}&7 kirjoittaisi &f{count}&7 asiakirjaa."
+entry = "&8[&dGloss&8] &7{state} &f{path}&7 {reason}"
+applied = "&8[&dGloss&8] &f{count}&7 asiakirjaa tuotu lähteestä &f{source}&7."
+absent = "&8[&dGloss&8] &7Polussa &f{path}&7 ei ole &f{source}&7-tietoja."
+
+# --- lane:forge ---
+[gloss.message.forge]
+disabled = "&8[&dGloss&8] &cKirjasinpaja on pois päältä. Aseta features.forge arvoon true tiedostossa gloss.toml."
+built = "&8[&dGloss&8] &aPaketti &f{value}&a koottu, {count} kuvaketta."
+build_failed = "&8[&dGloss&8] &cPaketin kokoaminen epäonnistui; edellinen paketti on yhä käytössä. Katso konsoli."
+status = "&7{value}"
+exported = "&8[&dGloss&8] &aVietiin {count} tiedostoa kohteeseen &f{path}&a."
+export_failed = "&8[&dGloss&8] &cVienti epäonnistui: &f{reason}&c."
+serve = "&8[&dGloss&8] &aPakettipalvelin {state}."
+serve_unchanged = "&8[&dGloss&8] &7Pakettipalvelin on jo {state}."
+
+[command.help.forge]
+root = "Kuvakepaketin työkalut"
+build = "Kokoa kuvakkeiden resurssipaketti uudelleen"
+status = "Näytä paketin, kuvakkeiden ja jakelun määrät"
+export = "Kopioi yhdistettävä pakettikansio muualle"
+"export.path" = "Paketin kohdekansio"
+serve = "Käynnistä tai pysäytä sisäänrakennettu pakettipalvelin"
+"serve.state" = "on tai off"
+reset = "Palauta mukana toimitetut kuvakedokumentit"
+
+# --- lane:fixes ---
+[gloss.message.fixes]
+status_bedrock = "&7bedrock: &f{name}&7, &f{count}&7 paikalla"
+status_textimage_oversize = "&7textimage-ylisuuri: &f{count}"
+hotload_skipped = " &7({count} ohitettu, väärä schemaVersion)"
+status_schema_skipped = "&7schema-ohitettu: &f{count}"
+bedrock_menu_unavailable = "&8[&dGloss&8]: &cTämä valikko ei näy Bedrockissa."
+

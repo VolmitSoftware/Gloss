@@ -319,7 +319,7 @@ public class EditorSyncServiceTest {
   @Test
   public void pendingAcknowledgementRetriesAfterRestartWithoutReapplying() {
     JsonObject project = menuProject("{\"components\":[]}");
-    EditorSyncPendingAck pending = new EditorSyncPendingAck(1L, "rejected", "Invalid edit.", null);
+    EditorSyncPendingAck pending = new EditorSyncPendingAck(1L, "rejected", "Invalid edit.", null, List.of());
     EditorSyncStoredSession session = session(project, pending);
     MemoryPersistence persistence = new MemoryPersistence(session);
     EditorSyncService first = service(persistence, new ControlledRelay(),
@@ -404,7 +404,7 @@ public class EditorSyncServiceTest {
     invalidPending.addProperty("unsupported", true);
     invalidPending.addProperty("baseRevision", EditorSyncJson.revision(invalidPending));
     EditorSyncPendingAck pending = new EditorSyncPendingAck(
-        1L, "applied", "Published.", invalidPending);
+        1L, "applied", "Published.", invalidPending, List.of());
     MemoryPersistence persistence = new MemoryPersistence(session(base, pending));
     EditorSyncService service = service(persistence, new ControlledRelay(),
         new TestSettings(true), baseReader());
@@ -542,17 +542,26 @@ public class EditorSyncServiceTest {
     }
 
     @Override
-    public CompletableFuture<Optional<EditorSyncPublication>> publication(
+    public CompletableFuture<EditorSyncRelayClient.RelayPoll> poll(
         EditorSyncStoredSession session) {
       publications.incrementAndGet();
       publicationStarted.countDown();
-      return publication.get();
+      return publication.get().thenApply(pending ->
+          new EditorSyncRelayClient.RelayPoll(pending, List.of()));
+    }
+
+    @Override
+    public CompletableFuture<Void> answerHistory(EditorSyncStoredSession session,
+                                                 EditorSyncRelayClient.HistoryRequest request,
+                                                 String json) {
+      return CompletableFuture.completedFuture(null);
     }
 
     @Override
     public CompletableFuture<Void> acknowledge(EditorSyncStoredSession session, long revision,
                                                String status, String message,
-                                               EditorSyncProject serverProject) {
+                                               EditorSyncProject serverProject,
+                                               List<EditorSyncPendingAck.Conflict> conflicts) {
       ackStatus.set(status);
       return CompletableFuture.completedFuture(null);
     }

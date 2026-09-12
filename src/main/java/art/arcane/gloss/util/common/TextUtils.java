@@ -25,6 +25,14 @@ public final class TextUtils {
     return MiniMessage.miniMessage().deserialize(translateLegacy(text));
   }
 
+  /**
+   * Legacy {@code &}/section codes as MiniMessage tags, leaving any tags already present alone.
+   * Used where authored text has to become a MiniMessage string the SERVER parses.
+   */
+  public static String toMiniMessage(String text) {
+    return translateLegacy(text);
+  }
+
   public static String renderLegacy(String text) {
     return LEGACY.serialize(parse(text));
   }

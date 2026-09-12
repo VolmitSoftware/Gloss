@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://volmit.com/gloss/strings.schema.json",
+  "title": "Gloss Strings Document",
+  "description": "One authored content catalog at plugins/Gloss/strings/<locale>.json, read by lang(key, args...) from every surface.",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "revision",
+    "locale"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "type": "integer",
+      "const": 1
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991
+    },
+    "locale": {
+      "type": "string",
+      "pattern": "^[A-Za-z]{2}[_-][A-Za-z]{2}$",
+      "description": "Canonicalized to language_COUNTRY; the file name should match."
+    },
+    "fallback": {
+      "type": "string",
+      "pattern": "^([A-Za-z]{2}[_-][A-Za-z]{2})?$",
+      "default": "",
+      "description": "Locale consulted before en_US when this one lacks a key."
+    },
+    "entries": {
+      "type": "object",
+      "maxProperties": 8192,
+      "propertyNames": {
+        "pattern": "^[a-z0-9][a-z0-9._-]*$"
+      },
+      "additionalProperties": {
+        "type": "string",
+        "maxLength": 4096
+      },
+      "description": "Key to template. Positional lang() arguments bind onto {placeholder} names in order."
+    }
+  }
+}

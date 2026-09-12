@@ -7,7 +7,10 @@ public enum LegacyImportSource {
   GHOLO("gholo", List.of("gholo", "files")),
   DECENT_HOLOGRAMS("decent-holograms", List.of("decent", "decent-holograms", "decent_holograms")),
   HOLOGRAPHIC_DISPLAYS("holographic-displays", List.of("hd", "holographic-displays", "holographic_displays")),
-  FANCY_HOLOGRAMS("fancy-holograms", List.of("fancy", "fancy-holograms", "fancy_holograms"));
+  FANCY_HOLOGRAMS("fancy-holograms", List.of("fancy", "fancy-holograms", "fancy_holograms")),
+  FEATHERBOARD("featherboard", List.of("featherboard", "feather", "feather-board")),
+  ANIMATED_SCOREBOARD("animated-scoreboard", List.of("animated-scoreboard", "animatedscoreboard", "as")),
+  TAB_HEADER_FOOTER("tab", List.of("tab", "tab-header-footer", "tab_header_footer"));
 
   private final String id;
   private final List<String> aliases;
@@ -35,6 +38,7 @@ public enum LegacyImportSource {
   }
 
   public static List<String> suggestions() {
-    return List.of("gholo", "decent-holograms", "holographic-displays", "fancy-holograms");
+    return List.of("gholo", "decent-holograms", "holographic-displays", "fancy-holograms",
+        "featherboard", "animated-scoreboard", "tab");
   }
 }

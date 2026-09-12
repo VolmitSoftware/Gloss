@@ -2,7 +2,11 @@ package art.arcane.gloss.command;
 
 import art.arcane.gloss.Gloss;
 import art.arcane.gloss.config.GlossConfigFile;
+import art.arcane.gloss.importer.DocumentImportEntry;
+import art.arcane.gloss.importer.DocumentImportPlan;
+import art.arcane.gloss.importer.DocumentImportService;
 import art.arcane.gloss.importer.HoloUiDataImporter;
+import art.arcane.gloss.history.HistoryService;
 import art.arcane.gloss.importer.HoloUiImportDisposition;
 import art.arcane.gloss.importer.LegacyGlossDataImporter;
 import art.arcane.gloss.importer.LegacyHologramImportService;
@@ -29,6 +33,8 @@ import org.bukkit.entity.Player;
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
@@ -52,6 +58,10 @@ public final class CommandGlossImport {
       CommandSender sender
   ) {
     if (!checkPermission(sender, PERMISSION)) {
+      return;
+    }
+    if (DocumentImportService.handles(source)) {
+      previewDocuments(sender, source);
       return;
     }
     LegacyHologramImportService importer = importer();
@@ -80,6 +90,10 @@ public final class CommandGlossImport {
       CommandSender sender
   ) {
     if (!checkPermission(sender, APPLY_PERMISSION)) {
+      return;
+    }
+    if (DocumentImportService.handles(source)) {
+      applyDocuments(sender, source);
       return;
     }
     LegacyHologramImportService importer = importer();
@@ -284,6 +298,96 @@ public final class CommandGlossImport {
 
   private static LegacyHologramImportService importer() {
     return Gloss.instance.getMenuCatalog().legacyImporter();
+  }
+
+  /**
+   * The sources that convert whole documents rather than holograms. Previewing never writes, and
+   * applying leaves an existing document alone: a document already at the target id is reported as
+   * a conflict and skipped.
+   */
+  private void previewDocuments(CommandSender sender, LegacyImportSource source) {
+    DocumentImportPlan plan;
+    try {
+      plan = documentImporter().preview(source);
+    } catch (IOException | RuntimeException failure) {
+      reportDocumentFailure(sender, source, failure);
+      return;
+    }
+    if (!plan.sourcePresent()) {
+      GlossCommandMessages.send(sender, GlossMessages.IMPORT_DOCUMENT_ABSENT,
+          MessageArgument.untrusted("source", source.id()),
+          MessageArgument.untrusted("path", plan.sourcePath()));
+      return;
+    }
+    GlossCommandMessages.send(sender, GlossMessages.IMPORT_DOCUMENT_PREVIEW,
+        MessageArgument.untrusted("source", source.id()),
+        MessageArgument.trusted("count", plan.entries().size()));
+    reportDocumentEntries(sender, plan);
+  }
+
+  private void applyDocuments(CommandSender sender, LegacyImportSource source) {
+    DocumentImportService importer = documentImporter();
+    List<DocumentImportEntry> applied;
+    DocumentImportPlan plan;
+    try {
+      plan = importer.preview(source);
+      applied = importer.apply(plan, false);
+    } catch (IOException | RuntimeException failure) {
+      reportDocumentFailure(sender, source, failure);
+      return;
+    }
+    if (!plan.sourcePresent()) {
+      GlossCommandMessages.send(sender, GlossMessages.IMPORT_DOCUMENT_ABSENT,
+          MessageArgument.untrusted("source", source.id()),
+          MessageArgument.untrusted("path", plan.sourcePath()));
+      return;
+    }
+    GlossCommandMessages.send(sender, GlossMessages.IMPORT_DOCUMENT_APPLIED,
+        MessageArgument.untrusted("source", source.id()),
+        MessageArgument.trusted("count", applied.size()));
+    reportDocumentEntries(sender, plan);
+    Gloss plugin = Gloss.instance;
+    if (plugin != null && !applied.isEmpty()) {
+      plugin.publishEditorSyncRuntime(DocumentImportService.kindsOf(applied), false);
+    }
+  }
+
+  private void reportDocumentEntries(CommandSender sender, DocumentImportPlan plan) {
+    int reported = 0;
+    for (DocumentImportEntry entry : plan.entries()) {
+      if (reported++ >= MAX_DETAIL_LINES) {
+        return;
+      }
+      GlossCommandMessages.send(sender, GlossMessages.IMPORT_DOCUMENT_ENTRY,
+          MessageArgument.untrusted("state",
+              entry.disposition().name().toLowerCase(Locale.ROOT)),
+          MessageArgument.untrusted("path", entry.path()),
+          MessageArgument.untrusted("reason", entry.warnings().isEmpty()
+              ? entry.dispositionReason()
+              : String.join("; ", entry.warnings())));
+    }
+  }
+
+  private void reportDocumentFailure(CommandSender sender, LegacyImportSource source,
+                                     Throwable failure) {
+    GlossCommandMessages.send(sender, GlossMessages.IMPORT_FAILED,
+        MessageArgument.untrusted("source", source.id()),
+        MessageArgument.untrusted("reason", safeReason(failure)));
+  }
+
+  private DocumentImportService documentImporter() {
+    Gloss plugin = Gloss.instance;
+    return new DocumentImportService(plugin.getDataFolder().toPath().getParent().getParent(),
+        plugin.getDataFolder().toPath(), plugin.getProjectTransaction(),
+        plugin.getPersistenceCoordinator(), this::recordHistory);
+  }
+
+  private void recordHistory(String kind, String id, byte[] content, String source) {
+    Gloss plugin = Gloss.instance;
+    HistoryService history = plugin == null ? null : plugin.service(HistoryService.class);
+    if (history != null) {
+      history.record(kind, id, content, source);
+    }
   }
 
   private static boolean checkPermission(CommandSender sender, String permission) {

@@ -1,0 +1,180 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://volmit.art/schema/gloss-zones.schema.json",
+  "title": "Gloss Zone Document",
+  "description": "One area outline in zones/. Particles render on Bedrock; wall panels are display entities and are withheld from Bedrock viewers.",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "revision",
+    "shape"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "show": {
+      "type": [
+        "string",
+        "boolean"
+      ]
+    },
+    "shape": {
+      "$ref": "#/$defs/shape"
+    },
+    "render": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": [
+            "particles",
+            "walls",
+            "hybrid"
+          ]
+        },
+        "particle": {
+          "type": "string"
+        },
+        "color": {
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$"
+        },
+        "spacing": {
+          "type": "number",
+          "minimum": 0.05,
+          "maximum": 8
+        },
+        "wallMaterial": {
+          "type": "string"
+        },
+        "facingOnly": {
+          "description": "Draws only the edges of faces turned toward the viewer, which halves the particle cost of a closed volume.",
+          "type": "boolean"
+        },
+        "edgesOnly": {
+          "type": "boolean"
+        }
+      }
+    },
+    "ambience": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "particle": {
+          "type": "string"
+        },
+        "perViewerPerTick": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 64
+        },
+        "radius": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 64
+        },
+        "when": {
+          "type": [
+            "string",
+            "boolean"
+          ]
+        }
+      }
+    },
+    "toggle": {
+      "description": "Permission a viewer needs to see this zone, and the node its show and hide commands check.",
+      "type": "string"
+    },
+    "audience": {
+      "$ref": "gloss-markers.schema.json#/$defs/audience"
+    }
+  },
+  "$defs": {
+    "shape": {
+      "type": "object",
+      "required": [
+        "type"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "cuboid",
+            "cylinder",
+            "polygon",
+            "region"
+          ]
+        },
+        "world": {
+          "type": "string"
+        },
+        "min": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "items": {
+            "type": "number"
+          }
+        },
+        "max": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "items": {
+            "type": "number"
+          }
+        },
+        "center": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "type": "number"
+          }
+        },
+        "radius": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "minY": {
+          "type": "number"
+        },
+        "maxY": {
+          "type": "number"
+        },
+        "points": {
+          "type": "array",
+          "minItems": 3,
+          "items": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 2,
+            "items": {
+              "type": "number"
+            }
+          }
+        },
+        "plugin": {
+          "type": "string",
+          "enum": [
+            "worldguard"
+          ]
+        },
+        "id": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

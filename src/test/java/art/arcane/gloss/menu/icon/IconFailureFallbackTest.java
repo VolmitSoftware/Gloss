@@ -1,5 +1,6 @@
 package art.arcane.gloss.menu.icon;
 
+import java.util.Map;
 import art.arcane.gloss.doc.DocumentParsers;
 
 import art.arcane.gloss.condition.ShowCondition;
@@ -62,7 +63,7 @@ public class IconFailureFallbackTest {
 
   @Test
   public void itemIconWithoutAResolvedMaterialFailsAsAMenuIconException() {
-    assertThrows(MenuIconException.class, () -> new ItemIconData(null, 1, 0, null).requireMaterial());
+    assertThrows(MenuIconException.class, () -> new ItemIconData(null, 1, 0, null, null, null).requireMaterial());
   }
 
   @Test
@@ -96,7 +97,7 @@ public class IconFailureFallbackTest {
         false,
         List.<MenuComponentData>of(),
         List.of(), ShowCondition.ALWAYS
-    );
+    , Map.of());
     data.setId("icon-test");
     Player player = (Player) Proxy.newProxyInstance(Player.class.getClassLoader(), new Class<?>[]{Player.class},
         (proxy, method, args) -> switch (method.getName()) {

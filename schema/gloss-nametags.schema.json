@@ -1,0 +1,167 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://volmit.com/gloss/nametags.schema.json",
+  "title": "Gloss Nametag Document",
+  "description": "One nametag ruleset at plugins/Gloss/nametags/<id>.json. subject is the tagged player and viewer is the observer; a document that reads only subject.* resolves once per subject, one that reads viewer.* resolves per pair for nearby subjects.",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "revision",
+    "presentation"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "description": "Document format version. Files on any other version are ignored.",
+      "type": "integer",
+      "const": 1
+    },
+    "revision": {
+      "description": "Server-owned monotonic revision, bumped on every write.",
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991
+    },
+    "show": {
+      "description": "Condition deciding whether this document is eligible at all. A boolean or a boolean expression.",
+      "type": [
+        "string",
+        "boolean"
+      ],
+      "default": true
+    },
+    "select": {
+      "title": "Nametag Selection",
+      "description": "How this document competes with the other nametag documents. Highest priority wins, ties break by lowest id.",
+      "type": "object",
+      "properties": {
+        "priority": {
+          "description": "Selection priority; higher wins.",
+          "type": "integer",
+          "default": 0
+        },
+        "when": {
+          "description": "Condition deciding whether this document wants to tag the subject.",
+          "type": "string",
+          "default": "false"
+        }
+      }
+    },
+    "presentation": {
+      "title": "Nametag Presentation",
+      "description": "The team style applied to the tagged player for this viewer.",
+      "type": "object",
+      "properties": {
+        "prefix": {
+          "description": "Text before the player name. Runs through the full text pipeline.",
+          "type": "string",
+          "default": ""
+        },
+        "suffix": {
+          "description": "Text after the player name. Runs through the full text pipeline.",
+          "type": "string",
+          "default": ""
+        },
+        "color": {
+          "description": "Named text color applied to the player name and to any glow the same entry carries.",
+          "type": "string",
+          "default": "white"
+        },
+        "nameTagVisibility": {
+          "description": "Who sees the floating name above the player.",
+          "type": "string",
+          "enum": [
+            "always",
+            "never",
+            "hide_for_other_teams",
+            "hide_for_own_team"
+          ],
+          "default": "always"
+        },
+        "collision": {
+          "description": "Whether the tagged player pushes and is pushed.",
+          "type": "string",
+          "enum": [
+            "always",
+            "never",
+            "push_other_teams",
+            "push_own_team"
+          ],
+          "default": "always"
+        }
+      }
+    },
+    "variants": {
+      "description": "Alternative presentations for the same document. The highest-priority variant whose condition matches replaces the base presentation; variants never merge.",
+      "type": "array",
+      "items": {
+        "title": "Nametag Variant",
+        "type": "object",
+        "required": [
+          "id",
+          "when",
+          "presentation"
+        ],
+        "properties": {
+          "id": {
+            "description": "Variant id, unique inside this document.",
+            "type": "string",
+            "pattern": "^[A-Za-z0-9._-]+$"
+          },
+          "priority": {
+            "description": "Variant priority; higher wins, ties break by lowest id.",
+            "type": "integer",
+            "default": 0
+          },
+          "when": {
+            "description": "Condition deciding whether this variant applies.",
+            "type": "string"
+          },
+          "presentation": {
+            "title": "Nametag Presentation",
+            "description": "The team style applied to the tagged player for this viewer.",
+            "type": "object",
+            "properties": {
+              "prefix": {
+                "description": "Text before the player name. Runs through the full text pipeline.",
+                "type": "string",
+                "default": ""
+              },
+              "suffix": {
+                "description": "Text after the player name. Runs through the full text pipeline.",
+                "type": "string",
+                "default": ""
+              },
+              "color": {
+                "description": "Named text color applied to the player name and to any glow the same entry carries.",
+                "type": "string",
+                "default": "white"
+              },
+              "nameTagVisibility": {
+                "description": "Who sees the floating name above the player.",
+                "type": "string",
+                "enum": [
+                  "always",
+                  "never",
+                  "hide_for_other_teams",
+                  "hide_for_own_team"
+                ],
+                "default": "always"
+              },
+              "collision": {
+                "description": "Whether the tagged player pushes and is pushed.",
+                "type": "string",
+                "enum": [
+                  "always",
+                  "never",
+                  "push_other_teams",
+                  "push_own_team"
+                ],
+                "default": "always"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

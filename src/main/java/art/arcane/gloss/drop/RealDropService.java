@@ -2,6 +2,8 @@ package art.arcane.gloss.drop;
 
 import art.arcane.gloss.Gloss;
 import art.arcane.gloss.GlossConfig;
+import art.arcane.gloss.bedrock.BedrockPolicy;
+import art.arcane.gloss.bedrock.BedrockSurface;
 import art.arcane.gloss.api.ParticleLayer;
 import art.arcane.gloss.api.HologramPresentation;
 import art.arcane.gloss.api.TemporaryHologram;
@@ -1414,7 +1416,7 @@ final class RealDropService {
 
     private void reconcileAudience(State state) {
         RealDropConditionPlan.Selection selection = state.selection;
-        if (state.closed || selection.universalAudience()) {
+        if (state.closed || (selection.universalAudience() && !bedrockDropsHidden())) {
             return;
         }
         GlossConfig.RealDrops config = selection.style().config();
@@ -1449,7 +1451,7 @@ final class RealDropService {
         if (state.closed || !viewer.isOnline()) {
             return;
         }
-        boolean visible = selection.visibleTo(plugin, viewer);
+        boolean visible = !hiddenOnBedrock(viewer) && selection.visibleTo(plugin, viewer);
         if (state.audience.changed(viewer.getUniqueId(), visible, revision)) {
             if (visible) {
                 viewer.hideEntity(plugin, state.item);
@@ -1471,12 +1473,33 @@ final class RealDropService {
 
     /** The decision the label hologram and the particle emitters read; never a fresh dispatch. */
     private boolean audienceVisible(State state, Player viewer) {
+        if (hiddenOnBedrock(viewer)) {
+            return false;
+        }
         RealDropConditionPlan.Selection selection = state.selection;
         if (selection.universalAudience()) {
             return true;
         }
         Boolean applied = state.audience.visibility(viewer.getUniqueId());
         return applied == null ? selection.visibleTo(plugin, viewer) : applied;
+    }
+
+    /**
+     * Item and text displays do not render on Bedrock, so those viewers keep the vanilla dropped
+     * item instead of an invisible presentation.
+     */
+    private boolean hiddenOnBedrock(Player viewer) {
+        BedrockPolicy policy = BedrockPolicy.of(plugin);
+        return policy != null && policy.hides(BedrockSurface.DROP, viewer);
+    }
+
+    /**
+     * True while a Bedrock detector is loaded and drops are withheld from it. Universal-audience
+     * drops otherwise never walk their viewers, and that walk is what restores the vanilla item.
+     */
+    private boolean bedrockDropsHidden() {
+        BedrockPolicy policy = BedrockPolicy.of(plugin);
+        return policy != null && policy.mayHide(BedrockSurface.DROP);
     }
 
     /** A viewer that quit or changed world keeps none of this drop's applied state. */

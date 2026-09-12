@@ -1,5 +1,6 @@
 package art.arcane.gloss.config.icon;
 
+import java.util.Map;
 import art.arcane.gloss.doc.DocumentParsers;
 
 import art.arcane.gloss.api.IconDisplayStyle;
@@ -122,7 +123,7 @@ public class IconDisplayStyleTest {
   private static MenuSession session() {
     MenuDefinitionData data = new MenuDefinitionData(
         new Vector(), false, false, 8D, false, false, List.<MenuComponentData>of(), List.of(), ShowCondition.ALWAYS
-    );
+    , Map.of());
     data.setId("style-test");
     Player player = (Player) Proxy.newProxyInstance(
         Player.class.getClassLoader(),

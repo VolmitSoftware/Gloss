@@ -13,6 +13,7 @@ import java.net.InetSocketAddress;
 import java.net.http.HttpClient;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.List;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -113,7 +114,7 @@ public class EditorSyncRelayClientTest {
         publicationResponse(large)));
     EditorSyncRelayClient client = client(2 * 1024 * 1024);
 
-    EditorSyncPublication publication = client.publication(session()).join().orElseThrow();
+    EditorSyncPublication publication = client.poll(session()).join().publication().orElseThrow();
 
     assertEquals(1L, publication.revision());
     assertEquals(large.length(), publication.snapshot().get("padding").getAsString().length());
@@ -126,7 +127,7 @@ public class EditorSyncRelayClientTest {
     EditorSyncRelayClient client = client(32 * 1024);
 
     CompletionException failure = assertThrows(CompletionException.class,
-        () -> client.publication(session()).join());
+        () -> client.poll(session()).join());
     assertTrue(failure.getCause() instanceof EditorSyncRelayException);
     assertTrue(failure.getCause().getMessage().contains("exceeds"));
   }
@@ -137,7 +138,7 @@ public class EditorSyncRelayClientTest {
     EditorSyncRelayClient client = client(1024 * 1024);
 
     CompletionException failure = assertThrows(CompletionException.class,
-        () -> client.publication(session()).join());
+        () -> client.poll(session()).join());
     assertTrue(failure.getCause() instanceof EditorSyncRelayException);
     assertTrue(failure.getCause().getMessage().contains("application/json"));
   }
@@ -160,8 +161,8 @@ public class EditorSyncRelayClientTest {
     });
     EditorSyncRelayClient client = client(1024 * 1024, Duration.ofSeconds(20L));
 
-    CompletableFuture<Optional<EditorSyncPublication>> publication =
-        client.publication(session());
+    CompletableFuture<EditorSyncRelayClient.RelayPoll> publication =
+        client.poll(session());
     assertTrue(headersSent.await(1L, TimeUnit.SECONDS));
     deadlines.expire();
     try {
@@ -201,8 +202,8 @@ public class EditorSyncRelayClientTest {
     });
     EditorSyncRelayClient client = client(1024 * 1024, Duration.ofSeconds(20L));
 
-    CompletableFuture<Optional<EditorSyncPublication>> publication =
-        client.publication(session());
+    CompletableFuture<EditorSyncRelayClient.RelayPoll> publication =
+        client.poll(session());
     assertTrue(firstByteSent.await(1L, TimeUnit.SECONDS));
     deadlines.expire();
     CompletionException failure = assertThrows(CompletionException.class, publication::join);
@@ -224,7 +225,7 @@ public class EditorSyncRelayClientTest {
     client.close();
 
     CompletionException failure = assertThrows(CompletionException.class,
-        () -> client.publication(session()).join());
+        () -> client.poll(session()).join());
 
     assertTrue(failure.getCause() instanceof EditorSyncRelayException);
     assertTrue(failure.getCause().getMessage().contains("shutting down"));
@@ -238,7 +239,7 @@ public class EditorSyncRelayClientTest {
     start(exchange -> respond(exchange, 200, "application/json", response.toString()));
 
     CompletionException failure = assertThrows(CompletionException.class,
-        () -> client(1024 * 1024).publication(session()).join());
+        () -> client(1024 * 1024).poll(session()).join());
     assertTrue(failure.getCause() instanceof EditorSyncRelayException);
     assertTrue(failure.getCause().getMessage(),
         failure.getCause().getMessage().contains("protocol version does not match"));
@@ -263,7 +264,7 @@ public class EditorSyncRelayClientTest {
     start(exchange -> respond(exchange, 200, "application/json", response.toString()));
 
     CompletionException fractional = assertThrows(CompletionException.class,
-        () -> client(1024 * 1024).publication(session()).join());
+        () -> client(1024 * 1024).poll(session()).join());
     assertTrue(fractional.getCause() instanceof EditorSyncRelayException);
 
     server.stop(0);
@@ -272,7 +273,7 @@ public class EditorSyncRelayClientTest {
     response.getAsJsonObject("publication").addProperty("extra", true);
     start(exchange -> respond(exchange, 200, "application/json", response.toString()));
     assertThrows(CompletionException.class,
-        () -> client(1024 * 1024).publication(session()).join());
+        () -> client(1024 * 1024).poll(session()).join());
   }
 
   @Test
@@ -299,17 +300,19 @@ public class EditorSyncRelayClientTest {
         {"protocol":3,"baseRevision":"%s","publication":{
           "revision":1,"state":"rejected","ack":{
             "status":"rejected","message":"Invalid edit.","serverRevision":null,
-            "acknowledgedAt":"2026-08-12T00:00:01Z"}}}
+            "acknowledgedAt":"2026-08-12T00:00:01Z","conflicts":[]}}}
         """.formatted(baseRevision)));
     EditorSyncStoredSession session = session();
 
-    client(1024 * 1024).acknowledge(session, 1L, "rejected", "Invalid edit.", null).join();
+    client(1024 * 1024).acknowledge(session, 1L, "rejected", "Invalid edit.", null,
+        List.of()).join();
 
     server.stop(0);
     server = null;
     start(exchange -> respond(exchange, 204, "application/json", ""));
     assertThrows(CompletionException.class, () ->
-        client(1024 * 1024).acknowledge(session(), 1L, "rejected", "Invalid edit.", null).join());
+        client(1024 * 1024).acknowledge(session(), 1L, "rejected", "Invalid edit.", null,
+            List.of()).join());
   }
 
   private EditorSyncRelayClient client(int maximumProjectBytes) {

@@ -314,13 +314,13 @@ public final class LegacyGlossDataImporter {
                 if (lines.size() > MotdDoc.MAX_LINES_PER_ENTRY) {
                     lines = lines.subList(0, MotdDoc.MAX_LINES_PER_ENTRY);
                 }
-                motdEntries.add(new MotdDoc.MotdEntry(lines));
+                motdEntries.add(MotdDoc.MotdEntry.ofLines(lines));
             }
             if (motdEntries.isEmpty()) {
                 return;
             }
             MotdDoc updated = new MotdDoc(MotdDoc.CURRENT_SCHEMA_VERSION, DocumentEnvelope.INITIAL_REVISION, ShowCondition.ALWAYS,
-                motdEntries);
+                motdEntries, List.of());
             writeDocument(motdFile.toPath(), updated);
             entries.add(Entry.of("config", LEGACY_CONFIG_FILE_NAME + ":motd.texts", Status.OVERLAID));
         } catch (IOException | RuntimeException failure) {

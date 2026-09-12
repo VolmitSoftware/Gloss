@@ -826,3 +826,517 @@ line = "Строка {line}"
 [language.editor.value]
 none = "Нет"
 empty = "(пусто)"
+
+# Lane message tables. Each lane appends its [gloss.message.<lane>] and [command.help.<group>]
+# tables inside its own anchor so parallel branches never share a line.
+# --- lane:screen ---
+[gloss.message.screen]
+"surfaces.empty" = "&8[&dGloss&8] &7Поверхности не загружены."
+"surfaces.unknown" = "&8[&dGloss&8]: &cПоверхности &f{id}&c не существует."
+"surfaces.tested" = "&8[&dGloss&8]: &a&f{id}&a выполнена для &f{player}&a."
+"nametags.empty" = "&8[&dGloss&8] &7Таблички имён не загружены."
+"nametags.unknown" = "&8[&dGloss&8]: &cТаблички имени &f{id}&c не существует."
+"nametags.refreshed" = "&8[&dGloss&8]: &aПовторно применено документов табличек: &d{count}&a."
+"hud.header" = "&8[&dGloss&8] &7Занятые слоты HUD у &f{player}&7: &d{count}"
+"hud.empty" = "&8[&dGloss&8] &7Ни один плагин не занимает слот HUD у &f{player}&7."
+"hud.line" = "&8- &f{kind} &7{source} &8| &7{value} &8| &7{count} &8| &7{state}"
+"player.unknown" = "&8[&dGloss&8]: &cИгрок с именем &f{player}&c не в сети."
+
+[command.help.surface]
+root = "Поверхности панели действий, полосы босса и заголовка"
+list = "Список документов поверхностей"
+info = "Показать документ поверхности"
+"info.id" = "Идентификатор документа поверхности"
+reset = "Восстановить поставляемые поверхности"
+test = "Выполнить проход поверхностей для игрока сейчас"
+"test.id" = "Идентификатор документа поверхности"
+"test.player" = "Игрок для проверки; по умолчанию вы"
+
+[command.help.nametag]
+root = "Документы табличек имён для каждого зрителя"
+list = "Список документов табличек имён"
+info = "Показать документ таблички имени"
+"info.id" = "Идентификатор документа таблички имени"
+reset = "Восстановить поставляемые таблички имён"
+refresh = "Повторно применить все таблички имён сейчас"
+
+[command.help.hud]
+root = "Просмотреть общий компоновщик HUD"
+who = "Показывает, какой плагин занимает каждый слот HUD"
+"who.player" = "Игрок для просмотра; по умолчанию вы"
+
+# --- lane:chat ---
+[gloss.message.chat]
+filtered = "&8[&dGloss&8]: &cФильтр чата заблокировал ваше сообщение."
+too_fast = "&8[&dGloss&8]: &eПодождите немного перед следующим сообщением."
+repeat = "&8[&dGloss&8]: &eВы только что это уже написали."
+channel_set = "&8[&dGloss&8]: &aТеперь вы пишете в канале &d{name}&a."
+channel_unknown = "&8[&dGloss&8]: &cКанала с именем &d{name}&c не существует."
+channel_list = "&8[&dGloss&8]: &7Каналы: &f{value}"
+msg_usage = "&8[&dGloss&8]: &eИспользование: &f{command}"
+msg_offline = "&8[&dGloss&8]: &c{player} не в сети."
+reply_none = "&8[&dGloss&8]: &cВам некому ответить."
+msg_self = "&8[&dGloss&8]: &cНельзя отправить сообщение самому себе."
+channels_header = "&dКаналы &7({count})"
+channels_empty = "&7Каналы не загружены."
+channel_missing = "&8[&dGloss&8]: &cДокумента канала с именем &f{id}&c не существует."
+strings_header = "&dЛокали текстов &7({count})"
+strings_empty = "&7Текстовые документы не загружены."
+strings_missing = "&dОтсутствует в {locale} &7({count})"
+strings_complete = "&8[&dGloss&8]: &a{locale} покрывает все ключи en_US."
+leaderboards_header = "&dТаблицы лидеров &7({count})"
+leaderboards_empty = "&7Таблицы лидеров не загружены."
+leaderboard_missing = "&8[&dGloss&8]: &cТаблицы лидеров с именем &f{id}&c не существует."
+leaderboard_reset = "&8[&dGloss&8]: &aТаблица лидеров &f{id}&a сброшена ({state})."
+leaderboard_sampled = "&8[&dGloss&8]: &aТаблица лидеров &f{id}&a собрана по всем игрокам в сети."
+
+
+[command.help.channel]
+root = "Каналы чата"
+list = "Показать загруженные каналы чата"
+info = "Показать область, формат и варианты канала"
+"info.id" = "Идентификатор документа канала"
+reset = "Восстановить поставляемые документы каналов"
+
+[command.help.strings]
+root = "Написанные тексты содержимого"
+list = "Показать загруженные локали текстов и число записей"
+missing = "Показать ключи, которые есть в en_US и отсутствуют в локали"
+"missing.locale" = "Локаль для сравнения с en_US"
+reset = "Восстановить поставляемые текстовые документы"
+
+[command.help.leaderboard]
+root = "Вычисляемые таблицы лидеров"
+list = "Показать загруженные таблицы лидеров и число записей"
+info = "Показать источник, порядок и записи таблицы лидеров"
+"info.id" = "Идентификатор документа"
+reset = "Очистить период или общие значения таблицы лидеров"
+"reset.id" = "Идентификатор документа"
+"reset.period" = "all или current"
+sample = "Собрать таблицу лидеров сейчас по всем игрокам в сети"
+"sample.id" = "Идентификатор документа"
+
+# --- lane:forms ---
+[gloss.message.forms]
+icon_unsupported = "&7Нельзя отобразить в ячейке сундука ({kind})"
+no_dialogs = "&8[&dGloss&8]: &7Диалоги не настроены."
+dialog_list_header = "&dДиалоги"
+dialog_list_entry = "&7Открыть диалог &f{id}"
+dialog_info = "&8[&dGloss&8]: &d{id} &8- &7тип &f{kind}&7, кнопки &f{count}"
+unknown_dialog = "&8[&dGloss&8]: &cДиалог с именем {id} не найден."
+dialog_opened = "&8[&dGloss&8]: &aДиалог {id} открыт для {player}."
+dialog_unsupported = "&8[&dGloss&8]: &cВаш клиент не может показать этот диалог."
+no_inventories = "&8[&dGloss&8]: &7Меню-сундуки не настроены."
+inventory_list_header = "&dМеню-сундуки"
+inventory_list_entry = "&7Открыть меню-сундук &f{id}"
+inventory_info = "&8[&dGloss&8]: &d{id} &8- &7размер &f{kind}&7, ячейки &f{count}"
+unknown_inventory = "&8[&dGloss&8]: &cМеню-сундук с именем {id} не найден."
+inventory_opened = "&8[&dGloss&8]: &aМеню-сундук {id} открыт для {player}."
+bad_args = "&8[&dGloss&8]: &cАргументы должны быть парами ключ=значение: {value}"
+prompt_timeout = "&8[&dGloss&8]: &7Время ввода истекло."
+prompt_busy = "&8[&dGloss&8]: &cУ вас уже есть ожидающий ввод."
+take_missing = "&8[&dGloss&8]: &cУ вас нет нужных предметов."
+economy_denied = "&8[&dGloss&8]: &cУ вас не хватает средств."
+economy_unavailable = "&8[&dGloss&8]: &cПлагин экономики недоступен."
+give_dropped = "&8[&dGloss&8]: &7Инвентарь был полон, поэтому предметы упали к вашим ногам."
+
+[command.help.dialog]
+root = "Просмотр и открытие документов диалогов"
+list = "Показать настроенные диалоги"
+"list.page" = "Страница списка, начиная с 1"
+info = "Показать тип, поля ввода и кнопки диалога"
+"info.id" = "Идентификатор диалога"
+open = "Открыть диалог для игрока"
+"open.id" = "Идентификатор диалога"
+"open.player" = "Игрок, которому открыть; по умолчанию вы"
+"open.args" = "Аргументы ключ=значение через пробел"
+reset = "Восстановить поставляемые диалоги по умолчанию"
+"reset.name" = "Имя для сброса или * для всех поставляемых файлов"
+
+["command.help.menu.open"]
+args = "Аргументы ключ=значение через пробел"
+
+[command.help.inventory]
+root = "Просмотр и открытие меню-сундуков"
+list = "Показать настроенные меню-сундуки"
+"list.page" = "Страница списка, начиная с 1"
+info = "Показать размер и ячейки меню-сундука"
+"info.id" = "Идентификатор меню-сундука"
+open = "Открыть меню-сундук для игрока"
+"open.id" = "Идентификатор меню-сундука"
+"open.player" = "Игрок, которому открыть; по умолчанию вы"
+"open.args" = "Аргументы ключ=значение через пробел"
+reset = "Восстановить поставляемые меню-сундуки по умолчанию"
+"reset.name" = "Имя для сброса или * для всех поставляемых файлов"
+
+
+# --- lane:rigs ---
+[command.help.rig]
+root = "Размещение и управление экземплярами ригов"
+list = "Список ригов и размещённых экземпляров; нажмите, чтобы телепортироваться"
+info = "Показать риг, позицию и состояние экземпляра"
+"info.id" = "ID экземпляра рига"
+place = "Разместить риг в вашей позиции"
+"place.rig" = "ID документа рига"
+"place.id" = "ID экземпляра; пустой выбирает следующий свободный"
+move = "Сместить экземпляр рига на относительное расстояние в блоках"
+"move.id" = "ID экземпляра рига"
+"move.x" = "Относительное смещение X в блоках"
+"move.y" = "Относительное смещение Y в блоках"
+"move.z" = "Относительное смещение Z в блоках"
+here = "Переместить экземпляр рига в вашу позицию"
+"here.id" = "ID экземпляра рига"
+rotate = "Задать yaw и pitch экземпляра рига"
+"rotate.id" = "ID экземпляра рига"
+"rotate.yaw" = "Yaw в градусах"
+"rotate.pitch" = "Pitch в градусах"
+scale = "Задать единый масштаб экземпляра рига"
+"scale.id" = "ID экземпляра рига"
+"scale.scale" = "Множитель масштаба, от 0.01 до 64"
+remove = "Удалить экземпляр рига"
+"remove.id" = "ID экземпляра рига"
+state = "Переключить экземпляр рига в состояние графа"
+"state.id" = "ID экземпляра рига"
+"state.state" = "Имя состояния из графа рига"
+var = "Задать переменную экземпляра рига"
+"var.id" = "ID экземпляра рига"
+"var.name" = "Имя переменной"
+"var.value" = "Число, true, false или текст"
+import = "Импортировать модель Blockbench как риг"
+"import.file" = "Путь к .bbmodel в папке данных Gloss"
+"import.id" = "Идентификатор рига; пусто берет имя файла"
+"import.texture" = "Кастомный предмет в виде provider:id для каждого куба"
+reset = "Восстановить встроенные документы ригов"
+
+["command.help.hologram"]
+page = "Перевести зрителя на страницу голограммы"
+"page.page" = "Идентификатор страницы, next или prev"
+"page.player" = "Имя игрока; пусто означает вас"
+motion = "Проиграть клип движения на голограмме"
+"motion.motion" = "Идентификатор движения или clear для остановки"
+actions = "Показать действия, которые голограмма выполняет по клику"
+
+[command.help.motion]
+root = "Просмотр клипов движения"
+list = "Список клипов движения"
+info = "Показать длительность, цикл, fps и дорожки клипа движения"
+"info.id" = "ID движения"
+reset = "Восстановить встроенные документы движения"
+
+[gloss.message.rigs]
+rig_unknown = "&8[&dGloss&8] &cНет рига с именем '&f{id}&c'."
+instance_missing = "&8[&dGloss&8] &cНет экземпляра рига с именем '&f{id}&c'."
+placed = "&8[&dGloss&8] &aРиг &f{name}&a размещён как &f{id}&a в &f{world} {x}, {y}, {z}&a."
+place_failed = "&8[&dGloss&8] &cНе удалось разместить риг &f{name}&c: {reason}"
+moved = "&8[&dGloss&8] &aЭкземпляр рига &f{id}&a перемещён в &f{world} {x}, {y}, {z}&a."
+rotated = "&8[&dGloss&8] &aЭкземпляр рига &f{id}&a повёрнут: yaw &f{yaw}&a, pitch &f{pitch}&a."
+scaled = "&8[&dGloss&8] &aЭкземпляр рига &f{id}&a масштабирован до &f{scale}&a."
+scale_out_of_range = "&8[&dGloss&8] &cМасштаб рига должен быть между &f{minimum}&c и &f{maximum}&c; получено &f{value}&c."
+removed = "&8[&dGloss&8] &aЭкземпляр рига &f{id}&a удалён."
+state_set = "&8[&dGloss&8] &aЭкземпляр рига &f{id}&a теперь в состоянии &f{state}&a."
+state_unknown = "&8[&dGloss&8] &cУ экземпляра рига &f{id}&c нет состояния с именем '&f{state}&c'."
+var_set = "&8[&dGloss&8] &aПеременная &f{name}&a экземпляра рига &f{id}&a установлена в &f{value}&a."
+save_failed = "&8[&dGloss&8] &cНе удалось сохранить экземпляр рига &f{id}&c: {reason}"
+list_empty = "&8[&dGloss&8] &7Риги не загружены."
+list_rigs = "&8[&dGloss&8] &7Риги (&f{count}&7): &f{value}"
+instances_empty = "&8[&dGloss&8] &7Экземпляры ригов не размещены."
+list_hover = "Нажмите, чтобы телепортироваться"
+list_entry = "{name} в {world} {x}, {y}, {z}; состояние {state}"
+info_header = "&8[&dGloss&8] &d{id} &7использует риг &f{name}&7 в &f{world} {x}, {y}, {z}"
+info_pose = "&8[&dGloss&8] &7Yaw &f{yaw}&7, pitch &f{pitch}&7, масштаб &f{scale}&7, состояние &f{state}"
+info_parts = "&8[&dGloss&8] &7Частей &f{count}&7, зрителей &f{value}"
+info_var = "&8[&dGloss&8] &7  {name} = &f{value}"
+motion_unknown = "&8[&dGloss&8] &cНет движения с именем '&f{id}&c'."
+motion_list_empty = "&8[&dGloss&8] &7Клипы движения не загружены."
+motion_list = "&8[&dGloss&8] &7Клипы движения (&f{count}&7): &f{value}"
+motion_info = "&8[&dGloss&8] &d{id} &7{value} тиков, {kind}, {count} fps"
+motion_track = "&8[&dGloss&8] &7  {name} &f{key} &7({count} ключевых кадров)"
+import_done = "&8[&dGloss&8] &aИмпортирован &f{id}&a: костей &f{value}&a, частей &f{count}&a, анимаций &f{kind}&a."
+import_unsupported = "&8[&dGloss&8] &7Не импортировано: &f{value}&7."
+import_failed = "&8[&dGloss&8] &cНе удалось импортировать &f{path}&c: {reason}"
+hologram_page_set = "&8[&dGloss&8] &a{player}&a теперь на странице &f{page}&a голограммы &f{id}&a."
+hologram_page_player_missing = "&8[&dGloss&8] &cИгрок &f{player}&c не в сети."
+hologram_page_unknown = "&8[&dGloss&8] &cУ голограммы &f{id}&c нет страницы '&f{page}&c'."
+hologram_motion_set = "&8[&dGloss&8] &aГолограмма &f{id}&a теперь проигрывает &f{value}&a."
+hologram_motion_cleared = "&8[&dGloss&8] &aГолограмма &f{id}&a больше не проигрывает движение."
+hologram_actions_empty = "&8[&dGloss&8] &7У голограммы &f{id}&7 нет действий."
+hologram_actions_header = "&8[&dGloss&8] &7Действия голограммы &f{id}&7 (&f{count}&7):"
+hologram_actions_entry = "&8[&dGloss&8] &7  &f{kind}&7 на &f{value}"
+
+# --- lane:world ---
+[gloss.message.world]
+players_only = "&cЭту команду должен выполнить игрок."
+disabled = "&cЭта функция отключена в gloss.toml."
+
+[gloss.message.world.marker]
+list = "&7Маркеры &8({count})&7: &f{value}"
+info = "&7Маркер &f{id} &7в &f{world} {x} {y} {z}"
+created = "&aМаркер &f{id} &aсоздан."
+removed = "&aМаркер &f{id} &aудалён."
+missing = "&cНет маркера с именем &f{id}&c."
+here = "&7Вы находитесь в &f{world} {x} {y} {z}&7."
+
+[gloss.message.world.waypoint]
+saved = "&aПутевая точка &f{name} &aсохранена."
+removed = "&aПутевая точка &f{name} &aудалена."
+missing = "&cНет путевой точки с именем &f{name}&c."
+list = "&7Путевые точки &8({count})&7: &f{value}"
+info = "&7Путевая точка &f{id} &7в &f{world} {x} {y} {z}"
+full = "&cУ вас уже максимум в {count} путевых точек."
+
+[gloss.message.world.zone]
+list = "&7Зоны &8({count})&7: &f{value}"
+info = "&7Зона &f{id} &7это &f{kind} &7в &f{world}&7."
+shown = "&aПоказываю зону &f{id}&a."
+hidden = "&7Скрываю зону &f{id}&7."
+created = "&aЗона &f{id} &aсоздана."
+removed = "&aЗона &f{id} &aудалена."
+missing = "&cНет зоны с именем &f{id}&c."
+
+[gloss.message.world.camera]
+started = "&7Полёт камеры начат."
+refused = "&cПолёт камеры был отклонён."
+stopped = "&7Полёт камеры остановлен для &f{player}&7."
+idle = "&c{player} не в полёте камеры."
+
+[gloss.message.world.nameplate]
+list = "&7Таблички имён &8({count})&7: &f{value}"
+info = "&7Табличка &f{id} &7приоритет &f{value}&7, строк: &f{count}&7."
+missing = "&cНет таблички с именем &f{id}&c."
+refreshed = "&aТаблички имён обновлены."
+
+[gloss.message.world.glow]
+set = "&f{target} &7теперь светится цветом &f{value}&a."
+cleared = "&7Свечение &f{target} &7снято."
+missing = "&cИгрок с именем &f{player} &cне в сети."
+
+[command.help.marker]
+root = "Инструменты мировых маркеров"
+list = "Показать список документов маркеров"
+info = "Показать один маркер"
+create = "Записать документ маркера в вашей позиции"
+remove = "Удалить документ маркера"
+here = "Вывести вашу позицию как координаты якоря"
+
+[command.help.marker.arg]
+id = "Идентификатор документа маркера"
+label = "Подпись над маркером"
+
+[command.help.waypoint]
+root = "Инструменты путевых точек панели локатора"
+set = "Сохранить вашу позицию как личную путевую точку"
+remove = "Удалить одну из ваших личных путевых точек"
+list = "Показать список ваших личных путевых точек"
+info = "Показать один документ путевой точки"
+
+[command.help.waypoint.arg]
+name = "Имя путевой точки"
+id = "Идентификатор документа путевой точки"
+
+[command.help.zone]
+root = "Инструменты контуров зон"
+list = "Показать список зон"
+info = "Показать одну зону"
+show = "Показать себе контур зоны"
+hide = "Скрыть от себя контур зоны"
+create = "Записать документ кубической зоны вокруг вашей позиции"
+remove = "Удалить документ зоны"
+
+[command.help.zone.arg]
+id = "Идентификатор документа зоны"
+radius = "Половина ширины в блоках"
+
+[command.help.camera]
+root = "Инструменты полётов камеры"
+test = "Пролететь демонстрационный маршрут вокруг себя"
+stop = "Завершить полёт камеры досрочно"
+
+[command.help.camera.arg]
+seconds = "Длительность полёта в секундах"
+player = "Кого остановить; по умолчанию вы"
+
+[command.help.nameplate]
+root = "Инструменты табличек имён игроков"
+list = "Показать список документов табличек"
+info = "Показать один документ таблички"
+reset = "Восстановить поставляемый документ таблички"
+refresh = "Перестроить таблички для всех зрителей"
+
+[command.help.nameplate.arg]
+id = "Идентификатор документа таблички"
+
+[command.help.glow]
+root = "Инструменты свечения сущностей"
+set = "Заставить игрока светиться для вас"
+clear = "Снять свечение игрока для вас"
+
+[command.help.glow.arg]
+player = "Игрок для подсветки"
+cleared = "Игрок, с которого снимается подсветка"
+color = "Именованный цвет текста"
+ticks = "Тики длительности свечения или 0, чтобы сохранить"
+
+# --- lane:behaviors ---
+[command.help.behavior]
+root = "Просмотр и запуск документов поведения"
+list = "Показать загруженные документы поведения"
+info = "Показать триггеры и условия документа поведения"
+fire = "Выполнить одну запись поведения сейчас"
+reset = "Восстановить поставляемые настройки поведения"
+id = "Идентификатор документа поведения"
+entry = "Номер записи, начиная с 1"
+player = "Игрок, для которого выполняется запись, или * для никого"
+
+[command.help.state]
+root = "Чтение и запись сохранённого состояния поведения"
+get = "Показать одно значение состояния"
+set = "Записать одно значение состояния"
+clear = "Вернуть одно значение состояния к значению по умолчанию"
+dump = "Показать все объявленные ключи состояния и их значения"
+key = "Объявленный ключ состояния"
+value = "Новое значение; возьмите в кавычки, чтобы включить пробелы"
+player = "Игрок, которому принадлежит значение, или * для себя"
+
+[command.help.do]
+root = "Запустить записи поведения command с этим именем"
+name = "Имя команды поведения"
+args = "Аргументы в виде пар ключ=значение; возьмите в кавычки, чтобы включить пробелы"
+
+[command.help.expr]
+root = "Вычислить выражение и показать, что на него ответило"
+expression = "Вычисляемое выражение; возьмите в кавычки, чтобы включить пробелы"
+
+[command.help.explain]
+root = "Показать, какие условия проверил рантайм и какое победило"
+kind = "Рантайм для объяснения, например board или behavior"
+id = "Идентификатор документа для объяснения"
+player = "Игрок, для которого объясняем, или * для себя"
+
+[gloss.message.behaviors]
+off = "&8[&dGloss&8]: &eПоведения отключены в features.behaviors."
+"list.empty" = "&8[&dGloss&8]: &7Документы поведения не загружены."
+missing = "&8[&dGloss&8]: &cНет документа поведения с именем \"{id}\"."
+"info.header" = "&8[&dGloss&8]: &d{id} &7ревизия &f{revision} &8| &7записи &f{count} &8| &7включён &f{enabled}"
+"info.entry" = " &8{line}. &f{name} &7если &f{when} &8| &7право &f{permission}"
+fired = "&8[&dGloss&8]: &aЗапись &f{line}&a из &f{id}&a выполнена."
+"fire.missing" = "&8[&dGloss&8]: &cУ {id} нет записи {line}."
+"do.ran" = "&8[&dGloss&8]: &aЗапущено &f{count}&a записей поведения для &f{name}&a."
+"do.none" = "&8[&dGloss&8]: &7Ни одна запись поведения не отвечает на команду \"{name}\"."
+"state.value" = " &7{key} &8= &f{value}"
+"state.set" = "&8[&dGloss&8]: &a{key} теперь &f{value}&a."
+"state.cleared" = "&8[&dGloss&8]: &a{key} вернулся к значению по умолчанию."
+"state.unknown" = "&8[&dGloss&8]: &cНи один документ поведения не объявляет ключ состояния \"{key}\"."
+"state.invalid" = "&8[&dGloss&8]: &c\"{value}\" не является значением {type}."
+"state.empty" = "&8[&dGloss&8]: &7Ни один документ поведения не объявляет состояние."
+"state.player" = "&8[&dGloss&8]: &cУкажите игрока: &f{key}&c не является глобальным ключом."
+"player.missing" = "&8[&dGloss&8]: &cИгрок с именем \"{player}\" не в сети."
+"expr.value" = "&8[&dGloss&8]: &f{value} &8({type})"
+"expr.reference" = " &7{name} &8= &f{value} &8через &7{source}"
+"expr.functions" = " &7функции &8= &f{value}"
+"expr.failed" = "&8[&dGloss&8]: &c{reason}"
+"explain.header" = "&8[&dGloss&8]: &d{kind} &f{id} &7для &f{player}"
+"explain.line" = " &8{path} &7{when} &8= &f{value}"
+"explain.winner" = " &a> &f{path} &7{when} &8= &f{value}"
+"explain.unknown" = "&8[&dGloss&8]: &cНичто не объясняет \"{kind}\"; попробуйте {options}."
+"explain.missing" = "&8[&dGloss&8]: &cНет {kind} с именем \"{id}\"."
+
+# --- lane:authoring ---
+[command.help.pack]
+root = "Установка и управление пакетами Gloss"
+install = "Установить пакет из файла или по адресу HTTPS"
+update = "Обновить установленный пакет из его источника"
+remove = "Удалить пакет, сохранив каждый файл, изменённый после установки"
+list = "Показать установленные пакеты"
+info = "Показать, какие файлы принадлежат пакету"
+arg_source = "Файл пакета в папке данных Gloss или адрес HTTPS"
+arg_dry = "Сообщить, что изменится, ничего не записывая"
+arg_id = "Идентификатор установленного пакета"
+
+[command.help.history]
+root = "Показать сохранённые версии документа"
+arg_kind = "Папка документа, например boards или menus"
+arg_id = "Идентификатор документа"
+arg_page = "Страница списка, считая с единицы"
+
+[command.help.restore]
+root = "Записать сохранённую версию поверх действующего документа"
+arg_version = "Метка версии из /gloss history"
+
+[command.help.check]
+root = "Проверить рабочую область на разорванные ссылки"
+arg_kind = "Ограничить проверку одной папкой документов"
+arg_id = "Ограничить проверку одним документом"
+
+[command.help.export]
+root = "Скопировать документы как обычный JSON"
+bundle = "Записать всю рабочую область как набор редактора"
+arg_kind = "Ограничить выгрузку одной папкой документов"
+arg_id = "Ограничить выгрузку одним документом"
+arg_dir = "Папка назначения внутри папки данных Gloss"
+
+[gloss.message.authoring.pack]
+preview = "&8[&dGloss&8] Пакет &f{id}&7 изменит &f{count}&7 файл(ов)."
+outcome = "&8[&dGloss&8] &7{state} &f{path}&7 {reason}"
+installed = "&8[&dGloss&8] Пакет &f{id}&7 установлен, &f{count}&7 файл(ов)."
+updated = "&8[&dGloss&8] Пакет &f{id}&7 обновлён в &f{count}&7 файле(ах)."
+removed = "&8[&dGloss&8] Пакет &f{id}&7 и &f{count}&7 файл(ов) удалены."
+unknown = "&8[&dGloss&8] &cНет установленного пакета с идентификатором &f{id}&c."
+failed = "&8[&dGloss&8] &cПакет &f{id}&c не удался: {reason}"
+entry = "&8[&dGloss&8] &f{id} &7{value} &8{count} файл(ов)"
+empty = "&8[&dGloss&8] &7Пакеты не установлены."
+disabled = "&8[&dGloss&8] &cПакеты Gloss выключены в gloss.toml."
+
+[gloss.message.authoring.history]
+empty = "&8[&dGloss&8] &7Нет сохранённых версий &f{kind} {id}&7."
+entry = "&8[&dGloss&8] &f{revision} &7{source} &8{count} байт"
+disabled = "&8[&dGloss&8] &cИстория документов выключена в gloss.toml."
+
+[gloss.message.authoring.restore]
+done = "&8[&dGloss&8] &f{kind} {id}&7 восстановлен до версии &f{revision}&7."
+unknown = "&8[&dGloss&8] &cНет версии &f{revision}&c для &f{kind} {id}&c."
+failed = "&8[&dGloss&8] &cВосстановление не удалось: {reason}"
+
+[gloss.message.authoring.check]
+clean = "&8[&dGloss&8] &aСообщать не о чем."
+entry = "&8[&dGloss&8] &7{state} &f{key} &8{kind} {id} {path} &7{message}"
+summary = "&8[&dGloss&8] &f{count}&7 замечание(й)."
+
+[gloss.message.authoring.export]
+done = "&8[&dGloss&8] &f{count}&7 документ(ов) выгружено в &f{path}&7."
+failed = "&8[&dGloss&8] &cВыгрузка не удалась: {reason}"
+
+[gloss.message.authoring.import]
+preview = "&8[&dGloss&8] &f{source}&7 запишет &f{count}&7 документ(ов)."
+entry = "&8[&dGloss&8] &7{state} &f{path}&7 {reason}"
+applied = "&8[&dGloss&8] &f{count}&7 документ(ов) импортировано из &f{source}&7."
+absent = "&8[&dGloss&8] &7По пути &f{path}&7 нет данных &f{source}&7."
+
+# --- lane:forge ---
+[gloss.message.forge]
+disabled = "&8[&dGloss&8] &cКузница глифов выключена. Установите features.forge в true в gloss.toml."
+built = "&8[&dGloss&8] &aПакет &f{value}&a собран, глифов: {count}."
+build_failed = "&8[&dGloss&8] &cСборка пакета не удалась; предыдущий пакет остаётся активным. Смотрите консоль."
+status = "&7{value}"
+exported = "&8[&dGloss&8] &aЭкспортировано файлов: {count} в &f{path}&a."
+export_failed = "&8[&dGloss&8] &cЭкспорт не удался: &f{reason}&c."
+serve = "&8[&dGloss&8] &aРаздача пакета {state}."
+serve_unchanged = "&8[&dGloss&8] &7Раздача пакета уже {state}."
+
+[command.help.forge]
+root = "Инструменты пакета глифов"
+build = "Пересобрать ресурс-пак глифов сейчас"
+status = "Показать счётчики пакета, глифов и доставки"
+export = "Скопировать объединяемую папку пакета"
+"export.path" = "Папка назначения для пакета"
+serve = "Запустить или остановить встроенную раздачу пакета"
+"serve.state" = "on или off"
+reset = "Восстановить поставляемые документы глифов"
+
+# --- lane:fixes ---
+[gloss.message.fixes]
+status_bedrock = "&7bedrock: &f{name}&7, &f{count}&7 в сети"
+status_textimage_oversize = "&7textimage-слишком-большой: &f{count}"
+hotload_skipped = " &7({count} пропущено, неверная schemaVersion)"
+status_schema_skipped = "&7schema-пропущено: &f{count}"
+bedrock_menu_unavailable = "&8[&dGloss&8]: &cЭто меню не отображается на Bedrock."
+

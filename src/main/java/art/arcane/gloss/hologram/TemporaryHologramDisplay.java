@@ -2,6 +2,8 @@ package art.arcane.gloss.hologram;
 
 import art.arcane.gloss.Gloss;
 import art.arcane.gloss.api.HologramPresentation;
+import art.arcane.gloss.bedrock.BedrockPolicy;
+import art.arcane.gloss.bedrock.BedrockSurface;
 import art.arcane.gloss.api.HologramBox;
 import art.arcane.gloss.api.HologramViewers;
 import art.arcane.gloss.api.TemporaryHologram;
@@ -1318,15 +1320,20 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
     }
 
     private List<Player> captureViewers(HologramTick tick, World world) {
+        BedrockPolicy policy = BedrockPolicy.of(service.plugin());
         boolean whitelist = viewerList.isWhitelist();
         Set<UUID> members = viewerList.members();
         boolean conditional = viewerCondition != null && display != null;
         if (members.isEmpty() && !conditional) {
-            return whitelist ? List.of() : tick.temporaryPlayers(world, position, service.viewRange());
+            return whitelist ? List.of()
+                : withoutBedrock(policy, tick.temporaryPlayers(world, position, service.viewRange()));
         }
         List<HologramTick.Viewer> candidates = tick.temporaryViewers(world, position, service.viewRange());
         List<Player> viewers = new ArrayList<>(candidates.size());
         for (HologramTick.Viewer candidate : candidates) {
+            if (policy != null && policy.hides(BedrockSurface.HOLOGRAM, candidate.player())) {
+                continue;
+            }
             if (whitelist == members.contains(candidate.id())
                 && (!conditional || Boolean.TRUE.equals(appliedVisibility.get(candidate.id())))) {
                 viewers.add(candidate.player());
@@ -1334,6 +1341,25 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
         }
 
         return List.copyOf(viewers);
+    }
+
+    /** Text displays do not render on Bedrock, so those viewers are dropped before any packet. */
+    private static List<Player> withoutBedrock(BedrockPolicy policy, List<Player> viewers) {
+        if (policy == null) {
+            return viewers;
+        }
+        List<Player> kept = null;
+        for (int index = 0; index < viewers.size(); index++) {
+            Player viewer = viewers.get(index);
+            if (policy.hides(BedrockSurface.HOLOGRAM, viewer)) {
+                if (kept == null) {
+                    kept = new ArrayList<>(viewers.subList(0, index));
+                }
+            } else if (kept != null) {
+                kept.add(viewer);
+            }
+        }
+        return kept == null ? viewers : List.copyOf(kept);
     }
 
     static Runnable once(Runnable action) {

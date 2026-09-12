@@ -1,0 +1,80 @@
+{
+  "meta": { "format_version": "4.5", "model_format": "free", "box_uv": false },
+  "name": "chest",
+  "resolution": { "width": 16, "height": 16 },
+  "elements": [
+    {
+      "name": "base",
+      "from": [0, 0, 0],
+      "to": [16, 8, 16],
+      "origin": [8, 0, 8],
+      "rotation": [0, 0, 0],
+      "uuid": "cube-base",
+      "faces": { "north": { "uv": [0, 0, 16, 8], "texture": 0 } }
+    },
+    {
+      "name": "lid",
+      "from": [0, 8, 0],
+      "to": [16, 12, 16],
+      "origin": [8, 8, 8],
+      "rotation": [0, 0, 0],
+      "uuid": "cube-lid",
+      "faces": { "north": { "uv": [0, 0, 16, 4], "texture": 0 } }
+    }
+  ],
+  "outliner": [
+    {
+      "name": "root",
+      "uuid": "group-root",
+      "origin": [8, 0, 8],
+      "rotation": [0, 0, 0],
+      "children": [
+        "cube-base",
+        {
+          "name": "lid",
+          "uuid": "group-lid",
+          "origin": [8, 8, 8],
+          "rotation": [0, 0, 0],
+          "children": ["cube-lid"]
+        }
+      ]
+    }
+  ],
+  "animations": [
+    {
+      "uuid": "anim-open",
+      "name": "open",
+      "loop": "once",
+      "length": 1.5,
+      "animators": {
+        "group-lid": {
+          "name": "lid",
+          "type": "bone",
+          "keyframes": [
+            {
+              "channel": "rotation",
+              "time": 0,
+              "interpolation": "linear",
+              "data_points": [{ "x": 0, "y": 0, "z": 0 }]
+            },
+            {
+              "channel": "rotation",
+              "time": 1.5,
+              "interpolation": "catmullrom",
+              "data_points": [{ "x": -90, "y": 0, "z": 0 }]
+            },
+            {
+              "channel": "position",
+              "time": 0,
+              "interpolation": "step",
+              "data_points": [{ "x": 0, "y": 0, "z": 8 }]
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "textures": [
+    { "name": "chest.png", "uuid": "texture-chest" }
+  ]
+}

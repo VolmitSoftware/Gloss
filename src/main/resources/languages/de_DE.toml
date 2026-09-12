@@ -826,3 +826,517 @@ line = "Zeile {line}"
 [language.editor.value]
 none = "Keine"
 empty = "(leer)"
+
+# Lane message tables. Each lane appends its [gloss.message.<lane>] and [command.help.<group>]
+# tables inside its own anchor so parallel branches never share a line.
+# --- lane:screen ---
+[gloss.message.screen]
+"surfaces.empty" = "&8[&dGloss&8] &7Keine Oberflächen geladen."
+"surfaces.unknown" = "&8[&dGloss&8]: &cKeine Oberfläche mit dem Namen &f{id}&c."
+"surfaces.tested" = "&8[&dGloss&8]: &a&f{id}&a für &f{player}&a ausgeführt."
+"nametags.empty" = "&8[&dGloss&8] &7Keine Namensschilder geladen."
+"nametags.unknown" = "&8[&dGloss&8]: &cKein Namensschild mit dem Namen &f{id}&c."
+"nametags.refreshed" = "&8[&dGloss&8]: &a&d{count}&a Namensschild-Dokumente erneut angewendet."
+"hud.header" = "&8[&dGloss&8] &7HUD-Belegungen für &f{player}&7: &d{count}"
+"hud.empty" = "&8[&dGloss&8] &7Kein Plugin belegt ein HUD-Feld für &f{player}&7."
+"hud.line" = "&8- &f{kind} &7{source} &8| &7{value} &8| &7{count} &8| &7{state}"
+"player.unknown" = "&8[&dGloss&8]: &cKein Spieler online mit dem Namen &f{player}&c."
+
+[command.help.surface]
+root = "Oberflächen für Actionbar, Bossbar und Titel"
+list = "Oberflächen-Dokumente auflisten"
+info = "Ein Oberflächen-Dokument anzeigen"
+"info.id" = "ID des Oberflächen-Dokuments"
+reset = "Mitgelieferte Oberflächen wiederherstellen"
+test = "Den Oberflächen-Durchlauf für einen Spieler jetzt ausführen"
+"test.id" = "ID des Oberflächen-Dokuments"
+"test.player" = "Zu testender Spieler; Standard bist du"
+
+[command.help.nametag]
+root = "Namensschild-Dokumente pro Betrachter"
+list = "Namensschild-Dokumente auflisten"
+info = "Ein Namensschild-Dokument anzeigen"
+"info.id" = "ID des Namensschild-Dokuments"
+reset = "Mitgelieferte Namensschilder wiederherstellen"
+refresh = "Alle Namensschilder jetzt neu anwenden"
+
+[command.help.hud]
+root = "Den gemeinsamen HUD-Compositor untersuchen"
+who = "Zeigt, welches Plugin welches HUD-Feld belegt"
+"who.player" = "Zu untersuchender Spieler; Standard bist du"
+
+# --- lane:chat ---
+[gloss.message.chat]
+filtered = "&8[&dGloss&8]: &cDeine Nachricht wurde von einem Chatfilter blockiert."
+too_fast = "&8[&dGloss&8]: &eWarte kurz, bevor du wieder etwas schreibst."
+repeat = "&8[&dGloss&8]: &eDas hast du gerade schon gesagt."
+channel_set = "&8[&dGloss&8]: &aDu schreibst jetzt in &d{name}&a."
+channel_unknown = "&8[&dGloss&8]: &cEs gibt keinen Kanal namens &d{name}&c."
+channel_list = "&8[&dGloss&8]: &7Kanäle: &f{value}"
+msg_usage = "&8[&dGloss&8]: &eVerwendung: &f{command}"
+msg_offline = "&8[&dGloss&8]: &c{player} ist nicht online."
+reply_none = "&8[&dGloss&8]: &cDu hast niemanden, dem du antworten könntest."
+msg_self = "&8[&dGloss&8]: &cDu kannst dir selbst keine Nachricht schicken."
+channels_header = "&dKanäle &7({count})"
+channels_empty = "&7Es sind keine Kanäle geladen."
+channel_missing = "&8[&dGloss&8]: &cEs gibt kein Kanaldokument namens &f{id}&c."
+strings_header = "&dSprachdateien &7({count})"
+strings_empty = "&7Es sind keine Textdokumente geladen."
+strings_missing = "&dFehlt in {locale} &7({count})"
+strings_complete = "&8[&dGloss&8]: &a{locale} deckt jeden en_US-Schlüssel ab."
+leaderboards_header = "&dBestenlisten &7({count})"
+leaderboards_empty = "&7Es sind keine Bestenlisten geladen."
+leaderboard_missing = "&8[&dGloss&8]: &cEs gibt kein Bestenlistendokument namens &f{id}&c."
+leaderboard_reset = "&8[&dGloss&8]: &aBestenliste &f{id}&a zurückgesetzt ({state})."
+leaderboard_sampled = "&8[&dGloss&8]: &aBestenliste &f{id}&a für alle Online-Spieler erfasst."
+
+
+[command.help.channel]
+root = "Chat-Kanäle"
+list = "Geladene Chat-Kanäle auflisten"
+info = "Bereich, Format und Varianten eines Kanals anzeigen"
+"info.id" = "Kanaldokument-ID"
+reset = "Mitgelieferte Kanaldokumente wiederherstellen"
+
+[command.help.strings]
+root = "Verfasste Inhaltstexte"
+list = "Geladene Textsprachen und ihre Eintragszahlen auflisten"
+missing = "Schlüssel auflisten, die en_US hat und eine Sprache nicht"
+"missing.locale" = "Sprache, die mit en_US verglichen wird"
+reset = "Mitgelieferte Textdokumente wiederherstellen"
+
+[command.help.leaderboard]
+root = "Berechnete Bestenlisten"
+list = "Geladene Bestenlisten und ihre Eintragszahlen auflisten"
+info = "Quelle, Reihenfolge und Einträge einer Bestenliste anzeigen"
+"info.id" = "Bestenlisten-Dokument-ID"
+reset = "Periode oder Gesamtwerte einer Bestenliste löschen"
+"reset.id" = "Bestenlisten-Dokument-ID"
+"reset.period" = "all oder current"
+sample = "Eine Bestenliste jetzt für alle Online-Spieler erfassen"
+"sample.id" = "Bestenlisten-Dokument-ID"
+
+# --- lane:forms ---
+[gloss.message.forms]
+icon_unsupported = "&7In einem Truhenslot nicht darstellbar ({kind})"
+no_dialogs = "&8[&dGloss&8]: &7Es sind keine Dialoge konfiguriert."
+dialog_list_header = "&dDialoge"
+dialog_list_entry = "&7Dialog &f{id}&7 öffnen"
+dialog_info = "&8[&dGloss&8]: &d{id} &8- &7Typ &f{kind}&7, Schaltflächen &f{count}"
+unknown_dialog = "&8[&dGloss&8]: &cKein Dialog mit dem Namen {id}."
+dialog_opened = "&8[&dGloss&8]: &aDialog {id} für {player} geöffnet."
+dialog_unsupported = "&8[&dGloss&8]: &cDein Client kann diesen Dialog nicht anzeigen."
+no_inventories = "&8[&dGloss&8]: &7Es sind keine Truhenmenüs konfiguriert."
+inventory_list_header = "&dTruhenmenüs"
+inventory_list_entry = "&7Truhenmenü &f{id}&7 öffnen"
+inventory_info = "&8[&dGloss&8]: &d{id} &8- &7Größe &f{kind}&7, Slots &f{count}"
+unknown_inventory = "&8[&dGloss&8]: &cKein Truhenmenü mit dem Namen {id}."
+inventory_opened = "&8[&dGloss&8]: &aTruhenmenü {id} für {player} geöffnet."
+bad_args = "&8[&dGloss&8]: &cArgumente müssen Paare aus key=value sein: {value}"
+prompt_timeout = "&8[&dGloss&8]: &7Die Eingabe ist abgelaufen."
+prompt_busy = "&8[&dGloss&8]: &cDu hast bereits eine Eingabe offen."
+take_missing = "&8[&dGloss&8]: &cDir fehlen die benötigten Gegenstände."
+economy_denied = "&8[&dGloss&8]: &cDu kannst dir das nicht leisten."
+economy_unavailable = "&8[&dGloss&8]: &cEs ist kein Wirtschafts-Plugin verfügbar."
+give_dropped = "&8[&dGloss&8]: &7Dein Inventar war voll, die Gegenstände liegen zu deinen Füßen."
+
+[command.help.dialog]
+root = "Dialogdokumente ansehen und öffnen"
+list = "Konfigurierte Dialoge auflisten"
+"list.page" = "Listenseite, beginnend bei 1"
+info = "Typ, Eingaben und Schaltflächen eines Dialogs anzeigen"
+"info.id" = "Dialog-ID"
+open = "Einen Dialog für einen Spieler öffnen"
+"open.id" = "Dialog-ID"
+"open.player" = "Spieler, für den geöffnet wird; standardmäßig du selbst"
+"open.args" = "Argumente als key=value, durch Leerzeichen getrennt"
+reset = "Mitgelieferte Dialog-Standards wiederherstellen"
+"reset.name" = "Name zum Zurücksetzen oder * für alle mitgelieferten Standards"
+
+["command.help.menu.open"]
+args = "Argumente als key=value, durch Leerzeichen getrennt"
+
+[command.help.inventory]
+root = "Truhenmenüs ansehen und öffnen"
+list = "Konfigurierte Truhenmenüs auflisten"
+"list.page" = "Listenseite, beginnend bei 1"
+info = "Größe und Slots eines Truhenmenüs anzeigen"
+"info.id" = "Truhenmenü-ID"
+open = "Ein Truhenmenü für einen Spieler öffnen"
+"open.id" = "Truhenmenü-ID"
+"open.player" = "Spieler, für den geöffnet wird; standardmäßig du selbst"
+"open.args" = "Argumente als key=value, durch Leerzeichen getrennt"
+reset = "Mitgelieferte Truhenmenü-Standards wiederherstellen"
+"reset.name" = "Name zum Zurücksetzen oder * für alle mitgelieferten Standards"
+
+
+# --- lane:rigs ---
+[command.help.rig]
+root = "Rig-Instanzen platzieren und verwalten"
+list = "Rigs und platzierte Instanzen auflisten; klicken zum Teleportieren"
+info = "Rig, Position und Zustand einer Rig-Instanz anzeigen"
+"info.id" = "Rig-Instanz-ID"
+place = "Ein Rig an deiner Position platzieren"
+"place.rig" = "Rig-Dokument-ID"
+"place.id" = "Instanz-ID; leer wählt die nächste freie"
+move = "Eine Rig-Instanz um relative Blockabstände verschieben"
+"move.id" = "Rig-Instanz-ID"
+"move.x" = "Relativer X-Versatz in Blöcken"
+"move.y" = "Relativer Y-Versatz in Blöcken"
+"move.z" = "Relativer Z-Versatz in Blöcken"
+here = "Eine Rig-Instanz zu deiner Position bewegen"
+"here.id" = "Rig-Instanz-ID"
+rotate = "Yaw und Pitch einer Rig-Instanz setzen"
+"rotate.id" = "Rig-Instanz-ID"
+"rotate.yaw" = "Yaw in Grad"
+"rotate.pitch" = "Pitch in Grad"
+scale = "Einheitliche Skalierung einer Rig-Instanz setzen"
+"scale.id" = "Rig-Instanz-ID"
+"scale.scale" = "Skalierungsfaktor, 0.01 bis 64"
+remove = "Eine Rig-Instanz entfernen"
+"remove.id" = "Rig-Instanz-ID"
+state = "Eine Rig-Instanz in einen Graph-Zustand schalten"
+"state.id" = "Rig-Instanz-ID"
+"state.state" = "Zustandsname aus dem Graph des Rigs"
+var = "Eine Variable einer Rig-Instanz setzen"
+"var.id" = "Rig-Instanz-ID"
+"var.name" = "Variablenname"
+"var.value" = "Zahl, true, false oder Text"
+import = "Ein Blockbench-Modell als Rig importieren"
+"import.file" = "Pfad zu einer .bbmodel im Gloss-Datenordner"
+"import.id" = "Rig-ID; leer nutzt den Dateinamen"
+"import.texture" = "Custom-Item als provider:id fuer jeden Wuerfel"
+reset = "Die mitgelieferten Rig-Dokumente wiederherstellen"
+
+["command.help.hologram"]
+page = "Einen Betrachter auf eine Hologrammseite schalten"
+"page.page" = "Seiten-ID, next oder prev"
+"page.player" = "Spielername; leer bedeutet du selbst"
+motion = "Einen Motion-Clip auf einem Hologramm abspielen"
+"motion.motion" = "Motion-ID oder clear zum Stoppen"
+actions = "Die Aktionen eines Hologramms beim Klick auflisten"
+
+[command.help.motion]
+root = "Motion-Clips prüfen"
+list = "Motion-Clips auflisten"
+info = "Dauer, Loop, FPS und Spuren eines Motion-Clips anzeigen"
+"info.id" = "Motion-ID"
+reset = "Die mitgelieferten Motion-Dokumente wiederherstellen"
+
+[gloss.message.rigs]
+rig_unknown = "&8[&dGloss&8] &cKein Rig namens '&f{id}&c'."
+instance_missing = "&8[&dGloss&8] &cKeine Rig-Instanz namens '&f{id}&c'."
+placed = "&8[&dGloss&8] &aRig &f{name}&a als &f{id}&a bei &f{world} {x}, {y}, {z}&a platziert."
+place_failed = "&8[&dGloss&8] &cRig &f{name}&c konnte nicht platziert werden: {reason}"
+moved = "&8[&dGloss&8] &aRig-Instanz &f{id}&a nach &f{world} {x}, {y}, {z}&a bewegt."
+rotated = "&8[&dGloss&8] &aRig-Instanz &f{id}&a auf Yaw &f{yaw}&a, Pitch &f{pitch}&a gedreht."
+scaled = "&8[&dGloss&8] &aRig-Instanz &f{id}&a auf &f{scale}&a skaliert."
+scale_out_of_range = "&8[&dGloss&8] &cDie Rig-Skalierung muss zwischen &f{minimum}&c und &f{maximum}&c liegen; erhalten: &f{value}&c."
+removed = "&8[&dGloss&8] &aRig-Instanz &f{id}&a entfernt."
+state_set = "&8[&dGloss&8] &aRig-Instanz &f{id}&a ist jetzt im Zustand &f{state}&a."
+state_unknown = "&8[&dGloss&8] &cRig-Instanz &f{id}&c hat keinen Zustand namens '&f{state}&c'."
+var_set = "&8[&dGloss&8] &a&f{name}&a der Rig-Instanz &f{id}&a auf &f{value}&a gesetzt."
+save_failed = "&8[&dGloss&8] &cRig-Instanz &f{id}&c konnte nicht gespeichert werden: {reason}"
+list_empty = "&8[&dGloss&8] &7Keine Rigs geladen."
+list_rigs = "&8[&dGloss&8] &7Rigs (&f{count}&7): &f{value}"
+instances_empty = "&8[&dGloss&8] &7Keine Rig-Instanzen platziert."
+list_hover = "Klicken zum Teleportieren"
+list_entry = "{name} bei {world} {x}, {y}, {z}; Zustand {state}"
+info_header = "&8[&dGloss&8] &d{id} &7verwendet Rig &f{name}&7 bei &f{world} {x}, {y}, {z}"
+info_pose = "&8[&dGloss&8] &7Yaw &f{yaw}&7, Pitch &f{pitch}&7, Skalierung &f{scale}&7, Zustand &f{state}"
+info_parts = "&8[&dGloss&8] &7Teile &f{count}&7, Zuschauer &f{value}"
+info_var = "&8[&dGloss&8] &7  {name} = &f{value}"
+motion_unknown = "&8[&dGloss&8] &cKein Motion-Clip namens '&f{id}&c'."
+motion_list_empty = "&8[&dGloss&8] &7Keine Motion-Clips geladen."
+motion_list = "&8[&dGloss&8] &7Motion-Clips (&f{count}&7): &f{value}"
+motion_info = "&8[&dGloss&8] &d{id} &7{value} Ticks, {kind}, {count} FPS"
+motion_track = "&8[&dGloss&8] &7  {name} &f{key} &7({count} Keyframes)"
+import_done = "&8[&dGloss&8] &a&f{id}&a importiert: &f{value}&a Knochen, &f{count}&a Teile, &f{kind}&a Animationen."
+import_unsupported = "&8[&dGloss&8] &7Nicht importiert: &f{value}&7."
+import_failed = "&8[&dGloss&8] &c&f{path}&c konnte nicht importiert werden: {reason}"
+hologram_page_set = "&8[&dGloss&8] &a{player}&a ist jetzt auf Seite &f{page}&a von &f{id}&a."
+hologram_page_player_missing = "&8[&dGloss&8] &cSpieler &f{player}&c ist nicht online."
+hologram_page_unknown = "&8[&dGloss&8] &cHologramm &f{id}&c hat keine Seite '&f{page}&c'."
+hologram_motion_set = "&8[&dGloss&8] &aHologramm &f{id}&a spielt jetzt &f{value}&a."
+hologram_motion_cleared = "&8[&dGloss&8] &aHologramm &f{id}&a spielt keine Motion mehr."
+hologram_actions_empty = "&8[&dGloss&8] &7Hologramm &f{id}&7 hat keine Aktionen."
+hologram_actions_header = "&8[&dGloss&8] &7Aktionen von Hologramm &f{id}&7 (&f{count}&7):"
+hologram_actions_entry = "&8[&dGloss&8] &7  &f{kind}&7 bei &f{value}"
+
+# --- lane:world ---
+[gloss.message.world]
+players_only = "&cDieser Befehl muss von einem Spieler ausgeführt werden."
+disabled = "&cDiese Funktion ist in gloss.toml deaktiviert."
+
+[gloss.message.world.marker]
+list = "&7Markierungen &8({count})&7: &f{value}"
+info = "&7Markierung &f{id} &7bei &f{world} {x} {y} {z}"
+created = "&aMarkierung &f{id} &aerstellt."
+removed = "&aMarkierung &f{id} &aentfernt."
+missing = "&cKeine Markierung namens &f{id}&c."
+here = "&7Du bist bei &f{world} {x} {y} {z}&7."
+
+[gloss.message.world.waypoint]
+saved = "&aWegpunkt &f{name} &agespeichert."
+removed = "&aWegpunkt &f{name} &aentfernt."
+missing = "&cKein Wegpunkt namens &f{name}&c."
+list = "&7Wegpunkte &8({count})&7: &f{value}"
+info = "&7Wegpunkt &f{id} &7bei &f{world} {x} {y} {z}"
+full = "&cDu hast bereits das Maximum von {count} Wegpunkten."
+
+[gloss.message.world.zone]
+list = "&7Zonen &8({count})&7: &f{value}"
+info = "&7Zone &f{id} &7ist ein &f{kind} &7in &f{world}&7."
+shown = "&aZone &f{id} &awird angezeigt."
+hidden = "&7Zone &f{id} &7wird ausgeblendet."
+created = "&aZone &f{id} &aerstellt."
+removed = "&aZone &f{id} &aentfernt."
+missing = "&cKeine Zone namens &f{id}&c."
+
+[gloss.message.world.camera]
+started = "&7Kamerafahrt gestartet."
+refused = "&cDie Kamerafahrt wurde abgelehnt."
+stopped = "&7Kamerafahrt für &f{player} &7beendet."
+idle = "&c{player} ist auf keiner Kamerafahrt."
+
+[gloss.message.world.nameplate]
+list = "&7Namensschilder &8({count})&7: &f{value}"
+info = "&7Namensschild &f{id} &7Priorität &f{value}&7, &f{count} &7Zeilen."
+missing = "&cKein Namensschild namens &f{id}&c."
+refreshed = "&aNamensschilder aktualisiert."
+
+[gloss.message.world.glow]
+set = "&f{target} &7leuchtet nun in &f{value}&a."
+cleared = "&7Leuchten von &f{target} &7entfernt."
+missing = "&cKein Spieler namens &f{player} &cist online."
+
+[command.help.marker]
+root = "Werkzeuge für Weltmarkierungen"
+list = "Markierungsdokumente auflisten"
+info = "Eine Markierung anzeigen"
+create = "Ein Markierungsdokument an deiner Position schreiben"
+remove = "Ein Markierungsdokument löschen"
+here = "Deine Position als Ankerkoordinaten ausgeben"
+
+[command.help.marker.arg]
+id = "ID des Markierungsdokuments"
+label = "Beschriftung über der Markierung"
+
+[command.help.waypoint]
+root = "Werkzeuge für Wegpunkte der Ortungsleiste"
+set = "Deine Position als persönlichen Wegpunkt speichern"
+remove = "Einen deiner persönlichen Wegpunkte löschen"
+list = "Deine persönlichen Wegpunkte auflisten"
+info = "Ein Wegpunktdokument anzeigen"
+
+[command.help.waypoint.arg]
+name = "Name des Wegpunkts"
+id = "ID des Wegpunktdokuments"
+
+[command.help.zone]
+root = "Werkzeuge für Zonenumrisse"
+list = "Zonen auflisten"
+info = "Eine Zone anzeigen"
+show = "Den Umriss einer Zone für dich einblenden"
+hide = "Den Umriss einer Zone für dich ausblenden"
+create = "Ein quaderförmiges Zonendokument um deine Position schreiben"
+remove = "Ein Zonendokument löschen"
+
+[command.help.zone.arg]
+id = "ID des Zonendokuments"
+radius = "Halbe Breite in Blöcken"
+
+[command.help.camera]
+root = "Werkzeuge für Kamerafahrten"
+test = "Eine Demonstrationsfahrt um dich herum fliegen"
+stop = "Eine Kamerafahrt vorzeitig beenden"
+
+[command.help.camera.arg]
+seconds = "Länge der Fahrt in Sekunden"
+player = "Zu stoppender Fahrer; Standard bist du"
+
+[command.help.nameplate]
+root = "Werkzeuge für Spieler-Namensschilder"
+list = "Namensschilddokumente auflisten"
+info = "Ein Namensschilddokument anzeigen"
+reset = "Das mitgelieferte Namensschilddokument wiederherstellen"
+refresh = "Namensschilder für alle Betrachter neu aufbauen"
+
+[command.help.nameplate.arg]
+id = "ID des Namensschilddokuments"
+
+[command.help.glow]
+root = "Werkzeuge für Entitäten-Leuchten"
+set = "Einen Spieler für dich leuchten lassen"
+clear = "Das Leuchten eines Spielers für dich entfernen"
+
+[command.help.glow.arg]
+player = "Zu umreißender Spieler"
+cleared = "Spieler, der nicht mehr umrissen wird"
+color = "Benannte Textfarbe"
+ticks = "Ticks, die das Leuchten hält, oder 0 zum Behalten"
+
+# --- lane:behaviors ---
+[command.help.behavior]
+root = "Verhaltensdokumente prüfen und auslösen"
+list = "Geladene Verhaltensdokumente auflisten"
+info = "Trigger und Bedingungen eines Verhaltensdokuments anzeigen"
+fire = "Einen Verhaltenseintrag jetzt ausführen"
+reset = "Mitgelieferte Verhaltensstandards wiederherstellen"
+id = "Verhaltensdokument-ID"
+entry = "Eintragsnummer, beginnend bei 1"
+player = "Spieler, für den der Eintrag läuft, oder * für keinen"
+
+[command.help.state]
+root = "Gespeicherten Verhaltenszustand lesen und schreiben"
+get = "Einen Zustandswert anzeigen"
+set = "Einen Zustandswert schreiben"
+clear = "Einen Zustandswert auf seinen Standard zurücksetzen"
+dump = "Alle deklarierten Zustandsschlüssel und ihre Werte auflisten"
+key = "Deklarierter Zustandsschlüssel"
+value = "Neuer Wert; in Anführungszeichen setzen, um Leerzeichen einzuschließen"
+player = "Spieler, dem der Wert gehört, oder * für dich selbst"
+
+[command.help.do]
+root = "Die command-Verhaltenseinträge mit diesem Namen auslösen"
+name = "Name des Verhaltensbefehls"
+args = "Argumente als key=value-Paare; in Anführungszeichen setzen, um Leerzeichen einzuschließen"
+
+[command.help.expr]
+root = "Einen Ausdruck auswerten und anzeigen, was ihn beantwortet hat"
+expression = "Auszuwertender Ausdruck; in Anführungszeichen setzen, um Leerzeichen einzuschließen"
+
+[command.help.explain]
+root = "Zeigen, welche Bedingungen eine Laufzeit geprüft hat und welche gewonnen hat"
+kind = "Zu erklärende Laufzeit, etwa board oder behavior"
+id = "Zu erklärende Dokument-ID"
+player = "Spieler, für den erklärt wird, oder * für dich selbst"
+
+[gloss.message.behaviors]
+off = "&8[&dGloss&8]: &eVerhalten ist in features.behaviors abgeschaltet."
+"list.empty" = "&8[&dGloss&8]: &7Es sind keine Verhaltensdokumente geladen."
+missing = "&8[&dGloss&8]: &cKein Verhaltensdokument namens \"{id}\"."
+"info.header" = "&8[&dGloss&8]: &d{id} &7Revision &f{revision} &8| &7Einträge &f{count} &8| &7aktiv &f{enabled}"
+"info.entry" = " &8{line}. &f{name} &7wenn &f{when} &8| &7Recht &f{permission}"
+fired = "&8[&dGloss&8]: &aEintrag &f{line}&a von &f{id}&a ausgeführt."
+"fire.missing" = "&8[&dGloss&8]: &c{id} hat keinen Eintrag {line}."
+"do.ran" = "&8[&dGloss&8]: &a&f{count}&a Verhaltenseinträge für &f{name}&a ausgelöst."
+"do.none" = "&8[&dGloss&8]: &7Kein Verhaltenseintrag beantwortet den Befehl \"{name}\"."
+"state.value" = " &7{key} &8= &f{value}"
+"state.set" = "&8[&dGloss&8]: &a{key} ist jetzt &f{value}&a."
+"state.cleared" = "&8[&dGloss&8]: &a{key} steht wieder auf seinem Standard."
+"state.unknown" = "&8[&dGloss&8]: &cKein Verhaltensdokument deklariert den Zustandsschlüssel \"{key}\"."
+"state.invalid" = "&8[&dGloss&8]: &c\"{value}\" ist kein {type}-Wert."
+"state.empty" = "&8[&dGloss&8]: &7Kein Verhaltensdokument deklariert einen Zustand."
+"state.player" = "&8[&dGloss&8]: &cNenne einen Spieler: &f{key}&c ist kein globaler Schlüssel."
+"player.missing" = "&8[&dGloss&8]: &cKein Spieler namens \"{player}\" ist online."
+"expr.value" = "&8[&dGloss&8]: &f{value} &8({type})"
+"expr.reference" = " &7{name} &8= &f{value} &8über &7{source}"
+"expr.functions" = " &7Funktionen &8= &f{value}"
+"expr.failed" = "&8[&dGloss&8]: &c{reason}"
+"explain.header" = "&8[&dGloss&8]: &d{kind} &f{id} &7für &f{player}"
+"explain.line" = " &8{path} &7{when} &8= &f{value}"
+"explain.winner" = " &a> &f{path} &7{when} &8= &f{value}"
+"explain.unknown" = "&8[&dGloss&8]: &cNichts erklärt \"{kind}\"; versuche {options}."
+"explain.missing" = "&8[&dGloss&8]: &cKein {kind} namens \"{id}\"."
+
+# --- lane:authoring ---
+[command.help.pack]
+root = "Gloss-Pakete installieren und verwalten"
+install = "Ein Paket aus einer Datei oder einer HTTPS-URL installieren"
+update = "Ein installiertes Paket von seiner Quelle aktualisieren"
+remove = "Ein Paket entfernen und dabei jede seit der Installation bearbeitete Datei behalten"
+list = "Installierte Pakete auflisten"
+info = "Zeigen, welche Dateien ein Paket besitzt"
+arg_source = "Paketdatei im Gloss-Datenordner oder eine HTTPS-URL"
+arg_dry = "Nur melden, was sich ändern würde, ohne zu schreiben"
+arg_id = "Id eines installierten Pakets"
+
+[command.help.history]
+root = "Gespeicherte Versionen eines Dokuments auflisten"
+arg_kind = "Dokumentordner, etwa boards oder menus"
+arg_id = "Dokument-Id"
+arg_page = "Eins-basierte Listenseite"
+
+[command.help.restore]
+root = "Eine gespeicherte Version über das aktive Dokument schreiben"
+arg_version = "Versionsstempel aus /gloss history"
+
+[command.help.check]
+root = "Den Arbeitsbereich auf kaputte Verweise prüfen"
+arg_kind = "Die Prüfung auf einen Dokumentordner beschränken"
+arg_id = "Die Prüfung auf ein Dokument beschränken"
+
+[command.help.export]
+root = "Dokumente als reines JSON herauskopieren"
+bundle = "Den gesamten Arbeitsbereich als Editor-Bündel schreiben"
+arg_kind = "Den Export auf einen Dokumentordner beschränken"
+arg_id = "Den Export auf ein Dokument beschränken"
+arg_dir = "Zielordner im Gloss-Datenordner"
+
+[gloss.message.authoring.pack]
+preview = "&8[&dGloss&8] Paket &f{id}&7 würde &f{count}&7 Datei(en) ändern."
+outcome = "&8[&dGloss&8] &7{state} &f{path}&7 {reason}"
+installed = "&8[&dGloss&8] Paket &f{id}&7 mit &f{count}&7 Datei(en) installiert."
+updated = "&8[&dGloss&8] Paket &f{id}&7 über &f{count}&7 Datei(en) aktualisiert."
+removed = "&8[&dGloss&8] Paket &f{id}&7 und &f{count}&7 Datei(en) entfernt."
+unknown = "&8[&dGloss&8] &cKein Paket mit der Id &f{id}&c ist installiert."
+failed = "&8[&dGloss&8] &cPaket &f{id}&c fehlgeschlagen: {reason}"
+entry = "&8[&dGloss&8] &f{id} &7{value} &8{count} Datei(en)"
+empty = "&8[&dGloss&8] &7Es sind keine Pakete installiert."
+disabled = "&8[&dGloss&8] &cGloss-Pakete sind in gloss.toml abgeschaltet."
+
+[gloss.message.authoring.history]
+empty = "&8[&dGloss&8] &7Keine gespeicherten Versionen von &f{kind} {id}&7."
+entry = "&8[&dGloss&8] &f{revision} &7{source} &8{count} Bytes"
+disabled = "&8[&dGloss&8] &cDer Dokumentverlauf ist in gloss.toml abgeschaltet."
+
+[gloss.message.authoring.restore]
+done = "&8[&dGloss&8] &f{kind} {id}&7 auf Version &f{revision}&7 zurückgesetzt."
+unknown = "&8[&dGloss&8] &cKeine Version &f{revision}&c von &f{kind} {id}&c."
+failed = "&8[&dGloss&8] &cWiederherstellung fehlgeschlagen: {reason}"
+
+[gloss.message.authoring.check]
+clean = "&8[&dGloss&8] &aNichts zu melden."
+entry = "&8[&dGloss&8] &7{state} &f{key} &8{kind} {id} {path} &7{message}"
+summary = "&8[&dGloss&8] &f{count}&7 Befund(e)."
+
+[gloss.message.authoring.export]
+done = "&8[&dGloss&8] &f{count}&7 Dokument(e) nach &f{path}&7 exportiert."
+failed = "&8[&dGloss&8] &cExport fehlgeschlagen: {reason}"
+
+[gloss.message.authoring.import]
+preview = "&8[&dGloss&8] &f{source}&7 würde &f{count}&7 Dokument(e) schreiben."
+entry = "&8[&dGloss&8] &7{state} &f{path}&7 {reason}"
+applied = "&8[&dGloss&8] &f{count}&7 Dokument(e) aus &f{source}&7 importiert."
+absent = "&8[&dGloss&8] &7Keine &f{source}&7-Daten unter &f{path}&7."
+
+# --- lane:forge ---
+[gloss.message.forge]
+disabled = "&8[&dGloss&8] &cDie Glyphenschmiede ist aus. Setze features.forge in gloss.toml auf true."
+built = "&8[&dGloss&8] &aPaket &f{value}&a mit {count} Glyphen gebaut."
+build_failed = "&8[&dGloss&8] &cPaketbau fehlgeschlagen; das vorherige Paket bleibt aktiv. Siehe Konsole."
+status = "&7{value}"
+exported = "&8[&dGloss&8] &a{count} Dateien nach &f{path}&a exportiert."
+export_failed = "&8[&dGloss&8] &cExport fehlgeschlagen: &f{reason}&c."
+serve = "&8[&dGloss&8] &aPaket-Listener {state}."
+serve_unchanged = "&8[&dGloss&8] &7Paket-Listener ist bereits {state}."
+
+[command.help.forge]
+root = "Werkzeuge für das Glyphenpaket"
+build = "Das Glyphen-Ressourcenpaket jetzt neu bauen"
+status = "Paket-, Glyphen- und Auslieferungszahlen anzeigen"
+export = "Den zusammenführbaren Paketordner irgendwohin kopieren"
+"export.path" = "Zielordner für das Paket"
+serve = "Den eingebauten Paket-Listener starten oder stoppen"
+"serve.state" = "on oder off"
+reset = "Mitgelieferte Glyphendokumente wiederherstellen"
+
+# --- lane:fixes ---
+[gloss.message.fixes]
+status_bedrock = "&7bedrock: &f{name}&7, &f{count}&7 online"
+status_textimage_oversize = "&7textimage-übergroß: &f{count}"
+hotload_skipped = " &7({count} ignoriert, falsche schemaVersion)"
+status_schema_skipped = "&7schema-übersprungen: &f{count}"
+bedrock_menu_unavailable = "&8[&dGloss&8]: &cDieses Menü wird auf Bedrock nicht dargestellt."
+

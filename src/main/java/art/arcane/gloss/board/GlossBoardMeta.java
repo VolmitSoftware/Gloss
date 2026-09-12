@@ -20,7 +20,7 @@ import java.util.function.UnaryOperator;
 
 public final class GlossBoardMeta {
     private final String id;
-    private final CopyOnWriteArrayList<String> content;
+    private final CopyOnWriteArrayList<BoardLine> content;
     private final AtomicLong contentGeneration;
     private final Map<String, RenderPlan> renderPlans;
     private volatile String title;
@@ -52,7 +52,7 @@ public final class GlossBoardMeta {
         GlossBoardMeta meta = new GlossBoardMeta(id);
         BoardDoc.Presentation presentation = doc.presentation();
         meta.setTitle(presentation.title().isEmpty() ? id : presentation.title());
-        for (String line : presentation.lines()) {
+        for (BoardLine line : presentation.lines()) {
             meta.addLine(line);
         }
         meta.setHideNumbers(presentation.hideNumbers());
@@ -80,17 +80,37 @@ public final class GlossBoardMeta {
         contentChanged();
     }
 
+    /** The label column only; {@link #boardLines()} carries the value column with it. */
     public List<String> lines() {
+        List<String> texts = new ArrayList<>(content.size());
+        for (BoardLine line : content) {
+            texts.add(line.text());
+        }
+        return List.copyOf(texts);
+    }
+
+    public List<BoardLine> boardLines() {
         return List.copyOf(content);
     }
 
     public void addLine(String line) {
-        content.add(line == null ? "" : line);
+        addLine(BoardLine.of(line));
+    }
+
+    public void addLine(BoardLine line) {
+        content.add(line == null ? BoardLine.of("") : line);
         contentChanged();
     }
 
+    /** Replaces the label of an existing row, keeping whatever value column it already carries. */
     public void setLine(int index, String line) {
-        content.set(index, line == null ? "" : line);
+        BoardLine current = content.get(index);
+        content.set(index, new BoardLine(line == null ? "" : line, current.value(), current.format()));
+        contentChanged();
+    }
+
+    public void setLine(int index, BoardLine line) {
+        content.set(index, line == null ? BoardLine.of("") : line);
         contentChanged();
     }
 
@@ -199,8 +219,9 @@ public final class GlossBoardMeta {
         if (TextPipeline.requiresFastRefresh(presentation.title())) {
             return true;
         }
-        for (String line : presentation.lines()) {
-            if (TextPipeline.requiresFastRefresh(line)) {
+        for (BoardLine line : presentation.lines()) {
+            if (TextPipeline.requiresFastRefresh(line.text())
+                || line.value() != null && TextPipeline.requiresFastRefresh(line.value())) {
                 return true;
             }
         }
@@ -214,13 +235,13 @@ public final class GlossBoardMeta {
             return current.profile();
         }
         ActiveProfile built = new ActiveProfile("base",
-            new BoardDoc.Presentation(title, lines(), hideNumbers));
+            new BoardDoc.Presentation(title, boardLines(), hideNumbers));
         base = new CachedBase(generation, built);
         return built;
     }
 
-    RenderPlan renderPlan(String profileId, BoardDoc.Presentation presentation, long emojiGeneration,
-                          int maxLines, UnaryOperator<String> staticRender) {
+    public RenderPlan renderPlan(String profileId, BoardDoc.Presentation presentation, long emojiGeneration,
+                                 int maxLines, UnaryOperator<String> staticRender) {
         RenderPlan current = renderPlans.get(profileId);
         long generation = contentGeneration.get();
         if (current != null && current.matches(generation, emojiGeneration)) {
@@ -278,7 +299,7 @@ public final class GlossBoardMeta {
      * pre-rendered; a {@code null} entry means the value
      * is viewer-dependent and must be rendered per player from the corresponding raw value.
      */
-    static final class RenderPlan {
+    public static final class RenderPlan {
         private static final int DYNAMIC_FLAGS = TextPipeline.HAS_PLACEHOLDER | TextPipeline.HAS_FUNCTION;
 
         private final long contentGeneration;
@@ -289,9 +310,13 @@ public final class GlossBoardMeta {
         private final String[] rawLines;
         private final String[] staticLines;
         private final boolean[] fastLines;
+        private final String[] rawValues;
+        private final String[] staticValues;
+        private final BoardLineFormat[] formats;
 
         private RenderPlan(long contentGeneration, long emojiGeneration, String rawTitle, String staticTitle,
-                           boolean fastTitle, String[] rawLines, String[] staticLines, boolean[] fastLines) {
+                           boolean fastTitle, String[] rawLines, String[] staticLines, boolean[] fastLines,
+                           String[] rawValues, String[] staticValues, BoardLineFormat[] formats) {
             this.contentGeneration = contentGeneration;
             this.emojiGeneration = emojiGeneration;
             this.rawTitle = rawTitle;
@@ -300,9 +325,12 @@ public final class GlossBoardMeta {
             this.rawLines = rawLines;
             this.staticLines = staticLines;
             this.fastLines = fastLines;
+            this.rawValues = rawValues;
+            this.staticValues = staticValues;
+            this.formats = formats;
         }
 
-        static RenderPlan build(long contentGeneration, long emojiGeneration, String title, List<String> content,
+        static RenderPlan build(long contentGeneration, long emojiGeneration, String title, List<BoardLine> content,
                                 int maxLines, UnaryOperator<String> staticRender) {
             String rawTitle = title == null ? "" : title;
             String staticTitle = null;
@@ -315,16 +343,27 @@ public final class GlossBoardMeta {
             String[] rawLines = new String[count];
             String[] staticLines = new String[count];
             boolean[] fastLines = new boolean[count];
+            String[] rawValues = new String[count];
+            String[] staticValues = new String[count];
+            BoardLineFormat[] formats = new BoardLineFormat[count];
             for (int i = 0; i < count; i++) {
-                String raw = (String) snapshot[i];
+                BoardLine line = (BoardLine) snapshot[i];
+                String raw = line.text();
                 rawLines[i] = raw;
                 staticLines[i] = (TextPipeline.classify(raw) & DYNAMIC_FLAGS) == 0
                     ? renderValue(raw, staticRender)
                     : null;
                 fastLines[i] = staticLines[i] == null && TextPipeline.requiresFastRefresh(raw);
+                formats[i] = line.format();
+                String value = line.value();
+                rawValues[i] = value;
+                staticValues[i] = value != null && (TextPipeline.classify(value) & DYNAMIC_FLAGS) == 0
+                    ? renderValue(value, staticRender)
+                    : null;
             }
             return new RenderPlan(contentGeneration, emojiGeneration, rawTitle, staticTitle,
-                staticTitle == null && TextPipeline.requiresFastRefresh(rawTitle), rawLines, staticLines, fastLines);
+                staticTitle == null && TextPipeline.requiresFastRefresh(rawTitle), rawLines, staticLines, fastLines,
+                rawValues, staticValues, formats);
         }
 
         private static String renderValue(String raw, UnaryOperator<String> staticRender) {
@@ -365,6 +404,27 @@ public final class GlossBoardMeta {
 
         String staticLine(int index) {
             return staticLines[index];
+        }
+
+        public String rawValue(int index) {
+            return rawValues[index];
+        }
+
+        public String staticValue(int index) {
+            return staticValues[index];
+        }
+
+        public BoardLineFormat format(int index) {
+            return formats[index];
+        }
+
+        public boolean hasValueColumn() {
+            for (int index = 0; index < formats.length; index++) {
+                if (formats[index] != null || rawValues[index] != null) {
+                    return true;
+                }
+            }
+            return false;
         }
     }
 }

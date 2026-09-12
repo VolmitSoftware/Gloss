@@ -113,6 +113,13 @@ slimJar {
 tasks.named('processResources').configure {
     exclude('languages/**')
     from(languageSourceManifestTask)
+    // The editor asks the server for a kind's JSON Schema when it has no dedicated stage for it.
+    // Only the per-kind document schemas ship; gloss.schema.json describes gloss.toml, which the
+    // editor never authors.
+    from('schema') {
+        into 'schema'
+        include 'gloss-*.schema.json'
+    }
     def pluginProperties = [
         name      : rootProject.name,
         version   : project.version,

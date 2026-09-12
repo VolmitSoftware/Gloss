@@ -9,6 +9,14 @@ import art.arcane.gloss.doc.DocumentRegistry;
 import art.arcane.gloss.doc.DocumentReviser;
 import art.arcane.gloss.doc.DocumentStore;
 import art.arcane.gloss.doc.GlossDocument;
+import art.arcane.gloss.config.action.MenuActionData;
+import art.arcane.gloss.doc.RegistryOwner;
+import art.arcane.gloss.interaction.InteractionHitboxService;
+import art.arcane.gloss.interaction.InteractionTarget;
+import art.arcane.gloss.menu.action.MenuAction;
+import art.arcane.gloss.motion.MotionClipHandle;
+import art.arcane.gloss.motion.MotionService;
+import art.arcane.gloss.motion.TransformStreamer;
 import art.arcane.gloss.particle.ParticleService;
 import art.arcane.gloss.text.TextDisplayLayout;
 import art.arcane.gloss.text.TextPipeline;
@@ -56,6 +64,7 @@ import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Queue;
 import java.util.Set;
 import java.util.UUID;
@@ -72,7 +81,7 @@ import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.logging.Level;
 
-public final class HologramService {
+public final class HologramService implements RegistryOwner {
     private static final String DISPLAY_TAG = "gloss_display";
     private static final int NO_TASK = -1;
     private static final int ANIMATION_REFRESH_INTERVAL_TICKS = 1;
@@ -120,6 +129,7 @@ public final class HologramService {
     private final Map<TextDisplay, DisplayIdentity> displayIdentities = Collections.synchronizedMap(new IdentityHashMap<>());
     private PacketListenerCommon trackingListener;
     private final HologramViewerIndex viewerIndex;
+    private final Map<String, List<InteractionHitboxService.Handle>> hitboxHandles = new ConcurrentHashMap<>();
     private final Set<PersistentHologram> persistentTicks;
     private final Map<UUID, ViewerWorkQueue> viewerWorkQueues;
     private final Map<String, FileMutation> pendingFileMutations;
@@ -260,6 +270,8 @@ public final class HologramService {
         PersistentHologram removed = removedHolder[0];
         if (removed != null) {
             removed.despawnAll();
+            unregisterHitboxes(safeId);
+            viewerIndex.forgetHologramPages(safeId);
             requestDriverIntervalReconcile();
         }
     }
@@ -889,6 +901,181 @@ public final class HologramService {
         }
     }
 
+    MotionService motion() {
+        return plugin.laneServices() == null ? null : plugin.service(MotionService.class);
+    }
+
+    TransformStreamer streamer() {
+        MotionService motion = motion();
+        return motion == null ? null : motion.streamer();
+    }
+
+    MotionClipHandle newClipHandle() {
+        return new MotionClipHandle(id -> {
+            MotionService motion = motion();
+            return motion == null ? Optional.empty() : motion.compiled(id);
+        });
+    }
+
+    InteractionHitboxService interaction() {
+        return plugin.laneServices() == null ? null : plugin.service(InteractionHitboxService.class);
+    }
+
+    boolean isBedrock(UUID viewerId) {
+        return plugin.bedrock() != null && plugin.bedrock().isBedrock(viewerId);
+    }
+
+    /** The page a viewer is reading of one hologram, or null while they are on the first page. */
+    public String viewerPage(String hologramId, UUID viewerId) {
+        return viewerIndex.page(viewerId, hologramId);
+    }
+
+    /**
+     * Moves a viewer to {@code target}, which may be a page id, {@code next} or {@code prev}.
+     *
+     * @return false when the hologram is not paged or the target names no page
+     */
+    public boolean setPage(String hologramId, UUID viewerId, String target) {
+        PersistentHologram hologram = holograms.get(hologramId);
+        if (hologram == null) {
+            return false;
+        }
+        String resolved = HologramPage.resolve(hologram.pages(), viewerIndex.page(viewerId, hologramId), target);
+        if (resolved == null) {
+            return false;
+        }
+        viewerIndex.setPage(viewerId, hologramId, resolved);
+        return true;
+    }
+
+    /** The page ids a hologram declares, empty when it is not paged. */
+    public List<String> pageIds(String hologramId) {
+        PersistentHologram hologram = holograms.get(hologramId);
+        if (hologram == null) {
+            return List.of();
+        }
+        List<String> ids = new ArrayList<>(hologram.pages().size());
+        for (HologramPage page : hologram.pages()) {
+            ids.add(page.id());
+        }
+        return List.copyOf(ids);
+    }
+
+    /** The motion clip a hologram plays, or null. */
+    public String motion(String hologramId) {
+        PersistentHologram hologram = holograms.get(hologramId);
+        return hologram == null ? null : hologram.motionId();
+    }
+
+    /** Plays {@code motion} on a hologram, or stops it when null. */
+    public boolean setMotion(String hologramId, String motion) {
+        PersistentHologram hologram = holograms.get(hologramId);
+        if (hologram == null) {
+            return false;
+        }
+        hologram.applyMotion(motion);
+        return true;
+    }
+
+    /** The actions a hologram runs on click, in document order. */
+    public List<MenuActionData> actions(String hologramId) {
+        PersistentHologram hologram = holograms.get(hologramId);
+        return hologram == null ? List.of() : hologram.actions();
+    }
+
+    void forgetStalePages(String hologramId, List<HologramPage> pages) {
+        Set<String> valid = new java.util.HashSet<>(pages.size() * 2);
+        for (HologramPage page : pages) {
+            valid.add(page.id());
+        }
+        viewerIndex.retainPages(hologramId, valid);
+    }
+
+    /** Re-registers the interaction boxes a hologram offers after its document changed. */
+    void hologramContentChanged(PersistentHologram hologram) {
+        InteractionHitboxService interaction = interaction();
+        if (interaction == null) {
+            return;
+        }
+        unregisterHitboxes(hologram.id(), interaction);
+        if (hologram.actions().isEmpty()) {
+            return;
+        }
+        HologramDoc.Hitbox box = hologram.hitboxOrDefault();
+        List<InteractionHitboxService.Handle> handles = new ArrayList<>();
+        if (box.perLine()) {
+            int rows = hologram.rowCount();
+            for (int row = 0; row < rows; row++) {
+                handles.add(interaction.register(hitboxTarget(hologram, box, row)));
+            }
+        } else {
+            handles.add(interaction.register(hitboxTarget(hologram, box, -1)));
+        }
+        hitboxHandles.put(hologram.id(), List.copyOf(handles));
+    }
+
+    private InteractionTarget hitboxTarget(PersistentHologram hologram, HologramDoc.Hitbox box, int row) {
+        String hologramId = hologram.id();
+        String componentId = row < 0 ? "hologram" : "line:" + row;
+        int rows = Math.max(1, hologram.rowCount());
+        double height = box.height();
+        double offset = row < 0 ? 0.0D : height * (rows - 1) / 2.0D - height * row;
+        List<MenuAction<?>> actions = MenuAction.resolve(hologram.actions(), "hologram:" + hologramId, componentId);
+        HologramActionContext.Pages pages = new ServicePages(hologramId);
+        return new InteractionTarget("hologram:" + hologramId, hologramId + "/" + componentId,
+            () -> hitboxOrigin(hologram, offset, height), box.width().floatValue(), (float) height, actions,
+            (player, trigger) -> new HologramActionContext(hologramId, pages, row, player, trigger),
+            () -> holograms.get(hologramId) == hologram);
+    }
+
+    private Location hitboxOrigin(PersistentHologram hologram, double offset, double height) {
+        Location anchor = hologram.location();
+        return anchor == null ? null : anchor.add(0.0D, offset - height / 2.0D, 0.0D);
+    }
+
+    private void unregisterHitboxes(String hologramId, InteractionHitboxService interaction) {
+        List<InteractionHitboxService.Handle> removed = hitboxHandles.remove(hologramId);
+        if (removed == null) {
+            return;
+        }
+        for (InteractionHitboxService.Handle handle : removed) {
+            interaction.unregister(handle);
+        }
+    }
+
+    private void unregisterHitboxes(String hologramId) {
+        InteractionHitboxService interaction = interaction();
+        if (interaction != null) {
+            unregisterHitboxes(hologramId, interaction);
+        } else {
+            hitboxHandles.remove(hologramId);
+        }
+    }
+
+    private final class ServicePages implements HologramActionContext.Pages {
+        private final String hologramId;
+
+        private ServicePages(String hologramId) {
+            this.hologramId = hologramId;
+        }
+
+        @Override
+        public List<HologramPage> pages() {
+            PersistentHologram hologram = holograms.get(hologramId);
+            return hologram == null ? List.of() : hologram.pages();
+        }
+
+        @Override
+        public String current(UUID viewerId) {
+            return viewerIndex.page(viewerId, hologramId);
+        }
+
+        @Override
+        public void select(UUID viewerId, String pageId) {
+            viewerIndex.setPage(viewerId, hologramId, pageId);
+        }
+    }
+
     public boolean forEachNearbyViewer(Location anchor, double rangeSquared, Consumer<Player> action) {
         World world = anchor.getWorld();
         if (world == null || rangeSquared < 0.0D || !Double.isFinite(rangeSquared)) {
@@ -1009,6 +1196,8 @@ public final class HologramService {
             }
 
             removed.despawnAll();
+            unregisterHitboxes(id);
+            viewerIndex.forgetHologramPages(id);
             Gloss.info("Hologram " + id + " removed from disk.");
         }
         requestDriverIntervalReconcile();
@@ -1240,5 +1429,10 @@ public final class HologramService {
         for (PersistentHologram hologram : holograms.values()) {
             hologram.refreshTrackingFor(player);
         }
+    }
+
+    @Override
+    public Map<String, DocumentRegistry<?>> registries() {
+        return Map.of("holograms", registry);
     }
 }

@@ -34,7 +34,7 @@ class HologramDocTest {
         assertEquals(6L, doc.revision());
         assertEquals("world_nether", doc.anchor().world());
         assertEquals(new Vector(12.5D, 64.0D, -7.25D), doc.anchor().position());
-        assertEquals(List.of("&dWelcome", "&7Line two"), doc.lines());
+        assertEquals(List.of("&dWelcome", "&7Line two"), doc.textLines());
         assertTrue(doc.style().seeThrough());
         assertEquals(2.5F, doc.style().scaleX());
         assertEquals(0.5F, doc.style().scaleY());
@@ -128,8 +128,8 @@ class HologramDocTest {
         HologramDoc doc = new HologramDoc(HologramDoc.CURRENT_SCHEMA_VERSION, 1L,
             new HologramDoc.Anchor("world", new Vector()), lines, null, null, null, null, List.of(), null);
         lines.clear();
-        assertEquals(List.of("one", ""), doc.lines());
-        assertThrows(UnsupportedOperationException.class, () -> doc.lines().add("two"));
+        assertEquals(List.of("one", ""), doc.textLines());
+        assertThrows(UnsupportedOperationException.class, () -> doc.lines().add(HologramLine.text("two")));
     }
 
     @Test
@@ -181,7 +181,7 @@ class HologramDocTest {
         assertEquals(HologramDoc.CURRENT_SCHEMA_VERSION, baseline.schemaVersion());
         assertEquals(IconDisplayStyle.hologramDefaults(), baseline.style());
         assertEquals(HologramBox.defaults(), baseline.box());
-        assertFalse(baseline.lines().isEmpty());
+        assertFalse(baseline.textLines().isEmpty());
         assertEquals(List.of("&dNew hologram"), HologramBaselines.defaultLines());
     }
 }

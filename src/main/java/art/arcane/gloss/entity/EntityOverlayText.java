@@ -77,6 +77,34 @@ public final class EntityOverlayText {
         return new Prepared(true, animation != null, frames, literals.snapshot());
     }
 
+    /**
+     * Compiles already-filtered authored lines into a frame source, for a source that owns the
+     * pane's conditions itself. The {@code {bar}}, {@code {health}} and friends tokens still
+     * resolve, so a nameplate writes the same line text an overlay would.
+     */
+    public static Prepared prepareLines(Gloss plugin, Player viewer, List<String> texts,
+                                        int healthSegments, Snapshot entity) {
+        if (texts.isEmpty()) {
+            return Prepared.hidden();
+        }
+        LiteralValues literals = new LiteralValues();
+        Map<String, String> tokens = tokens(healthSegments, entity);
+        List<String> lines = new ArrayList<>(texts.size());
+        for (String text : texts) {
+            lines.add(authored(text, tokens, "", literals));
+        }
+        ExprScope standard = plugin.text().expressionScope(viewer);
+        ExprScope conditions = GlossConditionScope.viewer(plugin, viewer);
+        ExprScope scope = new ViewerScope(standard, conditions);
+        String marked = ParticleText.parse(TextUtils.joinLegacyLines(lines)).marked();
+        UnaryOperator<String> render = source -> plugin.text().renderScoped(viewer, source, scope, literals::add);
+        AnimationTemplate animation = plugin.animator() == null ? null
+            : plugin.animator().compileTemplate(List.of(marked), render, false);
+        String rendered = animation == null ? render.apply(marked) : null;
+        TextFrameSource frames = animation == null ? ignored -> rendered : animation;
+        return new Prepared(true, animation != null, frames, literals.snapshot());
+    }
+
     public static boolean refreshRequired(EntityOverlayDoc settings) {
         if (settings.show().isDynamic() && external(ExprParser.parse(settings.show().expression()))) {
             return true;
@@ -140,19 +168,27 @@ public final class EntityOverlayText {
     }
 
     static String bar(EntityOverlayDoc settings, Snapshot entity) {
+        return bar(settings.healthSegments(), entity);
+    }
+
+    private static String bar(int healthSegments, Snapshot entity) {
         double fraction = entity.maxHealth() > 0 ? Math.clamp(entity.health() / entity.maxHealth(), 0, 1) : 0;
-        int filled = (int) Math.ceil(fraction * settings.healthSegments());
+        int filled = (int) Math.ceil(fraction * healthSegments);
         double priorFraction = entity.maxHealth() > 0
             ? Math.clamp(entity.previousHealth() / entity.maxHealth(), 0, 1) : fraction;
-        int prior = Math.max(filled, (int) Math.ceil(priorFraction * settings.healthSegments()));
+        int prior = Math.max(filled, (int) Math.ceil(priorFraction * healthSegments));
         String color = fraction >= 0.5 ? "&a" : fraction >= 0.25 ? "&e" : "&c";
         return color + "|".repeat(filled) + "&c" + "|".repeat(prior - filled)
-            + "&8" + "|".repeat(settings.healthSegments() - prior);
+            + "&8" + "|".repeat(healthSegments - prior);
     }
 
     private static Map<String, String> tokens(EntityOverlayDoc settings, Snapshot entity) {
+        return tokens(settings.healthSegments(), entity);
+    }
+
+    private static Map<String, String> tokens(int healthSegments, Snapshot entity) {
         return Map.ofEntries(
-            Map.entry("bar", bar(settings, entity)),
+            Map.entry("bar", bar(healthSegments, entity)),
             Map.entry("health", number(entity.health())),
             Map.entry("max_health", number(entity.maxHealth())),
             Map.entry("count", Integer.toString(entity.stackCount())),

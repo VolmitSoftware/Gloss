@@ -1,0 +1,102 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://volmit.com/gloss/rig-instances.schema.json",
+  "title": "Gloss Rig Instance Document",
+  "description": "A placed rig. Written by /gloss rig place and mutated by the server as the instance moves or changes state.",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "revision",
+    "rig",
+    "world",
+    "x",
+    "y",
+    "z"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "description": "Document format revision. Always 1 for rig instances.",
+      "type": "integer",
+      "const": 1
+    },
+    "revision": {
+      "description": "Server-owned monotonic revision, raised on every save.",
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991
+    },
+    "rig": {
+      "description": "Rig document id this instance renders.",
+      "type": "string",
+      "minLength": 1
+    },
+    "world": {
+      "description": "World name the instance is anchored in.",
+      "type": "string",
+      "minLength": 1
+    },
+    "x": {
+      "description": "Anchor X in blocks.",
+      "type": "number"
+    },
+    "y": {
+      "description": "Anchor Y in blocks.",
+      "type": "number"
+    },
+    "z": {
+      "description": "Anchor Z in blocks.",
+      "type": "number"
+    },
+    "yaw": {
+      "description": "Rotation around Y in degrees.",
+      "type": "number",
+      "default": 0
+    },
+    "pitch": {
+      "description": "Rotation around X in degrees.",
+      "type": "number",
+      "default": 0
+    },
+    "scale": {
+      "description": "Uniform scale applied to the whole rig.",
+      "type": "number",
+      "minimum": 0.01,
+      "maximum": 64,
+      "default": 1
+    },
+    "state": {
+      "description": "Current graph state. Written by the server when the state machine advances.",
+      "type": "string"
+    },
+    "vars": {
+      "description": "Instance variables readable as rig.var.<name>.",
+      "type": "object",
+      "maxProperties": 64,
+      "additionalProperties": {
+        "type": [
+          "number",
+          "string",
+          "boolean"
+        ]
+      }
+    },
+    "audience": {
+      "description": "Audience gate evaluated per viewer.",
+      "type": "object",
+      "properties": {
+        "when": {
+          "description": "Boolean or Gloss boolean expression a viewer must satisfy.",
+          "oneOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "string",
+              "minLength": 1
+            }
+          ]
+        }
+      }
+    }
+  }
+}

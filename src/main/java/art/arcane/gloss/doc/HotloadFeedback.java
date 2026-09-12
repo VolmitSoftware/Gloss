@@ -35,16 +35,19 @@ final class HotloadFeedback {
         if (plugin == null || snapshot.isEmpty()) {
             return;
         }
-        String kinds = String.join(", ", snapshot.changesByKind().keySet());
+        String kinds = String.join(", ", snapshot.totalChanges() > 0
+            ? snapshot.changesByKind().keySet()
+            : snapshot.skippedByKind().keySet());
         for (Player player : Bukkit.getOnlinePlayers()) {
             if (!player.hasPermission(ADMIN_PERMISSION)) {
                 continue;
             }
-            SchedulerUtils.runEntity(plugin, player, () -> deliver(player, kinds, snapshot.totalChanges()));
+            SchedulerUtils.runEntity(plugin, player,
+                () -> deliver(player, kinds, snapshot.totalChanges(), snapshot.totalSkipped()));
         }
     }
 
-    private void deliver(Player player, String kinds, int changes) {
+    private void deliver(Player player, String kinds, int changes, int skipped) {
         if (!player.isOnline()) {
             return;
         }
@@ -57,6 +60,10 @@ final class HotloadFeedback {
             changes == 1 ? GlossMessages.HOTLOAD_SINGULAR : GlossMessages.HOTLOAD_PLURAL,
             MessageArgs.builder().untrusted("kinds", kinds).untrusted("count", changes).build()
         );
+        if (skipped > 0) {
+            notice = notice + localization.legacy(GlossMessages.HOTLOAD_SKIPPED_SUFFIX,
+                MessageArgs.builder().untrusted("count", skipped).build());
+        }
         hudBar.publish(player, new HudSegment(
             RELOAD_PURPOSE,
             HudPriority.NOTICE,

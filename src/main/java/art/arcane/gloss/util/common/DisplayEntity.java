@@ -1,6 +1,5 @@
 package art.arcane.gloss.util.common;
 
-import art.arcane.gloss.Gloss;
 import art.arcane.gloss.text.TextDisplayLayout;
 import com.github.retrooper.packetevents.protocol.entity.data.EntityData;
 import com.github.retrooper.packetevents.protocol.entity.data.EntityDataTypes;
@@ -29,8 +28,6 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.logging.Level;
 
 import static io.github.retrooper.packetevents.util.SpigotConversionUtil.fromBukkitBlockData;
 import static io.github.retrooper.packetevents.util.SpigotConversionUtil.fromBukkitItemStack;
@@ -40,6 +37,8 @@ public class DisplayEntity {
   private static final EnumSet<MetadataIndex> RAW_ENTITY_METADATA_INDICES =
       EnumSet.of(MetadataIndex.ENTITY_FLAGS, MetadataIndex.NO_GRAVITY);
   private static final String COLLISION_TEAM_PREFIX = "gls_nc_";
+  private static final int INTERACTION_WIDTH_INDEX = 8;
+  private static final int INTERACTION_HEIGHT_INDEX = 9;
   private static final WrapperPlayServerTeams.ScoreBoardTeamInfo COLLISIONLESS_TEAM =
       new WrapperPlayServerTeams.ScoreBoardTeamInfo(
           Component.empty(),
@@ -450,6 +449,31 @@ public class DisplayEntity {
     return new WrapperPlayServerEntityMetadata(entityId, metadata);
   }
 
+  /**
+   * A transform-only metadata update built from values, never from a live instance, so an async
+   * streamer can send it without reading fields the tick thread may be mutating.
+   */
+  public static WrapperPlayServerEntityMetadata transformUpdate(int entityId, Vector3f translation, Vector3f scale,
+                                                                 Quaternion4f leftRotation, Quaternion4f rightRotation,
+                                                                 int interpolationDelay, int interpolationDuration) {
+    List<EntityData<?>> metadata = new ArrayList<>(6);
+    metadata.add(new EntityData<>(MetadataIndex.INTERPOLATION_DELAY.index(), EntityDataTypes.INT, interpolationDelay));
+    metadata.add(new EntityData<>(MetadataIndex.INTERPOLATION_DURATION.index(), EntityDataTypes.INT, interpolationDuration));
+    metadata.add(new EntityData<>(MetadataIndex.TRANSLATION.index(), EntityDataTypes.VECTOR3F, translation));
+    metadata.add(new EntityData<>(MetadataIndex.SCALE.index(), EntityDataTypes.VECTOR3F, scale));
+    metadata.add(new EntityData<>(MetadataIndex.LEFT_ROTATION.index(), EntityDataTypes.QUATERNION, leftRotation));
+    metadata.add(new EntityData<>(MetadataIndex.RIGHT_ROTATION.index(), EntityDataTypes.QUATERNION, rightRotation));
+    return new WrapperPlayServerEntityMetadata(entityId, metadata);
+  }
+
+  /** Width and height of an {@code INTERACTION} entity; slots 8 and 9 on that entity, not the display slots. */
+  public static WrapperPlayServerEntityMetadata interactionSize(int entityId, float width, float height) {
+    List<EntityData<?>> metadata = new ArrayList<>(2);
+    metadata.add(new EntityData<>(INTERACTION_WIDTH_INDEX, EntityDataTypes.FLOAT, width));
+    metadata.add(new EntityData<>(INTERACTION_HEIGHT_INDEX, EntityDataTypes.FLOAT, height));
+    return new WrapperPlayServerEntityMetadata(entityId, metadata);
+  }
+
   public WrapperPlayServerEntityMetadata metadataPacket(MetadataIndex... indices) {
     List<EntityData<?>> metadata = new ArrayList<>(indices.length);
     for (MetadataIndex index : indices) {
@@ -529,8 +553,6 @@ public class DisplayEntity {
   }
 
   public static final class Builder {
-    private static final AtomicInteger NEXT_ID = new AtomicInteger(Integer.MIN_VALUE);
-
     private final DisplayEntity displayEntity;
 
     private Builder(EntityType type, DisplayKind displayKind) {
@@ -602,12 +624,7 @@ public class DisplayEntity {
     }
 
     private static int nextId() {
-      return NEXT_ID.getAndUpdate(i -> {
-        if (++i < 0) return i;
-        Gloss.log(Level.SEVERE, "Entity IDs overflow");
-        Gloss.log(Level.SEVERE, "Please restart your server!");
-        return Integer.MIN_VALUE;
-      });
+      return EntityIdAllocator.global().next();
     }
 
     public Builder pos(Location loc) {
@@ -690,7 +707,7 @@ public class DisplayEntity {
     }
   }
 
-  enum DisplayKind {
+  public enum DisplayKind {
     RAW,
     TEXT,
     ITEM,

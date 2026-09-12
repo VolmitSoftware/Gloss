@@ -10,6 +10,7 @@ import art.arcane.gloss.condition.ShowCondition;
 import art.arcane.gloss.doc.DocumentDelta;
 import art.arcane.gloss.doc.DocumentRegistry;
 import art.arcane.gloss.doc.GlossDocument;
+import art.arcane.gloss.doc.RegistryOwner;
 import art.arcane.gloss.doc.ShippedDefaults;
 import art.arcane.gloss.doc.ShippedDocumentCatalog;
 import art.arcane.gloss.locale.GlossLocalization;
@@ -63,7 +64,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.UnaryOperator;
 
-public final class DropNameService implements Listener {
+public final class DropNameService implements Listener, RegistryOwner {
     private static final int PRUNE_INTERVAL_TICKS = 40;
     private static final int PRUNE_BUDGET = 64;
     private static final int REHYDRATE_CHUNK_BUDGET = 32;
@@ -860,5 +861,10 @@ public final class DropNameService implements Listener {
     }
 
     private record NativeParticleFrame(ParticleText.Rendered rendered, List<List<ParticleRect>> targets) {
+    }
+
+    @Override
+    public Map<String, DocumentRegistry<?>> registries() {
+        return Map.of("real-drops", realDropSettings);
     }
 }

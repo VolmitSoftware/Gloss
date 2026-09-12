@@ -1,6 +1,7 @@
 package art.arcane.gloss.condition;
 
 import art.arcane.gloss.expr.Expr;
+import art.arcane.gloss.expr.ExprFunctionRegistry;
 import art.arcane.gloss.expr.ExprException;
 import art.arcane.gloss.expr.ExprParser;
 
@@ -234,6 +235,7 @@ public final class ConditionCompiler {
             ValueKind.STRING, ValueKind.NUMBER);
         case "hasPermission", "inGroup", "inRegion" -> fixedType(call.name(), arguments,
             ValueType.BOOLEAN, ValueKind.STRING, ValueKind.STRING);
+        case "isBedrock" -> fixedType(call.name(), arguments, ValueType.BOOLEAN, ValueKind.STRING);
         case "papi" -> fixedType(call.name(), arguments, ValueType.STRING,
             ValueKind.STRING, ValueKind.STRING, ValueKind.STRING);
         case "papiNumber" -> fixedType(call.name(), arguments, ValueType.NUMBER,
@@ -269,7 +271,42 @@ public final class ConditionCompiler {
             ValueKind.NUMBER, ValueKind.NUMBER, ValueKind.NUMBER, ValueKind.NUMBER);
         case "wave" -> fixedType(call.name(), arguments, ValueType.STRING,
             ValueKind.STRING, ValueKind.LIST, ValueKind.NUMBER);
-        default -> throw error("unknown condition function: " + call.name());
+        default -> registeredType(call.name(), arguments);
+      };
+    }
+
+    /** Signature check for a function a lane registered at runtime; unknown names still fail. */
+    private ValueType registeredType(String name, List<ValueType> arguments) {
+      ExprFunctionRegistry.Spec spec = ExprFunctionRegistry.global().find(name);
+      if (spec == null) {
+        throw error("unknown condition function: " + name);
+      }
+      if (!spec.accepts(arguments.size())) {
+        throw error(name + " expects " + (spec.variadic() ? "at least " + (spec.parameters().size() - 1)
+            : String.valueOf(spec.parameters().size())) + " argument(s), got " + arguments.size());
+      }
+      for (int index = 0; index < arguments.size(); index++) {
+        ValueKind expected = kindOf(spec.parameter(index));
+        if (expected != null) {
+          requireArgumentType(name, arguments, index, expected);
+        }
+      }
+      return switch (spec.returns()) {
+        case NUMBER -> ValueType.NUMBER;
+        case STRING -> ValueType.STRING;
+        case BOOLEAN -> ValueType.BOOLEAN;
+        case LIST -> ValueType.list(ValueType.UNKNOWN);
+        case ANY -> ValueType.UNKNOWN;
+      };
+    }
+
+    private static ValueKind kindOf(ExprFunctionRegistry.Kind kind) {
+      return switch (kind) {
+        case NUMBER -> ValueKind.NUMBER;
+        case STRING -> ValueKind.STRING;
+        case BOOLEAN -> ValueKind.BOOLEAN;
+        case LIST -> ValueKind.LIST;
+        case ANY -> null;
       };
     }
 

@@ -129,8 +129,11 @@ public class GlossSchemaContractTest {
     JsonArray actionTypes = definitions.getAsJsonObject("action")
         .getAsJsonObject("properties").getAsJsonObject("type").getAsJsonArray("enum");
 
-    assertEquals(List.of("command", "sound", "message", "teleport", "connect", "navigate"),
-        actionTypes.asList().stream().map(value -> value.getAsString()).toList());
+    List<String> declaredTypes = actionTypes.asList().stream().map(value -> value.getAsString()).toList();
+    assertTrue("core action types missing from the schema enum: " + declaredTypes,
+        declaredTypes.containsAll(List.of("command", "sound", "message", "teleport", "connect", "navigate")));
+    assertEquals("schema action enum repeats a type: " + declaredTypes,
+        declaredTypes.size(), new java.util.HashSet<>(declaredTypes).size());
     assertEquals(List.of("message"), required(definitions.getAsJsonObject("messageAction")));
     assertEquals(List.of("world", "x", "y", "z", "yaw", "pitch"),
         required(definitions.getAsJsonObject("teleportAction")));

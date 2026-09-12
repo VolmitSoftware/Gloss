@@ -2,7 +2,10 @@ package art.arcane.gloss.api.internal;
 
 import art.arcane.gloss.Gloss;
 import art.arcane.gloss.api.HoloClickTrigger;
+import art.arcane.gloss.api.GlossDialogSubmitEvent;
+import art.arcane.gloss.api.GlossInventoryClickEvent;
 import art.arcane.gloss.api.GlossMenuClickEvent;
+import art.arcane.gloss.api.GlossMenuCloseEvent;
 import art.arcane.gloss.api.GlossMenuOpenEvent;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
@@ -29,6 +32,42 @@ public final class ApiEvents {
     }
 
     return !cancelled(new GlossMenuClickEvent(player, menuId, componentId, ownerPluginName, trigger));
+  }
+
+  /** A menu surface closed for this viewer. Notification only, so nothing is asked back. */
+  public static void fireMenuClose(Player player, String menuId) {
+    if (GlossMenuCloseEvent.getHandlerList().getRegisteredListeners().length == 0) {
+      return;
+    }
+
+    dispatch(new GlossMenuCloseEvent(player, menuId));
+  }
+
+  /** A dialog button's action list finished. */
+  public static void fireDialogSubmit(Player player, String dialogId, int button) {
+    if (GlossDialogSubmitEvent.getHandlerList().getRegisteredListeners().length == 0) {
+      return;
+    }
+
+    dispatch(new GlossDialogSubmitEvent(player, dialogId, button));
+  }
+
+  /** An inventory-menu slot's action list finished. */
+  public static void fireInventoryClick(Player player, String inventoryId, int slot) {
+    if (GlossInventoryClickEvent.getHandlerList().getRegisteredListeners().length == 0) {
+      return;
+    }
+
+    dispatch(new GlossInventoryClickEvent(player, inventoryId, slot));
+  }
+
+  private static void dispatch(Event event) {
+    try {
+      Bukkit.getPluginManager().callEvent(event);
+    } catch (Throwable error) {
+      Gloss.logExceptionStackThrottled(false, "api-event-dispatch", error,
+          "Failed to dispatch %s.", event.getEventName());
+    }
   }
 
   private static <T extends Event & Cancellable> boolean cancelled(T event) {

@@ -2,7 +2,7 @@ package art.arcane.gloss.persistence;
 
 import art.arcane.gloss.doc.AtomicFiles;
 import art.arcane.gloss.doc.DocumentHashes;
-import art.arcane.gloss.panel.PanelRepository;
+import art.arcane.gloss.editor.sync.EditorSyncDocumentKind;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonArray;
@@ -35,6 +35,8 @@ import java.util.stream.Stream;
 public final class GlossProjectTransaction {
   private static final int JOURNAL_VERSION = 2;
   private static final int MAX_BACKUPS = 20;
+  private static final int UUID_CHARACTERS = 36;
+  private static final String IMAGES_COLLECTION = "images";
   private static final long MAX_JOURNAL_BYTES = 1024L * 1024L;
   private static final Pattern TRANSACTION_DIRECTORY = Pattern.compile(
       "[0-9]{10,}-[A-Za-z0-9_-]{1,64}-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}");
@@ -407,16 +409,22 @@ public final class GlossProjectTransaction {
       return validRelativeTarget(dataRelative);
     }
     String collection = dataRelative.getName(0).toString();
-    if (Set.of("menus", "panels", "images").contains(collection)) {
+    if (collection.equals(IMAGES_COLLECTION)) {
       return true;
     }
-    return dataRelative.getNameCount() == 1
-        && Set.of("previews", "holograms", "animations", "boards", "emoji", "bubbles",
-        "real-drops", "damage-indicators").contains(collection);
+    EditorSyncDocumentKind kind = EditorSyncDocumentKind.byStorageCollection(collection);
+    if (kind == null || kind.layout() == EditorSyncDocumentKind.Layout.SINGLE) {
+      return false;
+    }
+    return kind.layout() == EditorSyncDocumentKind.Layout.TREE || dataRelative.getNameCount() == 1;
   }
 
   private Journal readJournal(Path transaction) throws IOException {
-    requireChild(transactionsDirectory, transaction);
+    return readJournal(transactionsDirectory, transaction);
+  }
+
+  private Journal readJournal(Path root, Path transaction) throws IOException {
+    requireChild(root, transaction);
     Path journalPath = transaction.resolve("journal.json").normalize();
     requireChild(transaction, journalPath);
     byte[] journalBytes = readRegularFile(journalPath);
@@ -601,27 +609,25 @@ public final class GlossProjectTransaction {
       return false;
     }
     String normalized = relativePath(relative);
-    if (normalized.equals("motd.json") || normalized.equals("tablist.json")) {
+    String collection = relative.getName(0).toString();
+    if (relative.getNameCount() == 1) {
+      EditorSyncDocumentKind single = EditorSyncDocumentKind.byStorageCollection(collection);
+      return single != null && single.layout() == EditorSyncDocumentKind.Layout.SINGLE;
+    }
+    if (collection.equals(IMAGES_COLLECTION)) {
       return true;
     }
-    if (relative.getNameCount() < 2) {
+    EditorSyncDocumentKind kind = EditorSyncDocumentKind.byStorageCollection(collection);
+    if (kind == null || kind.layout() == EditorSyncDocumentKind.Layout.SINGLE || !normalized.endsWith(".json")) {
       return false;
     }
-    String collection = relative.getName(0).toString();
-    if (collection.equals("images")) {
+    if (kind.layout() == EditorSyncDocumentKind.Layout.TREE) {
       return true;
     }
-    if (collection.equals("menus") || collection.equals(PanelRepository.DIRECTORY_NAME)) {
-      return normalized.endsWith(".json");
+    if (kind.singletonId() != null) {
+      return normalized.equals(kind.storageName() + "/" + kind.singletonId() + ".json");
     }
-    if (collection.equals("real-drops")) {
-      return normalized.equals("real-drops/default.json");
-    }
-    if (collection.equals("damage-indicators")) {
-      return normalized.equals("damage-indicators/default.json");
-    }
-    return List.of("previews", "holograms", "animations", "boards", "emoji", "bubbles")
-        .contains(collection) && relative.getNameCount() == 2 && normalized.endsWith(".json");
+    return relative.getNameCount() == 2;
   }
 
   private byte[] readRegularFile(Path file) throws IOException {
@@ -832,6 +838,72 @@ public final class GlossProjectTransaction {
   public static final class CommitUncertainException extends IOException {
     private CommitUncertainException(String message, IOException cause) {
       super(message, cause);
+    }
+  }
+
+  /**
+   * Every archived publication whose journal committed, newest last, with the original bytes each
+   * one replaced. The history timeline reads these so an editor publication appears beside the
+   * copies the watchdog and the pack installer took.
+   */
+  public List<TransactionRecord> committedTransactions() throws IOException {
+    if (!Files.isDirectory(backupsDirectory, LinkOption.NOFOLLOW_LINKS)) {
+      return List.of();
+    }
+    List<TransactionRecord> records = new ArrayList<>();
+    try (Stream<Path> stream = Files.list(backupsDirectory)) {
+      for (Path backup : stream.sorted(Comparator.comparing(Path::getFileName)).toList()) {
+        String id = backup.getFileName().toString();
+        if (!Files.isDirectory(backup, LinkOption.NOFOLLOW_LINKS)
+            || !TRANSACTION_DIRECTORY.matcher(id).matches()) {
+          continue;
+        }
+        Journal journal = readJournal(backupsDirectory, backup);
+        if (!journal.state().equals("committed")) {
+          continue;
+        }
+        records.add(transactionRecord(backup, id, journal));
+      }
+    }
+    return List.copyOf(records);
+  }
+
+  private TransactionRecord transactionRecord(Path backup, String id, Journal journal)
+      throws IOException {
+    int firstSeparator = id.indexOf('-');
+    long epochMillis = Long.parseLong(id.substring(0, firstSeparator));
+    String label = id.substring(firstSeparator + 1, id.length() - UUID_CHARACTERS - 1);
+    List<TransactionFile> files = new ArrayList<>();
+    Path originals = backup.resolve("backup");
+    for (Entry entry : journal.entries()) {
+      if (!entry.existed()) {
+        continue;
+      }
+      Path original = originals.resolve(entry.relativePath()).normalize();
+      if (!original.startsWith(originals)
+          || !Files.isRegularFile(original, LinkOption.NOFOLLOW_LINKS)) {
+        continue;
+      }
+      files.add(new TransactionFile(entry.relativePath(), original, Files.size(original)));
+    }
+    return new TransactionRecord(id, epochMillis, label, List.copyOf(files));
+  }
+
+  /** One archived publication: its identity, when it ran, the label that requested it, and its backups. */
+  public record TransactionRecord(String id, long epochMillis, String label,
+                                  List<TransactionFile> files) {
+    public TransactionRecord {
+      id = Objects.requireNonNull(id, "id");
+      label = Objects.requireNonNull(label, "label");
+      files = List.copyOf(files);
+    }
+  }
+
+  /** One data-folder file a publication replaced, and the copy of what it replaced. */
+  public record TransactionFile(String relativePath, Path backupFile, long bytes) {
+    public TransactionFile {
+      relativePath = Objects.requireNonNull(relativePath, "relativePath");
+      backupFile = Objects.requireNonNull(backupFile, "backupFile");
     }
   }
 

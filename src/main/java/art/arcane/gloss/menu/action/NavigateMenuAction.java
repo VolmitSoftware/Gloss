@@ -8,10 +8,7 @@ public final class NavigateMenuAction extends MenuAction<NavigationActionData> {
   }
 
   public boolean isValid() {
-    return switch (data.modeOrDefault()) {
-      case PUSH, REPLACE -> data.target() != null && !data.target().isBlank();
-      case BACK, HOME, CLOSE -> true;
-    };
+    return data.isValid();
   }
 
   @Override

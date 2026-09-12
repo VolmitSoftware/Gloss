@@ -12,6 +12,7 @@ import java.util.List;
 public class ButtonComponent extends ClickableComponent<ButtonComponentData> {
 
   private final List<MenuAction<?>> actions;
+  private final TooltipPane tooltip;
 
   public ButtonComponent(MenuSession session, MenuComponentData data) {
     super(session, data,
@@ -20,6 +21,23 @@ public class ButtonComponent extends ClickableComponent<ButtonComponentData> {
         ((ButtonComponentData) data.data()).resolvedHoverDurationTicks(),
         ((ButtonComponentData) data.data()).resolvedHoverEasing());
     this.actions = MenuAction.resolve(this.data.actions(), session.getId(), getId());
+    this.tooltip = this.data.tooltip() == null ? null : new TooltipPane(session, this.data.tooltip());
+  }
+
+  @Override
+  protected void onTick(org.bukkit.util.Vector eyeOrigin, org.bukkit.util.Vector eyeDirection) {
+    super.onTick(eyeOrigin, eyeDirection);
+    if (tooltip != null) {
+      tooltip.tick(isSelected(), getLocation());
+    }
+  }
+
+  @Override
+  public void onClose() {
+    super.onClose();
+    if (tooltip != null) {
+      tooltip.hide();
+    }
   }
 
   @Override

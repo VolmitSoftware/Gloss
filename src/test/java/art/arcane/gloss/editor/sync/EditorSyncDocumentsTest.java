@@ -10,10 +10,45 @@ import java.nio.file.Path;
 import java.util.List;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
 public class EditorSyncDocumentsTest {
+  @Test
+  public void entriesMayCarryAPerDocumentBaseRevision() {
+    JsonObject project = EditorSyncTestProjects.menuProject("fixture", "{\"components\":[]}");
+    JsonObject entry = project.getAsJsonArray("documents").get(0).getAsJsonObject();
+    entry.addProperty("baseRevision",
+        EditorSyncDocuments.contentRevision("{\"components\":[]}"));
+    EditorSyncTestProjects.sign(project);
+
+    List<EditorSyncDocuments.Entry> documents = EditorSyncDocuments.parse(project);
+
+    assertEquals(1, documents.size());
+    assertEquals(EditorSyncDocuments.contentRevision("{\"components\":[]}\n"),
+        documents.getFirst().baseRevision());
+  }
+
+  @Test
+  public void contentRevisionsIgnoreFormattingButNotContent() {
+    assertEquals(EditorSyncDocuments.contentRevision("{\"a\":1,\"b\":2}"),
+        EditorSyncDocuments.contentRevision("{\n  \"b\": 2,\n  \"a\": 1\n}\n"));
+    assertNotEquals(EditorSyncDocuments.contentRevision("{\"a\":1}"),
+        EditorSyncDocuments.contentRevision("{\"a\":2}"));
+  }
+
+  @Test
+  public void builtEntriesRoundTripTheirBaseRevision() {
+    EditorSyncDocuments.Entry entry = new EditorSyncDocuments.Entry("menu", "fixture", null,
+        "{\"components\":[]}", "sha256:" + "a".repeat(64));
+
+    JsonArray built = EditorSyncDocuments.build(List.of(entry));
+
+    assertEquals("sha256:" + "a".repeat(64),
+        built.get(0).getAsJsonObject().get("baseRevision").getAsString());
+  }
+
   @Test
   public void unsupportedProjectVersionIsRejected() {
     JsonObject project = EditorSyncTestProjects.menuProject("fixture", "{\"components\":[]}");
@@ -46,7 +81,7 @@ public class EditorSyncDocumentsTest {
     for (EditorSyncDocumentKind kind : EditorSyncDocumentKind.ORDERED) {
       assertEquals(kind, EditorSyncDocumentKind.parseWireName(kind.wireName()));
     }
-    assertEquals(13, EditorSyncDocumentKind.ORDERED.size());
+    assertEquals(EditorSyncDocumentKind.values().length, EditorSyncDocumentKind.ORDERED.size());
   }
 
   @Test
@@ -171,8 +206,8 @@ public class EditorSyncDocumentsTest {
   @Test
   public void genericBuilderPreservesCanonicalDocumentOrderAndRevisionShape() {
     List<EditorSyncDocuments.Entry> entries = List.of(
-        new EditorSyncDocuments.Entry("menu", "shop/main", null, "{\"components\":[]}"),
-        new EditorSyncDocuments.Entry("panel", "shop", 4L, "{\"id\":\"shop\"}"));
+        new EditorSyncDocuments.Entry("menu", "shop/main", null, "{\"components\":[]}", null),
+        new EditorSyncDocuments.Entry("panel", "shop", 4L, "{\"id\":\"shop\"}", null));
 
     JsonArray documents = EditorSyncDocuments.build(entries);
 

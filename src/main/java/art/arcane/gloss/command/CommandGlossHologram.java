@@ -3,6 +3,7 @@ package art.arcane.gloss.command;
 import art.arcane.gloss.Gloss;
 import art.arcane.gloss.api.AnchoredHologram;
 import art.arcane.gloss.api.IconBillboard;
+import art.arcane.gloss.config.action.MenuActionData;
 import art.arcane.gloss.hologram.HologramBaselines;
 import art.arcane.gloss.hologram.HologramDoc;
 import art.arcane.gloss.locale.GlossLocalization;
@@ -13,12 +14,14 @@ import art.arcane.volmlib.util.director.annotations.Param;
 import art.arcane.volmlib.util.director.help.DirectorMiniMenu;
 import art.arcane.volmlib.util.localization.MessageArgs;
 import art.arcane.volmlib.util.localization.MessageArgument;
+import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 @Director(name = "hologram", aliases = {"holo", "h"}, descriptionKey = "command.help.hologram", description = "Create and manage holograms")
 public class CommandGlossHologram {
@@ -306,6 +309,81 @@ public class CommandGlossHologram {
         GlossCommandMessages.send(player, GlossMessages.HOLOGRAM_RENDERED,
                 MessageArgument.untrusted("id", id),
                 MessageArgument.trusted("scale", scale));
+    }
+
+    @Director(name = "page", sync = true, descriptionKey = "command.help.hologram.page", description = "Move a viewer to a hologram page")
+    public void page(@Param(name = "sender", contextual = true) CommandSender sender,
+                     @Param(name = "id", descriptionKey = "command.help.hologram.info.id", description = "Hologram id") String id,
+                     @Param(name = "page", descriptionKey = "command.help.hologram.page.page", description = "Page id, next or prev") String page,
+                     @Param(name = "player", defaultValue = "", descriptionKey = "command.help.hologram.page.player", description = "Viewer name; blank uses you") String playerName) {
+        if (GlossCommandMessages.denied(sender, "gloss.holograms.edit")) {
+            return;
+        }
+        if (find(sender, id) == null) {
+            return;
+        }
+        Player viewer = playerName.isBlank()
+                ? (sender instanceof Player self ? self : null)
+                : Bukkit.getPlayerExact(playerName);
+        if (viewer == null) {
+            GlossCommandMessages.send(sender, GlossMessages.HOLOGRAM_PAGE_PLAYER_MISSING,
+                    MessageArgument.untrusted("player", playerName));
+            return;
+        }
+        if (!plugin.holograms().setPage(id, viewer.getUniqueId(), page)) {
+            GlossCommandMessages.send(sender, GlossMessages.HOLOGRAM_PAGE_UNKNOWN,
+                    MessageArgument.untrusted("id", id),
+                    MessageArgument.untrusted("page", page));
+            return;
+        }
+        GlossCommandMessages.send(sender, GlossMessages.HOLOGRAM_PAGE_SET,
+                MessageArgument.untrusted("player", viewer.getName()),
+                MessageArgument.untrusted("page", plugin.holograms().viewerPage(id, viewer.getUniqueId())),
+                MessageArgument.untrusted("id", id));
+    }
+
+    @Director(name = "motion", sync = true, descriptionKey = "command.help.hologram.motion", description = "Play a motion clip on a hologram")
+    public void motion(@Param(name = "sender", contextual = true) CommandSender sender,
+                       @Param(name = "id", descriptionKey = "command.help.hologram.info.id", description = "Hologram id") String id,
+                       @Param(name = "motion", descriptionKey = "command.help.hologram.motion.motion", description = "Motion id, or clear to stop") String motion) {
+        if (GlossCommandMessages.denied(sender, "gloss.holograms.edit")) {
+            return;
+        }
+        if (find(sender, id) == null) {
+            return;
+        }
+        boolean clearing = motion.isBlank() || "clear".equalsIgnoreCase(motion) || "none".equalsIgnoreCase(motion);
+        plugin.holograms().setMotion(id, clearing ? null : motion);
+        if (clearing) {
+            GlossCommandMessages.send(sender, GlossMessages.HOLOGRAM_MOTION_CLEARED,
+                    MessageArgument.untrusted("id", id));
+            return;
+        }
+        GlossCommandMessages.send(sender, GlossMessages.HOLOGRAM_MOTION_SET,
+                MessageArgument.untrusted("id", id),
+                MessageArgument.untrusted("value", motion));
+    }
+
+    @Director(name = "actions", descriptionKey = "command.help.hologram.actions", description = "List the actions a hologram runs on click")
+    public void actions(@Param(name = "sender", contextual = true) CommandSender sender,
+                        @Param(name = "id", descriptionKey = "command.help.hologram.info.id", description = "Hologram id") String id) {
+        if (find(sender, id) == null) {
+            return;
+        }
+        List<MenuActionData> actions = plugin.holograms().actions(id);
+        if (actions.isEmpty()) {
+            GlossCommandMessages.send(sender, GlossMessages.HOLOGRAM_ACTIONS_EMPTY,
+                    MessageArgument.untrusted("id", id));
+            return;
+        }
+        GlossCommandMessages.send(sender, GlossMessages.HOLOGRAM_ACTIONS_HEADER,
+                MessageArgument.untrusted("id", id),
+                MessageArgument.trusted("count", actions.size()));
+        for (MenuActionData action : actions) {
+            GlossCommandMessages.send(sender, GlossMessages.HOLOGRAM_ACTIONS_ENTRY,
+                    MessageArgument.untrusted("kind", action.getType().getSerializedName()),
+                    MessageArgument.untrusted("value", action.triggerOrDefault().name().toLowerCase(Locale.ROOT)));
+        }
     }
 
     private AnchoredHologram find(CommandSender sender, String id) {

@@ -5,6 +5,7 @@ import art.arcane.gloss.condition.ShowCondition;
 import art.arcane.gloss.doc.DocumentDelta;
 import art.arcane.gloss.doc.DocumentRegistry;
 import art.arcane.gloss.doc.GlossDocument;
+import art.arcane.gloss.doc.RegistryOwner;
 import art.arcane.gloss.doc.ShippedDefaults;
 import art.arcane.gloss.doc.ShippedDocumentCatalog;
 import art.arcane.gloss.text.TextPipeline;
@@ -21,7 +22,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 
-public final class AnimationService {
+public final class AnimationService implements RegistryOwner {
     private static final String FUNCTION_PREFIX = "animation.";
 
     private final Gloss plugin;
@@ -290,5 +291,10 @@ public final class AnimationService {
             plugin.text().unregisterFunction(name);
         }
         registeredFunctions.clear();
+    }
+
+    @Override
+    public Map<String, DocumentRegistry<?>> registries() {
+        return Map.of("animations", registry);
     }
 }

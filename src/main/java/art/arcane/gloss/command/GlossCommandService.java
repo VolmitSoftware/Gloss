@@ -100,7 +100,22 @@ public final class GlossCommandService implements CommandExecutor, TabCompleter,
             "gloss.web.workspace",
             "gloss.web.sessions",
             "gloss.import",
-            "gloss.import.apply"
+            "gloss.import.apply",
+            "gloss.rigs",
+            "gloss.rigs.place",
+            "gloss.rigs.edit",
+            "gloss.rigs.remove",
+            "gloss.rigs.import",
+            "gloss.motion",
+            "gloss.motion.reset",
+            "gloss.markers",
+            "gloss.waypoints",
+            "gloss.waypoints.self",
+            "gloss.zones",
+            "gloss.zones.toggle",
+            "gloss.camera",
+            "gloss.nameplates",
+            "gloss.glow"
     );
     /**
      * The ported subtrees keep HoloUi's positional-to-keyed convenience pre-pass. Everything

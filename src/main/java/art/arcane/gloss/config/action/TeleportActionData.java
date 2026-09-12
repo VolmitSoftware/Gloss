@@ -2,12 +2,15 @@ package art.arcane.gloss.config.action;
 
 import art.arcane.gloss.api.HoloClickTrigger;
 import art.arcane.gloss.enums.MenuActionType;
+import art.arcane.gloss.menu.action.MenuAction;
+import art.arcane.gloss.menu.action.TeleportMenuAction;
 import org.bukkit.NamespacedKey;
 
 import java.util.regex.Pattern;
 
 public record TeleportActionData(String world, Double x, Double y, Double z,
-                                 Float yaw, Float pitch, HoloClickTrigger trigger) implements MenuActionData {
+                                 Float yaw, Float pitch, HoloClickTrigger trigger,
+                                 String when, Integer cooldownTicks) implements MenuActionData {
   private static final int MAX_WORLD_KEY_LENGTH = 255;
   private static final Pattern WORLD_KEY = Pattern.compile("[a-z0-9._-]+:[a-z0-9/._-]+");
 
@@ -23,6 +26,21 @@ public record TeleportActionData(String world, Double x, Double y, Double z,
         && finite(z)
         && finite(yaw)
         && finite(pitch);
+  }
+
+  @Override
+  public ActionEnvelope envelope() {
+    return ActionEnvelope.of(when, cooldownTicks);
+  }
+
+  @Override
+  public MenuAction<?> createAction() {
+    return new TeleportMenuAction(this);
+  }
+
+  @Override
+  public String invalidReason() {
+    return hasValidDestination() ? null : "declares an invalid teleport destination";
   }
 
   public NamespacedKey resolveWorldKey() {

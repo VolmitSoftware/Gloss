@@ -13,8 +13,41 @@ import art.arcane.gloss.entity.EntityOverlayDoc;
 import art.arcane.gloss.motd.MotdDoc;
 import art.arcane.gloss.tab.TablistDoc;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+
+// Lane imports: each lane adds its document classes inside its own anchor.
+// --- lane:screen ---
+import art.arcane.gloss.nametag.NametagDoc;
+import art.arcane.gloss.surface.SurfaceDoc;
+
+// --- lane:chat ---
+import art.arcane.gloss.chat.ChannelDoc;
+import art.arcane.gloss.leaderboard.LeaderboardDoc;
+import art.arcane.gloss.strings.StringsDoc;
+
+// --- lane:forms ---
+import art.arcane.gloss.dialog.DialogDoc;
+import art.arcane.gloss.inventory.InventoryDoc;
+
+// --- lane:rigs ---
+import art.arcane.gloss.motion.MotionDoc;
+import art.arcane.gloss.rig.RigDoc;
+
+// --- lane:world ---
+import art.arcane.gloss.nameplate.NameplateDoc;
+
+// --- lane:behaviors ---
+import art.arcane.gloss.behavior.BehaviorDoc;
+
+// --- lane:authoring ---
+
+// --- lane:forge ---
+import art.arcane.gloss.forge.GlyphDoc;
+
+// --- lane:fixes ---
+
 
 public final class ShippedDocumentCatalog {
     public record Entry<T>(String kind, List<String> names, DocumentParser<T> parser) {
@@ -70,8 +103,82 @@ public final class ShippedDocumentCatalog {
     private ShippedDocumentCatalog() {
     }
 
+    private static final List<Entry<?>> CORE = List.of(EMOJI, ANIMATIONS, BOARDS, BUBBLES, TABLIST, MOTD,
+        REAL_DROPS, DAMAGE_INDICATORS, ENTITY_OVERLAYS, MENUS);
+
+    // Lane catalogs: a lane declares its Entry constants and lists them in its own constant so no
+    // two branches touch the same line. ShippedDocumentTest pins every entry listed here.
+    // --- lane:screen ---
+    public static final Entry<SurfaceDoc> SURFACES =
+        new Entry<>(SurfaceDoc.KIND, List.of("welcome"), SurfaceDoc::parse);
+
+    public static final Entry<NametagDoc> NAMETAGS =
+        new Entry<>(NametagDoc.KIND, List.of("default"), NametagDoc::parse);
+
+    private static final List<Entry<?>> SCREEN = List.of(SURFACES, NAMETAGS);
+
+    // --- lane:chat ---
+    public static final Entry<ChannelDoc> CHANNELS =
+        new Entry<>(ChannelDoc.KIND, List.of("global", "private"), ChannelDoc::parse);
+
+    public static final Entry<StringsDoc> STRINGS =
+        new Entry<>(StringsDoc.KIND, List.of(StringsDoc.DEFAULT_ID), StringsDoc::parse);
+
+    public static final Entry<LeaderboardDoc> LEADERBOARDS =
+        new Entry<>(LeaderboardDoc.KIND, List.of("playtime"), LeaderboardDoc::parse);
+
+    private static final List<Entry<?>> CHAT = List.of(CHANNELS, STRINGS, LEADERBOARDS);
+
+    // --- lane:forms ---
+    public static final Entry<DialogDoc> DIALOGS =
+        new Entry<>(DialogDoc.KIND, List.of("example"), DialogDoc::parse);
+
+    public static final Entry<InventoryDoc> INVENTORIES =
+        new Entry<>(InventoryDoc.KIND, List.of("example"), InventoryDoc::parse);
+
+    private static final List<Entry<?>> FORMS = List.of(DIALOGS, INVENTORIES);
+
+    // --- lane:rigs ---
+    public static final Entry<MotionDoc> MOTION =
+        new Entry<>(MotionDoc.KIND, List.of("breathe", "spin"), MotionDoc::parse);
+    public static final Entry<RigDoc> RIGS_ENTRY =
+        new Entry<>(RigDoc.KIND, List.of("pedestal"), RigDoc::parse);
+    private static final List<Entry<?>> RIGS = List.of(MOTION, RIGS_ENTRY);
+
+    // --- lane:world ---
+    public static final Entry<NameplateDoc> NAMEPLATES =
+        new Entry<>(NameplateDoc.KIND, List.of(NameplateDoc.DEFAULT_ID), NameplateDoc::parse);
+
+    private static final List<Entry<?>> WORLD = List.of(NAMEPLATES);
+
+    // --- lane:behaviors ---
+    public static final Entry<BehaviorDoc> BEHAVIORS_ENTRY =
+        new Entry<>(BehaviorDoc.KIND, List.of("welcome"), BehaviorDoc::parse);
+    private static final List<Entry<?>> BEHAVIORS = List.of(BEHAVIORS_ENTRY);
+
+    // --- lane:authoring ---
+    private static final List<Entry<?>> AUTHORING = List.of();
+
+    // --- lane:forge ---
+    public static final Entry<GlyphDoc> GLYPHS =
+        new Entry<>(GlyphDoc.KIND, List.of(GlyphDoc.DEFAULT_ID), GlyphDoc::parse);
+
+    private static final List<Entry<?>> FORGE = List.of(GLYPHS);
+
+    // --- lane:fixes ---
+    private static final List<Entry<?>> FIXES = List.of();
+
     public static List<Entry<?>> all() {
-        return List.of(EMOJI, ANIMATIONS, BOARDS, BUBBLES, TABLIST, MOTD, REAL_DROPS,
-            DAMAGE_INDICATORS, ENTITY_OVERLAYS, MENUS);
+        List<Entry<?>> all = new ArrayList<>(CORE);
+        all.addAll(SCREEN);
+        all.addAll(CHAT);
+        all.addAll(FORMS);
+        all.addAll(RIGS);
+        all.addAll(WORLD);
+        all.addAll(BEHAVIORS);
+        all.addAll(AUTHORING);
+        all.addAll(FORGE);
+        all.addAll(FIXES);
+        return List.copyOf(all);
     }
 }

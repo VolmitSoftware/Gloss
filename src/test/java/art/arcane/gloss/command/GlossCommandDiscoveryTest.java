@@ -1,5 +1,6 @@
 package art.arcane.gloss.command;
 
+import art.arcane.gloss.editor.sync.EditorSyncDocumentKind;
 import art.arcane.volmlib.util.director.compat.DirectorEngineFactory;
 import art.arcane.volmlib.util.director.runtime.DirectorRuntimeEngine;
 import art.arcane.volmlib.util.director.runtime.DirectorInvocation;
@@ -203,9 +204,7 @@ public class GlossCommandDiscoveryTest {
     Set<String> editNames = edit.getChildren().stream()
         .map(node -> node.getDescriptor().getName())
         .collect(Collectors.toUnmodifiableSet());
-    assertEquals(Set.of("menu", "panel", "hologram", "scoreboard", "emoji", "animation",
-        "bubble-style", "container-preview", "tablist", "motd", "real-drops",
-        "damage-indicators", "entity-overlays"), editNames);
+    assertEquals(Set.copyOf(EditorSyncDocumentKind.ORDERED_WIRE_NAMES), editNames);
     assertTrue(parameter(child(edit, "menu"), "id").getCustomHandlerOrNull()
         instanceof CommandGlossWebEdit.MenuIdHandler);
     assertTrue(parameter(child(edit, "panel"), "id").getCustomHandlerOrNull()

@@ -15,7 +15,7 @@ class DocumentEnvelopeTest {
     void mismatchedSchemaVersionIsRejected() {
         IllegalArgumentException failure = assertThrows(IllegalArgumentException.class,
             () -> DocumentEnvelope.requireSchemaVersion("emoji", 2, 1));
-        assertEquals("unsupported emoji schemaVersion: 2", failure.getMessage());
+        assertEquals("declares schemaVersion 2; this build reads 1", failure.getMessage());
     }
 
     @Test

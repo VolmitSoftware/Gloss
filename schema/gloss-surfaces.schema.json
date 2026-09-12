@@ -1,0 +1,337 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://volmit.com/gloss/surfaces.schema.json",
+  "title": "Gloss Surface Document",
+  "description": "One authored native screen slot at plugins/Gloss/surfaces/<id>.json: an action bar segment, a boss bar or a title, selected per viewer and delivered through the shared VolmLib HUD compositor.",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "revision",
+    "surface",
+    "presentation"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "description": "Document format version. Files on any other version are ignored.",
+      "type": "integer",
+      "const": 1
+    },
+    "revision": {
+      "description": "Server-owned monotonic revision, bumped on every write.",
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991
+    },
+    "surface": {
+      "description": "Which native screen slot this document drives.",
+      "type": "string",
+      "enum": [
+        "actionbar",
+        "bossbar",
+        "title"
+      ]
+    },
+    "show": {
+      "description": "Condition deciding whether this document is eligible for a viewer at all. A boolean or a boolean expression.",
+      "type": [
+        "string",
+        "boolean"
+      ],
+      "default": true
+    },
+    "select": {
+      "title": "Surface Selection",
+      "description": "How this document competes with the other documents of the same surface kind. Highest priority wins, ties break by lowest id.",
+      "type": "object",
+      "properties": {
+        "priority": {
+          "description": "Selection priority; higher wins.",
+          "type": "integer",
+          "default": 0
+        },
+        "when": {
+          "description": "Condition deciding whether this document wants the slot for a viewer.",
+          "type": "string",
+          "default": "false"
+        }
+      }
+    },
+    "presentation": {
+      "title": "Surface Presentation",
+      "description": "What this surface shows. Which fields apply depends on the document's surface: actionbar uses text and slots, bossbar uses title, progress, color and style, title uses title, subtitle, the fade timings and trigger.",
+      "type": "object",
+      "properties": {
+        "text": {
+          "description": "Action bar text. Runs through the full text pipeline for the viewer.",
+          "type": "string",
+          "minLength": 1
+        },
+        "slots": {
+          "description": "Compositor slots this action bar segment may occupy. The compositor merges segments from every plugin into one line.",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "left",
+              "center",
+              "right"
+            ]
+          },
+          "default": [
+            "center"
+          ]
+        },
+        "title": {
+          "description": "Boss bar title, or the title line for a title surface. Runs through the full text pipeline for the viewer.",
+          "type": "string",
+          "minLength": 1
+        },
+        "subtitle": {
+          "description": "Subtitle line for a title surface. Omitted means no subtitle.",
+          "type": "string"
+        },
+        "progress": {
+          "description": "Boss bar fill as a number expression, clamped to 0..1. Evaluated for the viewer on every refresh.",
+          "type": "string",
+          "default": "1"
+        },
+        "color": {
+          "description": "Boss bar color.",
+          "type": "string",
+          "enum": [
+            "pink",
+            "blue",
+            "red",
+            "green",
+            "yellow",
+            "purple",
+            "white"
+          ],
+          "default": "white"
+        },
+        "style": {
+          "description": "Boss bar segmentation.",
+          "type": "string",
+          "enum": [
+            "solid",
+            "segmented_6",
+            "segmented_10",
+            "segmented_12",
+            "segmented_20"
+          ],
+          "default": "solid"
+        },
+        "priority": {
+          "description": "Compositor priority this surface bids with. Higher priorities win the slot; Gloss surfaces default to status so a pregen progress bar or a modal title still wins.",
+          "type": "string",
+          "enum": [
+            "ambient",
+            "notice",
+            "status",
+            "progress",
+            "interactive",
+            "modal",
+            "pinned"
+          ],
+          "default": "status"
+        },
+        "ttlTicks": {
+          "description": "Ticks this surface stays asserted before the compositor drops it. Omitted means twice the [surfaces] refreshIntervalTicks.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1200
+        },
+        "fadeInTicks": {
+          "description": "Ticks a title fades in over.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1200,
+          "default": 10
+        },
+        "stayTicks": {
+          "description": "Ticks a title stays fully visible.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1200,
+          "default": 40
+        },
+        "fadeOutTicks": {
+          "description": "Ticks a title fades out over.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1200,
+          "default": 10
+        },
+        "trigger": {
+          "description": "When a title fires: select on the pass where the document becomes selected, once per session, or repeat while it stays selected.",
+          "type": "string",
+          "enum": [
+            "select",
+            "once",
+            "repeat"
+          ],
+          "default": "select"
+        },
+        "repeatTicks": {
+          "description": "Ticks between repeats for a repeat trigger. Clamped to at least stayTicks so a title never fights its own fade.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 72000
+        }
+      }
+    },
+    "variants": {
+      "description": "Alternative presentations for the same document. The highest-priority variant whose condition matches replaces the base presentation; variants never merge.",
+      "type": "array",
+      "items": {
+        "title": "Surface Variant",
+        "type": "object",
+        "required": [
+          "id",
+          "when",
+          "presentation"
+        ],
+        "properties": {
+          "id": {
+            "description": "Variant id, unique inside this document.",
+            "type": "string",
+            "pattern": "^[A-Za-z0-9._-]+$"
+          },
+          "priority": {
+            "description": "Variant priority; higher wins, ties break by lowest id.",
+            "type": "integer",
+            "default": 0
+          },
+          "when": {
+            "description": "Condition deciding whether this variant applies for the viewer.",
+            "type": "string"
+          },
+          "presentation": {
+            "title": "Surface Presentation",
+            "description": "What this surface shows. Which fields apply depends on the document's surface: actionbar uses text and slots, bossbar uses title, progress, color and style, title uses title, subtitle, the fade timings and trigger.",
+            "type": "object",
+            "properties": {
+              "text": {
+                "description": "Action bar text. Runs through the full text pipeline for the viewer.",
+                "type": "string",
+                "minLength": 1
+              },
+              "slots": {
+                "description": "Compositor slots this action bar segment may occupy. The compositor merges segments from every plugin into one line.",
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "left",
+                    "center",
+                    "right"
+                  ]
+                },
+                "default": [
+                  "center"
+                ]
+              },
+              "title": {
+                "description": "Boss bar title, or the title line for a title surface. Runs through the full text pipeline for the viewer.",
+                "type": "string",
+                "minLength": 1
+              },
+              "subtitle": {
+                "description": "Subtitle line for a title surface. Omitted means no subtitle.",
+                "type": "string"
+              },
+              "progress": {
+                "description": "Boss bar fill as a number expression, clamped to 0..1. Evaluated for the viewer on every refresh.",
+                "type": "string",
+                "default": "1"
+              },
+              "color": {
+                "description": "Boss bar color.",
+                "type": "string",
+                "enum": [
+                  "pink",
+                  "blue",
+                  "red",
+                  "green",
+                  "yellow",
+                  "purple",
+                  "white"
+                ],
+                "default": "white"
+              },
+              "style": {
+                "description": "Boss bar segmentation.",
+                "type": "string",
+                "enum": [
+                  "solid",
+                  "segmented_6",
+                  "segmented_10",
+                  "segmented_12",
+                  "segmented_20"
+                ],
+                "default": "solid"
+              },
+              "priority": {
+                "description": "Compositor priority this surface bids with. Higher priorities win the slot; Gloss surfaces default to status so a pregen progress bar or a modal title still wins.",
+                "type": "string",
+                "enum": [
+                  "ambient",
+                  "notice",
+                  "status",
+                  "progress",
+                  "interactive",
+                  "modal",
+                  "pinned"
+                ],
+                "default": "status"
+              },
+              "ttlTicks": {
+                "description": "Ticks this surface stays asserted before the compositor drops it. Omitted means twice the [surfaces] refreshIntervalTicks.",
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 1200
+              },
+              "fadeInTicks": {
+                "description": "Ticks a title fades in over.",
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1200,
+                "default": 10
+              },
+              "stayTicks": {
+                "description": "Ticks a title stays fully visible.",
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1200,
+                "default": 40
+              },
+              "fadeOutTicks": {
+                "description": "Ticks a title fades out over.",
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1200,
+                "default": 10
+              },
+              "trigger": {
+                "description": "When a title fires: select on the pass where the document becomes selected, once per session, or repeat while it stays selected.",
+                "type": "string",
+                "enum": [
+                  "select",
+                  "once",
+                  "repeat"
+                ],
+                "default": "select"
+              },
+              "repeatTicks": {
+                "description": "Ticks between repeats for a repeat trigger. Clamped to at least stayTicks so a title never fights its own fade.",
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 72000
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

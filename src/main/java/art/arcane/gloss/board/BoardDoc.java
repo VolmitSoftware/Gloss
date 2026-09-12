@@ -60,7 +60,7 @@ public record BoardDoc(int schemaVersion, long revision, ShowCondition show, Sel
         }
     }
 
-    public record Presentation(String title, List<String> lines, boolean hideNumbers) {
+    public record Presentation(String title, List<BoardLine> lines, boolean hideNumbers) {
         public static final Presentation EMPTY = new Presentation("", List.of(), false);
 
         public Presentation {
@@ -68,13 +68,33 @@ public record BoardDoc(int schemaVersion, long revision, ShowCondition show, Sel
             lines = copyLines(lines);
         }
 
-        private static List<String> copyLines(List<String> lines) {
+        public static Presentation ofStrings(String title, List<String> lines, boolean hideNumbers) {
+            if (lines == null) {
+                return new Presentation(title, List.of(), hideNumbers);
+            }
+            List<BoardLine> converted = new ArrayList<>(lines.size());
+            for (String line : lines) {
+                converted.add(BoardLine.of(line));
+            }
+            return new Presentation(title, converted, hideNumbers);
+        }
+
+        /** The label column only, for callers that never author a value. */
+        public List<String> texts() {
+            List<String> texts = new ArrayList<>(lines.size());
+            for (BoardLine line : lines) {
+                texts.add(line.text());
+            }
+            return List.copyOf(texts);
+        }
+
+        private static List<BoardLine> copyLines(List<BoardLine> lines) {
             if (lines == null) {
                 return List.of();
             }
-            List<String> copied = new ArrayList<>(lines.size());
-            for (String line : lines) {
-                copied.add(line == null ? "" : line);
+            List<BoardLine> copied = new ArrayList<>(lines.size());
+            for (BoardLine line : lines) {
+                copied.add(line == null ? BoardLine.of("") : line);
             }
             return List.copyOf(copied);
         }

@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "revision": 1,
+  "show": "true",
+  "channel": {
+    "name": "private",
+    "aliases": [],
+    "default": false,
+    "scope": "direct",
+    "radius": 0,
+    "permission": "",
+    "priority": 100,
+    "cooldownTicks": 0
+  },
+  "format": "&7[&d{{ sender.name }} &7-> &d{{ viewer.name }}&7] &f{{ message }}",
+  "card": [],
+  "mentions": {
+    "enabled": false
+  },
+  "items": {
+    "enabled": true,
+    "token": "[item]",
+    "permission": "gloss.chat.item"
+  },
+  "links": {
+    "enabled": true,
+    "render": "&9&n{{ link.host }}"
+  },
+  "filters": [],
+  "throttle": {
+    "repeatWindowTicks": 0,
+    "maxRepeats": 1,
+    "minIntervalTicks": 0
+  },
+  "variants": []
+}

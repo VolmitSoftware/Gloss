@@ -6,6 +6,7 @@ import art.arcane.gloss.condition.ShowCondition;
 import art.arcane.gloss.doc.DocumentDelta;
 import art.arcane.gloss.doc.DocumentRegistry;
 import art.arcane.gloss.doc.GlossDocument;
+import art.arcane.gloss.doc.RegistryOwner;
 import art.arcane.gloss.doc.ShippedDefaults;
 import art.arcane.gloss.doc.ShippedDocumentCatalog;
 import art.arcane.gloss.text.TextPipeline;
@@ -32,7 +33,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.function.Predicate;
 
-public final class EmojiService implements Listener {
+public final class EmojiService implements Listener, RegistryOwner {
     static final long SHOW_REFRESH_TICKS = 10L;
     private static final String PERMISSION_PREFIX = "gloss.emoji.";
 
@@ -44,6 +45,7 @@ public final class EmojiService implements Listener {
     private volatile EmojiReplacer replacer;
     private volatile Map<String, String> permissionNodes;
     private volatile EmojiVisibilityCache visibility;
+    private volatile GlyphSubstitution glyphSubstitution;
     private volatile boolean enabled;
     private SchedulerUtils.TaskHandle visibilityTask;
 
@@ -111,12 +113,22 @@ public final class EmojiService implements Listener {
         }
         Predicate<ShowCondition> visible = visibilityFor(sender);
         if (!plugin.cfg().emoji().emojiSpecificPermissions()) {
-            return counted(message, replacer.apply(message, null, visible));
+            String substituted = GlyphSubstitution.apply(glyphSubstitution, sender, message, entries, null, visible);
+            return counted(message, replacer.apply(substituted, null, visible));
         }
 
         Map<String, String> nodes = permissionNodes;
-        return counted(message, replacer.apply(message,
-            id -> sender.hasPermission(nodes.getOrDefault(id, PERMISSION_PREFIX + id)), visible));
+        Predicate<String> allowed = id -> sender.hasPermission(nodes.getOrDefault(id, PERMISSION_PREFIX + id));
+        String substituted = GlyphSubstitution.apply(glyphSubstitution, sender, message, entries, allowed, visible);
+        return counted(message, replacer.apply(substituted, allowed, visible));
+    }
+
+    /**
+     * Installed by the forge lane when a glyph document maps an emoji id; null otherwise, which is
+     * the state every server without a glyph pack stays in.
+     */
+    public void setGlyphSubstitution(GlyphSubstitution substitution) {
+        this.glyphSubstitution = substitution;
     }
 
     @EventHandler(priority = EventPriority.MONITOR)
@@ -258,5 +270,10 @@ public final class EmojiService implements Listener {
             }
         }
         TextPipeline.publishConditionalEmojiTokens(conditionalTokens);
+    }
+
+    @Override
+    public Map<String, DocumentRegistry<?>> registries() {
+        return Map.of("emoji", registry);
     }
 }

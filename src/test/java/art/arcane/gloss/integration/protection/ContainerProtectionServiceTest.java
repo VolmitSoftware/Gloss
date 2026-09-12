@@ -9,6 +9,7 @@ import org.bukkit.plugin.Plugin;
 import org.junit.Test;
 
 import java.lang.reflect.Proxy;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import java.util.logging.Logger;
@@ -68,8 +69,23 @@ public class ContainerProtectionServiceTest {
 
   private static ContainerProtectionService service(ContainerProtectionProvider provider,
                                                      Consumer<Event> dispatcher) {
-    return new ContainerProtectionService(plugin(), provider, dispatcher);
+    ContainerProtectionService service = new ContainerProtectionService(plugin(), List.of(),
+        ALLOW_ALL, dispatcher);
+    service.install("Test", provider);
+    return service;
   }
+
+  private static final ContainerProtectionProvider ALLOW_ALL = new ContainerProtectionProvider() {
+    @Override
+    public boolean canAccess(Player player, Block block) {
+      return true;
+    }
+
+    @Override
+    public boolean canAccess(Player player, Entity entity) {
+      return true;
+    }
+  };
 
   private static ContainerProtectionProvider provider(boolean blocks, boolean entities) {
     return new ContainerProtectionProvider() {

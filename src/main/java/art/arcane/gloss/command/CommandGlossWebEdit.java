@@ -133,6 +133,160 @@ public final class CommandGlossWebEdit {
     public EntityOverlaysIdHandler() { super("entity-overlays"); }
   }
 
+  // Lane web-edit surfaces: one @Director method per syncable kind, inside the lane's anchor.
+  // --- lane:screen ---
+  @Director(name = "surface", description = "Open this live document in the web editor",
+      descriptionKey = "command.help.web.edit.document")
+  public void surface(
+      @Param(name = "id", description = "Live Gloss document id",
+          descriptionKey = "command.help.arg.web_subject",
+          customHandler = SurfaceIdHandler.class) String id,
+      @Param(name = "sender", contextual = true) CommandSender sender) {
+    web.openSubject("surface", id, sender);
+  }
+
+  @Director(name = "nametag", description = "Open this live document in the web editor",
+      descriptionKey = "command.help.web.edit.document")
+  public void nametag(
+      @Param(name = "id", description = "Live Gloss document id",
+          descriptionKey = "command.help.arg.web_subject",
+          customHandler = NametagIdHandler.class) String id,
+      @Param(name = "sender", contextual = true) CommandSender sender) {
+    web.openSubject("nametag", id, sender);
+  }
+
+  // --- lane:chat ---
+  @Director(name = "channel", description = "Open this live document in the web editor",
+      descriptionKey = "command.help.web.edit.document")
+  public void channel(@Param(name = "id", description = "Live Gloss document id",
+                          descriptionKey = "command.help.arg.web_subject",
+                          customHandler = ChannelIdHandler.class) String id,
+                      @Param(name = "sender", contextual = true) CommandSender sender) {
+    web.openSubject("channel", id, sender);
+  }
+
+  @Director(name = "strings", description = "Open this live document in the web editor",
+      descriptionKey = "command.help.web.edit.document")
+  public void strings(@Param(name = "id", description = "Live Gloss document id",
+                          descriptionKey = "command.help.arg.web_subject",
+                          customHandler = StringsIdHandler.class) String id,
+                      @Param(name = "sender", contextual = true) CommandSender sender) {
+    web.openSubject("strings", id, sender);
+  }
+
+  @Director(name = "leaderboard", description = "Open this live document in the web editor",
+      descriptionKey = "command.help.web.edit.document")
+  public void leaderboard(@Param(name = "id", description = "Live Gloss document id",
+                              descriptionKey = "command.help.arg.web_subject",
+                              customHandler = LeaderboardIdHandler.class) String id,
+                          @Param(name = "sender", contextual = true) CommandSender sender) {
+    web.openSubject("leaderboard", id, sender);
+  }
+
+  // --- lane:forms ---
+  @Director(name = "dialog", description = "Open this live document in the web editor",
+      descriptionKey = "command.help.web.edit.document")
+  public void dialog(@Param(name = "id", description = "Live Gloss document id",
+                         descriptionKey = "command.help.arg.web_subject", customHandler = DialogIdHandler.class) String id,
+                     @Param(name = "sender", contextual = true) CommandSender sender) {
+    web.openSubject("dialog", id, sender);
+  }
+
+  @Director(name = "inventory", description = "Open this live document in the web editor",
+      descriptionKey = "command.help.web.edit.document")
+  public void inventory(@Param(name = "id", description = "Live Gloss document id",
+                            descriptionKey = "command.help.arg.web_subject", customHandler = InventoryIdHandler.class) String id,
+                        @Param(name = "sender", contextual = true) CommandSender sender) {
+    web.openSubject("inventory", id, sender);
+  }
+
+  // --- lane:rigs ---
+  @Director(name = "motion", description = "Open this live document in the web editor",
+      descriptionKey = "command.help.web.edit.document")
+  public void motion(@Param(name = "id", description = "Live Gloss document id",
+                         descriptionKey = "command.help.arg.web_subject", customHandler = MotionIdHandler.class) String id,
+                     @Param(name = "sender", contextual = true) CommandSender sender) {
+    web.openSubject("motion", id, sender);
+  }
+
+  @Director(name = "rig", description = "Open this live document in the web editor",
+      descriptionKey = "command.help.web.edit.document")
+  public void rig(@Param(name = "id", description = "Live Gloss document id",
+                      descriptionKey = "command.help.arg.web_subject", customHandler = RigIdHandler.class) String id,
+                  @Param(name = "sender", contextual = true) CommandSender sender) {
+    web.openSubject("rig", id, sender);
+  }
+
+  @Director(name = "rig-instance", description = "Open this live document in the web editor",
+      descriptionKey = "command.help.web.edit.document")
+  public void rigInstance(@Param(name = "id", description = "Live Gloss document id",
+                              descriptionKey = "command.help.arg.web_subject", customHandler = RigInstanceIdHandler.class) String id,
+                          @Param(name = "sender", contextual = true) CommandSender sender) {
+    web.openSubject("rig-instance", id, sender);
+  }
+
+  // --- lane:world ---
+  @Director(name = "marker", description = "Open this live document in the web editor",
+      descriptionKey = "command.help.web.edit.document")
+  public void marker(@Param(name = "id", description = "Live Gloss document id",
+                         descriptionKey = "command.help.arg.web_subject",
+                         customHandler = MarkerIdHandler.class) String id,
+                     @Param(name = "sender", contextual = true) CommandSender sender) {
+    web.openSubject("marker", id, sender);
+  }
+
+  @Director(name = "waypoint", description = "Open this live document in the web editor",
+      descriptionKey = "command.help.web.edit.document")
+  public void waypoint(@Param(name = "id", description = "Live Gloss document id",
+                           descriptionKey = "command.help.arg.web_subject",
+                           customHandler = WaypointIdHandler.class) String id,
+                       @Param(name = "sender", contextual = true) CommandSender sender) {
+    web.openSubject("waypoint", id, sender);
+  }
+
+  @Director(name = "zone", description = "Open this live document in the web editor",
+      descriptionKey = "command.help.web.edit.document")
+  public void zone(@Param(name = "id", description = "Live Gloss document id",
+                       descriptionKey = "command.help.arg.web_subject",
+                       customHandler = ZoneIdHandler.class) String id,
+                   @Param(name = "sender", contextual = true) CommandSender sender) {
+    web.openSubject("zone", id, sender);
+  }
+
+  @Director(name = "nameplate", description = "Open this live document in the web editor",
+      descriptionKey = "command.help.web.edit.document")
+  public void nameplate(@Param(name = "id", description = "Live Gloss document id",
+                            descriptionKey = "command.help.arg.web_subject",
+                            customHandler = NameplateIdHandler.class) String id,
+                        @Param(name = "sender", contextual = true) CommandSender sender) {
+    web.openSubject("nameplate", id, sender);
+  }
+
+  // --- lane:behaviors ---
+  @Director(name = "behavior", description = "Open this live document in the web editor",
+      descriptionKey = "command.help.web.edit.document")
+  public void behavior(@Param(name = "id", description = "Live Gloss document id",
+                           descriptionKey = "command.help.arg.web_subject",
+                           customHandler = BehaviorIdHandler.class) String id,
+                       @Param(name = "sender", contextual = true) CommandSender sender) {
+    web.openSubject("behavior", id, sender);
+  }
+
+  // --- lane:authoring ---
+
+  // --- lane:forge ---
+  @Director(name = "glyph", description = "Open this live document in the web editor",
+      descriptionKey = "command.help.web.edit.document")
+  public void glyph(
+      @Param(name = "id", description = "Live Gloss document id",
+          descriptionKey = "command.help.arg.web_subject",
+          customHandler = GlyphIdHandler.class) String id,
+      @Param(name = "sender", contextual = true) CommandSender sender) {
+    web.openSubject("glyph", id, sender);
+  }
+
+  // --- lane:fixes ---
+
   public abstract static class SubjectIdHandler implements DirectorParameterHandler<String> {
     private final String wireKind;
 
@@ -219,4 +373,81 @@ public final class CommandGlossWebEdit {
   public static final class DamageIndicatorsIdHandler extends SubjectIdHandler {
     public DamageIndicatorsIdHandler() { super("damage-indicators"); }
   }
+
+  // Lane id handlers: one SubjectIdHandler subclass per syncable kind, inside the lane's anchor.
+  // --- lane:screen ---
+  public static final class SurfaceIdHandler extends SubjectIdHandler {
+    public SurfaceIdHandler() { super("surface"); }
+  }
+
+  public static final class NametagIdHandler extends SubjectIdHandler {
+    public NametagIdHandler() { super("nametag"); }
+  }
+
+  // --- lane:chat ---
+  public static final class ChannelIdHandler extends SubjectIdHandler {
+    public ChannelIdHandler() { super("channel"); }
+  }
+
+  public static final class StringsIdHandler extends SubjectIdHandler {
+    public StringsIdHandler() { super("strings"); }
+  }
+
+  public static final class LeaderboardIdHandler extends SubjectIdHandler {
+    public LeaderboardIdHandler() { super("leaderboard"); }
+  }
+
+  // --- lane:forms ---
+  public static final class DialogIdHandler extends SubjectIdHandler {
+    public DialogIdHandler() { super("dialog"); }
+  }
+
+  public static final class InventoryIdHandler extends SubjectIdHandler {
+    public InventoryIdHandler() { super("inventory"); }
+  }
+
+  // --- lane:rigs ---
+  public static final class MotionIdHandler extends SubjectIdHandler {
+    public MotionIdHandler() { super("motion"); }
+  }
+
+  public static final class RigIdHandler extends SubjectIdHandler {
+    public RigIdHandler() { super("rig"); }
+  }
+
+  public static final class RigInstanceIdHandler extends SubjectIdHandler {
+    public RigInstanceIdHandler() { super("rig-instance"); }
+  }
+
+  // --- lane:world ---
+  public static final class MarkerIdHandler extends SubjectIdHandler {
+    public MarkerIdHandler() { super("marker"); }
+  }
+
+  public static final class WaypointIdHandler extends SubjectIdHandler {
+    public WaypointIdHandler() { super("waypoint"); }
+  }
+
+  public static final class ZoneIdHandler extends SubjectIdHandler {
+    public ZoneIdHandler() { super("zone"); }
+  }
+
+  public static final class NameplateIdHandler extends SubjectIdHandler {
+    public NameplateIdHandler() { super("nameplate"); }
+  }
+
+  // --- lane:behaviors ---
+  public static final class BehaviorIdHandler extends SubjectIdHandler {
+    public BehaviorIdHandler() { super("behavior"); }
+  }
+
+  // --- lane:authoring ---
+
+  // --- lane:forge ---
+  public static final class GlyphIdHandler extends SubjectIdHandler {
+    public GlyphIdHandler() { super("glyph"); }
+  }
+
+  // --- lane:fixes ---
+
 }

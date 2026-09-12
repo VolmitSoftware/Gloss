@@ -2,6 +2,9 @@ package art.arcane.gloss.menu.icon;
 
 import art.arcane.gloss.Gloss;
 import art.arcane.gloss.config.icon.TextImageIconData;
+import art.arcane.gloss.forge.GlyphAtlas;
+import art.arcane.gloss.forge.GlyphRegistry;
+import art.arcane.gloss.forge.PackNamespace;
 import art.arcane.gloss.exceptions.MenuIconException;
 import art.arcane.gloss.menu.DisplayEntityManager;
 import art.arcane.gloss.menu.MenuSession;
@@ -19,6 +22,7 @@ import org.bukkit.util.Vector;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 public class TextImageMenuIcon extends MenuIcon<TextImageIconData> {
@@ -32,16 +36,29 @@ public class TextImageMenuIcon extends MenuIcon<TextImageIconData> {
       TextUtils.textColor("████", "#f800f8").append(TextUtils.textColor("████", "#000000")),
       TextUtils.textColor("████", "#f800f8").append(TextUtils.textColor("████", "#000000")),
       TextUtils.textColor("████", "#f800f8").append(TextUtils.textColor("████", "#000000")));
+  /** A block-space line is eight pixels tall, which is what one vanilla font line occupies. */
+  private static final float PIXELS_PER_LINE = 8F;
+
   private final List<Component> components;
+  private final float planeLines;
 
   public TextImageMenuIcon(MenuSession session, Location loc, TextImageIconData data) throws MenuIconException {
     super(session, loc, data);
-    components = createComponents();
+    Optional<GlyphRegistry.ResolvedGlyph> glyph = PackNamespace.loaded(session.getPlayer())
+        ? GlyphAtlas.lookup(data.requirePath()) : Optional.empty();
+    if (glyph.isPresent()) {
+      components = glyphLines(GlyphAtlas.glyphFor(data.requirePath()).orElseThrow());
+      planeLines = glyphPlaneLines(glyph.get().height());
+    } else {
+      components = createComponents();
+      planeLines = components.size();
+    }
   }
 
   public TextImageMenuIcon(MenuSession session, Location loc) throws MenuIconException {
     super(session, loc, null);
     components = MISSING;
+    planeLines = MISSING.size();
   }
 
   @Override
@@ -65,15 +82,31 @@ public class TextImageMenuIcon extends MenuIcon<TextImageIconData> {
     float width = 0;
     for (Component component : components)
       width = Math.max(width, TextUtils.content(component).length() * characterWidth / 2F);
-    return session.getTransform().createPlane(textBoundingBoxCenter(anchor), width, components.size() * lineHeight);
+    return session.getTransform().createPlane(textBoundingBoxCenter(anchor), width, planeLines * lineHeight);
+  }
+
+  /** The glyph string as the single line a pack viewer sees. */
+  static List<Component> glyphLines(String glyph) {
+    return List.of(TextUtils.parse(glyph));
+  }
+
+  /** How many block-space lines a glyph of this pixel height occupies. */
+  static float glyphPlaneLines(int heightPx) {
+    return Math.max(1F, heightPx / PIXELS_PER_LINE);
   }
 
   private List<Component> createComponents() throws MenuIconException {
     String path = data.requirePath();
+    BufferedImage image = null;
     try {
       Pair<ImageFormat, BufferedImage> imageData = Gloss.instance.getImageAssets().get(path);
-      return TextImageRasterCache.lines(imageData.getRight(), imageData.getLeft() == ImageFormats.JPEG);
+      image = imageData.getRight();
+      return TextImageRasterCache.lines(image, imageData.getLeft() == ImageFormats.JPEG);
     } catch (IOException | RuntimeException e) {
+      if (image != null && (image.getWidth() > TextImageRasterCache.MAX_DIMENSION
+          || image.getHeight() > TextImageRasterCache.MAX_DIMENSION)) {
+        TextImageRasterCache.reportOversize(path, image.getWidth(), image.getHeight());
+      }
       MenuIconException ex = new MenuIconException("Failed to load relative image \"%s\"!", path);
       ex.initCause(e);
       throw ex;

@@ -826,3 +826,517 @@ line = "行{line}"
 [language.editor.value]
 none = "なし"
 empty = "(空)"
+
+# Lane message tables. Each lane appends its [gloss.message.<lane>] and [command.help.<group>]
+# tables inside its own anchor so parallel branches never share a line.
+# --- lane:screen ---
+[gloss.message.screen]
+"surfaces.empty" = "&8[&dGloss&8] &7読み込まれたサーフェスはありません。"
+"surfaces.unknown" = "&8[&dGloss&8]: &c&f{id}&c というサーフェスはありません。"
+"surfaces.tested" = "&8[&dGloss&8]: &a&f{player}&a に対して &f{id}&a を実行しました。"
+"nametags.empty" = "&8[&dGloss&8] &7読み込まれたネームタグはありません。"
+"nametags.unknown" = "&8[&dGloss&8]: &c&f{id}&c というネームタグはありません。"
+"nametags.refreshed" = "&8[&dGloss&8]: &a&d{count}&a 件のネームタグ文書を再適用しました。"
+"hud.header" = "&8[&dGloss&8] &7&f{player}&7 の HUD 占有: &d{count}"
+"hud.empty" = "&8[&dGloss&8] &7&f{player}&7 の HUD 枠を占有しているプラグインはありません。"
+"hud.line" = "&8- &f{kind} &7{source} &8| &7{value} &8| &7{count} &8| &7{state}"
+"player.unknown" = "&8[&dGloss&8]: &c&f{player}&c というオンラインプレイヤーはいません。"
+
+[command.help.surface]
+root = "アクションバー・ボスバー・タイトルのサーフェス"
+list = "サーフェス文書を一覧表示"
+info = "サーフェス文書を表示"
+"info.id" = "サーフェス文書の ID"
+reset = "同梱のサーフェスを復元"
+test = "指定プレイヤーのサーフェス処理を今すぐ実行"
+"test.id" = "サーフェス文書の ID"
+"test.player" = "テスト対象のプレイヤー。既定は自分"
+
+[command.help.nametag]
+root = "視点ごとのネームタグ文書"
+list = "ネームタグ文書を一覧表示"
+info = "ネームタグ文書を表示"
+"info.id" = "ネームタグ文書の ID"
+reset = "同梱のネームタグを復元"
+refresh = "すべてのネームタグを今すぐ再適用"
+
+[command.help.hud]
+root = "共有 HUD コンポジターを確認"
+who = "各 HUD 枠をどのプラグインが占有しているか表示"
+"who.player" = "確認するプレイヤー。既定は自分"
+
+# --- lane:chat ---
+[gloss.message.chat]
+filtered = "&8[&dGloss&8]: &cチャットフィルターによりメッセージがブロックされました。"
+too_fast = "&8[&dGloss&8]: &e次のメッセージを送るまで少し待ってください。"
+repeat = "&8[&dGloss&8]: &e同じ内容をすでに送信しています。"
+channel_set = "&8[&dGloss&8]: &a現在 &d{name}&a で発言しています。"
+channel_unknown = "&8[&dGloss&8]: &c&d{name}&c という名前のチャンネルはありません。"
+channel_list = "&8[&dGloss&8]: &7チャンネル: &f{value}"
+msg_usage = "&8[&dGloss&8]: &e使い方: &f{command}"
+msg_offline = "&8[&dGloss&8]: &c{player} はオンラインではありません。"
+reply_none = "&8[&dGloss&8]: &c返信する相手がいません。"
+msg_self = "&8[&dGloss&8]: &c自分自身にメッセージは送れません。"
+channels_header = "&dチャンネル &7({count})"
+channels_empty = "&7読み込まれたチャンネルはありません。"
+channel_missing = "&8[&dGloss&8]: &c&f{id}&c という名前のチャンネル文書はありません。"
+strings_header = "&dテキストロケール &7({count})"
+strings_empty = "&7読み込まれたテキスト文書はありません。"
+strings_missing = "&d{locale} に不足 &7({count})"
+strings_complete = "&8[&dGloss&8]: &a{locale} は en_US のすべてのキーを網羅しています。"
+leaderboards_header = "&dリーダーボード &7({count})"
+leaderboards_empty = "&7読み込まれたリーダーボードはありません。"
+leaderboard_missing = "&8[&dGloss&8]: &c&f{id}&c という名前のリーダーボード文書はありません。"
+leaderboard_reset = "&8[&dGloss&8]: &aリーダーボード &f{id}&a をリセットしました（{state}）。"
+leaderboard_sampled = "&8[&dGloss&8]: &aリーダーボード &f{id}&a をオンラインの全プレイヤーについて取得しました。"
+
+
+[command.help.channel]
+root = "チャットチャンネル"
+list = "読み込まれたチャンネルを一覧表示"
+info = "チャンネルの範囲、書式、バリアントを表示"
+"info.id" = "チャンネル文書のID"
+reset = "同梱のチャンネル文書を復元"
+
+[command.help.strings]
+root = "作成した内容テキスト"
+list = "読み込まれたテキストロケールと項目数を一覧表示"
+missing = "en_US にあってそのロケールにないキーを一覧表示"
+"missing.locale" = "en_US と比較するロケール"
+reset = "同梱のテキスト文書を復元"
+
+[command.help.leaderboard]
+root = "計算されたリーダーボード"
+list = "読み込まれたリーダーボードと項目数を一覧表示"
+info = "リーダーボードの取得元、並び順、項目を表示"
+"info.id" = "リーダーボード文書のID"
+reset = "リーダーボードの期間値または累計値を消去"
+"reset.id" = "リーダーボード文書のID"
+"reset.period" = "all または current"
+sample = "オンラインの全プレイヤーについて今すぐ取得"
+"sample.id" = "リーダーボード文書のID"
+
+# --- lane:forms ---
+[gloss.message.forms]
+icon_unsupported = "&7チェストのスロットには描画できません ({kind})"
+no_dialogs = "&8[&dGloss&8]: &7ダイアログが設定されていません。"
+dialog_list_header = "&dダイアログ"
+dialog_list_entry = "&7ダイアログ &f{id}&7 を開く"
+dialog_info = "&8[&dGloss&8]: &d{id} &8- &7種類 &f{kind}&7、ボタン &f{count}"
+unknown_dialog = "&8[&dGloss&8]: &c{id} という名前のダイアログはありません。"
+dialog_opened = "&8[&dGloss&8]: &aダイアログ {id} を {player} に開きました。"
+dialog_unsupported = "&8[&dGloss&8]: &cお使いのクライアントではこのダイアログを表示できません。"
+no_inventories = "&8[&dGloss&8]: &7チェストメニューが設定されていません。"
+inventory_list_header = "&dチェストメニュー"
+inventory_list_entry = "&7チェストメニュー &f{id}&7 を開く"
+inventory_info = "&8[&dGloss&8]: &d{id} &8- &7サイズ &f{kind}&7、スロット &f{count}"
+unknown_inventory = "&8[&dGloss&8]: &c{id} という名前のチェストメニューはありません。"
+inventory_opened = "&8[&dGloss&8]: &aチェストメニュー {id} を {player} に開きました。"
+bad_args = "&8[&dGloss&8]: &c引数は key=value の形式で指定してください: {value}"
+prompt_timeout = "&8[&dGloss&8]: &7入力がタイムアウトしました。"
+prompt_busy = "&8[&dGloss&8]: &c入力待ちがすでにあります。"
+take_missing = "&8[&dGloss&8]: &c必要なアイテムを持っていません。"
+economy_denied = "&8[&dGloss&8]: &c所持金が足りません。"
+economy_unavailable = "&8[&dGloss&8]: &c経済プラグインが利用できません。"
+give_dropped = "&8[&dGloss&8]: &7インベントリが満杯だったため、アイテムは足元に落ちました。"
+
+[command.help.dialog]
+root = "ダイアログ文書の確認と表示"
+list = "設定済みのダイアログを一覧表示"
+"list.page" = "1 から始まる一覧ページ"
+info = "ダイアログの種類、入力、ボタンを表示"
+"info.id" = "ダイアログ ID"
+open = "プレイヤーにダイアログを表示"
+"open.id" = "ダイアログ ID"
+"open.player" = "表示する対象プレイヤー。既定は自分"
+"open.args" = "スペース区切りの key=value 引数"
+reset = "同梱のダイアログ初期設定を復元"
+"reset.name" = "リセットする名前、または * ですべての同梱初期設定"
+
+["command.help.menu.open"]
+args = "スペース区切りの key=value 引数"
+
+[command.help.inventory]
+root = "チェストメニューの確認と表示"
+list = "設定済みのチェストメニューを一覧表示"
+"list.page" = "1 から始まる一覧ページ"
+info = "チェストメニューのサイズとスロットを表示"
+"info.id" = "チェストメニュー ID"
+open = "プレイヤーにチェストメニューを表示"
+"open.id" = "チェストメニュー ID"
+"open.player" = "表示する対象プレイヤー。既定は自分"
+"open.args" = "スペース区切りの key=value 引数"
+reset = "同梱のチェストメニュー初期設定を復元"
+"reset.name" = "リセットする名前、または * ですべての同梱初期設定"
+
+
+# --- lane:rigs ---
+[command.help.rig]
+root = "リグインスタンスの配置と管理"
+list = "リグと配置済みインスタンスを一覧表示。クリックでテレポート"
+info = "リグインスタンスのリグ、位置、状態を表示"
+"info.id" = "リグインスタンスID"
+place = "現在地にリグを配置"
+"place.rig" = "リグドキュメントID"
+"place.id" = "インスタンスID。空なら次の空きIDを使用"
+move = "リグインスタンスを相対ブロック距離で移動"
+"move.id" = "リグインスタンスID"
+"move.x" = "相対X距離（ブロック）"
+"move.y" = "相対Y距離（ブロック）"
+"move.z" = "相対Z距離（ブロック）"
+here = "リグインスタンスを現在地へ移動"
+"here.id" = "リグインスタンスID"
+rotate = "リグインスタンスのヨーとピッチを設定"
+"rotate.id" = "リグインスタンスID"
+"rotate.yaw" = "ヨー（度）"
+"rotate.pitch" = "ピッチ（度）"
+scale = "リグインスタンスの均一スケールを設定"
+"scale.id" = "リグインスタンスID"
+"scale.scale" = "スケール倍率、0.01〜64"
+remove = "リグインスタンスを削除"
+"remove.id" = "リグインスタンスID"
+state = "リグインスタンスをグラフの状態へ切り替え"
+"state.id" = "リグインスタンスID"
+"state.state" = "リグのグラフにある状態名"
+var = "リグインスタンスの変数を設定"
+"var.id" = "リグインスタンスID"
+"var.name" = "変数名"
+"var.value" = "数値、true、false またはテキスト"
+import = "Blockbench モデルをリグとして取り込む"
+"import.file" = "Gloss データフォルダ内の .bbmodel のパス"
+"import.id" = "リグID。空欄ならファイル名"
+"import.texture" = "各キューブに使うカスタムアイテム（provider:id）"
+reset = "同梱のリグドキュメントを復元"
+
+["command.help.hologram"]
+page = "ホログラムのページを視点ごとに切り替える"
+"page.page" = "ページID、next または prev"
+"page.player" = "プレイヤー名。空欄なら自分"
+motion = "ホログラムでモーションクリップを再生する"
+"motion.motion" = "モーションID、停止は clear"
+actions = "クリック時にホログラムが実行するアクションを一覧表示する"
+
+[command.help.motion]
+root = "モーションクリップを確認"
+list = "モーションクリップを一覧表示"
+info = "モーションクリップの長さ、ループ、fps、トラックを表示"
+"info.id" = "モーションID"
+reset = "同梱のモーションドキュメントを復元"
+
+[gloss.message.rigs]
+rig_unknown = "&8[&dGloss&8] &c'&f{id}&c' という名前のリグはありません。"
+instance_missing = "&8[&dGloss&8] &c'&f{id}&c' という名前のリグインスタンスはありません。"
+placed = "&8[&dGloss&8] &aリグ &f{name}&a を &f{id}&a として &f{world} {x}, {y}, {z}&a に配置しました。"
+place_failed = "&8[&dGloss&8] &cリグ &f{name}&c を配置できませんでした: {reason}"
+moved = "&8[&dGloss&8] &aリグインスタンス &f{id}&a を &f{world} {x}, {y}, {z}&a へ移動しました。"
+rotated = "&8[&dGloss&8] &aリグインスタンス &f{id}&a をヨー &f{yaw}&a、ピッチ &f{pitch}&a に回転しました。"
+scaled = "&8[&dGloss&8] &aリグインスタンス &f{id}&a を &f{scale}&a にスケールしました。"
+scale_out_of_range = "&8[&dGloss&8] &cリグのスケールは &f{minimum}&c から &f{maximum}&c の範囲で指定してください。指定値: &f{value}&c。"
+removed = "&8[&dGloss&8] &aリグインスタンス &f{id}&a を削除しました。"
+state_set = "&8[&dGloss&8] &aリグインスタンス &f{id}&a は状態 &f{state}&a になりました。"
+state_unknown = "&8[&dGloss&8] &cリグインスタンス &f{id}&c に '&f{state}&c' という状態はありません。"
+var_set = "&8[&dGloss&8] &aリグインスタンス &f{id}&a の &f{name}&a を &f{value}&a に設定しました。"
+save_failed = "&8[&dGloss&8] &cリグインスタンス &f{id}&c を保存できませんでした: {reason}"
+list_empty = "&8[&dGloss&8] &7読み込まれたリグはありません。"
+list_rigs = "&8[&dGloss&8] &7リグ (&f{count}&7): &f{value}"
+instances_empty = "&8[&dGloss&8] &7配置済みのリグインスタンスはありません。"
+list_hover = "クリックでテレポート"
+list_entry = "{name} @ {world} {x}, {y}, {z}; 状態 {state}"
+info_header = "&8[&dGloss&8] &d{id} &7はリグ &f{name}&7 を使用 @ &f{world} {x}, {y}, {z}"
+info_pose = "&8[&dGloss&8] &7ヨー &f{yaw}&7、ピッチ &f{pitch}&7、スケール &f{scale}&7、状態 &f{state}"
+info_parts = "&8[&dGloss&8] &7パーツ &f{count}&7、視聴者 &f{value}"
+info_var = "&8[&dGloss&8] &7  {name} = &f{value}"
+motion_unknown = "&8[&dGloss&8] &c'&f{id}&c' という名前のモーションはありません。"
+motion_list_empty = "&8[&dGloss&8] &7読み込まれたモーションクリップはありません。"
+motion_list = "&8[&dGloss&8] &7モーションクリップ (&f{count}&7): &f{value}"
+motion_info = "&8[&dGloss&8] &d{id} &7{value} ティック、{kind}、{count} fps"
+motion_track = "&8[&dGloss&8] &7  {name} &f{key} &7({count} キーフレーム)"
+import_done = "&8[&dGloss&8] &a&f{id}&a を取り込みました: ボーン &f{value}&a、パーツ &f{count}&a、アニメーション &f{kind}&a。"
+import_unsupported = "&8[&dGloss&8] &7未対応: &f{value}&7。"
+import_failed = "&8[&dGloss&8] &c&f{path}&c を取り込めませんでした: {reason}"
+hologram_page_set = "&8[&dGloss&8] &a{player}&a は &f{id}&a のページ &f{page}&a になりました。"
+hologram_page_player_missing = "&8[&dGloss&8] &cプレイヤー &f{player}&c はオンラインではありません。"
+hologram_page_unknown = "&8[&dGloss&8] &cホログラム &f{id}&c にページ '&f{page}&c' はありません。"
+hologram_motion_set = "&8[&dGloss&8] &aホログラム &f{id}&a は &f{value}&a を再生します。"
+hologram_motion_cleared = "&8[&dGloss&8] &aホログラム &f{id}&a はモーションを再生しなくなりました。"
+hologram_actions_empty = "&8[&dGloss&8] &7ホログラム &f{id}&7 にアクションはありません。"
+hologram_actions_header = "&8[&dGloss&8] &7ホログラム &f{id}&7 のアクション (&f{count}&7):"
+hologram_actions_entry = "&8[&dGloss&8] &7  &f{kind}&7 / &f{value}"
+
+# --- lane:world ---
+[gloss.message.world]
+players_only = "&cこのコマンドはプレイヤーが実行する必要があります。"
+disabled = "&cこの機能は gloss.toml で無効になっています。"
+
+[gloss.message.world.marker]
+list = "&7マーカー &8({count})&7: &f{value}"
+info = "&7マーカー &f{id} &7は &f{world} {x} {y} {z}"
+created = "&aマーカー &f{id} &aを作成しました。"
+removed = "&aマーカー &f{id} &aを削除しました。"
+missing = "&c&f{id} &cという名前のマーカーはありません。"
+here = "&7あなたは &f{world} {x} {y} {z} &7にいます。"
+
+[gloss.message.world.waypoint]
+saved = "&aウェイポイント &f{name} &aを保存しました。"
+removed = "&aウェイポイント &f{name} &aを削除しました。"
+missing = "&c&f{name} &cという名前のウェイポイントはありません。"
+list = "&7ウェイポイント &8({count})&7: &f{value}"
+info = "&7ウェイポイント &f{id} &7は &f{world} {x} {y} {z}"
+full = "&cすでに最大 {count} 個のウェイポイントを持っています。"
+
+[gloss.message.world.zone]
+list = "&7ゾーン &8({count})&7: &f{value}"
+info = "&7ゾーン &f{id} &7は &f{world} &7の &f{kind} &7です。"
+shown = "&aゾーン &f{id} &aを表示します。"
+hidden = "&7ゾーン &f{id} &7を隠します。"
+created = "&aゾーン &f{id} &aを作成しました。"
+removed = "&aゾーン &f{id} &aを削除しました。"
+missing = "&c&f{id} &cという名前のゾーンはありません。"
+
+[gloss.message.world.camera]
+started = "&7カメラライドを開始しました。"
+refused = "&cカメラライドは拒否されました。"
+stopped = "&f{player} &7のカメラライドを停止しました。"
+idle = "&c{player} はカメラライド中ではありません。"
+
+[gloss.message.world.nameplate]
+list = "&7ネームプレート &8({count})&7: &f{value}"
+info = "&7ネームプレート &f{id} &7優先度 &f{value}&7、&f{count} &7行。"
+missing = "&c&f{id} &cという名前のネームプレートはありません。"
+refreshed = "&aネームプレートを更新しました。"
+
+[gloss.message.world.glow]
+set = "&f{target} &7が &f{value} &aで光っています。"
+cleared = "&f{target} &7の発光を解除しました。"
+missing = "&c&f{player} &cという名前のプレイヤーはオンラインではありません。"
+
+[command.help.marker]
+root = "ワールドマーカーのツール"
+list = "マーカー文書を一覧表示"
+info = "マーカーを1つ表示"
+create = "現在地にマーカー文書を書き出す"
+remove = "マーカー文書を削除"
+here = "現在地をアンカー座標として表示"
+
+[command.help.marker.arg]
+id = "マーカー文書の ID"
+label = "マーカーの上に表示するラベル"
+
+[command.help.waypoint]
+root = "ロケーターバーのウェイポイントツール"
+set = "現在地を個人ウェイポイントとして保存"
+remove = "個人ウェイポイントを1つ削除"
+list = "個人ウェイポイントを一覧表示"
+info = "ウェイポイント文書を1つ表示"
+
+[command.help.waypoint.arg]
+name = "ウェイポイント名"
+id = "ウェイポイント文書の ID"
+
+[command.help.zone]
+root = "ゾーン輪郭のツール"
+list = "ゾーンを一覧表示"
+info = "ゾーンを1つ表示"
+show = "ゾーンの輪郭を自分に表示"
+hide = "ゾーンの輪郭を自分から隠す"
+create = "現在地の周囲に直方体ゾーン文書を書き出す"
+remove = "ゾーン文書を削除"
+
+[command.help.zone.arg]
+id = "ゾーン文書の ID"
+radius = "ブロック単位の半幅"
+
+[command.help.camera]
+root = "カメラライドのツール"
+test = "自分の周りをデモ飛行する"
+stop = "カメラライドを早めに終了"
+
+[command.help.camera.arg]
+seconds = "ライドの長さ（秒）"
+player = "停止する搭乗者。既定はあなた"
+
+[command.help.nameplate]
+root = "プレイヤーネームプレートのツール"
+list = "ネームプレート文書を一覧表示"
+info = "ネームプレート文書を1つ表示"
+reset = "同梱のネームプレート文書を復元"
+refresh = "すべての閲覧者のネームプレートを再構築"
+
+[command.help.nameplate.arg]
+id = "ネームプレート文書の ID"
+
+[command.help.glow]
+root = "エンティティ発光のツール"
+set = "プレイヤーを自分に対して光らせる"
+clear = "プレイヤーの発光を自分に対して解除"
+
+[command.help.glow.arg]
+player = "輪郭を付けるプレイヤー"
+cleared = "輪郭を外すプレイヤー"
+color = "名前付きテキスト色"
+ticks = "発光が続くティック数、0 で維持"
+
+# --- lane:behaviors ---
+[command.help.behavior]
+root = "ビヘイビア文書を確認して実行する"
+list = "読み込まれたビヘイビア文書を一覧表示する"
+info = "ビヘイビア文書のトリガーと条件を表示する"
+fire = "ビヘイビアの項目を今すぐ実行する"
+reset = "同梱のビヘイビア既定値を復元する"
+id = "ビヘイビア文書のID"
+entry = "項目番号（1から）"
+player = "項目を実行する対象プレイヤー、または * で対象なし"
+
+[command.help.state]
+root = "保存されたビヘイビア状態を読み書きする"
+get = "状態の値を1つ表示する"
+set = "状態の値を1つ書き込む"
+clear = "状態の値を1つ既定値に戻す"
+dump = "宣言されたすべての状態キーと値を一覧表示する"
+key = "宣言された状態キー"
+value = "新しい値。空白を含める場合は引用符で囲む"
+player = "値の所有プレイヤー、または * で自分"
+
+[command.help.do]
+root = "この名前を持つ command ビヘイビア項目を実行する"
+name = "ビヘイビアコマンド名"
+args = "key=value 形式の引数。空白を含める場合は引用符で囲む"
+
+[command.help.expr]
+root = "式を評価し、何が応答したかを表示する"
+expression = "評価する式。空白を含める場合は引用符で囲む"
+
+[command.help.explain]
+root = "ランタイムが参照した条件と、どれが選ばれたかを表示する"
+kind = "説明するランタイム（board や behavior など）"
+id = "説明する文書のID"
+player = "説明の対象プレイヤー、または * で自分"
+
+[gloss.message.behaviors]
+off = "&8[&dGloss&8]: &eビヘイビアは features.behaviors で無効です。"
+"list.empty" = "&8[&dGloss&8]: &7読み込まれたビヘイビア文書はありません。"
+missing = "&8[&dGloss&8]: &c\"{id}\" というビヘイビア文書はありません。"
+"info.header" = "&8[&dGloss&8]: &d{id} &7リビジョン &f{revision} &8| &7項目 &f{count} &8| &7有効 &f{enabled}"
+"info.entry" = " &8{line}. &f{name} &7条件 &f{when} &8| &7権限 &f{permission}"
+fired = "&8[&dGloss&8]: &a{id}&a の項目 &f{line}&a を実行しました。"
+"fire.missing" = "&8[&dGloss&8]: &c{id} に項目 {line} はありません。"
+"do.ran" = "&8[&dGloss&8]: &a{name}&a のビヘイビア項目を &f{count}&a 件実行しました。"
+"do.none" = "&8[&dGloss&8]: &7コマンド \"{name}\" に応答するビヘイビア項目はありません。"
+"state.value" = " &7{key} &8= &f{value}"
+"state.set" = "&8[&dGloss&8]: &a{key} は &f{value}&a になりました。"
+"state.cleared" = "&8[&dGloss&8]: &a{key} を既定値に戻しました。"
+"state.unknown" = "&8[&dGloss&8]: &c状態キー \"{key}\" を宣言しているビヘイビア文書はありません。"
+"state.invalid" = "&8[&dGloss&8]: &c\"{value}\" は {type} の値ではありません。"
+"state.empty" = "&8[&dGloss&8]: &7状態を宣言しているビヘイビア文書はありません。"
+"state.player" = "&8[&dGloss&8]: &cプレイヤーを指定してください。&f{key}&c はグローバルなキーではありません。"
+"player.missing" = "&8[&dGloss&8]: &c\"{player}\" というプレイヤーはオンラインではありません。"
+"expr.value" = "&8[&dGloss&8]: &f{value} &8({type})"
+"expr.reference" = " &7{name} &8= &f{value} &8← &7{source}"
+"expr.functions" = " &7関数 &8= &f{value}"
+"expr.failed" = "&8[&dGloss&8]: &c{reason}"
+"explain.header" = "&8[&dGloss&8]: &d{kind} &f{id} &7対象 &f{player}"
+"explain.line" = " &8{path} &7{when} &8= &f{value}"
+"explain.winner" = " &a> &f{path} &7{when} &8= &f{value}"
+"explain.unknown" = "&8[&dGloss&8]: &c\"{kind}\" を説明できるものはありません。{options} を試してください。"
+"explain.missing" = "&8[&dGloss&8]: &c\"{id}\" という {kind} はありません。"
+
+# --- lane:authoring ---
+[command.help.pack]
+root = "Gloss パックのインストールと管理"
+install = "ファイルまたは HTTPS URL からパックをインストールします"
+update = "インストール済みのパックを取得元から更新します"
+remove = "インストール後に編集されたファイルを残したままパックを削除します"
+list = "インストール済みのパックを一覧表示します"
+info = "パックが所有するファイルを表示します"
+arg_source = "Gloss データフォルダー内のパックファイル、または HTTPS URL"
+arg_dry = "何も書き込まずに変更内容だけを報告します"
+arg_id = "インストール済みパックの ID"
+
+[command.help.history]
+root = "ドキュメントの保存済みバージョンを一覧表示します"
+arg_kind = "boards や menus などのドキュメントフォルダー"
+arg_id = "ドキュメント ID"
+arg_page = "1 から始まる一覧ページ"
+
+[command.help.restore]
+root = "保存済みバージョンを現在のドキュメントに書き戻します"
+arg_version = "/gloss history が示すバージョン印"
+
+[command.help.check]
+root = "ワークスペースの壊れた参照を確認します"
+arg_kind = "確認を 1 つのドキュメントフォルダーに限定します"
+arg_id = "確認を 1 つのドキュメントに限定します"
+
+[command.help.export]
+root = "ドキュメントを素の JSON として書き出します"
+bundle = "ワークスペース全体をエディターのバンドルとして書き出します"
+arg_kind = "書き出しを 1 つのドキュメントフォルダーに限定します"
+arg_id = "書き出しを 1 つのドキュメントに限定します"
+arg_dir = "Gloss データフォルダー内の出力先フォルダー"
+
+[gloss.message.authoring.pack]
+preview = "&8[&dGloss&8] パック &f{id}&7 は &f{count}&7 個のファイルを変更します。"
+outcome = "&8[&dGloss&8] &7{state} &f{path}&7 {reason}"
+installed = "&8[&dGloss&8] パック &f{id}&7 を &f{count}&7 個のファイルでインストールしました。"
+updated = "&8[&dGloss&8] パック &f{id}&7 を &f{count}&7 個のファイルで更新しました。"
+removed = "&8[&dGloss&8] パック &f{id}&7 と &f{count}&7 個のファイルを削除しました。"
+unknown = "&8[&dGloss&8] &cID &f{id}&c のパックはインストールされていません。"
+failed = "&8[&dGloss&8] &cパック &f{id}&c が失敗しました: {reason}"
+entry = "&8[&dGloss&8] &f{id} &7{value} &8{count} 個のファイル"
+empty = "&8[&dGloss&8] &7インストール済みのパックはありません。"
+disabled = "&8[&dGloss&8] &cGloss パックは gloss.toml で無効になっています。"
+
+[gloss.message.authoring.history]
+empty = "&8[&dGloss&8] &7&f{kind} {id}&7 の保存済みバージョンはありません。"
+entry = "&8[&dGloss&8] &f{revision} &7{source} &8{count} バイト"
+disabled = "&8[&dGloss&8] &cドキュメント履歴は gloss.toml で無効になっています。"
+
+[gloss.message.authoring.restore]
+done = "&8[&dGloss&8] &f{kind} {id}&7 をバージョン &f{revision}&7 に戻しました。"
+unknown = "&8[&dGloss&8] &c&f{kind} {id}&c にバージョン &f{revision}&c はありません。"
+failed = "&8[&dGloss&8] &c復元に失敗しました: {reason}"
+
+[gloss.message.authoring.check]
+clean = "&8[&dGloss&8] &a報告することはありません。"
+entry = "&8[&dGloss&8] &7{state} &f{key} &8{kind} {id} {path} &7{message}"
+summary = "&8[&dGloss&8] &f{count}&7 件の指摘。"
+
+[gloss.message.authoring.export]
+done = "&8[&dGloss&8] &f{count}&7 個のドキュメントを &f{path}&7 に書き出しました。"
+failed = "&8[&dGloss&8] &c書き出しに失敗しました: {reason}"
+
+[gloss.message.authoring.import]
+preview = "&8[&dGloss&8] &f{source}&7 は &f{count}&7 個のドキュメントを書き込みます。"
+entry = "&8[&dGloss&8] &7{state} &f{path}&7 {reason}"
+applied = "&8[&dGloss&8] &f{source}&7 から &f{count}&7 個のドキュメントを取り込みました。"
+absent = "&8[&dGloss&8] &7&f{path}&7 に &f{source}&7 のデータはありません。"
+
+# --- lane:forge ---
+[gloss.message.forge]
+disabled = "&8[&dGloss&8] &cグリフフォージは無効です。gloss.toml の features.forge を true にしてください。"
+built = "&8[&dGloss&8] &aパック &f{value}&a を {count} 個のグリフでビルドしました。"
+build_failed = "&8[&dGloss&8] &cパックのビルドに失敗しました。以前のパックが有効なままです。コンソールを確認してください。"
+status = "&7{value}"
+exported = "&8[&dGloss&8] &a{count} 個のファイルを &f{path}&a に書き出しました。"
+export_failed = "&8[&dGloss&8] &c書き出しに失敗しました: &f{reason}&c。"
+serve = "&8[&dGloss&8] &aパックリスナーを {state} にしました。"
+serve_unchanged = "&8[&dGloss&8] &7パックリスナーはすでに {state} です。"
+
+[command.help.forge]
+root = "グリフパックツール"
+build = "グリフのリソースパックを今すぐ再ビルド"
+status = "パック・グリフ・配信の状況を表示"
+export = "マージ可能なパックフォルダーをコピー"
+"export.path" = "パックの出力先フォルダー"
+serve = "内蔵パックリスナーを開始または停止"
+"serve.state" = "on または off"
+reset = "同梱のグリフ文書を復元"
+
+# --- lane:fixes ---
+[gloss.message.fixes]
+status_bedrock = "&7bedrock: &f{name}&7、&f{count}&7 人接続中"
+status_textimage_oversize = "&7textimage-サイズ超過: &f{count}"
+hotload_skipped = " &7({count} 件を無視、schemaVersion 不一致)"
+status_schema_skipped = "&7schema-無視: &f{count}"
+bedrock_menu_unavailable = "&8[&dGloss&8]: &cこのメニューは Bedrock では表示されません。"
+

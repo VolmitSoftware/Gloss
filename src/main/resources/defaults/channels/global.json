@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "revision": 1,
+  "show": "true",
+  "channel": {
+    "name": "global",
+    "aliases": [ "g" ],
+    "default": true,
+    "scope": "global",
+    "radius": 0,
+    "permission": "",
+    "priority": 0,
+    "cooldownTicks": 0
+  },
+  "format": "<hover:show_text:'{{ card }}'>&7[{{ sender.group }}]</hover> &f{{ sender.name }}&8: &f{{ message }}",
+  "card": [
+    "&6{{ sender.name }}",
+    "&7World &f{{ sender.world }}"
+  ],
+  "mentions": {
+    "enabled": true,
+    "pattern": "@{name}",
+    "render": "&e@{{ mention.name }}&r",
+    "sound": "minecraft:entity.experience_orb.pickup",
+    "permission": "gloss.chat.mention"
+  },
+  "items": {
+    "enabled": true,
+    "token": "[item]",
+    "permission": "gloss.chat.item"
+  },
+  "links": {
+    "enabled": true,
+    "render": "&9&n{{ link.host }}"
+  },
+  "filters": [],
+  "throttle": {
+    "repeatWindowTicks": 100,
+    "maxRepeats": 1,
+    "minIntervalTicks": 10
+  },
+  "variants": []
+}

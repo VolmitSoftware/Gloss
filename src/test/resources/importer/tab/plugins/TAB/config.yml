@@ -1,0 +1,17 @@
+header-footer:
+  enabled: true
+  header:
+    - "&bWelcome"
+    - "&7to the server"
+  footer:
+    - "&8store.example.com"
+  per-group:
+    admin:
+      header:
+        - "&cADMIN"
+      footer:
+        - "&7staff"
+  per-world:
+    world_nether:
+      header:
+        - "&4Nether"

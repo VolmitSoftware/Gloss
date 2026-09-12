@@ -826,3 +826,517 @@ line = "Linha {line}"
 [language.editor.value]
 none = "Nenhum"
 empty = "(vazio)"
+
+# Lane message tables. Each lane appends its [gloss.message.<lane>] and [command.help.<group>]
+# tables inside its own anchor so parallel branches never share a line.
+# --- lane:screen ---
+[gloss.message.screen]
+"surfaces.empty" = "&8[&dGloss&8] &7Nenhuma superfície carregada."
+"surfaces.unknown" = "&8[&dGloss&8]: &cNão existe a superfície &f{id}&c."
+"surfaces.tested" = "&8[&dGloss&8]: &a&f{id}&a executada para &f{player}&a."
+"nametags.empty" = "&8[&dGloss&8] &7Nenhuma etiqueta carregada."
+"nametags.unknown" = "&8[&dGloss&8]: &cNão existe a etiqueta &f{id}&c."
+"nametags.refreshed" = "&8[&dGloss&8]: &aReaplicados &d{count}&a documentos de etiqueta."
+"hud.header" = "&8[&dGloss&8] &7Ocupações do HUD de &f{player}&7: &d{count}"
+"hud.empty" = "&8[&dGloss&8] &7Nenhum plugin ocupa um espaço do HUD de &f{player}&7."
+"hud.line" = "&8- &f{kind} &7{source} &8| &7{value} &8| &7{count} &8| &7{state}"
+"player.unknown" = "&8[&dGloss&8]: &cNão há nenhum jogador online chamado &f{player}&c."
+
+[command.help.surface]
+root = "Superfícies de barra de ação, barra de chefe e título"
+list = "Listar documentos de superfície"
+info = "Mostrar um documento de superfície"
+"info.id" = "Id do documento de superfície"
+reset = "Restaurar as superfícies incluídas"
+test = "Executar agora a passagem de superfícies para um jogador"
+"test.id" = "Id do documento de superfície"
+"test.player" = "Jogador a testar; por omissão tu"
+
+[command.help.nametag]
+root = "Documentos de etiqueta por observador"
+list = "Listar documentos de etiqueta"
+info = "Mostrar um documento de etiqueta"
+"info.id" = "Id do documento de etiqueta"
+reset = "Restaurar as etiquetas incluídas"
+refresh = "Reaplicar já todas as etiquetas"
+
+[command.help.hud]
+root = "Inspecionar o compositor de HUD partilhado"
+who = "Mostra que plugin ocupa cada espaço do HUD"
+"who.player" = "Jogador a inspecionar; por omissão tu"
+
+# --- lane:chat ---
+[gloss.message.chat]
+filtered = "&8[&dGloss&8]: &cUm filtro de chat bloqueou a tua mensagem."
+too_fast = "&8[&dGloss&8]: &eEspera um momento antes de enviares outra mensagem."
+repeat = "&8[&dGloss&8]: &eAcabaste de dizer isso."
+channel_set = "&8[&dGloss&8]: &aEstás agora a falar em &d{name}&a."
+channel_unknown = "&8[&dGloss&8]: &cNão existe nenhum canal chamado &d{name}&c."
+channel_list = "&8[&dGloss&8]: &7Canais: &f{value}"
+msg_usage = "&8[&dGloss&8]: &eUtilização: &f{command}"
+msg_offline = "&8[&dGloss&8]: &c{player} não está online."
+reply_none = "&8[&dGloss&8]: &cNão tens a quem responder."
+msg_self = "&8[&dGloss&8]: &cNão podes enviar uma mensagem a ti próprio."
+channels_header = "&dCanais &7({count})"
+channels_empty = "&7Não há canais carregados."
+channel_missing = "&8[&dGloss&8]: &cNão existe nenhum documento de canal chamado &f{id}&c."
+strings_header = "&dIdiomas de texto &7({count})"
+strings_empty = "&7Não há documentos de texto carregados."
+strings_missing = "&dEm falta em {locale} &7({count})"
+strings_complete = "&8[&dGloss&8]: &a{locale} cobre todas as chaves de en_US."
+leaderboards_header = "&dClassificações &7({count})"
+leaderboards_empty = "&7Não há classificações carregadas."
+leaderboard_missing = "&8[&dGloss&8]: &cNão existe nenhuma classificação chamada &f{id}&c."
+leaderboard_reset = "&8[&dGloss&8]: &aClassificação &f{id}&a reposta ({state})."
+leaderboard_sampled = "&8[&dGloss&8]: &aClassificação &f{id}&a amostrada para todos os jogadores online."
+
+
+[command.help.channel]
+root = "Canais de conversa"
+list = "Listar os canais carregados"
+info = "Mostrar o alcance, o formato e as variantes de um canal"
+"info.id" = "Id do documento de canal"
+reset = "Restaurar os documentos de canal incluídos"
+
+[command.help.strings]
+root = "Textos de conteúdo escritos"
+list = "Listar os idiomas de texto carregados e as suas entradas"
+missing = "Listar chaves que en_US tem e um idioma não"
+"missing.locale" = "Idioma a comparar com en_US"
+reset = "Restaurar os documentos de texto incluídos"
+
+[command.help.leaderboard]
+root = "Classificações calculadas"
+list = "Listar as classificações carregadas e as suas entradas"
+info = "Mostrar a origem, a ordem e as entradas de uma classificação"
+"info.id" = "Id do documento"
+reset = "Limpar o período ou os totais de uma classificação"
+"reset.id" = "Id do documento"
+"reset.period" = "all ou current"
+sample = "Amostrar uma classificação agora para todos os jogadores online"
+"sample.id" = "Id do documento"
+
+# --- lane:forms ---
+[gloss.message.forms]
+icon_unsupported = "&7Não é desenhável num slot de baú ({kind})"
+no_dialogs = "&8[&dGloss&8]: &7Não há diálogos configurados."
+dialog_list_header = "&dDiálogos"
+dialog_list_entry = "&7Abrir o diálogo &f{id}"
+dialog_info = "&8[&dGloss&8]: &d{id} &8- &7tipo &f{kind}&7, botões &f{count}"
+unknown_dialog = "&8[&dGloss&8]: &cNão existe nenhum diálogo chamado {id}."
+dialog_opened = "&8[&dGloss&8]: &aDiálogo {id} aberto para {player}."
+dialog_unsupported = "&8[&dGloss&8]: &cO teu cliente não consegue mostrar esse diálogo."
+no_inventories = "&8[&dGloss&8]: &7Não há menus de baú configurados."
+inventory_list_header = "&dMenus de baú"
+inventory_list_entry = "&7Abrir o menu de baú &f{id}"
+inventory_info = "&8[&dGloss&8]: &d{id} &8- &7tamanho &f{kind}&7, slots &f{count}"
+unknown_inventory = "&8[&dGloss&8]: &cNão existe nenhum menu de baú chamado {id}."
+inventory_opened = "&8[&dGloss&8]: &aMenu de baú {id} aberto para {player}."
+bad_args = "&8[&dGloss&8]: &cOs argumentos têm de ser pares chave=valor: {value}"
+prompt_timeout = "&8[&dGloss&8]: &7A introdução expirou."
+prompt_busy = "&8[&dGloss&8]: &cJá tens uma introdução pendente."
+take_missing = "&8[&dGloss&8]: &cNão tens os itens necessários."
+economy_denied = "&8[&dGloss&8]: &cNão tens dinheiro suficiente."
+economy_unavailable = "&8[&dGloss&8]: &cNão há nenhum plugin de economia disponível."
+give_dropped = "&8[&dGloss&8]: &7O teu inventário estava cheio, por isso os itens caíram aos teus pés."
+
+[command.help.dialog]
+root = "Inspecionar e abrir documentos de diálogo"
+list = "Listar os diálogos configurados"
+"list.page" = "Página da lista, a começar em 1"
+info = "Mostrar o tipo, as entradas e os botões de um diálogo"
+"info.id" = "ID do diálogo"
+open = "Abrir um diálogo para um jogador"
+"open.id" = "ID do diálogo"
+"open.player" = "Jogador para quem abrir; por omissão, tu"
+"open.args" = "Argumentos chave=valor separados por espaços"
+reset = "Restaurar os diálogos predefinidos incluídos"
+"reset.name" = "Nome a repor, ou * para todos os ficheiros incluídos"
+
+["command.help.menu.open"]
+args = "Argumentos chave=valor separados por espaços"
+
+[command.help.inventory]
+root = "Inspecionar e abrir menus de baú"
+list = "Listar os menus de baú configurados"
+"list.page" = "Página da lista, a começar em 1"
+info = "Mostrar o tamanho e os slots de um menu de baú"
+"info.id" = "ID do menu de baú"
+open = "Abrir um menu de baú para um jogador"
+"open.id" = "ID do menu de baú"
+"open.player" = "Jogador para quem abrir; por omissão, tu"
+"open.args" = "Argumentos chave=valor separados por espaços"
+reset = "Restaurar os menus de baú predefinidos incluídos"
+"reset.name" = "Nome a repor, ou * para todos os ficheiros incluídos"
+
+
+# --- lane:rigs ---
+[command.help.rig]
+root = "Colocar e gerir instâncias de rig"
+list = "Listar rigs e instâncias colocadas; clique para te teletransportares"
+info = "Mostrar o rig, a posição e o estado de uma instância"
+"info.id" = "ID da instância de rig"
+place = "Colocar um rig na tua posição"
+"place.rig" = "ID do documento de rig"
+"place.id" = "ID da instância; em branco escolhe a próxima livre"
+move = "Deslocar uma instância de rig por distâncias relativas em blocos"
+"move.id" = "ID da instância de rig"
+"move.x" = "Deslocamento X relativo em blocos"
+"move.y" = "Deslocamento Y relativo em blocos"
+"move.z" = "Deslocamento Z relativo em blocos"
+here = "Mover uma instância de rig para a tua posição"
+"here.id" = "ID da instância de rig"
+rotate = "Definir o yaw e o pitch de uma instância de rig"
+"rotate.id" = "ID da instância de rig"
+"rotate.yaw" = "Yaw em graus"
+"rotate.pitch" = "Pitch em graus"
+scale = "Definir a escala uniforme de uma instância de rig"
+"scale.id" = "ID da instância de rig"
+"scale.scale" = "Multiplicador de escala, de 0.01 a 64"
+remove = "Remover uma instância de rig"
+"remove.id" = "ID da instância de rig"
+state = "Mudar uma instância de rig para um estado do grafo"
+"state.id" = "ID da instância de rig"
+"state.state" = "Nome do estado no grafo do rig"
+var = "Definir uma variável da instância de rig"
+"var.id" = "ID da instância de rig"
+"var.name" = "Nome da variável"
+"var.value" = "Número, true, false ou texto"
+import = "Importar um modelo Blockbench como rig"
+"import.file" = "Caminho para um .bbmodel na pasta de dados do Gloss"
+"import.id" = "Id do rig; vazio usa o nome do ficheiro"
+"import.texture" = "Item personalizado como provider:id para cada cubo"
+reset = "Restaurar os documentos de rig incluídos"
+
+["command.help.hologram"]
+page = "Mover um espectador para uma pagina do holograma"
+"page.page" = "Id da pagina, next ou prev"
+"page.player" = "Nome do jogador; vazio usa-te a ti"
+motion = "Reproduzir um clip de movimento num holograma"
+"motion.motion" = "Id do movimento, ou clear para parar"
+actions = "Listar as acoes que um holograma executa ao clicar"
+
+[command.help.motion]
+root = "Inspecionar clipes de movimento"
+list = "Listar clipes de movimento"
+info = "Mostrar duração, ciclo, fps e faixas de um clipe"
+"info.id" = "ID do movimento"
+reset = "Restaurar os documentos de movimento incluídos"
+
+[gloss.message.rigs]
+rig_unknown = "&8[&dGloss&8] &cNão existe nenhum rig chamado '&f{id}&c'."
+instance_missing = "&8[&dGloss&8] &cNão existe nenhuma instância de rig chamada '&f{id}&c'."
+placed = "&8[&dGloss&8] &aRig &f{name}&a colocado como &f{id}&a em &f{world} {x}, {y}, {z}&a."
+place_failed = "&8[&dGloss&8] &cNão foi possível colocar o rig &f{name}&c: {reason}"
+moved = "&8[&dGloss&8] &aInstância de rig &f{id}&a movida para &f{world} {x}, {y}, {z}&a."
+rotated = "&8[&dGloss&8] &aInstância de rig &f{id}&a rodada para yaw &f{yaw}&a, pitch &f{pitch}&a."
+scaled = "&8[&dGloss&8] &aInstância de rig &f{id}&a escalada para &f{scale}&a."
+scale_out_of_range = "&8[&dGloss&8] &cA escala do rig tem de estar entre &f{minimum}&c e &f{maximum}&c; recebido &f{value}&c."
+removed = "&8[&dGloss&8] &aInstância de rig &f{id}&a removida."
+state_set = "&8[&dGloss&8] &aA instância de rig &f{id}&a está agora no estado &f{state}&a."
+state_unknown = "&8[&dGloss&8] &cA instância de rig &f{id}&c não tem nenhum estado chamado '&f{state}&c'."
+var_set = "&8[&dGloss&8] &a&f{name}&a da instância &f{id}&a definido para &f{value}&a."
+save_failed = "&8[&dGloss&8] &cNão foi possível guardar a instância de rig &f{id}&c: {reason}"
+list_empty = "&8[&dGloss&8] &7Nenhum rig carregado."
+list_rigs = "&8[&dGloss&8] &7Rigs (&f{count}&7): &f{value}"
+instances_empty = "&8[&dGloss&8] &7Nenhuma instância de rig colocada."
+list_hover = "Clica para te teletransportares"
+list_entry = "{name} em {world} {x}, {y}, {z}; estado {state}"
+info_header = "&8[&dGloss&8] &d{id} &7usa o rig &f{name}&7 em &f{world} {x}, {y}, {z}"
+info_pose = "&8[&dGloss&8] &7Yaw &f{yaw}&7, pitch &f{pitch}&7, escala &f{scale}&7, estado &f{state}"
+info_parts = "&8[&dGloss&8] &7Partes &f{count}&7, espectadores &f{value}"
+info_var = "&8[&dGloss&8] &7  {name} = &f{value}"
+motion_unknown = "&8[&dGloss&8] &cNão existe nenhum movimento chamado '&f{id}&c'."
+motion_list_empty = "&8[&dGloss&8] &7Nenhum clipe de movimento carregado."
+motion_list = "&8[&dGloss&8] &7Clipes de movimento (&f{count}&7): &f{value}"
+motion_info = "&8[&dGloss&8] &d{id} &7{value} ticks, {kind}, {count} fps"
+motion_track = "&8[&dGloss&8] &7  {name} &f{key} &7({count} keyframes)"
+import_done = "&8[&dGloss&8] &a&f{id}&a importado: &f{value}&a ossos, &f{count}&a pecas, &f{kind}&a animacoes."
+import_unsupported = "&8[&dGloss&8] &7Nao importado: &f{value}&7."
+import_failed = "&8[&dGloss&8] &cNao foi possivel importar &f{path}&c: {reason}"
+hologram_page_set = "&8[&dGloss&8] &a{player}&a esta agora na pagina &f{page}&a de &f{id}&a."
+hologram_page_player_missing = "&8[&dGloss&8] &cO jogador &f{player}&c nao esta online."
+hologram_page_unknown = "&8[&dGloss&8] &cO holograma &f{id}&c nao tem a pagina '&f{page}&c'."
+hologram_motion_set = "&8[&dGloss&8] &aO holograma &f{id}&a reproduz agora &f{value}&a."
+hologram_motion_cleared = "&8[&dGloss&8] &aO holograma &f{id}&a ja nao reproduz movimento."
+hologram_actions_empty = "&8[&dGloss&8] &7O holograma &f{id}&7 nao declara acoes."
+hologram_actions_header = "&8[&dGloss&8] &7Acoes do holograma &f{id}&7 (&f{count}&7):"
+hologram_actions_entry = "&8[&dGloss&8] &7  &f{kind}&7 em &f{value}"
+
+# --- lane:world ---
+[gloss.message.world]
+players_only = "&cEsse comando tem de ser executado por um jogador."
+disabled = "&cEssa funcionalidade está desativada em gloss.toml."
+
+[gloss.message.world.marker]
+list = "&7Marcadores &8({count})&7: &f{value}"
+info = "&7Marcador &f{id} &7em &f{world} {x} {y} {z}"
+created = "&aMarcador &f{id} &acriado."
+removed = "&aMarcador &f{id} &aremovido."
+missing = "&cNenhum marcador com o nome &f{id}&c."
+here = "&7Estás em &f{world} {x} {y} {z}&7."
+
+[gloss.message.world.waypoint]
+saved = "&aPonto de referência &f{name} &aguardado."
+removed = "&aPonto de referência &f{name} &aremovido."
+missing = "&cNenhum ponto de referência com o nome &f{name}&c."
+list = "&7Pontos de referência &8({count})&7: &f{value}"
+info = "&7Ponto de referência &f{id} &7em &f{world} {x} {y} {z}"
+full = "&cJá tens o máximo de {count} pontos de referência."
+
+[gloss.message.world.zone]
+list = "&7Zonas &8({count})&7: &f{value}"
+info = "&7A zona &f{id} &7é um &f{kind} &7em &f{world}&7."
+shown = "&aA mostrar a zona &f{id}&a."
+hidden = "&7A ocultar a zona &f{id}&7."
+created = "&aZona &f{id} &acriada."
+removed = "&aZona &f{id} &aremovida."
+missing = "&cNenhuma zona com o nome &f{id}&c."
+
+[gloss.message.world.camera]
+started = "&7Percurso de câmara iniciado."
+refused = "&cO percurso de câmara foi recusado."
+stopped = "&7Percurso de câmara parado para &f{player}&7."
+idle = "&c{player} não está em nenhum percurso de câmara."
+
+[gloss.message.world.nameplate]
+list = "&7Placas de nome &8({count})&7: &f{value}"
+info = "&7Placa de nome &f{id} &7prioridade &f{value}&7, &f{count} &7linhas."
+missing = "&cNenhuma placa de nome com o nome &f{id}&c."
+refreshed = "&aPlacas de nome atualizadas."
+
+[gloss.message.world.glow]
+set = "&f{target} &7brilha agora a &f{value}&a."
+cleared = "&7Brilho de &f{target} &7removido."
+missing = "&cNenhum jogador com o nome &f{player} &cestá online."
+
+[command.help.marker]
+root = "Ferramentas de marcadores do mundo"
+list = "Listar documentos de marcador"
+info = "Mostrar um marcador"
+create = "Escrever um documento de marcador na tua posição"
+remove = "Eliminar um documento de marcador"
+here = "Mostrar a tua posição como coordenadas de âncora"
+
+[command.help.marker.arg]
+id = "Identificador do documento de marcador"
+label = "Rótulo mostrado acima do marcador"
+
+[command.help.waypoint]
+root = "Ferramentas de pontos de referência da barra de localização"
+set = "Guardar a tua posição como ponto de referência pessoal"
+remove = "Eliminar um dos teus pontos de referência pessoais"
+list = "Listar os teus pontos de referência pessoais"
+info = "Mostrar um documento de ponto de referência"
+
+[command.help.waypoint.arg]
+name = "Nome do ponto de referência"
+id = "Identificador do documento de ponto de referência"
+
+[command.help.zone]
+root = "Ferramentas de contornos de zona"
+list = "Listar zonas"
+info = "Mostrar uma zona"
+show = "Mostrar-te o contorno de uma zona"
+hide = "Ocultar-te o contorno de uma zona"
+create = "Escrever um documento de zona cúbica à volta da tua posição"
+remove = "Eliminar um documento de zona"
+
+[command.help.zone.arg]
+id = "Identificador do documento de zona"
+radius = "Meia largura em blocos"
+
+[command.help.camera]
+root = "Ferramentas de percursos de câmara"
+test = "Voar um percurso de demonstração à tua volta"
+stop = "Terminar um percurso de câmara mais cedo"
+
+[command.help.camera.arg]
+seconds = "Duração do percurso em segundos"
+player = "Passageiro a parar; por omissão tu"
+
+[command.help.nameplate]
+root = "Ferramentas de placas de nome de jogador"
+list = "Listar documentos de placa de nome"
+info = "Mostrar um documento de placa de nome"
+reset = "Restaurar o documento de placa de nome incluído"
+refresh = "Reconstruir as placas de nome de todos os espectadores"
+
+[command.help.nameplate.arg]
+id = "Identificador do documento de placa de nome"
+
+[command.help.glow]
+root = "Ferramentas de brilho de entidade"
+set = "Fazer um jogador brilhar para ti"
+clear = "Limpar o brilho de um jogador para ti"
+
+[command.help.glow.arg]
+player = "Jogador a contornar"
+cleared = "Jogador a deixar de contornar"
+color = "Cor de texto com nome"
+ticks = "Ticks que o brilho dura, ou 0 para o manter"
+
+# --- lane:behaviors ---
+[command.help.behavior]
+root = "Inspecionar e disparar documentos de comportamento"
+list = "Listar os documentos de comportamento carregados"
+info = "Mostrar os gatilhos e as condicoes de um documento de comportamento"
+fire = "Executar agora uma entrada de comportamento"
+reset = "Restaurar os comportamentos predefinidos incluidos"
+id = "Id do documento de comportamento"
+entry = "Numero da entrada, a comecar em 1"
+player = "Jogador para quem a entrada corre, ou * para nenhum"
+
+[command.help.state]
+root = "Ler e escrever o estado de comportamento persistido"
+get = "Mostrar um valor de estado"
+set = "Escrever um valor de estado"
+clear = "Repor um valor de estado no seu valor predefinido"
+dump = "Listar cada chave de estado declarada e o seu valor"
+key = "Chave de estado declarada"
+value = "Novo valor; coloque entre aspas para incluir espacos"
+player = "Jogador a quem pertence o valor, ou * para si mesmo"
+
+[command.help.do]
+root = "Disparar as entradas de comportamento command com este nome"
+name = "Nome do comando de comportamento"
+args = "Argumentos como pares chave=valor; coloque entre aspas para incluir espacos"
+
+[command.help.expr]
+root = "Avaliar uma expressao e mostrar o que lhe respondeu"
+expression = "Expressao a avaliar; coloque entre aspas para incluir espacos"
+
+[command.help.explain]
+root = "Mostrar que condicoes um runtime consultou e qual venceu"
+kind = "Runtime a explicar, por exemplo board ou behavior"
+id = "Id do documento a explicar"
+player = "Jogador para quem explicar, ou * para si mesmo"
+
+[gloss.message.behaviors]
+off = "&8[&dGloss&8]: &eOs comportamentos estao desligados em features.behaviors."
+"list.empty" = "&8[&dGloss&8]: &7Nao ha documentos de comportamento carregados."
+missing = "&8[&dGloss&8]: &cNao existe o documento de comportamento \"{id}\"."
+"info.header" = "&8[&dGloss&8]: &d{id} &7revisao &f{revision} &8| &7entradas &f{count} &8| &7ativo &f{enabled}"
+"info.entry" = " &8{line}. &f{name} &7se &f{when} &8| &7permissao &f{permission}"
+fired = "&8[&dGloss&8]: &aEntrada &f{line}&a de &f{id}&a executada."
+"fire.missing" = "&8[&dGloss&8]: &c{id} nao tem a entrada {line}."
+"do.ran" = "&8[&dGloss&8]: &aDisparadas &f{count}&a entradas de comportamento para &f{name}&a."
+"do.none" = "&8[&dGloss&8]: &7Nenhuma entrada de comportamento responde ao comando \"{name}\"."
+"state.value" = " &7{key} &8= &f{value}"
+"state.set" = "&8[&dGloss&8]: &a{key} e agora &f{value}&a."
+"state.cleared" = "&8[&dGloss&8]: &a{key} voltou ao valor predefinido."
+"state.unknown" = "&8[&dGloss&8]: &cNenhum documento de comportamento declara a chave de estado \"{key}\"."
+"state.invalid" = "&8[&dGloss&8]: &c\"{value}\" nao e um valor {type}."
+"state.empty" = "&8[&dGloss&8]: &7Nenhum documento de comportamento declara estado."
+"state.player" = "&8[&dGloss&8]: &cIndique um jogador: &f{key}&c nao e uma chave global."
+"player.missing" = "&8[&dGloss&8]: &cNao ha nenhum jogador ligado chamado \"{player}\"."
+"expr.value" = "&8[&dGloss&8]: &f{value} &8({type})"
+"expr.reference" = " &7{name} &8= &f{value} &8via &7{source}"
+"expr.functions" = " &7funcoes &8= &f{value}"
+"expr.failed" = "&8[&dGloss&8]: &c{reason}"
+"explain.header" = "&8[&dGloss&8]: &d{kind} &f{id} &7para &f{player}"
+"explain.line" = " &8{path} &7{when} &8= &f{value}"
+"explain.winner" = " &a> &f{path} &7{when} &8= &f{value}"
+"explain.unknown" = "&8[&dGloss&8]: &cNada explica \"{kind}\"; experimente {options}."
+"explain.missing" = "&8[&dGloss&8]: &cNao existe o {kind} \"{id}\"."
+
+# --- lane:authoring ---
+[command.help.pack]
+root = "Instalar e gerir pacotes Gloss"
+install = "Instalar um pacote a partir de um ficheiro ou de um URL HTTPS"
+update = "Atualizar um pacote instalado a partir da sua origem"
+remove = "Remover um pacote mantendo cada ficheiro editado desde a instalação"
+list = "Listar os pacotes instalados"
+info = "Mostrar que ficheiros pertencem a um pacote"
+arg_source = "Ficheiro de pacote na pasta de dados do Gloss, ou um URL HTTPS"
+arg_dry = "Relatar o que mudaria sem escrever nada"
+arg_id = "Id do pacote instalado"
+
+[command.help.history]
+root = "Listar as versões guardadas de um documento"
+arg_kind = "Pasta do documento, como boards ou menus"
+arg_id = "Id do documento"
+arg_page = "Página da lista a começar em um"
+
+[command.help.restore]
+root = "Escrever uma versão guardada por cima do documento ativo"
+arg_version = "Marca de versão de /gloss history"
+
+[command.help.check]
+root = "Verificar referências partidas na área de trabalho"
+arg_kind = "Limitar a verificação a uma pasta de documentos"
+arg_id = "Limitar a verificação a um documento"
+
+[command.help.export]
+root = "Copiar documentos como JSON simples"
+bundle = "Escrever toda a área de trabalho como pacote do editor"
+arg_kind = "Limitar a exportação a uma pasta de documentos"
+arg_id = "Limitar a exportação a um documento"
+arg_dir = "Pasta de destino dentro da pasta de dados do Gloss"
+
+[gloss.message.authoring.pack]
+preview = "&8[&dGloss&8] O pacote &f{id}&7 mudaria &f{count}&7 ficheiro(s)."
+outcome = "&8[&dGloss&8] &7{state} &f{path}&7 {reason}"
+installed = "&8[&dGloss&8] Pacote &f{id}&7 instalado com &f{count}&7 ficheiro(s)."
+updated = "&8[&dGloss&8] Pacote &f{id}&7 atualizado em &f{count}&7 ficheiro(s)."
+removed = "&8[&dGloss&8] Pacote &f{id}&7 e &f{count}&7 ficheiro(s) removidos."
+unknown = "&8[&dGloss&8] &cNão há nenhum pacote instalado com a id &f{id}&c."
+failed = "&8[&dGloss&8] &cO pacote &f{id}&c falhou: {reason}"
+entry = "&8[&dGloss&8] &f{id} &7{value} &8{count} ficheiro(s)"
+empty = "&8[&dGloss&8] &7Não há pacotes instalados."
+disabled = "&8[&dGloss&8] &cOs pacotes Gloss estão desligados em gloss.toml."
+
+[gloss.message.authoring.history]
+empty = "&8[&dGloss&8] &7Não há versões guardadas de &f{kind} {id}&7."
+entry = "&8[&dGloss&8] &f{revision} &7{source} &8{count} bytes"
+disabled = "&8[&dGloss&8] &cO histórico de documentos está desligado em gloss.toml."
+
+[gloss.message.authoring.restore]
+done = "&8[&dGloss&8] &f{kind} {id}&7 reposto na versão &f{revision}&7."
+unknown = "&8[&dGloss&8] &cNão existe a versão &f{revision}&c de &f{kind} {id}&c."
+failed = "&8[&dGloss&8] &cA reposição falhou: {reason}"
+
+[gloss.message.authoring.check]
+clean = "&8[&dGloss&8] &aNada a relatar."
+entry = "&8[&dGloss&8] &7{state} &f{key} &8{kind} {id} {path} &7{message}"
+summary = "&8[&dGloss&8] &f{count}&7 conclusão(ões)."
+
+[gloss.message.authoring.export]
+done = "&8[&dGloss&8] &f{count}&7 documento(s) exportado(s) para &f{path}&7."
+failed = "&8[&dGloss&8] &cA exportação falhou: {reason}"
+
+[gloss.message.authoring.import]
+preview = "&8[&dGloss&8] &f{source}&7 escreveria &f{count}&7 documento(s)."
+entry = "&8[&dGloss&8] &7{state} &f{path}&7 {reason}"
+applied = "&8[&dGloss&8] &f{count}&7 documento(s) importado(s) de &f{source}&7."
+absent = "&8[&dGloss&8] &7Não há dados &f{source}&7 em &f{path}&7."
+
+# --- lane:forge ---
+[gloss.message.forge]
+disabled = "&8[&dGloss&8] &cA forja de glifos está desligada. Define features.forge como true em gloss.toml."
+built = "&8[&dGloss&8] &aPacote &f{value}&a criado com {count} glifos."
+build_failed = "&8[&dGloss&8] &cFalhou a criação do pacote; o pacote anterior continua ativo. Vê a consola."
+status = "&7{value}"
+exported = "&8[&dGloss&8] &aExportados {count} ficheiros para &f{path}&a."
+export_failed = "&8[&dGloss&8] &cA exportação falhou: &f{reason}&c."
+serve = "&8[&dGloss&8] &aServidor do pacote {state}."
+serve_unchanged = "&8[&dGloss&8] &7O servidor do pacote já está {state}."
+
+[command.help.forge]
+root = "Ferramentas do pacote de glifos"
+build = "Reconstruir agora o pacote de recursos de glifos"
+status = "Mostrar contagens do pacote, dos glifos e da entrega"
+export = "Copiar a pasta do pacote combinável para outro local"
+"export.path" = "Pasta de destino do pacote"
+serve = "Iniciar ou parar o servidor de pacote integrado"
+"serve.state" = "on ou off"
+reset = "Restaurar os documentos de glifos incluídos"
+
+# --- lane:fixes ---
+[gloss.message.fixes]
+status_bedrock = "&7bedrock: &f{name}&7, &f{count}&7 online"
+status_textimage_oversize = "&7textimage-demasiado-grande: &f{count}"
+hotload_skipped = " &7({count} ignorados, schemaVersion errada)"
+status_schema_skipped = "&7schema-ignorados: &f{count}"
+bedrock_menu_unavailable = "&8[&dGloss&8]: &cEste menu não é apresentado no Bedrock."
+

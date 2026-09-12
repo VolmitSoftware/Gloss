@@ -289,7 +289,7 @@ public class PanelViewSessionTest {
 
   private static MenuDefinitionData menu(String id) {
     MenuDefinitionData menu = new MenuDefinitionData(
-        new Vector(), false, false, 8D, false, false, List.<MenuComponentData>of(), List.of(), ShowCondition.ALWAYS);
+        new Vector(), false, false, 8D, false, false, List.<MenuComponentData>of(), List.of(), ShowCondition.ALWAYS, Map.of());
     menu.setId(id);
     return menu;
   }
@@ -308,7 +308,7 @@ public class PanelViewSessionTest {
         false,
         List.of(new MenuComponentData("probe", new Vector(), componentData, ShowCondition.ALWAYS)),
         List.of(), ShowCondition.ALWAYS
-    );
+    , Map.of());
     menu.setId(id);
     return menu;
   }

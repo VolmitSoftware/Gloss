@@ -18,7 +18,7 @@ public class NavigationActionTest {
   @Test
   public void targetNavigationIsResolvedAndStopsTheRemainingActionChain() {
     List<MenuAction<?>> actions = MenuAction.resolve(List.of(
-        new NavigationActionData("shops/confirm", NavigationMode.REPLACE, null)
+        new NavigationActionData("shops/confirm", NavigationMode.REPLACE, null, null, null, null)
     ), "shops/root", "buy");
     AtomicReference<NavigationRequest> request = new AtomicReference<>();
 
@@ -31,15 +31,15 @@ public class NavigationActionTest {
   @Test
   public void targetlessPushAndReplaceActionsAreDroppedDuringResolution() {
     assertTrue(MenuAction.resolve(List.of(
-        new NavigationActionData(" ", NavigationMode.PUSH, null),
-        new NavigationActionData(null, NavigationMode.REPLACE, null)
+        new NavigationActionData(" ", NavigationMode.PUSH, null, null, null, null),
+        new NavigationActionData(null, NavigationMode.REPLACE, null, null, null, null)
     ), "shops/root", "broken").isEmpty());
   }
 
   @Test
   public void backNavigationDoesNotRequireATarget() {
     AtomicReference<NavigationRequest> request = new AtomicReference<>();
-    NavigateMenuAction action = new NavigateMenuAction(new NavigationActionData(null, NavigationMode.BACK, null));
+    NavigateMenuAction action = new NavigateMenuAction(new NavigationActionData(null, NavigationMode.BACK, null, null, null, null));
 
     assertEquals(ActionOutcome.STOP, action.execute(context(request, HoloClickTrigger.LEFT_CLICK)));
     assertEquals(new NavigationRequest(NavigationMode.BACK, null), request.get());
@@ -50,7 +50,7 @@ public class NavigationActionTest {
     AtomicReference<NavigationRequest> request = new AtomicReference<>();
     RecordingAction any = new RecordingAction(HoloClickTrigger.ANY);
     NavigateMenuAction rightNavigation = new NavigateMenuAction(
-        new NavigationActionData("shops/right", NavigationMode.REPLACE, HoloClickTrigger.RIGHT_CLICK));
+        new NavigationActionData("shops/right", NavigationMode.REPLACE, null, HoloClickTrigger.RIGHT_CLICK, null, null));
     RecordingAction leftAfterNavigation = new RecordingAction(HoloClickTrigger.LEFT_CLICK);
     List<MenuAction<?>> actions = List.of(any, rightNavigation, leftAfterNavigation);
 
@@ -101,7 +101,7 @@ public class NavigationActionTest {
     private int executions;
 
     private RecordingAction(HoloClickTrigger trigger) {
-      super(new CommandActionData(null, "test", trigger));
+      super(new CommandActionData(null, "test", trigger, null, null));
     }
 
     @Override

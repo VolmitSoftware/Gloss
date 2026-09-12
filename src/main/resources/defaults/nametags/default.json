@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "revision": 1,
+  "show": "true",
+  "select": { "priority": 0, "when": "false" },
+  "presentation": { "prefix": "&7[{{ subject.group }}] ", "suffix": "", "color": "white", "nameTagVisibility": "always", "collision": "always" },
+  "variants": [
+    { "id": "staff", "priority": 10, "when": "hasPermission('subject', 'server.staff')",
+      "presentation": { "prefix": "&c[Staff] ", "suffix": " &c*", "color": "red", "nameTagVisibility": "always", "collision": "never" } }
+  ]
+}

@@ -826,3 +826,517 @@ line = "第 {line} 行"
 [language.editor.value]
 none = "无"
 empty = "(空)"
+
+# Lane message tables. Each lane appends its [gloss.message.<lane>] and [command.help.<group>]
+# tables inside its own anchor so parallel branches never share a line.
+# --- lane:screen ---
+[gloss.message.screen]
+"surfaces.empty" = "&8[&dGloss&8] &7未加载任何界面文档。"
+"surfaces.unknown" = "&8[&dGloss&8]: &c没有名为 &f{id}&c 的界面文档。"
+"surfaces.tested" = "&8[&dGloss&8]: &a已为 &f{player}&a 运行 &f{id}&a。"
+"nametags.empty" = "&8[&dGloss&8] &7未加载任何名牌文档。"
+"nametags.unknown" = "&8[&dGloss&8]: &c没有名为 &f{id}&c 的名牌文档。"
+"nametags.refreshed" = "&8[&dGloss&8]: &a已重新应用 &d{count}&a 个名牌文档。"
+"hud.header" = "&8[&dGloss&8] &7&f{player}&7 的 HUD 占用：&d{count}"
+"hud.empty" = "&8[&dGloss&8] &7没有插件占用 &f{player}&7 的 HUD 槽位。"
+"hud.line" = "&8- &f{kind} &7{source} &8| &7{value} &8| &7{count} &8| &7{state}"
+"player.unknown" = "&8[&dGloss&8]: &c没有名为 &f{player}&c 的在线玩家。"
+
+[command.help.surface]
+root = "快捷栏、Boss 栏与标题界面"
+list = "列出界面文档"
+info = "显示一个界面文档"
+"info.id" = "界面文档 ID"
+reset = "还原随附的界面文档"
+test = "立即为某位玩家运行界面处理"
+"test.id" = "界面文档 ID"
+"test.player" = "要测试的玩家，默认是你自己"
+
+[command.help.nametag]
+root = "按观察者生效的名牌文档"
+list = "列出名牌文档"
+info = "显示一个名牌文档"
+"info.id" = "名牌文档 ID"
+reset = "还原随附的名牌文档"
+refresh = "立即重新应用所有名牌"
+
+[command.help.hud]
+root = "查看共享的 HUD 合成器"
+who = "显示每个 HUD 槽位由哪个插件占用"
+"who.player" = "要查看的玩家，默认是你自己"
+
+# --- lane:chat ---
+[gloss.message.chat]
+filtered = "&8[&dGloss&8]: &c聊天过滤器拦截了你的消息。"
+too_fast = "&8[&dGloss&8]: &e请稍等片刻再发送下一条消息。"
+repeat = "&8[&dGloss&8]: &e你刚刚已经说过了。"
+channel_set = "&8[&dGloss&8]: &a你现在在 &d{name}&a 频道中发言。"
+channel_unknown = "&8[&dGloss&8]: &c不存在名为 &d{name}&c 的频道。"
+channel_list = "&8[&dGloss&8]: &7频道：&f{value}"
+msg_usage = "&8[&dGloss&8]: &e用法：&f{command}"
+msg_offline = "&8[&dGloss&8]: &c{player} 不在线。"
+reply_none = "&8[&dGloss&8]: &c你没有可回复的对象。"
+msg_self = "&8[&dGloss&8]: &c你不能给自己发消息。"
+channels_header = "&d频道 &7({count})"
+channels_empty = "&7未加载任何频道。"
+channel_missing = "&8[&dGloss&8]: &c不存在名为 &f{id}&c 的频道文档。"
+strings_header = "&d文本语言 &7({count})"
+strings_empty = "&7未加载任何文本文档。"
+strings_missing = "&d{locale} 中缺少 &7({count})"
+strings_complete = "&8[&dGloss&8]: &a{locale} 覆盖了全部 en_US 键。"
+leaderboards_header = "&d排行榜 &7({count})"
+leaderboards_empty = "&7未加载任何排行榜。"
+leaderboard_missing = "&8[&dGloss&8]: &c不存在名为 &f{id}&c 的排行榜文档。"
+leaderboard_reset = "&8[&dGloss&8]: &a排行榜 &f{id}&a 已重置（{state}）。"
+leaderboard_sampled = "&8[&dGloss&8]: &a已为所有在线玩家采样排行榜 &f{id}&a。"
+
+
+[command.help.channel]
+root = "聊天频道"
+list = "列出已加载的聊天频道"
+info = "显示频道的范围、格式与变体"
+"info.id" = "频道文档 ID"
+reset = "还原随附的频道文档"
+
+[command.help.strings]
+root = "编写的内容文本"
+list = "列出已加载的文本语言及其条目数"
+missing = "列出 en_US 拥有而该语言缺少的键"
+"missing.locale" = "与 en_US 比较的语言"
+reset = "还原随附的文本文档"
+
+[command.help.leaderboard]
+root = "计算得出的排行榜"
+list = "列出已加载的排行榜及其条目数"
+info = "显示排行榜的来源、排序与条目"
+"info.id" = "排行榜文档 ID"
+reset = "清除排行榜的周期值或累计值"
+"reset.id" = "排行榜文档 ID"
+"reset.period" = "all 或 current"
+sample = "立即为所有在线玩家采样排行榜"
+"sample.id" = "排行榜文档 ID"
+
+# --- lane:forms ---
+[gloss.message.forms]
+icon_unsupported = "&7无法在箱子格中显示 ({kind})"
+no_dialogs = "&8[&dGloss&8]: &7尚未配置任何对话框。"
+dialog_list_header = "&d对话框"
+dialog_list_entry = "&7打开对话框 &f{id}"
+dialog_info = "&8[&dGloss&8]: &d{id} &8- &7类型 &f{kind}&7，按钮 &f{count}"
+unknown_dialog = "&8[&dGloss&8]: &c没有名为 {id} 的对话框。"
+dialog_opened = "&8[&dGloss&8]: &a已为 {player} 打开对话框 {id}。"
+dialog_unsupported = "&8[&dGloss&8]: &c你的客户端无法显示该对话框。"
+no_inventories = "&8[&dGloss&8]: &7尚未配置任何箱子菜单。"
+inventory_list_header = "&d箱子菜单"
+inventory_list_entry = "&7打开箱子菜单 &f{id}"
+inventory_info = "&8[&dGloss&8]: &d{id} &8- &7大小 &f{kind}&7，格子 &f{count}"
+unknown_inventory = "&8[&dGloss&8]: &c没有名为 {id} 的箱子菜单。"
+inventory_opened = "&8[&dGloss&8]: &a已为 {player} 打开箱子菜单 {id}。"
+bad_args = "&8[&dGloss&8]: &c参数必须是 key=value 形式：{value}"
+prompt_timeout = "&8[&dGloss&8]: &7输入已超时。"
+prompt_busy = "&8[&dGloss&8]: &c你已经有一个等待中的输入。"
+take_missing = "&8[&dGloss&8]: &c你没有所需的物品。"
+economy_denied = "&8[&dGloss&8]: &c你的余额不足。"
+economy_unavailable = "&8[&dGloss&8]: &c没有可用的经济插件。"
+give_dropped = "&8[&dGloss&8]: &7你的背包已满，物品掉落在你脚下。"
+
+[command.help.dialog]
+root = "查看并打开对话框文档"
+list = "列出已配置的对话框"
+"list.page" = "列表页码，从 1 开始"
+info = "显示对话框的类型、输入项和按钮"
+"info.id" = "对话框 ID"
+open = "为玩家打开对话框"
+"open.id" = "对话框 ID"
+"open.player" = "为哪位玩家打开；默认是你自己"
+"open.args" = "以空格分隔的 key=value 参数"
+reset = "恢复随附的对话框默认文件"
+"reset.name" = "要重置的名称，或用 * 重置全部随附文件"
+
+["command.help.menu.open"]
+args = "以空格分隔的 key=value 参数"
+
+[command.help.inventory]
+root = "查看并打开箱子菜单"
+list = "列出已配置的箱子菜单"
+"list.page" = "列表页码，从 1 开始"
+info = "显示箱子菜单的大小和格子"
+"info.id" = "箱子菜单 ID"
+open = "为玩家打开箱子菜单"
+"open.id" = "箱子菜单 ID"
+"open.player" = "为哪位玩家打开；默认是你自己"
+"open.args" = "以空格分隔的 key=value 参数"
+reset = "恢复随附的箱子菜单默认文件"
+"reset.name" = "要重置的名称，或用 * 重置全部随附文件"
+
+
+# --- lane:rigs ---
+[command.help.rig]
+root = "放置并管理骨架实例"
+list = "列出骨架及已放置的实例；点击可传送"
+info = "显示骨架实例的骨架、位置和状态"
+"info.id" = "骨架实例 ID"
+place = "在你的位置放置骨架"
+"place.rig" = "骨架文档 ID"
+"place.id" = "实例 ID；留空则使用下一个空闲 ID"
+move = "按相对方块距离移动骨架实例"
+"move.id" = "骨架实例 ID"
+"move.x" = "相对 X 偏移（方块）"
+"move.y" = "相对 Y 偏移（方块）"
+"move.z" = "相对 Z 偏移（方块）"
+here = "将骨架实例移动到你的位置"
+"here.id" = "骨架实例 ID"
+rotate = "设置骨架实例的偏航和俯仰"
+"rotate.id" = "骨架实例 ID"
+"rotate.yaw" = "偏航角（度）"
+"rotate.pitch" = "俯仰角（度）"
+scale = "设置骨架实例的统一缩放"
+"scale.id" = "骨架实例 ID"
+"scale.scale" = "缩放倍率，0.01 到 64"
+remove = "移除骨架实例"
+"remove.id" = "骨架实例 ID"
+state = "将骨架实例切换到状态图中的状态"
+"state.id" = "骨架实例 ID"
+"state.state" = "骨架状态图中的状态名"
+var = "设置骨架实例变量"
+"var.id" = "骨架实例 ID"
+"var.name" = "变量名"
+"var.value" = "数字、true、false 或文本"
+import = "将 Blockbench 模型导入为骨架"
+"import.file" = "Gloss 数据文件夹中 .bbmodel 的路径"
+"import.id" = "骨架 ID，留空则使用文件名"
+"import.texture" = "每个方块使用的自定义物品，格式 provider:id"
+reset = "恢复自带的骨架文档"
+
+["command.help.hologram"]
+page = "将观看者切换到全息图的某一页"
+"page.page" = "页面 ID、next 或 prev"
+"page.player" = "玩家名称，留空表示你自己"
+motion = "在全息图上播放运动片段"
+"motion.motion" = "运动 ID，或用 clear 停止"
+actions = "列出全息图点击时执行的动作"
+
+[command.help.motion]
+root = "查看动作片段"
+list = "列出动作片段"
+info = "显示动作片段的时长、循环、fps 和轨道"
+"info.id" = "动作 ID"
+reset = "恢复自带的动作文档"
+
+[gloss.message.rigs]
+rig_unknown = "&8[&dGloss&8] &c没有名为 '&f{id}&c' 的骨架。"
+instance_missing = "&8[&dGloss&8] &c没有名为 '&f{id}&c' 的骨架实例。"
+placed = "&8[&dGloss&8] &a已将骨架 &f{name}&a 作为 &f{id}&a 放置在 &f{world} {x}, {y}, {z}&a。"
+place_failed = "&8[&dGloss&8] &c无法放置骨架 &f{name}&c：{reason}"
+moved = "&8[&dGloss&8] &a已将骨架实例 &f{id}&a 移动到 &f{world} {x}, {y}, {z}&a。"
+rotated = "&8[&dGloss&8] &a已将骨架实例 &f{id}&a 旋转为偏航 &f{yaw}&a、俯仰 &f{pitch}&a。"
+scaled = "&8[&dGloss&8] &a已将骨架实例 &f{id}&a 缩放为 &f{scale}&a。"
+scale_out_of_range = "&8[&dGloss&8] &c骨架缩放必须介于 &f{minimum}&c 和 &f{maximum}&c 之间；收到 &f{value}&c。"
+removed = "&8[&dGloss&8] &a已移除骨架实例 &f{id}&a。"
+state_set = "&8[&dGloss&8] &a骨架实例 &f{id}&a 现在处于状态 &f{state}&a。"
+state_unknown = "&8[&dGloss&8] &c骨架实例 &f{id}&c 没有名为 '&f{state}&c' 的状态。"
+var_set = "&8[&dGloss&8] &a已将骨架实例 &f{id}&a 的 &f{name}&a 设为 &f{value}&a。"
+save_failed = "&8[&dGloss&8] &c无法保存骨架实例 &f{id}&c：{reason}"
+list_empty = "&8[&dGloss&8] &7未加载任何骨架。"
+list_rigs = "&8[&dGloss&8] &7骨架 (&f{count}&7)：&f{value}"
+instances_empty = "&8[&dGloss&8] &7未放置任何骨架实例。"
+list_hover = "点击传送"
+list_entry = "{name} 位于 {world} {x}, {y}, {z}；状态 {state}"
+info_header = "&8[&dGloss&8] &d{id} &7使用骨架 &f{name}&7，位于 &f{world} {x}, {y}, {z}"
+info_pose = "&8[&dGloss&8] &7偏航 &f{yaw}&7，俯仰 &f{pitch}&7，缩放 &f{scale}&7，状态 &f{state}"
+info_parts = "&8[&dGloss&8] &7部件 &f{count}&7，观看者 &f{value}"
+info_var = "&8[&dGloss&8] &7  {name} = &f{value}"
+motion_unknown = "&8[&dGloss&8] &c没有名为 '&f{id}&c' 的动作。"
+motion_list_empty = "&8[&dGloss&8] &7未加载任何动作片段。"
+motion_list = "&8[&dGloss&8] &7动作片段 (&f{count}&7)：&f{value}"
+motion_info = "&8[&dGloss&8] &d{id} &7{value} 刻，{kind}，{count} fps"
+motion_track = "&8[&dGloss&8] &7  {name} &f{key} &7（{count} 个关键帧）"
+import_done = "&8[&dGloss&8] &a已导入 &f{id}&a：骨骼 &f{value}&a，部件 &f{count}&a，动画 &f{kind}&a。"
+import_unsupported = "&8[&dGloss&8] &7未导入：&f{value}&7。"
+import_failed = "&8[&dGloss&8] &c无法导入 &f{path}&c：{reason}"
+hologram_page_set = "&8[&dGloss&8] &a{player}&a 现在位于 &f{id}&a 的第 &f{page}&a 页。"
+hologram_page_player_missing = "&8[&dGloss&8] &c玩家 &f{player}&c 不在线。"
+hologram_page_unknown = "&8[&dGloss&8] &c全息图 &f{id}&c 没有页面 '&f{page}&c'。"
+hologram_motion_set = "&8[&dGloss&8] &a全息图 &f{id}&a 现在播放 &f{value}&a。"
+hologram_motion_cleared = "&8[&dGloss&8] &a全息图 &f{id}&a 不再播放运动。"
+hologram_actions_empty = "&8[&dGloss&8] &7全息图 &f{id}&7 未声明动作。"
+hologram_actions_header = "&8[&dGloss&8] &7全息图 &f{id}&7 的动作（&f{count}&7）："
+hologram_actions_entry = "&8[&dGloss&8] &7  &f{kind}&7 于 &f{value}"
+
+# --- lane:world ---
+[gloss.message.world]
+players_only = "&c该命令必须由玩家执行。"
+disabled = "&c该功能已在 gloss.toml 中关闭。"
+
+[gloss.message.world.marker]
+list = "&7标记 &8({count})&7：&f{value}"
+info = "&7标记 &f{id} &7位于 &f{world} {x} {y} {z}"
+created = "&a已创建标记 &f{id}&a。"
+removed = "&a已删除标记 &f{id}&a。"
+missing = "&c没有名为 &f{id} &c的标记。"
+here = "&7你位于 &f{world} {x} {y} {z}&7。"
+
+[gloss.message.world.waypoint]
+saved = "&a已保存路径点 &f{name}&a。"
+removed = "&a已删除路径点 &f{name}&a。"
+missing = "&c没有名为 &f{name} &c的路径点。"
+list = "&7路径点 &8({count})&7：&f{value}"
+info = "&7路径点 &f{id} &7位于 &f{world} {x} {y} {z}"
+full = "&c你已达到 {count} 个路径点的上限。"
+
+[gloss.message.world.zone]
+list = "&7区域 &8({count})&7：&f{value}"
+info = "&7区域 &f{id} &7是 &f{world} &7中的 &f{kind}&7。"
+shown = "&a正在显示区域 &f{id}&a。"
+hidden = "&7正在隐藏区域 &f{id}&7。"
+created = "&a已创建区域 &f{id}&a。"
+removed = "&a已删除区域 &f{id}&a。"
+missing = "&c没有名为 &f{id} &c的区域。"
+
+[gloss.message.world.camera]
+started = "&7镜头飞行已开始。"
+refused = "&c镜头飞行被拒绝。"
+stopped = "&7已为 &f{player} &7停止镜头飞行。"
+idle = "&c{player} 不在镜头飞行中。"
+
+[gloss.message.world.nameplate]
+list = "&7名牌 &8({count})&7：&f{value}"
+info = "&7名牌 &f{id} &7优先级 &f{value}&7，共 &f{count} &7行。"
+missing = "&c没有名为 &f{id} &c的名牌。"
+refreshed = "&a名牌已刷新。"
+
+[gloss.message.world.glow]
+set = "&f{target} &7现在以 &f{value} &a发光。"
+cleared = "&7已清除 &f{target} &7的发光。"
+missing = "&c没有名为 &f{player} &c的在线玩家。"
+
+[command.help.marker]
+root = "世界标记工具"
+list = "列出标记文档"
+info = "显示一个标记"
+create = "在你的位置写入标记文档"
+remove = "删除标记文档"
+here = "输出你的位置作为锚点坐标"
+
+[command.help.marker.arg]
+id = "标记文档 ID"
+label = "标记上方显示的标签"
+
+[command.help.waypoint]
+root = "定位栏路径点工具"
+set = "将你的位置保存为个人路径点"
+remove = "删除你的一个个人路径点"
+list = "列出你的个人路径点"
+info = "显示一个路径点文档"
+
+[command.help.waypoint.arg]
+name = "路径点名称"
+id = "路径点文档 ID"
+
+[command.help.zone]
+root = "区域轮廓工具"
+list = "列出区域"
+info = "显示一个区域"
+show = "向自己显示区域轮廓"
+hide = "对自己隐藏区域轮廓"
+create = "在你的位置周围写入长方体区域文档"
+remove = "删除区域文档"
+
+[command.help.zone.arg]
+id = "区域文档 ID"
+radius = "半宽（方块）"
+
+[command.help.camera]
+root = "镜头飞行工具"
+test = "围绕自己飞一段演示航线"
+stop = "提前结束镜头飞行"
+
+[command.help.camera.arg]
+seconds = "航线长度（秒）"
+player = "要停止的乘客；默认为你"
+
+[command.help.nameplate]
+root = "玩家名牌工具"
+list = "列出名牌文档"
+info = "显示一个名牌文档"
+reset = "还原随附的名牌文档"
+refresh = "为所有观察者重建名牌"
+
+[command.help.nameplate.arg]
+id = "名牌文档 ID"
+
+[command.help.glow]
+root = "实体发光工具"
+set = "让一名玩家为你发光"
+clear = "为你清除一名玩家的发光"
+
+[command.help.glow.arg]
+player = "要描边的玩家"
+cleared = "停止描边的玩家"
+color = "命名文本颜色"
+ticks = "发光持续的刻数，0 表示保持"
+
+# --- lane:behaviors ---
+[command.help.behavior]
+root = "查看并触发行为文档"
+list = "列出已加载的行为文档"
+info = "显示行为文档的触发器与条件"
+fire = "立即运行一条行为条目"
+reset = "恢复内置的行为默认文档"
+id = "行为文档 ID"
+entry = "条目编号，从 1 开始"
+player = "运行该条目的玩家，或用 * 表示无玩家"
+
+[command.help.state]
+root = "读写已持久化的行为状态"
+get = "显示一个状态值"
+set = "写入一个状态值"
+clear = "将一个状态值恢复为默认值"
+dump = "列出每个已声明的状态键及其值"
+key = "已声明的状态键"
+value = "新值；含空格时请用引号括起"
+player = "该值所属的玩家，或用 * 表示你自己"
+
+[command.help.do]
+root = "触发以此命名的 command 行为条目"
+name = "行为命令名称"
+args = "以 键=值 形式给出的参数；含空格时请用引号括起"
+
+[command.help.expr]
+root = "求值一个表达式并显示是谁给出了结果"
+expression = "要求值的表达式；含空格时请用引号括起"
+
+[command.help.explain]
+root = "显示某个运行时检查了哪些条件以及哪个胜出"
+kind = "要解释的运行时，例如 board 或 behavior"
+id = "要解释的文档 ID"
+player = "为其解释的玩家，或用 * 表示你自己"
+
+[gloss.message.behaviors]
+off = "&8[&dGloss&8]: &e行为已在 features.behaviors 中关闭。"
+"list.empty" = "&8[&dGloss&8]: &7没有加载任何行为文档。"
+missing = "&8[&dGloss&8]: &c没有名为 \"{id}\" 的行为文档。"
+"info.header" = "&8[&dGloss&8]: &d{id} &7修订 &f{revision} &8| &7条目 &f{count} &8| &7启用 &f{enabled}"
+"info.entry" = " &8{line}. &f{name} &7条件 &f{when} &8| &7权限 &f{permission}"
+fired = "&8[&dGloss&8]: &a已运行 &f{id}&a 的条目 &f{line}&a。"
+"fire.missing" = "&8[&dGloss&8]: &c{id} 没有条目 {line}。"
+"do.ran" = "&8[&dGloss&8]: &a已为 &f{name}&a 触发 &f{count}&a 条行为条目。"
+"do.none" = "&8[&dGloss&8]: &7没有行为条目响应命令 \"{name}\"。"
+"state.value" = " &7{key} &8= &f{value}"
+"state.set" = "&8[&dGloss&8]: &a{key} 现在是 &f{value}&a。"
+"state.cleared" = "&8[&dGloss&8]: &a{key} 已恢复为默认值。"
+"state.unknown" = "&8[&dGloss&8]: &c没有行为文档声明状态键 \"{key}\"。"
+"state.invalid" = "&8[&dGloss&8]: &c\"{value}\" 不是 {type} 值。"
+"state.empty" = "&8[&dGloss&8]: &7没有行为文档声明任何状态。"
+"state.player" = "&8[&dGloss&8]: &c请指定玩家：&f{key}&c 不是全局键。"
+"player.missing" = "&8[&dGloss&8]: &c没有名为 \"{player}\" 的在线玩家。"
+"expr.value" = "&8[&dGloss&8]: &f{value} &8({type})"
+"expr.reference" = " &7{name} &8= &f{value} &8来自 &7{source}"
+"expr.functions" = " &7函数 &8= &f{value}"
+"expr.failed" = "&8[&dGloss&8]: &c{reason}"
+"explain.header" = "&8[&dGloss&8]: &d{kind} &f{id} &7对象 &f{player}"
+"explain.line" = " &8{path} &7{when} &8= &f{value}"
+"explain.winner" = " &a> &f{path} &7{when} &8= &f{value}"
+"explain.unknown" = "&8[&dGloss&8]: &c没有东西能解释 \"{kind}\"；请试试 {options}。"
+"explain.missing" = "&8[&dGloss&8]: &c没有名为 \"{id}\" 的 {kind}。"
+
+# --- lane:authoring ---
+[command.help.pack]
+root = "安装和管理 Gloss 包"
+install = "从文件或 HTTPS 网址安装一个包"
+update = "从来源更新已安装的包"
+remove = "移除一个包，并保留安装后被改过的每个文件"
+list = "列出已安装的包"
+info = "显示一个包拥有哪些文件"
+arg_source = "Gloss 数据文件夹中的包文件，或一个 HTTPS 网址"
+arg_dry = "只报告会发生什么改动，不写入任何内容"
+arg_id = "已安装包的 id"
+
+[command.help.history]
+root = "列出一个文档已保存的版本"
+arg_kind = "文档文件夹，例如 boards 或 menus"
+arg_id = "文档 id"
+arg_page = "从一开始计数的列表页"
+
+[command.help.restore]
+root = "把保存的版本写回到当前文档上"
+arg_version = "来自 /gloss history 的版本标记"
+
+[command.help.check]
+root = "检查工作区中断开的引用"
+arg_kind = "把检查限定在一个文档文件夹"
+arg_id = "把检查限定在一个文档"
+
+[command.help.export]
+root = "把文档导出为纯 JSON"
+bundle = "把整个工作区写成编辑器包"
+arg_kind = "把导出限定在一个文档文件夹"
+arg_id = "把导出限定在一个文档"
+arg_dir = "Gloss 数据文件夹内的目标文件夹"
+
+[gloss.message.authoring.pack]
+preview = "&8[&dGloss&8] 包 &f{id}&7 将改动 &f{count}&7 个文件。"
+outcome = "&8[&dGloss&8] &7{state} &f{path}&7 {reason}"
+installed = "&8[&dGloss&8] 已安装包 &f{id}&7，共 &f{count}&7 个文件。"
+updated = "&8[&dGloss&8] 已在 &f{count}&7 个文件上更新包 &f{id}&7。"
+removed = "&8[&dGloss&8] 已移除包 &f{id}&7 和 &f{count}&7 个文件。"
+unknown = "&8[&dGloss&8] &c没有 id 为 &f{id}&c 的已安装包。"
+failed = "&8[&dGloss&8] &c包 &f{id}&c 失败：{reason}"
+entry = "&8[&dGloss&8] &f{id} &7{value} &8{count} 个文件"
+empty = "&8[&dGloss&8] &7没有已安装的包。"
+disabled = "&8[&dGloss&8] &cGloss 包在 gloss.toml 中已关闭。"
+
+[gloss.message.authoring.history]
+empty = "&8[&dGloss&8] &7&f{kind} {id}&7 没有保存的版本。"
+entry = "&8[&dGloss&8] &f{revision} &7{source} &8{count} 字节"
+disabled = "&8[&dGloss&8] &c文档历史在 gloss.toml 中已关闭。"
+
+[gloss.message.authoring.restore]
+done = "&8[&dGloss&8] 已把 &f{kind} {id}&7 还原到版本 &f{revision}&7。"
+unknown = "&8[&dGloss&8] &c&f{kind} {id}&c 没有版本 &f{revision}&c。"
+failed = "&8[&dGloss&8] &c还原失败：{reason}"
+
+[gloss.message.authoring.check]
+clean = "&8[&dGloss&8] &a没有需要报告的问题。"
+entry = "&8[&dGloss&8] &7{state} &f{key} &8{kind} {id} {path} &7{message}"
+summary = "&8[&dGloss&8] &f{count}&7 条结果。"
+
+[gloss.message.authoring.export]
+done = "&8[&dGloss&8] 已把 &f{count}&7 个文档导出到 &f{path}&7。"
+failed = "&8[&dGloss&8] &c导出失败：{reason}"
+
+[gloss.message.authoring.import]
+preview = "&8[&dGloss&8] &f{source}&7 将写入 &f{count}&7 个文档。"
+entry = "&8[&dGloss&8] &7{state} &f{path}&7 {reason}"
+applied = "&8[&dGloss&8] 已从 &f{source}&7 导入 &f{count}&7 个文档。"
+absent = "&8[&dGloss&8] &7&f{path}&7 没有 &f{source}&7 数据。"
+
+# --- lane:forge ---
+[gloss.message.forge]
+disabled = "&8[&dGloss&8] &c字形工坊已关闭。请在 gloss.toml 中将 features.forge 设为 true。"
+built = "&8[&dGloss&8] &a已构建资源包 &f{value}&a，共 {count} 个字形。"
+build_failed = "&8[&dGloss&8] &c资源包构建失败，仍使用上一个资源包。请查看控制台。"
+status = "&7{value}"
+exported = "&8[&dGloss&8] &a已导出 {count} 个文件到 &f{path}&a。"
+export_failed = "&8[&dGloss&8] &c导出失败：&f{reason}&c。"
+serve = "&8[&dGloss&8] &a资源包监听器已{state}。"
+serve_unchanged = "&8[&dGloss&8] &7资源包监听器已经是{state}。"
+
+[command.help.forge]
+root = "字形资源包工具"
+build = "立即重新构建字形资源包"
+status = "显示资源包、字形与分发数量"
+export = "把可合并的资源包目录复制到别处"
+"export.path" = "资源包的目标目录"
+serve = "启动或停止内置资源包监听器"
+"serve.state" = "on 或 off"
+reset = "恢复随附的字形文档"
+
+# --- lane:fixes ---
+[gloss.message.fixes]
+status_bedrock = "&7bedrock: &f{name}&7，在线 &f{count}&7 人"
+status_textimage_oversize = "&7textimage-超出尺寸: &f{count}"
+hotload_skipped = " &7(已忽略 {count} 个，schemaVersion 不符)"
+status_schema_skipped = "&7schema-已忽略: &f{count}"
+bedrock_menu_unavailable = "&8[&dGloss&8]: &c此菜单在基岩版中不会显示。"
+

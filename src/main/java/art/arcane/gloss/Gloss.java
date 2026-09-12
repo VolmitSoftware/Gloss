@@ -2,6 +2,8 @@ package art.arcane.gloss;
 
 import art.arcane.volmlib.util.diagnostics.BukkitDebugDump;
 import art.arcane.gloss.animation.AnimationService;
+import art.arcane.gloss.bedrock.BedrockPolicy;
+import art.arcane.gloss.bedrock.BedrockService;
 import art.arcane.gloss.api.GlossAPIProvider;
 import art.arcane.gloss.api.internal.GlossApiServiceImpl;
 import art.arcane.gloss.board.BoardService;
@@ -42,6 +44,11 @@ import art.arcane.gloss.preview.PreviewScaleService;
 import art.arcane.gloss.preview.doc.PreviewDocumentRegistry;
 import art.arcane.gloss.service.GlossAPIImpl;
 import art.arcane.gloss.service.GlossIntegrationService;
+import art.arcane.gloss.service.GlossLaneServices;
+import art.arcane.gloss.service.GlossService;
+import art.arcane.gloss.service.VisibilityGovernor;
+import art.arcane.gloss.util.common.PacketTeamAllocator;
+import art.arcane.gloss.util.common.TeamAllocator;
 import art.arcane.gloss.service.MetricsRuntime;
 import art.arcane.gloss.service.GlossPlaceholderInstaller;
 import art.arcane.gloss.service.PanelCreationService;
@@ -80,6 +87,7 @@ import java.nio.file.NoSuchFileException;
 import java.util.ArrayDeque;
 import java.util.Collection;
 import java.util.Deque;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -152,6 +160,11 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
     private GlossApiServiceImpl apiService;
     private PlaceholderRegistration placeholderRegistration;
     private volatile Events placeholderEnableListener;
+    private List<GlossService> laneServices = List.of();
+    private BedrockService bedrock;
+    private BedrockPolicy bedrockPolicy;
+    private TeamAllocator teams;
+    private VisibilityGovernor governor;
 
     public Gloss() {
         getLogger().info("Loading dependencies...");
@@ -275,6 +288,14 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
             config = GlossConfig.from(bootConfigFile);
             watchdog = new DataWatchdog(this);
             enableService("data-watchdog", this::startDataWatchdog, this::stopDataWatchdog);
+            bedrock = new BedrockService(BedrockService.Detection.parse(config.modules().bedrock().detection()));
+            bedrockPolicy = new BedrockPolicy(bedrock, () -> cfg().modules().bedrock());
+            teams = new PacketTeamAllocator();
+            governor = VisibilityGovernor.passthrough();
+            laneServices = GlossLaneServices.create(this);
+            for (GlossService service : laneServices) {
+                service.contribute();
+            }
             text = new TextPipeline(this);
             animations = new AnimationService(this);
             emoji = new EmojiService(this);
@@ -385,6 +406,9 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
             enableService("api-service", () -> apiService.register(api), apiService::unregister);
             placeholderRegistration = new PlaceholderRegistration(getLogger());
             enableService("placeholders", this::installPlaceholders, this::shutdownPlaceholders);
+            for (GlossService service : laneServices) {
+                enableService(service.name(), service::enable, service::disable);
+            }
             GlossAPIProvider.set(api);
         } catch (Throwable failure) {
             success = false;
@@ -459,45 +483,16 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
         CompletableFuture<Void> publication = new CompletableFuture<>();
         boolean accepted = SchedulerUtils.runGlobal(this, () -> {
             try {
-                if (kinds.contains(EditorSyncDocumentKind.ANIMATION)) {
-                    animations.reload();
-                }
-                if (kinds.contains(EditorSyncDocumentKind.EMOJI)) {
-                    emoji.reload();
-                }
-                if (kinds.contains(EditorSyncDocumentKind.HOLOGRAM)) {
-                    holograms.reload();
-                }
-                if (kinds.contains(EditorSyncDocumentKind.SCOREBOARD)) {
-                    boards.reload();
-                }
-                if (kinds.contains(EditorSyncDocumentKind.MOTD)) {
-                    motd.reload();
-                }
-                if (kinds.contains(EditorSyncDocumentKind.BUBBLE_STYLE)) {
-                    bubbles.reload();
-                }
-                if (kinds.contains(EditorSyncDocumentKind.TABLIST)) {
-                    tablist.reload();
-                }
-                if (kinds.contains(EditorSyncDocumentKind.REAL_DROPS)) {
-                    drops.reload();
-                }
-                if (kinds.contains(EditorSyncDocumentKind.CONTAINER_PREVIEW)
-                    && previewRegistry != null) {
-                    previewRegistry.reload();
-                }
-                if (kinds.contains(EditorSyncDocumentKind.DAMAGE_INDICATORS)) {
-                    indicators.reloadSettings();
-                }
-                if (kinds.contains(EditorSyncDocumentKind.ENTITY_OVERLAYS)) {
-                    entityOverlays.reload();
+                for (EditorSyncDocumentKind kind : EditorSyncDocumentKind.ORDERED) {
+                    if (kind != EditorSyncDocumentKind.PANEL && kinds.contains(kind)) {
+                        kind.reload(this);
+                    }
                 }
                 if (imagesChanged) {
                     imageAssets.publishEditorSyncChanges();
                 }
                 if (kinds.contains(EditorSyncDocumentKind.PANEL)) {
-                    panelService.publishExternalReload();
+                    EditorSyncDocumentKind.PANEL.reload(this);
                 }
                 publication.complete(null);
             } catch (IOException | RuntimeException failure) {
@@ -546,7 +541,13 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
      * Documents themselves keep hot-reloading through their own watchdog entries either way.
      */
     private void reloadServices(GlossConfig previous, GlossConfig next, boolean cycleEveryService) {
+        if (bedrock != null) {
+            bedrock.detection(BedrockService.Detection.parse(next.modules().bedrock().detection()));
+        }
         if (previous == null || cycleEveryService) {
+            for (GlossService service : laneServices) {
+                service.reload();
+            }
             text.reload();
             animations.reload();
             emoji.reload();
@@ -594,6 +595,11 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
         }
         if (!previous.drops().equals(next.drops()) || !previous.realDrops().equals(next.realDrops())) {
             drops.reload();
+        }
+        for (GlossService service : laneServices) {
+            if (service.reloadOnConfigChange(previous, next)) {
+                service.reload();
+            }
         }
     }
 
@@ -884,6 +890,36 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
 
     public HudActionBar getHudBar() {
         return hudBar;
+    }
+
+    public BedrockService bedrock() {
+        return bedrock;
+    }
+
+    public BedrockPolicy bedrockPolicy() {
+        return bedrockPolicy;
+    }
+
+    public TeamAllocator teams() {
+        return teams;
+    }
+
+    public VisibilityGovernor governor() {
+        return governor;
+    }
+
+    public List<GlossService> laneServices() {
+        return laneServices;
+    }
+
+    /** The lane service of the given type, or null when no lane registered one. */
+    public <T extends GlossService> T service(Class<T> type) {
+        for (GlossService service : laneServices) {
+            if (type.isInstance(service)) {
+                return type.cast(service);
+            }
+        }
+        return null;
     }
 
     public GlossLocalization getLocalization() {

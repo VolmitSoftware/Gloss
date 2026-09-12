@@ -46,7 +46,7 @@ public final class ApiMenuTranslator {
         menu.closeOnDeath(),
         menu.closeOnTeleport(),
         List.copyOf(components),
-        menu.particleLayers(), ShowCondition.ALWAYS);
+        menu.particleLayers(), ShowCondition.ALWAYS, Map.of());
     definition.setId(menu.id());
     return definition;
   }
@@ -78,7 +78,7 @@ public final class ApiMenuTranslator {
     return switch (component) {
       case HoloComponent.Decoration decoration -> new DecoComponentData(iconData(decoration.icon()));
       case HoloComponent.Button button ->
-          new ButtonComponentData(button.highlightModifier(), List.of(), iconData(button.icon()), null, null, null);
+          new ButtonComponentData(button.highlightModifier(), List.of(), iconData(button.icon()), null, null, null, null);
     };
   }
 }

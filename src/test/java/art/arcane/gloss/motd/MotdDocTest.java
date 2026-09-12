@@ -42,8 +42,8 @@ class MotdDocTest {
     @Test
     void gsonRoundTripPreservesAllFields() {
         MotdDoc original = new MotdDoc(1, 4L, ShowCondition.ALWAYS, List.of(
-            new MotdDoc.MotdEntry(List.of("&aHello")),
-            new MotdDoc.MotdEntry(List.of("&aHello", "&7World"))));
+            MotdDoc.MotdEntry.ofLines(List.of("&aHello")),
+            MotdDoc.MotdEntry.ofLines(List.of("&aHello", "&7World"))), List.of());
 
         MotdDoc decoded = MotdDoc.parse("motd.json", BukkitJson.GSON.toJson(original));
 
@@ -99,32 +99,107 @@ class MotdDocTest {
 
     @Test
     void revisionBoundsAreEnforced() {
-        List<MotdDoc.MotdEntry> entries = List.of(new MotdDoc.MotdEntry(List.of("hi")));
+        List<MotdDoc.MotdEntry> entries = List.of(MotdDoc.MotdEntry.ofLines(List.of("hi")));
 
-        assertThrows(IllegalArgumentException.class, () -> new MotdDoc(1, 0L, ShowCondition.ALWAYS, entries));
+        assertThrows(IllegalArgumentException.class, () -> new MotdDoc(1, 0L, ShowCondition.ALWAYS, entries, List.of()));
         assertThrows(IllegalArgumentException.class,
-            () -> new MotdDoc(1, DocumentEnvelope.MAX_SAFE_REVISION + 1L, ShowCondition.ALWAYS, entries));
+            () -> new MotdDoc(1, DocumentEnvelope.MAX_SAFE_REVISION + 1L, ShowCondition.ALWAYS, entries, List.of()));
     }
 
     @Test
     void atLeastOneEntryIsRequired() {
-        assertThrows(IllegalArgumentException.class, () -> new MotdDoc(1, 1L, ShowCondition.ALWAYS, null));
-        assertThrows(IllegalArgumentException.class, () -> new MotdDoc(1, 1L, ShowCondition.ALWAYS, List.of()));
+        assertThrows(IllegalArgumentException.class, () -> new MotdDoc(1, 1L, ShowCondition.ALWAYS, null, List.of()));
+        assertThrows(IllegalArgumentException.class, () -> new MotdDoc(1, 1L, ShowCondition.ALWAYS, List.of(), List.of()));
     }
 
     @Test
     void entriesRequireOneToTwoLines() {
-        assertThrows(IllegalArgumentException.class, () -> new MotdDoc.MotdEntry(null));
-        assertThrows(IllegalArgumentException.class, () -> new MotdDoc.MotdEntry(List.of()));
+        assertThrows(IllegalArgumentException.class, () -> MotdDoc.MotdEntry.ofLines(null));
+        assertThrows(IllegalArgumentException.class, () -> MotdDoc.MotdEntry.ofLines(List.of()));
         assertThrows(IllegalArgumentException.class,
-            () -> new MotdDoc.MotdEntry(List.of("one", "two", "three")));
+            () -> MotdDoc.MotdEntry.ofLines(List.of("one", "two", "three")));
     }
 
     @Test
     void nullLinesNormalizeToEmpty() {
-        MotdDoc.MotdEntry entry = new MotdDoc.MotdEntry(Arrays.asList("top", null));
+        MotdDoc.MotdEntry entry = MotdDoc.MotdEntry.ofLines(Arrays.asList("top", null));
 
         assertEquals(List.of("top", ""), entry.lines());
+    }
+
+    @Test
+    void anEntryCarriesItsFaviconSampleCountsAndVersion() {
+        MotdDoc doc = MotdDoc.parse("motd.json", """
+            { "schemaVersion": 1, "revision": 1,
+              "entries": [ { "lines": ["&6&lMy Server"], "favicon": "icons/season4.png",
+                             "sample": ["&e{{ server.online }} online", "&b3 staff"],
+                             "online": "{{ server.online }}", "max": "{{ server.maxPlayers }}",
+                             "version": "" } ] }
+            """);
+        MotdDoc.MotdEntry entry = doc.entries().get(0);
+
+        assertEquals("icons/season4.png", entry.favicon());
+        assertEquals(List.of("&e{{ server.online }} online", "&b3 staff"), entry.sample());
+        assertEquals("{{ server.online }}", entry.online());
+        assertEquals("{{ server.maxPlayers }}", entry.max());
+        assertEquals("", entry.version());
+    }
+
+    @Test
+    void theOptionalEntryFieldsDefaultToAbsent() {
+        MotdDoc.MotdEntry entry = MotdDoc.MotdEntry.ofLines(List.of("hi"));
+
+        assertEquals(null, entry.favicon());
+        assertEquals(List.of(), entry.sample());
+        assertEquals(null, entry.online());
+        assertEquals(null, entry.max());
+        assertEquals(null, entry.version());
+    }
+
+    @Test
+    void serverLinksParseWithTheirTypeLabelAndUrl() {
+        MotdDoc doc = MotdDoc.parse("motd.json", """
+            { "schemaVersion": 1, "revision": 1,
+              "entries": [ { "lines": ["hi"] } ],
+              "links": [ { "type": "website", "url": "https://example.org" },
+                         { "type": "community", "label": "Discord", "url": "https://discord.gg/example" } ] }
+            """);
+
+        assertEquals(2, doc.links().size());
+        assertEquals("website", doc.links().get(0).type());
+        assertEquals(null, doc.links().get(0).label());
+        assertEquals("Discord", doc.links().get(1).label());
+        assertEquals("https://discord.gg/example", doc.links().get(1).url());
+    }
+
+    @Test
+    void aLinkWithAnUnknownTypeOrABadUrlIsRefused() {
+        assertThrows(IllegalArgumentException.class,
+            () -> new MotdDoc.MotdLink("teleport", null, "https://example.org"));
+        assertThrows(IllegalArgumentException.class,
+            () -> new MotdDoc.MotdLink("website", null, "javascript:alert(1)"));
+        assertThrows(IllegalArgumentException.class,
+            () -> new MotdDoc.MotdLink("website", null, "not a url"));
+        assertThrows(IllegalArgumentException.class,
+            () -> new MotdDoc.MotdLink(null, "  ", "https://example.org"));
+    }
+
+    @Test
+    void aLabelledLinkNeedsNoKnownType() {
+        MotdDoc.MotdLink link = new MotdDoc.MotdLink(null, "Store", "https://example.org/store");
+
+        assertEquals(null, link.type());
+        assertEquals("Store", link.label());
+        assertTrue(link.isLabelled());
+    }
+
+    @Test
+    void linksDefaultToNoneAndRoundTrip() {
+        MotdDoc doc = new MotdDoc(1, 1L, ShowCondition.ALWAYS,
+            List.of(MotdDoc.MotdEntry.ofLines(List.of("hi"))), null);
+
+        assertEquals(List.of(), doc.links());
+        assertEquals(doc, MotdDoc.parse("motd.json", BukkitJson.GSON.toJson(doc)));
     }
 
     private record TestScope(Map<String, Object> variables) implements ExprScope {

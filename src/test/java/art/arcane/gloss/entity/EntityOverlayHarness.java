@@ -59,7 +59,7 @@ final class EntityOverlayHarness implements AutoCloseable {
     }
 
     static final class PlayerHandle {
-        final UUID uuid = UUID.randomUUID();
+        final UUID uuid;
         final String name;
         volatile Location location;
         volatile boolean online = true;
@@ -68,7 +68,12 @@ final class EntityOverlayHarness implements AutoCloseable {
         Player proxy;
 
         PlayerHandle(String name) {
+            this(name, UUID.randomUUID());
+        }
+
+        PlayerHandle(String name, UUID uuid) {
             this.name = name;
+            this.uuid = uuid;
         }
     }
 
@@ -265,7 +270,11 @@ final class EntityOverlayHarness implements AutoCloseable {
     }
 
     PlayerHandle join(String name, WorldState world, double x, double y, double z) {
-        PlayerHandle handle = new PlayerHandle(name);
+        return join(name, UUID.randomUUID(), world, x, y, z);
+    }
+
+    PlayerHandle join(String name, UUID id, WorldState world, double x, double y, double z) {
+        PlayerHandle handle = new PlayerHandle(name, id);
         handle.proxy = playerProxy(handle);
         handle.location = new Location(world.proxy, x, y, z);
         world.players.add(handle.proxy);

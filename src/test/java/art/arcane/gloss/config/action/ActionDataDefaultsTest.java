@@ -107,13 +107,13 @@ public class ActionDataDefaultsTest {
 
   @Test
   public void teleportAndConnectValidationRejectUnsafeValues() {
-    assertFalse(new TeleportActionData("world", 0D, 64D, 0D, 0F, 0F, null).hasValidDestination());
-    assertFalse(new TeleportActionData("minecraft:overworld", Double.NaN, 64D, 0D, 0F, 0F, null)
+    assertFalse(new TeleportActionData("world", 0D, 64D, 0D, 0F, 0F, null, null, null).hasValidDestination());
+    assertFalse(new TeleportActionData("minecraft:overworld", Double.NaN, 64D, 0D, 0F, 0F, null, null, null)
         .hasValidDestination());
-    assertFalse(new TeleportActionData("minecraft:overworld", 0D, 64D, 0D, Float.POSITIVE_INFINITY, 0F, null)
+    assertFalse(new TeleportActionData("minecraft:overworld", 0D, 64D, 0D, Float.POSITIVE_INFINITY, 0F, null, null, null)
         .hasValidDestination());
-    assertFalse(new ConnectActionData("lobby\nConnect\nevil", null).hasValidServer());
-    assertFalse(new ConnectActionData("lobby west", null).hasValidServer());
+    assertFalse(new ConnectActionData("lobby\nConnect\nevil", null, null, null).hasValidServer());
+    assertFalse(new ConnectActionData("lobby west", null, null, null).hasValidServer());
   }
 
   @Test
@@ -148,9 +148,9 @@ public class ActionDataDefaultsTest {
 
   @Test
   public void anInvalidSoundKeyResolvesToNothingInsteadOfThrowing() {
-    assertNull(new SoundActionData("ui.button.nonexistent", null, null, null, null).resolveSound());
-    assertNull(new SoundActionData("UI_BUTTON_CLICK", null, null, null, null).resolveSound());
-    assertNull(new SoundActionData(null, null, null, null, null).resolveSound());
+    assertNull(new SoundActionData("ui.button.nonexistent", null, null, null, null, null, null).resolveSound());
+    assertNull(new SoundActionData("UI_BUTTON_CLICK", null, null, null, null, null, null).resolveSound());
+    assertNull(new SoundActionData(null, null, null, null, null, null, null).resolveSound());
   }
 
   @Test
@@ -166,7 +166,7 @@ public class ActionDataDefaultsTest {
         "{\"type\":\"command\",\"command\":\"spawn\",\"trigger\":\"middle_click\"}"));
 
     String encoded = DocumentParsers.GSON.toJson(
-        new MessageActionData("Hello", HoloClickTrigger.SHIFT_LEFT_CLICK)
+        new MessageActionData("Hello", HoloClickTrigger.SHIFT_LEFT_CLICK, null, null)
     );
     assertTrue(encoded, encoded.contains("\"trigger\": \"shift_left_click\""));
   }

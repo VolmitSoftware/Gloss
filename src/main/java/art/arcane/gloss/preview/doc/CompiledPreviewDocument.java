@@ -7,6 +7,7 @@ import art.arcane.gloss.api.HologramBox;
 import art.arcane.gloss.expr.Expr;
 import art.arcane.gloss.expr.ExprEvaluator;
 import art.arcane.gloss.expr.ExprScope;
+import art.arcane.gloss.expr.RepeatScope;
 import art.arcane.gloss.preview.PreviewElement;
 import art.arcane.gloss.particle.ParticleText;
 import art.arcane.gloss.text.TextPipeline;
@@ -661,19 +662,6 @@ public final class CompiledPreviewDocument {
   }
 
   /** Resolves one repeat variable, delegating everything else to the document's live scope. */
-  private record RepeatScope(ExprScope parent, String name, Object value) implements ExprScope {
-
-    @Override
-    public Object variable(String dottedName) {
-      return name.equals(dottedName) ? value : parent.variable(dottedName);
-    }
-
-    @Override
-    public Object call(String function, List<Object> args) {
-      return parent.call(function, args);
-    }
-  }
-
   enum ElementType {
     PANEL, CELL, SLOT, LABEL
   }

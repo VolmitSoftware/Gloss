@@ -1,18 +1,21 @@
 package art.arcane.gloss.editor.sync;
 
-import java.util.Optional;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 interface EditorSyncRelayGateway {
   CompletableFuture<EditorSyncRelayClient.RelayCreated> create(
       String endpoint, String createToken, EditorSyncProject project, int expiresInSeconds);
 
-  CompletableFuture<Optional<EditorSyncPublication>> publication(
-      EditorSyncStoredSession session);
+  CompletableFuture<EditorSyncRelayClient.RelayPoll> poll(EditorSyncStoredSession session);
+
+  CompletableFuture<Void> answerHistory(EditorSyncStoredSession session,
+                                        EditorSyncRelayClient.HistoryRequest request, String json);
 
   CompletableFuture<Void> acknowledge(EditorSyncStoredSession session, long revision,
                                       String status, String message,
-                                      EditorSyncProject serverProject);
+                                      EditorSyncProject serverProject,
+                                      List<EditorSyncPendingAck.Conflict> conflicts);
 
   CompletableFuture<Void> revoke(EditorSyncStoredSession session);
 

@@ -1,0 +1,1628 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://volmit.com/gloss/behaviors.schema.json",
+  "title": "Gloss Behavior Document",
+  "description": "One behaviors/<id>.json document: the state keys it declares and the event entries it subscribes to. Hot reload picks up edits through the single data watchdog.",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "revision"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {
+      "description": "Document format revision. Server owned and monotonic.",
+      "type": "integer",
+      "const": 1
+    },
+    "revision": {
+      "description": "Bumped by the server on every write; the editor and the hot reloader compare it.",
+      "type": "integer",
+      "minimum": 0
+    },
+    "enabled": {
+      "description": "When false the document still loads and its state declarations still apply, but no entry ever fires.",
+      "type": "boolean",
+      "default": true
+    },
+    "allowServerCommands": {
+      "description": "Must be true before any command action inside this document may use source: server. Without it the document is refused at load and the refusal names the path.",
+      "type": "boolean",
+      "default": false
+    },
+    "state": {
+      "description": "The state keys this document declares. Every document that declares a key must agree on its scope, type and default.",
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/stateDeclaration"
+      },
+      "propertyNames": {
+        "pattern": "^[a-z][a-z0-9_.]*$"
+      }
+    },
+    "on": {
+      "description": "The event entries, evaluated in document order.",
+      "type": "array",
+      "maxItems": 256,
+      "items": {
+        "$ref": "#/$defs/entry"
+      }
+    }
+  },
+  "$defs": {
+    "stateDeclaration": {
+      "title": "State Declaration",
+      "description": "One state key: where it lives, what shape its value has and what a read returns before any write.",
+      "type": "object",
+      "required": [
+        "scope",
+        "type"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "scope": {
+          "description": "player keeps one value per player, world one per world, global one for the server.",
+          "type": "string",
+          "enum": [
+            "player",
+            "world",
+            "global"
+          ]
+        },
+        "type": {
+          "description": "The value shape. These are the expression language's own types, so a read drops straight into {{ }} and when.",
+          "type": "string",
+          "enum": [
+            "number",
+            "string",
+            "boolean"
+          ]
+        },
+        "default": {
+          "description": "What a read returns before anything writes. Defaults to 0, the empty string or false."
+        }
+      }
+    },
+    "entry": {
+      "title": "Behavior Entry",
+      "description": "One subscription: a trigger, the options that trigger accepts, an optional when gate and permission, and the actions to run. An option the trigger does not accept refuses the document.",
+      "type": "object",
+      "required": [
+        "trigger",
+        "do"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "trigger": {
+          "description": "The event this entry listens to. join: A player joined. Roles: viewer and subject are the player. first_join: A player joined for the first time. Roles: viewer and subject are the player. quit: A player left. Roles: viewer and subject are the player. respawn: A player respawned. Roles: viewer and subject are the player. death: A player died. args.cause carries the damage cause. Roles: viewer and subject are the victim, source is the killer. kill: A player killed an entity. Roles: viewer and source are the killer, subject is the victim. damage: One entity damaged another. args.amount and args.cause describe the hit. Roles: subject is the victim, source is the damager, viewer is whichever of them is a player. chat: A player sent a chat message. args.message carries the line. Roles: viewer and subject are the sender. command: A /gloss do call named this entry. args carry the call's key=value pairs. Roles: viewer and subject are the caller, if any. block_break: A player broke a block. args.block carries the material key. Roles: viewer and subject are the player. block_place: A player placed a block. args.block carries the material key. Roles: viewer and subject are the player. pickup: A player picked an item up. args.material and args.amount describe the stack. Roles: viewer and subject are the player. drop: A player dropped an item. args.material and args.amount describe the stack. Roles: viewer and subject are the player. world_change: A player changed world. args.from and args.to carry the world names. Roles: viewer and subject are the player. region_enter: A player entered a WorldGuard region. args.region carries its id. Roles: viewer and subject are the player. region_leave: A player left a WorldGuard region. args.region carries its id. Roles: viewer and subject are the player. menu_open: A Gloss menu opened. args.menu carries its id. Roles: viewer and subject are the player. menu_close: A Gloss menu closed. args.menu carries its id. Roles: viewer and subject are the player. menu_click: A Gloss menu component was clicked. args.menu and args.component identify it. Roles: viewer and subject are the player. dialog_submit: A dialog was submitted. args.menu carries its id. Roles: viewer and subject are the player. inventory_click: An inventory slot was clicked. args.menu and args.component identify it. Roles: viewer and subject are the player. interval: A repeating timer. A player-scoped interval fires once per online player on that player's region; a global one fires once with no viewer. Roles: viewer and subject are the player for a player-scoped interval, and absent for a global one. server_start: The server finished loading. There is no viewer. Roles: no roles are set. emit: An emit action or the API fired this event name. args carry whatever the emitter passed. Roles: viewer and subject are the emitting player, if any.",
+          "type": "string",
+          "enum": [
+            "join",
+            "first_join",
+            "quit",
+            "respawn",
+            "death",
+            "kill",
+            "damage",
+            "chat",
+            "command",
+            "block_break",
+            "block_place",
+            "pickup",
+            "drop",
+            "world_change",
+            "region_enter",
+            "region_leave",
+            "menu_open",
+            "menu_close",
+            "menu_click",
+            "dialog_submit",
+            "inventory_click",
+            "interval",
+            "server_start",
+            "emit"
+          ]
+        },
+        "when": {
+          "description": "Boolean condition evaluated with the trigger's roles and args before the actions run; false skips the entry.",
+          "type": "string"
+        },
+        "permission": {
+          "description": "Only a viewer with this permission runs the entry. An entry with no viewer never passes a permission gate.",
+          "type": "string",
+          "minLength": 1
+        },
+        "do": {
+          "description": "The actions the entry runs, in order.",
+          "type": "array",
+          "items": {
+            "$ref": "https://volmit.com/gloss/schema.json#/$defs/action"
+          }
+        },
+        "region": {
+          "description": "WorldGuard region id the entry listens to. Required by region_enter and region_leave.",
+          "type": "string",
+          "minLength": 1
+        },
+        "everyTicks": {
+          "description": "Interval length in ticks. Required by interval.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1728000
+        },
+        "scope": {
+          "description": "Whether an interval fires per player or once for the server.",
+          "type": "string",
+          "enum": [
+            "player",
+            "global"
+          ],
+          "default": "player"
+        },
+        "pattern": {
+          "description": "Java regular expression matched against the chat line; the entry fires when it finds a match anywhere. Omitted matches every line.",
+          "type": "string"
+        },
+        "name": {
+          "description": "Event or command name. Required by command and emit.",
+          "type": "string",
+          "minLength": 1
+        },
+        "material": {
+          "description": "Material key filter, such as minecraft:diamond_ore. Omitted matches every material.",
+          "type": "string",
+          "minLength": 1
+        },
+        "menu": {
+          "description": "Menu or inventory id filter. Omitted matches every one.",
+          "type": "string",
+          "minLength": 1
+        },
+        "component": {
+          "description": "Component or slot id filter. Omitted matches every one.",
+          "type": "string",
+          "minLength": 1
+        },
+        "dialog": {
+          "description": "Dialog id filter. Omitted matches every dialog.",
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "trigger": {
+                "const": "join"
+              }
+            },
+            "required": [
+              "trigger"
+            ]
+          },
+          "then": {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "region"
+                  ]
+                },
+                {
+                  "required": [
+                    "everyTicks"
+                  ]
+                },
+                {
+                  "required": [
+                    "scope"
+                  ]
+                },
+                {
+                  "required": [
+                    "pattern"
+                  ]
+                },
+                {
+                  "required": [
+                    "name"
+                  ]
+                },
+                {
+                  "required": [
+                    "material"
+                  ]
+                },
+                {
+                  "required": [
+                    "menu"
+                  ]
+                },
+                {
+                  "required": [
+                    "component"
+                  ]
+                },
+                {
+                  "required": [
+                    "dialog"
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "trigger": {
+                "const": "first_join"
+              }
+            },
+            "required": [
+              "trigger"
+            ]
+          },
+          "then": {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "region"
+                  ]
+                },
+                {
+                  "required": [
+                    "everyTicks"
+                  ]
+                },
+                {
+                  "required": [
+                    "scope"
+                  ]
+                },
+                {
+                  "required": [
+                    "pattern"
+                  ]
+                },
+                {
+                  "required": [
+                    "name"
+                  ]
+                },
+                {
+                  "required": [
+                    "material"
+                  ]
+                },
+                {
+                  "required": [
+                    "menu"
+                  ]
+                },
+                {
+                  "required": [
+                    "component"
+                  ]
+                },
+                {
+                  "required": [
+                    "dialog"
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "trigger": {
+                "const": "quit"
+              }
+            },
+            "required": [
+              "trigger"
+            ]
+          },
+          "then": {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "region"
+                  ]
+                },
+                {
+                  "required": [
+                    "everyTicks"
+                  ]
+                },
+                {
+                  "required": [
+                    "scope"
+                  ]
+                },
+                {
+                  "required": [
+                    "pattern"
+                  ]
+                },
+                {
+                  "required": [
+                    "name"
+                  ]
+                },
+                {
+                  "required": [
+                    "material"
+                  ]
+                },
+                {
+                  "required": [
+                    "menu"
+                  ]
+                },
+                {
+                  "required": [
+                    "component"
+                  ]
+                },
+                {
+                  "required": [
+                    "dialog"
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "trigger": {
+                "const": "respawn"
+              }
+            },
+            "required": [
+              "trigger"
+            ]
+          },
+          "then": {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "region"
+                  ]
+                },
+                {
+                  "required": [
+                    "everyTicks"
+                  ]
+                },
+                {
+                  "required": [
+                    "scope"
+                  ]
+                },
+                {
+                  "required": [
+                    "pattern"
+                  ]
+                },
+                {
+                  "required": [
+                    "name"
+                  ]
+                },
+                {
+                  "required": [
+                    "material"
+                  ]
+                },
+                {
+                  "required": [
+                    "menu"
+                  ]
+                },
+                {
+                  "required": [
+                    "component"
+                  ]
+                },
+                {
+                  "required": [
+                    "dialog"
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "trigger": {
+                "const": "death"
+              }
+            },
+            "required": [
+              "trigger"
+            ]
+          },
+          "then": {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "region"
+                  ]
+                },
+                {
+                  "required": [
+                    "everyTicks"
+                  ]
+                },
+                {
+                  "required": [
+                    "scope"
+                  ]
+                },
+                {
+                  "required": [
+                    "pattern"
+                  ]
+                },
+                {
+                  "required": [
+                    "name"
+                  ]
+                },
+                {
+                  "required": [
+                    "material"
+                  ]
+                },
+                {
+                  "required": [
+                    "menu"
+                  ]
+                },
+                {
+                  "required": [
+                    "component"
+                  ]
+                },
+                {
+                  "required": [
+                    "dialog"
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "trigger": {
+                "const": "kill"
+              }
+            },
+            "required": [
+              "trigger"
+            ]
+          },
+          "then": {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "region"
+                  ]
+                },
+                {
+                  "required": [
+                    "everyTicks"
+                  ]
+                },
+                {
+                  "required": [
+                    "scope"
+                  ]
+                },
+                {
+                  "required": [
+                    "pattern"
+                  ]
+                },
+                {
+                  "required": [
+                    "name"
+                  ]
+                },
+                {
+                  "required": [
+                    "menu"
+                  ]
+                },
+                {
+                  "required": [
+                    "component"
+                  ]
+                },
+                {
+                  "required": [
+                    "dialog"
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "trigger": {
+                "const": "damage"
+              }
+            },
+            "required": [
+              "trigger"
+            ]
+          },
+          "then": {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "region"
+                  ]
+                },
+                {
+                  "required": [
+                    "everyTicks"
+                  ]
+                },
+                {
+                  "required": [
+                    "scope"
+                  ]
+                },
+                {
+                  "required": [
+                    "pattern"
+                  ]
+                },
+                {
+                  "required": [
+                    "name"
+                  ]
+                },
+                {
+                  "required": [
+                    "material"
+                  ]
+                },
+                {
+                  "required": [
+                    "menu"
+                  ]
+                },
+                {
+                  "required": [
+                    "component"
+                  ]
+                },
+                {
+                  "required": [
+                    "dialog"
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "trigger": {
+                "const": "chat"
+              }
+            },
+            "required": [
+              "trigger"
+            ]
+          },
+          "then": {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "region"
+                  ]
+                },
+                {
+                  "required": [
+                    "everyTicks"
+                  ]
+                },
+                {
+                  "required": [
+                    "scope"
+                  ]
+                },
+                {
+                  "required": [
+                    "name"
+                  ]
+                },
+                {
+                  "required": [
+                    "material"
+                  ]
+                },
+                {
+                  "required": [
+                    "menu"
+                  ]
+                },
+                {
+                  "required": [
+                    "component"
+                  ]
+                },
+                {
+                  "required": [
+                    "dialog"
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "trigger": {
+                "const": "command"
+              }
+            },
+            "required": [
+              "trigger"
+            ]
+          },
+          "then": {
+            "required": [
+              "name"
+            ],
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "region"
+                  ]
+                },
+                {
+                  "required": [
+                    "everyTicks"
+                  ]
+                },
+                {
+                  "required": [
+                    "scope"
+                  ]
+                },
+                {
+                  "required": [
+                    "pattern"
+                  ]
+                },
+                {
+                  "required": [
+                    "material"
+                  ]
+                },
+                {
+                  "required": [
+                    "menu"
+                  ]
+                },
+                {
+                  "required": [
+                    "component"
+                  ]
+                },
+                {
+                  "required": [
+                    "dialog"
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "trigger": {
+                "const": "block_break"
+              }
+            },
+            "required": [
+              "trigger"
+            ]
+          },
+          "then": {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "region"
+                  ]
+                },
+                {
+                  "required": [
+                    "everyTicks"
+                  ]
+                },
+                {
+                  "required": [
+                    "scope"
+                  ]
+                },
+                {
+                  "required": [
+                    "pattern"
+                  ]
+                },
+                {
+                  "required": [
+                    "name"
+                  ]
+                },
+                {
+                  "required": [
+                    "menu"
+                  ]
+                },
+                {
+                  "required": [
+                    "component"
+                  ]
+                },
+                {
+                  "required": [
+                    "dialog"
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "trigger": {
+                "const": "block_place"
+              }
+            },
+            "required": [
+              "trigger"
+            ]
+          },
+          "then": {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "region"
+                  ]
+                },
+                {
+                  "required": [
+                    "everyTicks"
+                  ]
+                },
+                {
+                  "required": [
+                    "scope"
+                  ]
+                },
+                {
+                  "required": [
+                    "pattern"
+                  ]
+                },
+                {
+                  "required": [
+                    "name"
+                  ]
+                },
+                {
+                  "required": [
+                    "menu"
+                  ]
+                },
+                {
+                  "required": [
+                    "component"
+                  ]
+                },
+                {
+                  "required": [
+                    "dialog"
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "trigger": {
+                "const": "pickup"
+              }
+            },
+            "required": [
+              "trigger"
+            ]
+          },
+          "then": {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "region"
+                  ]
+                },
+                {
+                  "required": [
+                    "everyTicks"
+                  ]
+                },
+                {
+                  "required": [
+                    "scope"
+                  ]
+                },
+                {
+                  "required": [
+                    "pattern"
+                  ]
+                },
+                {
+                  "required": [
+                    "name"
+                  ]
+                },
+                {
+                  "required": [
+                    "menu"
+                  ]
+                },
+                {
+                  "required": [
+                    "component"
+                  ]
+                },
+                {
+                  "required": [
+                    "dialog"
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "trigger": {
+                "const": "drop"
+              }
+            },
+            "required": [
+              "trigger"
+            ]
+          },
+          "then": {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "region"
+                  ]
+                },
+                {
+                  "required": [
+                    "everyTicks"
+                  ]
+                },
+                {
+                  "required": [
+                    "scope"
+                  ]
+                },
+                {
+                  "required": [
+                    "pattern"
+                  ]
+                },
+                {
+                  "required": [
+                    "name"
+                  ]
+                },
+                {
+                  "required": [
+                    "menu"
+                  ]
+                },
+                {
+                  "required": [
+                    "component"
+                  ]
+                },
+                {
+                  "required": [
+                    "dialog"
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "trigger": {
+                "const": "world_change"
+              }
+            },
+            "required": [
+              "trigger"
+            ]
+          },
+          "then": {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "region"
+                  ]
+                },
+                {
+                  "required": [
+                    "everyTicks"
+                  ]
+                },
+                {
+                  "required": [
+                    "scope"
+                  ]
+                },
+                {
+                  "required": [
+                    "pattern"
+                  ]
+                },
+                {
+                  "required": [
+                    "name"
+                  ]
+                },
+                {
+                  "required": [
+                    "material"
+                  ]
+                },
+                {
+                  "required": [
+                    "menu"
+                  ]
+                },
+                {
+                  "required": [
+                    "component"
+                  ]
+                },
+                {
+                  "required": [
+                    "dialog"
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "trigger": {
+                "const": "region_enter"
+              }
+            },
+            "required": [
+              "trigger"
+            ]
+          },
+          "then": {
+            "required": [
+              "region"
+            ],
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "everyTicks"
+                  ]
+                },
+                {
+                  "required": [
+                    "scope"
+                  ]
+                },
+                {
+                  "required": [
+                    "pattern"
+                  ]
+                },
+                {
+                  "required": [
+                    "name"
+                  ]
+                },
+                {
+                  "required": [
+                    "material"
+                  ]
+                },
+                {
+                  "required": [
+                    "menu"
+                  ]
+                },
+                {
+                  "required": [
+                    "component"
+                  ]
+                },
+                {
+                  "required": [
+                    "dialog"
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "trigger": {
+                "const": "region_leave"
+              }
+            },
+            "required": [
+              "trigger"
+            ]
+          },
+          "then": {
+            "required": [
+              "region"
+            ],
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "everyTicks"
+                  ]
+                },
+                {
+                  "required": [
+                    "scope"
+                  ]
+                },
+                {
+                  "required": [
+                    "pattern"
+                  ]
+                },
+                {
+                  "required": [
+                    "name"
+                  ]
+                },
+                {
+                  "required": [
+                    "material"
+                  ]
+                },
+                {
+                  "required": [
+                    "menu"
+                  ]
+                },
+                {
+                  "required": [
+                    "component"
+                  ]
+                },
+                {
+                  "required": [
+                    "dialog"
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "trigger": {
+                "const": "menu_open"
+              }
+            },
+            "required": [
+              "trigger"
+            ]
+          },
+          "then": {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "region"
+                  ]
+                },
+                {
+                  "required": [
+                    "everyTicks"
+                  ]
+                },
+                {
+                  "required": [
+                    "scope"
+                  ]
+                },
+                {
+                  "required": [
+                    "pattern"
+                  ]
+                },
+                {
+                  "required": [
+                    "name"
+                  ]
+                },
+                {
+                  "required": [
+                    "material"
+                  ]
+                },
+                {
+                  "required": [
+                    "component"
+                  ]
+                },
+                {
+                  "required": [
+                    "dialog"
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "trigger": {
+                "const": "menu_close"
+              }
+            },
+            "required": [
+              "trigger"
+            ]
+          },
+          "then": {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "region"
+                  ]
+                },
+                {
+                  "required": [
+                    "everyTicks"
+                  ]
+                },
+                {
+                  "required": [
+                    "scope"
+                  ]
+                },
+                {
+                  "required": [
+                    "pattern"
+                  ]
+                },
+                {
+                  "required": [
+                    "name"
+                  ]
+                },
+                {
+                  "required": [
+                    "material"
+                  ]
+                },
+                {
+                  "required": [
+                    "component"
+                  ]
+                },
+                {
+                  "required": [
+                    "dialog"
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "trigger": {
+                "const": "menu_click"
+              }
+            },
+            "required": [
+              "trigger"
+            ]
+          },
+          "then": {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "region"
+                  ]
+                },
+                {
+                  "required": [
+                    "everyTicks"
+                  ]
+                },
+                {
+                  "required": [
+                    "scope"
+                  ]
+                },
+                {
+                  "required": [
+                    "pattern"
+                  ]
+                },
+                {
+                  "required": [
+                    "name"
+                  ]
+                },
+                {
+                  "required": [
+                    "material"
+                  ]
+                },
+                {
+                  "required": [
+                    "dialog"
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "trigger": {
+                "const": "dialog_submit"
+              }
+            },
+            "required": [
+              "trigger"
+            ]
+          },
+          "then": {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "region"
+                  ]
+                },
+                {
+                  "required": [
+                    "everyTicks"
+                  ]
+                },
+                {
+                  "required": [
+                    "scope"
+                  ]
+                },
+                {
+                  "required": [
+                    "pattern"
+                  ]
+                },
+                {
+                  "required": [
+                    "name"
+                  ]
+                },
+                {
+                  "required": [
+                    "material"
+                  ]
+                },
+                {
+                  "required": [
+                    "menu"
+                  ]
+                },
+                {
+                  "required": [
+                    "component"
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "trigger": {
+                "const": "inventory_click"
+              }
+            },
+            "required": [
+              "trigger"
+            ]
+          },
+          "then": {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "region"
+                  ]
+                },
+                {
+                  "required": [
+                    "everyTicks"
+                  ]
+                },
+                {
+                  "required": [
+                    "scope"
+                  ]
+                },
+                {
+                  "required": [
+                    "pattern"
+                  ]
+                },
+                {
+                  "required": [
+                    "name"
+                  ]
+                },
+                {
+                  "required": [
+                    "material"
+                  ]
+                },
+                {
+                  "required": [
+                    "dialog"
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "trigger": {
+                "const": "interval"
+              }
+            },
+            "required": [
+              "trigger"
+            ]
+          },
+          "then": {
+            "required": [
+              "everyTicks"
+            ],
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "region"
+                  ]
+                },
+                {
+                  "required": [
+                    "pattern"
+                  ]
+                },
+                {
+                  "required": [
+                    "name"
+                  ]
+                },
+                {
+                  "required": [
+                    "material"
+                  ]
+                },
+                {
+                  "required": [
+                    "menu"
+                  ]
+                },
+                {
+                  "required": [
+                    "component"
+                  ]
+                },
+                {
+                  "required": [
+                    "dialog"
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "trigger": {
+                "const": "server_start"
+              }
+            },
+            "required": [
+              "trigger"
+            ]
+          },
+          "then": {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "region"
+                  ]
+                },
+                {
+                  "required": [
+                    "everyTicks"
+                  ]
+                },
+                {
+                  "required": [
+                    "scope"
+                  ]
+                },
+                {
+                  "required": [
+                    "pattern"
+                  ]
+                },
+                {
+                  "required": [
+                    "name"
+                  ]
+                },
+                {
+                  "required": [
+                    "material"
+                  ]
+                },
+                {
+                  "required": [
+                    "menu"
+                  ]
+                },
+                {
+                  "required": [
+                    "component"
+                  ]
+                },
+                {
+                  "required": [
+                    "dialog"
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "trigger": {
+                "const": "emit"
+              }
+            },
+            "required": [
+              "trigger"
+            ]
+          },
+          "then": {
+            "required": [
+              "name"
+            ],
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "region"
+                  ]
+                },
+                {
+                  "required": [
+                    "everyTicks"
+                  ]
+                },
+                {
+                  "required": [
+                    "scope"
+                  ]
+                },
+                {
+                  "required": [
+                    "pattern"
+                  ]
+                },
+                {
+                  "required": [
+                    "material"
+                  ]
+                },
+                {
+                  "required": [
+                    "menu"
+                  ]
+                },
+                {
+                  "required": [
+                    "component"
+                  ]
+                },
+                {
+                  "required": [
+                    "dialog"
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  }
+}

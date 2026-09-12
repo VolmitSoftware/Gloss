@@ -29,4 +29,13 @@ public interface ExprScope {
    *     to {@link ExprFunctions#call(String, List)} for the standard library.
    */
   Object call(String name, List<Object> args);
+
+  /**
+   * The roles this scope evaluates for, so a registered function can read the viewer, subject or
+   * source without knowing which scope implementation is calling it. Scopes without roles answer
+   * {@link ExprVariableContext#empty()}.
+   */
+  default ExprVariableContext variableContext() {
+    return ExprVariableContext.empty();
+  }
 }

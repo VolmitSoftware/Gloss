@@ -46,6 +46,7 @@ public class MenuSession {
 
   private final ApiMenuHandle apiHandle;
   private final MenuSessionOptions options;
+  private final SessionVariables variables;
 
   private MenuTransform transform;
   private float scaleMultiplier;
@@ -80,8 +81,11 @@ public class MenuSession {
     this.show = data.getShow();
 
     this.transform = options.transform();
-    Map<String, MenuComponent<?>> uniqueComponents = new LinkedHashMap<>(data.getComponents().size());
-    for (MenuComponentData componentData : data.getComponents()) {
+    this.variables = SessionVariables.of(SessionVariables.evaluateDeclarations(data.getVars()), options.args());
+    List<MenuComponentData> declared = MenuComponentExpansion.expand(data.getComponents(),
+        new SessionScope(p, variables));
+    Map<String, MenuComponent<?>> uniqueComponents = new LinkedHashMap<>(declared.size());
+    for (MenuComponentData componentData : declared) {
       MenuComponent<?> component = componentData.createComponent(this);
       if (component == null) {
         continue;
@@ -172,6 +176,16 @@ public class MenuSession {
 
   public MenuSessionOptions getOptions() {
     return options;
+  }
+
+  /** This open's session variables: the document's {@code vars}, its arguments, and later writes. */
+  public SessionVariables variables() {
+    return variables;
+  }
+
+  /** The arguments this menu was opened with; they never change for the life of the session. */
+  public Map<String, Object> args() {
+    return variables.args();
   }
 
   public MenuTransform getTransform() {

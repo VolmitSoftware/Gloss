@@ -4,6 +4,8 @@ import art.arcane.gloss.condition.BoundedConditionErrorCallback;
 import art.arcane.gloss.condition.CompiledCondition;
 import art.arcane.gloss.condition.ConditionCompiler;
 import art.arcane.gloss.condition.ConditionSource;
+import art.arcane.gloss.expr.Expr;
+import art.arcane.gloss.expr.ExprParser;
 import art.arcane.gloss.expr.ExprScope;
 import art.arcane.gloss.text.TextPipeline;
 
@@ -12,19 +14,25 @@ import java.util.Comparator;
 import java.util.List;
 
 final class TablistRuntime {
+    private static final String VIEWER_PREFIX = "viewer.";
+
     private final TablistDoc doc;
     private final List<HeaderFooterVariant> headerFooterVariants;
     private final List<ListNameVariant> listNameVariants;
     private final HeaderFooterProfile baseHeaderFooter;
     private final ListNameProfile baseListName;
+    private final Expr sortWeight;
+    private final boolean sortViewerDependent;
 
     private TablistRuntime(TablistDoc doc, List<HeaderFooterVariant> headerFooterVariants,
-                           List<ListNameVariant> listNameVariants) {
+                           List<ListNameVariant> listNameVariants, Expr sortWeight, boolean sortViewerDependent) {
         this.doc = doc;
         this.headerFooterVariants = headerFooterVariants;
         this.listNameVariants = listNameVariants;
         this.baseHeaderFooter = new HeaderFooterProfile("base", doc.headerFooter().presentation());
         this.baseListName = new ListNameProfile("base", doc.listNames().presentation());
+        this.sortWeight = sortWeight;
+        this.sortViewerDependent = sortViewerDependent;
     }
 
     static TablistRuntime compile(TablistDoc doc) {
@@ -49,7 +57,34 @@ final class TablistRuntime {
         nameVariants.sort(Comparator
             .comparingInt((ListNameVariant value) -> value.variant().priority()).reversed()
             .thenComparing(value -> value.variant().id()));
-        return new TablistRuntime(doc, List.copyOf(headerVariants), List.copyOf(nameVariants));
+        return new TablistRuntime(doc, List.copyOf(headerVariants), List.copyOf(nameVariants),
+            compileSortWeight(doc), sortViewerDependent(doc));
+    }
+
+    /** The compiled {@code sort.weight}, or null when the document declares no active sort block. */
+    Expr sortWeight() {
+        return sortWeight;
+    }
+
+    /** Whether the weight reads a {@code viewer.*} variable, which forces a per-viewer pass. */
+    boolean sortViewerDependent() {
+        return sortViewerDependent;
+    }
+
+    private static Expr compileSortWeight(TablistDoc doc) {
+        return doc.sort().active() ? ExprParser.parse(doc.sort().weight()) : null;
+    }
+
+    private static boolean sortViewerDependent(TablistDoc doc) {
+        if (!doc.sort().active()) {
+            return false;
+        }
+        for (String variable : TablistDoc.Sort.references(doc.sort().weight()).variables()) {
+            if (variable.startsWith(VIEWER_PREFIX)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     HeaderFooterProfile headerFooter(ExprScope scope, BoundedConditionErrorCallback errors) {

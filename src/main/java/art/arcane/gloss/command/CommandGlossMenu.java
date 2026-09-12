@@ -4,6 +4,7 @@ import art.arcane.gloss.Gloss;
 import art.arcane.gloss.panel.PanelIds;
 import art.arcane.gloss.panel.PanelTransform;
 import art.arcane.gloss.config.MenuDefinitionData;
+import art.arcane.gloss.menu.MenuArguments;
 import art.arcane.gloss.config.menu.MenuRowMutations;
 import art.arcane.gloss.locale.GlossLocalization;
 import art.arcane.gloss.locale.GlossMessages;
@@ -28,6 +29,7 @@ import org.bukkit.entity.Player;
 import java.nio.file.FileAlreadyExistsException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CancellationException;
 
 @Director(name = "menu", aliases = {"menus"}, description = "Create, open and edit hologram menus", descriptionKey = "command.help.menu")
@@ -133,6 +135,8 @@ public class CommandGlossMenu {
   public void open(
       @Param(name = "menu", description = "Menu id to open (* shows all menus)", descriptionKey = "command.help.arg.menu", defaultValue = "*", customHandler = MenuNameHandler.class)
       String menuName,
+      @Param(name = "args", description = "Space-separated key=value arguments", descriptionKey = "command.help.menu.open.args", defaultValue = "")
+      String args,
       @Param(name = "sender", contextual = true)
       CommandSender sender
   ) {
@@ -152,7 +156,16 @@ public class CommandGlossMenu {
       return;
     }
 
-    openMenu(player, sender, menuName, true);
+    Map<String, Object> arguments;
+    try {
+      arguments = MenuArguments.parse(args);
+    } catch (IllegalArgumentException badArguments) {
+      plugin.getLocalization().send(sender, GlossMessages.FORMS_BAD_ARGS,
+          MessageArgs.builder().untrusted("value", badArguments.getMessage()).build());
+      return;
+    }
+
+    openMenu(player, sender, menuName, true, arguments);
   }
 
   @Director(name = "back", description = "Reopen your previous menu session", descriptionKey = "command.help.menu.back")
@@ -403,6 +416,11 @@ public class CommandGlossMenu {
   }
 
   private boolean openMenu(Player player, CommandSender feedback, String menuName, boolean includeRootPermission) {
+    return openMenu(player, feedback, menuName, includeRootPermission, Map.of());
+  }
+
+  private boolean openMenu(Player player, CommandSender feedback, String menuName, boolean includeRootPermission,
+                           Map<String, Object> args) {
     MenuDefinitionData ui = plugin.getMenuCatalog().definition(menuName).orElse(null);
     if (ui == null) {
       plugin.getLocalization().send(feedback,
@@ -426,7 +444,7 @@ public class CommandGlossMenu {
     }
 
     try {
-      plugin.getSessionManager().createNewSession(player, ui);
+      plugin.getSessionManager().createNewSession(player, ui, null, args);
       return true;
     } catch (Throwable e) {
       Gloss.logExceptionStack(true, e, "Error opening menu \"%s\".", ui.getId());

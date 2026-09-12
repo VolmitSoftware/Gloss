@@ -193,7 +193,7 @@ public class LegacyHologramImportTest {
   }
 
   @Test
-  public void commandSourceArgumentsReachAllFourImporters() {
+  public void commandSourceArgumentsReachEveryImporter() {
     assertEquals(LegacyImportSource.GHOLO, LegacyImportSource.parse("gholo"));
     assertEquals(LegacyImportSource.DECENT_HOLOGRAMS,
         LegacyImportSource.parse("decent-holograms"));
@@ -201,7 +201,12 @@ public class LegacyHologramImportTest {
         LegacyImportSource.parse("holographic-displays"));
     assertEquals(LegacyImportSource.FANCY_HOLOGRAMS,
         LegacyImportSource.parse("fancy-holograms"));
-    assertEquals(List.of("gholo", "decent-holograms", "holographic-displays", "fancy-holograms"),
+    assertEquals(LegacyImportSource.FEATHERBOARD, LegacyImportSource.parse("featherboard"));
+    assertEquals(LegacyImportSource.ANIMATED_SCOREBOARD,
+        LegacyImportSource.parse("animated-scoreboard"));
+    assertEquals(LegacyImportSource.TAB_HEADER_FOOTER, LegacyImportSource.parse("tab"));
+    assertEquals(List.of("gholo", "decent-holograms", "holographic-displays", "fancy-holograms",
+            "featherboard", "animated-scoreboard", "tab"),
         LegacyImportSource.suggestions());
   }
 

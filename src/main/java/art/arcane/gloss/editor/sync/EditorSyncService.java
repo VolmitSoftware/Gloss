@@ -4,6 +4,8 @@ import art.arcane.gloss.Gloss;
 import art.arcane.gloss.panel.PanelDefinition;
 import art.arcane.gloss.config.GlossConfigFile;
 import art.arcane.gloss.editor.EditorUrl;
+import art.arcane.gloss.history.HistoryEntry;
+import art.arcane.gloss.history.HistoryService;
 import art.arcane.gloss.persistence.GlossPersistenceCoordinator;
 import art.arcane.gloss.persistence.GlossProjectTransaction;
 import com.google.gson.JsonElement;
@@ -488,12 +490,53 @@ public final class EditorSyncService {
   }
 
   private CompletableFuture<Void> fetchPublication(EditorSyncStoredSession session) {
-    return relay.publication(session).thenComposeAsync(publication -> {
-      if (publication.isEmpty()) {
-        return CompletableFuture.completedFuture(null);
+    return relay.poll(session).thenComposeAsync(poll -> {
+      CompletableFuture<Void> answered = answerHistoryRequests(session, poll.historyRequests());
+      if (poll.publication().isEmpty()) {
+        return answered;
       }
-      return processPublication(currentSession(session.sessionId()), publication.get());
+      return answered.thenCompose(ignored ->
+          processPublication(currentSession(session.sessionId()), poll.publication().get()));
     }, executor);
+  }
+
+  /**
+   * Answers whatever versions the editor's History panel asked for. A version the server no longer
+   * keeps is answered as absent, and a failed answer never blocks the publication behind it.
+   */
+  private CompletableFuture<Void> answerHistoryRequests(
+      EditorSyncStoredSession session, List<EditorSyncRelayClient.HistoryRequest> requests) {
+    CompletableFuture<Void> chain = CompletableFuture.completedFuture(null);
+    for (EditorSyncRelayClient.HistoryRequest request : requests) {
+      chain = chain.thenCompose(ignored -> relay
+          .answerHistory(session, request, historyJson(request))
+          .handle((answered, failure) -> {
+            if (failure != null) {
+              logger.log(Level.WARNING, "Editor sync could not answer a history request for "
+                  + request.kind() + " " + request.id() + ".", rootCause(failure));
+            }
+            return null;
+          }));
+    }
+    return chain;
+  }
+
+  private String historyJson(EditorSyncRelayClient.HistoryRequest request) {
+    HistoryService history = plugin.service(HistoryService.class);
+    if (history == null) {
+      return null;
+    }
+    HistoryEntry version = history.version(request.kind(), request.id(), request.version());
+    if (version == null) {
+      return null;
+    }
+    try {
+      return new String(history.store().read(version), StandardCharsets.UTF_8);
+    } catch (IOException unreadable) {
+      logger.log(Level.WARNING, "Editor sync could not read a stored version of "
+          + request.kind() + " " + request.id() + ".", unreadable);
+      return null;
+    }
   }
 
   private CompletableFuture<Void> reconcileAndAcknowledge(EditorSyncStoredSession session) {
@@ -511,7 +554,8 @@ public final class EditorSyncService {
         clearPending(session);
         return fetchPublication(currentSession(session.sessionId()));
       }
-      if (!current.baseRevision().equals(expected.baseRevision())) {
+      if (!EditorSyncJson.contentRevision(current.json())
+          .equals(EditorSyncJson.contentRevision(expected.json()))) {
         clearPending(session);
         return fetchPublication(currentSession(session.sessionId()));
       }
@@ -526,30 +570,54 @@ public final class EditorSyncService {
       current = currentProject(session, session.baseProject());
     } catch (RuntimeException failure) {
       return queueAndSend(session, new EditorSyncPendingAck(publication.revision(), "rejected",
-          "The server subject no longer exists or cannot be read.", null));
+          "The server subject no longer exists or cannot be read.", null, List.of()));
     }
-    if (!current.baseRevision().equals(session.baseRevision())) {
+    if (!EditorSyncJson.contentRevision(current.json())
+        .equals(EditorSyncJson.contentRevision(session.baseProject()))
+        && !reconcilablePerDocument(session, current, publication)) {
       return queueAndSend(session, new EditorSyncPendingAck(publication.revision(), "conflict",
-          "The server project changed after this editor session was opened.", current.json()));
+          "The server project changed after this editor session was opened.", current.json(),
+          List.of()));
     }
 
     EditorSyncPublicationValidator.ValidatedProject validated;
     try {
       validated = publicationValidator.validate(session, publication,
-          settings.maximumProjectBytes());
+          settings.maximumProjectBytes(), current.json());
     } catch (RuntimeException failure) {
       return queueAndSend(session, new EditorSyncPendingAck(publication.revision(), "rejected",
-          safeMessage(failure), null));
+          safeMessage(failure), null, List.of()));
     }
-    return applyPublication(session, publication, validated);
+    return applyPublication(session, publication, validated, current);
+  }
+
+  /**
+   * A publication whose every document carries its own base revision is reconciled document by
+   * document against what is on disk now. Images have no per-document base, so a workspace whose
+   * assets moved under the session still fails as a whole.
+   */
+  private static boolean reconcilablePerDocument(EditorSyncStoredSession session,
+                                                 EditorSyncProject current,
+                                                 EditorSyncPublication publication) {
+    String sessionImages = EditorSyncJson.canonical(
+        EditorSyncJson.requireArray(session.baseProject(), "images"));
+    String currentImages = EditorSyncJson.canonical(
+        EditorSyncJson.requireArray(current.json(), "images"));
+    return sessionImages.equals(currentImages)
+        && EditorSyncDocuments.everyEntryCarriesBaseRevision(publication.snapshot());
   }
 
   private CompletableFuture<Void> applyPublication(
       EditorSyncStoredSession session, EditorSyncPublication publication,
-      EditorSyncPublicationValidator.ValidatedProject validated) {
+      EditorSyncPublicationValidator.ValidatedProject validated,
+      EditorSyncProject serverProject) {
     EditorSyncProject expectedApplied = validated.project();
-    EditorSyncPendingAck acknowledgement = new EditorSyncPendingAck(publication.revision(), "applied",
-        "Published to the server.", expectedApplied.json());
+    List<EditorSyncPendingAck.Conflict> conflicts = conflicts(validated);
+    boolean everyChangeConflicted = !conflicts.isEmpty() && validated.noOp();
+    String status = everyChangeConflicted ? "conflict" : "applied";
+    String message = acknowledgementMessage(everyChangeConflicted, conflicts.size());
+    EditorSyncPendingAck acknowledgement = new EditorSyncPendingAck(publication.revision(), status,
+        message, expectedApplied.json(), conflicts);
     EditorSyncStoredSession pendingSession = storePending(session, acknowledgement);
 
     if (validated.noOp()) {
@@ -568,13 +636,14 @@ public final class EditorSyncService {
     EditorSyncProject lockedCurrent;
     try {
       lockedCurrent = currentProject(session, session.baseProject());
-      if (!lockedCurrent.baseRevision().equals(session.baseRevision())) {
+      if (!EditorSyncJson.contentRevision(lockedCurrent.json())
+          .equals(EditorSyncJson.contentRevision(serverProject.json()))) {
         clearPending(pendingSession);
         lease.close();
         return queueAndSend(currentSession(session.sessionId()),
             new EditorSyncPendingAck(publication.revision(), "conflict",
                 "The server project changed while the publication was being prepared.",
-                lockedCurrent.json()));
+                lockedCurrent.json(), List.of()));
       }
     } catch (RuntimeException failure) {
       clearPending(pendingSession);
@@ -584,7 +653,7 @@ public final class EditorSyncService {
 
     GlossProjectTransaction.Pending transaction;
     try {
-      Map<Path, byte[]> expectedFiles = expectedFiles(session, validated);
+      Map<Path, byte[]> expectedFiles = expectedFiles(serverProject.json(), validated);
       transaction = plugin.getProjectTransaction().apply(session.sessionId(),
           mutations(validated), expectedFiles);
     } catch (IOException | RuntimeException failure) {
@@ -611,13 +680,14 @@ public final class EditorSyncService {
       EditorSyncStoredSession actualPendingSession = pendingSession;
       try {
         EditorSyncProject actualProject = currentProject(session, expectedApplied.json());
-        if (!actualProject.baseRevision().equals(expectedApplied.baseRevision())) {
+        if (!EditorSyncJson.contentRevision(actualProject.json())
+            .equals(EditorSyncJson.contentRevision(expectedApplied.json()))) {
           throw new IllegalStateException(
               "server content changed while the editor sync transaction was publishing");
         }
         actualPendingSession = storePending(pendingSession,
-            new EditorSyncPendingAck(publication.revision(), "applied",
-                "Published to the server.", actualProject.json()));
+            new EditorSyncPendingAck(publication.revision(), status, message,
+                actualProject.json(), conflicts));
         plugin.getProjectTransaction().commit(transaction);
         lease.close();
       } catch (GlossProjectTransaction.CommittedCleanupException cleanupFailure) {
@@ -716,7 +786,8 @@ public final class EditorSyncService {
     EditorSyncProject serverProject = acknowledgement.validatedServerProject(
         settings.maximumProjectBytes());
     return relay.acknowledge(session, acknowledgement.publicationRevision(),
-        acknowledgement.status(), acknowledgement.message(), serverProject)
+        acknowledgement.status(), acknowledgement.message(), serverProject,
+        acknowledgement.conflicts())
         .thenRunAsync(() -> {
           synchronized (sessionLock) {
             EditorSyncStoredSession current = sessions.get(session.sessionId());
@@ -773,7 +844,7 @@ public final class EditorSyncService {
   }
 
   private Map<Path, byte[]> expectedFiles(
-      EditorSyncStoredSession session,
+      JsonObject serverProject,
       EditorSyncPublicationValidator.ValidatedProject publication) {
     Path data = plugin.getDataFolder().toPath().toAbsolutePath().normalize();
     Map<Path, byte[]> expected = new LinkedHashMap<>();
@@ -792,7 +863,7 @@ public final class EditorSyncService {
         expectedBytes = null;
       } else if (key.kind() == EditorSyncDocumentKind.PANEL) {
         try {
-          expectedBytes = expectedBoardFile(target, session.baseProject());
+          expectedBytes = expectedBoardFile(target, serverProject);
         } catch (IOException failure) {
           throw new CompletionException(failure);
         }
@@ -847,6 +918,26 @@ public final class EditorSyncService {
           : GlossProjectTransaction.Mutation.write(applied));
     }
     return Map.copyOf(mutations);
+  }
+
+  private static List<EditorSyncPendingAck.Conflict> conflicts(
+      EditorSyncPublicationValidator.ValidatedProject validated) {
+    List<EditorSyncPendingAck.Conflict> conflicts = new ArrayList<>();
+    for (EditorSyncPublicationValidator.DocumentKey key : validated.conflicts()) {
+      conflicts.add(new EditorSyncPendingAck.Conflict(key.kind().wireName(), key.id()));
+    }
+    return List.copyOf(conflicts);
+  }
+
+  private static String acknowledgementMessage(boolean everyChangeConflicted, int conflicts) {
+    if (everyChangeConflicted) {
+      return "The server project changed after this editor session was opened.";
+    }
+    if (conflicts == 0) {
+      return "Published to the server.";
+    }
+    return "Published to the server; " + conflicts
+        + " document(s) changed on the server and kept the server copy.";
   }
 
   private boolean sameEntry(EditorSyncPublicationValidator.ParsedEntry left,

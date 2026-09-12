@@ -1,6 +1,8 @@
 package art.arcane.gloss.entity;
 
 import art.arcane.gloss.Gloss;
+import art.arcane.gloss.bedrock.BedrockPolicy;
+import art.arcane.gloss.bedrock.BedrockSurface;
 import art.arcane.gloss.api.TemporaryHologram;
 import art.arcane.gloss.api.ParticleTextSpan;
 import art.arcane.gloss.particle.ParticleText;
@@ -8,6 +10,7 @@ import art.arcane.gloss.text.TextPipeline;
 import art.arcane.gloss.doc.DocumentDelta;
 import art.arcane.gloss.doc.DocumentRegistry;
 import art.arcane.gloss.doc.GlossDocument;
+import art.arcane.gloss.doc.RegistryOwner;
 import art.arcane.gloss.doc.ShippedDefaults;
 import art.arcane.gloss.doc.ShippedDocumentCatalog;
 import art.arcane.volmlib.util.scheduling.FoliaScheduler;
@@ -49,7 +52,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicLong;
 
-public final class EntityOverlayService implements Listener {
+public final class EntityOverlayService implements Listener, RegistryOwner {
     private static final NamespacedKey REACT_STACK_COUNT = new NamespacedKey("react", "react-stack-count");
     private static final long ANCHOR_GRACE_DRIVES = 1L;
     private static final long AUDIENCE_GRACE_DRIVES = 1L;
@@ -64,6 +67,7 @@ public final class EntityOverlayService implements Listener {
     private final ConcurrentMap<UUID, Integer> stackCounts = new ConcurrentHashMap<>();
     private final ConcurrentMap<UUID, Hit> hits = new ConcurrentHashMap<>();
     private final Set<Plugin> restrictions = ConcurrentHashMap.newKeySet();
+    private final Set<EntityOverlaySource> sources = ConcurrentHashMap.newKeySet();
     private final AtomicLong renderPasses = new AtomicLong();
     private final AtomicLong textPreparations = new AtomicLong();
     private final AtomicLong removalMutations = new AtomicLong();
@@ -177,6 +181,24 @@ public final class EntityOverlayService implements Listener {
         });
     }
 
+    /**
+     * Adds a second owner of panes. While any source is registered, players are eligible even when
+     * the overlay document turns {@code includePlayers} off, which is how nameplates take players
+     * over without two panes ending up above one head.
+     */
+    public void registerSource(EntityOverlaySource source) {
+        sources.add(Objects.requireNonNull(source, "source"));
+    }
+
+    public void unregisterSource(EntityOverlaySource source) {
+        sources.remove(source);
+    }
+
+    /** True while another lane owns player panes. */
+    public boolean playersOwnedElsewhere() {
+        return !sources.isEmpty();
+    }
+
     public void restrict(Plugin owner, boolean restricted) {
         Objects.requireNonNull(owner, "owner");
         if (restricted && owner.isEnabled()) {
@@ -287,7 +309,7 @@ public final class EntityOverlayService implements Listener {
         for (UUID targetId : List.copyOf(overlays.keySet())) {
             EntityOverlayTarget overlay = overlays.remove(targetId);
             if (overlay != null) {
-                overlay.destroy();
+                destroy(overlay);
             }
         }
     }
@@ -353,17 +375,46 @@ public final class EntityOverlayService implements Listener {
 
     private void sweepOverlays(long sequence) {
         for (EntityOverlayTarget overlay : overlays.values()) {
-            boolean changed = overlay.audience.entrySet()
-                .removeIf(entry -> sequence - entry.getValue() > AUDIENCE_GRACE_DRIVES);
+            List<UUID> dropped = new ArrayList<>();
+            for (Map.Entry<UUID, Long> entry : overlay.audience.entrySet()) {
+                if (sequence - entry.getValue() > AUDIENCE_GRACE_DRIVES) {
+                    dropped.add(entry.getKey());
+                }
+            }
+            overlay.audience.keySet().removeAll(dropped);
+            retired(overlay.targetId(), dropped);
             if (overlay.audience.isEmpty()) {
                 if (overlays.remove(overlay.targetId(), overlay)) {
-                    overlay.destroy();
+                    destroy(overlay);
                 }
                 continue;
             }
-            if (changed) {
+            if (!dropped.isEmpty()) {
                 overlay.personalViewers.removeIf(viewerId -> !overlay.audience.containsKey(viewerId));
                 overlay.dirty = true;
+            }
+        }
+    }
+
+    /** Tears an overlay down and tells the sources every pair they were holding state for is gone. */
+    private void destroy(EntityOverlayTarget overlay) {
+        List<UUID> audience = List.copyOf(overlay.audience.keySet());
+        overlay.destroy();
+        retired(overlay.targetId(), audience);
+    }
+
+    /**
+     * A pane stopped being drawn for these viewers. Sources keep per-pair state outside the pane -
+     * nameplate suppression holds a scoreboard team that hides the vanilla tag - and never hear
+     * about the subject walking out of range unless they are told here.
+     */
+    private void retired(UUID targetId, List<UUID> viewerIds) {
+        if (viewerIds.isEmpty() || sources.isEmpty()) {
+            return;
+        }
+        for (EntityOverlaySource source : sources) {
+            for (UUID viewerId : viewerIds) {
+                source.retired(viewerId, targetId);
             }
         }
     }
@@ -506,6 +557,10 @@ public final class EntityOverlayService implements Listener {
     private void admitOnViewerRegion(Player viewer, EntityOverlayCell.Anchor anchor, List<CellTarget> targets,
                                      EntityOverlayDoc current, long sequence) {
         if (!enabled() || settings != current || !viewer.isOnline()) {
+            return;
+        }
+        BedrockPolicy policy = BedrockPolicy.of(plugin);
+        if (policy != null && policy.hides(BedrockSurface.OVERLAY, viewer)) {
             return;
         }
         UUID viewerId = anchor.viewerId();
@@ -739,9 +794,18 @@ public final class EntityOverlayService implements Listener {
         boolean prepare = render.prepared == null || refreshText || !snapshot.equals(render.snapshot)
             || !details.equals(render.details) || render0 != render.renderGeneration
             || emoji != render.emojiGeneration || animation != render.animationGeneration;
+        EntityOverlaySource source = sourceFor(target);
         if (prepare) {
             textPreparations.incrementAndGet();
-            render.prepared = EntityOverlayText.prepare(plugin, viewer, current, snapshot, details);
+            EntityOverlaySource.Pane pane = source == null ? null : source.prepare(viewer, target, snapshot);
+            if (source != null && pane == null) {
+                render.hide();
+                return false;
+            }
+            render.pane = pane;
+            render.prepared = pane == null
+                ? EntityOverlayText.prepare(plugin, viewer, current, snapshot, details)
+                : pane.prepared();
             render.snapshot = snapshot;
             render.details = details;
             render.renderGeneration = render0;
@@ -754,7 +818,8 @@ public final class EntityOverlayService implements Listener {
             render.hide();
             return false;
         }
-        if (!overlay.attach(render, () -> createDisplay(target, current, anchor))) {
+        EntityOverlaySource.Pane pane = render.pane;
+        if (!overlay.attach(render, () -> createDisplay(target, current, anchor, pane))) {
             return false;
         }
         if (!frame.equals(render.frame)) {
@@ -773,15 +838,17 @@ public final class EntityOverlayService implements Listener {
         return true;
     }
 
-    private TemporaryHologram createDisplay(LivingEntity target, EntityOverlayDoc current, Location anchor) {
+    private TemporaryHologram createDisplay(LivingEntity target, EntityOverlayDoc current, Location anchor,
+                                            EntityOverlaySource.Pane pane) {
+        double offset = pane == null ? current.verticalOffset() : pane.offset();
         TemporaryHologram display = plugin.holograms().createTemporary(
             "entity-overlay:" + target.getUniqueId(), anchor, Long.MAX_VALUE);
         display.viewers().whitelist();
-        display.setStyle(current.style());
-        display.setBox(current.box());
-        display.setParticleLayers(current.particleLayers());
+        display.setStyle(pane == null ? current.style() : pane.style());
+        display.setBox(pane == null ? current.box() : pane.box());
+        display.setParticleLayers(pane == null ? current.particleLayers() : List.of());
         display.bindPosition(target, () -> target.getLocation()
-            .add(0, target.getHeight() + current.verticalOffset(), 0));
+            .add(0, target.getHeight() + offset, 0));
         return display;
     }
 
@@ -816,9 +883,23 @@ public final class EntityOverlayService implements Listener {
 
     private boolean eligible(LivingEntity target, EntityOverlayDoc current) {
         return target.isValid() && !target.isDead() && !target.isInvisible()
-            && (current.includePlayers() || !(target instanceof Player))
+            && (current.includePlayers() || !(target instanceof Player) || claimed(target))
             && !(target instanceof Player other && other.getGameMode() == GameMode.SPECTATOR)
             && !current.excludedEntityTypes().contains(target.getType().name());
+    }
+
+    /** @return the source that owns this target's pane, or null when the document owns it */
+    private EntityOverlaySource sourceFor(LivingEntity target) {
+        for (EntityOverlaySource source : sources) {
+            if (source.wants(target)) {
+                return source;
+            }
+        }
+        return null;
+    }
+
+    private boolean claimed(LivingEntity target) {
+        return sourceFor(target) != null;
     }
 
     private static boolean isLivingCandidate(Entity entity) {
@@ -897,7 +978,7 @@ public final class EntityOverlayService implements Listener {
         }
         EntityOverlayTarget overlay = overlays.remove(entityId);
         if (overlay != null) {
-            overlay.destroy();
+            destroy(overlay);
             removalMutations.incrementAndGet();
         }
     }
@@ -923,6 +1004,7 @@ public final class EntityOverlayService implements Listener {
             if (overlay.audience.remove(viewerId) == null) {
                 continue;
             }
+            retired(overlay.targetId(), List.of(viewerId));
             overlay.personalViewers.remove(viewerId);
             overlay.dirty = true;
             overlay.retirePersonal(viewerId);
@@ -948,4 +1030,9 @@ public final class EntityOverlayService implements Listener {
     private record Hit(double previousHealth, double damage, long expiresAt) {
     }
 
+
+    @Override
+    public Map<String, DocumentRegistry<?>> registries() {
+        return Map.of("entity-overlays", registry);
+    }
 }

@@ -36,7 +36,7 @@ final class EditorSyncPublicationValidator {
       "image/png", "image/jpeg", "image/gif", "image/webp", "image/bmp");
 
   ValidatedProject validate(EditorSyncStoredSession session, EditorSyncPublication publication,
-                            int maximumBytes) {
+                            int maximumBytes, JsonObject serverProject) {
     if (!session.baseRevision().equals(publication.baseRevision())) {
       throw new IllegalArgumentException("publication baseRevision does not match the session base");
     }
@@ -49,13 +49,16 @@ final class EditorSyncPublicationValidator {
       throw new IllegalArgumentException("publication subject does not match the session");
     }
     requireImmutableConstraints(session, published.json());
-    Map<DocumentKey, ParsedEntry> baseDocuments = parseDocuments(session.baseProject());
+    requireEchoedUnhandledKinds(session.baseProject(), published.json());
+    Map<DocumentKey, ParsedEntry> serverDocuments = parseDocuments(serverProject);
+    Map<DocumentKey, ParsedEntry> sessionDocuments = parseDocuments(session.baseProject());
     Map<DocumentKey, ParsedEntry> publishedDocuments = parseDocuments(published.json());
-    enforceDocumentScope(session, baseDocuments, publishedDocuments);
-    Map<DocumentKey, ParsedEntry> appliedDocuments = applyServerRevisions(
-        baseDocuments, publishedDocuments);
-    validatePanels(session, baseDocuments, appliedDocuments);
-    Map<String, byte[]> baseImages = parseImages(session.baseProject(), maximumBytes,
+    enforceDocumentScope(session, sessionDocuments, publishedDocuments);
+    Reconciliation reconciled = applyServerRevisions(serverDocuments, sessionDocuments,
+        publishedDocuments);
+    Map<DocumentKey, ParsedEntry> appliedDocuments = reconciled.applied();
+    validatePanels(session, serverDocuments, appliedDocuments);
+    Map<String, byte[]> baseImages = parseImages(serverProject, maximumBytes,
         session.kind() == EditorSyncKind.WORKSPACE);
     Map<String, byte[]> publishedImages = parseImages(published.json(), maximumBytes,
         session.kind() == EditorSyncKind.WORKSPACE);
@@ -68,23 +71,34 @@ final class EditorSyncPublicationValidator {
             .thenComparing(EditorSyncDocuments.Entry::id))
         .toList();
     JsonObject constraints = EditorSyncJson.requireObject(session.baseProject(), "constraints");
+    List<String> appliedWarnings = new ArrayList<>(structuredWarnings(serverProject));
+    appliedWarnings.addAll(warnings(appliedEntries));
     EditorSyncProject appliedProject = EditorSyncContentSnapshotBuilder.project(
         session.kind(), session.subjectId(), appliedEntries, publishedImages, constraints,
-        warnings(appliedEntries), maximumBytes);
-    Set<EditorSyncDocumentKind> changedKinds = changedKinds(baseDocuments, appliedDocuments);
+        new EditorSyncProjectSections(appliedWarnings, serverSection(serverProject, "history",
+                new JsonArray()).getAsJsonArray(),
+            serverSection(serverProject, "schemas", new JsonObject()).getAsJsonObject(),
+            serverSection(serverProject, "defaults", new JsonObject()).getAsJsonObject()),
+        maximumBytes);
+    Set<EditorSyncDocumentKind> changedKinds = changedKinds(serverDocuments, appliedDocuments);
     boolean imagesChanged = !sameImages(baseImages, publishedImages);
-    return new ValidatedProject(appliedProject, baseDocuments, appliedDocuments,
-        baseImages, publishedImages, changedKinds, imagesChanged);
+    return new ValidatedProject(appliedProject, serverDocuments, appliedDocuments,
+        baseImages, publishedImages, changedKinds, imagesChanged, reconciled.conflicts());
   }
 
   ValidatedProject validateBase(EditorSyncStoredSession session, int maximumBytes) {
     return validate(session, new EditorSyncPublication(1L, session.baseRevision(),
-        session.baseProject()), maximumBytes);
+        session.baseProject()), maximumBytes, session.baseProject());
   }
 
   private void validateTopLevel(EditorSyncProject project) {
-    requireExactKeys(project.json(), Set.of("format", "version", "kind", "subjectId",
-        "documents", "images", "constraints", "warnings", "baseRevision"), "sync project");
+    Set<String> required = Set.of("format", "version", "kind", "subjectId",
+        "documents", "images", "constraints", "warnings", "baseRevision");
+    Set<String> optional = Set.of("history", "schemas", "defaults");
+    if (!project.json().keySet().containsAll(required)
+        || !optional.containsAll(difference(project.json().keySet(), required))) {
+      throw new IllegalArgumentException("sync project contains missing or unsupported fields");
+    }
     JsonArray warnings = EditorSyncJson.requireArray(project.json(), "warnings");
     if (warnings.size() > EditorSyncSnapshotBuilder.MAX_WARNING_COUNT) {
       throw new IllegalArgumentException("sync project contains too many warnings");
@@ -95,6 +109,12 @@ final class EditorSyncPublicationValidator {
         throw new IllegalArgumentException("sync project warning is invalid");
       }
     }
+  }
+
+  private static Set<String> difference(Set<String> present, Set<String> known) {
+    Set<String> extra = new LinkedHashSet<>(present);
+    extra.removeAll(known);
+    return extra;
   }
 
   private void requireImmutableConstraints(EditorSyncStoredSession session, JsonObject project) {
@@ -126,11 +146,14 @@ final class EditorSyncPublicationValidator {
     List<String> expectedDocumentKinds;
     List<String> expectedCreateKinds;
     if (session.kind() == EditorSyncKind.WORKSPACE) {
-      expectedDocumentKinds = EditorSyncDocumentKind.ORDERED_WIRE_NAMES;
-      expectedCreateKinds = EditorSyncDocumentKind.ORDERED_WIRE_NAMES;
       if (!allowDeletes) {
         throw new IllegalArgumentException("workspace sync constraints must allow deletes");
       }
+      if (!documentKinds.containsAll(EditorSyncDocumentKind.ORDERED_WIRE_NAMES)
+          || !createKinds.containsAll(EditorSyncDocumentKind.ORDERED_WIRE_NAMES)) {
+        throw new IllegalArgumentException("sync constraint document kinds are invalid");
+      }
+      return;
     } else if (session.kind() == EditorSyncKind.PANEL) {
       expectedDocumentKinds = List.of("menu", "panel");
       expectedCreateKinds = List.of("menu");
@@ -163,9 +186,37 @@ final class EditorSyncPublicationValidator {
     }
   }
 
+  /**
+   * A kind this build does not handle may only travel back exactly as it was served. The editor
+   * mirrors it byte for byte; anything else names the kind and refuses, so a document the server
+   * cannot parse is never quietly dropped or overwritten.
+   */
+  private void requireEchoedUnhandledKinds(JsonObject sessionProject, JsonObject published) {
+    Map<String, String> served = unhandledDocuments(sessionProject);
+    for (Map.Entry<String, String> entry : unhandledDocuments(published).entrySet()) {
+      if (!entry.getValue().equals(served.get(entry.getKey()))) {
+        throw new IllegalArgumentException(
+            "sync document kind is not handled by this server: " + entry.getKey());
+      }
+    }
+  }
+
+  private Map<String, String> unhandledDocuments(JsonObject project) {
+    Map<String, String> documents = new LinkedHashMap<>();
+    for (EditorSyncDocuments.Entry entry : EditorSyncDocuments.parse(project)) {
+      if (EditorSyncDocuments.handledKind(entry.kind()) == null) {
+        documents.put(entry.kind() + " " + entry.id(), entry.json());
+      }
+    }
+    return Map.copyOf(documents);
+  }
+
   private Map<DocumentKey, ParsedEntry> parseDocuments(JsonObject project) {
     Map<DocumentKey, ParsedEntry> documents = new LinkedHashMap<>();
     for (EditorSyncDocuments.Entry entry : EditorSyncDocuments.parse(project)) {
+      if (EditorSyncDocuments.handledKind(entry.kind()) == null) {
+        continue;
+      }
       EditorSyncDocumentKind kind = EditorSyncDocumentKind.parseWireName(entry.kind());
       EditorSyncDocumentKind.ParsedDocument parsed = kind.parse(entry.id(), entry.json());
       if (!Objects.equals(entry.revision(), parsed.revision())) {
@@ -228,14 +279,29 @@ final class EditorSyncPublicationValidator {
     }
   }
 
-  private Map<DocumentKey, ParsedEntry> applyServerRevisions(
+  private Reconciliation applyServerRevisions(
       Map<DocumentKey, ParsedEntry> base,
+      Map<DocumentKey, ParsedEntry> session,
       Map<DocumentKey, ParsedEntry> published) {
     Map<DocumentKey, ParsedEntry> applied = new LinkedHashMap<>();
+    List<DocumentKey> conflicts = new ArrayList<>();
     for (Map.Entry<DocumentKey, ParsedEntry> publishedEntry : published.entrySet()) {
       DocumentKey key = publishedEntry.getKey();
       ParsedEntry incoming = publishedEntry.getValue();
       ParsedEntry previous = base.get(key);
+      String editorBase = incoming.entry().baseRevision();
+      String serverRevision = contentRevision(previous);
+      if (editorBase != null && !editorBase.equals(serverRevision)) {
+        String editorRevision = EditorSyncDocuments.contentRevision(incoming.entry().json());
+        boolean editorChanged = !editorRevision.equals(editorBase);
+        if (editorChanged && !editorRevision.equals(serverRevision)) {
+          conflicts.add(key);
+        }
+        if (previous != null) {
+          applied.put(key, previous);
+        }
+        continue;
+      }
       if (previous == null) {
         if (key.kind().versioned() && incoming.entry().revision() != 1L) {
           throw new IllegalArgumentException("new versioned documents must start at revision 1: "
@@ -269,10 +335,40 @@ final class EditorSyncPublicationValidator {
       EditorSyncDocumentKind.ParsedDocument parsed = key.kind().parse(key.id(), persistedShape);
       String normalized = key.kind().wireSource(key.id(), persistedShape, parsed);
       EditorSyncDocuments.Entry revised = new EditorSyncDocuments.Entry(
-          key.kind().wireName(), key.id(), previousRevision + 1L, normalized);
+          key.kind().wireName(), key.id(), previousRevision + 1L, normalized,
+          EditorSyncDocuments.contentRevision(normalized));
       applied.put(key, new ParsedEntry(revised, parsed.value()));
     }
-    return Map.copyOf(applied);
+    retainServerOnlyDocuments(base, session, published, applied, conflicts);
+    conflicts.sort(Comparator.comparing((DocumentKey key) -> key.kind().wireName())
+        .thenComparing(DocumentKey::id));
+    return new Reconciliation(Map.copyOf(applied), List.copyOf(conflicts));
+  }
+
+  private void retainServerOnlyDocuments(Map<DocumentKey, ParsedEntry> base,
+                                         Map<DocumentKey, ParsedEntry> session,
+                                         Map<DocumentKey, ParsedEntry> published,
+                                         Map<DocumentKey, ParsedEntry> applied,
+                                         List<DocumentKey> conflicts) {
+    for (Map.Entry<DocumentKey, ParsedEntry> serverEntry : base.entrySet()) {
+      DocumentKey key = serverEntry.getKey();
+      if (published.containsKey(key) || applied.containsKey(key)) {
+        continue;
+      }
+      ParsedEntry sessionEntry = session.get(key);
+      if (sessionEntry == null) {
+        applied.put(key, serverEntry.getValue());
+        continue;
+      }
+      if (!sameSource(sessionEntry.entry().json(), serverEntry.getValue().entry().json())) {
+        conflicts.add(key);
+        applied.put(key, serverEntry.getValue());
+      }
+    }
+  }
+
+  private static String contentRevision(ParsedEntry entry) {
+    return entry == null ? null : EditorSyncDocuments.contentRevision(entry.entry().json());
   }
 
   private ParsedEntry normalizeNew(ParsedEntry incoming) {
@@ -284,7 +380,8 @@ final class EditorSyncPublicationValidator {
       return incoming;
     }
     EditorSyncDocuments.Entry normalized = new EditorSyncDocuments.Entry(
-        incoming.entry().kind(), incoming.entry().id(), incoming.entry().revision(), source);
+        incoming.entry().kind(), incoming.entry().id(), incoming.entry().revision(), source,
+        EditorSyncDocuments.contentRevision(source));
     return new ParsedEntry(normalized, parsed.value());
   }
 
@@ -460,6 +557,27 @@ final class EditorSyncPublicationValidator {
     return Set.copyOf(visited);
   }
 
+  /**
+   * Diagnostics the server computed about files the project does not carry, in the
+   * {@code code|kind|id|pointer|message} shape. They survive a publication unchanged; the
+   * document-derived warnings beside them are recomputed from what was applied.
+   */
+  private static JsonElement serverSection(JsonObject project, String field, JsonElement fallback) {
+    JsonElement value = project.get(field);
+    return value == null || value.isJsonNull() ? fallback : value;
+  }
+
+  private List<String> structuredWarnings(JsonObject project) {
+    List<String> warnings = new ArrayList<>();
+    for (JsonElement warning : EditorSyncJson.requireArray(project, "warnings")) {
+      String value = warning.getAsString();
+      if (value.indexOf('|') >= 0) {
+        warnings.add(value);
+      }
+    }
+    return List.copyOf(warnings);
+  }
+
   private List<String> warnings(List<EditorSyncDocuments.Entry> documents) {
     Set<String> menuIds = new HashSet<>();
     for (EditorSyncDocuments.Entry document : documents) {
@@ -558,7 +676,9 @@ final class EditorSyncPublicationValidator {
         throw new IllegalArgumentException(label + " must contain strings");
       }
       String wireName = value.getAsString();
-      EditorSyncDocumentKind.parseWireName(wireName);
+      if (!EditorSyncKind.WIRE_KIND_PATTERN.matcher(wireName).matches()) {
+        throw new IllegalArgumentException(label + " must contain sync v3 slugs");
+      }
       if (previous != null && previous.compareTo(wireName) >= 0) {
         throw new IllegalArgumentException(label + " must be sorted and unique");
       }
@@ -635,13 +755,21 @@ final class EditorSyncPublicationValidator {
     }
   }
 
+  record Reconciliation(Map<DocumentKey, ParsedEntry> applied, List<DocumentKey> conflicts) {
+    Reconciliation {
+      applied = Map.copyOf(applied);
+      conflicts = List.copyOf(conflicts);
+    }
+  }
+
   record ValidatedProject(EditorSyncProject project,
                           Map<DocumentKey, ParsedEntry> baseDocuments,
                           Map<DocumentKey, ParsedEntry> appliedDocuments,
                           Map<String, byte[]> baseImages,
                           Map<String, byte[]> appliedImages,
                           Set<EditorSyncDocumentKind> changedKinds,
-                          boolean imagesChanged) {
+                          boolean imagesChanged,
+                          List<DocumentKey> conflicts) {
     ValidatedProject {
       project = Objects.requireNonNull(project, "project");
       baseDocuments = Map.copyOf(baseDocuments);
@@ -649,6 +777,7 @@ final class EditorSyncPublicationValidator {
       baseImages = copyImages(baseImages);
       appliedImages = copyImages(appliedImages);
       changedKinds = Set.copyOf(changedKinds);
+      conflicts = List.copyOf(conflicts);
     }
 
     boolean noOp() {

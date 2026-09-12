@@ -1,6 +1,8 @@
 package art.arcane.gloss.panel;
 
 import art.arcane.gloss.Gloss;
+import art.arcane.gloss.bedrock.BedrockPolicy;
+import art.arcane.gloss.bedrock.BedrockSurface;
 import art.arcane.gloss.menu.MenuSession;
 import art.arcane.gloss.menu.action.NavigationResult;
 import art.arcane.gloss.menu.components.ClickableComponent;
@@ -573,6 +575,11 @@ public final class PanelRuntimeManager implements PanelServiceListener {
       recordPresence(player, location);
       World world = location.getWorld();
       if (world == null) {
+        discardViews();
+        return;
+      }
+      BedrockPolicy policy = BedrockPolicy.of(plugin);
+      if (policy != null && policy.hides(BedrockSurface.PANEL, player)) {
         discardViews();
         return;
       }

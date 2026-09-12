@@ -20,7 +20,7 @@ class GlossBoardMetaDocTest {
         meta.setShow(ShowCondition.of("world.time > 12000"));
         meta.setSelection(30, "viewer.world == 'arena'");
         meta.setVariants(List.of(new BoardDoc.Variant("critical", 100, "viewer.health < 5",
-            new BoardDoc.Presentation("&cDanger", List.of("heal"), false))));
+            BoardDoc.Presentation.ofStrings("&cDanger", List.of("heal"), false))));
 
         BoardDoc doc = meta.toDoc(7L);
         GlossBoardMeta restored = GlossBoardMeta.fromDoc("arena", doc);
@@ -38,7 +38,7 @@ class GlossBoardMetaDocTest {
     @Test
     void fromDocWithBlankTitleFallsBackToTheId() {
         BoardDoc doc = new BoardDoc(2, 1L, ShowCondition.ALWAYS, BoardDoc.Selection.NEVER,
-            new BoardDoc.Presentation("", List.of(), false), List.of());
+            BoardDoc.Presentation.ofStrings("", List.of(), false), List.of());
 
         GlossBoardMeta meta = GlossBoardMeta.fromDoc("bare", doc);
 

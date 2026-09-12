@@ -20,6 +20,7 @@ import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -169,9 +170,14 @@ final class EditorSyncSessionStore implements EditorSyncSessionPersistence {
   }
 
   private EditorSyncPendingAck parsePendingAck(JsonObject object) {
-    Set<String> expected = object.has("serverProject")
-        ? Set.of("publicationRevision", "status", "message", "serverProject")
-        : Set.of("publicationRevision", "status", "message");
+    Set<String> expected = new LinkedHashSet<>(
+        Set.of("publicationRevision", "status", "message"));
+    if (object.has("serverProject")) {
+      expected.add("serverProject");
+    }
+    if (object.has("conflicts")) {
+      expected.add("conflicts");
+    }
     if (!object.keySet().equals(expected)) {
       throw new IllegalArgumentException("pending acknowledgement contains unsupported fields");
     }
@@ -181,8 +187,29 @@ final class EditorSyncSessionStore implements EditorSyncSessionPersistence {
         EditorSyncJson.requireString(object, "message"),
         object.has("serverProject") && object.get("serverProject").isJsonObject()
             ? object.getAsJsonObject("serverProject")
-            : null
+            : null,
+        parseConflicts(object)
     );
+  }
+
+  private List<EditorSyncPendingAck.Conflict> parseConflicts(JsonObject object) {
+    if (!object.has("conflicts")) {
+      return List.of();
+    }
+    List<EditorSyncPendingAck.Conflict> conflicts = new ArrayList<>();
+    for (JsonElement value : EditorSyncJson.requireArray(object, "conflicts")) {
+      if (!value.isJsonObject()) {
+        throw new IllegalArgumentException("pending acknowledgement conflict must be an object");
+      }
+      JsonObject conflict = value.getAsJsonObject();
+      if (!conflict.keySet().equals(Set.of("kind", "id"))) {
+        throw new IllegalArgumentException("pending acknowledgement conflict is invalid");
+      }
+      conflicts.add(new EditorSyncPendingAck.Conflict(
+          EditorSyncJson.requireString(conflict, "kind"),
+          EditorSyncJson.requireString(conflict, "id")));
+    }
+    return List.copyOf(conflicts);
   }
 
   private JsonObject serializePendingAck(EditorSyncPendingAck acknowledgement) {
@@ -192,6 +219,9 @@ final class EditorSyncSessionStore implements EditorSyncSessionPersistence {
     object.addProperty("message", acknowledgement.message());
     if (acknowledgement.serverProject() != null) {
       object.add("serverProject", acknowledgement.serverProject());
+    }
+    if (!acknowledgement.conflicts().isEmpty()) {
+      object.add("conflicts", EditorSyncPendingAck.conflictsJson(acknowledgement.conflicts()));
     }
     return object;
   }

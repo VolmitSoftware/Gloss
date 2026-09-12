@@ -34,8 +34,10 @@ public record EditorSyncProject(EditorSyncKind kind, String subjectId, String ba
     if (EditorSyncJson.requireInt(copy, "version") != EditorSyncJson.PROTOCOL_VERSION) {
       throw new IllegalArgumentException("unsupported sync project version");
     }
-    EditorSyncDocuments.requireHandledKinds(EditorSyncDocuments.parse(copy));
     EditorSyncKind kind = EditorSyncKind.parse(EditorSyncJson.requireString(copy, "kind"));
+    if (kind != EditorSyncKind.WORKSPACE) {
+      EditorSyncDocuments.requireHandledKinds(EditorSyncDocuments.parse(copy));
+    }
     String subjectId = EditorSyncJson.requireString(copy, "subjectId");
     String baseRevision = EditorSyncJson.requireString(copy, "baseRevision");
     if (!baseRevision.equals(EditorSyncJson.revision(copy))) {

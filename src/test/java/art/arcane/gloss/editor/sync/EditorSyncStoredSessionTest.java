@@ -4,6 +4,7 @@ import com.google.gson.JsonObject;
 import org.junit.Test;
 
 import java.time.Instant;
+import java.util.List;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
@@ -25,7 +26,7 @@ public class EditorSyncStoredSessionTest {
     JsonObject applied = project("fixture", "{\"components\":[{\"type\":\"button\"}]}");
     EditorSyncStoredSession session = session(base);
     EditorSyncStoredSession pending = session.withPendingAck(
-        new EditorSyncPendingAck(1L, "applied", "Published.", applied));
+        new EditorSyncPendingAck(1L, "applied", "Published.", applied, List.of()));
 
     assertEquals(0L, pending.lastPublicationRevision());
     assertEquals(base.get("baseRevision").getAsString(), pending.baseRevision());
@@ -42,9 +43,9 @@ public class EditorSyncStoredSessionTest {
     JsonObject current = project("fixture", "{\"components\":[{\"type\":\"text\"}]}");
     EditorSyncStoredSession session = session(base);
     EditorSyncStoredSession conflicted = session.withPendingAck(
-        new EditorSyncPendingAck(2L, "conflict", "Changed.", current)).acknowledgePending();
+        new EditorSyncPendingAck(2L, "conflict", "Changed.", current, List.of())).acknowledgePending();
     EditorSyncStoredSession rejected = session.withPendingAck(
-        new EditorSyncPendingAck(2L, "rejected", "Invalid.", null)).acknowledgePending();
+        new EditorSyncPendingAck(2L, "rejected", "Invalid.", null, List.of())).acknowledgePending();
 
     assertEquals(current.get("baseRevision").getAsString(), conflicted.baseRevision());
     assertEquals(base.get("baseRevision").getAsString(), rejected.baseRevision());

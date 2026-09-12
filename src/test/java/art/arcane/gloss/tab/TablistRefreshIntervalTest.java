@@ -50,7 +50,7 @@ class TablistRefreshIntervalTest {
         assertFalse(TablistService.fastDriverRequired(enabled, true, true, false, 1));
 
         TablistDoc names = new TablistDoc(2, 1L, ShowCondition.ALWAYS, disabled.headerFooter(),
-            new TablistDoc.ListNames(true, ShowCondition.ALWAYS, new TablistDoc.ListNamePresentation("$player"), List.of()));
+            new TablistDoc.ListNames(true, ShowCondition.ALWAYS, new TablistDoc.ListNamePresentation("$player"), List.of()), null, null);
         assertTrue(TablistService.fastDriverRequired(names, true, false, true, 40));
     }
 
@@ -59,6 +59,6 @@ class TablistRefreshIntervalTest {
         return new TablistDoc(2, 1L, ShowCondition.ALWAYS,
             new TablistDoc.HeaderFooter(enabled, ShowCondition.ALWAYS,
                 new TablistDoc.HeaderFooterPresentation(header, footer), variants),
-            new TablistDoc.ListNames(true, ShowCondition.ALWAYS, new TablistDoc.ListNamePresentation("$player"), List.of()));
+            new TablistDoc.ListNames(true, ShowCondition.ALWAYS, new TablistDoc.ListNamePresentation("$player"), List.of()), null, null);
     }
 }

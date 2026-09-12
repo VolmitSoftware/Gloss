@@ -1,5 +1,6 @@
 package art.arcane.gloss.api;
 
+import com.google.gson.annotations.SerializedName;
 import org.bukkit.NamespacedKey;
 import org.bukkit.util.Vector;
 
@@ -16,7 +17,7 @@ public record ParticleLayer(String id, Target target, Geometry geometry, Placeme
     public static final int MAX_LAYERS = 64;
 
     private static final Set<String> TARGET_SCOPES = Set.of(
-        "projection", "component", "text", "line", "span", "label", "model", "local");
+        "projection", "component", "text", "line", "span", "label", "model", "local", "world");
     private static final Set<String> GEOMETRY_TYPES = Set.of(
         "point", "line", "polyline", "outline", "filledPlane", "cuboid",
         "letterBounds", "glyphOutline", "glyphFill");
@@ -74,13 +75,20 @@ public record ParticleLayer(String id, Target target, Geometry geometry, Placeme
         }
     }
 
-    public record Geometry(String type, Vector from, Vector to, List<Vector> points,
+    /**
+     * {@code from}, {@code to} and {@code points} are anchors: a coordinate in the target's frame,
+     * or — only under the {@code world} target scope — a role or an entity the renderer resolves.
+     * {@link #from()}, {@link #to()} and {@link #points()} still hand back the coordinate form the
+     * local-frame sampler works in.
+     */
+    public record Geometry(String type,
+                           @SerializedName("from") ParticleAnchor fromAnchor,
+                           @SerializedName("to") ParticleAnchor toAnchor,
+                           @SerializedName("points") List<ParticleAnchor> pointAnchors,
                            Double width, Double height, Double depth, Double padding, Double spacing) {
         public Geometry {
             type = normalizeChoice(type, "geometry type", GEOMETRY_TYPES);
-            from = cloneVector(from);
-            to = cloneVector(to);
-            points = copyVectors(points);
+            pointAnchors = copyAnchors(pointAnchors);
             width = finiteRange(width, 0.0D, 128.0D, "particle geometry width");
             height = finiteRange(height, 0.0D, 128.0D, "particle geometry height");
             depth = finiteRange(depth, 0.0D, 128.0D, "particle geometry depth");
@@ -88,27 +96,36 @@ public record ParticleLayer(String id, Target target, Geometry geometry, Placeme
                 "particle geometry padding");
             spacing = finiteRange(spacing == null ? 0.15D : spacing, 0.02D, 16.0D,
                 "particle geometry spacing");
-            if (type.equals("line") && (from == null || to == null)) {
-                throw new IllegalArgumentException("particle line geometry requires from and to vectors");
+            if (type.equals("line") && (fromAnchor == null || toAnchor == null)) {
+                throw new IllegalArgumentException("particle line geometry requires from and to");
             }
-            if (type.equals("polyline") && points.size() < 2) {
+            if (type.equals("polyline") && pointAnchors.size() < 2) {
                 throw new IllegalArgumentException("particle polyline geometry requires at least two points");
             }
         }
 
         @Override
+        public List<ParticleAnchor> pointAnchors() {
+            return pointAnchors;
+        }
+
         public Vector from() {
-            return cloneVector(from);
+            return fromAnchor == null ? null : fromAnchor.position();
         }
 
-        @Override
         public Vector to() {
-            return cloneVector(to);
+            return toAnchor == null ? null : toAnchor.position();
         }
 
-        @Override
         public List<Vector> points() {
-            return copyVectors(points);
+            List<Vector> vectors = new ArrayList<>(pointAnchors.size());
+            for (ParticleAnchor anchor : pointAnchors) {
+                Vector position = anchor.position();
+                if (position != null) {
+                    vectors.add(position);
+                }
+            }
+            return List.copyOf(vectors);
         }
     }
 
@@ -224,17 +241,13 @@ public record ParticleLayer(String id, Target target, Geometry geometry, Placeme
         return value;
     }
 
-    private static Vector cloneVector(Vector vector) {
-        return vector == null ? null : vector.clone();
-    }
-
-    private static List<Vector> copyVectors(List<Vector> vectors) {
-        if (vectors == null || vectors.isEmpty()) {
+    private static List<ParticleAnchor> copyAnchors(List<ParticleAnchor> anchors) {
+        if (anchors == null || anchors.isEmpty()) {
             return List.of();
         }
-        List<Vector> copied = new ArrayList<>(vectors.size());
-        for (Vector vector : vectors) {
-            copied.add(Objects.requireNonNull(vector, "particle geometry points must not contain null entries").clone());
+        List<ParticleAnchor> copied = new ArrayList<>(anchors.size());
+        for (ParticleAnchor anchor : anchors) {
+            copied.add(Objects.requireNonNull(anchor, "particle geometry points must not contain null entries"));
         }
         return List.copyOf(copied);
     }

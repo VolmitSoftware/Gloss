@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "revision": 1,
+  "enabled": false,
+  "allowServerCommands": false,
+  "state": {
+    "welcomed": { "scope": "player", "type": "boolean", "default": false },
+    "visits": { "scope": "player", "type": "number", "default": 0 },
+    "event": { "scope": "global", "type": "string", "default": "none" }
+  },
+  "on": [
+    {
+      "trigger": "join",
+      "when": "!state.welcomed",
+      "do": [
+        { "type": "delay", "ticks": 40 },
+        { "type": "message", "message": "&6Welcome, &f{{ viewer.name }}&6." },
+        { "type": "setState", "key": "welcomed", "value": "true" },
+        { "type": "addState", "key": "visits", "value": "1" }
+      ]
+    },
+    {
+      "trigger": "interval",
+      "everyTicks": 1200,
+      "scope": "global",
+      "do": [
+        { "type": "broadcast", "message": "&7The event is &f{{ state.event }}&7." }
+      ]
+    }
+  ]
+}

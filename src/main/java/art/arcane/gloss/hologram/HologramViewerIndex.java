@@ -18,6 +18,7 @@ final class HologramViewerIndex {
     private static final double CHUNK_SIZE = 16.0D;
 
     private final Map<UUID, HologramTick.Viewer> viewers = new ConcurrentHashMap<>();
+    private final Map<UUID, Map<String, String>> pages = new ConcurrentHashMap<>();
     private final Map<UUID, Map<Long, Set<UUID>>> chunks = new ConcurrentHashMap<>();
     private final Queue<UUID> reconciliationOrder = new ConcurrentLinkedQueue<>();
     private final Set<UUID> reconciliationActive = ConcurrentHashMap.newKeySet();
@@ -68,6 +69,41 @@ final class HologramViewerIndex {
             deactivateReconciliation(playerId);
             return null;
         });
+        forgetPages(playerId);
+    }
+
+    /** The page a viewer is reading of one hologram, or null when they have not moved off the first. */
+    String page(UUID viewerId, String hologramId) {
+        Map<String, String> selected = pages.get(viewerId);
+        return selected == null ? null : selected.get(hologramId);
+    }
+
+    void setPage(UUID viewerId, String hologramId, String pageId) {
+        if (pageId == null) {
+            Map<String, String> selected = pages.get(viewerId);
+            if (selected != null) {
+                selected.remove(hologramId);
+            }
+            return;
+        }
+        pages.computeIfAbsent(viewerId, ignored -> new ConcurrentHashMap<>()).put(hologramId, pageId);
+    }
+
+    void forgetPages(UUID viewerId) {
+        pages.remove(viewerId);
+    }
+
+    void forgetHologramPages(String hologramId) {
+        for (Map<String, String> selected : pages.values()) {
+            selected.remove(hologramId);
+        }
+    }
+
+    /** Drops viewer page selections a reloaded document no longer declares. */
+    void retainPages(String hologramId, Set<String> valid) {
+        for (Map<String, String> selected : pages.values()) {
+            selected.computeIfPresent(hologramId, (ignored, page) -> valid.contains(page) ? page : null);
+        }
     }
 
     List<HologramTick.Viewer> nearby(Location anchor, double range) {
@@ -175,6 +211,7 @@ final class HologramViewerIndex {
 
     void clear() {
         viewers.clear();
+        pages.clear();
         chunks.clear();
         reconciliationOrder.clear();
         reconciliationActive.clear();

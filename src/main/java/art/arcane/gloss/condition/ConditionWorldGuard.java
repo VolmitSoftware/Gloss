@@ -6,8 +6,10 @@ import org.bukkit.plugin.Plugin;
 
 import java.lang.reflect.Method;
 import java.util.Collection;
+import java.util.HashSet;
+import java.util.Set;
 
-final class ConditionWorldGuard {
+public final class ConditionWorldGuard {
     private static final long RETRY_INTERVAL_MS = 5000L;
 
     private static volatile Adapter adapter;
@@ -18,9 +20,26 @@ final class ConditionWorldGuard {
     private ConditionWorldGuard() {
     }
 
+    /**
+     * Drops everything read out of WorldGuard's classloader. A WorldGuard reload replaces that
+     * loader, so a cached query object keeps answering for a platform that no longer exists.
+     */
+    static synchronized void invalidate() {
+        adapter = null;
+        regionsMethod = null;
+        regionIdMethod = null;
+        retryAfterMs = 0L;
+    }
+
     static boolean contains(Location location, String regionId) {
         Adapter active = adapter();
         return active != null && active.contains(location, regionId);
+    }
+
+    /** Every WorldGuard region id at {@code location}; empty without WorldGuard. */
+    public static Set<String> regionsAt(Location location) {
+        Adapter active = adapter();
+        return active == null || location == null ? Set.of() : active.regionsAt(location);
     }
 
     private static Adapter adapter() {
@@ -108,6 +127,21 @@ final class ConditionWorldGuard {
                 return containsRegion(applicableRegions, regionId);
             } catch (ReflectiveOperationException | RuntimeException failure) {
                 return false;
+            }
+        }
+
+        private Set<String> regionsAt(Location location) {
+            try {
+                Object worldEditLocation = adapt.invoke(null, location);
+                Object applicableRegions = applicable.invoke(query, worldEditLocation);
+                Collection<?> regions = (Collection<?>) regionsMethod(applicableRegions.getClass()).invoke(applicableRegions);
+                Set<String> ids = new HashSet<>(regions.size());
+                for (Object region : regions) {
+                    ids.add((String) regionIdMethod(region.getClass()).invoke(region));
+                }
+                return ids;
+            } catch (ReflectiveOperationException | RuntimeException failure) {
+                return Set.of();
             }
         }
     }

@@ -16,6 +16,40 @@ public enum EditorSyncKind {
   REAL_DROPS("real-drops"),
   SCOREBOARD("scoreboard"),
   TABLIST("tablist"),
+  // --- lane:screen ---
+  SURFACE("surface"),
+  NAMETAG("nametag"),
+
+  // --- lane:chat ---
+  CHANNEL("channel"),
+  STRINGS("strings"),
+  LEADERBOARD("leaderboard"),
+
+  // --- lane:forms ---
+  DIALOG("dialog"),
+  INVENTORY("inventory"),
+
+  // --- lane:rigs ---
+  MOTION("motion"),
+  RIG("rig"),
+  RIG_INSTANCE("rig-instance"),
+
+  // --- lane:world ---
+  MARKER("marker"),
+  WAYPOINT("waypoint"),
+  ZONE("zone"),
+  NAMEPLATE("nameplate"),
+
+  // --- lane:behaviors ---
+  BEHAVIOR("behavior"),
+
+  // --- lane:authoring ---
+
+  // --- lane:forge ---
+  GLYPH("glyph"),
+
+  // --- lane:fixes ---
+
   WORKSPACE("workspace");
 
   public static final Pattern WIRE_KIND_PATTERN = Pattern.compile("^[a-z][a-z0-9-]{0,31}$");

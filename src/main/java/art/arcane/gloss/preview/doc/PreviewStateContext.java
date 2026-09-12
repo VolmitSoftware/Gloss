@@ -7,11 +7,11 @@ import art.arcane.gloss.expr.ExprException;
 import art.arcane.gloss.expr.ExprFunctions;
 import art.arcane.gloss.expr.ExprScope;
 import art.arcane.gloss.locale.GlossLocalization;
+import art.arcane.gloss.locale.LangArguments;
 import art.arcane.volmlib.util.localization.LanguageAudience;
 import art.arcane.gloss.locale.GlossMessages;
 import art.arcane.gloss.text.TextPipeline;
 import art.arcane.volmlib.util.localization.MessageArgs;
-import art.arcane.volmlib.util.localization.MessageKey;
 import art.arcane.volmlib.util.localization.TextKey;
 import org.bukkit.World;
 import org.bukkit.block.Block;
@@ -20,7 +20,6 @@ import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -66,7 +65,6 @@ import java.util.logging.Level;
 public final class PreviewStateContext implements ExprScope {
 
   private static final String VARS_PREFIX = "vars.";
-  private static final String LANG_ARG_PREFIX = "arg";
   private static final long MILLIS_PER_TICK = 50L;
 
   /** Room for the widest built-in group set (universal + inventory + furnace) without a resize. */
@@ -329,72 +327,19 @@ public final class PreviewStateContext implements ExprScope {
     }
   }
 
-  /**
-   * The catalog's own key when the id is known, else a synthesised key whose English default is the
-   * id itself. The synthesised key only renders on a headless call; a running server rejects it,
-   * see {@link #lang}.
-   */
+  /** @see LangArguments#messageKey(String) */
   static TextKey messageKey(String key) {
-    MessageKey known = GlossMessages.catalog().key(key);
-    return known instanceof TextKey text ? text : TextKey.of(key, key);
+    return LangArguments.messageKey(key);
   }
 
-  /**
-   * Binds positional call arguments onto the resolved key's own placeholder names: argument 1 fills
-   * the first <code>{name}</code> in the English template, argument 2 the second, and so on. That
-   * is what lets a document write {@code lang("gloss.preview.state.smelting_item", item, percent)}
-   * and get {@code "Smelting Iron Ore 42%"} out of the template {@code "Smelting {item} {percent}%"}.
-   *
-   * <p>Arguments past the last placeholder are ignored for catalog keys so strict localization does
-   * not receive unexpected names. Unknown headless-only keys retain positional names such as
-   * {@code arg0}. Values are stringified with the expression language's own rule, so {@code 42.0}
-   * inserts as {@code "42"}, and they are inserted as untrusted text so a container name can never
-   * smuggle in colour codes.
-   */
+  /** @see LangArguments#arguments(TextKey, List) */
   static MessageArgs langArguments(TextKey key, List<Object> args) {
-    if (args.size() <= 1) {
-      return MessageArgs.empty();
-    }
-    List<String> placeholders = orderedPlaceholders(key.english());
-    boolean knownKey = GlossMessages.catalog().key(key.id()) != null;
-    int suppliedArguments = args.size() - 1;
-    int boundArguments = knownKey ? Math.min(suppliedArguments, placeholders.size()) : suppliedArguments;
-    MessageArgs.Builder builder = MessageArgs.builder();
-    for (int position = 0; position < boundArguments; position++) {
-      String name = knownKey ? placeholders.get(position) : LANG_ARG_PREFIX + position;
-      builder.untrusted(name, ExprFunctions.call("str", List.of(args.get(position + 1))));
-    }
-    return builder.build();
+    return LangArguments.arguments(key, args);
   }
 
-  /**
-   * Placeholder names in first-appearance order, honouring the <code>{{</code> escape VolmLib's own
-   * scanner uses. {@code TextKey.placeholders()} cannot be used here: it returns a
-   * {@code Set.copyOf(...)}, which has already lost the insertion order this binding depends on.
-   */
+  /** @see LangArguments#orderedPlaceholders(String) */
   static List<String> orderedPlaceholders(String template) {
-    List<String> names = new ArrayList<>();
-    int cursor = 0;
-    while (cursor < template.length()) {
-      int open = template.indexOf('{', cursor);
-      if (open < 0) {
-        break;
-      }
-      if (open + 1 < template.length() && template.charAt(open + 1) == '{') {
-        cursor = open + 2;
-        continue;
-      }
-      int close = template.indexOf('}', open + 1);
-      if (close < 0) {
-        break;
-      }
-      String name = template.substring(open + 1, close);
-      if (!names.contains(name)) {
-        names.add(name);
-      }
-      cursor = close + 1;
-    }
-    return names;
+    return LangArguments.orderedPlaceholders(template);
   }
 
   private double count(List<Object> args) {

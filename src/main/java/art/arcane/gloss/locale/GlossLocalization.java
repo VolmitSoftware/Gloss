@@ -49,6 +49,8 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.function.LongSupplier;
 import java.util.logging.Level;
@@ -99,6 +101,12 @@ public final class GlossLocalization implements AutoCloseable {
 
   public File languageFile() {
     return languageFile;
+  }
+
+  /** The player's explicit {@code /gloss language self} choice, empty when they never made one. */
+  public Optional<String> playerLocale(UUID playerId) {
+    PluginLanguageService service = languages;
+    return service == null ? Optional.empty() : service.playerLocale(playerId);
   }
 
   public PluginLanguageService enableLanguages(Gloss plugin) {

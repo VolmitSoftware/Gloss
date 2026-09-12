@@ -17,7 +17,7 @@ public final class MessageMenuAction extends MenuAction<MessageActionData> {
   }
 
   public boolean hasMessage() {
-    return data.message() != null && !data.message().isBlank();
+    return data.hasMessage();
   }
 
   @Override

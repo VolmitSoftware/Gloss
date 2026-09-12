@@ -106,7 +106,8 @@ public class ButtonHitboxDataTest {
         null,
         null,
         41,
-        HoverEasing.LINEAR
+        HoverEasing.LINEAR,
+        null
     ));
   }
 }

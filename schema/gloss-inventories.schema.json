@@ -1,0 +1,186 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://volmit.com/gloss/inventories.schema.json",
+  "title": "Gloss Inventory Menu Document",
+  "description": "A chest menu at plugins/Gloss/inventories/<id>.json. Every click is cancelled and no player item ever enters the window.",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "revision"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "type": "integer",
+      "const": 1
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991
+    },
+    "title": {
+      "description": "Window title, run through the text pipeline.",
+      "type": "string"
+    },
+    "resolution": {
+      "description": "Window size.",
+      "type": "string",
+      "enum": [
+        "9x1",
+        "9x2",
+        "9x3",
+        "9x4",
+        "9x5",
+        "9x6",
+        "5x1",
+        "3x3"
+      ],
+      "default": "9x3"
+    },
+    "mask": {
+      "description": "One row per window row, one character per slot. A space is always empty.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "keys": {
+      "description": "What each mask character draws.",
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "https://volmit.com/gloss/schema.json#/$defs/componentData"
+      }
+    },
+    "slots": {
+      "description": "Slot index to component; overrides whatever the mask drew there.",
+      "type": "object",
+      "propertyNames": {
+        "pattern": "^[0-9]+$"
+      },
+      "additionalProperties": {
+        "$ref": "https://volmit.com/gloss/schema.json#/$defs/componentData"
+      }
+    },
+    "list": {
+      "description": "Fills one mask character with pages of a template.",
+      "type": "object",
+      "required": [
+        "area",
+        "var",
+        "source",
+        "template"
+      ],
+      "properties": {
+        "area": {
+          "description": "The mask character this list fills.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1
+        },
+        "var": {
+          "description": "Loop variable bound for each entry.",
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "source": {
+          "description": "Expression producing the entries.",
+          "type": "string",
+          "minLength": 1
+        },
+        "pageSize": {
+          "description": "Entries per page; defaults to the size of the area.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "template": {
+          "$ref": "https://volmit.com/gloss/schema.json#/$defs/componentData"
+        },
+        "refreshTicks": {
+          "description": "How often a viewer-dependent source is re-evaluated. 0 never refreshes.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1200
+        }
+      }
+    },
+    "closeOnTeleport": {
+      "description": "Closes the window when its viewer teleports. Default true.",
+      "type": "boolean"
+    },
+    "show": {
+      "description": "Condition deciding whether this document is offered to a viewer at all.",
+      "type": "string"
+    },
+    "select": {
+      "description": "Board-model selection: the highest matching priority wins, ties break on the lowest id.",
+      "type": "object",
+      "properties": {
+        "priority": {
+          "description": "Higher wins.",
+          "type": "integer"
+        },
+        "when": {
+          "description": "Condition offering this document.",
+          "type": "string"
+        }
+      }
+    },
+    "variants": {
+      "description": "Conditional replacements of title, mask, keys and slots. Nothing merges.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "presentation"
+        ],
+        "properties": {
+          "id": {
+            "description": "Variant id.",
+            "type": "string",
+            "minLength": 1
+          },
+          "priority": {
+            "description": "Higher wins.",
+            "type": "integer"
+          },
+          "when": {
+            "description": "Condition selecting this variant.",
+            "type": "string"
+          },
+          "presentation": {
+            "description": "The replacement window.",
+            "type": "object",
+            "properties": {
+              "title": {
+                "description": "Replacement title.",
+                "type": "string"
+              },
+              "mask": {
+                "description": "Replacement mask.",
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "keys": {
+                "description": "Replacement key map.",
+                "type": "object",
+                "additionalProperties": {
+                  "$ref": "https://volmit.com/gloss/schema.json#/$defs/componentData"
+                }
+              },
+              "slots": {
+                "description": "Replacement slot overrides.",
+                "type": "object",
+                "additionalProperties": {
+                  "$ref": "https://volmit.com/gloss/schema.json#/$defs/componentData"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

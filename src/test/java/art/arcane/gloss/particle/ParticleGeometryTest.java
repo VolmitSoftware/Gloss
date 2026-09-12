@@ -1,5 +1,6 @@
 package art.arcane.gloss.particle;
 
+import art.arcane.gloss.api.ParticleAnchor;
 import art.arcane.gloss.api.ParticleLayer;
 import org.bukkit.util.Vector;
 import org.junit.jupiter.api.Test;
@@ -13,7 +14,7 @@ class ParticleGeometryTest {
     @Test
     void lineSamplingIncludesBothEndpointsAndHonorsLimit() {
         ParticleLayer.Geometry geometry = new ParticleLayer.Geometry("line",
-            new Vector(), new Vector(1.0D, 0.0D, 0.0D), null,
+            ParticleAnchor.of(new Vector()), ParticleAnchor.of(new Vector(1.0D, 0.0D, 0.0D)), null,
             null, null, null, null, 0.25D);
 
         List<Vector> complete = ParticleGeometrySampler.sample(geometry, List.of(), 20);

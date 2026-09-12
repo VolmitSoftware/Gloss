@@ -34,7 +34,7 @@ class OperatorLoggingBehaviorTest {
         assertContains("art/arcane/gloss/hologram/HologramAnimator.java", "Gloss.verbose(");
         assertContains("art/arcane/gloss/hologram/HologramService.java", "\"hologram-viewer-refresh\"");
         assertContains("art/arcane/gloss/tab/TablistService.java", "\"tablist-player-refresh\"");
-        assertContains("art/arcane/gloss/chat/ChatListener.java", "\"chat-hook\"");
+        assertContains("art/arcane/gloss/chat/ChatService.java", "\"chat-hook\"");
         assertContains("art/arcane/gloss/panel/PanelRuntimeManager.java", "\"panel-viewer-update\"");
     }
 

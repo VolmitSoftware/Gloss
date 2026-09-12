@@ -826,3 +826,517 @@ line = "{line}번째 줄"
 [language.editor.value]
 none = "없음"
 empty = "(비어 있음)"
+
+# Lane message tables. Each lane appends its [gloss.message.<lane>] and [command.help.<group>]
+# tables inside its own anchor so parallel branches never share a line.
+# --- lane:screen ---
+[gloss.message.screen]
+"surfaces.empty" = "&8[&dGloss&8] &7불러온 서피스가 없습니다."
+"surfaces.unknown" = "&8[&dGloss&8]: &c&f{id}&c 서피스가 없습니다."
+"surfaces.tested" = "&8[&dGloss&8]: &a&f{player}&a 에게 &f{id}&a 를 실행했습니다."
+"nametags.empty" = "&8[&dGloss&8] &7불러온 이름표가 없습니다."
+"nametags.unknown" = "&8[&dGloss&8]: &c&f{id}&c 이름표가 없습니다."
+"nametags.refreshed" = "&8[&dGloss&8]: &a이름표 문서 &d{count}&a 개를 다시 적용했습니다."
+"hud.header" = "&8[&dGloss&8] &7&f{player}&7 의 HUD 점유: &d{count}"
+"hud.empty" = "&8[&dGloss&8] &7&f{player}&7 의 HUD 칸을 점유한 플러그인이 없습니다."
+"hud.line" = "&8- &f{kind} &7{source} &8| &7{value} &8| &7{count} &8| &7{state}"
+"player.unknown" = "&8[&dGloss&8]: &c&f{player}&c 라는 접속 중인 플레이어가 없습니다."
+
+[command.help.surface]
+root = "액션바, 보스바, 타이틀 서피스"
+list = "서피스 문서 목록"
+info = "서피스 문서 표시"
+"info.id" = "서피스 문서 ID"
+reset = "기본 제공 서피스 복원"
+test = "지정한 플레이어의 서피스 처리를 즉시 실행"
+"test.id" = "서피스 문서 ID"
+"test.player" = "테스트할 플레이어. 기본값은 자신"
+
+[command.help.nametag]
+root = "관찰자별 이름표 문서"
+list = "이름표 문서 목록"
+info = "이름표 문서 표시"
+"info.id" = "이름표 문서 ID"
+reset = "기본 제공 이름표 복원"
+refresh = "모든 이름표를 즉시 다시 적용"
+
+[command.help.hud]
+root = "공유 HUD 컴포지터 확인"
+who = "각 HUD 칸을 어떤 플러그인이 점유하는지 표시"
+"who.player" = "확인할 플레이어. 기본값은 자신"
+
+# --- lane:chat ---
+[gloss.message.chat]
+filtered = "&8[&dGloss&8]: &c채팅 필터가 메시지를 차단했습니다."
+too_fast = "&8[&dGloss&8]: &e다음 메시지를 보내기 전에 잠시 기다리세요."
+repeat = "&8[&dGloss&8]: &e방금 같은 말을 했습니다."
+channel_set = "&8[&dGloss&8]: &a이제 &d{name}&a 채널에서 대화합니다."
+channel_unknown = "&8[&dGloss&8]: &c&d{name}&c(이)라는 채널이 없습니다."
+channel_list = "&8[&dGloss&8]: &7채널: &f{value}"
+msg_usage = "&8[&dGloss&8]: &e사용법: &f{command}"
+msg_offline = "&8[&dGloss&8]: &c{player} 님은 접속해 있지 않습니다."
+reply_none = "&8[&dGloss&8]: &c답장할 상대가 없습니다."
+msg_self = "&8[&dGloss&8]: &c자신에게는 메시지를 보낼 수 없습니다."
+channels_header = "&d채널 &7({count})"
+channels_empty = "&7불러온 채널이 없습니다."
+channel_missing = "&8[&dGloss&8]: &c&f{id}&c(이)라는 채널 문서가 없습니다."
+strings_header = "&d문자열 로케일 &7({count})"
+strings_empty = "&7불러온 문자열 문서가 없습니다."
+strings_missing = "&d{locale}에 없음 &7({count})"
+strings_complete = "&8[&dGloss&8]: &a{locale}이(가) 모든 en_US 키를 포함합니다."
+leaderboards_header = "&d리더보드 &7({count})"
+leaderboards_empty = "&7불러온 리더보드가 없습니다."
+leaderboard_missing = "&8[&dGloss&8]: &c&f{id}&c(이)라는 리더보드 문서가 없습니다."
+leaderboard_reset = "&8[&dGloss&8]: &a리더보드 &f{id}&a을(를) 초기화했습니다 ({state})."
+leaderboard_sampled = "&8[&dGloss&8]: &a리더보드 &f{id}&a을(를) 접속 중인 모든 플레이어에 대해 수집했습니다."
+
+
+[command.help.channel]
+root = "채팅 채널"
+list = "불러온 채팅 채널 나열"
+info = "채널의 범위, 형식, 변형 표시"
+"info.id" = "채널 문서 ID"
+reset = "기본 제공 채널 문서 복원"
+
+[command.help.strings]
+root = "작성한 콘텐츠 문자열"
+list = "불러온 문자열 로케일과 항목 수 나열"
+missing = "en_US에는 있고 해당 로케일에는 없는 키 나열"
+"missing.locale" = "en_US와 비교할 로케일"
+reset = "기본 제공 문자열 문서 복원"
+
+[command.help.leaderboard]
+root = "계산된 리더보드"
+list = "불러온 리더보드와 항목 수 나열"
+info = "리더보드의 출처, 정렬, 항목 표시"
+"info.id" = "리더보드 문서 ID"
+reset = "리더보드의 기간 값 또는 전체 값 삭제"
+"reset.id" = "리더보드 문서 ID"
+"reset.period" = "all 또는 current"
+sample = "접속 중인 모든 플레이어에 대해 지금 수집"
+"sample.id" = "리더보드 문서 ID"
+
+# --- lane:forms ---
+[gloss.message.forms]
+icon_unsupported = "&7상자 칸에는 표시할 수 없습니다 ({kind})"
+no_dialogs = "&8[&dGloss&8]: &7설정된 대화 상자가 없습니다."
+dialog_list_header = "&d대화 상자"
+dialog_list_entry = "&7대화 상자 &f{id}&7 열기"
+dialog_info = "&8[&dGloss&8]: &d{id} &8- &7종류 &f{kind}&7, 버튼 &f{count}"
+unknown_dialog = "&8[&dGloss&8]: &c{id} 이름의 대화 상자가 없습니다."
+dialog_opened = "&8[&dGloss&8]: &a대화 상자 {id}을(를) {player}에게 열었습니다."
+dialog_unsupported = "&8[&dGloss&8]: &c클라이언트가 이 대화 상자를 표시할 수 없습니다."
+no_inventories = "&8[&dGloss&8]: &7설정된 상자 메뉴가 없습니다."
+inventory_list_header = "&d상자 메뉴"
+inventory_list_entry = "&7상자 메뉴 &f{id}&7 열기"
+inventory_info = "&8[&dGloss&8]: &d{id} &8- &7크기 &f{kind}&7, 칸 &f{count}"
+unknown_inventory = "&8[&dGloss&8]: &c{id} 이름의 상자 메뉴가 없습니다."
+inventory_opened = "&8[&dGloss&8]: &a상자 메뉴 {id}을(를) {player}에게 열었습니다."
+bad_args = "&8[&dGloss&8]: &c인수는 key=value 쌍이어야 합니다: {value}"
+prompt_timeout = "&8[&dGloss&8]: &7입력 시간이 초과되었습니다."
+prompt_busy = "&8[&dGloss&8]: &c이미 대기 중인 입력이 있습니다."
+take_missing = "&8[&dGloss&8]: &c필요한 아이템이 없습니다."
+economy_denied = "&8[&dGloss&8]: &c자금이 부족합니다."
+economy_unavailable = "&8[&dGloss&8]: &c사용 가능한 경제 플러그인이 없습니다."
+give_dropped = "&8[&dGloss&8]: &7인벤토리가 가득 차서 아이템이 발밑에 떨어졌습니다."
+
+[command.help.dialog]
+root = "대화 상자 문서 확인 및 열기"
+list = "설정된 대화 상자 목록 표시"
+"list.page" = "1부터 시작하는 목록 페이지"
+info = "대화 상자의 종류, 입력, 버튼 표시"
+"info.id" = "대화 상자 ID"
+open = "플레이어에게 대화 상자 열기"
+"open.id" = "대화 상자 ID"
+"open.player" = "열어 줄 플레이어. 기본값은 자신"
+"open.args" = "공백으로 구분된 key=value 인수"
+reset = "기본 제공 대화 상자 설정 복원"
+"reset.name" = "초기화할 이름 또는 * 로 모든 기본 제공 파일"
+
+["command.help.menu.open"]
+args = "공백으로 구분된 key=value 인수"
+
+[command.help.inventory]
+root = "상자 메뉴 확인 및 열기"
+list = "설정된 상자 메뉴 목록 표시"
+"list.page" = "1부터 시작하는 목록 페이지"
+info = "상자 메뉴의 크기와 칸 표시"
+"info.id" = "상자 메뉴 ID"
+open = "플레이어에게 상자 메뉴 열기"
+"open.id" = "상자 메뉴 ID"
+"open.player" = "열어 줄 플레이어. 기본값은 자신"
+"open.args" = "공백으로 구분된 key=value 인수"
+reset = "기본 제공 상자 메뉴 설정 복원"
+"reset.name" = "초기화할 이름 또는 * 로 모든 기본 제공 파일"
+
+
+# --- lane:rigs ---
+[command.help.rig]
+root = "리그 인스턴스 배치 및 관리"
+list = "리그와 배치된 인스턴스 목록; 클릭하면 이동합니다"
+info = "리그 인스턴스의 리그, 위치, 상태 표시"
+"info.id" = "리그 인스턴스 ID"
+place = "현재 위치에 리그 배치"
+"place.rig" = "리그 문서 ID"
+"place.id" = "인스턴스 ID; 비워 두면 다음 빈 ID를 사용합니다"
+move = "리그 인스턴스를 상대 블록 거리만큼 이동"
+"move.id" = "리그 인스턴스 ID"
+"move.x" = "상대 X 오프셋 (블록)"
+"move.y" = "상대 Y 오프셋 (블록)"
+"move.z" = "상대 Z 오프셋 (블록)"
+here = "리그 인스턴스를 현재 위치로 이동"
+"here.id" = "리그 인스턴스 ID"
+rotate = "리그 인스턴스의 yaw와 pitch 설정"
+"rotate.id" = "리그 인스턴스 ID"
+"rotate.yaw" = "Yaw (도)"
+"rotate.pitch" = "Pitch (도)"
+scale = "리그 인스턴스의 균일 크기 설정"
+"scale.id" = "리그 인스턴스 ID"
+"scale.scale" = "크기 배율, 0.01~64"
+remove = "리그 인스턴스 제거"
+"remove.id" = "리그 인스턴스 ID"
+state = "리그 인스턴스를 그래프 상태로 전환"
+"state.id" = "리그 인스턴스 ID"
+"state.state" = "리그 그래프의 상태 이름"
+var = "리그 인스턴스 변수 설정"
+"var.id" = "리그 인스턴스 ID"
+"var.name" = "변수 이름"
+"var.value" = "숫자, true, false 또는 텍스트"
+import = "Blockbench 모델을 리그로 가져오기"
+"import.file" = "Gloss 데이터 폴더 안의 .bbmodel 경로"
+"import.id" = "리그 ID. 비우면 파일 이름 사용"
+"import.texture" = "각 큐브에 사용할 커스텀 아이템 (provider:id)"
+reset = "기본 제공 리그 문서 복원"
+
+["command.help.hologram"]
+page = "플레이어를 홀로그램 페이지로 이동"
+"page.page" = "페이지 ID, next 또는 prev"
+"page.player" = "플레이어 이름. 비우면 자신"
+motion = "홀로그램에서 모션 클립 재생"
+"motion.motion" = "모션 ID, 중지하려면 clear"
+actions = "클릭할 때 홀로그램이 실행하는 동작 목록"
+
+[command.help.motion]
+root = "모션 클립 확인"
+list = "모션 클립 목록"
+info = "모션 클립의 길이, 반복, fps, 트랙 표시"
+"info.id" = "모션 ID"
+reset = "기본 제공 모션 문서 복원"
+
+[gloss.message.rigs]
+rig_unknown = "&8[&dGloss&8] &c'&f{id}&c' 이름의 리그가 없습니다."
+instance_missing = "&8[&dGloss&8] &c'&f{id}&c' 이름의 리그 인스턴스가 없습니다."
+placed = "&8[&dGloss&8] &a리그 &f{name}&a을(를) &f{id}&a로 &f{world} {x}, {y}, {z}&a에 배치했습니다."
+place_failed = "&8[&dGloss&8] &c리그 &f{name}&c을(를) 배치할 수 없습니다: {reason}"
+moved = "&8[&dGloss&8] &a리그 인스턴스 &f{id}&a을(를) &f{world} {x}, {y}, {z}&a로 이동했습니다."
+rotated = "&8[&dGloss&8] &a리그 인스턴스 &f{id}&a을(를) yaw &f{yaw}&a, pitch &f{pitch}&a로 회전했습니다."
+scaled = "&8[&dGloss&8] &a리그 인스턴스 &f{id}&a의 크기를 &f{scale}&a로 조정했습니다."
+scale_out_of_range = "&8[&dGloss&8] &c리그 크기는 &f{minimum}&c과 &f{maximum}&c 사이여야 합니다. 입력값: &f{value}&c."
+removed = "&8[&dGloss&8] &a리그 인스턴스 &f{id}&a을(를) 제거했습니다."
+state_set = "&8[&dGloss&8] &a리그 인스턴스 &f{id}&a이(가) 이제 &f{state}&a 상태입니다."
+state_unknown = "&8[&dGloss&8] &c리그 인스턴스 &f{id}&c에 '&f{state}&c' 상태가 없습니다."
+var_set = "&8[&dGloss&8] &a리그 인스턴스 &f{id}&a의 &f{name}&a을(를) &f{value}&a로 설정했습니다."
+save_failed = "&8[&dGloss&8] &c리그 인스턴스 &f{id}&c을(를) 저장할 수 없습니다: {reason}"
+list_empty = "&8[&dGloss&8] &7불러온 리그가 없습니다."
+list_rigs = "&8[&dGloss&8] &7리그 (&f{count}&7): &f{value}"
+instances_empty = "&8[&dGloss&8] &7배치된 리그 인스턴스가 없습니다."
+list_hover = "클릭하여 이동"
+list_entry = "{name} @ {world} {x}, {y}, {z}; 상태 {state}"
+info_header = "&8[&dGloss&8] &d{id} &7은(는) 리그 &f{name}&7 사용 @ &f{world} {x}, {y}, {z}"
+info_pose = "&8[&dGloss&8] &7Yaw &f{yaw}&7, pitch &f{pitch}&7, 크기 &f{scale}&7, 상태 &f{state}"
+info_parts = "&8[&dGloss&8] &7파트 &f{count}&7, 시청자 &f{value}"
+info_var = "&8[&dGloss&8] &7  {name} = &f{value}"
+motion_unknown = "&8[&dGloss&8] &c'&f{id}&c' 이름의 모션이 없습니다."
+motion_list_empty = "&8[&dGloss&8] &7불러온 모션 클립이 없습니다."
+motion_list = "&8[&dGloss&8] &7모션 클립 (&f{count}&7): &f{value}"
+motion_info = "&8[&dGloss&8] &d{id} &7{value} 틱, {kind}, {count} fps"
+motion_track = "&8[&dGloss&8] &7  {name} &f{key} &7({count} 키프레임)"
+import_done = "&8[&dGloss&8] &a&f{id}&a 가져옴: 뼈대 &f{value}&a, 파츠 &f{count}&a, 애니메이션 &f{kind}&a."
+import_unsupported = "&8[&dGloss&8] &7가져오지 않음: &f{value}&7."
+import_failed = "&8[&dGloss&8] &c&f{path}&c 을(를) 가져올 수 없습니다: {reason}"
+hologram_page_set = "&8[&dGloss&8] &a{player}&a 님이 &f{id}&a 의 페이지 &f{page}&a 로 이동했습니다."
+hologram_page_player_missing = "&8[&dGloss&8] &c플레이어 &f{player}&c 님은 접속 중이 아닙니다."
+hologram_page_unknown = "&8[&dGloss&8] &c홀로그램 &f{id}&c 에 '&f{page}&c' 페이지가 없습니다."
+hologram_motion_set = "&8[&dGloss&8] &a홀로그램 &f{id}&a 이(가) &f{value}&a 을(를) 재생합니다."
+hologram_motion_cleared = "&8[&dGloss&8] &a홀로그램 &f{id}&a 이(가) 더 이상 모션을 재생하지 않습니다."
+hologram_actions_empty = "&8[&dGloss&8] &7홀로그램 &f{id}&7 에 동작이 없습니다."
+hologram_actions_header = "&8[&dGloss&8] &7홀로그램 &f{id}&7 동작 (&f{count}&7):"
+hologram_actions_entry = "&8[&dGloss&8] &7  &f{kind}&7 / &f{value}"
+
+# --- lane:world ---
+[gloss.message.world]
+players_only = "&c이 명령은 플레이어만 실행할 수 있습니다."
+disabled = "&c이 기능은 gloss.toml에서 꺼져 있습니다."
+
+[gloss.message.world.marker]
+list = "&7마커 &8({count})&7: &f{value}"
+info = "&7마커 &f{id} &7위치 &f{world} {x} {y} {z}"
+created = "&a마커 &f{id} &a을(를) 만들었습니다."
+removed = "&a마커 &f{id} &a을(를) 삭제했습니다."
+missing = "&c&f{id} &c이라는 마커가 없습니다."
+here = "&7현재 위치는 &f{world} {x} {y} {z} &7입니다."
+
+[gloss.message.world.waypoint]
+saved = "&a웨이포인트 &f{name} &a을(를) 저장했습니다."
+removed = "&a웨이포인트 &f{name} &a을(를) 삭제했습니다."
+missing = "&c&f{name} &c이라는 웨이포인트가 없습니다."
+list = "&7웨이포인트 &8({count})&7: &f{value}"
+info = "&7웨이포인트 &f{id} &7위치 &f{world} {x} {y} {z}"
+full = "&c이미 최대 {count}개의 웨이포인트를 가지고 있습니다."
+
+[gloss.message.world.zone]
+list = "&7구역 &8({count})&7: &f{value}"
+info = "&7구역 &f{id} &7은(는) &f{world} &7의 &f{kind} &7입니다."
+shown = "&a구역 &f{id} &a을(를) 표시합니다."
+hidden = "&7구역 &f{id} &7을(를) 숨깁니다."
+created = "&a구역 &f{id} &a을(를) 만들었습니다."
+removed = "&a구역 &f{id} &a을(를) 삭제했습니다."
+missing = "&c&f{id} &c이라는 구역이 없습니다."
+
+[gloss.message.world.camera]
+started = "&7카메라 이동을 시작했습니다."
+refused = "&c카메라 이동이 거부되었습니다."
+stopped = "&f{player} &7의 카메라 이동을 멈췄습니다."
+idle = "&c{player} 님은 카메라 이동 중이 아닙니다."
+
+[gloss.message.world.nameplate]
+list = "&7이름표 &8({count})&7: &f{value}"
+info = "&7이름표 &f{id} &7우선순위 &f{value}&7, &f{count} &7줄."
+missing = "&c&f{id} &c이라는 이름표가 없습니다."
+refreshed = "&a이름표를 새로 고쳤습니다."
+
+[gloss.message.world.glow]
+set = "&f{target} &7이(가) 이제 &f{value} &a으로 빛납니다."
+cleared = "&f{target} &7의 발광을 해제했습니다."
+missing = "&c&f{player} &c이라는 플레이어가 접속 중이 아닙니다."
+
+[command.help.marker]
+root = "월드 마커 도구"
+list = "마커 문서 목록 보기"
+info = "마커 하나 보기"
+create = "현재 위치에 마커 문서 작성"
+remove = "마커 문서 삭제"
+here = "현재 위치를 앵커 좌표로 출력"
+
+[command.help.marker.arg]
+id = "마커 문서 ID"
+label = "마커 위에 표시할 라벨"
+
+[command.help.waypoint]
+root = "위치 표시줄 웨이포인트 도구"
+set = "현재 위치를 개인 웨이포인트로 저장"
+remove = "개인 웨이포인트 하나 삭제"
+list = "개인 웨이포인트 목록 보기"
+info = "웨이포인트 문서 하나 보기"
+
+[command.help.waypoint.arg]
+name = "웨이포인트 이름"
+id = "웨이포인트 문서 ID"
+
+[command.help.zone]
+root = "구역 윤곽 도구"
+list = "구역 목록 보기"
+info = "구역 하나 보기"
+show = "구역 윤곽을 나에게 표시"
+hide = "구역 윤곽을 나에게서 숨기기"
+create = "현재 위치 주변에 직육면체 구역 문서 작성"
+remove = "구역 문서 삭제"
+
+[command.help.zone.arg]
+id = "구역 문서 ID"
+radius = "블록 단위 반너비"
+
+[command.help.camera]
+root = "카메라 이동 도구"
+test = "자신 주위를 도는 시연 이동 비행"
+stop = "카메라 이동을 일찍 종료"
+
+[command.help.camera.arg]
+seconds = "이동 길이(초)"
+player = "멈출 탑승자, 기본값은 자신"
+
+[command.help.nameplate]
+root = "플레이어 이름표 도구"
+list = "이름표 문서 목록 보기"
+info = "이름표 문서 하나 보기"
+reset = "기본 제공 이름표 문서 복원"
+refresh = "모든 관찰자의 이름표 재구성"
+
+[command.help.nameplate.arg]
+id = "이름표 문서 ID"
+
+[command.help.glow]
+root = "엔티티 발광 도구"
+set = "플레이어를 나에게 빛나게 하기"
+clear = "플레이어의 발광을 나에게서 해제"
+
+[command.help.glow.arg]
+player = "윤곽을 그릴 플레이어"
+cleared = "윤곽을 그만둘 플레이어"
+color = "이름이 있는 텍스트 색상"
+ticks = "발광이 지속되는 틱, 0이면 유지"
+
+# --- lane:behaviors ---
+[command.help.behavior]
+root = "동작 문서를 살펴보고 실행합니다"
+list = "불러온 동작 문서를 나열합니다"
+info = "동작 문서의 트리거와 조건을 표시합니다"
+fire = "동작 항목 하나를 지금 실행합니다"
+reset = "기본 제공 동작 문서를 복원합니다"
+id = "동작 문서 ID"
+entry = "항목 번호, 1부터 시작"
+player = "항목을 실행할 플레이어, 또는 * 로 없음"
+
+[command.help.state]
+root = "저장된 동작 상태를 읽고 씁니다"
+get = "상태 값 하나를 표시합니다"
+set = "상태 값 하나를 기록합니다"
+clear = "상태 값 하나를 기본값으로 되돌립니다"
+dump = "선언된 모든 상태 키와 값을 나열합니다"
+key = "선언된 상태 키"
+value = "새 값. 공백을 포함하려면 따옴표로 감싸세요"
+player = "값이 속한 플레이어, 또는 * 로 자신"
+
+[command.help.do]
+root = "이 이름을 가진 command 동작 항목을 실행합니다"
+name = "동작 명령 이름"
+args = "key=value 형식의 인수. 공백을 포함하려면 따옴표로 감싸세요"
+
+[command.help.expr]
+root = "식을 계산하고 무엇이 값을 제공했는지 보여줍니다"
+expression = "계산할 식. 공백을 포함하려면 따옴표로 감싸세요"
+
+[command.help.explain]
+root = "런타임이 확인한 조건과 어느 것이 선택되었는지 보여줍니다"
+kind = "설명할 런타임. 예를 들어 board 또는 behavior"
+id = "설명할 문서 ID"
+player = "설명 대상 플레이어, 또는 * 로 자신"
+
+[gloss.message.behaviors]
+off = "&8[&dGloss&8]: &e동작이 features.behaviors 에서 꺼져 있습니다."
+"list.empty" = "&8[&dGloss&8]: &7불러온 동작 문서가 없습니다."
+missing = "&8[&dGloss&8]: &c\"{id}\" 라는 동작 문서가 없습니다."
+"info.header" = "&8[&dGloss&8]: &d{id} &7리비전 &f{revision} &8| &7항목 &f{count} &8| &7사용 &f{enabled}"
+"info.entry" = " &8{line}. &f{name} &7조건 &f{when} &8| &7권한 &f{permission}"
+fired = "&8[&dGloss&8]: &a{id}&a 의 항목 &f{line}&a 을(를) 실행했습니다."
+"fire.missing" = "&8[&dGloss&8]: &c{id} 에는 항목 {line} 이(가) 없습니다."
+"do.ran" = "&8[&dGloss&8]: &a{name}&a 의 동작 항목 &f{count}&a 개를 실행했습니다."
+"do.none" = "&8[&dGloss&8]: &7명령 \"{name}\" 에 응답하는 동작 항목이 없습니다."
+"state.value" = " &7{key} &8= &f{value}"
+"state.set" = "&8[&dGloss&8]: &a{key} 이(가) 이제 &f{value}&a 입니다."
+"state.cleared" = "&8[&dGloss&8]: &a{key} 을(를) 기본값으로 되돌렸습니다."
+"state.unknown" = "&8[&dGloss&8]: &c상태 키 \"{key}\" 를 선언한 동작 문서가 없습니다."
+"state.invalid" = "&8[&dGloss&8]: &c\"{value}\" 은(는) {type} 값이 아닙니다."
+"state.empty" = "&8[&dGloss&8]: &7상태를 선언한 동작 문서가 없습니다."
+"state.player" = "&8[&dGloss&8]: &c플레이어를 지정하세요. &f{key}&c 는 전역 키가 아닙니다."
+"player.missing" = "&8[&dGloss&8]: &c\"{player}\" 라는 플레이어가 접속해 있지 않습니다."
+"expr.value" = "&8[&dGloss&8]: &f{value} &8({type})"
+"expr.reference" = " &7{name} &8= &f{value} &8출처 &7{source}"
+"expr.functions" = " &7함수 &8= &f{value}"
+"expr.failed" = "&8[&dGloss&8]: &c{reason}"
+"explain.header" = "&8[&dGloss&8]: &d{kind} &f{id} &7대상 &f{player}"
+"explain.line" = " &8{path} &7{when} &8= &f{value}"
+"explain.winner" = " &a> &f{path} &7{when} &8= &f{value}"
+"explain.unknown" = "&8[&dGloss&8]: &c\"{kind}\" 을(를) 설명할 수 있는 것이 없습니다. {options} 를 사용해 보세요."
+"explain.missing" = "&8[&dGloss&8]: &c\"{id}\" 라는 {kind} 이(가) 없습니다."
+
+# --- lane:authoring ---
+[command.help.pack]
+root = "Gloss 팩 설치 및 관리"
+install = "파일이나 HTTPS 주소에서 팩을 설치합니다"
+update = "설치된 팩을 원본 위치에서 갱신합니다"
+remove = "설치 후 수정된 파일은 남기고 팩을 제거합니다"
+list = "설치된 팩을 나열합니다"
+info = "팩이 소유한 파일을 보여 줍니다"
+arg_source = "Gloss 데이터 폴더의 팩 파일 또는 HTTPS 주소"
+arg_dry = "아무것도 쓰지 않고 바뀔 내용만 알려 줍니다"
+arg_id = "설치된 팩 id"
+
+[command.help.history]
+root = "문서의 저장된 버전을 나열합니다"
+arg_kind = "boards나 menus 같은 문서 폴더"
+arg_id = "문서 id"
+arg_page = "1부터 시작하는 목록 페이지"
+
+[command.help.restore]
+root = "저장된 버전을 현재 문서 위에 씁니다"
+arg_version = "/gloss history 가 알려 준 버전 표식"
+
+[command.help.check]
+root = "작업 공간의 끊어진 참조를 확인합니다"
+arg_kind = "확인을 문서 폴더 하나로 제한합니다"
+arg_id = "확인을 문서 하나로 제한합니다"
+
+[command.help.export]
+root = "문서를 그대로의 JSON 으로 내보냅니다"
+bundle = "작업 공간 전체를 편집기 묶음으로 씁니다"
+arg_kind = "내보내기를 문서 폴더 하나로 제한합니다"
+arg_id = "내보내기를 문서 하나로 제한합니다"
+arg_dir = "Gloss 데이터 폴더 안의 대상 폴더"
+
+[gloss.message.authoring.pack]
+preview = "&8[&dGloss&8] 팩 &f{id}&7 이(가) 파일 &f{count}&7 개를 바꿉니다."
+outcome = "&8[&dGloss&8] &7{state} &f{path}&7 {reason}"
+installed = "&8[&dGloss&8] 팩 &f{id}&7 을(를) 파일 &f{count}&7 개로 설치했습니다."
+updated = "&8[&dGloss&8] 팩 &f{id}&7 을(를) 파일 &f{count}&7 개에서 갱신했습니다."
+removed = "&8[&dGloss&8] 팩 &f{id}&7 과(와) 파일 &f{count}&7 개를 제거했습니다."
+unknown = "&8[&dGloss&8] &cid &f{id}&c 로 설치된 팩이 없습니다."
+failed = "&8[&dGloss&8] &c팩 &f{id}&c 이(가) 실패했습니다: {reason}"
+entry = "&8[&dGloss&8] &f{id} &7{value} &8파일 {count} 개"
+empty = "&8[&dGloss&8] &7설치된 팩이 없습니다."
+disabled = "&8[&dGloss&8] &cGloss 팩이 gloss.toml 에서 꺼져 있습니다."
+
+[gloss.message.authoring.history]
+empty = "&8[&dGloss&8] &7&f{kind} {id}&7 의 저장된 버전이 없습니다."
+entry = "&8[&dGloss&8] &f{revision} &7{source} &8{count} 바이트"
+disabled = "&8[&dGloss&8] &c문서 기록이 gloss.toml 에서 꺼져 있습니다."
+
+[gloss.message.authoring.restore]
+done = "&8[&dGloss&8] &f{kind} {id}&7 을(를) 버전 &f{revision}&7 로 되돌렸습니다."
+unknown = "&8[&dGloss&8] &c&f{kind} {id}&c 에 버전 &f{revision}&c 이(가) 없습니다."
+failed = "&8[&dGloss&8] &c복원에 실패했습니다: {reason}"
+
+[gloss.message.authoring.check]
+clean = "&8[&dGloss&8] &a보고할 내용이 없습니다."
+entry = "&8[&dGloss&8] &7{state} &f{key} &8{kind} {id} {path} &7{message}"
+summary = "&8[&dGloss&8] &f{count}&7 건의 지적."
+
+[gloss.message.authoring.export]
+done = "&8[&dGloss&8] 문서 &f{count}&7 개를 &f{path}&7 로 내보냈습니다."
+failed = "&8[&dGloss&8] &c내보내기에 실패했습니다: {reason}"
+
+[gloss.message.authoring.import]
+preview = "&8[&dGloss&8] &f{source}&7 이(가) 문서 &f{count}&7 개를 씁니다."
+entry = "&8[&dGloss&8] &7{state} &f{path}&7 {reason}"
+applied = "&8[&dGloss&8] &f{source}&7 에서 문서 &f{count}&7 개를 가져왔습니다."
+absent = "&8[&dGloss&8] &7&f{path}&7 에 &f{source}&7 데이터가 없습니다."
+
+# --- lane:forge ---
+[gloss.message.forge]
+disabled = "&8[&dGloss&8] &c글리프 포지가 꺼져 있습니다. gloss.toml에서 features.forge를 true로 설정하세요."
+built = "&8[&dGloss&8] &a팩 &f{value}&a을(를) 글리프 {count}개로 빌드했습니다."
+build_failed = "&8[&dGloss&8] &c팩 빌드에 실패했습니다. 이전 팩이 계속 사용됩니다. 콘솔을 확인하세요."
+status = "&7{value}"
+exported = "&8[&dGloss&8] &a파일 {count}개를 &f{path}&a(으)로 내보냈습니다."
+export_failed = "&8[&dGloss&8] &c내보내기에 실패했습니다: &f{reason}&c."
+serve = "&8[&dGloss&8] &a팩 리스너를 {state}(으)로 바꿨습니다."
+serve_unchanged = "&8[&dGloss&8] &7팩 리스너는 이미 {state} 상태입니다."
+
+[command.help.forge]
+root = "글리프 팩 도구"
+build = "글리프 리소스 팩을 지금 다시 빌드"
+status = "팩, 글리프, 전달 수치를 표시"
+export = "병합 가능한 팩 폴더를 복사"
+"export.path" = "팩을 내보낼 폴더"
+serve = "내장 팩 리스너를 시작하거나 중지"
+"serve.state" = "on 또는 off"
+reset = "기본 제공 글리프 문서를 복원"
+
+# --- lane:fixes ---
+[gloss.message.fixes]
+status_bedrock = "&7bedrock: &f{name}&7, &f{count}&7명 접속 중"
+status_textimage_oversize = "&7textimage-크기초과: &f{count}"
+hotload_skipped = " &7({count}개 무시됨, schemaVersion 불일치)"
+status_schema_skipped = "&7schema-무시됨: &f{count}"
+bedrock_menu_unavailable = "&8[&dGloss&8]: &c이 메뉴는 베드락에서 표시되지 않습니다."
+

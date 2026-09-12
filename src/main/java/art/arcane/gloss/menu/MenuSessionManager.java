@@ -9,10 +9,13 @@ import art.arcane.gloss.api.internal.ApiClickGuard;
 import art.arcane.gloss.api.internal.ApiEvents;
 import art.arcane.gloss.api.internal.ApiMenuHandle;
 import art.arcane.gloss.GlossConfig;
+import art.arcane.gloss.bedrock.BedrockPolicy;
+import art.arcane.gloss.bedrock.BedrockSurface;
 import art.arcane.gloss.panel.PanelClickTarget;
 import art.arcane.gloss.panel.PanelRuntimeManager;
 import art.arcane.gloss.config.MenuDefinitionData;
 import art.arcane.gloss.enums.NavigationMode;
+import art.arcane.gloss.integration.protection.ContainerProtectionProbe;
 import art.arcane.gloss.locale.GlossMessages;
 import art.arcane.gloss.menu.action.MenuNavigationHistory;
 import art.arcane.gloss.menu.action.NavigationRequest;
@@ -232,14 +235,25 @@ public final class MenuSessionManager {
         (id, current) -> current == holder && current.isDisposable() ? null : current);
   }
 
-  private void dispatchClick(PlayerInteractEvent event) {
-    if (event.isCancelled()) return;
+  /**
+   * Whether an interact event is a viewer's own main-hand click. The container-preview access
+   * probe fires a real interact event roughly every ten ticks per viewer per container; running
+   * the element's actions from it would fire commands and payouts unasked, and the cancel would
+   * read back as a denied preview.
+   */
+  static boolean isViewerClick(PlayerInteractEvent event) {
+    if (event.isCancelled() || ContainerProtectionProbe.isProbe(event)) return false;
     Action action = event.getAction();
     if (action != Action.LEFT_CLICK_AIR && action != Action.LEFT_CLICK_BLOCK
-        && action != Action.RIGHT_CLICK_AIR && action != Action.RIGHT_CLICK_BLOCK) return;
-    if (event.getHand() == EquipmentSlot.OFF_HAND) return;
+        && action != Action.RIGHT_CLICK_AIR && action != Action.RIGHT_CLICK_BLOCK) return false;
+    return event.getHand() != EquipmentSlot.OFF_HAND;
+  }
 
-    HoloClickTrigger trigger = HoloClickTrigger.fromInteraction(action, event.getPlayer().isSneaking());
+  private void dispatchClick(PlayerInteractEvent event) {
+    if (!isViewerClick(event)) return;
+
+    HoloClickTrigger trigger = HoloClickTrigger.fromInteraction(event.getAction(),
+        event.getPlayer().isSneaking());
     if (dispatchClick(event.getPlayer(), trigger)) {
       event.setCancelled(true);
     }
@@ -479,6 +493,9 @@ public final class MenuSessionManager {
     if (!GlossConfig.current().menus().enabled()) {
       return NavigationResult.DENIED;
     }
+    if (hiddenOnBedrock(player)) {
+      return NavigationResult.DENIED;
+    }
 
     String target = MenuNavigationHistory.resolveTarget(
         request.mode(),
@@ -518,15 +535,43 @@ public final class MenuSessionManager {
   }
 
   public boolean createNewSession(Player p, MenuDefinitionData menu, ApiMenuHandle handle) {
+    return createNewSession(p, menu, handle, Map.of());
+  }
+
+  /** Opens a menu seeding its {@code args.*} namespace for the life of the session. */
+  public boolean createNewSession(Player p, MenuDefinitionData menu, ApiMenuHandle handle,
+                                  Map<String, Object> args) {
     if (!GlossConfig.current().menus().enabled()) {
+      return false;
+    }
+    if (hiddenOnBedrock(p)) {
       return false;
     }
     if (!ApiEvents.fireOpen(p, menu.getId(), handle == null ? null : handle.owner().name())) {
       return false;
     }
 
-    holder(p).openSession(menu, handle);
+    holder(p).openSession(menu, handle, args);
     return true;
+  }
+
+  /**
+   * Hologram menus are text and block displays; a Bedrock viewer would be left staring at nothing,
+   * so the open is refused with a message instead of a silent no-op.
+   */
+  private static boolean hiddenOnBedrock(Player player) {
+    BedrockPolicy policy = BedrockPolicy.of(Gloss.instance);
+    if (policy == null || !policy.hides(BedrockSurface.PANEL, player)) {
+      return false;
+    }
+    Gloss.instance.getLocalization().send(player, GlossMessages.BEDROCK_MENU_UNAVAILABLE);
+    return true;
+  }
+
+  /** The session variables of this viewer's open menu, or null when nothing is open. */
+  public SessionVariables sessionVariables(UUID playerId) {
+    SessionHolder holder = holders.get(playerId);
+    return holder == null ? null : holder.sessionVariables();
   }
 
   public boolean hasMenuSession(Player p) {

@@ -7,5 +7,6 @@ public enum NavigationMode {
   @SerializedName("replace") REPLACE,
   @SerializedName("back") BACK,
   @SerializedName("home") HOME,
-  @SerializedName("close") CLOSE
+  @SerializedName("close") CLOSE,
+  @SerializedName("page") PAGE
 }

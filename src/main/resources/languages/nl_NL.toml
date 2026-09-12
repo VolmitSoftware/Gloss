@@ -826,3 +826,517 @@ line = "Regel {line}"
 [language.editor.value]
 none = "Geen"
 empty = "(leeg)"
+
+# Lane message tables. Each lane appends its [gloss.message.<lane>] and [command.help.<group>]
+# tables inside its own anchor so parallel branches never share a line.
+# --- lane:screen ---
+[gloss.message.screen]
+"surfaces.empty" = "&8[&dGloss&8] &7Geen oppervlakken geladen."
+"surfaces.unknown" = "&8[&dGloss&8]: &cGeen oppervlak met de naam &f{id}&c."
+"surfaces.tested" = "&8[&dGloss&8]: &a&f{id}&a uitgevoerd voor &f{player}&a."
+"nametags.empty" = "&8[&dGloss&8] &7Geen naamplaatjes geladen."
+"nametags.unknown" = "&8[&dGloss&8]: &cGeen naamplaatje met de naam &f{id}&c."
+"nametags.refreshed" = "&8[&dGloss&8]: &a&d{count}&a naamplaatjedocumenten opnieuw toegepast."
+"hud.header" = "&8[&dGloss&8] &7HUD-claims voor &f{player}&7: &d{count}"
+"hud.empty" = "&8[&dGloss&8] &7Geen plugin bezet een HUD-plek voor &f{player}&7."
+"hud.line" = "&8- &f{kind} &7{source} &8| &7{value} &8| &7{count} &8| &7{state}"
+"player.unknown" = "&8[&dGloss&8]: &cGeen online speler met de naam &f{player}&c."
+
+[command.help.surface]
+root = "Oppervlakken voor actiebalk, bossbalk en titel"
+list = "Oppervlakdocumenten tonen"
+info = "Een oppervlakdocument tonen"
+"info.id" = "Id van het oppervlakdocument"
+reset = "Meegeleverde oppervlakken herstellen"
+test = "De oppervlakronde nu voor één speler uitvoeren"
+"test.id" = "Id van het oppervlakdocument"
+"test.player" = "Speler om te testen; standaard jijzelf"
+
+[command.help.nametag]
+root = "Naamplaatjedocumenten per kijker"
+list = "Naamplaatjedocumenten tonen"
+info = "Een naamplaatjedocument tonen"
+"info.id" = "Id van het naamplaatjedocument"
+reset = "Meegeleverde naamplaatjes herstellen"
+refresh = "Alle naamplaatjes nu opnieuw toepassen"
+
+[command.help.hud]
+root = "De gedeelde HUD-compositor inspecteren"
+who = "Toont welke plugin elke HUD-plek bezet"
+"who.player" = "Speler om te inspecteren; standaard jijzelf"
+
+# --- lane:chat ---
+[gloss.message.chat]
+filtered = "&8[&dGloss&8]: &cEen chatfilter heeft je bericht geblokkeerd."
+too_fast = "&8[&dGloss&8]: &eWacht even voordat je nog een bericht stuurt."
+repeat = "&8[&dGloss&8]: &eDat heb je net al gezegd."
+channel_set = "&8[&dGloss&8]: &aJe praat nu in &d{name}&a."
+channel_unknown = "&8[&dGloss&8]: &cEr is geen kanaal met de naam &d{name}&c."
+channel_list = "&8[&dGloss&8]: &7Kanalen: &f{value}"
+msg_usage = "&8[&dGloss&8]: &eGebruik: &f{command}"
+msg_offline = "&8[&dGloss&8]: &c{player} is niet online."
+reply_none = "&8[&dGloss&8]: &cJe hebt niemand om op te antwoorden."
+msg_self = "&8[&dGloss&8]: &cJe kunt jezelf geen bericht sturen."
+channels_header = "&dKanalen &7({count})"
+channels_empty = "&7Er zijn geen kanalen geladen."
+channel_missing = "&8[&dGloss&8]: &cEr is geen kanaaldocument met de naam &f{id}&c."
+strings_header = "&dTekstlocales &7({count})"
+strings_empty = "&7Er zijn geen tekstdocumenten geladen."
+strings_missing = "&dOntbreekt in {locale} &7({count})"
+strings_complete = "&8[&dGloss&8]: &a{locale} dekt elke en_US-sleutel."
+leaderboards_header = "&dRanglijsten &7({count})"
+leaderboards_empty = "&7Er zijn geen ranglijsten geladen."
+leaderboard_missing = "&8[&dGloss&8]: &cEr is geen ranglijstdocument met de naam &f{id}&c."
+leaderboard_reset = "&8[&dGloss&8]: &aRanglijst &f{id}&a gereset ({state})."
+leaderboard_sampled = "&8[&dGloss&8]: &aRanglijst &f{id}&a bemonsterd voor alle online spelers."
+
+
+[command.help.channel]
+root = "Chatkanalen"
+list = "Geladen chatkanalen tonen"
+info = "Bereik, opmaak en varianten van een kanaal tonen"
+"info.id" = "Id van het kanaaldocument"
+reset = "Meegeleverde kanaaldocumenten herstellen"
+
+[command.help.strings]
+root = "Geschreven inhoudsteksten"
+list = "Geladen tekstlocales en hun aantal vermeldingen tonen"
+missing = "Sleutels tonen die en_US heeft en een locale niet"
+"missing.locale" = "Locale om met en_US te vergelijken"
+reset = "Meegeleverde tekstdocumenten herstellen"
+
+[command.help.leaderboard]
+root = "Berekende ranglijsten"
+list = "Geladen ranglijsten en hun aantal vermeldingen tonen"
+info = "Bron, volgorde en vermeldingen van een ranglijst tonen"
+"info.id" = "Id van het document"
+reset = "De periode of totalen van een ranglijst wissen"
+"reset.id" = "Id van het document"
+"reset.period" = "all of current"
+sample = "Een ranglijst nu bemonsteren voor alle online spelers"
+"sample.id" = "Id van het document"
+
+# --- lane:forms ---
+[gloss.message.forms]
+icon_unsupported = "&7Niet weer te geven in een kistvak ({kind})"
+no_dialogs = "&8[&dGloss&8]: &7Er zijn geen dialogen ingesteld."
+dialog_list_header = "&dDialogen"
+dialog_list_entry = "&7Dialoog &f{id}&7 openen"
+dialog_info = "&8[&dGloss&8]: &d{id} &8- &7type &f{kind}&7, knoppen &f{count}"
+unknown_dialog = "&8[&dGloss&8]: &cGeen dialoog met de naam {id}."
+dialog_opened = "&8[&dGloss&8]: &aDialoog {id} geopend voor {player}."
+dialog_unsupported = "&8[&dGloss&8]: &cJe client kan die dialoog niet weergeven."
+no_inventories = "&8[&dGloss&8]: &7Er zijn geen kistmenu's ingesteld."
+inventory_list_header = "&dKistmenu's"
+inventory_list_entry = "&7Kistmenu &f{id}&7 openen"
+inventory_info = "&8[&dGloss&8]: &d{id} &8- &7grootte &f{kind}&7, vakken &f{count}"
+unknown_inventory = "&8[&dGloss&8]: &cGeen kistmenu met de naam {id}."
+inventory_opened = "&8[&dGloss&8]: &aKistmenu {id} geopend voor {player}."
+bad_args = "&8[&dGloss&8]: &cArgumenten moeten sleutel=waarde-paren zijn: {value}"
+prompt_timeout = "&8[&dGloss&8]: &7De invoer is verlopen."
+prompt_busy = "&8[&dGloss&8]: &cJe hebt al een invoer openstaan."
+take_missing = "&8[&dGloss&8]: &cJe hebt de vereiste voorwerpen niet."
+economy_denied = "&8[&dGloss&8]: &cDat kun je niet betalen."
+economy_unavailable = "&8[&dGloss&8]: &cEr is geen economie-plugin beschikbaar."
+give_dropped = "&8[&dGloss&8]: &7Je inventaris zat vol, dus de voorwerpen vielen voor je voeten."
+
+[command.help.dialog]
+root = "Dialoogdocumenten bekijken en openen"
+list = "De ingestelde dialogen tonen"
+"list.page" = "Lijstpagina, beginnend bij 1"
+info = "Het type, de invoervelden en de knoppen van een dialoog tonen"
+"info.id" = "Dialoog-id"
+open = "Een dialoog voor een speler openen"
+"open.id" = "Dialoog-id"
+"open.player" = "Speler voor wie je hem opent; standaard jijzelf"
+"open.args" = "Door spaties gescheiden sleutel=waarde-argumenten"
+reset = "De meegeleverde dialoogstandaarden herstellen"
+"reset.name" = "Naam om te herstellen, of * voor alle meegeleverde bestanden"
+
+["command.help.menu.open"]
+args = "Door spaties gescheiden sleutel=waarde-argumenten"
+
+[command.help.inventory]
+root = "Kistmenu's bekijken en openen"
+list = "De ingestelde kistmenu's tonen"
+"list.page" = "Lijstpagina, beginnend bij 1"
+info = "De grootte en vakken van een kistmenu tonen"
+"info.id" = "Kistmenu-id"
+open = "Een kistmenu voor een speler openen"
+"open.id" = "Kistmenu-id"
+"open.player" = "Speler voor wie je het opent; standaard jijzelf"
+"open.args" = "Door spaties gescheiden sleutel=waarde-argumenten"
+reset = "De meegeleverde kistmenustandaarden herstellen"
+"reset.name" = "Naam om te herstellen, of * voor alle meegeleverde bestanden"
+
+
+# --- lane:rigs ---
+[command.help.rig]
+root = "Rig-instanties plaatsen en beheren"
+list = "Rigs en geplaatste instanties tonen; klik om te teleporteren"
+info = "Rig, positie en toestand van een rig-instantie tonen"
+"info.id" = "Rig-instantie-id"
+place = "Een rig op jouw positie plaatsen"
+"place.rig" = "Rig-document-id"
+"place.id" = "Instantie-id; leeg kiest de volgende vrije"
+move = "Een rig-instantie verplaatsen met relatieve blokafstanden"
+"move.id" = "Rig-instantie-id"
+"move.x" = "Relatieve X-verschuiving in blokken"
+"move.y" = "Relatieve Y-verschuiving in blokken"
+"move.z" = "Relatieve Z-verschuiving in blokken"
+here = "Een rig-instantie naar jouw positie verplaatsen"
+"here.id" = "Rig-instantie-id"
+rotate = "Yaw en pitch van een rig-instantie instellen"
+"rotate.id" = "Rig-instantie-id"
+"rotate.yaw" = "Yaw in graden"
+"rotate.pitch" = "Pitch in graden"
+scale = "Uniforme schaal van een rig-instantie instellen"
+"scale.id" = "Rig-instantie-id"
+"scale.scale" = "Schaalfactor, 0.01 tot 64"
+remove = "Een rig-instantie verwijderen"
+"remove.id" = "Rig-instantie-id"
+state = "Een rig-instantie naar een graaftoestand schakelen"
+"state.id" = "Rig-instantie-id"
+"state.state" = "Toestandsnaam uit de graaf van de rig"
+var = "Een variabele van een rig-instantie instellen"
+"var.id" = "Rig-instantie-id"
+"var.name" = "Variabelenaam"
+"var.value" = "Getal, true, false of tekst"
+import = "Een Blockbench-model als rig importeren"
+"import.file" = "Pad naar een .bbmodel in de Gloss-datamap"
+"import.id" = "Rig-id; leeg gebruikt de bestandsnaam"
+"import.texture" = "Custom item als provider:id voor elke kubus"
+reset = "De meegeleverde rig-documenten herstellen"
+
+["command.help.hologram"]
+page = "Een kijker naar een hologrampagina sturen"
+"page.page" = "Pagina-id, next of prev"
+"page.player" = "Spelersnaam; leeg betekent jijzelf"
+motion = "Een motion-clip op een hologram afspelen"
+"motion.motion" = "Motion-id, of clear om te stoppen"
+actions = "De acties tonen die een hologram bij een klik uitvoert"
+
+[command.help.motion]
+root = "Bewegingsclips bekijken"
+list = "Bewegingsclips tonen"
+info = "Duur, lus, fps en sporen van een bewegingsclip tonen"
+"info.id" = "Bewegings-id"
+reset = "De meegeleverde bewegingsdocumenten herstellen"
+
+[gloss.message.rigs]
+rig_unknown = "&8[&dGloss&8] &cGeen rig met de naam '&f{id}&c'."
+instance_missing = "&8[&dGloss&8] &cGeen rig-instantie met de naam '&f{id}&c'."
+placed = "&8[&dGloss&8] &aRig &f{name}&a geplaatst als &f{id}&a op &f{world} {x}, {y}, {z}&a."
+place_failed = "&8[&dGloss&8] &cKon rig &f{name}&c niet plaatsen: {reason}"
+moved = "&8[&dGloss&8] &aRig-instantie &f{id}&a verplaatst naar &f{world} {x}, {y}, {z}&a."
+rotated = "&8[&dGloss&8] &aRig-instantie &f{id}&a gedraaid naar yaw &f{yaw}&a, pitch &f{pitch}&a."
+scaled = "&8[&dGloss&8] &aRig-instantie &f{id}&a geschaald naar &f{scale}&a."
+scale_out_of_range = "&8[&dGloss&8] &cDe rig-schaal moet tussen &f{minimum}&c en &f{maximum}&c liggen; ontvangen &f{value}&c."
+removed = "&8[&dGloss&8] &aRig-instantie &f{id}&a verwijderd."
+state_set = "&8[&dGloss&8] &aRig-instantie &f{id}&a is nu in toestand &f{state}&a."
+state_unknown = "&8[&dGloss&8] &cRig-instantie &f{id}&c heeft geen toestand met de naam '&f{state}&c'."
+var_set = "&8[&dGloss&8] &a&f{name}&a van rig-instantie &f{id}&a ingesteld op &f{value}&a."
+save_failed = "&8[&dGloss&8] &cKon rig-instantie &f{id}&c niet opslaan: {reason}"
+list_empty = "&8[&dGloss&8] &7Geen rigs geladen."
+list_rigs = "&8[&dGloss&8] &7Rigs (&f{count}&7): &f{value}"
+instances_empty = "&8[&dGloss&8] &7Geen rig-instanties geplaatst."
+list_hover = "Klik om te teleporteren"
+list_entry = "{name} op {world} {x}, {y}, {z}; toestand {state}"
+info_header = "&8[&dGloss&8] &d{id} &7gebruikt rig &f{name}&7 op &f{world} {x}, {y}, {z}"
+info_pose = "&8[&dGloss&8] &7Yaw &f{yaw}&7, pitch &f{pitch}&7, schaal &f{scale}&7, toestand &f{state}"
+info_parts = "&8[&dGloss&8] &7Onderdelen &f{count}&7, kijkers &f{value}"
+info_var = "&8[&dGloss&8] &7  {name} = &f{value}"
+motion_unknown = "&8[&dGloss&8] &cGeen beweging met de naam '&f{id}&c'."
+motion_list_empty = "&8[&dGloss&8] &7Geen bewegingsclips geladen."
+motion_list = "&8[&dGloss&8] &7Bewegingsclips (&f{count}&7): &f{value}"
+motion_info = "&8[&dGloss&8] &d{id} &7{value} ticks, {kind}, {count} fps"
+motion_track = "&8[&dGloss&8] &7  {name} &f{key} &7({count} keyframes)"
+import_done = "&8[&dGloss&8] &a&f{id}&a geimporteerd: &f{value}&a botten, &f{count}&a onderdelen, &f{kind}&a animaties."
+import_unsupported = "&8[&dGloss&8] &7Niet geimporteerd: &f{value}&7."
+import_failed = "&8[&dGloss&8] &cKon &f{path}&c niet importeren: {reason}"
+hologram_page_set = "&8[&dGloss&8] &a{player}&a staat nu op pagina &f{page}&a van &f{id}&a."
+hologram_page_player_missing = "&8[&dGloss&8] &cSpeler &f{player}&c is niet online."
+hologram_page_unknown = "&8[&dGloss&8] &cHologram &f{id}&c heeft geen pagina '&f{page}&c'."
+hologram_motion_set = "&8[&dGloss&8] &aHologram &f{id}&a speelt nu &f{value}&a af."
+hologram_motion_cleared = "&8[&dGloss&8] &aHologram &f{id}&a speelt geen motion meer af."
+hologram_actions_empty = "&8[&dGloss&8] &7Hologram &f{id}&7 heeft geen acties."
+hologram_actions_header = "&8[&dGloss&8] &7Acties van hologram &f{id}&7 (&f{count}&7):"
+hologram_actions_entry = "&8[&dGloss&8] &7  &f{kind}&7 op &f{value}"
+
+# --- lane:world ---
+[gloss.message.world]
+players_only = "&cDit commando moet door een speler worden uitgevoerd."
+disabled = "&cDeze functie staat uit in gloss.toml."
+
+[gloss.message.world.marker]
+list = "&7Markeringen &8({count})&7: &f{value}"
+info = "&7Markering &f{id} &7op &f{world} {x} {y} {z}"
+created = "&aMarkering &f{id} &aaangemaakt."
+removed = "&aMarkering &f{id} &averwijderd."
+missing = "&cGeen markering met de naam &f{id}&c."
+here = "&7Je bent op &f{world} {x} {y} {z}&7."
+
+[gloss.message.world.waypoint]
+saved = "&aWaypoint &f{name} &aopgeslagen."
+removed = "&aWaypoint &f{name} &averwijderd."
+missing = "&cGeen waypoint met de naam &f{name}&c."
+list = "&7Waypoints &8({count})&7: &f{value}"
+info = "&7Waypoint &f{id} &7op &f{world} {x} {y} {z}"
+full = "&cJe hebt al het maximum van {count} waypoints."
+
+[gloss.message.world.zone]
+list = "&7Zones &8({count})&7: &f{value}"
+info = "&7Zone &f{id} &7is een &f{kind} &7in &f{world}&7."
+shown = "&aZone &f{id} &awordt getoond."
+hidden = "&7Zone &f{id} &7wordt verborgen."
+created = "&aZone &f{id} &aaangemaakt."
+removed = "&aZone &f{id} &averwijderd."
+missing = "&cGeen zone met de naam &f{id}&c."
+
+[gloss.message.world.camera]
+started = "&7Camerarit gestart."
+refused = "&cDe camerarit is geweigerd."
+stopped = "&7Camerarit gestopt voor &f{player}&7."
+idle = "&c{player} zit niet in een camerarit."
+
+[gloss.message.world.nameplate]
+list = "&7Naamplaatjes &8({count})&7: &f{value}"
+info = "&7Naamplaatje &f{id} &7prioriteit &f{value}&7, &f{count} &7regels."
+missing = "&cGeen naamplaatje met de naam &f{id}&c."
+refreshed = "&aNaamplaatjes vernieuwd."
+
+[gloss.message.world.glow]
+set = "&f{target} &7gloeit nu in &f{value}&a."
+cleared = "&7Gloed van &f{target} &7verwijderd."
+missing = "&cGeen speler met de naam &f{player} &cis online."
+
+[command.help.marker]
+root = "Gereedschap voor wereldmarkeringen"
+list = "Markeringsdocumenten opsommen"
+info = "Eén markering tonen"
+create = "Een markeringsdocument op je positie schrijven"
+remove = "Een markeringsdocument verwijderen"
+here = "Je positie als ankercoördinaten tonen"
+
+[command.help.marker.arg]
+id = "Id van het markeringsdocument"
+label = "Label boven de markering"
+
+[command.help.waypoint]
+root = "Gereedschap voor waypoints van de locatiebalk"
+set = "Je positie als persoonlijk waypoint opslaan"
+remove = "Een van je persoonlijke waypoints verwijderen"
+list = "Je persoonlijke waypoints opsommen"
+info = "Eén waypointdocument tonen"
+
+[command.help.waypoint.arg]
+name = "Naam van het waypoint"
+id = "Id van het waypointdocument"
+
+[command.help.zone]
+root = "Gereedschap voor zonecontouren"
+list = "Zones opsommen"
+info = "Eén zone tonen"
+show = "De contour van een zone aan jezelf tonen"
+hide = "De contour van een zone voor jezelf verbergen"
+create = "Een blokvormig zonedocument rond je positie schrijven"
+remove = "Een zonedocument verwijderen"
+
+[command.help.zone.arg]
+id = "Id van het zonedocument"
+radius = "Halve breedte in blokken"
+
+[command.help.camera]
+root = "Gereedschap voor camerarittten"
+test = "Een demonstratierit om jezelf heen vliegen"
+stop = "Een camerarit vroegtijdig beëindigen"
+
+[command.help.camera.arg]
+seconds = "Duur van de rit in seconden"
+player = "Rijder om te stoppen; standaard jijzelf"
+
+[command.help.nameplate]
+root = "Gereedschap voor spelernaamplaatjes"
+list = "Naamplaatjedocumenten opsommen"
+info = "Eén naamplaatjedocument tonen"
+reset = "Het meegeleverde naamplaatjedocument herstellen"
+refresh = "Naamplaatjes voor alle kijkers opnieuw opbouwen"
+
+[command.help.nameplate.arg]
+id = "Id van het naamplaatjedocument"
+
+[command.help.glow]
+root = "Gereedschap voor entiteitsgloed"
+set = "Een speler voor jou laten gloeien"
+clear = "De gloed van een speler voor jou wissen"
+
+[command.help.glow.arg]
+player = "Speler om te omlijnen"
+cleared = "Speler die niet meer omlijnd wordt"
+color = "Benoemde tekstkleur"
+ticks = "Ticks dat de gloed duurt, of 0 om hem te houden"
+
+# --- lane:behaviors ---
+[command.help.behavior]
+root = "Gedragsdocumenten bekijken en afvuren"
+list = "Geladen gedragsdocumenten opsommen"
+info = "De triggers en voorwaarden van een gedragsdocument tonen"
+fire = "Nu een gedragsregel uitvoeren"
+reset = "Meegeleverde gedragsstandaarden herstellen"
+id = "Id van het gedragsdocument"
+entry = "Regelnummer, te beginnen bij 1"
+player = "Speler voor wie de regel loopt, of * voor niemand"
+
+[command.help.state]
+root = "Bewaarde gedragsstatus lezen en schrijven"
+get = "Een statuswaarde tonen"
+set = "Een statuswaarde schrijven"
+clear = "Een statuswaarde terugzetten op de standaard"
+dump = "Elke gedeclareerde statussleutel en waarde opsommen"
+key = "Gedeclareerde statussleutel"
+value = "Nieuwe waarde; zet er aanhalingstekens omheen voor spaties"
+player = "Speler bij wie de waarde hoort, of * voor jezelf"
+
+[command.help.do]
+root = "De command-gedragsregels met deze naam afvuren"
+name = "Naam van het gedragscommando"
+args = "Argumenten als sleutel=waarde-paren; zet er aanhalingstekens omheen voor spaties"
+
+[command.help.expr]
+root = "Een expressie evalueren en tonen wat hem beantwoordde"
+expression = "Te evalueren expressie; zet er aanhalingstekens omheen voor spaties"
+
+[command.help.explain]
+root = "Tonen welke voorwaarden een runtime raadpleegde en welke won"
+kind = "Runtime om uit te leggen, bijvoorbeeld board of behavior"
+id = "Id van het uit te leggen document"
+player = "Speler voor wie je uitlegt, of * voor jezelf"
+
+[gloss.message.behaviors]
+off = "&8[&dGloss&8]: &eGedrag staat uit in features.behaviors."
+"list.empty" = "&8[&dGloss&8]: &7Er zijn geen gedragsdocumenten geladen."
+missing = "&8[&dGloss&8]: &cGeen gedragsdocument met de naam \"{id}\"."
+"info.header" = "&8[&dGloss&8]: &d{id} &7revisie &f{revision} &8| &7regels &f{count} &8| &7aan &f{enabled}"
+"info.entry" = " &8{line}. &f{name} &7als &f{when} &8| &7recht &f{permission}"
+fired = "&8[&dGloss&8]: &aRegel &f{line}&a van &f{id}&a uitgevoerd."
+"fire.missing" = "&8[&dGloss&8]: &c{id} heeft geen regel {line}."
+"do.ran" = "&8[&dGloss&8]: &a&f{count}&a gedragsregels afgevuurd voor &f{name}&a."
+"do.none" = "&8[&dGloss&8]: &7Geen enkele gedragsregel beantwoordt het commando \"{name}\"."
+"state.value" = " &7{key} &8= &f{value}"
+"state.set" = "&8[&dGloss&8]: &a{key} is nu &f{value}&a."
+"state.cleared" = "&8[&dGloss&8]: &a{key} staat weer op de standaard."
+"state.unknown" = "&8[&dGloss&8]: &cGeen enkel gedragsdocument declareert de statussleutel \"{key}\"."
+"state.invalid" = "&8[&dGloss&8]: &c\"{value}\" is geen {type}-waarde."
+"state.empty" = "&8[&dGloss&8]: &7Geen enkel gedragsdocument declareert status."
+"state.player" = "&8[&dGloss&8]: &cNoem een speler: &f{key}&c is geen globale sleutel."
+"player.missing" = "&8[&dGloss&8]: &cGeen speler met de naam \"{player}\" is online."
+"expr.value" = "&8[&dGloss&8]: &f{value} &8({type})"
+"expr.reference" = " &7{name} &8= &f{value} &8via &7{source}"
+"expr.functions" = " &7functies &8= &f{value}"
+"expr.failed" = "&8[&dGloss&8]: &c{reason}"
+"explain.header" = "&8[&dGloss&8]: &d{kind} &f{id} &7voor &f{player}"
+"explain.line" = " &8{path} &7{when} &8= &f{value}"
+"explain.winner" = " &a> &f{path} &7{when} &8= &f{value}"
+"explain.unknown" = "&8[&dGloss&8]: &cNiets legt \"{kind}\" uit; probeer {options}."
+"explain.missing" = "&8[&dGloss&8]: &cGeen {kind} met de naam \"{id}\"."
+
+# --- lane:authoring ---
+[command.help.pack]
+root = "Gloss-pakketten installeren en beheren"
+install = "Een pakket installeren vanuit een bestand of een HTTPS-URL"
+update = "Een geïnstalleerd pakket bijwerken vanaf zijn bron"
+remove = "Een pakket verwijderen en elk sinds de installatie bewerkt bestand behouden"
+list = "Geïnstalleerde pakketten tonen"
+info = "Tonen welke bestanden bij een pakket horen"
+arg_source = "Pakketbestand in de Gloss-gegevensmap, of een HTTPS-URL"
+arg_dry = "Melden wat er zou veranderen zonder iets te schrijven"
+arg_id = "Id van een geïnstalleerd pakket"
+
+[command.help.history]
+root = "De bewaarde versies van een document tonen"
+arg_kind = "Documentmap, zoals boards of menus"
+arg_id = "Document-id"
+arg_page = "Lijstpagina vanaf één"
+
+[command.help.restore]
+root = "Een bewaarde versie over het actieve document schrijven"
+arg_version = "Versiemarkering uit /gloss history"
+
+[command.help.check]
+root = "De werkruimte op gebroken verwijzingen controleren"
+arg_kind = "De controle tot één documentmap beperken"
+arg_id = "De controle tot één document beperken"
+
+[command.help.export]
+root = "Documenten als kale JSON wegschrijven"
+bundle = "De hele werkruimte als editorbundel wegschrijven"
+arg_kind = "De export tot één documentmap beperken"
+arg_id = "De export tot één document beperken"
+arg_dir = "Doelmap binnen de Gloss-gegevensmap"
+
+[gloss.message.authoring.pack]
+preview = "&8[&dGloss&8] Pakket &f{id}&7 zou &f{count}&7 bestand(en) wijzigen."
+outcome = "&8[&dGloss&8] &7{state} &f{path}&7 {reason}"
+installed = "&8[&dGloss&8] Pakket &f{id}&7 geïnstalleerd met &f{count}&7 bestand(en)."
+updated = "&8[&dGloss&8] Pakket &f{id}&7 bijgewerkt over &f{count}&7 bestand(en)."
+removed = "&8[&dGloss&8] Pakket &f{id}&7 en &f{count}&7 bestand(en) verwijderd."
+unknown = "&8[&dGloss&8] &cEr is geen pakket geïnstalleerd met de id &f{id}&c."
+failed = "&8[&dGloss&8] &cPakket &f{id}&c is mislukt: {reason}"
+entry = "&8[&dGloss&8] &f{id} &7{value} &8{count} bestand(en)"
+empty = "&8[&dGloss&8] &7Er zijn geen pakketten geïnstalleerd."
+disabled = "&8[&dGloss&8] &cGloss-pakketten staan uit in gloss.toml."
+
+[gloss.message.authoring.history]
+empty = "&8[&dGloss&8] &7Geen bewaarde versies van &f{kind} {id}&7."
+entry = "&8[&dGloss&8] &f{revision} &7{source} &8{count} bytes"
+disabled = "&8[&dGloss&8] &cDocumentgeschiedenis staat uit in gloss.toml."
+
+[gloss.message.authoring.restore]
+done = "&8[&dGloss&8] &f{kind} {id}&7 hersteld naar versie &f{revision}&7."
+unknown = "&8[&dGloss&8] &cGeen versie &f{revision}&c van &f{kind} {id}&c."
+failed = "&8[&dGloss&8] &cHerstellen is mislukt: {reason}"
+
+[gloss.message.authoring.check]
+clean = "&8[&dGloss&8] &aNiets te melden."
+entry = "&8[&dGloss&8] &7{state} &f{key} &8{kind} {id} {path} &7{message}"
+summary = "&8[&dGloss&8] &f{count}&7 bevinding(en)."
+
+[gloss.message.authoring.export]
+done = "&8[&dGloss&8] &f{count}&7 document(en) geëxporteerd naar &f{path}&7."
+failed = "&8[&dGloss&8] &cExporteren is mislukt: {reason}"
+
+[gloss.message.authoring.import]
+preview = "&8[&dGloss&8] &f{source}&7 zou &f{count}&7 document(en) schrijven."
+entry = "&8[&dGloss&8] &7{state} &f{path}&7 {reason}"
+applied = "&8[&dGloss&8] &f{count}&7 document(en) geïmporteerd uit &f{source}&7."
+absent = "&8[&dGloss&8] &7Geen &f{source}&7-gegevens op &f{path}&7."
+
+# --- lane:forge ---
+[gloss.message.forge]
+disabled = "&8[&dGloss&8] &cDe glyph-smederij staat uit. Zet features.forge op true in gloss.toml."
+built = "&8[&dGloss&8] &aPakket &f{value}&a gebouwd met {count} glyphs."
+build_failed = "&8[&dGloss&8] &cPakket bouwen mislukt; het vorige pakket blijft actief. Zie de console."
+status = "&7{value}"
+exported = "&8[&dGloss&8] &a{count} bestanden geëxporteerd naar &f{path}&a."
+export_failed = "&8[&dGloss&8] &cExport mislukt: &f{reason}&c."
+serve = "&8[&dGloss&8] &aPakketlistener {state}."
+serve_unchanged = "&8[&dGloss&8] &7Pakketlistener staat al {state}."
+
+[command.help.forge]
+root = "Gereedschap voor het glyph-pakket"
+build = "Bouw het glyph-resourcepakket nu opnieuw"
+status = "Toon pakket-, glyph- en afleveringsaantallen"
+export = "Kopieer de samenvoegbare pakketmap ergens heen"
+"export.path" = "Doelmap voor het pakket"
+serve = "Start of stop de ingebouwde pakketlistener"
+"serve.state" = "on of off"
+reset = "Herstel de meegeleverde glyph-documenten"
+
+# --- lane:fixes ---
+[gloss.message.fixes]
+status_bedrock = "&7bedrock: &f{name}&7, &f{count}&7 online"
+status_textimage_oversize = "&7textimage-te-groot: &f{count}"
+hotload_skipped = " &7({count} genegeerd, verkeerde schemaVersion)"
+status_schema_skipped = "&7schema-genegeerd: &f{count}"
+bedrock_menu_unavailable = "&8[&dGloss&8]: &cDit menu wordt niet weergegeven op Bedrock."
+

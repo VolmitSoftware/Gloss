@@ -1,5 +1,6 @@
 package art.arcane.gloss.menu.icon;
 
+import art.arcane.gloss.Gloss;
 import art.arcane.gloss.util.common.TextUtils;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.TextComponent;
@@ -10,7 +11,10 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.logging.Level;
 
 /**
  * Shared rasters for the two image icons. Turning an image into text lines allocates styled
@@ -22,7 +26,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * menus reference a handful of images, and a runaway key set is a bug, not a working set worth
  * keeping.
  */
-final class TextImageRasterCache {
+public final class TextImageRasterCache {
 
   static final int MAX_DIMENSION = 16;
 
@@ -30,8 +34,28 @@ final class TextImageRasterCache {
 
   private static final Map<Raster, List<Component>> LINES = new ConcurrentHashMap<>();
   private static final Map<Integer, Component> BLANK_ROWS = new ConcurrentHashMap<>();
+  private static final Set<String> OVERSIZE_REPORTED = ConcurrentHashMap.newKeySet();
+  private static final AtomicInteger OVERSIZE = new AtomicInteger();
 
   private TextImageRasterCache() {
+  }
+
+  /**
+   * Names a file the raster cannot draw. Menus re-render constantly, so each path is logged once
+   * and the running total is what /gloss status prints.
+   */
+  static void reportOversize(String path, int width, int height) {
+    if (OVERSIZE_REPORTED.add(path)) {
+      OVERSIZE.incrementAndGet();
+      Gloss.log(Level.WARNING,
+          "textImage %s is %dx%d; the text raster renders at most %dx%d, so it shows the missing-icon checkerboard."
+              + " Declare it in a glyphs/ document to render it as one glyph for players with the Gloss pack.",
+          path, width, height, MAX_DIMENSION, MAX_DIMENSION);
+    }
+  }
+
+  public static int oversizeCount() {
+    return OVERSIZE.get();
   }
 
   /**

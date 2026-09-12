@@ -146,7 +146,7 @@ public class PanelDomainTest {
   public void everyRejectionAPlayerCanSeeSpeaksThePanelVocabulary() {
     PanelTransform transform = PanelTransform.at("example:missing_world", WORLD_UUID, 1.0D, 2.0D, 3.0D, 45.0D);
 
-    assertEquals("unsupported panel schemaVersion: 0",
+    assertEquals("declares schemaVersion 0; this build reads 1",
         assertThrows(IllegalArgumentException.class,
             () -> new PanelDefinition(0, "panels/main", UUID.randomUUID(), 1L, "Shop", transform,
                 PanelFollow.none(), PanelVisibility.publicAccess(), ShowCondition.ALWAYS)).getMessage());

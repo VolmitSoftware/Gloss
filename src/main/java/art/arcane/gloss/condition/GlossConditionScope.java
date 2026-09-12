@@ -1,8 +1,12 @@
 package art.arcane.gloss.condition;
 
 import art.arcane.gloss.Gloss;
+import art.arcane.gloss.bedrock.BedrockService;
+import art.arcane.gloss.expr.ExprFunctionRegistry;
 import art.arcane.gloss.expr.ExprFunctions;
 import art.arcane.gloss.expr.ExprScope;
+import art.arcane.gloss.expr.ExprVariableContext;
+import art.arcane.gloss.expr.ExprVariableNamespaces;
 import art.arcane.volmlib.util.bukkit.Placeholders;
 import org.bukkit.Location;
 import org.bukkit.World;
@@ -61,7 +65,16 @@ public final class GlossConditionScope implements ExprScope {
             return worldValue(world(), name.substring("world.".length()));
         }
         Object timeValue = timeValue(name);
-        return timeValue == null ? standardScope.variable(name) : timeValue;
+        if (timeValue != null) {
+            return timeValue;
+        }
+        Object namespaced = ExprVariableNamespaces.global().resolve(name, variableContext());
+        return namespaced != null ? namespaced : standardScope.variable(name);
+    }
+
+    @Override
+    public ExprVariableContext variableContext() {
+        return new ExprVariableContext(context.viewer(), context.subject(), context.source(), context.location());
     }
 
     @Override
@@ -70,9 +83,14 @@ public final class GlossConditionScope implements ExprScope {
             case "hasPermission" -> hasPermission(args);
             case "inGroup" -> inGroup(args);
             case "inRegion" -> inRegion(args);
+            case "isBedrock" -> isBedrock(args);
             case "papi" -> papi(args, false);
             case "papiNumber" -> papi(args, true);
             default -> {
+                Object registered = ExprFunctionRegistry.global().call(this, name, args);
+                if (registered != null) {
+                    yield registered;
+                }
                 Object value = standardScope.call(name, args);
                 yield value == null ? ExprFunctions.call(name, args) : value;
             }
@@ -172,6 +190,7 @@ public final class GlossConditionScope implements ExprScope {
             case "clientViewDistance" -> (double) player.getClientViewDistance();
             case "gameMode" -> player.getGameMode().name().toLowerCase(Locale.ROOT);
             case "locale" -> player.getLocale();
+            case "bedrock" -> isBedrock(player);
             case "sneaking" -> player.isSneaking();
             case "sprinting" -> player.isSprinting();
             case "flying" -> player.isFlying();
@@ -260,6 +279,18 @@ public final class GlossConditionScope implements ExprScope {
         } catch (NumberFormatException failure) {
             return fallback;
         }
+    }
+
+    private boolean isBedrock(List<Object> args) {
+        if (args.size() != 1) {
+            throw new IllegalArgumentException("isBedrock expects a role");
+        }
+        return isBedrock(rolePlayer(args, "isBedrock"));
+    }
+
+    private boolean isBedrock(Player player) {
+        BedrockService service = plugin.bedrock();
+        return player != null && service != null && service.isBedrock(player.getUniqueId());
     }
 
     private Player rolePlayer(List<Object> args, String function) {

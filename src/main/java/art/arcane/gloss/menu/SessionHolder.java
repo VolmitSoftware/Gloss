@@ -17,6 +17,7 @@ import org.bukkit.Location;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.Map;
 import java.util.List;
 import java.util.Objects;
 import java.util.OptionalDouble;
@@ -106,8 +107,8 @@ class SessionHolder {
     }
   }
 
-  void openSession(MenuDefinitionData data, ApiMenuHandle handle) {
-    Opened opened = openSessionLocked(data, handle, NavigationMode.PUSH);
+  void openSession(MenuDefinitionData data, ApiMenuHandle handle, Map<String, Object> args) {
+    Opened opened = openSessionLocked(data, handle, NavigationMode.PUSH, args);
     settle(opened);
   }
 
@@ -117,7 +118,7 @@ class SessionHolder {
       if (!matchesNavigationTarget(data, request.mode())) {
         return NavigationResult.NO_HISTORY;
       }
-      opened = openSessionLocked(data, null, request.mode());
+      opened = openSessionLocked(data, null, request.mode(), currentArgs());
     }
     settle(opened);
     return opened.rejected() == null && opened.failure() == null
@@ -246,6 +247,18 @@ class SessionHolder {
     }
   }
 
+  /** The arguments the open session carries, so a navigation inside it keeps them. */
+  private Map<String, Object> currentArgs() {
+    MenuSession current = session;
+    return current == null ? Map.of() : current.args();
+  }
+
+  /** The open session's variables, or null when nothing is open. */
+  SessionVariables sessionVariables() {
+    MenuSession current = session;
+    return current == null ? null : current.variables();
+  }
+
   boolean hasSession() {
     return session != null;
   }
@@ -326,7 +339,8 @@ class SessionHolder {
     }
   }
 
-  private Opened openSessionLocked(MenuDefinitionData data, ApiMenuHandle handle, NavigationMode mode) {
+  private Opened openSessionLocked(MenuDefinitionData data, ApiMenuHandle handle, NavigationMode mode,
+                                   Map<String, Object> args) {
     synchronized (sessionLock) {
       if (!player.isOnline()) return new Opened(null, handle, null);
 
@@ -335,7 +349,7 @@ class SessionHolder {
       openMenus.publish(playerId, data.getId());
       MenuSession replacement = null;
       try {
-        replacement = new MenuSession(data, player, MenuSessionOptions.personal(data, player, handle));
+        replacement = new MenuSession(data, player, MenuSessionOptions.personal(data, player, handle, args));
         replacement.open();
       } catch (RuntimeException | Error failure) {
         if (replacement != null) {

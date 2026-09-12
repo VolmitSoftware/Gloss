@@ -1,46 +1,33 @@
 package art.arcane.gloss.menu.action;
 
 import art.arcane.gloss.Gloss;
-import art.arcane.gloss.config.action.CommandActionData;
-import art.arcane.gloss.config.action.ConnectActionData;
-import art.arcane.gloss.config.action.MessageActionData;
+import art.arcane.gloss.behavior.ActionProgram;
+import art.arcane.gloss.condition.CompiledCondition;
+import art.arcane.gloss.condition.ConditionCompiler;
+import art.arcane.gloss.condition.ConditionValidationException;
+import art.arcane.gloss.config.action.ActionEnvelope;
 import art.arcane.gloss.config.action.MenuActionData;
-import art.arcane.gloss.config.action.NavigationActionData;
-import art.arcane.gloss.config.action.SoundActionData;
-import art.arcane.gloss.config.action.TeleportActionData;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 
 public abstract class MenuAction<E extends MenuActionData> {
 
   private static final String UNKNOWN_MENU = "unknown";
-  private static final Set<CommandWarning> COMMAND_WARNINGS = ConcurrentHashMap.newKeySet();
-  private static final Set<SoundWarning> SOUND_WARNINGS = ConcurrentHashMap.newKeySet();
-  private static final Set<ComponentWarning> MESSAGE_WARNINGS = ConcurrentHashMap.newKeySet();
-  private static final Set<ComponentWarning> TELEPORT_WARNINGS = ConcurrentHashMap.newKeySet();
-  private static final Set<ComponentWarning> CONNECT_WARNINGS = ConcurrentHashMap.newKeySet();
-  private static final Set<ComponentWarning> NAVIGATION_WARNINGS = ConcurrentHashMap.newKeySet();
+  private static final UUID GLOBAL_OWNER = new UUID(0L, 0L);
+  private static final Set<ComponentWarning> WARNINGS = ConcurrentHashMap.newKeySet();
 
   protected final E data;
+  private final CompiledCondition gate;
 
   public MenuAction(E data) {
     this.data = data;
-  }
-
-  public static MenuAction<?> get(MenuActionData data) {
-    return switch (data) {
-      case CommandActionData command -> new CommandMenuAction(command);
-      case SoundActionData sound -> new SoundMenuAction(sound);
-      case MessageActionData message -> new MessageMenuAction(message);
-      case TeleportActionData teleport -> new TeleportMenuAction(teleport);
-      case ConnectActionData connect -> new ConnectMenuAction(connect);
-      case NavigationActionData navigation -> new NavigateMenuAction(navigation);
-      case null, default -> null;
-    };
+    ActionEnvelope envelope = data == null ? ActionEnvelope.NONE : data.envelope();
+    this.gate = envelope.hasWhen() ? ConditionCompiler.compile(envelope.when()) : null;
   }
 
   public static List<MenuAction<?>> resolve(List<MenuActionData> data, String menuId, String componentId) {
@@ -50,67 +37,29 @@ public abstract class MenuAction<E extends MenuActionData> {
     }
 
     for (MenuActionData entry : data) {
-      MenuAction<?> action = entry == null ? null : get(entry);
+      MenuAction<?> action;
+      try {
+        action = entry == null ? null : entry.createAction();
+      } catch (ConditionValidationException invalidGate) {
+        String owner = menuId == null ? UNKNOWN_MENU : menuId;
+        if (WARNINGS.add(new ComponentWarning(owner, componentId, invalidGate.getMessage()))) {
+          Gloss.log(Level.WARNING, "Menu \"%s\" component \"%s\" declares an invalid when condition: %s; that action does nothing.",
+              owner, componentId, invalidGate.getMessage());
+        }
+        continue;
+      }
       if (action == null) {
         Gloss.log(Level.WARNING, "Component \"%s\" declares an unsupported action \"%s\"; skipping it.",
             componentId, entry == null ? "null" : entry.getClass().getSimpleName());
         continue;
       }
 
-      if (action instanceof CommandMenuAction command && !command.hasCommand()) {
+      String reason = entry.invalidReason();
+      if (reason != null) {
         String owner = menuId == null ? UNKNOWN_MENU : menuId;
-        if (COMMAND_WARNINGS.add(new CommandWarning(owner, componentId))) {
-          Gloss.log(Level.WARNING, "Menu \"%s\" component \"%s\" declares an empty command; that action does nothing.",
-              owner, componentId);
-        }
-        continue;
-      }
-
-      if (action instanceof SoundMenuAction sound && !sound.hasSound()) {
-        String owner = menuId == null ? UNKNOWN_MENU : menuId;
-        String soundKey = ((SoundActionData) entry).sound();
-        if (SOUND_WARNINGS.add(new SoundWarning(owner, componentId, soundKey))) {
-          Gloss.log(Level.WARNING, "Menu \"%s\" component \"%s\" declares an unknown sound \"%s\"; that action does nothing.",
-              owner, componentId, soundKey);
-        }
-        continue;
-      }
-
-      if (action instanceof MessageMenuAction message && !message.hasMessage()) {
-        String owner = menuId == null ? UNKNOWN_MENU : menuId;
-        if (MESSAGE_WARNINGS.add(new ComponentWarning(owner, componentId))) {
-          Gloss.log(Level.WARNING,
-              "Menu \"%s\" component \"%s\" declares an empty message; that action does nothing.",
-              owner, componentId);
-        }
-        continue;
-      }
-
-      if (action instanceof TeleportMenuAction teleport && !teleport.hasValidDestination()) {
-        String owner = menuId == null ? UNKNOWN_MENU : menuId;
-        if (TELEPORT_WARNINGS.add(new ComponentWarning(owner, componentId))) {
-          Gloss.log(Level.WARNING,
-              "Menu \"%s\" component \"%s\" declares an invalid teleport destination; that action does nothing.",
-              owner, componentId);
-        }
-        continue;
-      }
-
-      if (action instanceof ConnectMenuAction connect && !connect.hasValidServer()) {
-        String owner = menuId == null ? UNKNOWN_MENU : menuId;
-        if (CONNECT_WARNINGS.add(new ComponentWarning(owner, componentId))) {
-          Gloss.log(Level.WARNING,
-              "Menu \"%s\" component \"%s\" declares an invalid proxy server name; that action does nothing.",
-              owner, componentId);
-        }
-        continue;
-      }
-
-      if (action instanceof NavigateMenuAction navigation && !navigation.isValid()) {
-        String owner = menuId == null ? UNKNOWN_MENU : menuId;
-        if (NAVIGATION_WARNINGS.add(new ComponentWarning(owner, componentId))) {
-          Gloss.log(Level.WARNING, "Menu \"%s\" component \"%s\" declares navigation without a target; that action does nothing.",
-              owner, componentId);
+        if (WARNINGS.add(new ComponentWarning(owner, componentId, reason))) {
+          Gloss.log(Level.WARNING, "Menu \"%s\" component \"%s\" %s; that action does nothing.",
+              owner, componentId, reason);
         }
         continue;
       }
@@ -121,26 +70,50 @@ public abstract class MenuAction<E extends MenuActionData> {
     return actions;
   }
 
+  /** Runs the list as an action program; a suspended run reads as {@link ActionOutcome#STOP} to the caller. */
   public static ActionOutcome execute(List<MenuAction<?>> actions, ActionContext context) {
-    for (MenuAction<?> action : actions) {
-      if (!action.data.triggerOrDefault().matches(context.trigger())) {
-        continue;
-      }
-      if (action.execute(context) == ActionOutcome.STOP) {
-        return ActionOutcome.STOP;
-      }
+    ActionOutcome outcome = ActionProgram.run(actions, 0, context);
+    return outcome == ActionOutcome.SUSPENDED ? ActionOutcome.STOP : outcome;
+  }
+
+  /** One step of the runner: trigger filter, then the gate and cooldown, then the action; a filtered action continues. */
+  public static ActionOutcome executeAt(List<MenuAction<?>> actions, int index, ActionContext context) {
+    MenuAction<?> action = actions.get(index);
+    if (!action.data.triggerOrDefault().matches(context.trigger())) {
+      return ActionOutcome.CONTINUE;
     }
-    return ActionOutcome.CONTINUE;
+    if (!action.gateOpen(context, index)) {
+      return ActionOutcome.CONTINUE;
+    }
+    if (context.viewerless() && action.requiresPlayer()) {
+      Gloss.warnThrottled("action-no-player:" + context.menuId(),
+          "%s runs a %s action without a player; skipping it.", context.menuId(), action.data.getType().getSerializedName());
+      return ActionOutcome.CONTINUE;
+    }
+    return action.execute(context);
+  }
+
+  /** True when the {@code when} gate passes (a throwing gate counts as closed) and the cooldown window is free. */
+  boolean gateOpen(ActionContext context, int index) {
+    if (gate != null && !gate.matches(context.conditionScope())) {
+      return false;
+    }
+    ActionEnvelope envelope = data.envelope();
+    if (!envelope.hasCooldown()) {
+      return true;
+    }
+    String key = context.menuId() + "/" + context.componentId() + "/" + index;
+    UUID owner = context.player() == null ? GLOBAL_OWNER : context.player().getUniqueId();
+    return ActionCooldowns.global().claim(owner, key, envelope.cooldownTicks());
   }
 
   public abstract ActionOutcome execute(ActionContext context);
 
-  private record CommandWarning(String menuId, String componentId) {
+  /** False for actions that work without a viewer (control flow, state, broadcast, emit, effects on other roles). */
+  protected boolean requiresPlayer() {
+    return true;
   }
 
-  private record SoundWarning(String menuId, String componentId, String sound) {
-  }
-
-  private record ComponentWarning(String menuId, String componentId) {
+  private record ComponentWarning(String menuId, String componentId, String reason) {
   }
 }

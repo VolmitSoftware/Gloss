@@ -11,7 +11,7 @@ public final class HologramBaselines {
     }
 
     public static List<String> defaultLines() {
-        return baseline().lines();
+        return baseline().textLines();
     }
 
     public static HologramDoc baseline() {

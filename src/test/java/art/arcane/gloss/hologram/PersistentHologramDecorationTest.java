@@ -100,7 +100,7 @@ class PersistentHologramDecorationTest {
             HologramDoc doc = hologram.toDoc(1L);
             hologram.apply(new HologramDoc(doc.schemaVersion(), doc.revision(), doc.anchor(), doc.lines(),
                 doc.style(), new HologramBox(true, 4, 2, null, null), doc.yaw(), doc.pitch(), List.of(),
-                ShowCondition.of("player.x > 1")));
+                ShowCondition.of("player.x > 1"), doc.pages(), doc.actions(), doc.hitbox(), doc.motion()));
             hologram.update();
             harness.drainDelayed();
             hologram.update();

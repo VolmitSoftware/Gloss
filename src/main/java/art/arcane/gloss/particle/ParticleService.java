@@ -109,6 +109,43 @@ public final class ParticleService {
         }
     }
 
+    /**
+     * Emits a {@code world} scope layer for one viewer. Anchors are absolute, so nothing here goes
+     * through a projection frame; the viewer budget is the same one every other particle spends.
+     */
+    public void renderWorld(Player viewer, ParticleLayer layer,
+                            ParticleGeometrySampler.AnchorResolver resolver, long tick) {
+        if (!plugin.cfg().particles().enabled() || !viewer.isOnline()
+            || tick % layer.emission().intervalTicks() != 0L) {
+            return;
+        }
+        List<Vector> sampled = ParticleGeometrySampler.sampleWorld(layer.geometry(), resolver,
+            plugin.cfg().particles().maxCachedSamplesPerLayer());
+        if (sampled.isEmpty()) {
+            return;
+        }
+        List<Vector> selected = select(sampled, layer.emission(), tick);
+        int admitted = reserve(viewer.getUniqueId(), selected.size());
+        if (admitted == 0) {
+            return;
+        }
+        ResolvedParticle resolved = particles.computeIfAbsent(layer.particle(), this::resolve);
+        Location viewerLocation = viewer.getLocation();
+        double rangeSquared = square(plugin.cfg().particles().viewRange());
+        for (int index = 0; index < admitted; index++) {
+            Vector point = selected.get(index);
+            Location at = new Location(viewerLocation.getWorld(), point.getX(), point.getY(), point.getZ());
+            if (at.distanceSquared(viewerLocation) > rangeSquared) {
+                continue;
+            }
+            if (resolved.data() == null) {
+                viewer.spawnParticle(resolved.particle(), at, 1);
+            } else {
+                viewer.spawnParticle(resolved.particle(), at, 1, resolved.data());
+            }
+        }
+    }
+
     public void prune(UUID playerId) {
         viewerBudgets.remove(playerId);
     }

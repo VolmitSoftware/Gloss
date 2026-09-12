@@ -1,5 +1,6 @@
 package art.arcane.gloss.menu.icon;
 
+import java.util.Map;
 import art.arcane.gloss.condition.ShowCondition;
 import art.arcane.gloss.config.MenuDefinitionData;
 import art.arcane.gloss.config.icon.TextIconData;
@@ -51,7 +52,7 @@ class TextMenuIconRefreshTest {
 
     private static TextMenuIcon icon(Integer refreshTicks) throws MenuIconException {
         MenuDefinitionData definition = new MenuDefinitionData(new Vector(), false, false, 8D,
-            false, false, List.of(), List.of(), ShowCondition.ALWAYS);
+            false, false, List.of(), List.of(), ShowCondition.ALWAYS, Map.of());
         definition.setId("text-refresh");
         Player player = (Player) Proxy.newProxyInstance(Player.class.getClassLoader(),
             new Class<?>[]{Player.class}, (proxy, method, args) -> switch (method.getName()) {

@@ -249,7 +249,7 @@ class LegacyGlossDataImporterTest {
     @Test
     void customizedMotdBlocksConfigYmlMotdTexts() throws IOException {
         write("motd.json", document(new MotdDoc(MotdDoc.CURRENT_SCHEMA_VERSION, 4L, ShowCondition.ALWAYS,
-            List.of(new MotdDoc.MotdEntry(List.of("&bOperator MOTD"))))));
+            List.of(MotdDoc.MotdEntry.ofLines(List.of("&bOperator MOTD"))), List.of())));
         write("config.yml", """
             motd:
               texts:

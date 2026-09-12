@@ -1,0 +1,11 @@
+title:
+  - "&e&lSERVER"
+  - "&6&lSERVER"
+title-interval: 10
+lines:
+  - "&7Welcome back"
+  - text:
+      - "&aOnline: %server_online%"
+      - "&2Online: %server_online%"
+    interval: 5
+  - "&8&m----------"

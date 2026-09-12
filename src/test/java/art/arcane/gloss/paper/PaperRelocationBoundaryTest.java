@@ -8,6 +8,7 @@ import java.lang.classfile.ClassFile;
 import java.lang.classfile.ClassModel;
 import java.lang.classfile.constantpool.MemberRefEntry;
 import java.lang.classfile.constantpool.PoolEntry;
+import java.lang.classfile.constantpool.StringEntry;
 import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -39,6 +40,31 @@ class PaperRelocationBoundaryTest {
         List<String> violations = new ArrayList<>();
         for (Path candidate : compiled) {
             collectViolations(candidate, violations);
+        }
+        assertTrue(violations.isEmpty(), String.join("\n", violations));
+    }
+
+    /**
+     * The relocator also rewrites string constants naming a relocated package, so a reflective
+     * bridge that spells {@code net.kyori} loads the plugin's relocated copy instead of the server's.
+     * Bridges derive those names at runtime (see ServerAdventure) and never spell them.
+     */
+    @Test
+    void paperClassesSpellNoRelocatedPackageInStringConstants() throws IOException, URISyntaxException {
+        List<String> violations = new ArrayList<>();
+        for (Path candidate : compiledPaperClasses()) {
+            ClassModel model = ClassFile.of().parse(Files.readAllBytes(candidate));
+            for (PoolEntry entry : model.constantPool()) {
+                if (!(entry instanceof StringEntry string)) {
+                    continue;
+                }
+                String value = string.stringValue();
+                for (String prefix : RELOCATIONS.keySet()) {
+                    if (value.startsWith(prefix) || value.startsWith(prefix.replace('/', '.'))) {
+                        violations.add(model.thisClass().asInternalName() + " spells \"" + value + "\"");
+                    }
+                }
+            }
         }
         assertTrue(violations.isEmpty(), String.join("\n", violations));
     }

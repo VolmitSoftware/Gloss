@@ -1,0 +1,24 @@
+{
+  "manifest": {
+    "format": "glosspack",
+    "version": 1,
+    "id": "lobby-starter",
+    "name": "Lobby Starter",
+    "packVersion": "1.0.0",
+    "author": "Volmit",
+    "requires": {
+      "gloss": "",
+      "schemas": {},
+      "plugins": [],
+      "itemProviders": []
+    },
+    "documents": [],
+    "images": [],
+    "serverCommands": true
+  },
+  "source": "file:pack",
+  "installedAt": 1,
+  "installedHashes": {
+    "menus/shop.json": "0000000000000000000000000000000000000000000000000000000000000000"
+  }
+}

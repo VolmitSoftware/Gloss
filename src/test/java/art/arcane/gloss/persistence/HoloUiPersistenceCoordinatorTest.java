@@ -2,12 +2,14 @@ package art.arcane.gloss.persistence;
 
 import org.junit.Test;
 
+import java.io.IOException;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
@@ -15,6 +17,33 @@ import static org.junit.Assert.assertTrue;
 public class HoloUiPersistenceCoordinatorTest {
   /** Mirrors {@code GlossPersistenceCoordinator.EXTERNAL_TRANSACTION_TTL_MS}. */
   private static final long TTL_MILLIS = 120_000L;
+
+  @Test
+  public void writeExternallyHoldsThePermitForTheBodyAndReleasesItAfterwards() throws Exception {
+    GlossPersistenceCoordinator coordinator = new GlossPersistenceCoordinator();
+    AtomicBoolean pausedDuring = new AtomicBoolean();
+
+    String result = coordinator.writeExternally(() -> {
+      pausedDuring.set(coordinator.watcherPaused());
+      return "written";
+    });
+
+    assertTrue(pausedDuring.get());
+    assertEquals("written", result);
+    assertFalse(coordinator.watcherPaused());
+    coordinator.beginExternalTransaction().close();
+  }
+
+  @Test
+  public void writeExternallyReleasesThePermitWhenTheBodyThrows() {
+    GlossPersistenceCoordinator coordinator = new GlossPersistenceCoordinator();
+
+    assertThrows(IOException.class, () -> coordinator.writeExternally(() -> {
+      throw new IOException("disk full");
+    }));
+
+    assertFalse(coordinator.watcherPaused());
+  }
 
   @Test
   public void externalTransactionPausesWatchersAndSerializesOrdinaryWriters() throws Exception {

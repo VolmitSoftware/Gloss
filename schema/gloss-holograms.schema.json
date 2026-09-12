@@ -35,13 +35,35 @@
       }
     },
     "lines": {
+      "description": "Authored lines, top to bottom. A string is a text row; an object carries an item, head, block or entity drawn under the text column.",
       "type": "array",
       "items": {
-        "type": [
-          "string",
-          "null"
-        ]
+        "$ref": "#/$defs/line"
       }
+    },
+    "pages": {
+      "description": "Pages replacing lines. Each viewer reads one page; navigate with mode page.",
+      "type": "array",
+      "maxItems": 64,
+      "items": {
+        "$ref": "#/$defs/page"
+      }
+    },
+    "actions": {
+      "description": "Actions run when a viewer clicks the hologram's interaction box.",
+      "type": "array",
+      "maxItems": 32,
+      "items": {
+        "$ref": "#/$defs/action"
+      }
+    },
+    "hitbox": {
+      "$ref": "#/$defs/hitbox"
+    },
+    "motion": {
+      "description": "Motion document played on this hologram as bone root.",
+      "type": "string",
+      "minLength": 1
     },
     "style": {
       "$ref": "#/$defs/iconDisplayStyle"
@@ -435,6 +457,162 @@
         }
       ],
       "description": "Boolean or Gloss boolean expression. Entity variables include entity.name, named, type, health, maxHealth, healthPercent (0..100), damage, damaged, attack, armor, stackCount, distance, and insight.active. Viewer, world, server, time, permissions, groups, regions and integration functions use the shared condition scope."
+    },
+    "line": {
+      "title": "Hologram Line",
+      "description": "A text row, or an object with exactly one of text, item, head, block or entity.",
+      "oneOf": [
+        {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "text": {
+              "description": "Text row source, run through the text pipeline.",
+              "type": "string"
+            },
+            "item": {
+              "description": "Menu icon data drawn as an item display.",
+              "type": "object"
+            },
+            "head": {
+              "description": "Player name whose head is drawn.",
+              "type": "string",
+              "minLength": 1
+            },
+            "block": {
+              "description": "Block key drawn as a block display.",
+              "type": "string",
+              "pattern": "^([a-z0-9_.-]+:)?[a-z0-9_./-]+$"
+            },
+            "entity": {
+              "description": "Entity type drawn as a raw packet entity.",
+              "type": "string",
+              "minLength": 1
+            },
+            "show": {
+              "$ref": "#/$defs/show",
+              "description": "Per-viewer condition; text rows only."
+            },
+            "scale": {
+              "description": "Row height in blocks for object lines.",
+              "type": "number",
+              "minimum": 0.01,
+              "maximum": 64,
+              "default": 1
+            }
+          }
+        }
+      ]
+    },
+    "page": {
+      "title": "Hologram Page",
+      "type": "object",
+      "required": [
+        "id",
+        "lines"
+      ],
+      "properties": {
+        "id": {
+          "description": "Page id used by navigate targets.",
+          "type": "string",
+          "minLength": 1
+        },
+        "lines": {
+          "description": "Lines shown while a viewer reads this page.",
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/line"
+          }
+        }
+      }
+    },
+    "hitbox": {
+      "title": "Hologram Hitbox",
+      "description": "The interaction box spawned for viewers within range when the hologram declares actions.",
+      "type": "object",
+      "properties": {
+        "width": {
+          "description": "Box width in blocks.",
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 64,
+          "default": 1.2
+        },
+        "height": {
+          "description": "Box height per row in blocks.",
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 64,
+          "default": 0.35
+        },
+        "perLine": {
+          "description": "One box per rendered row, each carrying its line index.",
+          "type": "boolean",
+          "default": false
+        }
+      }
+    },
+    "action": {
+      "title": "Hologram Action",
+      "description": "Same shape as a menu action. Navigation additionally accepts mode page with target next, prev or a page id.",
+      "type": "object",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "description": "Action type.",
+          "type": "string",
+          "minLength": 1
+        },
+        "trigger": {
+          "description": "Click binding. Omitted matches every accepted main-hand click.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "any",
+            "left_click",
+            "right_click",
+            "shift_left_click",
+            "shift_right_click",
+            null
+          ]
+        },
+        "mode": {
+          "description": "Navigation mode; page moves the clicking viewer between hologram pages.",
+          "type": "string",
+          "enum": [
+            "push",
+            "replace",
+            "back",
+            "home",
+            "close",
+            "page"
+          ]
+        },
+        "target": {
+          "description": "Navigation target; for mode page this is next, prev or a page id.",
+          "type": "string"
+        },
+        "when": {
+          "description": "Condition evaluated for the clicking player before this action runs.",
+          "type": "string"
+        },
+        "cooldownTicks": {
+          "description": "Per-player cooldown in ticks after this action runs.",
+          "type": "integer",
+          "minimum": 0
+        }
+      }
     }
   }
 }

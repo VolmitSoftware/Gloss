@@ -1,6 +1,8 @@
 package art.arcane.gloss.indicator;
 
 import art.arcane.gloss.Gloss;
+import art.arcane.gloss.bedrock.BedrockPolicy;
+import art.arcane.gloss.bedrock.BedrockSurface;
 import art.arcane.gloss.GlossConfig;
 import art.arcane.gloss.api.HologramPresentation;
 import art.arcane.gloss.api.TemporaryHologram;
@@ -10,6 +12,7 @@ import art.arcane.gloss.condition.GlossConditionScope;
 import art.arcane.gloss.doc.DocumentDelta;
 import art.arcane.gloss.doc.DocumentRegistry;
 import art.arcane.gloss.doc.GlossDocument;
+import art.arcane.gloss.doc.RegistryOwner;
 import art.arcane.gloss.doc.ShippedDefaults;
 import art.arcane.gloss.doc.ShippedDocumentCatalog;
 import art.arcane.gloss.service.AdmissionBudget;
@@ -46,7 +49,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Supplier;
 
-public final class DamageIndicatorsService implements Listener {
+public final class DamageIndicatorsService implements Listener, RegistryOwner {
     private static final long DEBOUNCE_MS = 150L;
     private static final long SAMPLE_DELAY_TICKS = 2L;
     private static final int DRIVER_INTERVAL_TICKS = 2;
@@ -455,6 +458,12 @@ public final class DamageIndicatorsService implements Listener {
             });
     }
 
+    /** Indicators are text displays; a Bedrock viewer renders nothing, so it never joins one. */
+    private boolean hiddenOnBedrock(Player viewer) {
+        BedrockPolicy policy = BedrockPolicy.of(plugin);
+        return policy != null && policy.hides(BedrockSurface.INDICATOR, viewer);
+    }
+
     private void reevaluateViewer(Player viewer) {
         if (!listening || !viewer.isOnline() || index.isEmpty()) {
             return;
@@ -570,7 +579,7 @@ public final class DamageIndicatorsService implements Listener {
             }
             GlossConditionContext context = new GlossConditionContext(
                 viewer, null, null, viewerLocation, eventValues);
-            boolean included = conditions.includesViewer(
+            boolean included = !hiddenOnBedrock(viewer) && conditions.includesViewer(
                 new GlossConditionScope(plugin, context), conditionErrors);
             if (included) {
                 hologram.viewers().add(viewer.getUniqueId());
@@ -599,4 +608,9 @@ public final class DamageIndicatorsService implements Listener {
         }
     }
 
+
+    @Override
+    public Map<String, DocumentRegistry<?>> registries() {
+        return Map.of("damage-indicators", settings);
+    }
 }

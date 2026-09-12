@@ -1,5 +1,6 @@
 package art.arcane.gloss.menu.icon;
 
+import java.util.Map;
 import art.arcane.gloss.condition.ShowCondition;
 import art.arcane.gloss.config.MenuComponentData;
 import art.arcane.gloss.config.MenuDefinitionData;
@@ -39,7 +40,7 @@ public class TextImageMenuIconGeometryTest {
         false,
         List.<MenuComponentData>of(),
         List.of(), ShowCondition.ALWAYS
-    );
+    , Map.of());
     definition.setId("image-geometry");
     MenuSession session = new MenuSession(
         definition,

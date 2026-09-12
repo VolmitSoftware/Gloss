@@ -104,7 +104,7 @@ class TablistSweepStripeTest {
             new TablistDoc.ListNames(true, ShowCondition.ALWAYS,
                 new TablistDoc.ListNamePresentation("$player"),
                 List.of(new TablistDoc.ListNameVariant("staff", 10, "viewer.level > 5",
-                    new TablistDoc.ListNamePresentation("&c[$group] |animation.rainbow| $player")))));
+                    new TablistDoc.ListNamePresentation("&c[$group] |animation.rainbow| $player")))), null, null);
         TablistRuntime runtime = TablistRuntime.compile(doc);
 
         TablistRuntime.ListNameProfile staff = runtime.listName(
@@ -123,7 +123,7 @@ class TablistSweepStripeTest {
             new TablistDoc.HeaderFooter(false, ShowCondition.ALWAYS,
                 new TablistDoc.HeaderFooterPresentation("", ""), List.of()),
             new TablistDoc.ListNames(true, ShowCondition.ALWAYS,
-                new TablistDoc.ListNamePresentation(format), List.of()));
+                new TablistDoc.ListNamePresentation(format), List.of()), null, null);
     }
 
     private static ExprScope scope() {

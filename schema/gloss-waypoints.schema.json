@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://volmit.art/schema/gloss-waypoints.schema.json",
+  "title": "Gloss Waypoint Document",
+  "description": "One locator-bar entry in waypoints/. Clients older than the version that shipped the locator bar, and Bedrock viewers, are skipped.",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "revision",
+    "anchor"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "show": {
+      "type": [
+        "string",
+        "boolean"
+      ]
+    },
+    "anchor": {
+      "$ref": "gloss-markers.schema.json#/$defs/anchor"
+    },
+    "color": {
+      "type": "string",
+      "pattern": "^#[0-9a-fA-F]{6}$"
+    },
+    "style": {
+      "type": "string",
+      "enum": [
+        "default",
+        "bowtie"
+      ]
+    },
+    "range": {
+      "description": "Blocks beyond which the client is given a bearing instead of the exact position. Zero always sends the position.",
+      "type": "number",
+      "minimum": 0
+    },
+    "audience": {
+      "$ref": "gloss-markers.schema.json#/$defs/audience"
+    }
+  }
+}

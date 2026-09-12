@@ -23,7 +23,7 @@ public final class MenuNavigationHistory {
       case PUSH, REPLACE -> pushTarget;
       case BACK -> lastMenuId;
       case HOME -> rootMenuId;
-      case CLOSE -> null;
+      case CLOSE, PAGE -> null;
     };
   }
 
@@ -50,7 +50,7 @@ public final class MenuNavigationHistory {
       }
       case BACK -> entries.pollFirst();
       case HOME -> entries.clear();
-      case REPLACE, CLOSE -> {
+      case REPLACE, CLOSE, PAGE -> {
       }
     }
   }

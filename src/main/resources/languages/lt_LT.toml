@@ -826,3 +826,517 @@ line = "Eilutė {line}"
 [language.editor.value]
 none = "Nėra"
 empty = "(tuščia)"
+
+# Lane message tables. Each lane appends its [gloss.message.<lane>] and [command.help.<group>]
+# tables inside its own anchor so parallel branches never share a line.
+# --- lane:screen ---
+[gloss.message.screen]
+"surfaces.empty" = "&8[&dGloss&8] &7Nėra įkeltų paviršių."
+"surfaces.unknown" = "&8[&dGloss&8]: &cNėra paviršiaus pavadinimu &f{id}&c."
+"surfaces.tested" = "&8[&dGloss&8]: &a&f{id}&a paleistas žaidėjui &f{player}&a."
+"nametags.empty" = "&8[&dGloss&8] &7Nėra įkeltų vardo kortelių."
+"nametags.unknown" = "&8[&dGloss&8]: &cNėra vardo kortelės pavadinimu &f{id}&c."
+"nametags.refreshed" = "&8[&dGloss&8]: &aIš naujo pritaikyta &d{count}&a vardo kortelių dokumentų."
+"hud.header" = "&8[&dGloss&8] &7HUD užimtumas žaidėjui &f{player}&7: &d{count}"
+"hud.empty" = "&8[&dGloss&8] &7Joks papildinys neužima HUD vietos žaidėjui &f{player}&7."
+"hud.line" = "&8- &f{kind} &7{source} &8| &7{value} &8| &7{count} &8| &7{state}"
+"player.unknown" = "&8[&dGloss&8]: &cNėra prisijungusio žaidėjo vardu &f{player}&c."
+
+[command.help.surface]
+root = "Veiksmų juostos, boso juostos ir antraštės paviršiai"
+list = "Išvardyti paviršių dokumentus"
+info = "Rodyti paviršiaus dokumentą"
+"info.id" = "Paviršiaus dokumento ID"
+reset = "Atkurti pridėtus paviršius"
+test = "Dabar paleisti paviršių ciklą vienam žaidėjui"
+"test.id" = "Paviršiaus dokumento ID"
+"test.player" = "Tikrinamas žaidėjas; numatytai tu"
+
+[command.help.nametag]
+root = "Vardo kortelių dokumentai kiekvienam stebėtojui"
+list = "Išvardyti vardo kortelių dokumentus"
+info = "Rodyti vardo kortelės dokumentą"
+"info.id" = "Vardo kortelės dokumento ID"
+reset = "Atkurti pridėtas vardo korteles"
+refresh = "Dabar iš naujo pritaikyti visas vardo korteles"
+
+[command.help.hud]
+root = "Tikrinti bendrą HUD kompozitorių"
+who = "Rodo, kuris papildinys užima kiekvieną HUD vietą"
+"who.player" = "Tikrinamas žaidėjas; numatytai tu"
+
+# --- lane:chat ---
+[gloss.message.chat]
+filtered = "&8[&dGloss&8]: &cPokalbių filtras užblokavo tavo žinutę."
+too_fast = "&8[&dGloss&8]: &ePalauk akimirką prieš siųsdamas kitą žinutę."
+repeat = "&8[&dGloss&8]: &eTą jau ką tik pasakei."
+channel_set = "&8[&dGloss&8]: &aDabar kalbi kanale &d{name}&a."
+channel_unknown = "&8[&dGloss&8]: &cNėra kanalo, pavadinto &d{name}&c."
+channel_list = "&8[&dGloss&8]: &7Kanalai: &f{value}"
+msg_usage = "&8[&dGloss&8]: &eNaudojimas: &f{command}"
+msg_offline = "&8[&dGloss&8]: &c{player} nėra prisijungęs."
+reply_none = "&8[&dGloss&8]: &cNeturi kam atsakyti."
+msg_self = "&8[&dGloss&8]: &cNegali siųsti žinutės sau."
+channels_header = "&dKanalai &7({count})"
+channels_empty = "&7Nėra įkeltų kanalų."
+channel_missing = "&8[&dGloss&8]: &cNėra kanalo dokumento, pavadinto &f{id}&c."
+strings_header = "&dTekstų lokalės &7({count})"
+strings_empty = "&7Nėra įkeltų tekstų dokumentų."
+strings_missing = "&dTrūksta lokalėje {locale} &7({count})"
+strings_complete = "&8[&dGloss&8]: &a{locale} apima visus en_US raktus."
+leaderboards_header = "&dLyderių lentelės &7({count})"
+leaderboards_empty = "&7Nėra įkeltų lyderių lentelių."
+leaderboard_missing = "&8[&dGloss&8]: &cNėra lyderių lentelės, pavadintos &f{id}&c."
+leaderboard_reset = "&8[&dGloss&8]: &aLyderių lentelė &f{id}&a atstatyta ({state})."
+leaderboard_sampled = "&8[&dGloss&8]: &aLyderių lentelė &f{id}&a nuskaityta visiems prisijungusiems žaidėjams."
+
+
+[command.help.channel]
+root = "Pokalbių kanalai"
+list = "Išvardyti įkeltus pokalbių kanalus"
+info = "Parodyti kanalo aprėptį, formatą ir variantus"
+"info.id" = "Kanalo dokumento ID"
+reset = "Atkurti pateiktus kanalų dokumentus"
+
+[command.help.strings]
+root = "Sukurti turinio tekstai"
+list = "Išvardyti įkeltas tekstų lokales ir jų įrašų skaičių"
+missing = "Išvardyti raktus, kuriuos turi en_US, o lokalė ne"
+"missing.locale" = "Lokalė, lyginama su en_US"
+reset = "Atkurti pateiktus tekstų dokumentus"
+
+[command.help.leaderboard]
+root = "Apskaičiuotos lyderių lentelės"
+list = "Išvardyti įkeltas lyderių lenteles ir jų įrašus"
+info = "Parodyti lyderių lentelės šaltinį, tvarką ir įrašus"
+"info.id" = "Dokumento ID"
+reset = "Išvalyti lyderių lentelės laikotarpio arba visų laikų reikšmes"
+"reset.id" = "Dokumento ID"
+"reset.period" = "all arba current"
+sample = "Nuskaityti lyderių lentelę dabar visiems prisijungusiems"
+"sample.id" = "Dokumento ID"
+
+# --- lane:forms ---
+[gloss.message.forms]
+icon_unsupported = "&7Negalima pavaizduoti skrynios langelyje ({kind})"
+no_dialogs = "&8[&dGloss&8]: &7Nesukonfigūruota jokių dialogų."
+dialog_list_header = "&dDialogai"
+dialog_list_entry = "&7Atidaryti dialogą &f{id}"
+dialog_info = "&8[&dGloss&8]: &d{id} &8- &7tipas &f{kind}&7, mygtukai &f{count}"
+unknown_dialog = "&8[&dGloss&8]: &cNėra dialogo pavadinimu {id}."
+dialog_opened = "&8[&dGloss&8]: &aDialogas {id} atidarytas žaidėjui {player}."
+dialog_unsupported = "&8[&dGloss&8]: &cTavo klientas negali parodyti šio dialogo."
+no_inventories = "&8[&dGloss&8]: &7Nesukonfigūruota jokių skrynios meniu."
+inventory_list_header = "&dSkrynios meniu"
+inventory_list_entry = "&7Atidaryti skrynios meniu &f{id}"
+inventory_info = "&8[&dGloss&8]: &d{id} &8- &7dydis &f{kind}&7, langeliai &f{count}"
+unknown_inventory = "&8[&dGloss&8]: &cNėra skrynios meniu pavadinimu {id}."
+inventory_opened = "&8[&dGloss&8]: &aSkrynios meniu {id} atidarytas žaidėjui {player}."
+bad_args = "&8[&dGloss&8]: &cArgumentai turi būti raktas=reikšmė poros: {value}"
+prompt_timeout = "&8[&dGloss&8]: &7Įvesties laikas baigėsi."
+prompt_busy = "&8[&dGloss&8]: &cJau turi laukiančią įvestį."
+take_missing = "&8[&dGloss&8]: &cNeturi reikiamų daiktų."
+economy_denied = "&8[&dGloss&8]: &cNeturi tam pakankamai lėšų."
+economy_unavailable = "&8[&dGloss&8]: &cNėra prieinamo ekonomikos įskiepio."
+give_dropped = "&8[&dGloss&8]: &7Tavo inventorius buvo pilnas, todėl daiktai nukrito prie kojų."
+
+[command.help.dialog]
+root = "Peržiūrėti ir atidaryti dialogų dokumentus"
+list = "Išvardyti sukonfigūruotus dialogus"
+"list.page" = "Sąrašo puslapis, skaičiuojant nuo 1"
+info = "Rodyti dialogo tipą, įvestis ir mygtukus"
+"info.id" = "Dialogo ID"
+open = "Atidaryti dialogą žaidėjui"
+"open.id" = "Dialogo ID"
+"open.player" = "Žaidėjas, kuriam atidaryti; numatytasis – tu"
+"open.args" = "Tarpais atskirti raktas=reikšmė argumentai"
+reset = "Atkurti pateiktus dialogų numatytuosius failus"
+"reset.name" = "Atkurtinas pavadinimas arba * visiems pateiktiems failams"
+
+["command.help.menu.open"]
+args = "Tarpais atskirti raktas=reikšmė argumentai"
+
+[command.help.inventory]
+root = "Peržiūrėti ir atidaryti skrynios meniu"
+list = "Išvardyti sukonfigūruotus skrynios meniu"
+"list.page" = "Sąrašo puslapis, skaičiuojant nuo 1"
+info = "Rodyti skrynios meniu dydį ir langelius"
+"info.id" = "Skrynios meniu ID"
+open = "Atidaryti skrynios meniu žaidėjui"
+"open.id" = "Skrynios meniu ID"
+"open.player" = "Žaidėjas, kuriam atidaryti; numatytasis – tu"
+"open.args" = "Tarpais atskirti raktas=reikšmė argumentai"
+reset = "Atkurti pateiktus skrynios meniu numatytuosius failus"
+"reset.name" = "Atkurtinas pavadinimas arba * visiems pateiktiems failams"
+
+
+# --- lane:rigs ---
+[command.help.rig]
+root = "Dėti ir valdyti rig egzempliorius"
+list = "Rodyti rig'us ir padėtus egzempliorius; spustelėkite, kad teleportuotumėtės"
+info = "Rodyti rig egzemplioriaus rig'ą, padėtį ir būseną"
+"info.id" = "Rig egzemplioriaus ID"
+place = "Padėti rig'ą jūsų vietoje"
+"place.rig" = "Rig dokumento ID"
+"place.id" = "Egzemplioriaus ID; tuščias parenka kitą laisvą"
+move = "Perkelti rig egzempliorių santykiniais blokų atstumais"
+"move.id" = "Rig egzemplioriaus ID"
+"move.x" = "Santykinis X poslinkis blokais"
+"move.y" = "Santykinis Y poslinkis blokais"
+"move.z" = "Santykinis Z poslinkis blokais"
+here = "Perkelti rig egzempliorių į jūsų vietą"
+"here.id" = "Rig egzemplioriaus ID"
+rotate = "Nustatyti rig egzemplioriaus yaw ir pitch"
+"rotate.id" = "Rig egzemplioriaus ID"
+"rotate.yaw" = "Yaw laipsniais"
+"rotate.pitch" = "Pitch laipsniais"
+scale = "Nustatyti vienodą rig egzemplioriaus mastelį"
+"scale.id" = "Rig egzemplioriaus ID"
+"scale.scale" = "Mastelio daugiklis, nuo 0.01 iki 64"
+remove = "Pašalinti rig egzempliorių"
+"remove.id" = "Rig egzemplioriaus ID"
+state = "Perjungti rig egzempliorių į grafo būseną"
+"state.id" = "Rig egzemplioriaus ID"
+"state.state" = "Būsenos pavadinimas iš rig grafo"
+var = "Nustatyti rig egzemplioriaus kintamąjį"
+"var.id" = "Rig egzemplioriaus ID"
+"var.name" = "Kintamojo pavadinimas"
+"var.value" = "Skaičius, true, false arba tekstas"
+import = "Importuoti Blockbench modeli kaip riga"
+"import.file" = "Kelias iki .bbmodel Gloss duomenu aplanke"
+"import.id" = "Rigo id; tuscia naudoja failo pavadinima"
+"import.texture" = "Pasirinktinis daiktas provider:id kiekvienam kubui"
+reset = "Atkurti pridėtus rig dokumentus"
+
+["command.help.hologram"]
+page = "Perkelti zaideja i hologramos puslapi"
+"page.page" = "Puslapio id, next arba prev"
+"page.player" = "Zaidejo vardas; tuscia reiskia tave"
+motion = "Paleisti judesio klipa hologramoje"
+"motion.motion" = "Judesio id arba clear sustabdyti"
+actions = "Isvardyti veiksmus, kuriuos hologramoje paleidzia paspaudimas"
+
+[command.help.motion]
+root = "Peržiūrėti judesio klipus"
+list = "Rodyti judesio klipus"
+info = "Rodyti judesio klipo trukmę, ciklą, fps ir takelius"
+"info.id" = "Judesio ID"
+reset = "Atkurti pridėtus judesio dokumentus"
+
+[gloss.message.rigs]
+rig_unknown = "&8[&dGloss&8] &cNėra rig'o pavadinimu '&f{id}&c'."
+instance_missing = "&8[&dGloss&8] &cNėra rig egzemplioriaus pavadinimu '&f{id}&c'."
+placed = "&8[&dGloss&8] &aRig'as &f{name}&a padėtas kaip &f{id}&a ties &f{world} {x}, {y}, {z}&a."
+place_failed = "&8[&dGloss&8] &cNepavyko padėti rig'o &f{name}&c: {reason}"
+moved = "&8[&dGloss&8] &aRig egzempliorius &f{id}&a perkeltas į &f{world} {x}, {y}, {z}&a."
+rotated = "&8[&dGloss&8] &aRig egzempliorius &f{id}&a pasuktas: yaw &f{yaw}&a, pitch &f{pitch}&a."
+scaled = "&8[&dGloss&8] &aRig egzemplioriaus &f{id}&a mastelis nustatytas į &f{scale}&a."
+scale_out_of_range = "&8[&dGloss&8] &cRig mastelis turi būti tarp &f{minimum}&c ir &f{maximum}&c; gauta &f{value}&c."
+removed = "&8[&dGloss&8] &aRig egzempliorius &f{id}&a pašalintas."
+state_set = "&8[&dGloss&8] &aRig egzempliorius &f{id}&a dabar yra būsenoje &f{state}&a."
+state_unknown = "&8[&dGloss&8] &cRig egzempliorius &f{id}&c neturi būsenos pavadinimu '&f{state}&c'."
+var_set = "&8[&dGloss&8] &aRig egzemplioriaus &f{id}&a kintamasis &f{name}&a nustatytas į &f{value}&a."
+save_failed = "&8[&dGloss&8] &cNepavyko išsaugoti rig egzemplioriaus &f{id}&c: {reason}"
+list_empty = "&8[&dGloss&8] &7Rig'ų neįkelta."
+list_rigs = "&8[&dGloss&8] &7Rig'ai (&f{count}&7): &f{value}"
+instances_empty = "&8[&dGloss&8] &7Rig egzempliorių nepadėta."
+list_hover = "Spustelėkite, kad teleportuotumėtės"
+list_entry = "{name} ties {world} {x}, {y}, {z}; būsena {state}"
+info_header = "&8[&dGloss&8] &d{id} &7naudoja rig'ą &f{name}&7 ties &f{world} {x}, {y}, {z}"
+info_pose = "&8[&dGloss&8] &7Yaw &f{yaw}&7, pitch &f{pitch}&7, mastelis &f{scale}&7, būsena &f{state}"
+info_parts = "&8[&dGloss&8] &7Dalys &f{count}&7, žiūrovai &f{value}"
+info_var = "&8[&dGloss&8] &7  {name} = &f{value}"
+motion_unknown = "&8[&dGloss&8] &cNėra judesio pavadinimu '&f{id}&c'."
+motion_list_empty = "&8[&dGloss&8] &7Judesio klipų neįkelta."
+motion_list = "&8[&dGloss&8] &7Judesio klipai (&f{count}&7): &f{value}"
+motion_info = "&8[&dGloss&8] &d{id} &7{value} tikų, {kind}, {count} fps"
+motion_track = "&8[&dGloss&8] &7  {name} &f{key} &7({count} raktinių kadrų)"
+import_done = "&8[&dGloss&8] &aImportuota &f{id}&a: &f{value}&a kaulai, &f{count}&a dalys, &f{kind}&a animacijos."
+import_unsupported = "&8[&dGloss&8] &7Neimportuota: &f{value}&7."
+import_failed = "&8[&dGloss&8] &cNepavyko importuoti &f{path}&c: {reason}"
+hologram_page_set = "&8[&dGloss&8] &a{player}&a dabar yra &f{id}&a puslapyje &f{page}&a."
+hologram_page_player_missing = "&8[&dGloss&8] &cZaidejas &f{player}&c neprisijunges."
+hologram_page_unknown = "&8[&dGloss&8] &cHologramoje &f{id}&c nera puslapio '&f{page}&c'."
+hologram_motion_set = "&8[&dGloss&8] &aHologramoje &f{id}&a dabar grojama &f{value}&a."
+hologram_motion_cleared = "&8[&dGloss&8] &aHologramoje &f{id}&a judesys nebegrojamas."
+hologram_actions_empty = "&8[&dGloss&8] &7Hologramoje &f{id}&7 nera veiksmu."
+hologram_actions_header = "&8[&dGloss&8] &7Hologramos &f{id}&7 veiksmai (&f{count}&7):"
+hologram_actions_entry = "&8[&dGloss&8] &7  &f{kind}&7 ties &f{value}"
+
+# --- lane:world ---
+[gloss.message.world]
+players_only = "&cŠią komandą turi vykdyti žaidėjas."
+disabled = "&cŠi funkcija išjungta gloss.toml faile."
+
+[gloss.message.world.marker]
+list = "&7Žymekliai &8({count})&7: &f{value}"
+info = "&7Žymeklis &f{id} &7ties &f{world} {x} {y} {z}"
+created = "&aŽymeklis &f{id} &asukurtas."
+removed = "&aŽymeklis &f{id} &apašalintas."
+missing = "&cNėra žymeklio pavadinimu &f{id}&c."
+here = "&7Esi ties &f{world} {x} {y} {z}&7."
+
+[gloss.message.world.waypoint]
+saved = "&aKelio taškas &f{name} &aišsaugotas."
+removed = "&aKelio taškas &f{name} &apašalintas."
+missing = "&cNėra kelio taško pavadinimu &f{name}&c."
+list = "&7Kelio taškai &8({count})&7: &f{value}"
+info = "&7Kelio taškas &f{id} &7ties &f{world} {x} {y} {z}"
+full = "&cJau turi daugiausia {count} kelio taškų."
+
+[gloss.message.world.zone]
+list = "&7Zonos &8({count})&7: &f{value}"
+info = "&7Zona &f{id} &7yra &f{kind} &7pasaulyje &f{world}&7."
+shown = "&aRodoma zona &f{id}&a."
+hidden = "&7Slepiama zona &f{id}&7."
+created = "&aZona &f{id} &asukurta."
+removed = "&aZona &f{id} &apašalinta."
+missing = "&cNėra zonos pavadinimu &f{id}&c."
+
+[gloss.message.world.camera]
+started = "&7Kameros skrydis pradėtas."
+refused = "&cKameros skrydis buvo atmestas."
+stopped = "&7Kameros skrydis sustabdytas žaidėjui &f{player}&7."
+idle = "&c{player} nedalyvauja kameros skrydyje."
+
+[gloss.message.world.nameplate]
+list = "&7Vardo lentelės &8({count})&7: &f{value}"
+info = "&7Vardo lentelė &f{id} &7prioritetas &f{value}&7, &f{count} &7eilutės."
+missing = "&cNėra vardo lentelės pavadinimu &f{id}&c."
+refreshed = "&aVardo lentelės atnaujintos."
+
+[gloss.message.world.glow]
+set = "&f{target} &7dabar šviečia &f{value} &aspalva."
+cleared = "&7Švytėjimas nuo &f{target} &7pašalintas."
+missing = "&cŽaidėjo pavadinimu &f{player} &cnėra prisijungusio."
+
+[command.help.marker]
+root = "Pasaulio žymeklių įrankiai"
+list = "Išvardyti žymeklių dokumentus"
+info = "Parodyti vieną žymeklį"
+create = "Įrašyti žymeklio dokumentą tavo vietoje"
+remove = "Ištrinti žymeklio dokumentą"
+here = "Parodyti tavo vietą kaip inkaro koordinates"
+
+[command.help.marker.arg]
+id = "Žymeklio dokumento ID"
+label = "Etiketė virš žymeklio"
+
+[command.help.waypoint]
+root = "Vietos juostos kelio taškų įrankiai"
+set = "Išsaugoti tavo vietą kaip asmeninį kelio tašką"
+remove = "Ištrinti vieną iš tavo asmeninių kelio taškų"
+list = "Išvardyti tavo asmeninius kelio taškus"
+info = "Parodyti vieną kelio taško dokumentą"
+
+[command.help.waypoint.arg]
+name = "Kelio taško pavadinimas"
+id = "Kelio taško dokumento ID"
+
+[command.help.zone]
+root = "Zonų kontūrų įrankiai"
+list = "Išvardyti zonas"
+info = "Parodyti vieną zoną"
+show = "Parodyti sau zonos kontūrą"
+hide = "Paslėpti nuo savęs zonos kontūrą"
+create = "Įrašyti stačiakampės zonos dokumentą aplink tavo vietą"
+remove = "Ištrinti zonos dokumentą"
+
+[command.help.zone.arg]
+id = "Zonos dokumento ID"
+radius = "Pusė pločio blokais"
+
+[command.help.camera]
+root = "Kameros skrydžių įrankiai"
+test = "Nuskristi demonstracinį maršrutą aplink save"
+stop = "Anksti baigti kameros skrydį"
+
+[command.help.camera.arg]
+seconds = "Skrydžio trukmė sekundėmis"
+player = "Kurį sustabdyti; numatyta – tu"
+
+[command.help.nameplate]
+root = "Žaidėjų vardo lentelių įrankiai"
+list = "Išvardyti vardo lentelių dokumentus"
+info = "Parodyti vieną vardo lentelės dokumentą"
+reset = "Atkurti pridedamą vardo lentelės dokumentą"
+refresh = "Perkurti vardo lenteles visiems žiūrovams"
+
+[command.help.nameplate.arg]
+id = "Vardo lentelės dokumento ID"
+
+[command.help.glow]
+root = "Objektų švytėjimo įrankiai"
+set = "Priversti žaidėją švytėti tau"
+clear = "Pašalinti žaidėjo švytėjimą tau"
+
+[command.help.glow.arg]
+player = "Žaidėjas, kurį apvesti"
+cleared = "Žaidėjas, kurio apvedimas nuimamas"
+color = "Pavadinta teksto spalva"
+ticks = "Tiktai, kiek trunka švytėjimas, arba 0, kad liktų"
+
+# --- lane:behaviors ---
+[command.help.behavior]
+root = "Perziureti ir paleisti elgsenos dokumentus"
+list = "Isvardyti ikeltus elgsenos dokumentus"
+info = "Parodyti elgsenos dokumento paleidiklius ir salygas"
+fire = "Paleisti viena elgsenos irasa dabar"
+reset = "Atkurti pateiktus elgsenos numatytuosius"
+id = "Elgsenos dokumento ID"
+entry = "Iraso numeris, pradedant nuo 1"
+player = "Zaidejas, kuriam vykdomas irasas, arba * jokiam"
+
+[command.help.state]
+root = "Skaityti ir rasyti issaugota elgsenos busena"
+get = "Parodyti viena busenos reiksme"
+set = "Irasyti viena busenos reiksme"
+clear = "Grazinti viena busenos reiksme i numatytaja"
+dump = "Isvardyti visus paskelbtus busenos raktus ir ju reiksmes"
+key = "Paskelbtas busenos raktas"
+value = "Nauja reiksme; rasykite kabutese, kad itrauktumete tarpus"
+player = "Zaidejas, kuriam priklauso reiksme, arba * sau"
+
+[command.help.do]
+root = "Paleisti siuo pavadinimu paskelbtus command elgsenos irasus"
+name = "Elgsenos komandos pavadinimas"
+args = "Argumentai kaip raktas=reiksme poros; rasykite kabutese, kad itrauktumete tarpus"
+
+[command.help.expr]
+root = "Ivertinti israiska ir parodyti, kas i ja atsake"
+expression = "Vertinama israiska; rasykite kabutese, kad itrauktumete tarpus"
+
+[command.help.explain]
+root = "Parodyti, kokias salygas vykdykle tikrino ir kuri laimejo"
+kind = "Aiskinama vykdykle, pavyzdziui board arba behavior"
+id = "Aiskinamo dokumento ID"
+player = "Zaidejas, kuriam aiskinama, arba * sau"
+
+[gloss.message.behaviors]
+off = "&8[&dGloss&8]: &eElgsenos isjungtos per features.behaviors."
+"list.empty" = "&8[&dGloss&8]: &7Nera ikeltu elgsenos dokumentu."
+missing = "&8[&dGloss&8]: &cNera elgsenos dokumento \"{id}\"."
+"info.header" = "&8[&dGloss&8]: &d{id} &7revizija &f{revision} &8| &7irasai &f{count} &8| &7ijungta &f{enabled}"
+"info.entry" = " &8{line}. &f{name} &7kai &f{when} &8| &7teise &f{permission}"
+fired = "&8[&dGloss&8]: &aIvykdytas &f{id}&a irasas &f{line}&a."
+"fire.missing" = "&8[&dGloss&8]: &c{id} neturi iraso {line}."
+"do.ran" = "&8[&dGloss&8]: &aPaleista &f{count}&a elgsenos irasu pavadinimui &f{name}&a."
+"do.none" = "&8[&dGloss&8]: &7Joks elgsenos irasas neatsako i komanda \"{name}\"."
+"state.value" = " &7{key} &8= &f{value}"
+"state.set" = "&8[&dGloss&8]: &a{key} dabar yra &f{value}&a."
+"state.cleared" = "&8[&dGloss&8]: &a{key} grazintas i numatytaja reiksme."
+"state.unknown" = "&8[&dGloss&8]: &cJoks elgsenos dokumentas neskelbia busenos rakto \"{key}\"."
+"state.invalid" = "&8[&dGloss&8]: &c\"{value}\" nera {type} reiksme."
+"state.empty" = "&8[&dGloss&8]: &7Joks elgsenos dokumentas neskelbia busenos."
+"state.player" = "&8[&dGloss&8]: &cNurodykite zaideja: &f{key}&c nera globalus raktas."
+"player.missing" = "&8[&dGloss&8]: &cNera prisijungusio zaidejo \"{player}\"."
+"expr.value" = "&8[&dGloss&8]: &f{value} &8({type})"
+"expr.reference" = " &7{name} &8= &f{value} &8is &7{source}"
+"expr.functions" = " &7funkcijos &8= &f{value}"
+"expr.failed" = "&8[&dGloss&8]: &c{reason}"
+"explain.header" = "&8[&dGloss&8]: &d{kind} &f{id} &7zaidejui &f{player}"
+"explain.line" = " &8{path} &7{when} &8= &f{value}"
+"explain.winner" = " &a> &f{path} &7{when} &8= &f{value}"
+"explain.unknown" = "&8[&dGloss&8]: &cNiekas nepaaiskina \"{kind}\"; pabandykite {options}."
+"explain.missing" = "&8[&dGloss&8]: &cNera {kind} pavadinimu \"{id}\"."
+
+# --- lane:authoring ---
+[command.help.pack]
+root = "Diegti ir tvarkyti Gloss paketus"
+install = "Įdiegti paketą iš failo arba HTTPS adreso"
+update = "Atnaujinti įdiegtą paketą iš jo šaltinio"
+remove = "Pašalinti paketą paliekant kiekvieną po įdiegimo redaguotą failą"
+list = "Išvardyti įdiegtus paketus"
+info = "Parodyti, kurie failai priklauso paketui"
+arg_source = "Paketo failas Gloss duomenų aplanke arba HTTPS adresas"
+arg_dry = "Pranešti, kas pasikeistų, nieko nerašant"
+arg_id = "Įdiegto paketo id"
+
+[command.help.history]
+root = "Išvardyti išsaugotas dokumento versijas"
+arg_kind = "Dokumento aplankas, pavyzdžiui boards arba menus"
+arg_id = "Dokumento id"
+arg_page = "Nuo vieneto skaičiuojamas sąrašo puslapis"
+
+[command.help.restore]
+root = "Įrašyti išsaugotą versiją ant veikiančio dokumento"
+arg_version = "Versijos žyma iš /gloss history"
+
+[command.help.check]
+root = "Patikrinti darbo srities nutrūkusias nuorodas"
+arg_kind = "Apriboti patikrą vienu dokumentų aplanku"
+arg_id = "Apriboti patikrą vienu dokumentu"
+
+[command.help.export]
+root = "Kopijuoti dokumentus kaip gryną JSON"
+bundle = "Įrašyti visą darbo sritį kaip redaktoriaus rinkinį"
+arg_kind = "Apriboti eksportą vienu dokumentų aplanku"
+arg_id = "Apriboti eksportą vienu dokumentu"
+arg_dir = "Paskirties aplankas Gloss duomenų aplanke"
+
+[gloss.message.authoring.pack]
+preview = "&8[&dGloss&8] Paketas &f{id}&7 pakeistų &f{count}&7 failą (-us)."
+outcome = "&8[&dGloss&8] &7{state} &f{path}&7 {reason}"
+installed = "&8[&dGloss&8] Paketas &f{id}&7 įdiegtas su &f{count}&7 failu (-ais)."
+updated = "&8[&dGloss&8] Paketas &f{id}&7 atnaujintas &f{count}&7 faile (-uose)."
+removed = "&8[&dGloss&8] Paketas &f{id}&7 ir &f{count}&7 failas (-ai) pašalinti."
+unknown = "&8[&dGloss&8] &cNėra įdiegto paketo su id &f{id}&c."
+failed = "&8[&dGloss&8] &cPaketas &f{id}&c nepavyko: {reason}"
+entry = "&8[&dGloss&8] &f{id} &7{value} &8{count} failas (-ai)"
+empty = "&8[&dGloss&8] &7Nėra įdiegtų paketų."
+disabled = "&8[&dGloss&8] &cGloss paketai išjungti gloss.toml faile."
+
+[gloss.message.authoring.history]
+empty = "&8[&dGloss&8] &7Nėra išsaugotų &f{kind} {id}&7 versijų."
+entry = "&8[&dGloss&8] &f{revision} &7{source} &8{count} baitų"
+disabled = "&8[&dGloss&8] &cDokumentų istorija išjungta gloss.toml faile."
+
+[gloss.message.authoring.restore]
+done = "&8[&dGloss&8] &f{kind} {id}&7 atkurtas į versiją &f{revision}&7."
+unknown = "&8[&dGloss&8] &cNėra &f{kind} {id}&c versijos &f{revision}&c."
+failed = "&8[&dGloss&8] &cAtkūrimas nepavyko: {reason}"
+
+[gloss.message.authoring.check]
+clean = "&8[&dGloss&8] &aNėra apie ką pranešti."
+entry = "&8[&dGloss&8] &7{state} &f{key} &8{kind} {id} {path} &7{message}"
+summary = "&8[&dGloss&8] &f{count}&7 radinys (-iai)."
+
+[gloss.message.authoring.export]
+done = "&8[&dGloss&8] &f{count}&7 dokumentas (-ai) eksportuotas į &f{path}&7."
+failed = "&8[&dGloss&8] &cEksportas nepavyko: {reason}"
+
+[gloss.message.authoring.import]
+preview = "&8[&dGloss&8] &f{source}&7 įrašytų &f{count}&7 dokumentą (-us)."
+entry = "&8[&dGloss&8] &7{state} &f{path}&7 {reason}"
+applied = "&8[&dGloss&8] &f{count}&7 dokumentas (-ai) importuotas iš &f{source}&7."
+absent = "&8[&dGloss&8] &7Kelyje &f{path}&7 nėra &f{source}&7 duomenų."
+
+# --- lane:forge ---
+[gloss.message.forge]
+disabled = "&8[&dGloss&8] &cGlifų kalvė išjungta. Faile gloss.toml nustatykite features.forge į true."
+built = "&8[&dGloss&8] &aPaketas &f{value}&a sukurtas su {count} glifų."
+build_failed = "&8[&dGloss&8] &cNepavyko sukurti paketo; lieka ankstesnis paketas. Žiūrėkite konsolę."
+status = "&7{value}"
+exported = "&8[&dGloss&8] &aEksportuota {count} failų į &f{path}&a."
+export_failed = "&8[&dGloss&8] &cEksportas nepavyko: &f{reason}&c."
+serve = "&8[&dGloss&8] &aPaketo klausytuvas {state}."
+serve_unchanged = "&8[&dGloss&8] &7Paketo klausytuvas jau {state}."
+
+[command.help.forge]
+root = "Glifų paketo įrankiai"
+build = "Perkurti glifų išteklių paketą dabar"
+status = "Rodyti paketo, glifų ir pristatymo skaičius"
+export = "Nukopijuoti sujungiamo paketo aplanką"
+"export.path" = "Paskirties aplankas paketui"
+serve = "Paleisti arba sustabdyti įtaisytą paketo klausytuvą"
+"serve.state" = "on arba off"
+reset = "Atkurti pateiktus glifų dokumentus"
+
+# --- lane:fixes ---
+[gloss.message.fixes]
+status_bedrock = "&7bedrock: &f{name}&7, &f{count}&7 prisijungę"
+status_textimage_oversize = "&7textimage-per-didelis: &f{count}"
+hotload_skipped = " &7({count} ignoruota, netinkama schemaVersion)"
+status_schema_skipped = "&7schema-praleista: &f{count}"
+bedrock_menu_unavailable = "&8[&dGloss&8]: &cŠis meniu Bedrock versijoje nerodomas."
+

@@ -19,7 +19,8 @@ public record ButtonComponentData(
     MenuIconData iconData,
     HitboxData hitbox,
     Integer hoverDurationTicks,
-    HoverEasing hoverEasing
+    HoverEasing hoverEasing,
+    TooltipData tooltip
 ) implements ComponentData {
 
   public static final int DEFAULT_HOVER_DURATION_TICKS = 4;
@@ -48,6 +49,17 @@ public record ButtonComponentData(
 
   public MenuComponentType getType() {
     return MenuComponentType.BUTTON;
+  }
+
+  /** A secondary pane shown after the viewer has hovered this button for {@code delayTicks}. */
+  public record TooltipData(Integer delayTicks, java.util.List<String> lines) {
+    public static final int DEFAULT_DELAY_TICKS = 10;
+    public static final int MAX_DELAY_TICKS = 200;
+
+    public TooltipData {
+      delayTicks = delayTicks == null ? DEFAULT_DELAY_TICKS : Math.clamp(delayTicks.intValue(), 0, MAX_DELAY_TICKS);
+      lines = lines == null ? java.util.List.of() : java.util.List.copyOf(lines);
+    }
   }
 
   @Override

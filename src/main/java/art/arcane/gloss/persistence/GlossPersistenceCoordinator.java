@@ -2,6 +2,7 @@ package art.arcane.gloss.persistence;
 
 import art.arcane.gloss.Gloss;
 
+import java.io.IOException;
 import java.util.Objects;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
@@ -63,6 +64,26 @@ public final class GlossPersistenceCoordinator {
     ExternalTransaction transaction = new ExternalTransaction(this, clock.getAsLong());
     activeTransaction.set(transaction);
     return transaction;
+  }
+
+  /**
+   * Runs {@code write} holding the external write permit and with the hot-reload watchers paused,
+   * which is what keeps a second writer - an editor publication, another command - out of the same
+   * files. Every data-folder writer outside the editor takes this.
+   */
+  public <T> T writeExternally(ExternalWrite<T> write) throws IOException {
+    ExternalTransaction lease;
+    try {
+      lease = beginExternalTransaction();
+    } catch (InterruptedException interruption) {
+      Thread.currentThread().interrupt();
+      throw new IOException("the persistence write permit was interrupted", interruption);
+    }
+    try {
+      return write.run();
+    } finally {
+      lease.close();
+    }
   }
 
   public boolean tryRead(Runnable operation) {
@@ -154,6 +175,11 @@ public final class GlossPersistenceCoordinator {
   @FunctionalInterface
   public interface CheckedOperation<T> {
     T execute() throws Exception;
+  }
+
+  @FunctionalInterface
+  public interface ExternalWrite<T> {
+    T run() throws IOException;
   }
 
   public static final class ExternalTransaction implements AutoCloseable {

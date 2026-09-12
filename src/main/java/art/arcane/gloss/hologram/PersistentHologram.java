@@ -1,19 +1,31 @@
 package art.arcane.gloss.hologram;
 
 import art.arcane.gloss.Gloss;
+import art.arcane.gloss.animation.clip.ClipSample;
+import art.arcane.gloss.bedrock.BedrockPolicy;
+import art.arcane.gloss.bedrock.BedrockSurface;
 import art.arcane.gloss.api.AnchoredHologram;
 import art.arcane.gloss.api.HologramBox;
 import art.arcane.gloss.api.HologramPresentation;
 import art.arcane.gloss.api.IconDisplayStyle;
+import art.arcane.gloss.config.action.MenuActionData;
 import art.arcane.gloss.doc.DocumentEnvelope;
 import art.arcane.gloss.api.ParticleLayer;
 import art.arcane.gloss.condition.ShowCondition;
+import art.arcane.gloss.motion.MotionClipHandle;
+import art.arcane.gloss.motion.TransformFrameSource;
+import art.arcane.gloss.motion.TransformStreamer;
 import art.arcane.gloss.particle.ParticleFrame;
 import art.arcane.gloss.particle.ParticleRect;
 import art.arcane.gloss.particle.ParticleText;
 import art.arcane.gloss.particle.ParticleTextLayout;
+import art.arcane.gloss.rig.Quaternions;
 import art.arcane.gloss.text.TextPipeline;
+import art.arcane.gloss.util.common.DisplayEntity;
+import art.arcane.gloss.util.common.PacketUtils;
 import art.arcane.gloss.util.common.TextUtils;
+import com.github.retrooper.packetevents.util.Quaternion4f;
+import com.github.retrooper.packetevents.wrapper.PacketWrapper;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.World;
@@ -33,11 +45,25 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
+import java.util.function.UnaryOperator;
 
 final class PersistentHologram implements AnchoredHologram {
     private static final double POSITION_EPSILON_SQUARED = 1.0E-6D;
-    private record LineSet(List<String> lines, int flags, long generation, boolean fastRefresh) {
+    private static final double MILLIS_PER_TICK = 50.0D;
+    /** Motion applies to a hologram as the single bone every motion document defaults to. */
+    private static final String MOTION_BONE = "root";
+    /**
+     * One resolved line list: the authored source, the text rows and their per-line show
+     * conditions, and the object lines drawn as their own display entities. A paged hologram keeps
+     * one set per page.
+     */
+    private record LineSet(List<HologramLine> source, List<String> lines, List<ShowCondition> conditions,
+                           List<HologramLine> objects, int flags, long generation, boolean fastRefresh,
+                           boolean conditional) {
     }
+
+    private static final LineSet EMPTY_LINES = new LineSet(List.of(), List.of(), List.of(), List.of(),
+        0, 0L, false, false);
 
     private record AnchorState(String worldName, double x, double y, double z, long generation) {
     }
@@ -71,6 +97,9 @@ final class PersistentHologram implements AnchoredHologram {
                                 long refreshAfterMs, String text) {
     }
 
+    private record SpawnedObjects(Player player, String pageKey, int[] entityIds) {
+    }
+
     private final HologramService service;
     private final String id;
     private final String animatorGroup;
@@ -84,8 +113,22 @@ final class PersistentHologram implements AnchoredHologram {
     private final Set<UUID> untrackedViewers = ConcurrentHashMap.newKeySet();
     private final Set<UUID> trackingChangedViewers = ConcurrentHashMap.newKeySet();
     private final AtomicBoolean sharedSpawning;
+    private final Map<String, LineSet> pageSets = new ConcurrentHashMap<>();
+    private final Map<String, List<HologramLineRenderer.ObjectLine>> objectsByPage = new ConcurrentHashMap<>();
+    private final Map<UUID, SpawnedObjects> objectViewers = new ConcurrentHashMap<>();
+    private final Map<Long, StaticSegments> staticSegmentsByGeneration = new ConcurrentHashMap<>();
+    private final MotionClipHandle clip;
+    private final MotionStream motionStream = new MotionStream();
     private long lineGenerations;
     private volatile LineSet lineSet;
+    private volatile List<HologramPage> pages = List.of();
+    private volatile List<MenuActionData> actions = List.of();
+    private volatile HologramDoc.Hitbox hitbox;
+    private volatile String motionId;
+    private volatile List<Player> motionViewers = List.of();
+    private volatile boolean motionPublished;
+    private volatile Location objectAnchor;
+    private volatile long objectLinesGeneration = Long.MIN_VALUE;
     private volatile AnchorState anchorState;
     private final Object decorationLock = new Object();
     private final Map<UUID, TextDisplayDecoration> viewerDecorations = new ConcurrentHashMap<>();
@@ -104,7 +147,6 @@ final class PersistentHologram implements AnchoredHologram {
     private volatile boolean personalizedDisplay;
     private volatile String sharedRendered;
     private volatile SharedText sharedTextCache;
-    private volatile StaticSegments staticSegmentsCache;
     private volatile SharedAnimation sharedAnimationCache;
     private volatile DependencyMemo dependencyMemo;
     private volatile ShowCondition show = ShowCondition.ALWAYS;
@@ -116,7 +158,8 @@ final class PersistentHologram implements AnchoredHologram {
         this.particlesWorkKey = id + "#particles";
         this.boxWorkKey = id + "#box";
         this.linesLock = new Object();
-        this.lineSet = new LineSet(List.of(), 0, 0L, false);
+        this.lineSet = EMPTY_LINES;
+        this.clip = service.newClipHandle();
         this.viewerRendered = new ConcurrentHashMap<>();
         this.viewerAnimations = new ConcurrentHashMap<>();
         this.activeViewers = new ConcurrentHashMap<>();
@@ -139,7 +182,8 @@ final class PersistentHologram implements AnchoredHologram {
         this.particlesWorkKey = id + "#particles";
         this.boxWorkKey = id + "#box";
         this.linesLock = new Object();
-        this.lineSet = new LineSet(List.of(), 0, 0L, false);
+        this.lineSet = EMPTY_LINES;
+        this.clip = service.newClipHandle();
         this.viewerRendered = new ConcurrentHashMap<>();
         this.viewerAnimations = new ConcurrentHashMap<>();
         this.activeViewers = new ConcurrentHashMap<>();
@@ -177,57 +221,33 @@ final class PersistentHologram implements AnchoredHologram {
     @Override
     public void addLine(String line) {
         Objects.requireNonNull(line, "Hologram line may not be null.");
-        synchronized (linesLock) {
-            List<String> next = new ArrayList<>(lineSet.lines());
-            next.add(line);
-            publishLines(List.copyOf(next));
-        }
-
-        service.persist(this);
-        service.persistentTextChanged();
+        mutateLines(current -> {
+            List<HologramLine> next = new ArrayList<>(current);
+            next.add(HologramLine.text(line));
+            return next;
+        });
     }
 
     @Override
     public void setLine(int index, String line) {
         Objects.requireNonNull(line, "Hologram line may not be null.");
-        if (!replaceLine(index, line)) {
-            return;
-        }
-
-        service.persist(this);
-        service.persistentTextChanged();
+        replaceLine(index, line);
     }
 
     @Override
     public void setLines(List<String> lines) {
         Objects.requireNonNull(lines, "Hologram lines may not be null.");
-        List<String> next = List.copyOf(lines);
-        synchronized (linesLock) {
-            publishLines(next);
-        }
-
-        service.persist(this);
-        service.persistentTextChanged();
+        mutateLines(ignored -> HologramDoc.textLines(lines));
     }
 
     @Override
     public void removeLine(int index) {
-        if (!dropLine(index)) {
-            return;
-        }
-
-        service.persist(this);
-        service.persistentTextChanged();
+        dropLine(index);
     }
 
     @Override
     public void clearLines() {
-        synchronized (linesLock) {
-            publishLines(List.of());
-        }
-
-        service.persist(this);
-        service.persistentTextChanged();
+        mutateLines(ignored -> List.of());
     }
 
     @Override
@@ -309,22 +329,61 @@ final class PersistentHologram implements AnchoredHologram {
         pitch = doc.pitch();
         particleLayers = doc.particleLayers();
         revision = doc.revision();
+        actions = doc.actions();
+        hitbox = doc.hitbox();
         synchronized (linesLock) {
-            publishLines(doc.lines());
+            publishDocument(doc.lines(), doc.pages());
         }
+        setMotion(doc.motion());
         if (styleChanged) {
             applyStyle();
         }
         if (orientationChanged) {
             applyOrientation();
         }
+        service.hologramContentChanged(this);
     }
 
     HologramDoc toDoc(long revision) {
         AnchorState anchor = anchorState;
+        List<HologramPage> currentPages = pages;
         return new HologramDoc(HologramDoc.CURRENT_SCHEMA_VERSION, revision,
             new HologramDoc.Anchor(anchor.worldName(), new Vector(anchor.x(), anchor.y(), anchor.z())),
-            lineSet.lines(), style, box, yaw, pitch, particleLayers, show);
+            currentPages.isEmpty() ? lineSet.source() : List.of(), style, box, yaw, pitch, particleLayers, show,
+            currentPages, actions, hitbox, motionId);
+    }
+
+    List<MenuActionData> actions() {
+        return actions;
+    }
+
+    HologramDoc.Hitbox hitbox() {
+        return hitboxOrDefault();
+    }
+
+    HologramDoc.Hitbox hitboxOrDefault() {
+        HologramDoc.Hitbox current = hitbox;
+        return current == null ? HologramDoc.Hitbox.DEFAULTS : current;
+    }
+
+    List<HologramPage> pages() {
+        return pages;
+    }
+
+    String motionId() {
+        return motionId;
+    }
+
+    /** Switches the clip this hologram plays and writes the change to disk. */
+    void applyMotion(String motion) {
+        setMotion(motion == null || motion.isBlank() ? null : motion.trim());
+        service.persist(this);
+    }
+
+    /** The number of hitboxes a per-line hologram registers: one per rendered row. */
+    int rowCount() {
+        LineSet snapshot = lineSet;
+        return snapshot.lines().size() + snapshot.objects().size();
     }
 
     long nextRevision() {
@@ -335,45 +394,107 @@ final class PersistentHologram implements AnchoredHologram {
         return next;
     }
 
-    private void publishLines(List<String> next) {
-        lineGenerations++;
-        boolean fastRefresh = false;
-        for (String line : next) {
-            if (TextPipeline.requiresFastRefresh(line)) {
-                fastRefresh = true;
-                break;
+    /**
+     * Replaces the authored lines. A paged hologram edits its first page, which is the page every
+     * viewer starts on; emptying it drops the page.
+     */
+    private boolean mutateLines(UnaryOperator<List<HologramLine>> edit) {
+        boolean changed;
+        synchronized (linesLock) {
+            List<HologramPage> currentPages = pages;
+            if (currentPages.isEmpty()) {
+                List<HologramLine> next = edit.apply(lineSet.source());
+                changed = next != null;
+                if (changed) {
+                    publishDocument(List.copyOf(next), List.of());
+                }
+            } else {
+                HologramPage first = currentPages.getFirst();
+                List<HologramLine> next = edit.apply(first.lines());
+                changed = next != null;
+                if (changed) {
+                    List<HologramPage> updated = new ArrayList<>(currentPages);
+                    if (next.isEmpty()) {
+                        updated.removeFirst();
+                    } else {
+                        updated.set(0, new HologramPage(first.id(), List.copyOf(next)));
+                    }
+                    publishDocument(List.of(), List.copyOf(updated));
+                }
             }
         }
-        lineSet = new LineSet(next, HologramMath.classify(next), lineGenerations, fastRefresh);
+        if (!changed) {
+            return false;
+        }
+        service.persist(this);
+        service.persistentTextChanged();
+        return true;
+    }
+
+    private void publishDocument(List<HologramLine> lines, List<HologramPage> nextPages) {
+        pageSets.clear();
+        staticSegmentsByGeneration.clear();
+        pages = nextPages;
+        if (nextPages.isEmpty()) {
+            lineSet = buildLineSet(lines);
+        } else {
+            LineSet first = null;
+            for (HologramPage page : nextPages) {
+                LineSet built = buildLineSet(page.lines());
+                pageSets.put(page.id(), built);
+                if (first == null) {
+                    first = built;
+                }
+            }
+            lineSet = first;
+            service.forgetStalePages(id, nextPages);
+        }
         dependencyMemo = null;
+        objectLinesGeneration = Long.MIN_VALUE;
+    }
+
+    private LineSet buildLineSet(List<HologramLine> source) {
+        lineGenerations++;
+        List<String> text = new ArrayList<>(source.size());
+        List<ShowCondition> conditions = new ArrayList<>(source.size());
+        List<HologramLine> objects = new ArrayList<>();
+        boolean conditional = false;
+        boolean fastRefresh = false;
+        for (HologramLine line : source) {
+            if (!line.isText()) {
+                objects.add(line);
+                continue;
+            }
+            text.add(line.text());
+            conditions.add(line.show());
+            conditional |= !line.show().isAlwaysVisible();
+            fastRefresh |= TextPipeline.requiresFastRefresh(line.text());
+        }
+        List<String> lines = List.copyOf(text);
+        return new LineSet(List.copyOf(source), lines, List.copyOf(conditions), List.copyOf(objects),
+            HologramMath.classify(lines), lineGenerations, fastRefresh, conditional);
     }
 
     private boolean replaceLine(int index, String line) {
-        synchronized (linesLock) {
-            List<String> current = lineSet.lines();
+        return mutateLines(current -> {
             if (index < 0 || index >= current.size()) {
-                return false;
+                return null;
             }
-
-            List<String> next = new ArrayList<>(current);
-            next.set(index, line);
-            publishLines(List.copyOf(next));
-            return true;
-        }
+            List<HologramLine> next = new ArrayList<>(current);
+            next.set(index, HologramLine.text(line));
+            return next;
+        });
     }
 
     private boolean dropLine(int index) {
-        synchronized (linesLock) {
-            List<String> current = lineSet.lines();
+        return mutateLines(current -> {
             if (index < 0 || index >= current.size()) {
-                return false;
+                return null;
             }
-
-            List<String> next = new ArrayList<>(current);
+            List<HologramLine> next = new ArrayList<>(current);
             next.remove(index);
-            publishLines(List.copyOf(next));
-            return true;
-        }
+            return next;
+        });
     }
 
     void update() {
@@ -399,7 +520,8 @@ final class PersistentHologram implements AnchoredHologram {
         if (!isCurrent(tickAnchor)) {
             return;
         }
-        if (snapshot.lines().isEmpty() || !show.isDynamic() && !show.isAlwaysVisible()) {
+        if (snapshot.lines().isEmpty() && snapshot.objects().isEmpty()
+            || !show.isDynamic() && !show.isAlwaysVisible()) {
             despawnAll();
             return;
         }
@@ -414,13 +536,21 @@ final class PersistentHologram implements AnchoredHologram {
         }
         reconcilePosition(tickAnchor, anchor);
         List<HologramTick.Viewer> viewers = tick.viewers(world, anchor, service.viewRange());
-        if (show.isDynamic() || viewerSpecific(snapshot) && service.perViewerPlaceholders()) {
+        if (show.isDynamic() || perViewerLines(snapshot)
+            || viewerSpecific(snapshot) && service.perViewerPlaceholders()) {
             updatePersonalized(world, tickAnchor, anchor, snapshot, viewers);
         } else {
             updateShared(world, tickAnchor, anchor, snapshot, viewers);
         }
         updateDecorations(tickAnchor, anchor, snapshot, viewers);
         emitParticles(anchor, snapshot, viewers);
+        updateObjectLines(anchor, snapshot, viewers);
+        updateMotion(viewers);
+    }
+
+    /** Pages and per-line show conditions give every viewer their own line list. */
+    private boolean perViewerLines(LineSet snapshot) {
+        return !pages.isEmpty() || snapshot.conditional();
     }
 
     TickAnchor tickAnchor() {
@@ -469,6 +599,8 @@ final class PersistentHologram implements AnchoredHologram {
     }
 
     void despawnAll() {
+        clearObjectLines();
+        stopMotion();
         if (sharedDisplay == null && activeViewers.isEmpty()) {
             return;
         }
@@ -478,6 +610,7 @@ final class PersistentHologram implements AnchoredHologram {
     void onPlayerQuit(UUID playerId) {
         untrackedViewers.remove(playerId);
         trackingChangedViewers.remove(playerId);
+        objectViewers.remove(playerId);
         invalidateViewer(playerId, false);
     }
 
@@ -776,7 +909,8 @@ final class PersistentHologram implements AnchoredHologram {
         for (HologramTick.Viewer viewer : viewers) {
             current.add(viewer.id());
             activeViewers.put(viewer.id(), viewer.player());
-            refreshViewerText(viewer.id(), viewer.player(), entityId, snapshot, delayTicks);
+            refreshViewerText(viewer.id(), viewer.player(), entityId, viewerLineSet(viewer.id(), snapshot),
+                delayTicks);
         }
         for (UUID viewerId : activeViewers.keySet()) {
             if (!current.contains(viewerId)) {
@@ -918,7 +1052,7 @@ final class PersistentHologram implements AnchoredHologram {
             return true;
         }
         boolean visible = condition.matches(service.plugin(), player);
-        if (sharedDisplay != expectedDisplay || expectedDisplay == null || lineSet != snapshot
+        if (sharedDisplay != expectedDisplay || expectedDisplay == null || !isCurrentSet(snapshot)
             || show != condition || !personalizedDisplay || activeViewers.get(viewerId) != player) {
             return null;
         }
@@ -964,9 +1098,14 @@ final class PersistentHologram implements AnchoredHologram {
     private String composeViewerText(Player player, LineSet snapshot) {
         String[] segments = staticSegments(snapshot);
         List<String> values = snapshot.lines();
+        List<ShowCondition> conditions = snapshot.conditions();
         TextPipeline text = service.plugin().text();
         List<String> rendered = new ArrayList<>(values.size());
         for (int index = 0; index < values.size(); index++) {
+            ShowCondition condition = conditions.get(index);
+            if (!condition.isAlwaysVisible() && !condition.matches(service.plugin(), player)) {
+                continue;
+            }
             String cached = segments[index];
             rendered.add(cached != null ? cached : text.render(player, values.get(index)));
         }
@@ -977,9 +1116,8 @@ final class PersistentHologram implements AnchoredHologram {
     private String[] staticSegments(LineSet snapshot) {
         long emojiGeneration = TextPipeline.emojiGeneration();
         long renderGeneration = service.plugin().text().renderGeneration();
-        StaticSegments cached = staticSegmentsCache;
-        if (cached != null && cached.generation() == snapshot.generation()
-            && cached.emojiGeneration() == emojiGeneration
+        StaticSegments cached = staticSegmentsByGeneration.get(snapshot.generation());
+        if (cached != null && cached.emojiGeneration() == emojiGeneration
             && cached.renderGeneration() == renderGeneration) {
             return cached.segments();
         }
@@ -996,8 +1134,8 @@ final class PersistentHologram implements AnchoredHologram {
             segments[index] = text.renderStatic(line);
         }
 
-        staticSegmentsCache = new StaticSegments(snapshot.generation(), emojiGeneration,
-            renderGeneration, segments);
+        staticSegmentsByGeneration.put(snapshot.generation(), new StaticSegments(snapshot.generation(),
+            emojiGeneration, renderGeneration, segments));
         return segments;
     }
 
@@ -1156,8 +1294,12 @@ final class PersistentHologram implements AnchoredHologram {
     }
 
     private List<Player> captureViewers(List<HologramTick.Viewer> viewers) {
+        BedrockPolicy policy = BedrockPolicy.of(service.plugin());
         List<Player> captured = new ArrayList<>(viewers.size());
         for (HologramTick.Viewer viewer : viewers) {
+            if (policy != null && policy.hides(BedrockSurface.HOLOGRAM, viewer.player())) {
+                continue;
+            }
             captured.add(viewer.player());
         }
 
@@ -1222,5 +1364,254 @@ final class PersistentHologram implements AnchoredHologram {
 
     private static boolean isChunkLoaded(World world, Location anchor) {
         return world.isChunkLoaded(anchor.getBlockX() >> 4, anchor.getBlockZ() >> 4);
+    }
+
+    private boolean isCurrentSet(LineSet snapshot) {
+        if (snapshot == lineSet) {
+            return true;
+        }
+        for (LineSet candidate : pageSets.values()) {
+            if (candidate == snapshot) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** The line list this viewer reads: their page when the hologram is paged, the document otherwise. */
+    private LineSet viewerLineSet(UUID viewerId, LineSet fallback) {
+        if (pages.isEmpty()) {
+            return fallback;
+        }
+        LineSet selected = pageSets.get(pageKey(viewerId));
+        return selected == null ? lineSet : selected;
+    }
+
+    private String pageKey(UUID viewerId) {
+        if (pages.isEmpty()) {
+            return "";
+        }
+        String selected = service.viewerPage(id, viewerId);
+        return selected == null ? pages.getFirst().id() : selected;
+    }
+
+    private void updateObjectLines(Location anchor, LineSet snapshot, List<HologramTick.Viewer> viewers) {
+        if (!hasObjectLines()) {
+            if (!objectsByPage.isEmpty()) {
+                clearObjectLines();
+            }
+            return;
+        }
+        rebuildObjectLines(anchor, snapshot);
+        Set<UUID> present = new HashSet<>(viewers.size() * 2);
+        for (HologramTick.Viewer viewer : viewers) {
+            present.add(viewer.id());
+            spawnObjectLines(viewer.id(), viewer.player());
+        }
+        for (UUID viewerId : List.copyOf(objectViewers.keySet())) {
+            if (!present.contains(viewerId)) {
+                despawnObjectLines(viewerId);
+            }
+        }
+    }
+
+    private boolean hasObjectLines() {
+        if (!lineSet.objects().isEmpty()) {
+            return true;
+        }
+        for (LineSet candidate : pageSets.values()) {
+            if (!candidate.objects().isEmpty()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void rebuildObjectLines(Location anchor, LineSet snapshot) {
+        Location applied = objectAnchor;
+        boolean moved = applied == null || applied.getWorld() != anchor.getWorld()
+            || applied.distanceSquared(anchor) > POSITION_EPSILON_SQUARED;
+        if (!moved && objectLinesGeneration == snapshot.generation()) {
+            return;
+        }
+        clearObjectLines();
+        if (pages.isEmpty()) {
+            objectsByPage.put("", buildObjectLines(lineSet, anchor));
+        } else {
+            for (HologramPage page : pages) {
+                LineSet set = pageSets.get(page.id());
+                if (set != null) {
+                    objectsByPage.put(page.id(), buildObjectLines(set, anchor));
+                }
+            }
+        }
+        objectAnchor = anchor.clone();
+        objectLinesGeneration = snapshot.generation();
+    }
+
+    private List<HologramLineRenderer.ObjectLine> buildObjectLines(LineSet set, Location anchor) {
+        if (set.objects().isEmpty()) {
+            return List.of();
+        }
+        return HologramLineRenderer.build(service.plugin(), id, set.source(), anchor, set.lines().size(),
+            style.scaleY());
+    }
+
+    private void spawnObjectLines(UUID viewerId, Player player) {
+        String page = pageKey(viewerId);
+        SpawnedObjects current = objectViewers.get(viewerId);
+        if (current != null && current.player() == player && current.pageKey().equals(page)) {
+            return;
+        }
+        if (current != null) {
+            despawnObjectLines(viewerId);
+        }
+        if (service.isBedrock(viewerId)) {
+            return;
+        }
+        List<HologramLineRenderer.ObjectLine> lines = objectsByPage.getOrDefault(page, List.of());
+        if (lines.isEmpty()) {
+            return;
+        }
+        List<PacketWrapper<?>> packets = new ArrayList<>(lines.size() * 2);
+        int[] entityIds = new int[lines.size()];
+        for (int index = 0; index < lines.size(); index++) {
+            DisplayEntity display = lines.get(index).display();
+            entityIds[index] = display.id();
+            packets.addAll(display.spawn());
+        }
+        objectViewers.put(viewerId, new SpawnedObjects(player, page, entityIds));
+        PacketUtils.send(player, packets);
+    }
+
+    private void despawnObjectLines(UUID viewerId) {
+        SpawnedObjects removed = objectViewers.remove(viewerId);
+        if (removed == null || !removed.player().isOnline() || removed.entityIds().length == 0) {
+            return;
+        }
+        PacketUtils.send(removed.player(), List.of(DisplayEntity.destroyAll(removed.entityIds())));
+    }
+
+    private void clearObjectLines() {
+        for (UUID viewerId : List.copyOf(objectViewers.keySet())) {
+            despawnObjectLines(viewerId);
+        }
+        objectsByPage.clear();
+        objectAnchor = null;
+        objectLinesGeneration = Long.MIN_VALUE;
+    }
+
+    private void setMotion(String motion) {
+        if (Objects.equals(motionId, motion)) {
+            return;
+        }
+        motionId = motion;
+        stopMotion();
+    }
+
+    private void updateMotion(List<HologramTick.Viewer> viewers) {
+        String motion = motionId;
+        if (motion == null || viewers.isEmpty() || sharedEntityId == 0) {
+            stopMotion();
+            return;
+        }
+        motionViewers = captureViewers(viewers);
+        if (!clip.playing() && !clip.play(motion, System.currentTimeMillis())) {
+            Gloss.warnThrottled("hologram-motion-" + id + "-" + motion,
+                "Hologram %s references unknown motion %s.", id, motion);
+            return;
+        }
+        TransformStreamer streamer = service.streamer();
+        if (streamer != null && !motionPublished) {
+            motionPublished = true;
+            streamer.publish(motionStreamKey(), motionStream);
+        }
+    }
+
+    private void stopMotion() {
+        motionViewers = List.of();
+        if (motionPublished) {
+            motionPublished = false;
+            TransformStreamer streamer = service.streamer();
+            if (streamer != null) {
+                streamer.remove(motionStreamKey());
+            }
+        }
+        clip.stop();
+    }
+
+    private String motionStreamKey() {
+        return "hologram:" + id;
+    }
+
+    boolean motionPlaying() {
+        return clip.playing();
+    }
+
+    long motionStartedAtMs() {
+        return clip.startedAtMs();
+    }
+
+    List<Player> motionViewers() {
+        return motionViewers;
+    }
+
+    /**
+     * The transform frame for this hologram at {@code nowMs}: the text display and every object
+     * line move together as bone {@code root}. Never touches the text animator.
+     */
+    List<PacketWrapper<?>> motionFrame(long nowMs) {
+        int entityId = sharedEntityId;
+        if (!clip.playing() || entityId == 0) {
+            return List.of();
+        }
+        ClipSample sample = clip.sampleBones(List.of(MOTION_BONE), nowMs).get(MOTION_BONE);
+        if (sample == null) {
+            return List.of();
+        }
+        IconDisplayStyle current = style;
+        int frameTicks = Math.max(1, (int) Math.round(1000.0D / Math.max(1, clip.fps()) / MILLIS_PER_TICK));
+        com.github.retrooper.packetevents.util.Vector3f translation =
+            new com.github.retrooper.packetevents.util.Vector3f((float) sample.offsetX(), (float) sample.offsetY(),
+                (float) sample.offsetZ());
+        Quaternion4f rotation = Quaternions.fromEulerDegrees((float) sample.rotationX(), (float) sample.rotationY(),
+            (float) sample.rotationZ());
+        List<PacketWrapper<?>> packets = new ArrayList<>();
+        packets.add(DisplayEntity.transformUpdate(entityId, translation,
+            new com.github.retrooper.packetevents.util.Vector3f(current.scaleX() * (float) sample.scaleX(),
+                current.scaleY() * (float) sample.scaleY(), current.scaleZ() * (float) sample.scaleZ()),
+            rotation, Quaternions.identity(), 0, frameTicks));
+        for (List<HologramLineRenderer.ObjectLine> lines : objectsByPage.values()) {
+            for (HologramLineRenderer.ObjectLine line : lines) {
+                float scale = (float) line.source().scale();
+                packets.add(DisplayEntity.transformUpdate(line.display().id(), translation,
+                    new com.github.retrooper.packetevents.util.Vector3f(scale * (float) sample.scaleX(),
+                        scale * (float) sample.scaleY(), scale * (float) sample.scaleZ()),
+                    rotation, Quaternions.identity(), 0, frameTicks));
+            }
+        }
+        return packets;
+    }
+
+    private final class MotionStream implements TransformFrameSource {
+        @Override
+        public List<PacketWrapper<?>> compose(long nowMs) {
+            return motionFrame(nowMs);
+        }
+
+        @Override
+        public List<Player> viewers() {
+            return motionViewers;
+        }
+
+        @Override
+        public boolean live() {
+            return clip.playing();
+        }
+
+        @Override
+        public int fps() {
+            return Math.max(1, clip.fps());
+        }
     }
 }

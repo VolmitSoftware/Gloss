@@ -1,0 +1,167 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://volmit.art/schema/gloss-markers.schema.json",
+  "title": "Gloss Marker Document",
+  "description": "One navigation marker in markers/. A marker is a label, an optional beam, an optional off-screen edge arrow and an optional trail, all drawn per viewer.",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "revision",
+    "anchor"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "show": {
+      "description": "Condition gating the whole marker.",
+      "type": [
+        "string",
+        "boolean"
+      ]
+    },
+    "anchor": {
+      "$ref": "#/$defs/anchor"
+    },
+    "label": {
+      "description": "Text drawn at the marker. Runs through the text pipeline and may read marker.distance, marker.id and marker.x|y|z.",
+      "type": "string"
+    },
+    "icon": {
+      "description": "Optional icon line drawn with the label.",
+      "type": "object"
+    },
+    "color": {
+      "type": "string",
+      "pattern": "^#[0-9a-fA-F]{6}$"
+    },
+    "distanceScale": {
+      "description": "Expression producing the label's scale. Evaluated per render; a failure reads as 1.",
+      "type": "string"
+    },
+    "hideWithin": {
+      "description": "Blocks within which the marker is not drawn, so a marker you are standing on gets out of the way.",
+      "type": "number",
+      "minimum": 0
+    },
+    "maxDistance": {
+      "type": "number",
+      "minimum": 1
+    },
+    "beam": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "height": {
+          "type": "number",
+          "minimum": 1
+        },
+        "width": {
+          "type": "number",
+          "minimum": 0.02
+        },
+        "material": {
+          "type": "string"
+        }
+      }
+    },
+    "edge": {
+      "description": "Off-screen arrow drawn at the frustum edge while the marker is behind or beside the viewer.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "margin": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "arrow": {
+          "type": "string"
+        }
+      }
+    },
+    "trail": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "particle": {
+          "type": "string"
+        },
+        "spacing": {
+          "type": "number",
+          "minimum": 0.25
+        },
+        "maxPoints": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 256
+        }
+      }
+    },
+    "audience": {
+      "$ref": "#/$defs/audience"
+    },
+    "lifetimeTicks": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "waypoint": {
+      "description": "Also publishes this marker to the client's locator bar, which is the only navigation a Bedrock viewer gets.",
+      "type": "boolean"
+    }
+  },
+  "$defs": {
+    "anchor": {
+      "description": "Exactly one of a world position, an entity to follow, or a player to follow.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "world": {
+          "type": "string"
+        },
+        "x": {
+          "type": "number"
+        },
+        "y": {
+          "type": "number"
+        },
+        "z": {
+          "type": "number"
+        },
+        "entity": {
+          "type": "string",
+          "pattern": "^[0-9a-fA-F-]{36}$"
+        },
+        "player": {
+          "type": "string"
+        }
+      }
+    },
+    "audience": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "when": {
+          "type": [
+            "string",
+            "boolean"
+          ]
+        }
+      }
+    }
+  }
+}

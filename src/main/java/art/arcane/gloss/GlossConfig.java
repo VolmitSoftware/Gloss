@@ -1,5 +1,15 @@
 package art.arcane.gloss;
 
+import art.arcane.gloss.animation.clip.Blend;
+import art.arcane.gloss.animation.clip.Clip;
+import art.arcane.gloss.animation.clip.ClipSet;
+import art.arcane.gloss.animation.clip.Easing;
+import art.arcane.gloss.animation.clip.Keyframe;
+import art.arcane.gloss.animation.clip.LoopMode;
+import art.arcane.gloss.animation.clip.Profile;
+import art.arcane.gloss.animation.clip.Target;
+import art.arcane.gloss.animation.clip.Track;
+import art.arcane.gloss.animation.clip.Trigger;
 import art.arcane.gloss.api.ParticleLayer;
 import art.arcane.gloss.api.IconDisplayStyle;
 import art.arcane.gloss.api.HologramBox;
@@ -7,9 +17,13 @@ import art.arcane.gloss.condition.ShowCondition;
 import art.arcane.gloss.config.GlossConfigFile;
 import art.arcane.gloss.drop.RealDropSettingsDoc;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.Function;
 
 public record GlossConfig(
     String language,
@@ -38,14 +52,116 @@ public record GlossConfig(
     Debug debug,
     CustomItems customItems,
     PlayerHeads playerHeads,
-    Integration integration
+    Integration integration,
+    Modules modules
 ) {
     private static final GlossConfig DEFAULTS = defaults();
 
     public GlossConfig withLanguage(String locale) {
         return new GlossConfig(locale, metrics, splashScreen, holograms, particles, boards, tablist,
             emoji, animations, chat, text, bubbles, indicators, drops, realDrops, motd, groups,
-            hotload, commands, menus, panels, previews, editorSync, debug, customItems, playerHeads, integration);
+            hotload, commands, menus, panels, previews, editorSync, debug, customItems, playerHeads, integration,
+            modules);
+    }
+
+    /**
+     * Headline module snapshots. Each lane owns one nested record here plus its block in
+     * {@link #from}; the master switch is the record's {@code enabled}, sourced from {@code features.*}.
+     */
+    public record Modules(
+        // --- lane:screen ---
+        Surfaces surfaces,
+        Nametags nametags,
+        // --- lane:chat ---
+        Leaderboards leaderboards,
+        Channels channels,
+        Strings strings,
+        // --- lane:forms ---
+        Dialogs dialogs,
+        Inventories inventories,
+        // --- lane:rigs ---
+        Rigs rigs,
+        // --- lane:world ---
+        Markers markers,
+        Waypoints waypoints,
+        Zones zones,
+        Camera camera,
+        Sky sky,
+        Nameplates nameplates,
+        Glow glow,
+        // --- lane:behaviors ---
+        Behaviors behaviors,
+        // --- lane:authoring ---
+        GlossPacks glosspacks,
+        History history,
+        // --- lane:forge ---
+        Forge forge,
+        // --- lane:fixes ---
+        Bedrock bedrock
+    ) {
+    }
+
+    public record Surfaces(boolean enabled, int refreshIntervalTicks, int maxBossBarsPerViewer, int titleQueueLimit) {
+    }
+
+    public record Nametags(boolean enabled, int refreshIntervalTicks) {
+    }
+
+    public record Leaderboards(boolean enabled, int sampleIntervalTicks, int maxEntries) {
+    }
+
+    public record Channels(boolean enabled) {
+    }
+
+    public record Strings(boolean enabled) {
+    }
+
+    public record Dialogs(boolean enabled, int responseTimeoutSeconds) {
+    }
+
+    public record Inventories(boolean enabled, boolean closeOnTeleport, String unsupportedIconItem) {
+    }
+
+    public record Rigs(boolean enabled, int maxPartsPerRig, int maxInstancesPerChunk, int transformPacketBudget,
+                       int maxMotionFps) {
+    }
+
+    public record Markers(boolean enabled, int maxPerViewer, double viewRange) {
+    }
+
+    public record Waypoints(boolean enabled, int maxPerViewer) {
+    }
+
+    public record Zones(boolean enabled, double viewRange, int particlesPerViewerPerTick) {
+    }
+
+    public record Camera(boolean enabled, int maxRideSeconds) {
+    }
+
+    public record Sky(boolean enabled) {
+    }
+
+    public record Nameplates(boolean enabled) {
+    }
+
+    public record Glow(boolean enabled) {
+    }
+
+    public record Behaviors(boolean enabled, int maxActionsPerTick, int maxTimersPerPlayer, int stateFlushSeconds) {
+    }
+
+    public record GlossPacks(boolean enabled, boolean allowServerCommands) {
+    }
+
+    public record History(boolean enabled, int maxVersions, int maxAgeDays) {
+    }
+
+    public record Forge(boolean enabled, String url, boolean serve, String serveBind, int servePort, boolean required,
+                        String prompt, int packFormat, int codepointBase) {
+    }
+
+    public record Bedrock(String detection, boolean hideHolograms, boolean hidePanels, boolean hideBubbles,
+                          boolean hideIndicators, boolean hideDrops, boolean hideOverlays) {
     }
 
 
@@ -238,7 +354,13 @@ public record GlossConfig(
             EXIT_FLUID,
             START_ROLL,
             SETTLE,
-            WAKE
+            WAKE;
+
+            private final Trigger clip = Trigger.of(name());
+
+            public Trigger toClip() {
+                return clip;
+            }
         }
 
         public enum AnimationTarget {
@@ -254,13 +376,21 @@ public record GlossConfig(
             GLOW,
             VISIBLE,
             PHYSICS,
-            LIGHT_LEVEL
+            LIGHT_LEVEL;
+
+            public Target toClip() {
+                return Target.valueOf(name());
+            }
         }
 
         public enum AnimationBlend {
             ADD,
             REPLACE,
-            MULTIPLY
+            MULTIPLY;
+
+            public Blend toClip() {
+                return Blend.valueOf(name());
+            }
         }
 
         public enum AnimationEasing {
@@ -269,10 +399,17 @@ public record GlossConfig(
             EASE_IN,
             EASE_OUT,
             EASE_IN_OUT,
-            BACK_OUT
+            BACK_OUT;
+
+            public Easing.Curve toClip() {
+                return Easing.Curve.of(Easing.valueOf(name()));
+            }
         }
 
         public record MaterialProperties(double glow, double lightLevel) {
+            public art.arcane.gloss.animation.clip.MaterialProperties toClip() {
+                return new art.arcane.gloss.animation.clip.MaterialProperties(glow, lightLevel);
+            }
         }
 
         public record AnimationKeyframe(
@@ -281,6 +418,9 @@ public record GlossConfig(
             String materialMap,
             AnimationEasing easing
         ) {
+            public Keyframe toClip() {
+                return new Keyframe(tick, value, materialMap, easing == null ? null : easing.toClip());
+            }
         }
 
         public record AnimationTrack(
@@ -288,6 +428,10 @@ public record GlossConfig(
             AnimationBlend blend,
             List<AnimationKeyframe> keyframes
         ) {
+            public Track toClip() {
+                return new Track(null, target == null ? null : target.toClip(), blend == null ? null : blend.toClip(),
+                    convertEach(keyframes, AnimationKeyframe::toClip));
+            }
         }
 
         public record AnimationClip(
@@ -296,6 +440,10 @@ public record GlossConfig(
             boolean loop,
             List<AnimationTrack> tracks
         ) {
+            public Clip toClip() {
+                return new Clip(trigger == null ? null : trigger.toClip(), durationTicks,
+                    loop ? LoopMode.LOOP : LoopMode.ONCE, convertEach(tracks, AnimationTrack::toClip));
+            }
         }
 
         public record AnimationProfile(
@@ -304,6 +452,9 @@ public record GlossConfig(
             List<String> materials,
             List<AnimationClip> clips
         ) {
+            public Profile toClip() {
+                return new Profile(id, priority, materials, convertEach(clips, AnimationClip::toClip));
+            }
         }
 
         public record RealDropAnimation(
@@ -311,6 +462,39 @@ public record GlossConfig(
             Map<String, Map<String, MaterialProperties>> materialProperties,
             List<AnimationProfile> profiles
         ) {
+            public ClipSet toClipSet() {
+                Map<String, Map<String, art.arcane.gloss.animation.clip.MaterialProperties>> converted = null;
+                if (materialProperties != null) {
+                    converted = new LinkedHashMap<>(materialProperties.size());
+                    for (Map.Entry<String, Map<String, MaterialProperties>> group : materialProperties.entrySet()) {
+                        converted.put(group.getKey(), group.getValue() == null ? null
+                            : convertValues(group.getValue()));
+                    }
+                }
+                return new ClipSet(enabled, converted, convertEach(profiles, AnimationProfile::toClip));
+            }
+
+            private static Map<String, art.arcane.gloss.animation.clip.MaterialProperties> convertValues(
+                Map<String, MaterialProperties> source
+            ) {
+                Map<String, art.arcane.gloss.animation.clip.MaterialProperties> values =
+                    new LinkedHashMap<>(source.size());
+                for (Map.Entry<String, MaterialProperties> entry : source.entrySet()) {
+                    values.put(entry.getKey(), entry.getValue() == null ? null : entry.getValue().toClip());
+                }
+                return values;
+            }
+        }
+
+        private static <S, T> List<T> convertEach(List<S> source, Function<S, T> mapper) {
+            if (source == null) {
+                return null;
+            }
+            List<T> converted = new ArrayList<>(source.size());
+            for (S element : source) {
+                converted.add(element == null ? null : mapper.apply(element));
+            }
+            return Collections.unmodifiableList(converted);
         }
     }
 
@@ -336,7 +520,8 @@ public record GlossConfig(
 
     public record Menus(
         boolean enabled,
-        float uiScale
+        float uiScale,
+        int maxListEntries
     ) {
     }
 
@@ -478,7 +663,8 @@ public record GlossConfig(
             ),
             new Menus(
                 source.features.menus,
-                (float) source.menus.uiScale
+                (float) source.menus.uiScale,
+                source.menus.maxListEntries
             ),
             new Panels(
                 source.features.panels
@@ -515,6 +701,46 @@ public record GlossConfig(
             ),
             new Integration(
                 source.integration.sampleIntervalTicks
+            ),
+            new Modules(
+                // --- lane:screen ---
+                new Surfaces(source.features.surfaces, source.surfaces.refreshIntervalTicks,
+                    source.surfaces.maxBossBarsPerViewer, source.surfaces.titleQueueLimit),
+                new Nametags(source.features.nametags, source.nametags.refreshIntervalTicks),
+                // --- lane:chat ---
+                new Leaderboards(source.features.leaderboards, source.leaderboards.sampleIntervalTicks,
+                    source.leaderboards.maxEntries),
+                new Channels(source.features.channels),
+                new Strings(source.features.strings),
+                // --- lane:forms ---
+                new Dialogs(source.features.dialogs, source.dialogs.responseTimeoutSeconds),
+                new Inventories(source.features.inventories, source.inventories.closeOnTeleport,
+                    source.inventories.unsupportedIconItem),
+                // --- lane:rigs ---
+                new Rigs(source.features.rigs, source.rigs.maxPartsPerRig, source.rigs.maxInstancesPerChunk,
+                    source.rigs.transformPacketBudget, source.rigs.maxMotionFps),
+                // --- lane:world ---
+                new Markers(source.features.markers, source.markers.maxPerViewer, source.markers.viewRange),
+                new Waypoints(source.features.waypoints, source.waypoints.maxPerViewer),
+                new Zones(source.features.zones, source.zones.viewRange, source.zones.particlesPerViewerPerTick),
+                new Camera(source.features.camera, source.camera.maxRideSeconds),
+                new Sky(source.features.sky),
+                new Nameplates(source.features.nameplates),
+                new Glow(source.features.glow),
+                // --- lane:behaviors ---
+                new Behaviors(source.features.behaviors, source.behaviors.maxActionsPerTick,
+                    source.behaviors.maxTimersPerPlayer, source.behaviors.stateFlushSeconds),
+                // --- lane:authoring ---
+                new GlossPacks(source.features.glosspacks, source.glosspacks.allowServerCommands),
+                new History(source.features.history, source.history.maxVersions, source.history.maxAgeDays),
+                // --- lane:forge ---
+                new Forge(source.features.forge, source.forge.url, source.forge.serve, source.forge.serveBind,
+                    source.forge.servePort, source.forge.required, source.forge.prompt, source.forge.packFormat,
+                    source.forge.codepointBase),
+                // --- lane:fixes ---
+                new Bedrock(source.bedrock.detection, source.bedrock.hideHolograms, source.bedrock.hidePanels,
+                    source.bedrock.hideBubbles, source.bedrock.hideIndicators, source.bedrock.hideDrops,
+                    source.bedrock.hideOverlays)
             )
         );
     }

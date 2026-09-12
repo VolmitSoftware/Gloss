@@ -35,6 +35,7 @@ final class EditorSyncRelayClient implements EditorSyncRelayGateway {
   private static final int SMALL_RESPONSE_BYTES = 64 * 1024;
   private static final int RESPONSE_ENVELOPE_BYTES = 64 * 1024;
   private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(20L);
+  private static final int MAX_HISTORY_REQUESTS = 32;
 
   private final HttpClient http;
   private final ScheduledExecutorService deadlineExecutor;
@@ -115,47 +116,135 @@ final class EditorSyncRelayClient implements EditorSyncRelayGateway {
         });
   }
 
+  /**
+   * One poll of the relay: whatever the editor published, plus whatever history versions it has
+   * asked to read. A poll that carries only history requests answers 200 with a null publication.
+   */
   @Override
-  public CompletableFuture<Optional<EditorSyncPublication>> publication(
-      EditorSyncStoredSession session) {
+  public CompletableFuture<RelayPoll> poll(EditorSyncStoredSession session) {
     URI uri = endpointUri(session.endpoint(), "/sessions/" + encode(session.sessionId())
         + "/publication?after=" + session.lastPublicationRevision());
     return send("GET", uri, session.serverToken(), null, publicationResponseLimit()).thenApply(response -> {
       if (response.statusCode() == 204) {
-        return Optional.empty();
+        return RelayPoll.EMPTY;
       }
       requireStatus(response, 200);
       JsonObject body = parseObject(response.body());
-      requireExactKeys(body, Set.of("protocol", "sessionId", "publication"),
-          "publication response");
+      if (!body.keySet().equals(Set.of("protocol", "sessionId", "publication"))
+          && !body.keySet().equals(Set.of("protocol", "sessionId", "publication",
+          "historyRequests"))) {
+        throw new EditorSyncRelayException(
+            "publication response contains missing or unsupported fields");
+      }
       requireProtocol(body);
       String responseSessionId = EditorSyncJson.requireString(body, "sessionId");
       if (!responseSessionId.equals(session.sessionId())) {
         throw new EditorSyncRelayException("relay returned a publication for another session");
       }
-      JsonObject publication = EditorSyncJson.requireObject(body, "publication");
-      requireExactKeys(publication, Set.of("revision", "baseRevision", "snapshot",
-          "publishedAt", "state"), "publication");
-      long revision = requirePositiveSafeLong(publication, "revision");
-      String baseRevision = EditorSyncJson.requireString(publication, "baseRevision");
-      if (!baseRevision.matches("sha256:[0-9a-f]{64}")
-          || !"pending".equals(EditorSyncJson.requireString(publication, "state"))) {
-        throw new EditorSyncRelayException("relay returned an invalid pending publication");
-      }
-      requireInstant(publication, "publishedAt");
-      JsonObject snapshot = EditorSyncJson.requireObject(publication, "snapshot");
-      EditorSyncProject.validated(snapshot, maximumProjectBytes.getAsInt());
-      return Optional.of(new EditorSyncPublication(revision, baseRevision, snapshot));
+      return new RelayPoll(parsePublication(body), parseHistoryRequests(body));
     });
+  }
+
+  /** Hands the relay the bytes of one stored version, or says the server no longer has it. */
+  @Override
+  public CompletableFuture<Void> answerHistory(EditorSyncStoredSession session,
+                                               HistoryRequest request, String json) {
+    JsonObject body = new JsonObject();
+    body.addProperty("protocol", EditorSyncJson.PROTOCOL_VERSION);
+    body.addProperty("found", json != null);
+    if (json == null) {
+      body.add("json", com.google.gson.JsonNull.INSTANCE);
+    } else {
+      body.addProperty("json", json);
+    }
+    URI uri = endpointUri(session.endpoint(), "/sessions/" + encode(session.sessionId())
+        + "/history?kind=" + encode(request.kind())
+        + "&documentId=" + encode(request.id())
+        + "&version=" + request.version());
+    return sendJson("POST", uri, session.serverToken(), body).thenApply(response -> {
+      requireStatus(response, 200);
+      JsonObject parsed = parseObject(response.body());
+      requireExactKeys(parsed, Set.of("protocol", "accepted"), "history answer response");
+      requireProtocol(parsed);
+      return null;
+    });
+  }
+
+  private Optional<EditorSyncPublication> parsePublication(JsonObject body) {
+    JsonElement value = body.get("publication");
+    if (value == null || value.isJsonNull()) {
+      return Optional.empty();
+    }
+    if (!value.isJsonObject()) {
+      throw new EditorSyncRelayException("publication must be an object or null");
+    }
+    JsonObject publication = value.getAsJsonObject();
+    requireExactKeys(publication, Set.of("revision", "baseRevision", "snapshot",
+        "publishedAt", "state"), "publication");
+    long revision = requirePositiveSafeLong(publication, "revision");
+    String baseRevision = EditorSyncJson.requireString(publication, "baseRevision");
+    if (!baseRevision.matches("sha256:[0-9a-f]{64}")
+        || !"pending".equals(EditorSyncJson.requireString(publication, "state"))) {
+      throw new EditorSyncRelayException("relay returned an invalid pending publication");
+    }
+    requireInstant(publication, "publishedAt");
+    JsonObject snapshot = EditorSyncJson.requireObject(publication, "snapshot");
+    EditorSyncProject.validated(snapshot, maximumProjectBytes.getAsInt());
+    return Optional.of(new EditorSyncPublication(revision, baseRevision, snapshot));
+  }
+
+  private List<HistoryRequest> parseHistoryRequests(JsonObject body) {
+    if (!body.has("historyRequests")) {
+      return List.of();
+    }
+    java.util.List<HistoryRequest> requests = new java.util.ArrayList<>();
+    for (JsonElement value : EditorSyncJson.requireArray(body, "historyRequests")) {
+      if (!value.isJsonObject()) {
+        throw new EditorSyncRelayException("history request must be an object");
+      }
+      JsonObject request = value.getAsJsonObject();
+      requireExactKeys(request, Set.of("kind", "id", "version"), "history request");
+      requests.add(new HistoryRequest(EditorSyncJson.requireString(request, "kind"),
+          EditorSyncJson.requireString(request, "id"),
+          requirePositiveSafeLong(request, "version")));
+      if (requests.size() > MAX_HISTORY_REQUESTS) {
+        throw new EditorSyncRelayException("relay returned too many history requests");
+      }
+    }
+    return List.copyOf(requests);
+  }
+
+  /** One poll: the publication to apply, and the versions the editor wants to read. */
+  record RelayPoll(Optional<EditorSyncPublication> publication,
+                   List<HistoryRequest> historyRequests) {
+    static final RelayPoll EMPTY = new RelayPoll(Optional.empty(), List.of());
+
+    RelayPoll {
+      publication = Objects.requireNonNull(publication, "publication");
+      historyRequests = List.copyOf(historyRequests);
+    }
+  }
+
+  /** One stored version the editor asked the server to send back through the relay. */
+  record HistoryRequest(String kind, String id, long version) {
+    HistoryRequest {
+      kind = Objects.requireNonNull(kind, "kind");
+      id = Objects.requireNonNull(id, "id");
+      if (version < 0L) {
+        throw new IllegalArgumentException("history version must not be negative");
+      }
+    }
   }
 
   @Override
   public CompletableFuture<Void> acknowledge(EditorSyncStoredSession session, long revision,
-                                      String status, String message, EditorSyncProject serverProject) {
+                                      String status, String message, EditorSyncProject serverProject,
+                                      List<EditorSyncPendingAck.Conflict> conflicts) {
     JsonObject request = new JsonObject();
     request.addProperty("protocol", EditorSyncJson.PROTOCOL_VERSION);
     request.addProperty("status", status);
     request.addProperty("message", message);
+    request.add("conflicts", EditorSyncPendingAck.conflictsJson(conflicts));
     if (serverProject != null) {
       request.addProperty("serverRevision", serverProject.baseRevision());
       request.add("snapshot", serverProject.json());
@@ -164,7 +253,8 @@ final class EditorSyncRelayClient implements EditorSyncRelayGateway {
         + "/publication/" + revision + "/ack");
     return sendJson("POST", uri, session.serverToken(), request).thenApply(response -> {
       requireStatus(response, 200);
-      validateAcknowledgement(response.body(), session, revision, status, message, serverProject);
+      validateAcknowledgement(response.body(), session, revision, status, message, serverProject,
+          conflicts);
       return null;
     });
   }
@@ -499,7 +589,8 @@ final class EditorSyncRelayClient implements EditorSyncRelayGateway {
 
   private static void validateAcknowledgement(
       String source, EditorSyncStoredSession session, long revision,
-      String status, String message, EditorSyncProject serverProject) {
+      String status, String message, EditorSyncProject serverProject,
+      List<EditorSyncPendingAck.Conflict> conflicts) {
     JsonObject body = parseObject(source);
     requireExactKeys(body, Set.of("protocol", "baseRevision", "publication"),
         "acknowledgement response");
@@ -519,8 +610,13 @@ final class EditorSyncRelayClient implements EditorSyncRelayGateway {
     }
     JsonObject acknowledgement = EditorSyncJson.requireObject(publication, "ack");
     requireExactKeys(acknowledgement,
-        Set.of("status", "message", "serverRevision", "acknowledgedAt"),
+        Set.of("status", "message", "serverRevision", "acknowledgedAt", "conflicts"),
         "publication acknowledgement");
+    if (!EditorSyncJson.canonical(EditorSyncPendingAck.conflictsJson(conflicts))
+        .equals(EditorSyncJson.canonical(
+            EditorSyncJson.requireArray(acknowledgement, "conflicts")))) {
+      throw new EditorSyncRelayException("relay acknowledgement conflicts do not match");
+    }
     JsonElement rawServerRevision = acknowledgement.get("serverRevision");
     String actualServerRevision = rawServerRevision == null || rawServerRevision.isJsonNull()
         ? null

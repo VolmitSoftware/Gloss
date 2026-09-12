@@ -26,7 +26,8 @@ public class EditorSyncPublicationValidatorTest {
 
     EditorSyncPublicationValidator.ValidatedProject validated =
         new EditorSyncPublicationValidator().validate(session,
-            new EditorSyncPublication(1L, session.baseRevision(), changed), 1024 * 1024);
+            new EditorSyncPublication(1L, session.baseRevision(), changed), 1024 * 1024,
+            session.baseProject());
 
     assertEquals("shop", validated.project().subjectId());
     assertNotEquals(changed.get("baseRevision").getAsString(),
@@ -48,7 +49,8 @@ public class EditorSyncPublicationValidatorTest {
 
     assertThrows(IllegalArgumentException.class, () ->
         new EditorSyncPublicationValidator().validate(session,
-            new EditorSyncPublication(1L, session.baseRevision(), changed), 1024 * 1024));
+            new EditorSyncPublication(1L, session.baseRevision(), changed), 1024 * 1024,
+                session.baseProject()));
   }
 
   @Test
@@ -68,7 +70,8 @@ public class EditorSyncPublicationValidatorTest {
 
     IllegalArgumentException failure = assertThrows(IllegalArgumentException.class, () ->
         new EditorSyncPublicationValidator().validate(session,
-            new EditorSyncPublication(1L, session.baseRevision(), changed), 1024 * 1024));
+            new EditorSyncPublication(1L, session.baseRevision(), changed), 1024 * 1024,
+                session.baseProject()));
     assertTrue(failure.getMessage(), failure.getMessage().contains("panel"));
   }
 
@@ -81,7 +84,7 @@ public class EditorSyncPublicationValidatorTest {
     assertThrows(IllegalArgumentException.class, () ->
         new EditorSyncPublicationValidator().validate(session,
             new EditorSyncPublication(1L, "sha256:" + "0".repeat(64), changed),
-            1024 * 1024));
+            1024 * 1024, session.baseProject()));
   }
 
   private static EditorSyncStoredSession session(JsonObject project) {

@@ -1,5 +1,6 @@
 package art.arcane.gloss.preview.doc;
 
+import art.arcane.gloss.expr.ExprVariableNamespaces;
 import art.arcane.gloss.expr.ExprFunctions;
 import org.bukkit.Material;
 import org.bukkit.Nameable;
@@ -98,7 +99,7 @@ final class PreviewStateAdapters {
 
   /** True when a provider using this namespace would shadow a built-in variable. */
   static boolean isReservedNamespace(String namespace) {
-    return RESERVED_NAMESPACES.contains(namespace);
+    return RESERVED_NAMESPACES.contains(namespace) || ExprVariableNamespaces.global().isRegistered(namespace);
   }
 
   private static Set<String> reservedNamespaces() {

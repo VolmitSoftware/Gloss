@@ -159,7 +159,7 @@ public class DisplayEntityManagerPacketShapeTest {
           }
           """.formatted(gate.equals("menu") ? condition : "",
           gate.equals("component") ? condition : "")).definition();
-      holder.openSession(menu, null);
+      holder.openSession(menu, null, Map.of());
       MenuSession session = (MenuSession) CharacterizationSupport.getField(holder, "session");
       ButtonComponent button = (ButtonComponent) session.getComponents().getFirst();
       holder.tick();

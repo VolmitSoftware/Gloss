@@ -28,7 +28,7 @@ public class InteractionMenuActionTest {
   public void messageUsesMiniMessageAndTheClickingPlayerToken() {
     AtomicReference<Component> delivered = new AtomicReference<>();
     MessageMenuAction action = new MessageMenuAction(
-        new MessageActionData("<green>Hello <bold>%player%</bold></green>", null));
+        new MessageActionData("<green>Hello <bold>%player%</bold></green>", null, null, null));
 
     assertEquals(ActionOutcome.CONTINUE, action.execute(context(player(delivered))));
     assertEquals("Hello tester", TextUtils.content(delivered.get()));
@@ -48,7 +48,7 @@ public class InteractionMenuActionTest {
   public void messageFormattingCannotInstallClickOrInsertionActions() {
     AtomicReference<Component> delivered = new AtomicReference<>();
     MessageMenuAction action = new MessageMenuAction(new MessageActionData(
-        "<click:open_url:'https://example.com'><insert:'unsafe'>Open</insert></click>", null));
+        "<click:open_url:'https://example.com'><insert:'unsafe'>Open</insert></click>", null, null, null));
 
     action.execute(context(player(delivered)));
 
@@ -59,10 +59,10 @@ public class InteractionMenuActionTest {
   @Test
   public void invalidInteractionActionsAreDroppedWithoutDroppingValidNeighbors() {
     List<MenuActionData> data = new ArrayList<>();
-    data.add(new MessageActionData(" ", null));
-    data.add(new TeleportActionData("world", 0D, 64D, 0D, 0F, 0F, null));
-    data.add(new ConnectActionData("bad server", null));
-    data.add(new MessageActionData("<gold>Good</gold>", null));
+    data.add(new MessageActionData(" ", null, null, null));
+    data.add(new TeleportActionData("world", 0D, 64D, 0D, 0F, 0F, null, null, null));
+    data.add(new ConnectActionData("bad server", null, null, null));
+    data.add(new MessageActionData("<gold>Good</gold>", null, null, null));
 
     List<MenuAction<?>> actions = MenuAction.resolve(data, "shops/root", "destination");
 

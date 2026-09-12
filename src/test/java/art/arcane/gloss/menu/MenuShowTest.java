@@ -1,5 +1,6 @@
 package art.arcane.gloss.menu;
 
+import java.util.Map;
 import art.arcane.gloss.Gloss;
 import art.arcane.gloss.api.HoloClickTrigger;
 import art.arcane.gloss.condition.ShowCondition;
@@ -215,7 +216,7 @@ public class MenuShowTest {
         });
     MenuDefinitionData definition = new MenuDefinitionData(new Vector(), true, false, 8D,
         false, false, List.of(new MenuComponentData("probe", new Vector(), new ProbeData(), componentShow)),
-        List.of(), show);
+        List.of(), show, Map.of());
     definition.setId("show-test");
     MenuTransform transform = new MenuTransform(player.getLocation(), new Vector(), 0F, 0F, 0F, 1F);
     return new MenuSession(definition, player,

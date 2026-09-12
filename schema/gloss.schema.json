@@ -51,6 +51,14 @@
     "show": {
       "description": "Boolean or expression controlling visibility of the menu.",
       "$ref": "#/$defs/show"
+    },
+    "vars": {
+      "title": "Session Variable Defaults",
+      "description": "Starting values for session.<name>. Each value is a constant expression; anything that needs live state is ignored.",
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
     }
   },
   "$defs": {
@@ -82,7 +90,8 @@
                 "span",
                 "label",
                 "model",
-                "local"
+                "local",
+                "world"
               ]
             },
             "name": {
@@ -119,15 +128,15 @@
               ]
             },
             "from": {
-              "$ref": "#/$defs/vector3"
+              "$ref": "#/$defs/particleAnchor"
             },
             "to": {
-              "$ref": "#/$defs/vector3"
+              "$ref": "#/$defs/particleAnchor"
             },
             "points": {
               "type": "array",
               "items": {
-                "$ref": "#/$defs/vector3"
+                "$ref": "#/$defs/particleAnchor"
               }
             },
             "width": {
@@ -233,6 +242,34 @@
         }
       }
     },
+    "particleAnchor": {
+      "title": "Particle Anchor",
+      "description": "One end of a particle geometry: a coordinate in the target's frame, or, under the world scope only, the role name viewer or subject, or an object naming an entity to follow.",
+      "oneOf": [
+        {
+          "$ref": "#/$defs/vector3"
+        },
+        {
+          "type": "string",
+          "enum": [
+            "viewer",
+            "subject"
+          ]
+        },
+        {
+          "type": "object",
+          "required": [
+            "entity"
+          ],
+          "properties": {
+            "entity": {
+              "type": "string",
+              "pattern": "^[0-9a-fA-F-]{36}$"
+            }
+          }
+        }
+      ]
+    },
     "vector3": {
       "title": "3D Vector",
       "description": "Represents a 3D floating-point vector.",
@@ -285,7 +322,11 @@
           "enum": [
             "button",
             "decoration",
-            "toggle"
+            "toggle",
+            "list",
+            "slider",
+            "field",
+            "tabs"
           ]
         }
       },
@@ -325,6 +366,54 @@
           "then": {
             "$ref": "#/$defs/toggleComponent"
           }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "list"
+              }
+            }
+          },
+          "then": {
+            "$ref": "#/$defs/listComponent"
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "slider"
+              }
+            }
+          },
+          "then": {
+            "$ref": "#/$defs/sliderComponent"
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "field"
+              }
+            }
+          },
+          "then": {
+            "$ref": "#/$defs/fieldComponent"
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "tabs"
+              }
+            }
+          },
+          "then": {
+            "$ref": "#/$defs/tabsComponent"
+          }
         }
       ]
     },
@@ -345,7 +434,41 @@
             "message",
             "teleport",
             "connect",
-            "navigate"
+            "navigate",
+            "title",
+            "actionbar",
+            "bossbar",
+            "dialog",
+            "confirm",
+            "close",
+            "inventory",
+            "setSession",
+            "prompt",
+            "book",
+            "give",
+            "take",
+            "economy",
+            "setRig",
+            "rigState",
+            "delay",
+            "sequence",
+            "parallel",
+            "repeat",
+            "if",
+            "switch",
+            "chance",
+            "cooldown",
+            "emit",
+            "broadcast",
+            "effect",
+            "particle",
+            "stop",
+            "setState",
+            "addState",
+            "clearState",
+            "sky",
+            "camera",
+            "glow"
           ]
         },
         "trigger": {
@@ -366,6 +489,15 @@
               "type": "null"
             }
           ]
+        },
+        "when": {
+          "description": "Optional condition evaluated for the clicking player each time the action would run; false skips this action and continues with the next. Same syntax as show conditions.",
+          "type": "string"
+        },
+        "cooldownTicks": {
+          "description": "Optional per-player cooldown in ticks after this action runs; while it is active the action is skipped and the list continues. Omitted or 0 means no cooldown.",
+          "type": "integer",
+          "minimum": 0
         }
       },
       "allOf": [
@@ -440,8 +572,572 @@
           "then": {
             "$ref": "#/$defs/navigationAction"
           }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "title"
+              }
+            }
+          },
+          "then": {
+            "$ref": "#/$defs/titleAction"
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "actionbar"
+              }
+            }
+          },
+          "then": {
+            "$ref": "#/$defs/actionBarAction"
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "bossbar"
+              }
+            }
+          },
+          "then": {
+            "$ref": "#/$defs/bossBarAction"
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "dialog"
+              }
+            }
+          },
+          "then": {
+            "$ref": "#/$defs/dialogAction"
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "confirm"
+              }
+            }
+          },
+          "then": {
+            "$ref": "#/$defs/confirmAction"
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "close"
+              }
+            }
+          },
+          "then": {
+            "$ref": "#/$defs/closeAction"
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "inventory"
+              }
+            }
+          },
+          "then": {
+            "$ref": "#/$defs/inventoryAction"
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "setSession"
+              }
+            }
+          },
+          "then": {
+            "$ref": "#/$defs/setSessionAction"
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "prompt"
+              }
+            }
+          },
+          "then": {
+            "$ref": "#/$defs/promptAction"
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "book"
+              }
+            }
+          },
+          "then": {
+            "$ref": "#/$defs/bookAction"
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "give"
+              }
+            }
+          },
+          "then": {
+            "$ref": "#/$defs/giveAction"
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "take"
+              }
+            }
+          },
+          "then": {
+            "$ref": "#/$defs/takeAction"
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "economy"
+              }
+            }
+          },
+          "then": {
+            "$ref": "#/$defs/economyAction"
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "setRig"
+              }
+            }
+          },
+          "then": {
+            "$ref": "#/$defs/setRigAction"
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "rigState"
+              }
+            }
+          },
+          "then": {
+            "$ref": "#/$defs/rigStateAction"
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "delay"
+              }
+            }
+          },
+          "then": {
+            "$ref": "#/$defs/delayAction"
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "sequence"
+              }
+            }
+          },
+          "then": {
+            "$ref": "#/$defs/sequenceAction"
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "parallel"
+              }
+            }
+          },
+          "then": {
+            "$ref": "#/$defs/parallelAction"
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "repeat"
+              }
+            }
+          },
+          "then": {
+            "$ref": "#/$defs/repeatAction"
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "if"
+              }
+            }
+          },
+          "then": {
+            "$ref": "#/$defs/ifAction"
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "switch"
+              }
+            }
+          },
+          "then": {
+            "$ref": "#/$defs/switchAction"
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "chance"
+              }
+            }
+          },
+          "then": {
+            "$ref": "#/$defs/chanceAction"
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "cooldown"
+              }
+            }
+          },
+          "then": {
+            "$ref": "#/$defs/cooldownAction"
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "emit"
+              }
+            }
+          },
+          "then": {
+            "$ref": "#/$defs/emitAction"
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "broadcast"
+              }
+            }
+          },
+          "then": {
+            "$ref": "#/$defs/broadcastAction"
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "effect"
+              }
+            }
+          },
+          "then": {
+            "$ref": "#/$defs/effectAction"
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "particle"
+              }
+            }
+          },
+          "then": {
+            "$ref": "#/$defs/particleAction"
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "stop"
+              }
+            }
+          },
+          "then": {
+            "$ref": "#/$defs/stopAction"
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "setState"
+              }
+            }
+          },
+          "then": {
+            "$ref": "#/$defs/setStateAction"
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "addState"
+              }
+            }
+          },
+          "then": {
+            "$ref": "#/$defs/addStateAction"
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "clearState"
+              }
+            }
+          },
+          "then": {
+            "$ref": "#/$defs/clearStateAction"
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "sky"
+              }
+            }
+          },
+          "then": {
+            "$ref": "#/$defs/skyAction"
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "camera"
+              }
+            }
+          },
+          "then": {
+            "$ref": "#/$defs/cameraAction"
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "glow"
+              }
+            }
+          },
+          "then": {
+            "$ref": "#/$defs/glowAction"
+          }
         }
       ]
+    },
+    "glowAction": {
+      "title": "Entity Glow Action Data Object",
+      "description": "Outlines an entity for the clicking player alone. Tags stack per purpose and the highest priority decides the colour shown.",
+      "type": "object",
+      "required": [
+        "color"
+      ],
+      "properties": {
+        "target": {
+          "description": "Whose outline: viewer, subject, or an entity uuid. Defaults to the clicking player.",
+          "type": "string"
+        },
+        "color": {
+          "description": "Named text colour applied to the outline and the team.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 32
+        },
+        "ticks": {
+          "description": "Ticks the tag lives for. Zero keeps it until something untags it.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "purpose": {
+          "description": "Owner name for this tag, so two owners never clear each other.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "priority": {
+          "description": "Higher priority wins when several tags target the same entity for the same viewer.",
+          "type": "integer"
+        }
+      }
+    },
+    "cameraAction": {
+      "title": "Camera Ride Action Data Object",
+      "description": "Takes the clicking player on a spectator ride along a Catmull-Rom path. Terminates the action list: the ride owns the player until it ends.",
+      "type": "object",
+      "required": [
+        "path"
+      ],
+      "properties": {
+        "path": {
+          "description": "Ordered camera nodes. Each node's durationTicks is the time spent travelling to the next one; the last node's is ignored.",
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": [
+              "x",
+              "y",
+              "z"
+            ],
+            "properties": {
+              "x": {
+                "type": "number"
+              },
+              "y": {
+                "type": "number"
+              },
+              "z": {
+                "type": "number"
+              },
+              "yaw": {
+                "type": "number"
+              },
+              "pitch": {
+                "type": "number",
+                "minimum": -90,
+                "maximum": 90
+              },
+              "durationTicks": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          }
+        },
+        "skippable": {
+          "description": "Ends the ride when the rider sneaks. Defaults to true.",
+          "type": "boolean"
+        },
+        "letterbox": {
+          "description": "Asks for black bars while the ride runs. Ignored when no surface provider is installed, and never sent to Bedrock viewers.",
+          "type": "boolean"
+        }
+      }
+    },
+    "skyAction": {
+      "title": "Per-Viewer Sky Action Data Object",
+      "description": "Claims the clicking player's time, weather and world border under a purpose. Overrides stack by purpose and the newest wins; releasing one hands the sky back to the previous owner.",
+      "type": "object",
+      "required": [
+        "purpose"
+      ],
+      "properties": {
+        "purpose": {
+          "description": "Owner name for this claim. Releasing the same purpose restores what was showing before it.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "time": {
+          "description": "Day-clock tick shown to this viewer, or \"reset\" to release the purpose.",
+          "type": [
+            "integer",
+            "string"
+          ]
+        },
+        "weather": {
+          "description": "Weather shown to this viewer, or \"reset\" to release the purpose. Bukkit has no per-player thunder, so thunder renders as downfall.",
+          "type": "string",
+          "enum": [
+            "clear",
+            "rain",
+            "downfall",
+            "thunder",
+            "storm",
+            "reset"
+          ]
+        },
+        "border": {
+          "description": "Per-viewer world border. Sent through Paper's Bukkit-typed API when it exists and as border packets on Spigot.",
+          "type": "object",
+          "required": [
+            "centerX",
+            "centerZ",
+            "size"
+          ],
+          "properties": {
+            "centerX": {
+              "type": "number"
+            },
+            "centerZ": {
+              "type": "number"
+            },
+            "size": {
+              "type": "number",
+              "minimum": 1
+            },
+            "warningBlocks": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 512
+            }
+          }
+        },
+        "fadeTicks": {
+          "description": "Ticks the time takes to walk from the world's own time to the override, along the shorter arc of the day clock. Zero jumps.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 72000
+        }
+      }
     },
     "iconDisplayStyle": {
       "title": "Icon Display Style",
@@ -800,6 +1496,24 @@
         "hitbox": {
           "description": "Optional dimensions and displacement for the click plane. Omitted dimensions remain automatic; omitted offset remains icon-aligned.",
           "$ref": "#/$defs/hitbox"
+        },
+        "tooltip": {
+          "description": "Secondary pane shown after the viewer has hovered this button for delayTicks.",
+          "type": "object",
+          "properties": {
+            "delayTicks": {
+              "description": "Hover ticks before the pane appears.",
+              "type": "integer",
+              "minimum": 0
+            },
+            "lines": {
+              "description": "Lines drawn in the pane.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
         }
       }
     },
@@ -1022,6 +1736,222 @@
         }
       }
     },
+    "titleAction": {
+      "title": "Title Action Data Object",
+      "description": "Shows a title and subtitle to the clicking player through the shared HUD compositor, so a higher-priority title from another plugin is not overwritten. Continues the action list.",
+      "type": "object",
+      "required": [
+        "title"
+      ],
+      "properties": {
+        "title": {
+          "description": "Title text. Runs through the full text pipeline for the clicking player.",
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "subtitle": {
+          "description": "Optional subtitle text under the title. Omitted means no subtitle.",
+          "type": "string"
+        },
+        "fadeInTicks": {
+          "description": "Ticks the title fades in over. Defaults to 10.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1200
+        },
+        "stayTicks": {
+          "description": "Ticks the title stays fully visible. Defaults to 40.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1200
+        },
+        "fadeOutTicks": {
+          "description": "Ticks the title fades out over. Defaults to 10.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1200
+        },
+        "priority": {
+          "description": "Compositor priority this title bids with. Defaults to notice.",
+          "type": "string",
+          "enum": [
+            "ambient",
+            "notice",
+            "status",
+            "progress",
+            "interactive",
+            "modal",
+            "pinned"
+          ]
+        }
+      }
+    },
+    "actionBarAction": {
+      "title": "Action Bar Action Data Object",
+      "description": "Publishes one action bar segment for the clicking player through the shared HUD compositor, which merges it with segments other plugins publish. Continues the action list.",
+      "type": "object",
+      "required": [
+        "text"
+      ],
+      "properties": {
+        "text": {
+          "description": "Action bar text. Runs through the full text pipeline for the clicking player.",
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "ticks": {
+          "description": "Ticks the segment stays published before it expires. Defaults to 60.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1200
+        },
+        "slots": {
+          "description": "Compositor slots this segment may occupy. Defaults to center.",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "left",
+              "center",
+              "right"
+            ]
+          }
+        },
+        "priority": {
+          "description": "Compositor priority this segment bids with. Defaults to notice.",
+          "type": "string",
+          "enum": [
+            "ambient",
+            "notice",
+            "status",
+            "progress",
+            "interactive",
+            "modal",
+            "pinned"
+          ]
+        }
+      }
+    },
+    "bossBarAction": {
+      "title": "Boss Bar Action Data Object",
+      "description": "Shows or hides one boss bar lane for the clicking player through the shared HUD compositor, which caps how many bars a viewer sees at once. Continues the action list.",
+      "type": "object",
+      "required": [
+        "id",
+        "title"
+      ],
+      "properties": {
+        "id": {
+          "description": "Lane id for this bar. Reusing the id replaces the bar instead of adding a second one.",
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "title": {
+          "description": "Bar title. Runs through the full text pipeline for the clicking player.",
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "progress": {
+          "description": "Fill from 0 to 1 as a literal number in a string. Defaults to 1.",
+          "type": "string"
+        },
+        "color": {
+          "description": "Bar color. Defaults to white.",
+          "type": "string",
+          "enum": [
+            "pink",
+            "blue",
+            "red",
+            "green",
+            "yellow",
+            "purple",
+            "white"
+          ]
+        },
+        "style": {
+          "description": "Bar segmentation. Defaults to solid.",
+          "type": "string",
+          "enum": [
+            "solid",
+            "segmented_6",
+            "segmented_10",
+            "segmented_12",
+            "segmented_20"
+          ]
+        },
+        "ticks": {
+          "description": "Ticks the bar stays asserted before it expires. 0 hides the lane instead of showing it. Defaults to 100.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1200
+        },
+        "priority": {
+          "description": "Compositor priority this bar bids with. Defaults to notice.",
+          "type": "string",
+          "enum": [
+            "ambient",
+            "notice",
+            "status",
+            "progress",
+            "interactive",
+            "modal",
+            "pinned"
+          ]
+        }
+      }
+    },
+    "setRigAction": {
+      "title": "Rig Variable Action Data Object",
+      "description": "Sets a variable on a rig instance. The value is a Gloss expression evaluated for the clicking player.",
+      "type": "object",
+      "required": [
+        "var",
+        "value"
+      ],
+      "properties": {
+        "instance": {
+          "description": "Rig instance id, or self for the instance that owns the clicked hitbox.",
+          "type": "string",
+          "minLength": 1,
+          "default": "self"
+        },
+        "var": {
+          "description": "Variable name readable as rig.var.<name>.",
+          "type": "string",
+          "minLength": 1
+        },
+        "value": {
+          "description": "Gloss expression producing a number, boolean or string.",
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "rigStateAction": {
+      "title": "Rig State Action Data Object",
+      "description": "Switches a rig instance to a state declared in its graph.",
+      "type": "object",
+      "required": [
+        "state"
+      ],
+      "properties": {
+        "instance": {
+          "description": "Rig instance id, or self for the instance that owns the clicked hitbox.",
+          "type": "string",
+          "minLength": 1,
+          "default": "self"
+        },
+        "state": {
+          "description": "State name from the rig's graph.",
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
     "navigationAction": {
       "title": "Navigation Action Data Object",
       "description": "Changes the current viewer's native menu page stack. Navigation is terminal for actions matching the current click trigger.",
@@ -1043,6 +1973,11 @@
             "home",
             "close"
           ]
+        },
+        "list": {
+          "description": "Id of the list a page navigation targets. Menus name a list component; a chest menu has one list, so this may be omitted there.",
+          "type": "string",
+          "minLength": 1
         }
       },
       "allOf": [
@@ -1303,6 +2238,869 @@
         }
       ],
       "description": "Boolean or Gloss boolean expression. Entity variables include entity.name, named, type, health, maxHealth, healthPercent (0..100), damage, damaged, attack, armor, stackCount, distance, and insight.active. Viewer, world, server, time, permissions, groups, regions and integration functions use the shared condition scope."
+    },
+    "dialogAction": {
+      "title": "Dialog Action Data Object",
+      "description": "Opens a dialogs/ document for the clicking player. Terminal: the dialog owns the flow from here. A client older than 1.21.6 and a Bedrock viewer take the document's fallback instead.",
+      "type": "object",
+      "required": [
+        "id"
+      ],
+      "properties": {
+        "id": {
+          "description": "Dialog document id, without the .json suffix.",
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "args": {
+          "description": "Values seeded into the dialog's args.* namespace for this open.",
+          "type": "object",
+          "additionalProperties": true
+        }
+      }
+    },
+    "confirmAction": {
+      "title": "Confirm Action Data Object",
+      "description": "Shows an ad-hoc yes/no dialog. Terminal: the answer's action list runs when the player picks one.",
+      "type": "object",
+      "properties": {
+        "title": {
+          "description": "Dialog title.",
+          "type": "string"
+        },
+        "text": {
+          "description": "Body paragraph shown above the two answers.",
+          "type": "string"
+        },
+        "yes": {
+          "description": "Actions run when the player confirms.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/action"
+          }
+        },
+        "no": {
+          "description": "Actions run when the player cancels.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/action"
+          }
+        }
+      }
+    },
+    "closeAction": {
+      "title": "Close Action Data Object",
+      "description": "Closes the surface the click came from: a menu session, an inventory window or a dialog. Terminal.",
+      "type": "object",
+      "properties": {}
+    },
+    "inventoryAction": {
+      "title": "Inventory Action Data Object",
+      "description": "Opens an inventories/ chest menu for the clicking player. Terminal: the window owns the flow from here.",
+      "type": "object",
+      "required": [
+        "id"
+      ],
+      "properties": {
+        "id": {
+          "description": "Inventory document id, without the .json suffix.",
+          "type": "string",
+          "minLength": 1,
+          "pattern": "\\S"
+        },
+        "args": {
+          "description": "Values seeded into the window's args.* namespace for this open.",
+          "type": "object",
+          "additionalProperties": true
+        }
+      }
+    },
+    "setSessionAction": {
+      "title": "Set Session Variable Action Data Object",
+      "description": "Writes one session variable of the open surface. Continues the list; components whose text or show reads the variable re-render.",
+      "type": "object",
+      "required": [
+        "var",
+        "value"
+      ],
+      "properties": {
+        "var": {
+          "description": "Session variable name, matching [a-z][a-z0-9_]*.",
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "value": {
+          "description": "Expression evaluated in the clicking player's scope; its result is stored.",
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "listComponent": {
+      "title": "List Component Data Object",
+      "description": "Repeats one template per entry of a source expression, flowed on a grid. Capped by [menus] maxListEntries.",
+      "type": "object",
+      "required": [
+        "var",
+        "source",
+        "template"
+      ],
+      "properties": {
+        "var": {
+          "description": "Loop variable bound for each entry.",
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "source": {
+          "description": "Expression producing the list of entries.",
+          "type": "string",
+          "minLength": 1
+        },
+        "pageSize": {
+          "description": "Entries shown at once; navigate mode page moves between them.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "flow": {
+          "description": "Grid geometry in menu-local units.",
+          "type": "object",
+          "properties": {
+            "columns": {
+              "description": "Entries per row.",
+              "type": "integer",
+              "minimum": 1
+            },
+            "spacingX": {
+              "description": "Horizontal spacing between entries.",
+              "type": "number"
+            },
+            "spacingY": {
+              "description": "Vertical spacing between rows.",
+              "type": "number"
+            },
+            "x": {
+              "description": "Horizontal offset of the first entry.",
+              "type": "number"
+            },
+            "y": {
+              "description": "Vertical offset of the first entry.",
+              "type": "number"
+            }
+          }
+        },
+        "template": {
+          "description": "The component each entry becomes.",
+          "$ref": "#/$defs/componentData"
+        }
+      }
+    },
+    "sliderComponent": {
+      "title": "Slider Component Data Object",
+      "description": "A clickable value between two bounds. Left click adds a step, right click subtracts one, shift multiplies the step by five.",
+      "type": "object",
+      "required": [
+        "var"
+      ],
+      "properties": {
+        "var": {
+          "description": "Session variable written by this slider.",
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "min": {
+          "description": "Lowest value.",
+          "type": "number"
+        },
+        "max": {
+          "description": "Highest value; must be greater than min.",
+          "type": "number"
+        },
+        "step": {
+          "description": "Amount one click moves the value.",
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "width": {
+          "description": "Rendered width in menu-local units.",
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "label": {
+          "description": "Text drawn for the slider; usually reads session.<var>.",
+          "type": "string"
+        },
+        "style": {
+          "$ref": "#/$defs/iconDisplayStyle"
+        }
+      }
+    },
+    "fieldComponent": {
+      "title": "Field Component Data Object",
+      "description": "A button that opens a text prompt and writes the answer into a session variable.",
+      "type": "object",
+      "required": [
+        "var"
+      ],
+      "properties": {
+        "var": {
+          "description": "Session variable written with the answer.",
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "prompt": {
+          "description": "Which editor opens.",
+          "type": "string",
+          "enum": [
+            "sign",
+            "anvil",
+            "chat"
+          ]
+        },
+        "label": {
+          "description": "Text drawn for the field.",
+          "type": "string"
+        },
+        "initial": {
+          "description": "Value offered when the variable is unset.",
+          "type": "string"
+        },
+        "style": {
+          "$ref": "#/$defs/iconDisplayStyle"
+        }
+      }
+    },
+    "tabsComponent": {
+      "title": "Tabs Component Data Object",
+      "description": "A row of buttons writing one session variable; other components gate on it with show.",
+      "type": "object",
+      "required": [
+        "var",
+        "tabs"
+      ],
+      "properties": {
+        "var": {
+          "description": "Session variable written with the selected tab id.",
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "tabs": {
+          "description": "The tabs, in draw order.",
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": [
+              "id"
+            ],
+            "properties": {
+              "id": {
+                "description": "Value written when this tab is clicked.",
+                "type": "string",
+                "minLength": 1
+              },
+              "label": {
+                "description": "Text drawn for this tab.",
+                "type": "string"
+              }
+            }
+          }
+        },
+        "spacing": {
+          "description": "Horizontal spacing between tabs.",
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "style": {
+          "$ref": "#/$defs/iconDisplayStyle"
+        }
+      }
+    },
+    "promptAction": {
+      "title": "Prompt Action Data Object",
+      "description": "Asks the player for a line of text in a sign, anvil or chat editor. Terminal: the answer lands in the session variable and then runs, with input.value holding it.",
+      "type": "object",
+      "properties": {
+        "kind": {
+          "description": "Which editor opens.",
+          "type": "string",
+          "enum": [
+            "sign",
+            "anvil",
+            "chat"
+          ]
+        },
+        "var": {
+          "description": "Session variable written with the answer.",
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "label": {
+          "description": "Text shown with the editor.",
+          "type": "string"
+        },
+        "initial": {
+          "description": "Text the editor opens with.",
+          "type": "string"
+        },
+        "timeoutTicks": {
+          "description": "Ticks before the prompt gives up.",
+          "type": "integer",
+          "minimum": 1
+        },
+        "then": {
+          "description": "Actions run once the answer lands.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/action"
+          }
+        }
+      }
+    },
+    "bookAction": {
+      "title": "Book Action Data Object",
+      "description": "Opens a written book for the clicking player. Continues the list.",
+      "type": "object",
+      "required": [
+        "pages"
+      ],
+      "properties": {
+        "title": {
+          "description": "Book title.",
+          "type": "string"
+        },
+        "author": {
+          "description": "Book author.",
+          "type": "string"
+        },
+        "pages": {
+          "description": "Page texts, run through the text pipeline.",
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 100,
+          "items": {
+            "type": "string",
+            "maxLength": 1024
+          }
+        }
+      }
+    },
+    "giveAction": {
+      "title": "Give Action Data Object",
+      "description": "Gives the clicking player items. Continues the list; with dropIfFull false a full inventory stops it instead.",
+      "type": "object",
+      "required": [
+        "item"
+      ],
+      "properties": {
+        "item": {
+          "description": "The item to give, in icon form.",
+          "$ref": "#/$defs/icon"
+        },
+        "amount": {
+          "description": "Expression for how many to give.",
+          "type": "string"
+        },
+        "dropIfFull": {
+          "description": "Drops at the player's feet when the inventory is full. Default true.",
+          "type": "boolean"
+        }
+      }
+    },
+    "takeAction": {
+      "title": "Take Action Data Object",
+      "description": "Takes items from the clicking player, all or nothing. Terminal when they do not have them.",
+      "type": "object",
+      "required": [
+        "item"
+      ],
+      "properties": {
+        "item": {
+          "description": "The item to take, in icon form.",
+          "$ref": "#/$defs/icon"
+        },
+        "amount": {
+          "description": "Expression for how many to take.",
+          "type": "string"
+        },
+        "denyMessage": {
+          "description": "Message sent when the player does not have them.",
+          "type": "string"
+        }
+      }
+    },
+    "economyAction": {
+      "title": "Economy Action Data Object",
+      "description": "Moves or checks money through Vault. A failed has or withdraw is terminal; a deposit always continues.",
+      "type": "object",
+      "required": [
+        "op"
+      ],
+      "properties": {
+        "op": {
+          "description": "Which operation to run.",
+          "type": "string",
+          "enum": [
+            "withdraw",
+            "deposit",
+            "has"
+          ]
+        },
+        "amount": {
+          "description": "Expression for the amount of money.",
+          "type": "string"
+        },
+        "denyMessage": {
+          "description": "Message sent when the player cannot afford it.",
+          "type": "string"
+        }
+      }
+    },
+    "actionList": {
+      "title": "Action List",
+      "description": "An ordered list of actions. Control-flow actions nest their branches and steps through this definition.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/action"
+      }
+    },
+    "delayAction": {
+      "title": "Delay Action Data Object",
+      "description": "Suspends the surrounding action list and resumes it after the given number of ticks on the player's region thread.",
+      "type": "object",
+      "required": [
+        "ticks"
+      ],
+      "properties": {
+        "ticks": {
+          "description": "Ticks to wait before the rest of the list runs.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1728000
+        }
+      }
+    },
+    "sequenceAction": {
+      "title": "Sequence Action Data Object",
+      "description": "A timed list of steps. Each step is an ordinary action that may carry atTicks, its cue measured from the start of the sequence; steps without a cue run with the previous one.",
+      "type": "object",
+      "required": [
+        "steps"
+      ],
+      "properties": {
+        "steps": {
+          "description": "The ordered steps. Each entry is an action object that may add an integer atTicks cue.",
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/action"
+              }
+            ],
+            "properties": {
+              "atTicks": {
+                "description": "Tick offset from the start of the sequence.",
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1728000
+              }
+            }
+          }
+        },
+        "skippable": {
+          "description": "When true the viewer ends the sequence by sneaking, which runs onSkip.",
+          "type": "boolean",
+          "default": false
+        },
+        "once": {
+          "description": "Player boolean state key set when the sequence completes; while it is true the sequence is skipped.",
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_.]*$"
+        },
+        "onSkip": {
+          "$ref": "#/$defs/actionList",
+          "description": "Actions run when a skippable sequence is ended early."
+        }
+      }
+    },
+    "parallelAction": {
+      "title": "Parallel Action Data Object",
+      "description": "Starts every branch as its own program and continues with the rest of the list immediately.",
+      "type": "object",
+      "required": [
+        "branches"
+      ],
+      "properties": {
+        "branches": {
+          "description": "One action list per branch.",
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/actionList"
+          }
+        }
+      }
+    },
+    "repeatAction": {
+      "title": "Repeat Action Data Object",
+      "description": "Runs steps up to times iterations. With everyTicks the loop suspends between iterations; without it the whole loop runs in one tick and is capped at 1024 iterations.",
+      "type": "object",
+      "required": [
+        "times",
+        "steps"
+      ],
+      "properties": {
+        "times": {
+          "description": "Maximum number of iterations.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100000
+        },
+        "everyTicks": {
+          "description": "Ticks between iterations. 0 or omitted runs every iteration in the same tick.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1728000,
+          "default": 0
+        },
+        "steps": {
+          "$ref": "#/$defs/actionList",
+          "description": "The actions run on each iteration."
+        },
+        "while": {
+          "description": "Boolean condition checked before each iteration; false ends the loop early.",
+          "type": "string"
+        }
+      }
+    },
+    "ifAction": {
+      "title": "If Action Data Object",
+      "description": "Evaluates when in the action's condition scope and runs then or else.",
+      "type": "object",
+      "required": [
+        "when"
+      ],
+      "properties": {
+        "when": {
+          "description": "Boolean condition. Same syntax as show conditions.",
+          "type": "string",
+          "minLength": 1
+        },
+        "then": {
+          "$ref": "#/$defs/actionList",
+          "description": "Actions run when the condition is true."
+        },
+        "else": {
+          "$ref": "#/$defs/actionList",
+          "description": "Actions run when the condition is false."
+        }
+      }
+    },
+    "switchAction": {
+      "title": "Switch Action Data Object",
+      "description": "Evaluates on, converts the result to text and runs the matching case, or default when nothing matches.",
+      "type": "object",
+      "required": [
+        "on",
+        "cases"
+      ],
+      "properties": {
+        "on": {
+          "description": "Expression whose value selects the case.",
+          "type": "string",
+          "minLength": 1
+        },
+        "cases": {
+          "description": "Case value to action list.",
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "$ref": "#/$defs/actionList"
+          }
+        },
+        "default": {
+          "$ref": "#/$defs/actionList",
+          "description": "Actions run when no case matches."
+        }
+      }
+    },
+    "chanceAction": {
+      "title": "Chance Action Data Object",
+      "description": "Rolls a percentage and runs then or else.",
+      "type": "object",
+      "required": [
+        "percent"
+      ],
+      "properties": {
+        "percent": {
+          "description": "Chance of running then, from 0 to 100.",
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "then": {
+          "$ref": "#/$defs/actionList",
+          "description": "Actions run when the roll succeeds."
+        },
+        "else": {
+          "$ref": "#/$defs/actionList",
+          "description": "Actions run when the roll fails."
+        }
+      }
+    },
+    "cooldownAction": {
+      "title": "Cooldown Action Data Object",
+      "description": "Claims a named per-player cooldown. The first claim runs then; a claim inside the window runs else.",
+      "type": "object",
+      "required": [
+        "key",
+        "ticks"
+      ],
+      "properties": {
+        "key": {
+          "description": "Cooldown name, scoped to behaviors.",
+          "type": "string",
+          "minLength": 1
+        },
+        "ticks": {
+          "description": "Length of the cooldown window in ticks.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1728000
+        },
+        "then": {
+          "$ref": "#/$defs/actionList",
+          "description": "Actions run when the cooldown was free."
+        },
+        "else": {
+          "$ref": "#/$defs/actionList",
+          "description": "Actions run while the cooldown is active."
+        }
+      }
+    },
+    "emitAction": {
+      "title": "Emit Action Data Object",
+      "description": "Fires the emit trigger with this name. Emits nest at most eight deep before they are dropped with a warning.",
+      "type": "object",
+      "required": [
+        "name"
+      ],
+      "properties": {
+        "name": {
+          "description": "Event name matched by an emit trigger.",
+          "type": "string",
+          "minLength": 1
+        },
+        "args": {
+          "description": "Values readable as args.* in the entries that answer. A string wrapped in {{ }} is evaluated first.",
+          "type": "object"
+        }
+      }
+    },
+    "broadcastAction": {
+      "title": "Broadcast Action Data Object",
+      "description": "Sends one message to several players at once.",
+      "type": "object",
+      "required": [
+        "message"
+      ],
+      "properties": {
+        "message": {
+          "description": "MiniMessage text rendered for each recipient.",
+          "type": "string",
+          "minLength": 1
+        },
+        "scope": {
+          "description": "Who receives it. Defaults to the whole server.",
+          "type": "string",
+          "enum": [
+            "server",
+            "world",
+            "radius"
+          ],
+          "default": "server"
+        },
+        "radius": {
+          "description": "Block radius around the viewer; required when scope is radius.",
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "permission": {
+          "description": "Only players with this permission receive the message.",
+          "type": "string"
+        }
+      }
+    },
+    "effectAction": {
+      "title": "Potion Effect Action Data Object",
+      "description": "Applies a potion effect to one of the trigger's roles.",
+      "type": "object",
+      "required": [
+        "effect",
+        "ticks"
+      ],
+      "properties": {
+        "effect": {
+          "description": "Potion effect key, such as minecraft:speed.",
+          "type": "string",
+          "pattern": "^([a-z0-9_.-]+:)?[a-z0-9_./-]+$"
+        },
+        "ticks": {
+          "description": "Effect duration in ticks.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1728000
+        },
+        "amplifier": {
+          "description": "Effect amplifier; 0 is level one.",
+          "type": "integer",
+          "minimum": 0,
+          "default": 0
+        },
+        "target": {
+          "description": "Which role receives the effect.",
+          "type": "string",
+          "enum": [
+            "viewer",
+            "subject",
+            "source"
+          ],
+          "default": "viewer"
+        }
+      }
+    },
+    "particleAction": {
+      "title": "Particle Action Data Object",
+      "description": "Spawns particles at one of the trigger's roles or at its location.",
+      "type": "object",
+      "required": [
+        "particle"
+      ],
+      "properties": {
+        "particle": {
+          "description": "Particle key, such as minecraft:flame.",
+          "type": "string",
+          "pattern": "^([a-z0-9_.-]+:)?[a-z0-9_./-]+$"
+        },
+        "count": {
+          "description": "How many particles to spawn.",
+          "type": "integer",
+          "minimum": 1,
+          "default": 1
+        },
+        "offset": {
+          "description": "Random spread in blocks around the anchor.",
+          "type": "number",
+          "minimum": 0,
+          "default": 0
+        },
+        "at": {
+          "description": "Where to spawn them.",
+          "type": "string",
+          "enum": [
+            "viewer",
+            "subject",
+            "source",
+            "location"
+          ],
+          "default": "viewer"
+        }
+      }
+    },
+    "stopAction": {
+      "title": "Stop Action Data Object",
+      "description": "Ends the surrounding action list. Nothing after it runs.",
+      "type": "object",
+      "required": [],
+      "properties": {}
+    },
+    "setStateAction": {
+      "title": "Set State Action Data Object",
+      "description": "Writes one state value, coerced to the key's declared type.",
+      "type": "object",
+      "required": [
+        "key",
+        "value"
+      ],
+      "properties": {
+        "key": {
+          "description": "A state key declared by a behavior document.",
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_.]*$"
+        },
+        "value": {
+          "description": "Expression evaluated in the action's condition scope; its result becomes the new value.",
+          "type": "string",
+          "minLength": 1
+        },
+        "target": {
+          "description": "Whose value to write for a player-scoped or world-scoped key.",
+          "type": "string",
+          "enum": [
+            "viewer",
+            "subject",
+            "source"
+          ],
+          "default": "viewer"
+        }
+      }
+    },
+    "addStateAction": {
+      "title": "Add State Action Data Object",
+      "description": "Adds to one number state value.",
+      "type": "object",
+      "required": [
+        "key",
+        "value"
+      ],
+      "properties": {
+        "key": {
+          "description": "A state key declared by a behavior document.",
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_.]*$"
+        },
+        "value": {
+          "description": "Expression evaluated in the action's condition scope; its number result is added to the current value.",
+          "type": "string",
+          "minLength": 1
+        },
+        "target": {
+          "description": "Whose value to write for a player-scoped or world-scoped key.",
+          "type": "string",
+          "enum": [
+            "viewer",
+            "subject",
+            "source"
+          ],
+          "default": "viewer"
+        }
+      }
+    },
+    "clearStateAction": {
+      "title": "Clear State Action Data Object",
+      "description": "Returns one state value to the default its declaration gives.",
+      "type": "object",
+      "required": [
+        "key"
+      ],
+      "properties": {
+        "key": {
+          "description": "A state key declared by a behavior document.",
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_.]*$"
+        },
+        "target": {
+          "description": "Whose value to clear for a player-scoped or world-scoped key.",
+          "type": "string",
+          "enum": [
+            "viewer",
+            "subject",
+            "source"
+          ],
+          "default": "viewer"
+        }
+      }
     }
   }
 }

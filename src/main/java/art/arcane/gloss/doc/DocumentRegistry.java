@@ -17,6 +17,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.logging.Level;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
@@ -27,6 +28,8 @@ import java.util.function.ToLongFunction;
 
 public final class DocumentRegistry<T> implements AutoCloseable {
     private static final String EXTENSION = ".json";
+    /** Every open registry, so /gloss status can count the files this build refuses to read. */
+    private static final Set<DocumentRegistry<?>> LIVE = ConcurrentHashMap.newKeySet();
     static final long MAX_DOCUMENT_BYTES = 2L * 1024L * 1024L;
     private static final long RECONCILIATION_BYTE_BUDGET = 8L * 1024L * 1024L;
     private static final long RECONCILIATION_TIME_BUDGET_NANOS = TimeUnit.MILLISECONDS.toNanos(10L);
@@ -64,6 +67,7 @@ public final class DocumentRegistry<T> implements AutoCloseable {
     private final Map<String, String> pendingFailureFingerprints;
     private final Map<String, String> reportedFailureFingerprints;
     private final Map<String, String> ignoredSchemaFingerprints;
+    private final Map<String, String> ignoredSchemaReasons;
     private final Set<String> failureRetryIds;
     private final Set<String> retryIds;
     private final Set<String> failedIds;
@@ -104,6 +108,7 @@ public final class DocumentRegistry<T> implements AutoCloseable {
         this.pendingFailureFingerprints = new HashMap<>();
         this.reportedFailureFingerprints = new HashMap<>();
         this.ignoredSchemaFingerprints = new ConcurrentHashMap<>();
+        this.ignoredSchemaReasons = new ConcurrentHashMap<>();
         this.failureRetryIds = new HashSet<>();
         this.retryIds = new HashSet<>();
         this.failedIds = new HashSet<>();
@@ -114,6 +119,7 @@ public final class DocumentRegistry<T> implements AutoCloseable {
         this.reconciliationFiles = List.of();
         this.pendingSnapshot = Map.of();
         scheduleReconciliationWindows();
+        LIVE.add(this);
     }
 
     public static <T> DocumentRegistry<T> folder(String kind, File folder, DocumentParser<T> parser,
@@ -195,6 +201,7 @@ public final class DocumentRegistry<T> implements AutoCloseable {
         recordOwnerWrite(id);
         clearFailure(id);
         ignoredSchemaFingerprints.remove(id);
+        ignoredSchemaReasons.remove(id);
         reconciliationLoaded.remove(id);
         GlossDocument<T> document = GlossDocument.of(id, raw, value, revisionOf.applyAsLong(value));
         documents.put(id, document);
@@ -212,6 +219,7 @@ public final class DocumentRegistry<T> implements AutoCloseable {
         recordOwnerWrite(id);
         clearFailure(id);
         ignoredSchemaFingerprints.remove(id);
+        ignoredSchemaReasons.remove(id);
         reconciliationLoaded.remove(id);
         pendingDeletions.remove(id);
         boolean workingRemoved = documents.remove(id) != null;
@@ -236,6 +244,7 @@ public final class DocumentRegistry<T> implements AutoCloseable {
         pendingFailureFingerprints.clear();
         reportedFailureFingerprints.clear();
         ignoredSchemaFingerprints.clear();
+        ignoredSchemaReasons.clear();
         pendingDeletions.clear();
         resetReconciliation();
         if (layout == Layout.FILE) {
@@ -642,6 +651,7 @@ public final class DocumentRegistry<T> implements AutoCloseable {
         if (documents.remove(id) != null) {
             clearFailure(id);
             ignoredSchemaFingerprints.remove(id);
+            ignoredSchemaReasons.remove(id);
             removed.add(id);
         }
     }
@@ -658,6 +668,7 @@ public final class DocumentRegistry<T> implements AutoCloseable {
 
     @Override
     public synchronized void close() {
+        LIVE.remove(this);
         pollInvalidated = polling;
         replaceFolderWatcher(null);
         replaceFileWatcher(null);
@@ -668,6 +679,7 @@ public final class DocumentRegistry<T> implements AutoCloseable {
         pendingFailureFingerprints.clear();
         reportedFailureFingerprints.clear();
         ignoredSchemaFingerprints.clear();
+        ignoredSchemaReasons.clear();
         reconciliationLoaded.clear();
         pendingDeletions.clear();
         resetReconciliation();
@@ -927,6 +939,7 @@ public final class DocumentRegistry<T> implements AutoCloseable {
             if (current != null && current.raw().equals(raw)) {
                 clearFailure(id);
                 ignoredSchemaFingerprints.remove(id);
+                ignoredSchemaReasons.remove(id);
                 return false;
             }
             T value = prepared.value();
@@ -936,6 +949,7 @@ public final class DocumentRegistry<T> implements AutoCloseable {
             documents.put(id, GlossDocument.of(id, raw, value, revisionOf.applyAsLong(value)));
             clearFailure(id);
             ignoredSchemaFingerprints.remove(id);
+            ignoredSchemaReasons.remove(id);
             return true;
         }
         failedIds.add(id);
@@ -947,8 +961,19 @@ public final class DocumentRegistry<T> implements AutoCloseable {
         }
         if (DocumentEnvelope.isUnsupportedSchemaVersion(failure)) {
             clearFailure(id);
-            if (raw != null) {
-                ignoredSchemaFingerprints.put(id, DocumentHashes.sha256(raw));
+            String reason = failure.getMessage() == null ? "declares an unsupported schemaVersion" : failure.getMessage();
+            boolean firstSighting;
+            if (raw == null) {
+                firstSighting = !ignoredSchemaReasons.containsKey(id);
+            } else {
+                String fingerprint = DocumentHashes.sha256(raw);
+                firstSighting = !fingerprint.equals(ignoredSchemaFingerprints.put(id, fingerprint));
+            }
+            ignoredSchemaReasons.put(id, reason);
+            if (firstSighting) {
+                Gloss.log(Level.WARNING, "%s/%s%s %s; the file is ignored until it is updated.",
+                    kind, id, EXTENSION, reason);
+                reportSkippedToWatchdog();
             }
             return false;
         }
@@ -964,6 +989,7 @@ public final class DocumentRegistry<T> implements AutoCloseable {
             return;
         }
         ignoredSchemaFingerprints.remove(id);
+        ignoredSchemaReasons.remove(id);
         if (documents.containsKey(id)) {
             pendingDeletions.putIfAbsent(id, clock.getAsLong());
         }
@@ -1153,6 +1179,32 @@ public final class DocumentRegistry<T> implements AutoCloseable {
 
         private static <V> PreparedLoad<V> failed(String id, File file, String raw, Throwable failure) {
             return new PreparedLoad<>(id, file, false, false, raw, null, failure);
+        }
+    }
+
+    /**
+     * Documents skipped because they declare a schemaVersion this build does not read, by id, with
+     * the reason. Populated by every load and poll; consumers report it, this registry stays silent.
+     */
+    public Map<String, String> unsupportedSchemaDocuments() {
+        return Map.copyOf(ignoredSchemaReasons);
+    }
+
+    /** Documents every open registry is ignoring for their {@code schemaVersion}, right now. */
+    public static int unsupportedSchemaTotal() {
+        int total = 0;
+        for (DocumentRegistry<?> registry : LIVE) {
+            total += registry.ignoredSchemaReasons.size();
+        }
+        return total;
+    }
+
+    /** The hotload notice carries the count so an operator sees the skip without reading the log. */
+    private void reportSkippedToWatchdog() {
+        Gloss plugin = Gloss.instance;
+        DataWatchdog watchdog = plugin == null ? null : plugin.watchdog();
+        if (watchdog != null) {
+            watchdog.recordSkipped(kind, 1);
         }
     }
 }

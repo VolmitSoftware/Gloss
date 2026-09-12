@@ -124,6 +124,11 @@ public final class DataWatchdog {
         hotloadBatch.record(kind, changes);
     }
 
+    /** A document this build refuses to read; the next notice says how many were ignored. */
+    public void recordSkipped(String kind, int count) {
+        hotloadBatch.recordSkipped(kind, count);
+    }
+
     private void pump() {
         batchGate.request();
         dispatchQueuedPass();

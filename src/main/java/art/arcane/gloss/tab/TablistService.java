@@ -1,16 +1,23 @@
 package art.arcane.gloss.tab;
 
 import art.arcane.gloss.Gloss;
+import art.arcane.gloss.behavior.ExplainReport;
+import art.arcane.gloss.behavior.ExplainReports;
+import art.arcane.gloss.behavior.Explainable;
 import art.arcane.gloss.condition.BoundedConditionErrorCallback;
+import art.arcane.gloss.condition.GlossConditionContext;
 import art.arcane.gloss.condition.GlossConditionScope;
 import art.arcane.gloss.doc.DocumentDelta;
 import art.arcane.gloss.doc.DocumentRegistry;
 import art.arcane.gloss.doc.GlossDocument;
+import art.arcane.gloss.doc.RegistryOwner;
 import art.arcane.gloss.doc.ShippedDefaults;
 import art.arcane.gloss.doc.ShippedDocumentCatalog;
 import art.arcane.gloss.text.TextPipeline;
 import art.arcane.volmlib.util.scheduling.FoliaScheduler;
 import art.arcane.volmlib.util.scheduling.SchedulerUtils;
+import com.github.retrooper.packetevents.PacketEvents;
+import com.github.retrooper.packetevents.event.PacketListenerCommon;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -38,7 +45,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.IntConsumer;
 import java.util.function.IntSupplier;
 
-public final class TablistService implements Listener {
+public final class TablistService implements Listener, Explainable, RegistryOwner {
     private static final String PLAYER_TOKEN = "$player";
     static final String GROUP_TOKEN = "$group";
     private static final int ANIMATION_REFRESH_INTERVAL_TICKS = 1;
@@ -69,6 +76,10 @@ public final class TablistService implements Listener {
     private int applyCursor;
     private HeaderFooterHeartbeatCycle heartbeatCycle;
     private final BoundedConditionErrorCallback conditionErrors;
+    private final TablistSortService sorts;
+    private final TablistLayoutService layouts;
+    private volatile TablistLayoutRuntime activeLayout;
+    private volatile PacketListenerCommon layoutListener;
     private volatile TablistDoc activeDoc;
     private volatile TablistRuntime activeRuntime;
     private volatile int driverTaskId;
@@ -99,13 +110,23 @@ public final class TablistService implements Listener {
         this.conditionErrors = BoundedConditionErrorCallback.bounded(100, error ->
             Gloss.logExceptionStackThrottled(false, "tablist-condition-" + error.path(), error.cause(),
                 "Tablist condition %s failed and was treated as false.", error.path()));
+        this.sorts = new TablistSortService();
+        this.layouts = new TablistLayoutService(new PacketLayoutSink(),
+            raw -> plugin.text().renderStatic(raw));
         this.activeDoc = TablistDoc.DEFAULTS;
         this.activeRuntime = TablistRuntime.compile(activeDoc);
+        this.activeLayout = TablistLayoutRuntime.compile(activeDoc.layout());
         this.driverTaskId = -1;
         this.driverIntervalTicks = -1;
     }
 
     /** Single-pass splice of the {@code $player} and {@code $group} tokens; substituted text is never rescanned. */
+    /** {@code /gloss explain tablist}: the document gate plus the header/footer and list-name variants. */
+    @Override
+    public ExplainReport explain(String id, Player viewer) {
+        return ExplainReports.tablist(doc(), GlossConditionScope.viewer(plugin, viewer));
+    }
+
     public static String substituteTokens(String raw, String playerName, String groupName) {
         if (raw == null) {
             return "";
@@ -146,8 +167,10 @@ public final class TablistService implements Listener {
         activeRuntime = TablistRuntime.compile(activeDoc);
         headerFooterMemos.clear();
         docGeneration.incrementAndGet();
+        activeLayout = TablistLayoutRuntime.compile(activeDoc.layout());
         Bukkit.getPluginManager().registerEvents(this, plugin);
         plugin.watchdog().register(TablistDoc.KIND, this::pollRegistry);
+        syncLayoutListener();
         startDriver();
     }
 
@@ -166,6 +189,12 @@ public final class TablistService implements Listener {
             queue.retire();
         }
         playerApplyQueues.clear();
+        sorts.clear();
+        restoreLayouts();
+        if (layoutListener != null) {
+            PacketEvents.getAPI().getEventManager().unregisterListener(layoutListener);
+            layoutListener = null;
+        }
         resetAppliedHeaderFooters();
         resetAppliedListNames();
     }
@@ -178,6 +207,7 @@ public final class TablistService implements Listener {
         registry.reload();
         activeDoc = committedDoc();
         activeRuntime = TablistRuntime.compile(activeDoc);
+        adoptLayout(activeDoc);
         headerFooterMemos.clear();
         docGeneration.incrementAndGet();
         clearFastNamePlayers();
@@ -253,6 +283,8 @@ public final class TablistService implements Listener {
             fastPlayers.remove(uuid);
             reconcileFastDriverLocked();
         }
+        sorts.forget(uuid);
+        layouts.forget(uuid);
         appliedListNames.remove(uuid);
         appliedHeaderFooters.remove(uuid);
         listNameSources.remove(uuid);
@@ -275,6 +307,66 @@ public final class TablistService implements Listener {
     @EventHandler(priority = EventPriority.MONITOR)
     public void on(PlayerChangedWorldEvent event) {
         invalidateAndPush(event.getPlayer());
+    }
+
+    /** One layout pass per driver cycle; only the rows whose text changed leave the server. */
+    private void layoutPass() {
+        TablistLayoutRuntime layout = activeLayout;
+        List<Player> players = new ArrayList<>(Bukkit.getOnlinePlayers());
+        for (Player viewer : players) {
+            plugin.scheduler().runEntity(viewer,
+                () -> layouts.apply(viewer, layout, players, this::sortScope, conditionErrors));
+        }
+    }
+
+    /**
+     * Swaps the compiled grid and matches the packet rewriter to it. Every path that changes the
+     * document goes through here: a hot reload that only reassigned the runtime kept drawing the
+     * grid the previous compile produced.
+     */
+    private void adoptLayout(TablistDoc updated) {
+        restoreLayouts();
+        activeLayout = TablistLayoutRuntime.compile(updated.layout());
+        syncLayoutListener();
+    }
+
+    /** The rewriter is only installed while a layout is live; a document may gain or lose one. */
+    private void syncLayoutListener() {
+        boolean wanted = activeLayout != null;
+        if (wanted == (layoutListener != null)) {
+            return;
+        }
+        if (PacketEvents.getAPI() == null || PacketEvents.getAPI().getEventManager() == null) {
+            return;
+        }
+        if (wanted) {
+            layoutListener = PacketEvents.getAPI().getEventManager()
+                .registerListener(new PlayerInfoRewriteListener(layouts::hasLayout, layouts::recordUnlisted));
+            return;
+        }
+        PacketEvents.getAPI().getEventManager().unregisterListener(layoutListener);
+        layoutListener = null;
+    }
+
+    private void restoreLayouts() {
+        for (Player viewer : Bukkit.getOnlinePlayers()) {
+            layouts.restore(viewer);
+        }
+        layouts.forgetAll();
+    }
+
+    /** One ordering pass per driver cycle: weights are cheap, the packets are change-gated. */
+    private void sortPass() {
+        TablistRuntime runtime = activeRuntime;
+        if (runtime.sortWeight() == null) {
+            return;
+        }
+        sorts.pass(runtime, new ArrayList<>(Bukkit.getOnlinePlayers()), this::sortScope, conditionErrors);
+    }
+
+    private GlossConditionScope sortScope(Player viewer, Player subject) {
+        return new GlossConditionScope(plugin,
+            GlossConditionContext.subject(viewer, subject, null, Map.of()));
     }
 
     private TablistDoc doc() {
@@ -303,6 +395,7 @@ public final class TablistService implements Listener {
         TablistDoc updated = document == null ? TablistDoc.DEFAULTS : document.value();
         activeDoc = updated;
         activeRuntime = TablistRuntime.compile(updated);
+        adoptLayout(updated);
         headerFooterMemos.clear();
         docGeneration.incrementAndGet();
         clearFastNamePlayers();
@@ -410,6 +503,8 @@ public final class TablistService implements Listener {
             applyOrder.clear();
             applyCursor = 0;
             HeaderFooterHeartbeatCycle cycle = new HeaderFooterHeartbeatCycle(HEADER_FOOTER_HEARTBEAT_LIMIT_PER_CYCLE);
+            sortPass();
+            layoutPass();
             for (Player player : Bukkit.getOnlinePlayers()) {
                 requestApply(player, epoch, APPLY_FULL, cycle);
             }
@@ -420,6 +515,8 @@ public final class TablistService implements Listener {
         }
         if (applyStripeIndex == 0) {
             beginApplyCycle();
+            sortPass();
+            layoutPass();
         }
         int remaining = applyOrder.size() - applyCursor;
         if (remaining > 0) {
@@ -971,5 +1068,10 @@ public final class TablistService implements Listener {
         synchronized boolean required() {
             return required;
         }
+    }
+
+    @Override
+    public Map<String, DocumentRegistry<?>> registries() {
+        return Map.of("tablist", registry);
     }
 }

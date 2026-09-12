@@ -1,0 +1,169 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://volmit.com/gloss/channels.schema.json",
+  "title": "Gloss Channel Document",
+  "description": "One chat channel at plugins/Gloss/channels/<id>.json: who hears it, how it renders per viewer, and what the engine does to the text before rendering.",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "revision",
+    "channel",
+    "format"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "type": "integer",
+      "const": 1
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991
+    },
+    "show": {
+      "type": ["string", "boolean"],
+      "default": "true",
+      "description": "Boolean expression gating whether a sender may talk in this channel."
+    },
+    "channel": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_-]{0,31}$"
+        },
+        "aliases": {
+          "type": "array",
+          "maxItems": 8,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9_-]{0,31}$"
+          }
+        },
+        "default": {
+          "type": "boolean",
+          "default": false,
+          "description": "The channel new players talk in; lowest priority wins when several are marked."
+        },
+        "scope": {
+          "type": "string",
+          "enum": ["global", "world", "radius", "permission", "direct", "party"],
+          "default": "global",
+          "description": "party is reserved and resolves to global until a party SPI exists."
+        },
+        "radius": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 512,
+          "description": "Required and positive when scope is radius."
+        },
+        "permission": {
+          "type": "string",
+          "default": "",
+          "description": "Gates sending; with scope permission it also gates hearing. Required for that scope."
+        },
+        "priority": {
+          "type": "integer",
+          "minimum": -1000,
+          "maximum": 1000,
+          "default": 0
+        },
+        "cooldownTicks": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 72000,
+          "default": 0
+        }
+      }
+    },
+    "format": {
+      "type": "string",
+      "maxLength": 4096,
+      "description": "The per-viewer line. Reads sender.*, viewer.*, message, card and channel.*."
+    },
+    "card": {
+      "type": "array",
+      "maxItems": 16,
+      "items": { "type": "string" },
+      "description": "Hover-card lines rendered per viewer and joined with newlines into {{ card }}."
+    },
+    "mentions": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean", "default": true },
+        "pattern": {
+          "type": "string",
+          "default": "@{name}",
+          "description": "Must contain {name}; the literal halves may carry regex metacharacters."
+        },
+        "render": {
+          "type": "string",
+          "default": "&e@{{ mention.name }}&r",
+          "description": "Rendered only for the mentioned viewer. Reads mention.name."
+        },
+        "sound": {
+          "type": "string",
+          "default": "",
+          "description": "Namespaced sound played to the mentioned viewer; empty plays nothing."
+        },
+        "permission": { "type": "string", "default": "gloss.chat.mention" }
+      }
+    },
+    "items": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean", "default": true },
+        "token": { "type": "string", "default": "[item]" },
+        "permission": { "type": "string", "default": "gloss.chat.item" }
+      }
+    },
+    "links": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean", "default": true },
+        "render": {
+          "type": "string",
+          "default": "&9&n{{ link.host }}",
+          "description": "Reads link.host and link.url."
+        }
+      }
+    },
+    "filters": {
+      "type": "array",
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "required": ["match"],
+        "properties": {
+          "match": { "type": "string", "format": "regex" },
+          "replace": { "type": "string", "default": "" }
+        }
+      },
+      "description": "Applied in order to the plain message; a match that empties it cancels the message."
+    },
+    "throttle": {
+      "type": "object",
+      "properties": {
+        "repeatWindowTicks": { "type": "integer", "minimum": 0, "maximum": 72000, "default": 100 },
+        "maxRepeats": { "type": "integer", "minimum": 1, "maximum": 64, "default": 1 },
+        "minIntervalTicks": { "type": "integer", "minimum": 0, "maximum": 72000, "default": 10 }
+      }
+    },
+    "variants": {
+      "type": "array",
+      "maxItems": 32,
+      "items": {
+        "type": "object",
+        "required": ["id", "when", "format"],
+        "properties": {
+          "id": { "type": "string" },
+          "priority": { "type": "integer", "minimum": -1000, "maximum": 1000, "default": 0 },
+          "when": { "type": "string" },
+          "format": { "type": "string", "maxLength": 4096 }
+        }
+      },
+      "description": "Highest priority matching variant replaces the base format whole; ties break on id."
+    }
+  }
+}

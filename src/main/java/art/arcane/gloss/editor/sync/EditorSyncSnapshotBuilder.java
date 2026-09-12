@@ -1,7 +1,12 @@
 package art.arcane.gloss.editor.sync;
 
 import art.arcane.gloss.Gloss;
+import art.arcane.gloss.history.HistoryEntry;
+import art.arcane.gloss.history.HistoryKinds;
+import art.arcane.gloss.history.HistoryService;
+import art.arcane.gloss.lint.WorkspaceLint;
 import art.arcane.gloss.config.menu.MenuIds;
+import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
@@ -38,21 +43,105 @@ public final class EditorSyncSnapshotBuilder implements EditorSyncSnapshotSource
       "^\\s*/?(?:gloss|gl|glo|gg)\\s+menus?\\s+open\\s+(?:menu=)?([^\\s]+)\\s*$",
       Pattern.CASE_INSENSITIVE);
 
+  private final Gloss plugin;
   private final EditorSyncContentSnapshotBuilder contentSnapshots;
 
   public EditorSyncSnapshotBuilder(Gloss plugin) {
+    this.plugin = Objects.requireNonNull(plugin, "plugin");
     this.contentSnapshots = new EditorSyncContentSnapshotBuilder(
-        Objects.requireNonNull(plugin, "plugin").getDataFolder().toPath());
+        plugin.getDataFolder().toPath());
   }
 
   @Override
   public EditorSyncProject open(EditorSyncKind kind, String subjectId, int maximumBytes) {
-    return contentSnapshots.open(kind, subjectId, maximumBytes);
+    return contentSnapshots.open(kind, subjectId, maximumBytes,
+        new PluginSections(kind == EditorSyncKind.WORKSPACE));
+  }
+
+  /**
+   * The workspace linter's findings for exactly the documents this snapshot carries, in the
+   * {@code code|kind|id|pointer|message} shape the editor's Problems panel reads.
+   */
+  List<String> lintWarnings(List<EditorSyncDocuments.Entry> documents) {
+    WorkspaceLint lint = plugin.service(WorkspaceLint.class);
+    if (lint == null) {
+      return List.of();
+    }
+    Map<String, Map<String, String>> byKind = new java.util.LinkedHashMap<>();
+    for (EditorSyncDocuments.Entry document : documents) {
+      EditorSyncDocumentKind kind = EditorSyncDocuments.handledKind(document.kind());
+      if (kind == null) {
+        continue;
+      }
+      byKind.computeIfAbsent(HistoryKinds.collection(kind),
+          ignored -> new java.util.LinkedHashMap<>()).put(document.id(), document.json());
+    }
+    try {
+      return lint.warningsFor(byKind);
+    } catch (RuntimeException failure) {
+      Gloss.logExceptionStack(false, failure, "Workspace lint failed for a sync snapshot.");
+      return List.of();
+    }
   }
 
   @Override
   public List<String> subjectIds(EditorSyncKind kind) {
     return contentSnapshots.subjectIds(kind);
+  }
+
+  /** The sections this server contributes to every snapshot it builds. */
+  private final class PluginSections implements EditorSyncContentSnapshotBuilder.ServerSections {
+    private final boolean workspace;
+
+    private PluginSections(boolean workspace) {
+      this.workspace = workspace;
+    }
+
+    @Override
+    public List<String> warnings(List<EditorSyncDocuments.Entry> documents) {
+      return lintWarnings(documents);
+    }
+
+    @Override
+    public JsonArray history(List<EditorSyncDocuments.Entry> documents) {
+      return documentHistory(documents);
+    }
+
+    @Override
+    public JsonObject schemas() {
+      return workspace ? EditorSyncServerCatalog.schemas() : new JsonObject();
+    }
+
+    @Override
+    public JsonObject defaults() {
+      return workspace ? EditorSyncServerCatalog.defaults() : new JsonObject();
+    }
+  }
+
+  private JsonArray documentHistory(List<EditorSyncDocuments.Entry> documents) {
+    HistoryService history = plugin.service(HistoryService.class);
+    if (history == null) {
+      return new JsonArray();
+    }
+    JsonArray entries = new JsonArray();
+    for (EditorSyncDocuments.Entry document : documents) {
+      EditorSyncDocumentKind kind = EditorSyncDocuments.handledKind(document.kind());
+      if (kind == null) {
+        continue;
+      }
+      String collection = HistoryKinds.collection(kind);
+      int carried = 0;
+      for (HistoryEntry version : history.versions(collection, document.id())) {
+        if (carried >= EditorSyncProjectSections.MAX_HISTORY_PER_DOCUMENT
+            || entries.size() >= EditorSyncProjectSections.MAX_HISTORY_ENTRIES) {
+          break;
+        }
+        entries.add(EditorSyncProjectSections.historyEntry(collection, document.id(),
+            version.epochMillis(), version.source(), version.bytes()));
+        carried++;
+      }
+    }
+    return entries;
   }
 
   static void collectTargets(JsonElement element, Set<String> targets) {

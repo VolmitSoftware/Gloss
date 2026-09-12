@@ -826,3 +826,517 @@ line = "Dòng {line}"
 [language.editor.value]
 none = "Không có"
 empty = "(trống)"
+
+# Lane message tables. Each lane appends its [gloss.message.<lane>] and [command.help.<group>]
+# tables inside its own anchor so parallel branches never share a line.
+# --- lane:screen ---
+[gloss.message.screen]
+"surfaces.empty" = "&8[&dGloss&8] &7Chưa tải bề mặt nào."
+"surfaces.unknown" = "&8[&dGloss&8]: &cKhông có bề mặt tên &f{id}&c."
+"surfaces.tested" = "&8[&dGloss&8]: &aĐã chạy &f{id}&a cho &f{player}&a."
+"nametags.empty" = "&8[&dGloss&8] &7Chưa tải thẻ tên nào."
+"nametags.unknown" = "&8[&dGloss&8]: &cKhông có thẻ tên &f{id}&c."
+"nametags.refreshed" = "&8[&dGloss&8]: &aĐã áp dụng lại &d{count}&a tài liệu thẻ tên."
+"hud.header" = "&8[&dGloss&8] &7Các chiếm dụng HUD của &f{player}&7: &d{count}"
+"hud.empty" = "&8[&dGloss&8] &7Không plugin nào chiếm ô HUD của &f{player}&7."
+"hud.line" = "&8- &f{kind} &7{source} &8| &7{value} &8| &7{count} &8| &7{state}"
+"player.unknown" = "&8[&dGloss&8]: &cKhông có người chơi trực tuyến tên &f{player}&c."
+
+[command.help.surface]
+root = "Bề mặt thanh hành động, thanh boss và tiêu đề"
+list = "Liệt kê tài liệu bề mặt"
+info = "Hiển thị một tài liệu bề mặt"
+"info.id" = "Mã tài liệu bề mặt"
+reset = "Khôi phục các bề mặt đi kèm"
+test = "Chạy lượt bề mặt cho một người chơi ngay"
+"test.id" = "Mã tài liệu bề mặt"
+"test.player" = "Người chơi để thử; mặc định là bạn"
+
+[command.help.nametag]
+root = "Tài liệu thẻ tên theo từng người xem"
+list = "Liệt kê tài liệu thẻ tên"
+info = "Hiển thị một tài liệu thẻ tên"
+"info.id" = "Mã tài liệu thẻ tên"
+reset = "Khôi phục các thẻ tên đi kèm"
+refresh = "Áp dụng lại toàn bộ thẻ tên ngay"
+
+[command.help.hud]
+root = "Kiểm tra bộ ghép HUD dùng chung"
+who = "Hiển thị plugin nào đang chiếm từng ô HUD"
+"who.player" = "Người chơi để kiểm tra; mặc định là bạn"
+
+# --- lane:chat ---
+[gloss.message.chat]
+filtered = "&8[&dGloss&8]: &cMột bộ lọc trò chuyện đã chặn tin nhắn của bạn."
+too_fast = "&8[&dGloss&8]: &eHãy chờ một chút trước khi gửi tin nhắn tiếp theo."
+repeat = "&8[&dGloss&8]: &eBạn vừa nói điều đó rồi."
+channel_set = "&8[&dGloss&8]: &aBạn đang nói trong kênh &d{name}&a."
+channel_unknown = "&8[&dGloss&8]: &cKhông có kênh nào tên &d{name}&c."
+channel_list = "&8[&dGloss&8]: &7Kênh: &f{value}"
+msg_usage = "&8[&dGloss&8]: &eCách dùng: &f{command}"
+msg_offline = "&8[&dGloss&8]: &c{player} không trực tuyến."
+reply_none = "&8[&dGloss&8]: &cBạn không có ai để trả lời."
+msg_self = "&8[&dGloss&8]: &cBạn không thể nhắn tin cho chính mình."
+channels_header = "&dKênh &7({count})"
+channels_empty = "&7Chưa nạp kênh nào."
+channel_missing = "&8[&dGloss&8]: &cKhông có tài liệu kênh nào tên &f{id}&c."
+strings_header = "&dNgôn ngữ văn bản &7({count})"
+strings_empty = "&7Chưa nạp tài liệu văn bản nào."
+strings_missing = "&dThiếu trong {locale} &7({count})"
+strings_complete = "&8[&dGloss&8]: &a{locale} bao phủ mọi khóa của en_US."
+leaderboards_header = "&dBảng xếp hạng &7({count})"
+leaderboards_empty = "&7Chưa nạp bảng xếp hạng nào."
+leaderboard_missing = "&8[&dGloss&8]: &cKhông có bảng xếp hạng nào tên &f{id}&c."
+leaderboard_reset = "&8[&dGloss&8]: &aĐã đặt lại bảng xếp hạng &f{id}&a ({state})."
+leaderboard_sampled = "&8[&dGloss&8]: &aĐã lấy mẫu bảng xếp hạng &f{id}&a cho mọi người chơi trực tuyến."
+
+
+[command.help.channel]
+root = "Kênh trò chuyện"
+list = "Liệt kê các kênh đã nạp"
+info = "Hiển thị phạm vi, định dạng và biến thể của một kênh"
+"info.id" = "Id tài liệu kênh"
+reset = "Khôi phục các tài liệu kênh đi kèm"
+
+[command.help.strings]
+root = "Văn bản nội dung đã soạn"
+list = "Liệt kê các ngôn ngữ văn bản đã nạp và số mục"
+missing = "Liệt kê khóa mà en_US có còn ngôn ngữ đó không có"
+"missing.locale" = "Ngôn ngữ cần so với en_US"
+reset = "Khôi phục các tài liệu văn bản đi kèm"
+
+[command.help.leaderboard]
+root = "Bảng xếp hạng được tính"
+list = "Liệt kê các bảng xếp hạng đã nạp và số mục"
+info = "Hiển thị nguồn, thứ tự và các mục của một bảng xếp hạng"
+"info.id" = "Id tài liệu"
+reset = "Xóa giá trị theo kỳ hoặc toàn thời gian của bảng xếp hạng"
+"reset.id" = "Id tài liệu"
+"reset.period" = "all hoặc current"
+sample = "Lấy mẫu bảng xếp hạng ngay cho mọi người chơi trực tuyến"
+"sample.id" = "Id tài liệu"
+
+# --- lane:forms ---
+[gloss.message.forms]
+icon_unsupported = "&7Không thể vẽ trong ô rương ({kind})"
+no_dialogs = "&8[&dGloss&8]: &7Chưa cấu hình hộp thoại nào."
+dialog_list_header = "&dHộp thoại"
+dialog_list_entry = "&7Mở hộp thoại &f{id}"
+dialog_info = "&8[&dGloss&8]: &d{id} &8- &7loại &f{kind}&7, nút &f{count}"
+unknown_dialog = "&8[&dGloss&8]: &cKhông có hộp thoại nào tên {id}."
+dialog_opened = "&8[&dGloss&8]: &aĐã mở hộp thoại {id} cho {player}."
+dialog_unsupported = "&8[&dGloss&8]: &cMáy khách của bạn không thể hiển thị hộp thoại đó."
+no_inventories = "&8[&dGloss&8]: &7Chưa cấu hình menu rương nào."
+inventory_list_header = "&dMenu rương"
+inventory_list_entry = "&7Mở menu rương &f{id}"
+inventory_info = "&8[&dGloss&8]: &d{id} &8- &7kích thước &f{kind}&7, ô &f{count}"
+unknown_inventory = "&8[&dGloss&8]: &cKhông có menu rương nào tên {id}."
+inventory_opened = "&8[&dGloss&8]: &aĐã mở menu rương {id} cho {player}."
+bad_args = "&8[&dGloss&8]: &cĐối số phải là các cặp key=value: {value}"
+prompt_timeout = "&8[&dGloss&8]: &7Đã hết thời gian nhập."
+prompt_busy = "&8[&dGloss&8]: &cBạn đã có một yêu cầu nhập đang chờ."
+take_missing = "&8[&dGloss&8]: &cBạn không có vật phẩm cần thiết."
+economy_denied = "&8[&dGloss&8]: &cBạn không đủ tiền."
+economy_unavailable = "&8[&dGloss&8]: &cKhông có plugin kinh tế nào khả dụng."
+give_dropped = "&8[&dGloss&8]: &7Túi đồ của bạn đã đầy nên vật phẩm rơi xuống chân bạn."
+
+[command.help.dialog]
+root = "Xem và mở tài liệu hộp thoại"
+list = "Liệt kê các hộp thoại đã cấu hình"
+"list.page" = "Trang danh sách, bắt đầu từ 1"
+info = "Hiển thị loại, ô nhập và nút của hộp thoại"
+"info.id" = "ID hộp thoại"
+open = "Mở hộp thoại cho một người chơi"
+"open.id" = "ID hộp thoại"
+"open.player" = "Người chơi để mở; mặc định là bạn"
+"open.args" = "Đối số key=value cách nhau bằng dấu cách"
+reset = "Khôi phục các hộp thoại mặc định đi kèm"
+"reset.name" = "Tên cần đặt lại, hoặc * cho mọi tệp đi kèm"
+
+["command.help.menu.open"]
+args = "Đối số key=value cách nhau bằng dấu cách"
+
+[command.help.inventory]
+root = "Xem và mở menu rương"
+list = "Liệt kê các menu rương đã cấu hình"
+"list.page" = "Trang danh sách, bắt đầu từ 1"
+info = "Hiển thị kích thước và ô của menu rương"
+"info.id" = "ID menu rương"
+open = "Mở menu rương cho một người chơi"
+"open.id" = "ID menu rương"
+"open.player" = "Người chơi để mở; mặc định là bạn"
+"open.args" = "Đối số key=value cách nhau bằng dấu cách"
+reset = "Khôi phục các menu rương mặc định đi kèm"
+"reset.name" = "Tên cần đặt lại, hoặc * cho mọi tệp đi kèm"
+
+
+# --- lane:rigs ---
+[command.help.rig]
+root = "Đặt và quản lý các thực thể rig"
+list = "Liệt kê rig và các thực thể đã đặt; nhấp để dịch chuyển"
+info = "Hiển thị rig, vị trí và trạng thái của một thực thể rig"
+"info.id" = "ID thực thể rig"
+place = "Đặt một rig tại vị trí của bạn"
+"place.rig" = "ID tài liệu rig"
+"place.id" = "ID thực thể; để trống sẽ chọn ID trống tiếp theo"
+move = "Dịch một thực thể rig theo khoảng cách khối tương đối"
+"move.id" = "ID thực thể rig"
+"move.x" = "Độ lệch X tương đối theo khối"
+"move.y" = "Độ lệch Y tương đối theo khối"
+"move.z" = "Độ lệch Z tương đối theo khối"
+here = "Di chuyển một thực thể rig đến vị trí của bạn"
+"here.id" = "ID thực thể rig"
+rotate = "Đặt yaw và pitch của một thực thể rig"
+"rotate.id" = "ID thực thể rig"
+"rotate.yaw" = "Yaw theo độ"
+"rotate.pitch" = "Pitch theo độ"
+scale = "Đặt tỉ lệ đồng nhất của một thực thể rig"
+"scale.id" = "ID thực thể rig"
+"scale.scale" = "Hệ số tỉ lệ, từ 0.01 đến 64"
+remove = "Xóa một thực thể rig"
+"remove.id" = "ID thực thể rig"
+state = "Chuyển một thực thể rig sang một trạng thái trong đồ thị"
+"state.id" = "ID thực thể rig"
+"state.state" = "Tên trạng thái trong đồ thị của rig"
+var = "Đặt một biến của thực thể rig"
+"var.id" = "ID thực thể rig"
+"var.name" = "Tên biến"
+"var.value" = "Số, true, false hoặc văn bản"
+import = "Nhap mot mo hinh Blockbench thanh rig"
+"import.file" = "Duong dan toi tep .bbmodel trong thu muc du lieu Gloss"
+"import.id" = "Ma rig; de trong se dung ten tep"
+"import.texture" = "Vat pham tuy chinh dang provider:id cho moi khoi"
+reset = "Khôi phục các tài liệu rig đi kèm"
+
+["command.help.hologram"]
+page = "Chuyen nguoi xem sang trang cua hologram"
+"page.page" = "Ma trang, next hoac prev"
+"page.player" = "Ten nguoi choi; de trong la ban"
+motion = "Phat mot clip chuyen dong tren hologram"
+"motion.motion" = "Ma chuyen dong, hoac clear de dung"
+actions = "Liet ke cac hanh dong hologram chay khi nhap chuot"
+
+[command.help.motion]
+root = "Kiểm tra các clip chuyển động"
+list = "Liệt kê các clip chuyển động"
+info = "Hiển thị thời lượng, vòng lặp, fps và các track của clip"
+"info.id" = "ID chuyển động"
+reset = "Khôi phục các tài liệu chuyển động đi kèm"
+
+[gloss.message.rigs]
+rig_unknown = "&8[&dGloss&8] &cKhông có rig nào tên '&f{id}&c'."
+instance_missing = "&8[&dGloss&8] &cKhông có thực thể rig nào tên '&f{id}&c'."
+placed = "&8[&dGloss&8] &aĐã đặt rig &f{name}&a thành &f{id}&a tại &f{world} {x}, {y}, {z}&a."
+place_failed = "&8[&dGloss&8] &cKhông thể đặt rig &f{name}&c: {reason}"
+moved = "&8[&dGloss&8] &aĐã di chuyển thực thể rig &f{id}&a đến &f{world} {x}, {y}, {z}&a."
+rotated = "&8[&dGloss&8] &aĐã xoay thực thể rig &f{id}&a sang yaw &f{yaw}&a, pitch &f{pitch}&a."
+scaled = "&8[&dGloss&8] &aĐã đặt tỉ lệ thực thể rig &f{id}&a thành &f{scale}&a."
+scale_out_of_range = "&8[&dGloss&8] &cTỉ lệ rig phải nằm giữa &f{minimum}&c và &f{maximum}&c; nhận được &f{value}&c."
+removed = "&8[&dGloss&8] &aĐã xóa thực thể rig &f{id}&a."
+state_set = "&8[&dGloss&8] &aThực thể rig &f{id}&a hiện ở trạng thái &f{state}&a."
+state_unknown = "&8[&dGloss&8] &cThực thể rig &f{id}&c không có trạng thái tên '&f{state}&c'."
+var_set = "&8[&dGloss&8] &aĐã đặt &f{name}&a của thực thể rig &f{id}&a thành &f{value}&a."
+save_failed = "&8[&dGloss&8] &cKhông thể lưu thực thể rig &f{id}&c: {reason}"
+list_empty = "&8[&dGloss&8] &7Chưa tải rig nào."
+list_rigs = "&8[&dGloss&8] &7Rig (&f{count}&7): &f{value}"
+instances_empty = "&8[&dGloss&8] &7Chưa đặt thực thể rig nào."
+list_hover = "Nhấp để dịch chuyển"
+list_entry = "{name} tại {world} {x}, {y}, {z}; trạng thái {state}"
+info_header = "&8[&dGloss&8] &d{id} &7dùng rig &f{name}&7 tại &f{world} {x}, {y}, {z}"
+info_pose = "&8[&dGloss&8] &7Yaw &f{yaw}&7, pitch &f{pitch}&7, tỉ lệ &f{scale}&7, trạng thái &f{state}"
+info_parts = "&8[&dGloss&8] &7Bộ phận &f{count}&7, người xem &f{value}"
+info_var = "&8[&dGloss&8] &7  {name} = &f{value}"
+motion_unknown = "&8[&dGloss&8] &cKhông có chuyển động nào tên '&f{id}&c'."
+motion_list_empty = "&8[&dGloss&8] &7Chưa tải clip chuyển động nào."
+motion_list = "&8[&dGloss&8] &7Clip chuyển động (&f{count}&7): &f{value}"
+motion_info = "&8[&dGloss&8] &d{id} &7{value} tick, {kind}, {count} fps"
+motion_track = "&8[&dGloss&8] &7  {name} &f{key} &7({count} keyframe)"
+import_done = "&8[&dGloss&8] &aDa nhap &f{id}&a: &f{value}&a xuong, &f{count}&a bo phan, &f{kind}&a hoat anh."
+import_unsupported = "&8[&dGloss&8] &7Khong nhap: &f{value}&7."
+import_failed = "&8[&dGloss&8] &cKhong the nhap &f{path}&c: {reason}"
+hologram_page_set = "&8[&dGloss&8] &a{player}&a hien o trang &f{page}&a cua &f{id}&a."
+hologram_page_player_missing = "&8[&dGloss&8] &cNguoi choi &f{player}&c khong truc tuyen."
+hologram_page_unknown = "&8[&dGloss&8] &cHologram &f{id}&c khong co trang '&f{page}&c'."
+hologram_motion_set = "&8[&dGloss&8] &aHologram &f{id}&a dang phat &f{value}&a."
+hologram_motion_cleared = "&8[&dGloss&8] &aHologram &f{id}&a khong con phat chuyen dong."
+hologram_actions_empty = "&8[&dGloss&8] &7Hologram &f{id}&7 khong khai bao hanh dong."
+hologram_actions_header = "&8[&dGloss&8] &7Hanh dong cua hologram &f{id}&7 (&f{count}&7):"
+hologram_actions_entry = "&8[&dGloss&8] &7  &f{kind}&7 tren &f{value}"
+
+# --- lane:world ---
+[gloss.message.world]
+players_only = "&cLệnh này phải do một người chơi thực hiện."
+disabled = "&cTính năng này đang tắt trong gloss.toml."
+
+[gloss.message.world.marker]
+list = "&7Điểm đánh dấu &8({count})&7: &f{value}"
+info = "&7Điểm đánh dấu &f{id} &7tại &f{world} {x} {y} {z}"
+created = "&aĐã tạo điểm đánh dấu &f{id}&a."
+removed = "&aĐã xóa điểm đánh dấu &f{id}&a."
+missing = "&cKhông có điểm đánh dấu tên &f{id}&c."
+here = "&7Bạn đang ở &f{world} {x} {y} {z}&7."
+
+[gloss.message.world.waypoint]
+saved = "&aĐã lưu điểm mốc &f{name}&a."
+removed = "&aĐã xóa điểm mốc &f{name}&a."
+missing = "&cKhông có điểm mốc tên &f{name}&c."
+list = "&7Điểm mốc &8({count})&7: &f{value}"
+info = "&7Điểm mốc &f{id} &7tại &f{world} {x} {y} {z}"
+full = "&cBạn đã có tối đa {count} điểm mốc."
+
+[gloss.message.world.zone]
+list = "&7Khu vực &8({count})&7: &f{value}"
+info = "&7Khu vực &f{id} &7là &f{kind} &7trong &f{world}&7."
+shown = "&aĐang hiện khu vực &f{id}&a."
+hidden = "&7Đang ẩn khu vực &f{id}&7."
+created = "&aĐã tạo khu vực &f{id}&a."
+removed = "&aĐã xóa khu vực &f{id}&a."
+missing = "&cKhông có khu vực tên &f{id}&c."
+
+[gloss.message.world.camera]
+started = "&7Đã bắt đầu chuyến bay camera."
+refused = "&cChuyến bay camera đã bị từ chối."
+stopped = "&7Đã dừng chuyến bay camera cho &f{player}&7."
+idle = "&c{player} không ở trong chuyến bay camera nào."
+
+[gloss.message.world.nameplate]
+list = "&7Bảng tên &8({count})&7: &f{value}"
+info = "&7Bảng tên &f{id} &7ưu tiên &f{value}&7, &f{count} &7dòng."
+missing = "&cKhông có bảng tên tên &f{id}&c."
+refreshed = "&aĐã làm mới bảng tên."
+
+[gloss.message.world.glow]
+set = "&f{target} &7giờ phát sáng màu &f{value}&a."
+cleared = "&7Đã xóa phát sáng của &f{target}&7."
+missing = "&cKhông có người chơi tên &f{player} &cđang trực tuyến."
+
+[command.help.marker]
+root = "Công cụ điểm đánh dấu thế giới"
+list = "Liệt kê tài liệu điểm đánh dấu"
+info = "Hiện một điểm đánh dấu"
+create = "Ghi tài liệu điểm đánh dấu tại vị trí của bạn"
+remove = "Xóa tài liệu điểm đánh dấu"
+here = "In vị trí của bạn dưới dạng tọa độ neo"
+
+[command.help.marker.arg]
+id = "ID tài liệu điểm đánh dấu"
+label = "Nhãn hiển thị phía trên điểm đánh dấu"
+
+[command.help.waypoint]
+root = "Công cụ điểm mốc trên thanh định vị"
+set = "Lưu vị trí của bạn thành điểm mốc cá nhân"
+remove = "Xóa một điểm mốc cá nhân của bạn"
+list = "Liệt kê điểm mốc cá nhân của bạn"
+info = "Hiện một tài liệu điểm mốc"
+
+[command.help.waypoint.arg]
+name = "Tên điểm mốc"
+id = "ID tài liệu điểm mốc"
+
+[command.help.zone]
+root = "Công cụ đường viền khu vực"
+list = "Liệt kê khu vực"
+info = "Hiện một khu vực"
+show = "Hiện đường viền khu vực cho chính bạn"
+hide = "Ẩn đường viền khu vực khỏi chính bạn"
+create = "Ghi tài liệu khu vực hình hộp quanh vị trí của bạn"
+remove = "Xóa tài liệu khu vực"
+
+[command.help.zone.arg]
+id = "ID tài liệu khu vực"
+radius = "Nửa chiều rộng tính theo khối"
+
+[command.help.camera]
+root = "Công cụ chuyến bay camera"
+test = "Bay một chuyến trình diễn quanh bạn"
+stop = "Kết thúc chuyến bay camera sớm"
+
+[command.help.camera.arg]
+seconds = "Độ dài chuyến bay tính bằng giây"
+player = "Người cần dừng; mặc định là bạn"
+
+[command.help.nameplate]
+root = "Công cụ bảng tên người chơi"
+list = "Liệt kê tài liệu bảng tên"
+info = "Hiện một tài liệu bảng tên"
+reset = "Khôi phục tài liệu bảng tên đi kèm"
+refresh = "Dựng lại bảng tên cho mọi người xem"
+
+[command.help.nameplate.arg]
+id = "ID tài liệu bảng tên"
+
+[command.help.glow]
+root = "Công cụ phát sáng thực thể"
+set = "Làm một người chơi phát sáng với bạn"
+clear = "Xóa phát sáng của một người chơi với bạn"
+
+[command.help.glow.arg]
+player = "Người chơi cần viền sáng"
+cleared = "Người chơi ngừng viền sáng"
+color = "Màu chữ có tên"
+ticks = "Số tick phát sáng, hoặc 0 để giữ lại"
+
+# --- lane:behaviors ---
+[command.help.behavior]
+root = "Xem va kich hoat cac tai lieu hanh vi"
+list = "Liet ke cac tai lieu hanh vi da nap"
+info = "Hien thi cac trigger va dieu kien cua mot tai lieu hanh vi"
+fire = "Chay ngay mot muc hanh vi"
+reset = "Khoi phuc cac hanh vi mac dinh di kem"
+id = "Id cua tai lieu hanh vi"
+entry = "So thu tu muc, bat dau tu 1"
+player = "Nguoi choi de chay muc, hoac * de khong chon ai"
+
+[command.help.state]
+root = "Doc va ghi trang thai hanh vi duoc luu"
+get = "Hien thi mot gia tri trang thai"
+set = "Ghi mot gia tri trang thai"
+clear = "Dua mot gia tri trang thai ve mac dinh"
+dump = "Liet ke moi khoa trang thai da khai bao va gia tri cua no"
+key = "Khoa trang thai da khai bao"
+value = "Gia tri moi; dat trong dau nhay de co khoang trang"
+player = "Nguoi choi so huu gia tri, hoac * cho chinh ban"
+
+[command.help.do]
+root = "Kich hoat cac muc hanh vi command co ten nay"
+name = "Ten lenh hanh vi"
+args = "Tham so dang khoa=gia tri; dat trong dau nhay de co khoang trang"
+
+[command.help.expr]
+root = "Tinh mot bieu thuc va cho biet cai gi da tra loi no"
+expression = "Bieu thuc can tinh; dat trong dau nhay de co khoang trang"
+
+[command.help.explain]
+root = "Cho biet runtime da xet nhung dieu kien nao va dieu kien nao thang"
+kind = "Runtime can giai thich, vi du board hoac behavior"
+id = "Id tai lieu can giai thich"
+player = "Nguoi choi de giai thich, hoac * cho chinh ban"
+
+[gloss.message.behaviors]
+off = "&8[&dGloss&8]: &eHanh vi dang tat trong features.behaviors."
+"list.empty" = "&8[&dGloss&8]: &7Khong co tai lieu hanh vi nao duoc nap."
+missing = "&8[&dGloss&8]: &cKhong co tai lieu hanh vi ten \"{id}\"."
+"info.header" = "&8[&dGloss&8]: &d{id} &7ban &f{revision} &8| &7muc &f{count} &8| &7bat &f{enabled}"
+"info.entry" = " &8{line}. &f{name} &7khi &f{when} &8| &7quyen &f{permission}"
+fired = "&8[&dGloss&8]: &aDa chay muc &f{line}&a cua &f{id}&a."
+"fire.missing" = "&8[&dGloss&8]: &c{id} khong co muc {line}."
+"do.ran" = "&8[&dGloss&8]: &aDa kich hoat &f{count}&a muc hanh vi cho &f{name}&a."
+"do.none" = "&8[&dGloss&8]: &7Khong co muc hanh vi nao tra loi lenh \"{name}\"."
+"state.value" = " &7{key} &8= &f{value}"
+"state.set" = "&8[&dGloss&8]: &a{key} bay gio la &f{value}&a."
+"state.cleared" = "&8[&dGloss&8]: &a{key} da tro ve gia tri mac dinh."
+"state.unknown" = "&8[&dGloss&8]: &cKhong tai lieu hanh vi nao khai bao khoa trang thai \"{key}\"."
+"state.invalid" = "&8[&dGloss&8]: &c\"{value}\" khong phai gia tri {type}."
+"state.empty" = "&8[&dGloss&8]: &7Khong tai lieu hanh vi nao khai bao trang thai."
+"state.player" = "&8[&dGloss&8]: &cHay chi dinh nguoi choi: &f{key}&c khong phai khoa toan cuc."
+"player.missing" = "&8[&dGloss&8]: &cKhong co nguoi choi ten \"{player}\" dang online."
+"expr.value" = "&8[&dGloss&8]: &f{value} &8({type})"
+"expr.reference" = " &7{name} &8= &f{value} &8qua &7{source}"
+"expr.functions" = " &7ham &8= &f{value}"
+"expr.failed" = "&8[&dGloss&8]: &c{reason}"
+"explain.header" = "&8[&dGloss&8]: &d{kind} &f{id} &7cho &f{player}"
+"explain.line" = " &8{path} &7{when} &8= &f{value}"
+"explain.winner" = " &a> &f{path} &7{when} &8= &f{value}"
+"explain.unknown" = "&8[&dGloss&8]: &cKhong co gi giai thich \"{kind}\"; hay thu {options}."
+"explain.missing" = "&8[&dGloss&8]: &cKhong co {kind} ten \"{id}\"."
+
+# --- lane:authoring ---
+[command.help.pack]
+root = "Cài đặt và quản lý gói Gloss"
+install = "Cài một gói từ tệp hoặc địa chỉ HTTPS"
+update = "Cập nhật gói đã cài từ nguồn của nó"
+remove = "Gỡ một gói, giữ lại mọi tệp đã sửa kể từ khi cài"
+list = "Liệt kê các gói đã cài"
+info = "Xem gói sở hữu những tệp nào"
+arg_source = "Tệp gói trong thư mục dữ liệu Gloss, hoặc một địa chỉ HTTPS"
+arg_dry = "Báo cáo những gì sẽ thay đổi mà không ghi gì cả"
+arg_id = "Id của gói đã cài"
+
+[command.help.history]
+root = "Liệt kê các phiên bản đã lưu của một tài liệu"
+arg_kind = "Thư mục tài liệu, ví dụ boards hoặc menus"
+arg_id = "Id tài liệu"
+arg_page = "Trang danh sách tính từ một"
+
+[command.help.restore]
+root = "Ghi một phiên bản đã lưu đè lên tài liệu đang dùng"
+arg_version = "Dấu phiên bản lấy từ /gloss history"
+
+[command.help.check]
+root = "Kiểm tra không gian làm việc tìm tham chiếu hỏng"
+arg_kind = "Giới hạn việc kiểm tra trong một thư mục tài liệu"
+arg_id = "Giới hạn việc kiểm tra trong một tài liệu"
+
+[command.help.export]
+root = "Sao chép tài liệu ra dưới dạng JSON thuần"
+bundle = "Ghi toàn bộ không gian làm việc thành gói của trình biên tập"
+arg_kind = "Giới hạn việc xuất trong một thư mục tài liệu"
+arg_id = "Giới hạn việc xuất trong một tài liệu"
+arg_dir = "Thư mục đích bên trong thư mục dữ liệu Gloss"
+
+[gloss.message.authoring.pack]
+preview = "&8[&dGloss&8] Gói &f{id}&7 sẽ thay đổi &f{count}&7 tệp."
+outcome = "&8[&dGloss&8] &7{state} &f{path}&7 {reason}"
+installed = "&8[&dGloss&8] Đã cài gói &f{id}&7 với &f{count}&7 tệp."
+updated = "&8[&dGloss&8] Đã cập nhật gói &f{id}&7 trên &f{count}&7 tệp."
+removed = "&8[&dGloss&8] Đã gỡ gói &f{id}&7 và &f{count}&7 tệp."
+unknown = "&8[&dGloss&8] &cKhông có gói nào đã cài mang id &f{id}&c."
+failed = "&8[&dGloss&8] &cGói &f{id}&c thất bại: {reason}"
+entry = "&8[&dGloss&8] &f{id} &7{value} &8{count} tệp"
+empty = "&8[&dGloss&8] &7Chưa cài gói nào."
+disabled = "&8[&dGloss&8] &cGói Gloss đang tắt trong gloss.toml."
+
+[gloss.message.authoring.history]
+empty = "&8[&dGloss&8] &7Không có phiên bản đã lưu của &f{kind} {id}&7."
+entry = "&8[&dGloss&8] &f{revision} &7{source} &8{count} byte"
+disabled = "&8[&dGloss&8] &cLịch sử tài liệu đang tắt trong gloss.toml."
+
+[gloss.message.authoring.restore]
+done = "&8[&dGloss&8] Đã khôi phục &f{kind} {id}&7 về phiên bản &f{revision}&7."
+unknown = "&8[&dGloss&8] &cKhông có phiên bản &f{revision}&c của &f{kind} {id}&c."
+failed = "&8[&dGloss&8] &cKhôi phục thất bại: {reason}"
+
+[gloss.message.authoring.check]
+clean = "&8[&dGloss&8] &aKhông có gì để báo."
+entry = "&8[&dGloss&8] &7{state} &f{key} &8{kind} {id} {path} &7{message}"
+summary = "&8[&dGloss&8] &f{count}&7 phát hiện."
+
+[gloss.message.authoring.export]
+done = "&8[&dGloss&8] Đã xuất &f{count}&7 tài liệu sang &f{path}&7."
+failed = "&8[&dGloss&8] &cXuất thất bại: {reason}"
+
+[gloss.message.authoring.import]
+preview = "&8[&dGloss&8] &f{source}&7 sẽ ghi &f{count}&7 tài liệu."
+entry = "&8[&dGloss&8] &7{state} &f{path}&7 {reason}"
+applied = "&8[&dGloss&8] Đã nhập &f{count}&7 tài liệu từ &f{source}&7."
+absent = "&8[&dGloss&8] &7Không có dữ liệu &f{source}&7 tại &f{path}&7."
+
+# --- lane:forge ---
+[gloss.message.forge]
+disabled = "&8[&dGloss&8] &cLò rèn glyph đang tắt. Đặt features.forge thành true trong gloss.toml."
+built = "&8[&dGloss&8] &aĐã dựng gói &f{value}&a với {count} glyph."
+build_failed = "&8[&dGloss&8] &cDựng gói thất bại; gói trước vẫn đang hoạt động. Xem console."
+status = "&7{value}"
+exported = "&8[&dGloss&8] &aĐã xuất {count} tệp tới &f{path}&a."
+export_failed = "&8[&dGloss&8] &cXuất thất bại: &f{reason}&c."
+serve = "&8[&dGloss&8] &aBộ phục vụ gói {state}."
+serve_unchanged = "&8[&dGloss&8] &7Bộ phục vụ gói đã {state} rồi."
+
+[command.help.forge]
+root = "Công cụ gói glyph"
+build = "Dựng lại gói tài nguyên glyph ngay"
+status = "Hiện số liệu gói, glyph và phân phối"
+export = "Sao chép thư mục gói có thể hợp nhất"
+"export.path" = "Thư mục đích cho gói"
+serve = "Bật hoặc tắt bộ phục vụ gói tích hợp"
+"serve.state" = "on hoặc off"
+reset = "Khôi phục các tài liệu glyph đi kèm"
+
+# --- lane:fixes ---
+[gloss.message.fixes]
+status_bedrock = "&7bedrock: &f{name}&7, &f{count}&7 đang trực tuyến"
+status_textimage_oversize = "&7textimage-quá-lớn: &f{count}"
+hotload_skipped = " &7({count} bị bỏ qua, sai schemaVersion)"
+status_schema_skipped = "&7schema-bỏ qua: &f{count}"
+bedrock_menu_unavailable = "&8[&dGloss&8]: &cMenu này không hiển thị trên Bedrock."
+

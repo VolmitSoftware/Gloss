@@ -40,6 +40,7 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.function.LongSupplier;
 import java.util.function.UnaryOperator;
+import java.util.logging.Level;
 import java.util.stream.Stream;
 
 public final class PanelRepository implements PanelStore {
@@ -143,7 +144,9 @@ public final class PanelRepository implements PanelStore {
         loadedFiles.put(file, captured.fingerprint());
         loaded++;
       } catch (IOException | RuntimeException failure) {
-        if (!DocumentEnvelope.isUnsupportedSchemaVersion(failure)) {
+        if (DocumentEnvelope.isUnsupportedSchemaVersion(failure)) {
+          reportUnsupportedSchema(file, captured.fingerprint(), failure);
+        } else {
           failures.put(relative, message(failure));
           reportFailure(file, captured.fingerprint(), failure);
         }
@@ -640,7 +643,9 @@ public final class PanelRepository implements PanelStore {
       }
       remember(definition, captured.raw());
     } catch (IOException | RuntimeException failure) {
-      if (!DocumentEnvelope.isUnsupportedSchemaVersion(failure)) {
+      if (DocumentEnvelope.isUnsupportedSchemaVersion(failure)) {
+        reportUnsupportedSchema(file, captured.fingerprint(), failure);
+      } else {
         reportFailure(file, captured.fingerprint(), failure);
       }
     }
@@ -659,6 +664,18 @@ public final class PanelRepository implements PanelStore {
     pendingFiles.remove(file);
     queuedFiles.remove(file);
     reportedFailures.remove(file);
+  }
+
+  /**
+   * Panels are not on the document registry, so they say the same sentence themselves: a file this
+   * build cannot read is ignored, and the operator hears about it once per edit rather than never.
+   */
+  private void reportUnsupportedSchema(Path file, String fingerprint, Throwable failure) {
+    if (!fingerprint.equals(reportedFailures.put(file, fingerprint))) {
+      String reason = failure.getMessage() == null ? "declares an unsupported schemaVersion" : failure.getMessage();
+      Gloss.log(Level.WARNING, "panels/%s %s; the file is ignored until it is updated.",
+          relativeName(file), reason);
+    }
   }
 
   private void reportFailure(Path file, String fingerprint, Throwable failure) {

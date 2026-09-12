@@ -1,0 +1,140 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://volmit.art/schema/gloss-nameplates.schema.json",
+  "title": "Gloss Nameplate Document",
+  "description": "One player pane in nameplates/. Panes render through the entity-overlay engine and suppress the vanilla tag underneath; Bedrock viewers keep the vanilla tag.",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "revision"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "show": {
+      "type": [
+        "string",
+        "boolean"
+      ]
+    },
+    "select": {
+      "$ref": "#/$defs/selection"
+    },
+    "presentation": {
+      "$ref": "#/$defs/presentation"
+    },
+    "variants": {
+      "description": "Alternative presentations. The highest-priority match replaces the presentation wholesale; variants never merge.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "priority": {
+            "type": "integer"
+          },
+          "when": {
+            "type": [
+              "string",
+              "boolean"
+            ]
+          },
+          "presentation": {
+            "$ref": "#/$defs/presentation"
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "selection": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "priority": {
+          "type": "integer"
+        },
+        "when": {
+          "type": [
+            "string",
+            "boolean"
+          ]
+        }
+      }
+    },
+    "presentation": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "lines": {
+          "type": "array",
+          "maxItems": 16,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "text": {
+                "type": "string",
+                "maxLength": 4096
+              },
+              "show": {
+                "type": [
+                  "string",
+                  "boolean"
+                ]
+              }
+            }
+          }
+        },
+        "style": {
+          "type": "object"
+        },
+        "box": {
+          "type": "object"
+        },
+        "offset": {
+          "description": "Blocks above the subject's head.",
+          "type": "number",
+          "minimum": -2,
+          "maximum": 8
+        },
+        "hideSneaking": {
+          "type": "boolean"
+        },
+        "relations": {
+          "description": "Colour applied to the whole pane; the first matching entry wins.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "when": {
+                "type": [
+                  "string",
+                  "boolean"
+                ]
+              },
+              "color": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

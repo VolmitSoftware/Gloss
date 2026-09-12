@@ -33,7 +33,7 @@ public class EditorSyncSessionStoreTest {
     EditorSyncStoredSession session = new EditorSyncStoredSession(
         capability(), new EditorSyncStoredSession.Subject(EditorSyncKind.MENU, "fixture"),
         Instant.now().plusSeconds(3600L), 2L,
-        project, new EditorSyncPendingAck(3L, "applied", "Published.", project));
+        project, new EditorSyncPendingAck(3L, "applied", "Published.", project, List.of()));
 
     store.save(java.util.List.of(session));
     Map<String, EditorSyncStoredSession> loaded = store.load(Instant.now());

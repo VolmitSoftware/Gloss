@@ -16,6 +16,7 @@ import org.bukkit.NamespacedKey;
 import org.bukkit.inventory.ItemStack;
 
 import java.io.IOException;
+import java.util.List;
 
 public record ItemIconData(
     @SerializedName("item")
@@ -23,13 +24,19 @@ public record ItemIconData(
     Material materialType,
     int count,
     int customModelValue,
-    IconDisplayStyle style
+    IconDisplayStyle style,
+    String name,
+    List<String> lore
 ) implements MenuIconData {
+  public ItemIconData {
+    lore = lore == null ? List.of() : List.copyOf(lore);
+  }
+
   public static ItemIconData of(ItemStack stack, boolean facing) {
     if (stack.hasItemMeta() && stack.getItemMeta().hasCustomModelData())
-      return new ItemIconData(stack.getType(), stack.getAmount(), stack.getItemMeta().getCustomModelData(), null);
+      return new ItemIconData(stack.getType(), stack.getAmount(), stack.getItemMeta().getCustomModelData(), null, null, null);
     else
-      return new ItemIconData(stack.getType(), stack.getAmount(), 0, null);
+      return new ItemIconData(stack.getType(), stack.getAmount(), 0, null, null, null);
   }
 
   public MenuIconType getType() {

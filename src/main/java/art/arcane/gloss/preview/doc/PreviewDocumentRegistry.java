@@ -6,6 +6,7 @@ import art.arcane.gloss.doc.DataWatchdog;
 import art.arcane.gloss.doc.DocumentDelta;
 import art.arcane.gloss.doc.DocumentRegistry;
 import art.arcane.gloss.doc.GlossDocument;
+import art.arcane.gloss.doc.RegistryOwner;
 import art.arcane.gloss.menu.MenuSessionManager;
 import art.arcane.gloss.preview.doc.CompiledPreviewDocument.CompiledMatch;
 import art.arcane.gloss.preview.doc.CompiledPreviewDocument.CompiledVariant;
@@ -57,7 +58,7 @@ import java.util.logging.Level;
  * <message>} and is skipped on first load; on a reload the previously compiled version stays live,
  * so a half-saved edit never blanks a preview.
  */
-public final class PreviewDocumentRegistry {
+public final class PreviewDocumentRegistry implements RegistryOwner {
 
   /** {@code match.special} marker for the viewer's own ender chest. */
   public static final String SPECIAL_ENDER_CHEST = "enderChest";
@@ -504,5 +505,10 @@ public final class PreviewDocumentRegistry {
     }
     String prefix = name + EXTENSION + " ";
     return message.startsWith(prefix) ? message.substring(prefix.length()) : message;
+  }
+
+  @Override
+  public Map<String, DocumentRegistry<?>> registries() {
+    return Map.of("previews", registry);
   }
 }

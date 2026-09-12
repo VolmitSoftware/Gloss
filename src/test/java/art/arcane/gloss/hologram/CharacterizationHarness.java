@@ -6,6 +6,8 @@ import art.arcane.gloss.animation.AnimationClip;
 import art.arcane.gloss.animation.AnimationMode;
 import art.arcane.gloss.animation.AnimationService;
 import art.arcane.gloss.config.GlossConfigFile;
+import art.arcane.gloss.motion.MotionService;
+import art.arcane.gloss.service.GlossService;
 import art.arcane.gloss.text.TextPipeline;
 import art.arcane.gloss.particle.ParticleService;
 import art.arcane.volmlib.util.scheduling.SchedulerRuntime;
@@ -106,7 +108,7 @@ final class CharacterizationHarness implements AutoCloseable {
     }
 
     static final class PlayerHandle {
-        final UUID uuid = UUID.randomUUID();
+        final UUID uuid;
         final String name;
         final Map<UUID, Boolean> playerVisibility = new ConcurrentHashMap<>();
         final Map<UUID, Boolean> perceived = new ConcurrentHashMap<>();
@@ -119,7 +121,12 @@ final class CharacterizationHarness implements AutoCloseable {
         Player proxy;
 
         PlayerHandle(String name) {
+            this(name, UUID.randomUUID());
+        }
+
+        PlayerHandle(String name, UUID uuid) {
             this.name = name;
+            this.uuid = uuid;
         }
 
         /** Empty when no visibility dispatch ever reached this player for the display. */
@@ -295,7 +302,11 @@ final class CharacterizationHarness implements AutoCloseable {
     }
 
     PlayerHandle join(String name, WorldState world, double x, double y, double z) {
-        PlayerHandle handle = new PlayerHandle(name);
+        return join(name, UUID.randomUUID(), world, x, y, z);
+    }
+
+    PlayerHandle join(String name, UUID id, WorldState world, double x, double y, double z) {
+        PlayerHandle handle = new PlayerHandle(name, id);
         handle.proxy = playerProxy(handle);
         handle.location = new Location(world.proxy, x, y, z);
         world.players.add(handle.proxy);
@@ -333,6 +344,22 @@ final class CharacterizationHarness implements AutoCloseable {
 
     PersistentHologram persistent(String id, Location at) {
         return (PersistentHologram) service.create(id, at);
+    }
+
+    /**
+     * Registers a real {@link MotionService} as the plugin's lane services, so holograms with a
+     * {@code motion} resolve the shipped clips. Only the motion suites call this; without it the
+     * lane service list stays unset and the hologram engine behaves exactly as before.
+     */
+    MotionService motionService() {
+        MotionService motion = new MotionService(gloss);
+        try {
+            setDeclaredField(gloss, Gloss.class, "laneServices", List.<GlossService>of(motion));
+        } catch (ReflectiveOperationException failure) {
+            throw new IllegalStateException("Failed to publish the motion service", failure);
+        }
+        motion.reload();
+        return motion;
     }
 
     DisplayHandle onlySpawned(WorldState world) {

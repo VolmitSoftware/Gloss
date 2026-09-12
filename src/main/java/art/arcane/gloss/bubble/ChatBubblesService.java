@@ -1,6 +1,8 @@
 package art.arcane.gloss.bubble;
 
 import art.arcane.gloss.Gloss;
+import art.arcane.gloss.bedrock.BedrockPolicy;
+import art.arcane.gloss.bedrock.BedrockSurface;
 import art.arcane.gloss.api.HologramPresentation;
 import art.arcane.gloss.api.ParticleTextSpan;
 import art.arcane.gloss.api.TemporaryHologram;
@@ -11,6 +13,7 @@ import art.arcane.gloss.condition.GlossConditionScope;
 import art.arcane.gloss.doc.DocumentDelta;
 import art.arcane.gloss.doc.DocumentRegistry;
 import art.arcane.gloss.doc.GlossDocument;
+import art.arcane.gloss.doc.RegistryOwner;
 import art.arcane.gloss.doc.ShippedDefaults;
 import art.arcane.gloss.doc.ShippedDocumentCatalog;
 import art.arcane.gloss.service.GlossTelemetry;
@@ -49,7 +52,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.UnaryOperator;
 
-public final class ChatBubblesService implements Listener {
+public final class ChatBubblesService implements Listener, RegistryOwner {
     private static final String SEND_PERMISSION = "gloss.bubbles.send";
     private static final String STATE_FILE_NAME = "bubble-styles.json";
     private static final int STYLE_PERSIST_DELAY_TICKS = 40;
@@ -310,7 +313,8 @@ public final class ChatBubblesService implements Listener {
         BubbleRecord record = null;
         try {
             hologram = plugin.holograms().createTemporary(id, captured.clone(), style.maxAliveMs(),
-                viewer -> (!style.hideOwn() || !senderId.equals(viewer.getUniqueId()))
+                viewer -> !hiddenOnBedrock(viewer)
+                    && (!style.hideOwn() || !senderId.equals(viewer.getUniqueId()))
                     && viewer.canSee(sender) && style.show().matches(plugin, viewer));
             hologram.setStyle(style.style());
             hologram.setBox(style.box());
@@ -475,6 +479,12 @@ public final class ChatBubblesService implements Listener {
         if (removeBubble(bubbles, senderId, record)) {
             retire(record);
         }
+    }
+
+    /** Bubbles are text displays; a Bedrock viewer renders nothing, so it never joins the audience. */
+    private boolean hiddenOnBedrock(Player viewer) {
+        BedrockPolicy policy = BedrockPolicy.of(plugin);
+        return policy != null && policy.hides(BedrockSurface.BUBBLE, viewer);
     }
 
     private boolean reserveBubble() {
@@ -783,5 +793,10 @@ public final class ChatBubblesService implements Listener {
     }
 
     record BubbleFrame(double stackY, BubbleMotionSample motion) {
+    }
+
+    @Override
+    public Map<String, DocumentRegistry<?>> registries() {
+        return Map.of("bubbles", registry);
     }
 }

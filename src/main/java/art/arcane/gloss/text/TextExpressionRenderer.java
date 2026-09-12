@@ -3,7 +3,11 @@ package art.arcane.gloss.text;
 import art.arcane.gloss.Gloss;
 import art.arcane.gloss.expr.Expr;
 import art.arcane.gloss.expr.ExprEvaluator;
+import art.arcane.gloss.bedrock.BedrockService;
+import art.arcane.gloss.expr.ExprFunctionRegistry;
 import art.arcane.gloss.expr.ExprFunctions;
+import art.arcane.gloss.expr.ExprVariableContext;
+import art.arcane.gloss.expr.ExprVariableNamespaces;
 import art.arcane.gloss.expr.ExprParser;
 import art.arcane.gloss.expr.ExprScope;
 import art.arcane.gloss.integrate.IntegrationBridgeService;
@@ -24,7 +28,7 @@ public final class TextExpressionRenderer {
     public static final Set<String> STANDARD_VARIABLES = Set.of(
         "time.ms", "time.seconds", "time.ticks",
         "server.online", "server.maxPlayers", "server.tps",
-        "player.name", "player.ping", "player.health", "player.level");
+        "player.name", "player.ping", "player.health", "player.level", "player.bedrock");
     public static final Set<String> STANDARD_FUNCTIONS = Set.of("papi", "papiNumber", "metric");
 
     private static final int CACHE_LIMIT = 4096;
@@ -258,8 +262,17 @@ public final class TextExpressionRenderer {
                 case "player.ping" -> viewer == null ? null : (double) viewer.getPing();
                 case "player.health" -> viewer == null ? null : viewer.getHealth();
                 case "player.level" -> viewer == null ? null : (double) viewer.getLevel();
-                default -> metric(name);
+                case "player.bedrock" -> viewer == null ? null : BedrockService.isBedrockPlayer(viewer.getUniqueId());
+                default -> {
+                    Object namespaced = ExprVariableNamespaces.global().resolve(name, variableContext());
+                    yield namespaced != null ? namespaced : metric(name);
+                }
             };
+        }
+
+        @Override
+        public ExprVariableContext variableContext() {
+            return ExprVariableContext.viewer(viewer);
         }
 
         @Override
@@ -268,7 +281,10 @@ public final class TextExpressionRenderer {
                 case "papi" -> papi(args, false);
                 case "papiNumber" -> papi(args, true);
                 case "metric" -> metricCall(args);
-                default -> ExprFunctions.call(name, args);
+                default -> {
+                    Object value = ExprFunctions.call(name, args);
+                    yield value != null ? value : ExprFunctionRegistry.global().call(this, name, args);
+                }
             };
         }
 

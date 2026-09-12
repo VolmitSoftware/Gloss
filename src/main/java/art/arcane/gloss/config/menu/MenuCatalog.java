@@ -7,6 +7,7 @@ import art.arcane.gloss.doc.DocumentRegistry;
 import art.arcane.gloss.doc.DocumentRevisionConflictException;
 import art.arcane.gloss.doc.DocumentTree;
 import art.arcane.gloss.doc.GlossDocument;
+import art.arcane.gloss.doc.RegistryOwner;
 import art.arcane.gloss.doc.ShippedDefaults;
 import art.arcane.gloss.doc.ShippedDocumentCatalog;
 import art.arcane.gloss.importer.LegacyHologramImportService;
@@ -54,7 +55,7 @@ import java.util.logging.Level;
  * still tolerates a missing root while menus are disabled, and every authored write path creates
  * only the directory it needs.
  */
-public final class MenuCatalog {
+public final class MenuCatalog implements RegistryOwner {
   public static final String KIND = "menus";
 
   private static final String RELOAD_PURPOSE = "gloss:reload";
@@ -466,5 +467,10 @@ public final class MenuCatalog {
   private static boolean menusEnabled() {
     Gloss plugin = Gloss.instance;
     return plugin != null && plugin.cfg() != null && plugin.cfg().menus().enabled();
+  }
+
+  @Override
+  public Map<String, DocumentRegistry<?>> registries() {
+    return Map.of("menus", registry);
   }
 }

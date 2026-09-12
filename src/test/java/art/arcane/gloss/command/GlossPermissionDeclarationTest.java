@@ -43,7 +43,10 @@ class GlossPermissionDeclarationTest {
 
   /** The only nodes servers grant to everyone by default. */
   private static final Set<String> PLAYER_DEFAULT_NODES = Set.of(
-      "gloss.emoji.use", "gloss.bubbles.send", "gloss.indicators.show", "gloss.language.self");
+      "gloss.emoji.use", "gloss.bubbles.send", "gloss.indicators.show", "gloss.language.self",
+      "gloss.chat.msg", "gloss.chat.channel", "gloss.chat.mention", "gloss.chat.item",
+      "gloss.behaviors.do",
+      "gloss.zones.toggle", "gloss.waypoints.self");
 
   private static final Set<String> NON_PERMISSION_LITERALS = Set.of("gloss.toml");
 

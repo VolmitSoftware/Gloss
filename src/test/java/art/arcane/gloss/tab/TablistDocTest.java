@@ -74,9 +74,9 @@ class TablistDocTest {
         assertThrows(IllegalArgumentException.class,
             () -> TablistDoc.parse("tablist.json", "{\"schemaVersion\":1,\"revision\":1}"));
         assertThrows(IllegalArgumentException.class,
-            () -> new TablistDoc(2, 0L, ShowCondition.ALWAYS, null, null));
+            () -> new TablistDoc(2, 0L, ShowCondition.ALWAYS, null, null, null, null));
         assertThrows(IllegalArgumentException.class,
-            () -> new TablistDoc(2, DocumentEnvelope.MAX_SAFE_REVISION + 1L, ShowCondition.ALWAYS, null, null));
+            () -> new TablistDoc(2, DocumentEnvelope.MAX_SAFE_REVISION + 1L, ShowCondition.ALWAYS, null, null, null, null));
     }
 
     @Test
@@ -230,7 +230,40 @@ class TablistDocTest {
                                        List<TablistDoc.ListNameVariant> nameVariants) {
         return new TablistDoc(2, 1L, ShowCondition.ALWAYS,
             new TablistDoc.HeaderFooter(true, ShowCondition.ALWAYS, header, headerVariants),
-            new TablistDoc.ListNames(true, ShowCondition.ALWAYS, names, nameVariants));
+            new TablistDoc.ListNames(true, ShowCondition.ALWAYS, names, nameVariants), null, null);
+    }
+
+    @Test
+    void anAbsentSortBlockIsInactive() {
+        TablistDoc doc = TablistDoc.parse("tablist.json", """
+            {"schemaVersion":2,"revision":1}
+            """);
+
+        assertEquals(TablistDoc.Sort.DISABLED, doc.sort());
+        assertFalse(doc.sort().active());
+    }
+
+    @Test
+    void aSortBlockParsesItsWeightExpression() {
+        TablistDoc doc = TablistDoc.parse("tablist.json", """
+            {"schemaVersion":2,"revision":1,
+             "sort":{"enabled":true,"weight":"inGroup('subject', 'admin') ? 1000 : subject.level"}}
+            """);
+
+        assertTrue(doc.sort().active());
+        assertEquals("inGroup('subject', 'admin') ? 1000 : subject.level", doc.sort().weight());
+    }
+
+    @Test
+    void anEnabledSortWithoutAWeightIsRefused() {
+        assertThrows(IllegalArgumentException.class, () -> new TablistDoc.Sort(true, null));
+        assertThrows(IllegalArgumentException.class, () -> new TablistDoc.Sort(true, "   "));
+    }
+
+    @Test
+    void aWeightThatDoesNotCompileIsRefused() {
+        assertThrows(RuntimeException.class, () -> new TablistDoc.Sort(true, "1 +"));
+        assertThrows(RuntimeException.class, () -> new TablistDoc.Sort(true, "'text'"));
     }
 
     private record TestScope(Map<String, Object> variables) implements ExprScope {

@@ -79,7 +79,7 @@ class BoardStorageQueueTest {
 
     private static BoardDoc document(long revision, String title) {
         return new BoardDoc(BoardDoc.CURRENT_SCHEMA_VERSION, revision, ShowCondition.ALWAYS, BoardDoc.Selection.NEVER,
-            new BoardDoc.Presentation(title, List.of(), false), List.of());
+            BoardDoc.Presentation.ofStrings(title, List.of(), false), List.of());
     }
 
     private static Logger logger() {

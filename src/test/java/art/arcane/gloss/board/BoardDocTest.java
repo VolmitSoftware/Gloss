@@ -37,7 +37,7 @@ class BoardDocTest {
         assertEquals(2, doc.schemaVersion());
         assertEquals(4L, doc.revision());
         assertEquals(new BoardDoc.Selection(40, "viewer.world == 'arena'"), doc.select());
-        assertEquals(new BoardDoc.Presentation("&6Board", List.of("a", "b"), true), doc.presentation());
+        assertEquals(BoardDoc.Presentation.ofStrings("&6Board", List.of("a", "b"), true), doc.presentation());
         assertEquals("critical", doc.variants().getFirst().id());
         assertEquals("&cDanger", doc.variants().getFirst().presentation().title());
     }
@@ -46,9 +46,9 @@ class BoardDocTest {
     void gsonRoundTripPreservesAllFields() {
         BoardDoc original = new BoardDoc(2, 12L, ShowCondition.of("world.time > 12000"),
             new BoardDoc.Selection(10, "hasPermission('viewer', 'gloss.staff')"),
-            new BoardDoc.Presentation("&d&lArena", List.of("one", "two"), true),
+            BoardDoc.Presentation.ofStrings("&d&lArena", List.of("one", "two"), true),
             List.of(new BoardDoc.Variant("low-health", 50, "viewer.health < 5",
-                new BoardDoc.Presentation("&cWarning", List.of("heal"), false))));
+                BoardDoc.Presentation.ofStrings("&cWarning", List.of("heal"), false))));
 
         BoardDoc decoded = BoardDoc.parse("arena.json", BukkitJson.GSON.toJson(original));
 
@@ -103,18 +103,18 @@ class BoardDocTest {
 
     @Test
     void nullPresentationTextAndLinesNormalize() {
-        BoardDoc.Presentation presentation = new BoardDoc.Presentation(null, Arrays.asList("one", null), true);
+        BoardDoc.Presentation presentation = BoardDoc.Presentation.ofStrings(null, Arrays.asList("one", null), true);
 
         assertEquals("", presentation.title());
-        assertEquals(List.of("one", ""), presentation.lines());
+        assertEquals(List.of("one", ""), presentation.texts());
         assertTrue(presentation.hideNumbers());
-        assertThrows(UnsupportedOperationException.class, () -> presentation.lines().add("three"));
+        assertThrows(UnsupportedOperationException.class, () -> presentation.lines().add(BoardLine.of("three")));
     }
 
     @Test
     void withRevisionOnlyChangesTheRevision() {
         BoardDoc doc = new BoardDoc(2, 1L, ShowCondition.ALWAYS, new BoardDoc.Selection(7, "true"),
-            new BoardDoc.Presentation("t", List.of("x"), true), List.of());
+            BoardDoc.Presentation.ofStrings("t", List.of("x"), true), List.of());
 
         BoardDoc bumped = doc.withRevision(2L);
 

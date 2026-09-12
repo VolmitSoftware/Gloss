@@ -20,7 +20,7 @@ public class CommandMenuActionSourceTest {
   @Test
   public void anOmittedSourceRunsTheCommandAsTheClickingPlayer() {
     List<String> dispatched = new ArrayList<>();
-    new CommandMenuAction(new CommandActionData(null, "/spawn", null)).execute(context(dispatched));
+    new CommandMenuAction(new CommandActionData(null, "/spawn", null, null, null)).execute(context(dispatched));
 
     assertEquals(List.of("spawn"), dispatched);
   }
@@ -28,7 +28,7 @@ public class CommandMenuActionSourceTest {
   @Test
   public void anExplicitPlayerSourceRunsTheCommandAsTheClickingPlayer() {
     List<String> dispatched = new ArrayList<>();
-    new CommandMenuAction(new CommandActionData(MenuActionCommandSource.PLAYER, "heal", null)).execute(context(dispatched));
+    new CommandMenuAction(new CommandActionData(MenuActionCommandSource.PLAYER, "heal", null, null, null)).execute(context(dispatched));
 
     assertEquals(List.of("heal"), dispatched);
   }
@@ -36,7 +36,7 @@ public class CommandMenuActionSourceTest {
   @Test
   public void anExplicitServerSourceKeepsConsoleDispatchAndNeverUsesThePlayer() {
     List<String> dispatched = new ArrayList<>();
-    new CommandMenuAction(new CommandActionData(MenuActionCommandSource.GLOBAL, "/say hi", null)).execute(context(dispatched));
+    new CommandMenuAction(new CommandActionData(MenuActionCommandSource.GLOBAL, "/say hi", null, null, null)).execute(context(dispatched));
 
     assertTrue("a server source must never be routed through the player", dispatched.isEmpty());
   }

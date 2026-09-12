@@ -1,0 +1,12 @@
+title:
+  frames:
+    - "&b&lLOBBY"
+    - "&3&lLOBBY"
+  interval: 4
+scores:
+  - frames:
+      - "&7Rank: %vault_rank%"
+  - frames:
+      - "&aCoins: 1"
+      - "&aCoins: 2"
+    interval: 8

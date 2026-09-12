@@ -72,6 +72,37 @@ public final class GlossConfigFile {
     @ConfigDoc("Sampling cadence for metrics published by other Volmit plugins.")
     public Integration integration = new Integration();
 
+    @ConfigDoc("Authored action bar, boss bar and title documents under surfaces/.")
+    public Surfaces surfaces = new Surfaces();
+    @ConfigDoc("Per-viewer nametag prefixes and suffixes from nametags/ documents.")
+    public Nametags nametags = new Nametags();
+    @ConfigDoc("Ranked top-N snapshots from leaderboards/ documents.")
+    public Leaderboards leaderboards = new Leaderboards();
+    @ConfigDoc("Native client dialogs from dialogs/ documents.")
+    public Dialogs dialogs = new Dialogs();
+    @ConfigDoc("Chest-inventory menus from inventories/ documents.")
+    public Inventories inventories = new Inventories();
+    @ConfigDoc("Multi-part display-entity models from rigs/ documents and their motion streaming budget.")
+    public Rigs rigs = new Rigs();
+    @ConfigDoc("World markers, beams and trails from markers/ documents.")
+    public Markers markers = new Markers();
+    @ConfigDoc("Locator bar waypoints from waypoints/ documents.")
+    public Waypoints waypoints = new Waypoints();
+    @ConfigDoc("Area outlines and ambience from zones/ documents.")
+    public Zones zones = new Zones();
+    @ConfigDoc("Per-viewer camera rides driven by the camera action.")
+    public Camera camera = new Camera();
+    @ConfigDoc("Event-driven behaviors/ documents, their timers and persisted state.")
+    public Behaviors behaviors = new Behaviors();
+    @ConfigDoc("Generated resource pack: glyph fonts, image atlases and how the pack reaches players.")
+    public Forge forge = new Forge();
+    @ConfigDoc("Installable .glosspack content bundles.")
+    public GlossPacks glosspacks = new GlossPacks();
+    @ConfigDoc("Document version history retention.")
+    public History history = new History();
+    @ConfigDoc("Bedrock (Geyser) viewer detection and which surfaces are withheld from Bedrock clients.")
+    public Bedrock bedrock = new Bedrock();
+
     public static final class Features {
         @ConfigDoc("Enables the hologram engine.")
         public boolean holograms = true;
@@ -114,6 +145,63 @@ public final class GlossConfigFile {
 
         @ConfigDoc("Enables particle layers attached to in-world renders.")
         public boolean particles = true;
+
+        @ConfigDoc("Enables authored action bar, boss bar and title surfaces.")
+        public boolean surfaces = true;
+
+        @ConfigDoc("Enables per-viewer nametag prefixes and suffixes.")
+        public boolean nametags = false;
+
+        @ConfigDoc("Enables leaderboard sampling.")
+        public boolean leaderboards = true;
+
+        @ConfigDoc("Enables the chat channel engine; off keeps the legacy emoji and color chat pass.")
+        public boolean channels = false;
+
+        @ConfigDoc("Enables author-owned strings/ catalogs for lang() in content.")
+        public boolean strings = true;
+
+        @ConfigDoc("Enables native client dialogs.")
+        public boolean dialogs = true;
+
+        @ConfigDoc("Enables chest-inventory menus.")
+        public boolean inventories = true;
+
+        @ConfigDoc("Enables rigs and motion documents.")
+        public boolean rigs = true;
+
+        @ConfigDoc("Enables world markers.")
+        public boolean markers = true;
+
+        @ConfigDoc("Enables locator bar waypoints.")
+        public boolean waypoints = true;
+
+        @ConfigDoc("Enables zone outlines and ambience.")
+        public boolean zones = true;
+
+        @ConfigDoc("Enables camera rides.")
+        public boolean camera = true;
+
+        @ConfigDoc("Enables per-viewer sky, weather and border overrides.")
+        public boolean sky = true;
+
+        @ConfigDoc("Replaces the vanilla player nametag with a Gloss nameplate pane.")
+        public boolean nameplates = false;
+
+        @ConfigDoc("Enables per-viewer entity glow tagging.")
+        public boolean glow = true;
+
+        @ConfigDoc("Enables behaviors documents.")
+        public boolean behaviors = true;
+
+        @ConfigDoc("Enables resource pack generation.")
+        public boolean forge = false;
+
+        @ConfigDoc("Enables .glosspack installation commands.")
+        public boolean glosspacks = true;
+
+        @ConfigDoc("Enables document version history.")
+        public boolean history = true;
     }
 
     public static final class Hotload {
@@ -302,6 +390,9 @@ public final class GlossConfigFile {
     public static final class Menus {
         @ConfigDoc("Global render scale multiplier for holographic menus and panels. Clamped to 0.25..4.0.")
         public double uiScale = 1.0D;
+
+        @ConfigDoc("Maximum entries one menu list component may expand into display entities. Clamped to 1..512.")
+        public int maxListEntries = 64;
     }
 
     public static final class Items {
@@ -332,6 +423,166 @@ public final class GlossConfigFile {
     public static final class Integration {
         @ConfigDoc("Ticks between samples of the metrics other Volmit plugins publish for |metric.<key>| and preview variables. Clamped to 1..200.")
         public int sampleIntervalTicks = 20;
+    }
+
+    // Lane sections. A lane adds knobs inside its own class and its own clamp anchor in normalize().
+    // --- lane:screen ---
+    public static final class Surfaces {
+        @ConfigDoc("Ticks between surface document refreshes. Clamped to 1..200.")
+        public int refreshIntervalTicks = 10;
+
+        @ConfigDoc("Boss bars one viewer may see from Gloss surfaces at once. Clamped to 1..8.")
+        public int maxBossBarsPerViewer = 3;
+
+        @ConfigDoc("Queued titles per viewer before older ones are dropped. Clamped to 1..64.")
+        public int titleQueueLimit = 8;
+    }
+
+    public static final class Nametags {
+        @ConfigDoc("Ticks between nametag re-evaluations. Clamped to 1..200.")
+        public int refreshIntervalTicks = 20;
+    }
+
+    // --- lane:chat ---
+    public static final class Leaderboards {
+        @ConfigDoc("Ticks between leaderboard samples. Clamped to 20..72000.")
+        public int sampleIntervalTicks = 1200;
+
+        @ConfigDoc("Maximum ranked entries kept per leaderboard. Clamped to 1..1000.")
+        public int maxEntries = 100;
+    }
+
+    // --- lane:forms ---
+    public static final class Dialogs {
+        @ConfigDoc("Seconds a dialog waits for a response before its bound inputs are discarded. Clamped to 5..3600.")
+        public int responseTimeoutSeconds = 120;
+    }
+
+    public static final class Inventories {
+        @ConfigDoc("Closes an open inventory menu when its viewer teleports.")
+        public boolean closeOnTeleport = true;
+
+        @ConfigDoc("Item drawn in a chest slot for icon kinds that only exist as display entities (textImage, animatedTextImage, entity).")
+        public String unsupportedIconItem = "minecraft:paper";
+    }
+
+    // --- lane:rigs ---
+    public static final class Rigs {
+        @ConfigDoc("Maximum display parts one rig may declare. Clamped to 1..256.")
+        public int maxPartsPerRig = 64;
+
+        @ConfigDoc("Maximum placed rig instances per chunk. Clamped to 1..64.")
+        public int maxInstancesPerChunk = 8;
+
+        @ConfigDoc("Transform packets per second allowed across every animated rig's audience. Clamped to 100..1000000.")
+        public int transformPacketBudget = 20000;
+
+        @ConfigDoc("Maximum frames per second the motion streaming thread targets. Clamped to 1..120.")
+        public int maxMotionFps = 60;
+    }
+
+    // --- lane:world ---
+    public static final class Markers {
+        @ConfigDoc("Markers one viewer may see at once; the nearest win. Clamped to 1..64.")
+        public int maxPerViewer = 12;
+
+        @ConfigDoc("Distance in blocks at which markers stop rendering. Clamped to 16..1024.")
+        public double viewRange = 256.0D;
+    }
+
+    public static final class Waypoints {
+        @ConfigDoc("Locator bar waypoints one viewer may track at once. Clamped to 1..64.")
+        public int maxPerViewer = 16;
+    }
+
+    public static final class Zones {
+        @ConfigDoc("Distance in blocks at which zone outlines render. Clamped to 8..256.")
+        public double viewRange = 64.0D;
+
+        @ConfigDoc("Zone outline particles per viewer per tick. Clamped to 1..1024.")
+        public int particlesPerViewerPerTick = 64;
+    }
+
+    public static final class Camera {
+        @ConfigDoc("Longest camera ride in seconds; longer rides are cut and the viewer restored. Clamped to 1..3600.")
+        public int maxRideSeconds = 120;
+    }
+
+    // --- lane:behaviors ---
+    public static final class Behaviors {
+        @ConfigDoc("Behavior actions executed per tick across the server before the rest defer. Clamped to 16..65536.")
+        public int maxActionsPerTick = 256;
+
+        @ConfigDoc("Pending delayed or repeating behavior timers per player. Clamped to 1..256.")
+        public int maxTimersPerPlayer = 16;
+
+        @ConfigDoc("Seconds between persisted state flushes. Clamped to 1..600.")
+        public int stateFlushSeconds = 30;
+    }
+
+    // --- lane:authoring ---
+    public static final class GlossPacks {
+        @ConfigDoc("Allows installed packs to carry command actions with source server. Off strips them at install.")
+        public boolean allowServerCommands = false;
+    }
+
+    public static final class History {
+        @ConfigDoc("Versions kept per document. Clamped to 1..500.")
+        public int maxVersions = 20;
+
+        @ConfigDoc("Days a version is kept before pruning. Clamped to 1..3650.")
+        public int maxAgeDays = 30;
+    }
+
+    // --- lane:forge ---
+    public static final class Forge {
+        @ConfigDoc("Public URL players download the generated pack from; {sha1} is replaced with the current pack hash. Blank disables pack delivery unless serve is on.")
+        public String url = "";
+
+        @ConfigDoc("Serves the generated pack from an embedded HTTP listener; needs a port reachable by players.")
+        public boolean serve = false;
+
+        @ConfigDoc("Bind address for the embedded pack listener.")
+        public String serveBind = "0.0.0.0";
+
+        @ConfigDoc("Port for the embedded pack listener. Clamped to 1024..65535.")
+        public int servePort = 8085;
+
+        @ConfigDoc("Marks the pack as required so declining it disconnects the player.")
+        public boolean required = false;
+
+        @ConfigDoc("Prompt shown with the pack request.")
+        public String prompt = "Gloss glyphs and icons";
+
+        @ConfigDoc("Resource pack format written to pack.mcmeta; 0 picks the value for the running server version.")
+        public int packFormat = 0;
+
+        @ConfigDoc("First private-use codepoint the glyph ledger allocates from. Clamped to 57344..63488 (U+E000..U+F800); raise it to sit above another glyph plugin's range.")
+        public int codepointBase = 57344;
+    }
+
+    // --- lane:fixes ---
+    public static final class Bedrock {
+        @ConfigDoc("Bedrock viewer detection: auto (Floodgate, then Geyser), floodgate, geyser, uuid (Floodgate UUID shape), or off.")
+        public String detection = "auto";
+
+        @ConfigDoc("Withholds holograms from Bedrock viewers; text displays do not render on Bedrock.")
+        public boolean hideHolograms = true;
+
+        @ConfigDoc("Withholds panels and hologram menus from Bedrock viewers.")
+        public boolean hidePanels = true;
+
+        @ConfigDoc("Withholds chat bubbles from Bedrock viewers.")
+        public boolean hideBubbles = true;
+
+        @ConfigDoc("Withholds damage indicators from Bedrock viewers.")
+        public boolean hideIndicators = true;
+
+        @ConfigDoc("Withholds real-drop presentations from Bedrock viewers.")
+        public boolean hideDrops = true;
+
+        @ConfigDoc("Withholds entity overlays from Bedrock viewers.")
+        public boolean hideOverlays = true;
     }
 
     public void normalize() {
@@ -400,6 +651,51 @@ public final class GlossConfigFile {
         if (integration == null) {
             integration = new Integration();
         }
+        if (surfaces == null) {
+            surfaces = new Surfaces();
+        }
+        if (nametags == null) {
+            nametags = new Nametags();
+        }
+        if (leaderboards == null) {
+            leaderboards = new Leaderboards();
+        }
+        if (dialogs == null) {
+            dialogs = new Dialogs();
+        }
+        if (inventories == null) {
+            inventories = new Inventories();
+        }
+        if (rigs == null) {
+            rigs = new Rigs();
+        }
+        if (markers == null) {
+            markers = new Markers();
+        }
+        if (waypoints == null) {
+            waypoints = new Waypoints();
+        }
+        if (zones == null) {
+            zones = new Zones();
+        }
+        if (camera == null) {
+            camera = new Camera();
+        }
+        if (behaviors == null) {
+            behaviors = new Behaviors();
+        }
+        if (forge == null) {
+            forge = new Forge();
+        }
+        if (glosspacks == null) {
+            glosspacks = new GlossPacks();
+        }
+        if (history == null) {
+            history = new History();
+        }
+        if (bedrock == null) {
+            bedrock = new Bedrock();
+        }
 
         hotload.watchIntervalTicks = clampInt(hotload.watchIntervalTicks, 1, 200);
 
@@ -448,6 +744,57 @@ public final class GlossConfigFile {
         playerHeads.unknownCacheMinutes = clampInt(playerHeads.unknownCacheMinutes, 1, 1440);
         playerHeads.maxCachedProfiles = clampInt(playerHeads.maxCachedProfiles, 16, 65536);
         playerHeads.unknownFallbackItem = orDefault(playerHeads.unknownFallbackItem, "minecraft:skeleton_skull");
+
+        // Lane clamps: each lane clamps its own section inside its own anchor.
+        // --- lane:screen ---
+        surfaces.refreshIntervalTicks = clampInt(surfaces.refreshIntervalTicks, 1, 200);
+        surfaces.maxBossBarsPerViewer = clampInt(surfaces.maxBossBarsPerViewer, 1, 8);
+        surfaces.titleQueueLimit = clampInt(surfaces.titleQueueLimit, 1, 64);
+        nametags.refreshIntervalTicks = clampInt(nametags.refreshIntervalTicks, 1, 200);
+
+        // --- lane:chat ---
+        leaderboards.sampleIntervalTicks = clampInt(leaderboards.sampleIntervalTicks, 20, 72000);
+        leaderboards.maxEntries = clampInt(leaderboards.maxEntries, 1, 1000);
+
+        // --- lane:forms ---
+        dialogs.responseTimeoutSeconds = clampInt(dialogs.responseTimeoutSeconds, 5, 3600);
+        menus.maxListEntries = clampInt(menus.maxListEntries, 1, 512);
+        inventories.unsupportedIconItem = inventories.unsupportedIconItem == null || inventories.unsupportedIconItem.isBlank()
+            ? "minecraft:paper" : inventories.unsupportedIconItem.trim();
+
+        // --- lane:rigs ---
+        rigs.maxPartsPerRig = clampInt(rigs.maxPartsPerRig, 1, 256);
+        rigs.maxInstancesPerChunk = clampInt(rigs.maxInstancesPerChunk, 1, 64);
+        rigs.transformPacketBudget = clampInt(rigs.transformPacketBudget, 100, 1_000_000);
+        rigs.maxMotionFps = clampInt(rigs.maxMotionFps, 1, 120);
+
+        // --- lane:world ---
+        markers.maxPerViewer = clampInt(markers.maxPerViewer, 1, 64);
+        markers.viewRange = clampDouble(markers.viewRange, 16.0D, 1024.0D, 256.0D);
+        waypoints.maxPerViewer = clampInt(waypoints.maxPerViewer, 1, 64);
+        zones.viewRange = clampDouble(zones.viewRange, 8.0D, 256.0D, 64.0D);
+        zones.particlesPerViewerPerTick = clampInt(zones.particlesPerViewerPerTick, 1, 1024);
+        camera.maxRideSeconds = clampInt(camera.maxRideSeconds, 1, 3600);
+
+        // --- lane:behaviors ---
+        behaviors.maxActionsPerTick = clampInt(behaviors.maxActionsPerTick, 16, 65536);
+        behaviors.maxTimersPerPlayer = clampInt(behaviors.maxTimersPerPlayer, 1, 256);
+        behaviors.stateFlushSeconds = clampInt(behaviors.stateFlushSeconds, 1, 600);
+
+        // --- lane:authoring ---
+        history.maxVersions = clampInt(history.maxVersions, 1, 500);
+        history.maxAgeDays = clampInt(history.maxAgeDays, 1, 3650);
+
+        // --- lane:forge ---
+        forge.url = forge.url == null ? "" : forge.url.strip();
+        forge.serveBind = orDefault(forge.serveBind, "0.0.0.0");
+        forge.servePort = clampInt(forge.servePort, 1024, 65535);
+        forge.prompt = orDefault(forge.prompt, "Gloss glyphs and icons");
+        forge.packFormat = clampInt(forge.packFormat, 0, 1000);
+        forge.codepointBase = clampInt(forge.codepointBase, 57344, 63488);
+
+        // --- lane:fixes ---
+        bedrock.detection = normalizeChoice(bedrock.detection, "AUTO", "FLOODGATE", "GEYSER", "UUID", "OFF").toLowerCase(Locale.ROOT);
     }
 
     public static String sanitizeBuilderUrl(String configured) {

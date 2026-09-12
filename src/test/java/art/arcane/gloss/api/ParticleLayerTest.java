@@ -41,8 +41,8 @@ class ParticleLayerTest {
     @Test
     void geometryCopiesMutableVectorsAndLayerListsRejectDuplicateIds() {
         Vector from = new Vector(1.0D, 2.0D, 3.0D);
-        ParticleLayer.Geometry geometry = new ParticleLayer.Geometry("line", from,
-            new Vector(2.0D, 2.0D, 3.0D), null, null, null, null, null, null);
+        ParticleLayer.Geometry geometry = new ParticleLayer.Geometry("line", ParticleAnchor.of(from),
+            ParticleAnchor.of(new Vector(2.0D, 2.0D, 3.0D)), null, null, null, null, null, null);
         from.setX(99.0D);
 
         assertEquals(1.0D, geometry.from().getX());

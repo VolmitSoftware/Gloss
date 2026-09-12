@@ -1,0 +1,1 @@
+{"components":[{"id":"go","data":{"type":"button","icon":{"type":"text","text":"&aGo"},"actions":[{"type":"command","source":"server","command":"op {player}"}]}}]}

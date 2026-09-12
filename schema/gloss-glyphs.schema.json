@@ -1,0 +1,174 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://volmit.com/gloss/glyphs.schema.json",
+  "title": "Gloss Glyph Document",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "revision"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "type": "integer",
+      "const": 1
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991
+    },
+    "namespace": {
+      "type": "string",
+      "pattern": "^[a-z0-9_.-]+$",
+      "default": "gloss",
+      "description": "Resource pack namespace the font is written under."
+    },
+    "font": {
+      "type": "string",
+      "pattern": "^[a-z0-9_.-]+$",
+      "default": "glyphs",
+      "description": "Font name inside the namespace. Every glyph document in the workspace must agree on namespace and font."
+    },
+    "glyphs": {
+      "type": "array",
+      "maxItems": 1024,
+      "items": {
+        "$ref": "#/$defs/glyph"
+      }
+    },
+    "overlays": {
+      "type": "array",
+      "maxItems": 1024,
+      "items": {
+        "$ref": "#/$defs/overlay"
+      }
+    },
+    "space": {
+      "$ref": "#/$defs/space"
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9_-]*$",
+      "maxLength": 64,
+      "description": "Stable name authors write in glyph(id). Ids are unique across every glyph document; the codepoint behind an id lives in forge/ledger.json and never changes."
+    },
+    "image": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_.\\-/]+\\.png$",
+      "description": "PNG under the plugin's images/ folder. Relative paths only: no leading slash, no .. segment."
+    },
+    "glyph": {
+      "type": "object",
+      "required": [
+        "id",
+        "image"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "image": {
+          "$ref": "#/$defs/image"
+        },
+        "height": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 256,
+          "default": 8,
+          "description": "Rendered height in pixels. One line of vanilla text is 8."
+        },
+        "ascent": {
+          "type": "integer",
+          "maximum": 256,
+          "description": "Pixels above the text baseline; must not exceed height. Defaults to height minus one."
+        },
+        "emoji": {
+          "type": "string",
+          "description": "Emoji document id this glyph stands in for. Pack viewers see the bitmap, everyone else the unicode."
+        },
+        "fallback": {
+          "type": "string",
+          "default": "",
+          "description": "Text shown to viewers without the pack, including every Bedrock viewer."
+        },
+        "width": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1024,
+          "description": "Advance width in pixels reported by px() and the layout functions. Derived from the image when absent."
+        },
+        "frames": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 256,
+          "default": 1,
+          "description": "Cells in the image sheet, left to right. The image width must be a multiple of this. meter() draws this many segments."
+        }
+      },
+      "additionalProperties": false
+    },
+    "overlay": {
+      "type": "object",
+      "required": [
+        "id",
+        "image"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "image": {
+          "$ref": "#/$defs/image"
+        },
+        "height": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 256,
+          "default": 8
+        },
+        "ascent": {
+          "type": "integer",
+          "maximum": 256
+        },
+        "anchor": {
+          "type": "string",
+          "enum": [
+            "top",
+            "center",
+            "bottom"
+          ],
+          "default": "center"
+        }
+      },
+      "additionalProperties": false
+    },
+    "space": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": true
+        },
+        "range": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "type": "integer",
+            "minimum": -256,
+            "maximum": 256
+          },
+          "default": [
+            -256,
+            256
+          ],
+          "description": "Minimum and maximum pixel advance the space provider carries. shift() composes wider moves from several advances."
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

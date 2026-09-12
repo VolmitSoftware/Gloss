@@ -1,7 +1,10 @@
 package art.arcane.gloss.command;
 
 import art.arcane.gloss.locale.GlossLocalization;
+import art.arcane.gloss.locale.GlossMessages;
 import art.arcane.volmlib.util.director.help.DirectorMiniMenu;
+import art.arcane.volmlib.util.localization.MessageArgument;
+import org.bukkit.command.CommandSender;
 
 import java.util.List;
 
@@ -26,6 +29,23 @@ final class GlossCommandPager {
     static void appendFooter(List<String> lines, DirectorMiniMenu.ContentPage page, String command,
                              DirectorMiniMenu.Theme theme) {
         lines.add(DirectorMiniMenu.paginationBar(page, command, theme, GlossLocalization.globalDirectorResolver()));
+    }
+
+    /** The page counter and the next-page hint for a command that sends its rows as plain messages. */
+    static void sendPageFooter(CommandSender sender, DirectorMiniMenu.ContentPage page, String command) {
+        if (page.pages() <= 1) {
+            return;
+        }
+        GlossCommandMessages.send(sender, GlossMessages.LIST_PAGE,
+                MessageArgument.trusted("page", page.page()),
+                MessageArgument.trusted("pages", page.pages()),
+                MessageArgument.trusted("from", page.startIndex() + 1),
+                MessageArgument.trusted("to", page.endIndex()),
+                MessageArgument.trusted("total", page.total()));
+        if (page.hasNext()) {
+            GlossCommandMessages.send(sender, GlossMessages.LIST_NEXT,
+                    MessageArgument.untrusted("command", page.nextCommand(command)));
+        }
     }
 
     static String entry(String label, String details, DirectorMiniMenu.Theme theme) {

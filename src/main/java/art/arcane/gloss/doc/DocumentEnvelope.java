@@ -9,7 +9,7 @@ public final class DocumentEnvelope {
 
     public static int requireSchemaVersion(String kind, int schemaVersion, int supported) {
         if (schemaVersion != supported) {
-            throw new UnsupportedSchemaVersionException(kind, schemaVersion);
+            throw new UnsupportedSchemaVersionException(schemaVersion, supported);
         }
         return schemaVersion;
     }
@@ -33,9 +33,10 @@ public final class DocumentEnvelope {
         return revision;
     }
 
+    /** Names both numbers: the reader has to know which way the file needs to move. */
     private static final class UnsupportedSchemaVersionException extends IllegalArgumentException {
-        private UnsupportedSchemaVersionException(String kind, int schemaVersion) {
-            super("unsupported " + kind + " schemaVersion: " + schemaVersion);
+        private UnsupportedSchemaVersionException(int schemaVersion, int supported) {
+            super("declares schemaVersion " + schemaVersion + "; this build reads " + supported);
         }
     }
 }

@@ -59,7 +59,7 @@ class BoardFastRefreshMemoTest {
         assertFalse(meta.usesFastRefreshText());
 
         meta.setVariants(List.of(new BoardDoc.Variant("animated", 1, "true",
-            new BoardDoc.Presentation("Static", List.of("{{ time.ticks }}"), false))));
+            BoardDoc.Presentation.ofStrings("Static", List.of("{{ time.ticks }}"), false))));
         assertTrue(meta.usesFastRefreshText());
 
         meta.setVariants(List.of());
@@ -81,7 +81,7 @@ class BoardFastRefreshMemoTest {
     void aConditionalEmojiInAVariantIsTrackedToo() {
         GlossBoardMeta meta = board("Static", "plain");
         meta.setVariants(List.of(new BoardDoc.Variant("vip", 1, "true",
-            new BoardDoc.Presentation("Static", List.of("&7:vip:"), false))));
+            BoardDoc.Presentation.ofStrings("Static", List.of("&7:vip:"), false))));
 
         assertFalse(meta.usesFastRefreshText());
         TextPipeline.publishConditionalEmojiTokens(List.of(":vip:"));
@@ -99,7 +99,7 @@ class BoardFastRefreshMemoTest {
         BoardDoc.Presentation rebuilt = meta.presentation();
         assertNotNull(rebuilt);
         assertNotSame(presentation, rebuilt, "a content change must rebuild the presentation");
-        assertEquals(List.of("c", "b"), rebuilt.lines());
+        assertEquals(List.of("c", "b"), rebuilt.texts());
         assertSame(rebuilt, meta.presentation());
     }
 

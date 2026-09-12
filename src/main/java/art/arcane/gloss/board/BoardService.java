@@ -1,6 +1,9 @@
 package art.arcane.gloss.board;
 
 import art.arcane.gloss.Gloss;
+import art.arcane.gloss.behavior.ExplainReport;
+import art.arcane.gloss.behavior.ExplainReports;
+import art.arcane.gloss.behavior.Explainable;
 import art.arcane.gloss.condition.BoundedConditionErrorCallback;
 import art.arcane.gloss.condition.GlossConditionScope;
 import art.arcane.gloss.doc.DocumentDelta;
@@ -9,6 +12,7 @@ import art.arcane.gloss.doc.DocumentRegistry;
 import art.arcane.gloss.doc.DocumentReviser;
 import art.arcane.gloss.doc.DocumentStore;
 import art.arcane.gloss.doc.GlossDocument;
+import art.arcane.gloss.doc.RegistryOwner;
 import art.arcane.gloss.doc.ShippedDefaults;
 import art.arcane.gloss.doc.ShippedDocumentCatalog;
 import art.arcane.gloss.expr.ExprScope;
@@ -19,6 +23,10 @@ import art.arcane.volmlib.util.board.BoardManager;
 import art.arcane.volmlib.util.board.BoardProvider;
 import art.arcane.volmlib.util.board.BoardSettings;
 import art.arcane.volmlib.util.board.ScoreDirection;
+import com.github.retrooper.packetevents.PacketEvents;
+import com.github.retrooper.packetevents.event.PacketListenerCommon;
+import com.github.retrooper.packetevents.protocol.score.ScoreFormat;
+import art.arcane.gloss.util.common.TextUtils;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -33,6 +41,7 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -43,7 +52,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.UnaryOperator;
 import java.util.logging.Level;
 
-public final class BoardService implements Listener {
+public final class BoardService implements Listener, Explainable, RegistryOwner {
     private static final int MAX_LINES = 15;
     private static final int ANIMATION_REFRESH_INTERVAL_TICKS = 1;
     private static final int SELECTION_STRIPE_PERIOD_TICKS = 1;
@@ -81,6 +90,9 @@ public final class BoardService implements Listener {
     private volatile int ordinaryManagerIntervalTicks;
     private volatile int selectionTaskId;
     private volatile List<GlossBoardMeta> boardSnapshot;
+    private final Map<UUID, BoardFormatIndex> formatIndex;
+    private volatile PacketListenerCommon scoreFormatListener;
+    private volatile boolean loggedSidebarObjective;
 
     public BoardService(Gloss plugin) {
         this.plugin = plugin;
@@ -101,10 +113,18 @@ public final class BoardService implements Listener {
             Gloss.logExceptionStackThrottled(false, "board-condition-" + error.path(), error.cause(),
                 "Board condition %s failed and was treated as false.", error.path()));
         this.renderCache = new BoardRenderCache();
+        this.formatIndex = new ConcurrentHashMap<>();
         this.selectionOrder = new ArrayList<>();
         this.selectionStripeIndex = 0;
         this.selectionCursor = 0;
         this.selectionTaskId = -1;
+    }
+
+    /** {@code /gloss explain board <id>}: the visibility gate, the selection gate and every variant. */
+    @Override
+    public ExplainReport explain(String id, Player viewer) {
+        GlossBoardMeta meta = board(id);
+        return meta == null ? null : ExplainReports.board(meta, GlossConditionScope.viewer(plugin, viewer));
     }
 
     public static String selectBoardId(List<GlossBoardMeta> boards, ExprScope scope) {
@@ -142,12 +162,22 @@ public final class BoardService implements Listener {
             createManagers();
         }
         plugin.watchdog().register("boards", this::pollRegistry);
+        if (plugin.cfg().boards().enabled()) {
+            scoreFormatListener = PacketEvents.getAPI().getEventManager()
+                .registerListener(new ScoreFormatDecorator(formatIndex::get));
+        }
         plugin.scheduler().s(this::selectAllAutomatically, 1);
     }
 
     public void disable() {
         HandlerList.unregisterAll(this);
         plugin.watchdog().unregister("boards");
+        if (scoreFormatListener != null) {
+            PacketEvents.getAPI().getEventManager().unregisterListener(scoreFormatListener);
+            scoreFormatListener = null;
+        }
+        formatIndex.clear();
+        loggedSidebarObjective = false;
         registry.close();
         stopManagers();
         storage.shutdown();
@@ -299,6 +329,7 @@ public final class BoardService implements Listener {
         selections.remove(uuid);
         profiles.remove(uuid);
         sticky.remove(uuid);
+        formatIndex.remove(uuid);
         renderCache.forget(uuid);
         removeFromManagers(event.getPlayer());
     }
@@ -619,6 +650,7 @@ public final class BoardService implements Listener {
             }
             GlossBoardMeta.ActiveProfile profile = selectedProfile(player, meta);
             GlossBoardMeta.RenderPlan plan = plan(meta, profile);
+            publishFormats(player, plan);
             if (fastCadence) {
                 return Arrays.asList(renderCache.entry(player.getUniqueId()).lines(plan, System.nanoTime(),
                     slowIntervalNanos(), player.getUniqueId().hashCode(), raw -> render(player, raw)));
@@ -634,6 +666,56 @@ public final class BoardService implements Listener {
                 rendered.add(render(player, plan.rawLine(index)));
             }
             return rendered;
+        }
+
+        /**
+         * The value column is published here, beside the line render that produced it: the packet
+         * thread reads one immutable snapshot per viewer and never touches document state.
+         */
+        private void publishFormats(Player player, GlossBoardMeta.RenderPlan plan) {
+            if (!plan.hasValueColumn()) {
+                formatIndex.remove(player.getUniqueId());
+                return;
+            }
+            String objectiveName = objectiveNameFor(player);
+            if (objectiveName == null) {
+                formatIndex.remove(player.getUniqueId());
+                return;
+            }
+            Map<String, ScoreFormat> formats = new HashMap<>();
+            for (int index = 0; index < plan.lineCount(); index++) {
+                BoardLineFormat format = plan.format(index);
+                if (format == null) {
+                    continue;
+                }
+                String entry = Board.entryForLine(index);
+                if (entry == null) {
+                    continue;
+                }
+                ScoreFormat resolved = scoreFormat(player, format, plan, index);
+                if (resolved != null) {
+                    formats.put(entry, resolved);
+                }
+            }
+            BoardFormatIndex published = BoardFormatIndex.of(objectiveName, formats);
+            if (published == null) {
+                formatIndex.remove(player.getUniqueId());
+                return;
+            }
+            formatIndex.put(player.getUniqueId(), published);
+        }
+
+        private ScoreFormat scoreFormat(Player player, BoardLineFormat format, GlossBoardMeta.RenderPlan plan,
+                                        int index) {
+            return switch (format) {
+                case BLANK -> ScoreFormat.blankScore();
+                case NUMBER, STYLED -> null;
+                case FIXED -> {
+                    String cached = plan.staticValue(index);
+                    String value = cached != null ? cached : render(player, plan.rawValue(index));
+                    yield ScoreFormat.fixedScore(TextUtils.parse(value));
+                }
+            };
         }
 
         @Override
@@ -658,7 +740,30 @@ public final class BoardService implements Listener {
      * How long a viewer on the one-tick manager may serve a line that does not need per-tick
      * refresh from its last render: the ordinary board interval.
      */
+    /**
+     * The live objective the viewer's sidebar scores against. VolmLib picks the Bukkit objective or
+     * its packet sidebar per player, so the name is read from the board rather than assumed.
+     */
+    private String objectiveNameFor(Player player) {
+        BoardManager<Board> manager = ordinaryManager;
+        String objectiveName = manager == null ? null : manager.getBoard(player).map(Board::objectiveName).orElse(null);
+        if (objectiveName == null) {
+            BoardManager<Board> animation = animationManager;
+            objectiveName = animation == null ? null : animation.getBoard(player).map(Board::objectiveName).orElse(null);
+        }
+        if (objectiveName != null && !loggedSidebarObjective) {
+            loggedSidebarObjective = true;
+            Gloss.log(Level.INFO, "Sidebar number formats decorate objective \"%s\".", objectiveName);
+        }
+        return objectiveName;
+    }
+
     private long slowIntervalNanos() {
         return Math.max(1, ordinaryManagerIntervalTicks) * TICK_NANOS;
+    }
+
+    @Override
+    public Map<String, DocumentRegistry<?>> registries() {
+        return Map.of("boards", registry);
     }
 }

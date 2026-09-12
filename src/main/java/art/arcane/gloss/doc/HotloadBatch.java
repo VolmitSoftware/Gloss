@@ -7,6 +7,7 @@ import java.util.TreeMap;
 
 final class HotloadBatch {
     private final Map<String, Integer> changesByKind = new TreeMap<>();
+    private final Map<String, Integer> skippedByKind = new TreeMap<>();
 
     synchronized void record(String kind, int changes) {
         if (kind == null || kind.isBlank() || changes <= 0) {
@@ -15,28 +16,44 @@ final class HotloadBatch {
         changesByKind.merge(kind, changes, Integer::sum);
     }
 
+    /** Files a poll refused for their {@code schemaVersion}; they ride the same notice. */
+    synchronized void recordSkipped(String kind, int skipped) {
+        if (kind == null || kind.isBlank() || skipped <= 0) {
+            return;
+        }
+        skippedByKind.merge(kind, skipped, Integer::sum);
+    }
+
     synchronized Snapshot drain() {
-        if (changesByKind.isEmpty()) {
+        if (changesByKind.isEmpty() && skippedByKind.isEmpty()) {
             return Snapshot.EMPTY;
         }
         Map<String, Integer> changes = Collections.unmodifiableMap(new LinkedHashMap<>(changesByKind));
+        Map<String, Integer> skipped = Collections.unmodifiableMap(new LinkedHashMap<>(skippedByKind));
         changesByKind.clear();
-        int total = 0;
-        for (int count : changes.values()) {
-            total += count;
-        }
-        return new Snapshot(changes, total);
+        skippedByKind.clear();
+        return new Snapshot(changes, total(changes), skipped, total(skipped));
     }
 
     synchronized void clear() {
         changesByKind.clear();
+        skippedByKind.clear();
     }
 
-    record Snapshot(Map<String, Integer> changesByKind, int totalChanges) {
-        private static final Snapshot EMPTY = new Snapshot(Map.of(), 0);
+    private static int total(Map<String, Integer> counts) {
+        int total = 0;
+        for (int count : counts.values()) {
+            total += count;
+        }
+        return total;
+    }
+
+    record Snapshot(Map<String, Integer> changesByKind, int totalChanges,
+                    Map<String, Integer> skippedByKind, int totalSkipped) {
+        private static final Snapshot EMPTY = new Snapshot(Map.of(), 0, Map.of(), 0);
 
         boolean isEmpty() {
-            return totalChanges <= 0;
+            return totalChanges <= 0 && totalSkipped <= 0;
         }
     }
 }

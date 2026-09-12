@@ -85,7 +85,7 @@ class BoardSelectionTest {
 
         assertEquals("critical", profile.id());
         assertEquals("Critical", profile.presentation().title());
-        assertEquals(List.of("Critical-line"), profile.presentation().lines());
+        assertEquals(List.of("Critical-line"), profile.presentation().texts());
     }
 
     @Test
@@ -116,7 +116,7 @@ class BoardSelectionTest {
 
     private static BoardDoc.Variant variant(String id, int priority, String when, String title) {
         return new BoardDoc.Variant(id, priority, when,
-            new BoardDoc.Presentation(title, List.of(title + "-line"), false));
+            BoardDoc.Presentation.ofStrings(title, List.of(title + "-line"), false));
     }
 
     private record TestScope(Map<String, Object> variables, Set<String> permissions) implements ExprScope {

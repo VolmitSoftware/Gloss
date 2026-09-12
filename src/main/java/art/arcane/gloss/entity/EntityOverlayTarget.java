@@ -22,6 +22,7 @@ final class EntityOverlayTarget {
         TemporaryHologram display;
         ParticleText.Rendered frame;
         EntityOverlayText.Prepared prepared;
+        EntityOverlaySource.Pane pane;
         EntityOverlayText.Snapshot snapshot;
         List<String> details = List.of();
         long renderGeneration = -1;
@@ -35,6 +36,7 @@ final class EntityOverlayTarget {
             }
             frame = null;
             prepared = null;
+            pane = null;
             snapshot = null;
             details = List.of();
             whitelist.clear();

@@ -826,3 +826,517 @@ line = "שורה {line}"
 [language.editor.value]
 none = "אין"
 empty = "(ריק)"
+
+# Lane message tables. Each lane appends its [gloss.message.<lane>] and [command.help.<group>]
+# tables inside its own anchor so parallel branches never share a line.
+# --- lane:screen ---
+[gloss.message.screen]
+"surfaces.empty" = "&8[&dGloss&8] &7לא נטענו משטחים."
+"surfaces.unknown" = "&8[&dGloss&8]: &cאין משטח בשם &f{id}&c."
+"surfaces.tested" = "&8[&dGloss&8]: &a&f{id}&a הורץ עבור &f{player}&a."
+"nametags.empty" = "&8[&dGloss&8] &7לא נטענו תגיות שם."
+"nametags.unknown" = "&8[&dGloss&8]: &cאין תגית שם בשם &f{id}&c."
+"nametags.refreshed" = "&8[&dGloss&8]: &a&d{count}&a מסמכי תגיות שם הוחלו מחדש."
+"hud.header" = "&8[&dGloss&8] &7תפיסות HUD עבור &f{player}&7: &d{count}"
+"hud.empty" = "&8[&dGloss&8] &7אף תוסף אינו תופס משבצת HUD עבור &f{player}&7."
+"hud.line" = "&8- &f{kind} &7{source} &8| &7{value} &8| &7{count} &8| &7{state}"
+"player.unknown" = "&8[&dGloss&8]: &cאין שחקן מחובר בשם &f{player}&c."
+
+[command.help.surface]
+root = "משטחי סרגל פעולה, סרגל בוס וכותרת"
+list = "הצגת רשימת מסמכי משטח"
+info = "הצגת מסמך משטח"
+"info.id" = "מזהה מסמך המשטח"
+reset = "שחזור המשטחים המצורפים"
+test = "הרצת מעבר המשטחים עבור שחקן עכשיו"
+"test.id" = "מזהה מסמך המשטח"
+"test.player" = "השחקן לבדיקה; ברירת המחדל היא אתה"
+
+[command.help.nametag]
+root = "מסמכי תגיות שם לכל צופה"
+list = "הצגת רשימת מסמכי תגיות שם"
+info = "הצגת מסמך תגית שם"
+"info.id" = "מזהה מסמך תגית השם"
+reset = "שחזור תגיות השם המצורפות"
+refresh = "החלה מחדש של כל תגיות השם עכשיו"
+
+[command.help.hud]
+root = "בדיקת מרכיב ה-HUD המשותף"
+who = "מציג איזה תוסף תופס כל משבצת HUD"
+"who.player" = "השחקן לבדיקה; ברירת המחדל היא אתה"
+
+# --- lane:chat ---
+[gloss.message.chat]
+filtered = "&8[&dGloss&8]: &cמסנן הצ'אט חסם את ההודעה שלך."
+too_fast = "&8[&dGloss&8]: &eהמתן רגע לפני שליחת הודעה נוספת."
+repeat = "&8[&dGloss&8]: &eכבר אמרת את זה."
+channel_set = "&8[&dGloss&8]: &aאתה מדבר כעת בערוץ &d{name}&a."
+channel_unknown = "&8[&dGloss&8]: &cאין ערוץ בשם &d{name}&c."
+channel_list = "&8[&dGloss&8]: &7ערוצים: &f{value}"
+msg_usage = "&8[&dGloss&8]: &eשימוש: &f{command}"
+msg_offline = "&8[&dGloss&8]: &c{player} אינו מחובר."
+reply_none = "&8[&dGloss&8]: &cאין לך למי להשיב."
+msg_self = "&8[&dGloss&8]: &cאינך יכול לשלוח הודעה לעצמך."
+channels_header = "&dערוצים &7({count})"
+channels_empty = "&7לא נטענו ערוצים."
+channel_missing = "&8[&dGloss&8]: &cאין מסמך ערוץ בשם &f{id}&c."
+strings_header = "&dשפות טקסט &7({count})"
+strings_empty = "&7לא נטענו מסמכי טקסט."
+strings_missing = "&dחסר ב-{locale} &7({count})"
+strings_complete = "&8[&dGloss&8]: &a{locale} מכסה כל מפתח של en_US."
+leaderboards_header = "&dטבלאות מובילים &7({count})"
+leaderboards_empty = "&7לא נטענו טבלאות מובילים."
+leaderboard_missing = "&8[&dGloss&8]: &cאין טבלת מובילים בשם &f{id}&c."
+leaderboard_reset = "&8[&dGloss&8]: &aטבלת המובילים &f{id}&a אופסה ({state})."
+leaderboard_sampled = "&8[&dGloss&8]: &aטבלת המובילים &f{id}&a נדגמה עבור כל השחקנים המחוברים."
+
+
+[command.help.channel]
+root = "ערוצי צ'אט"
+list = "הצגת הערוצים שנטענו"
+info = "הצגת ההיקף, התבנית והווריאציות של ערוץ"
+"info.id" = "מזהה מסמך הערוץ"
+reset = "שחזור מסמכי הערוץ המצורפים"
+
+[command.help.strings]
+root = "טקסטי תוכן שנכתבו"
+list = "הצגת שפות הטקסט שנטענו ומספר הערכים בהן"
+missing = "הצגת מפתחות שקיימים ב-en_US וחסרים בשפה"
+"missing.locale" = "השפה להשוואה מול en_US"
+reset = "שחזור מסמכי הטקסט המצורפים"
+
+[command.help.leaderboard]
+root = "טבלאות מובילים מחושבות"
+list = "הצגת טבלאות המובילים שנטענו ומספר הערכים בהן"
+info = "הצגת המקור, הסדר והערכים של טבלת מובילים"
+"info.id" = "מזהה המסמך"
+reset = "ניקוי התקופה או הערכים הכוללים של טבלת מובילים"
+"reset.id" = "מזהה המסמך"
+"reset.period" = "all או current"
+sample = "דגימת טבלת מובילים כעת עבור כל המחוברים"
+"sample.id" = "מזהה המסמך"
+
+# --- lane:forms ---
+[gloss.message.forms]
+icon_unsupported = "&7לא ניתן להצגה במשבצת תיבה ({kind})"
+no_dialogs = "&8[&dGloss&8]: &7לא הוגדרו דיאלוגים."
+dialog_list_header = "&dדיאלוגים"
+dialog_list_entry = "&7פתח את הדיאלוג &f{id}"
+dialog_info = "&8[&dGloss&8]: &d{id} &8- &7סוג &f{kind}&7, כפתורים &f{count}"
+unknown_dialog = "&8[&dGloss&8]: &cאין דיאלוג בשם {id}."
+dialog_opened = "&8[&dGloss&8]: &aהדיאלוג {id} נפתח עבור {player}."
+dialog_unsupported = "&8[&dGloss&8]: &cהלקוח שלך אינו יכול להציג את הדיאלוג הזה."
+no_inventories = "&8[&dGloss&8]: &7לא הוגדרו תפריטי תיבה."
+inventory_list_header = "&dתפריטי תיבה"
+inventory_list_entry = "&7פתח את תפריט התיבה &f{id}"
+inventory_info = "&8[&dGloss&8]: &d{id} &8- &7גודל &f{kind}&7, משבצות &f{count}"
+unknown_inventory = "&8[&dGloss&8]: &cאין תפריט תיבה בשם {id}."
+inventory_opened = "&8[&dGloss&8]: &aתפריט התיבה {id} נפתח עבור {player}."
+bad_args = "&8[&dGloss&8]: &cהארגומנטים חייבים להיות זוגות מפתח=ערך: {value}"
+prompt_timeout = "&8[&dGloss&8]: &7זמן הקלט פג."
+prompt_busy = "&8[&dGloss&8]: &cכבר יש לך קלט ממתין."
+take_missing = "&8[&dGloss&8]: &cאין ברשותך את הפריטים הדרושים."
+economy_denied = "&8[&dGloss&8]: &cאין לך מספיק כסף."
+economy_unavailable = "&8[&dGloss&8]: &cאין תוסף כלכלה זמין."
+give_dropped = "&8[&dGloss&8]: &7המלאי שלך היה מלא, לכן הפריטים נפלו לרגליך."
+
+[command.help.dialog]
+root = "בדיקה ופתיחה של מסמכי דיאלוג"
+list = "הצגת רשימת הדיאלוגים המוגדרים"
+"list.page" = "עמוד ברשימה, החל מ-1"
+info = "הצגת הסוג, הקלטים והכפתורים של דיאלוג"
+"info.id" = "מזהה הדיאלוג"
+open = "פתיחת דיאלוג עבור שחקן"
+"open.id" = "מזהה הדיאלוג"
+"open.player" = "השחקן שעבורו לפתוח; ברירת המחדל היא אתה"
+"open.args" = "ארגומנטים מסוג מפתח=ערך מופרדים ברווחים"
+reset = "שחזור ברירות המחדל המצורפות של הדיאלוגים"
+"reset.name" = "השם לאיפוס, או * עבור כל ברירות המחדל המצורפות"
+
+["command.help.menu.open"]
+args = "ארגומנטים מסוג מפתח=ערך מופרדים ברווחים"
+
+[command.help.inventory]
+root = "בדיקה ופתיחה של תפריטי תיבה"
+list = "הצגת רשימת תפריטי התיבה המוגדרים"
+"list.page" = "עמוד ברשימה, החל מ-1"
+info = "הצגת הגודל והמשבצות של תפריט תיבה"
+"info.id" = "מזהה תפריט התיבה"
+open = "פתיחת תפריט תיבה עבור שחקן"
+"open.id" = "מזהה תפריט התיבה"
+"open.player" = "השחקן שעבורו לפתוח; ברירת המחדל היא אתה"
+"open.args" = "ארגומנטים מסוג מפתח=ערך מופרדים ברווחים"
+reset = "שחזור ברירות המחדל המצורפות של תפריטי התיבה"
+"reset.name" = "השם לאיפוס, או * עבור כל ברירות המחדל המצורפות"
+
+
+# --- lane:rigs ---
+[command.help.rig]
+root = "הצבה וניהול של מופעי ריג"
+list = "רשימת ריגים ומופעים מוצבים; לחיצה משגרת אליהם"
+info = "הצגת הריג, המיקום והמצב של מופע ריג"
+"info.id" = "מזהה מופע ריג"
+place = "הצבת ריג במיקומך"
+"place.rig" = "מזהה מסמך ריג"
+"place.id" = "מזהה מופע; ריק בוחר את הפנוי הבא"
+move = "הזזת מופע ריג במרחקי בלוקים יחסיים"
+"move.id" = "מזהה מופע ריג"
+"move.x" = "היסט X יחסי בבלוקים"
+"move.y" = "היסט Y יחסי בבלוקים"
+"move.z" = "היסט Z יחסי בבלוקים"
+here = "העברת מופע ריג למיקומך"
+"here.id" = "מזהה מופע ריג"
+rotate = "הגדרת yaw ו-pitch של מופע ריג"
+"rotate.id" = "מזהה מופע ריג"
+"rotate.yaw" = "Yaw במעלות"
+"rotate.pitch" = "Pitch במעלות"
+scale = "הגדרת קנה מידה אחיד למופע ריג"
+"scale.id" = "מזהה מופע ריג"
+"scale.scale" = "מכפיל קנה מידה, 0.01 עד 64"
+remove = "הסרת מופע ריג"
+"remove.id" = "מזהה מופע ריג"
+state = "העברת מופע ריג למצב בגרף"
+"state.id" = "מזהה מופע ריג"
+"state.state" = "שם מצב מגרף הריג"
+var = "הגדרת משתנה של מופע ריג"
+"var.id" = "מזהה מופע ריג"
+"var.name" = "שם המשתנה"
+"var.value" = "מספר, true, false או טקסט"
+import = "ייבוא מודל Blockbench כריג"
+"import.file" = "נתיב לקובץ ‎.bbmodel בתיקיית הנתונים של Gloss"
+"import.id" = "מזהה ריג; ריק משתמש בשם הקובץ"
+"import.texture" = "פריט מותאם בצורת provider:id לכל קובייה"
+reset = "שחזור מסמכי הריג המצורפים"
+
+["command.help.hologram"]
+page = "העברת צופה לעמוד של ההולוגרמה"
+"page.page" = "מזהה עמוד, next או prev"
+"page.player" = "שם שחקן; ריק מתייחס אליך"
+motion = "הפעלת קליפ תנועה על הולוגרמה"
+"motion.motion" = "מזהה תנועה, או clear כדי לעצור"
+actions = "הצגת הפעולות שההולוגרמה מריצה בלחיצה"
+
+[command.help.motion]
+root = "בדיקת קטעי תנועה"
+list = "רשימת קטעי תנועה"
+info = "הצגת משך, לולאה, fps ורצועות של קטע תנועה"
+"info.id" = "מזהה תנועה"
+reset = "שחזור מסמכי התנועה המצורפים"
+
+[gloss.message.rigs]
+rig_unknown = "&8[&dGloss&8] &cאין ריג בשם '&f{id}&c'."
+instance_missing = "&8[&dGloss&8] &cאין מופע ריג בשם '&f{id}&c'."
+placed = "&8[&dGloss&8] &aהריג &f{name}&a הוצב בתור &f{id}&a ב-&f{world} {x}, {y}, {z}&a."
+place_failed = "&8[&dGloss&8] &cלא ניתן להציב את הריג &f{name}&c: {reason}"
+moved = "&8[&dGloss&8] &aמופע הריג &f{id}&a הועבר אל &f{world} {x}, {y}, {z}&a."
+rotated = "&8[&dGloss&8] &aמופע הריג &f{id}&a סובב ל-yaw &f{yaw}&a, pitch &f{pitch}&a."
+scaled = "&8[&dGloss&8] &aמופע הריג &f{id}&a שונה לקנה מידה &f{scale}&a."
+scale_out_of_range = "&8[&dGloss&8] &cקנה המידה של הריג חייב להיות בין &f{minimum}&c ל-&f{maximum}&c; התקבל &f{value}&c."
+removed = "&8[&dGloss&8] &aמופע הריג &f{id}&a הוסר."
+state_set = "&8[&dGloss&8] &aמופע הריג &f{id}&a נמצא כעת במצב &f{state}&a."
+state_unknown = "&8[&dGloss&8] &cלמופע הריג &f{id}&c אין מצב בשם '&f{state}&c'."
+var_set = "&8[&dGloss&8] &a&f{name}&a במופע הריג &f{id}&a הוגדר ל-&f{value}&a."
+save_failed = "&8[&dGloss&8] &cלא ניתן לשמור את מופע הריג &f{id}&c: {reason}"
+list_empty = "&8[&dGloss&8] &7לא נטענו ריגים."
+list_rigs = "&8[&dGloss&8] &7ריגים (&f{count}&7): &f{value}"
+instances_empty = "&8[&dGloss&8] &7לא הוצבו מופעי ריג."
+list_hover = "לחיצה לשיגור"
+list_entry = "{name} ב-{world} {x}, {y}, {z}; מצב {state}"
+info_header = "&8[&dGloss&8] &d{id} &7משתמש בריג &f{name}&7 ב-&f{world} {x}, {y}, {z}"
+info_pose = "&8[&dGloss&8] &7Yaw &f{yaw}&7, pitch &f{pitch}&7, קנה מידה &f{scale}&7, מצב &f{state}"
+info_parts = "&8[&dGloss&8] &7חלקים &f{count}&7, צופים &f{value}"
+info_var = "&8[&dGloss&8] &7  {name} = &f{value}"
+motion_unknown = "&8[&dGloss&8] &cאין תנועה בשם '&f{id}&c'."
+motion_list_empty = "&8[&dGloss&8] &7לא נטענו קטעי תנועה."
+motion_list = "&8[&dGloss&8] &7קטעי תנועה (&f{count}&7): &f{value}"
+motion_info = "&8[&dGloss&8] &d{id} &7{value} טיקים, {kind}, {count} fps"
+motion_track = "&8[&dGloss&8] &7  {name} &f{key} &7({count} פריימים)"
+import_done = "&8[&dGloss&8] &a&f{id}&a יובא: &f{value}&a עצמות, &f{count}&a חלקים, &f{kind}&a אנימציות."
+import_unsupported = "&8[&dGloss&8] &7לא יובא: &f{value}&7."
+import_failed = "&8[&dGloss&8] &cלא ניתן לייבא את &f{path}&c: {reason}"
+hologram_page_set = "&8[&dGloss&8] &a{player}&a נמצא כעת בעמוד &f{page}&a של &f{id}&a."
+hologram_page_player_missing = "&8[&dGloss&8] &cהשחקן &f{player}&c אינו מחובר."
+hologram_page_unknown = "&8[&dGloss&8] &cלהולוגרמה &f{id}&c אין עמוד '&f{page}&c'."
+hologram_motion_set = "&8[&dGloss&8] &aההולוגרמה &f{id}&a מנגנת כעת &f{value}&a."
+hologram_motion_cleared = "&8[&dGloss&8] &aההולוגרמה &f{id}&a כבר לא מנגנת תנועה."
+hologram_actions_empty = "&8[&dGloss&8] &7להולוגרמה &f{id}&7 אין פעולות."
+hologram_actions_header = "&8[&dGloss&8] &7פעולות ההולוגרמה &f{id}&7 (&f{count}&7):"
+hologram_actions_entry = "&8[&dGloss&8] &7  &f{kind}&7 על &f{value}"
+
+# --- lane:world ---
+[gloss.message.world]
+players_only = "&cפקודה זו חייבת להתבצע על ידי שחקן."
+disabled = "&cתכונה זו כבויה ב-gloss.toml."
+
+[gloss.message.world.marker]
+list = "&7סמנים &8({count})&7: &f{value}"
+info = "&7סמן &f{id} &7ב-&f{world} {x} {y} {z}"
+created = "&aהסמן &f{id} &aנוצר."
+removed = "&aהסמן &f{id} &aהוסר."
+missing = "&cאין סמן בשם &f{id}&c."
+here = "&7אתה נמצא ב-&f{world} {x} {y} {z}&7."
+
+[gloss.message.world.waypoint]
+saved = "&aנקודת הדרך &f{name} &aנשמרה."
+removed = "&aנקודת הדרך &f{name} &aהוסרה."
+missing = "&cאין נקודת דרך בשם &f{name}&c."
+list = "&7נקודות דרך &8({count})&7: &f{value}"
+info = "&7נקודת דרך &f{id} &7ב-&f{world} {x} {y} {z}"
+full = "&cכבר יש לך את המקסימום של {count} נקודות דרך."
+
+[gloss.message.world.zone]
+list = "&7אזורים &8({count})&7: &f{value}"
+info = "&7האזור &f{id} &7הוא &f{kind} &7ב-&f{world}&7."
+shown = "&aמציג את האזור &f{id}&a."
+hidden = "&7מסתיר את האזור &f{id}&7."
+created = "&aהאזור &f{id} &aנוצר."
+removed = "&aהאזור &f{id} &aהוסר."
+missing = "&cאין אזור בשם &f{id}&c."
+
+[gloss.message.world.camera]
+started = "&7מסלול המצלמה התחיל."
+refused = "&cמסלול המצלמה נדחה."
+stopped = "&7מסלול המצלמה נעצר עבור &f{player}&7."
+idle = "&c{player} אינו במסלול מצלמה."
+
+[gloss.message.world.nameplate]
+list = "&7תגי שם &8({count})&7: &f{value}"
+info = "&7תג שם &f{id} &7עדיפות &f{value}&7, &f{count} &7שורות."
+missing = "&cאין תג שם בשם &f{id}&c."
+refreshed = "&aתגי השם רועננו."
+
+[gloss.message.world.glow]
+set = "&f{target} &7זוהר כעת ב-&f{value}&a."
+cleared = "&7הזוהר של &f{target} &7הוסר."
+missing = "&cאין שחקן בשם &f{player} &cמחובר."
+
+[command.help.marker]
+root = "כלי סמני עולם"
+list = "רשימת מסמכי סמנים"
+info = "הצג סמן אחד"
+create = "כתוב מסמך סמן במיקומך"
+remove = "מחק מסמך סמן"
+here = "הדפס את מיקומך כקואורדינטות עוגן"
+
+[command.help.marker.arg]
+id = "מזהה מסמך הסמן"
+label = "תווית המוצגת מעל הסמן"
+
+[command.help.waypoint]
+root = "כלי נקודות דרך בסרגל האיתור"
+set = "שמור את מיקומך כנקודת דרך אישית"
+remove = "מחק אחת מנקודות הדרך האישיות שלך"
+list = "רשימת נקודות הדרך האישיות שלך"
+info = "הצג מסמך נקודת דרך אחד"
+
+[command.help.waypoint.arg]
+name = "שם נקודת הדרך"
+id = "מזהה מסמך נקודת הדרך"
+
+[command.help.zone]
+root = "כלי מתאר אזורים"
+list = "רשימת אזורים"
+info = "הצג אזור אחד"
+show = "הצג לעצמך את מתאר האזור"
+hide = "הסתר מעצמך את מתאר האזור"
+create = "כתוב מסמך אזור תיבתי סביב מיקומך"
+remove = "מחק מסמך אזור"
+
+[command.help.zone.arg]
+id = "מזהה מסמך האזור"
+radius = "חצי רוחב בבלוקים"
+
+[command.help.camera]
+root = "כלי מסלולי מצלמה"
+test = "טוס מסלול הדגמה סביב עצמך"
+stop = "סיים מסלול מצלמה מוקדם"
+
+[command.help.camera.arg]
+seconds = "אורך המסלול בשניות"
+player = "את מי לעצור; ברירת המחדל היא אתה"
+
+[command.help.nameplate]
+root = "כלי תגי שם לשחקנים"
+list = "רשימת מסמכי תגי שם"
+info = "הצג מסמך תג שם אחד"
+reset = "שחזר את מסמך תג השם המצורף"
+refresh = "בנה מחדש את תגי השם לכל הצופים"
+
+[command.help.nameplate.arg]
+id = "מזהה מסמך תג השם"
+
+[command.help.glow]
+root = "כלי זוהר ישויות"
+set = "גרום לשחקן לזהור עבורך"
+clear = "נקה את הזוהר של שחקן עבורך"
+
+[command.help.glow.arg]
+player = "השחקן שיקבל מתאר"
+cleared = "השחקן שהמתאר שלו יוסר"
+color = "צבע טקסט בשם"
+ticks = "טיקים שהזוהר נמשך, או 0 לשמירה"
+
+# --- lane:behaviors ---
+[command.help.behavior]
+root = "בדיקה והפעלה של מסמכי התנהגות"
+list = "הצגת מסמכי ההתנהגות הטעונים"
+info = "הצגת הטריגרים והתנאים של מסמך התנהגות"
+fire = "הרצת רשומת התנהגות אחת עכשיו"
+reset = "שחזור ברירות המחדל המצורפות להתנהגות"
+id = "מזהה מסמך ההתנהגות"
+entry = "מספר הרשומה, החל מ-1"
+player = "השחקן שעבורו תרוץ הרשומה, או * לאף אחד"
+
+[command.help.state]
+root = "קריאה וכתיבה של מצב התנהגות שמור"
+get = "הצגת ערך מצב אחד"
+set = "כתיבת ערך מצב אחד"
+clear = "החזרת ערך מצב לברירת המחדל שלו"
+dump = "הצגת כל מפתחות המצב המוצהרים והערכים שלהם"
+key = "מפתח מצב מוצהר"
+value = "ערך חדש; הקף במרכאות כדי לכלול רווחים"
+player = "השחקן שאליו שייך הערך, או * עבור עצמך"
+
+[command.help.do]
+root = "הפעלת רשומות ההתנהגות מסוג command בשם הזה"
+name = "שם פקודת ההתנהגות"
+args = "ארגומנטים כזוגות מפתח=ערך; הקף במרכאות כדי לכלול רווחים"
+
+[command.help.expr]
+root = "הערכת ביטוי והצגת מי שענה עליו"
+expression = "הביטוי להערכה; הקף במרכאות כדי לכלול רווחים"
+
+[command.help.explain]
+root = "הצגת התנאים שזמן הריצה בדק ומי מהם ניצח"
+kind = "זמן הריצה להסבר, למשל board או behavior"
+id = "מזהה המסמך להסבר"
+player = "השחקן שעבורו להסביר, או * עבור עצמך"
+
+[gloss.message.behaviors]
+off = "&8[&dGloss&8]: &eההתנהגויות כבויות ב-features.behaviors."
+"list.empty" = "&8[&dGloss&8]: &7לא נטענו מסמכי התנהגות."
+missing = "&8[&dGloss&8]: &cאין מסמך התנהגות בשם \"{id}\"."
+"info.header" = "&8[&dGloss&8]: &d{id} &7גרסה &f{revision} &8| &7רשומות &f{count} &8| &7פעיל &f{enabled}"
+"info.entry" = " &8{line}. &f{name} &7כאשר &f{when} &8| &7הרשאה &f{permission}"
+fired = "&8[&dGloss&8]: &aרשומה &f{line}&a של &f{id}&a הורצה."
+"fire.missing" = "&8[&dGloss&8]: &cל-{id} אין רשומה {line}."
+"do.ran" = "&8[&dGloss&8]: &aהופעלו &f{count}&a רשומות התנהגות עבור &f{name}&a."
+"do.none" = "&8[&dGloss&8]: &7אף רשומת התנהגות לא עונה לפקודה \"{name}\"."
+"state.value" = " &7{key} &8= &f{value}"
+"state.set" = "&8[&dGloss&8]: &a{key} הוא כעת &f{value}&a."
+"state.cleared" = "&8[&dGloss&8]: &a{key} חזר לברירת המחדל שלו."
+"state.unknown" = "&8[&dGloss&8]: &cאף מסמך התנהגות לא מצהיר על מפתח המצב \"{key}\"."
+"state.invalid" = "&8[&dGloss&8]: &c\"{value}\" אינו ערך {type}."
+"state.empty" = "&8[&dGloss&8]: &7אף מסמך התנהגות לא מצהיר על מצב."
+"state.player" = "&8[&dGloss&8]: &cציין שחקן: &f{key}&c אינו מפתח גלובלי."
+"player.missing" = "&8[&dGloss&8]: &cאין שחקן מחובר בשם \"{player}\"."
+"expr.value" = "&8[&dGloss&8]: &f{value} &8({type})"
+"expr.reference" = " &7{name} &8= &f{value} &8דרך &7{source}"
+"expr.functions" = " &7פונקציות &8= &f{value}"
+"expr.failed" = "&8[&dGloss&8]: &c{reason}"
+"explain.header" = "&8[&dGloss&8]: &d{kind} &f{id} &7עבור &f{player}"
+"explain.line" = " &8{path} &7{when} &8= &f{value}"
+"explain.winner" = " &a> &f{path} &7{when} &8= &f{value}"
+"explain.unknown" = "&8[&dGloss&8]: &cשום דבר לא מסביר \"{kind}\"; נסה {options}."
+"explain.missing" = "&8[&dGloss&8]: &cאין {kind} בשם \"{id}\"."
+
+# --- lane:authoring ---
+[command.help.pack]
+root = "התקנה וניהול של חבילות Gloss"
+install = "התקנת חבילה מקובץ או מכתובת HTTPS"
+update = "עדכון חבילה מותקנת מהמקור שלה"
+remove = "הסרת חבילה תוך שמירת כל קובץ שנערך מאז ההתקנה"
+list = "הצגת החבילות המותקנות"
+info = "הצגת הקבצים שבבעלות חבילה"
+arg_source = "קובץ חבילה בתיקיית הנתונים של Gloss, או כתובת HTTPS"
+arg_dry = "דיווח על מה שישתנה בלי לכתוב דבר"
+arg_id = "מזהה של חבילה מותקנת"
+
+[command.help.history]
+root = "הצגת הגרסאות השמורות של מסמך"
+arg_kind = "תיקיית המסמך, למשל boards או menus"
+arg_id = "מזהה המסמך"
+arg_page = "עמוד רשימה החל מאחד"
+
+[command.help.restore]
+root = "כתיבת גרסה שמורה מעל המסמך הפעיל"
+arg_version = "חותמת גרסה מתוך /gloss history"
+
+[command.help.check]
+root = "בדיקת סביבת העבודה אחר הפניות שבורות"
+arg_kind = "הגבלת הבדיקה לתיקיית מסמכים אחת"
+arg_id = "הגבלת הבדיקה למסמך אחד"
+
+[command.help.export]
+root = "העתקת מסמכים כ-JSON פשוט"
+bundle = "כתיבת כל סביבת העבודה כחבילת עורך"
+arg_kind = "הגבלת הייצוא לתיקיית מסמכים אחת"
+arg_id = "הגבלת הייצוא למסמך אחד"
+arg_dir = "תיקיית יעד בתוך תיקיית הנתונים של Gloss"
+
+[gloss.message.authoring.pack]
+preview = "&8[&dGloss&8] החבילה &f{id}&7 תשנה &f{count}&7 קבצים."
+outcome = "&8[&dGloss&8] &7{state} &f{path}&7 {reason}"
+installed = "&8[&dGloss&8] החבילה &f{id}&7 הותקנה עם &f{count}&7 קבצים."
+updated = "&8[&dGloss&8] החבילה &f{id}&7 עודכנה ב-&f{count}&7 קבצים."
+removed = "&8[&dGloss&8] החבילה &f{id}&7 ו-&f{count}&7 קבצים הוסרו."
+unknown = "&8[&dGloss&8] &cאין חבילה מותקנת עם המזהה &f{id}&c."
+failed = "&8[&dGloss&8] &cהחבילה &f{id}&c נכשלה: {reason}"
+entry = "&8[&dGloss&8] &f{id} &7{value} &8{count} קבצים"
+empty = "&8[&dGloss&8] &7אין חבילות מותקנות."
+disabled = "&8[&dGloss&8] &cחבילות Gloss כבויות בקובץ gloss.toml."
+
+[gloss.message.authoring.history]
+empty = "&8[&dGloss&8] &7אין גרסאות שמורות של &f{kind} {id}&7."
+entry = "&8[&dGloss&8] &f{revision} &7{source} &8{count} בתים"
+disabled = "&8[&dGloss&8] &cהיסטוריית המסמכים כבויה בקובץ gloss.toml."
+
+[gloss.message.authoring.restore]
+done = "&8[&dGloss&8] &f{kind} {id}&7 שוחזר לגרסה &f{revision}&7."
+unknown = "&8[&dGloss&8] &cאין גרסה &f{revision}&c עבור &f{kind} {id}&c."
+failed = "&8[&dGloss&8] &cהשחזור נכשל: {reason}"
+
+[gloss.message.authoring.check]
+clean = "&8[&dGloss&8] &aאין מה לדווח."
+entry = "&8[&dGloss&8] &7{state} &f{key} &8{kind} {id} {path} &7{message}"
+summary = "&8[&dGloss&8] &f{count}&7 ממצאים."
+
+[gloss.message.authoring.export]
+done = "&8[&dGloss&8] &f{count}&7 מסמכים יוצאו אל &f{path}&7."
+failed = "&8[&dGloss&8] &cהייצוא נכשל: {reason}"
+
+[gloss.message.authoring.import]
+preview = "&8[&dGloss&8] &f{source}&7 יכתוב &f{count}&7 מסמכים."
+entry = "&8[&dGloss&8] &7{state} &f{path}&7 {reason}"
+applied = "&8[&dGloss&8] &f{count}&7 מסמכים יובאו מ-&f{source}&7."
+absent = "&8[&dGloss&8] &7אין נתוני &f{source}&7 בנתיב &f{path}&7."
+
+# --- lane:forge ---
+[gloss.message.forge]
+disabled = "&8[&dGloss&8] &cמפעל הגליפים כבוי. הגדר את features.forge לערך true בקובץ gloss.toml."
+built = "&8[&dGloss&8] &aהחבילה &f{value}&a נבנתה עם {count} גליפים."
+build_failed = "&8[&dGloss&8] &cבניית החבילה נכשלה; החבילה הקודמת עדיין פעילה. בדוק את הקונסולה."
+status = "&7{value}"
+exported = "&8[&dGloss&8] &aיוצאו {count} קבצים אל &f{path}&a."
+export_failed = "&8[&dGloss&8] &cהייצוא נכשל: &f{reason}&c."
+serve = "&8[&dGloss&8] &aשרת החבילה {state}."
+serve_unchanged = "&8[&dGloss&8] &7שרת החבילה כבר {state}."
+
+[command.help.forge]
+root = "כלי חבילת הגליפים"
+build = "בנה מחדש את חבילת משאבי הגליפים עכשיו"
+status = "הצג מוני חבילה, גליפים ומסירה"
+export = "העתק את תיקיית החבילה הניתנת למיזוג"
+"export.path" = "תיקיית היעד של החבילה"
+serve = "הפעל או עצור את שרת החבילה המובנה"
+"serve.state" = "on או off"
+reset = "שחזר את מסמכי הגליפים המצורפים"
+
+# --- lane:fixes ---
+[gloss.message.fixes]
+status_bedrock = "&7bedrock: &f{name}&7, &f{count}&7 מחוברים"
+status_textimage_oversize = "&7textimage-גדול מדי: &f{count}"
+hotload_skipped = " &7({count} התעלמות, schemaVersion שגוי)"
+status_schema_skipped = "&7schema-דילוג: &f{count}"
+bedrock_menu_unavailable = "&8[&dGloss&8]: &cהתפריט הזה אינו מוצג ב-Bedrock."
+

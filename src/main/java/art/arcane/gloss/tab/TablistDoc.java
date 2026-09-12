@@ -1,6 +1,7 @@
 package art.arcane.gloss.tab;
 
 import art.arcane.gloss.condition.ConditionCompiler;
+import art.arcane.gloss.condition.ConditionReferences;
 import art.arcane.gloss.condition.ConditionSource;
 import art.arcane.gloss.condition.ShowCondition;
 import art.arcane.gloss.doc.DocumentEnvelope;
@@ -8,11 +9,12 @@ import art.arcane.gloss.doc.DocumentParsers;
 
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.Locale;
 import java.util.List;
 import java.util.Set;
 
 public record TablistDoc(int schemaVersion, long revision, ShowCondition show, HeaderFooter headerFooter,
-                         ListNames listNames) {
+                         ListNames listNames, Sort sort, Layout layout) {
     public static final String KIND = "tablist";
     public static final int CURRENT_SCHEMA_VERSION = 2;
     public static final String FALLBACK_FORMAT = "$player";
@@ -22,7 +24,8 @@ public record TablistDoc(int schemaVersion, long revision, ShowCondition show, H
         new HeaderFooter(true, ShowCondition.ALWAYS,
             new HeaderFooterPresentation("&d&lGloss", "&7VolmitSoftware.com"), List.of()),
         new ListNames(true, ShowCondition.ALWAYS, new ListNamePresentation(FALLBACK_FORMAT), List.of(
-            new ListNameVariant("operator", 100, "subject.op", new ListNamePresentation("&6$player")))));
+            new ListNameVariant("operator", 100, "subject.op", new ListNamePresentation("&6$player")))),
+        Sort.DISABLED, Layout.DISABLED);
 
     public TablistDoc {
         show = show == null ? ShowCondition.ALWAYS : show;
@@ -30,10 +33,155 @@ public record TablistDoc(int schemaVersion, long revision, ShowCondition show, H
         DocumentEnvelope.requireRevision(KIND, revision);
         headerFooter = headerFooter == null ? HeaderFooter.DEFAULTS : headerFooter;
         listNames = listNames == null ? ListNames.DEFAULTS : listNames;
+        sort = sort == null ? Sort.DISABLED : sort;
+        layout = layout == null ? Layout.DISABLED : layout;
     }
 
     public static TablistDoc parse(String fileName, String raw) {
         return DocumentParsers.parseJson(fileName, raw, TablistDoc.class);
+    }
+
+    /**
+     * Optional list ordering. {@code weight} is a number expression evaluated with {@code subject}
+     * as the listed player and {@code viewer} as the observer; higher weights sort first.
+     */
+    public record Sort(boolean enabled, String weight) {
+        public static final Sort DISABLED = new Sort(false, null);
+
+        public Sort {
+            weight = weight == null || weight.isBlank() ? null : weight.trim();
+            if (enabled && weight == null) {
+                throw new IllegalArgumentException("tablist sort requires a weight expression when enabled");
+            }
+            if (weight != null) {
+                references(weight);
+            }
+        }
+
+        public boolean active() {
+            return enabled && weight != null;
+        }
+
+        /**
+         * Type-checks and collects the weight's references. The condition compiler validates
+         * booleans, so the weight is compared against zero to reuse it for a number expression.
+         */
+        public static ConditionReferences references(String weight) {
+            return ConditionCompiler.compile(new ConditionSource("tablist.sort.weight", "(" + weight + ") > 0"))
+                .references();
+        }
+    }
+
+    /**
+     * Optional fixed grid of client-side tab entries. Real players are unlisted for viewers that
+     * receive a layout and reappear in the {@code players} column, so {@code /list}, proxies and
+     * {@code Bukkit.getOnlinePlayers()} are unaffected.
+     */
+    public record Layout(boolean enabled, int columns, int rows, List<Slot> slots, Players players,
+                         ShowCondition show) {
+        public static final int MAX_COLUMNS = 4;
+        public static final int MAX_ROWS = 20;
+        public static final ShowCondition NOT_BEDROCK = ShowCondition.of("!viewer.bedrock");
+        public static final Layout DISABLED = new Layout(false, 0, 0, List.of(), null, null);
+
+        public Layout {
+            if (enabled) {
+                columns = requireRange(columns, 1, MAX_COLUMNS, "tablist layout columns");
+                rows = requireRange(rows, 1, MAX_ROWS, "tablist layout rows");
+            }
+            slots = copySlots(slots, columns, rows);
+            show = show == null ? NOT_BEDROCK : show;
+            if (players != null) {
+                players.requireInside(columns, rows);
+            }
+        }
+
+        public boolean active() {
+            return enabled && columns > 0 && rows > 0;
+        }
+
+        public int size() {
+            return columns * rows;
+        }
+
+        private static List<Slot> copySlots(List<Slot> slots, int columns, int rows) {
+            if (slots == null || slots.isEmpty()) {
+                return List.of();
+            }
+            List<Slot> copied = new ArrayList<>(slots.size());
+            Set<Integer> taken = new HashSet<>(slots.size());
+            for (Slot slot : slots) {
+                if (slot == null) {
+                    throw new IllegalArgumentException("tablist layout slots may not contain null entries");
+                }
+                slot.requireInside(columns, rows);
+                if (!taken.add(slot.column() * rows + slot.row())) {
+                    throw new IllegalArgumentException("tablist layout declares two slots at column "
+                        + slot.column() + " row " + slot.row());
+                }
+                copied.add(slot);
+            }
+            return List.copyOf(copied);
+        }
+    }
+
+    public record Slot(int column, int row, String text, String skin, Integer ping) {
+        public Slot {
+            text = text == null ? "" : text;
+            skin = skin == null || skin.isBlank() ? null : skin.trim();
+            ping = ping == null ? null : Integer.valueOf(Math.clamp(ping.intValue(), -1, 10_000));
+        }
+
+        void requireInside(int columns, int rows) {
+            if (column < 0 || column >= columns || row < 0 || row >= rows) {
+                throw new IllegalArgumentException("tablist layout slot " + column + "," + row
+                    + " falls outside the " + columns + "x" + rows + " grid");
+            }
+        }
+    }
+
+    public record Players(int column, int columns, int rows, String filter, String overflow) {
+        public static final String OVERFLOW_HIDE = "hide";
+        public static final String OVERFLOW_COUNT = "count";
+
+        public Players {
+            columns = Math.max(1, columns);
+            rows = Math.max(1, rows);
+            filter = filter == null || filter.isBlank() ? "true" : filter.trim();
+            ConditionCompiler.compile(new ConditionSource("tablist.layout.players.filter", filter));
+            overflow = normalizeOverflow(overflow);
+        }
+
+        public boolean countsOverflow() {
+            return OVERFLOW_COUNT.equals(overflow);
+        }
+
+        public int capacity() {
+            return columns * rows;
+        }
+
+        void requireInside(int gridColumns, int gridRows) {
+            if (column < 0 || column + columns > gridColumns || rows > gridRows) {
+                throw new IllegalArgumentException("tablist layout players block does not fit the "
+                    + gridColumns + "x" + gridRows + " grid");
+            }
+        }
+
+        private static String normalizeOverflow(String overflow) {
+            String normalized = overflow == null || overflow.isBlank()
+                ? OVERFLOW_HIDE : overflow.trim().toLowerCase(Locale.ROOT);
+            if (!normalized.equals(OVERFLOW_HIDE) && !normalized.equals(OVERFLOW_COUNT)) {
+                throw new IllegalArgumentException("tablist layout overflow must be hide or count: " + overflow);
+            }
+            return normalized;
+        }
+    }
+
+    private static int requireRange(int value, int min, int max, String owner) {
+        if (value < min || value > max) {
+            throw new IllegalArgumentException(owner + " must be between " + min + " and " + max + ": " + value);
+        }
+        return value;
     }
 
     public record HeaderFooter(boolean enabled, ShowCondition show, HeaderFooterPresentation presentation,

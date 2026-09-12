@@ -1,5 +1,6 @@
 package art.arcane.gloss.menu;
 
+import java.util.Map;
 import art.arcane.gloss.condition.ShowCondition;
 import art.arcane.gloss.config.MenuComponentData;
 import art.arcane.gloss.config.MenuDefinitionData;
@@ -25,7 +26,7 @@ public class MenuSessionComponentDeduplicationTest {
         component("duplicate", "first"),
         component("duplicate", "second"),
         component("unique", "third")
-    ), List.of(), ShowCondition.ALWAYS);
+    ), List.of(), ShowCondition.ALWAYS, Map.of());
     menu.setId("test");
 
     Player player = player();

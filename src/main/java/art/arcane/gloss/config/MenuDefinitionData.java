@@ -5,6 +5,7 @@ import art.arcane.gloss.condition.ShowCondition;
 import org.bukkit.util.Vector;
 
 import java.util.List;
+import java.util.Map;
 
 public class MenuDefinitionData {
   private static final double MAX_DISTANCE = 6E7;
@@ -16,11 +17,12 @@ public class MenuDefinitionData {
   private final List<MenuComponentData> components;
   private final List<ParticleLayer> particleLayers;
   private final ShowCondition show;
+  private final Map<String, String> vars;
   private volatile String id;
 
   public MenuDefinitionData(Vector offset, boolean lockPosition, boolean followPlayer, Double maxDistance,
                             boolean closeOnDeath, boolean closeOnTeleport, List<MenuComponentData> components,
-                            List<ParticleLayer> particleLayers, ShowCondition show) {
+                            List<ParticleLayer> particleLayers, ShowCondition show, Map<String, String> vars) {
     this.offset = offset;
     this.lockPosition = lockPosition;
     this.followPlayer = followPlayer;
@@ -30,6 +32,12 @@ public class MenuDefinitionData {
     this.components = components;
     this.particleLayers = ParticleLayer.copyLayers(particleLayers, "menu");
     this.show = show == null ? ShowCondition.ALWAYS : show;
+    this.vars = vars == null ? Map.of() : Map.copyOf(vars);
+  }
+
+  /** Declared session-variable defaults; each value is a constant expression. */
+  public Map<String, String> getVars() {
+    return vars == null ? Map.of() : vars;
   }
 
   public Vector getOffset() {

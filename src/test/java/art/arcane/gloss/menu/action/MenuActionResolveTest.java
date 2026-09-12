@@ -18,7 +18,7 @@ public class MenuActionResolveTest {
   @Test
   public void resolveSkipsUnsupportedActionTypesInsteadOfAddingNull() {
     List<MenuActionData> declared = new ArrayList<>();
-    declared.add(new CommandActionData(MenuActionCommandSource.GLOBAL, "/say hi", null));
+    declared.add(new CommandActionData(MenuActionCommandSource.GLOBAL, "/say hi", null, null, null));
     declared.add(new UnknownActionData());
     declared.add(null);
 
@@ -32,8 +32,8 @@ public class MenuActionResolveTest {
   @Test
   public void resolveKeepsKnownActionsInDeclarationOrderAndToleratesNullLists() {
     List<MenuActionData> declared = List.of(
-        new CommandActionData(MenuActionCommandSource.GLOBAL, "/first", null),
-        new CommandActionData(MenuActionCommandSource.PLAYER, "/second", null));
+        new CommandActionData(MenuActionCommandSource.GLOBAL, "/first", null, null, null),
+        new CommandActionData(MenuActionCommandSource.PLAYER, "/second", null, null, null));
 
     List<MenuAction<?>> resolved = MenuAction.resolve(declared, "shop", "buy");
 
@@ -50,6 +50,11 @@ public class MenuActionResolveTest {
 
     @Override
     public HoloClickTrigger trigger() {
+      return null;
+    }
+
+    @Override
+    public MenuAction<?> createAction() {
       return null;
     }
   }

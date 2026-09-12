@@ -1,5 +1,6 @@
 package art.arcane.gloss.particle;
 
+import art.arcane.gloss.api.ParticleAnchor;
 import art.arcane.gloss.api.ParticleLayer;
 import org.bukkit.util.Vector;
 
@@ -8,6 +9,46 @@ import java.util.List;
 
 public final class ParticleGeometrySampler {
     private ParticleGeometrySampler() {
+    }
+
+    /**
+     * World-frame sampling for the {@code world} target scope: anchors are resolved to absolute
+     * positions by the caller and the points are emitted as-is, with no projection frame applied.
+     * Only {@code line} and {@code polyline} have a meaning without a local frame.
+     */
+    public static List<Vector> sampleWorld(ParticleLayer.Geometry geometry, AnchorResolver resolver,
+                                           int maximum) {
+        int limit = Math.max(1, maximum);
+        List<Vector> anchors = switch (geometry.type()) {
+            case "line" -> resolveAll(resolver, List.of(geometry.fromAnchor(), geometry.toAnchor()));
+            case "polyline" -> resolveAll(resolver, geometry.pointAnchors());
+            default -> List.of();
+        };
+        if (anchors.size() < 2) {
+            return List.of();
+        }
+        List<Vector> output = new ArrayList<>(Math.min(limit, 64));
+        for (int index = 1; index < anchors.size() && output.size() < limit; index++) {
+            addLine(output, anchors.get(index - 1), anchors.get(index), geometry.spacing(), limit, index == 1);
+        }
+        return List.copyOf(output);
+    }
+
+    private static List<Vector> resolveAll(AnchorResolver resolver, List<ParticleAnchor> anchors) {
+        List<Vector> resolved = new ArrayList<>(anchors.size());
+        for (ParticleAnchor anchor : anchors) {
+            Vector position = anchor == null ? null : resolver.resolve(anchor);
+            if (position == null) {
+                return List.of();
+            }
+            resolved.add(position);
+        }
+        return resolved;
+    }
+
+    /** Turns one anchor into an absolute world position, or null when it cannot be resolved now. */
+    public interface AnchorResolver {
+        Vector resolve(ParticleAnchor anchor);
     }
 
     public static List<Vector> sample(ParticleLayer.Geometry geometry, List<ParticleRect> targets, int maximum) {

@@ -57,7 +57,7 @@ public class SessionHolderSnapshotTest {
     assertNull("constructing a holder must not publish a menu", openMenus.get(PLAYER));
 
     identity.set(IMPOSTOR);
-    holder.openSession(menu("alpha"), null);
+    holder.openSession(menu("alpha"), null, Map.of());
 
     assertEquals("the publish must key on the id captured at construction", "alpha", openMenus.get(PLAYER));
     assertNull("a lazily re-read player id would leak the snapshot onto another key", openMenus.get(IMPOSTOR));
@@ -69,7 +69,7 @@ public class SessionHolderSnapshotTest {
     PlayerSnapshotStore<String> openMenus = new PlayerSnapshotStore<>();
     SessionHolder holder = holder(openMenus);
 
-    holder.openSession(menu("alpha"), null);
+    holder.openSession(menu("alpha"), null, Map.of());
 
     assertTrue(holder.hasSession());
     assertEquals("alpha", openMenus.get(PLAYER));
@@ -85,7 +85,7 @@ public class SessionHolderSnapshotTest {
   @Test
   public void movingReanchorsTheOpenSessionWithoutReplacingIt() {
     SessionHolder holder = holder(new PlayerSnapshotStore<>());
-    holder.openSession(menu("alpha", new Vector(2D, 1.5D, 3D)), null);
+    holder.openSession(menu("alpha", new Vector(2D, 1.5D, 3D)), null, Map.of());
     AtomicReference<MenuSession> before = new AtomicReference<>();
     holder.onSession(before::set);
     Location anchor = new Location(null, 10D, 70D, 20D);
@@ -108,8 +108,8 @@ public class SessionHolderSnapshotTest {
     PlayerSnapshotStore<String> openMenus = new PlayerSnapshotStore<>();
     SessionHolder holder = holder(openMenus);
 
-    holder.openSession(menu("alpha"), null);
-    holder.openSession(menu("beta"), null);
+    holder.openSession(menu("alpha"), null, Map.of());
+    holder.openSession(menu("beta"), null, Map.of());
 
     assertEquals("beta", openMenus.get(PLAYER));
   }
@@ -118,7 +118,7 @@ public class SessionHolderSnapshotTest {
   public void navigationPushesARealStackAndBackPopsWithoutToggling() {
     PlayerSnapshotStore<String> openMenus = new PlayerSnapshotStore<>();
     SessionHolder holder = holder(openMenus);
-    holder.openSession(menu("root"), null);
+    holder.openSession(menu("root"), null, Map.of());
 
     assertEquals(NavigationResult.APPLIED, holder.navigateSession(
         menu("category"), new NavigationRequest(NavigationMode.PUSH, "category")));
@@ -143,7 +143,7 @@ public class SessionHolderSnapshotTest {
   @Test
   public void replaceKeepsHistoryAndHomeClearsIt() {
     SessionHolder holder = holder(new PlayerSnapshotStore<>());
-    holder.openSession(menu("root"), null);
+    holder.openSession(menu("root"), null, Map.of());
     holder.navigateSession(menu("category"), new NavigationRequest(NavigationMode.PUSH, "category"));
 
     assertEquals(NavigationResult.APPLIED, holder.navigateSession(
@@ -159,7 +159,7 @@ public class SessionHolderSnapshotTest {
   @Test
   public void pushingTheSameMenuTwiceRecordsBothEntries() {
     SessionHolder holder = holder(new PlayerSnapshotStore<>());
-    holder.openSession(menu("root"), null);
+    holder.openSession(menu("root"), null, Map.of());
     holder.navigateSession(menu("alpha"), new NavigationRequest(NavigationMode.PUSH, "alpha"));
 
     assertEquals(NavigationResult.APPLIED, holder.navigateSession(
@@ -174,13 +174,13 @@ public class SessionHolderSnapshotTest {
   @Test
   public void openingAFreshSessionResetsTheRootAndDropsTheHistory() {
     SessionHolder holder = holder(new PlayerSnapshotStore<>());
-    holder.openSession(menu("root"), null);
+    holder.openSession(menu("root"), null, Map.of());
     holder.navigateSession(menu("alpha"), new NavigationRequest(NavigationMode.PUSH, "alpha"));
     assertTrue(holder.closeSession(true, HoloCloseReason.CLOSED_BY_COMMAND));
     assertEquals("alpha", holder.lastSessionId());
     assertEquals("root", holder.rootSessionId());
 
-    holder.openSession(menu("gamma"), null);
+    holder.openSession(menu("gamma"), null, Map.of());
 
     assertNull("a fresh open starts a new stack", holder.lastSessionId());
     assertEquals("gamma", holder.rootSessionId());
@@ -200,7 +200,7 @@ public class SessionHolderSnapshotTest {
   @Test
   public void backAndHomeRejectAMenuThatIsNotTheRecordedTarget() {
     SessionHolder holder = holder(new PlayerSnapshotStore<>());
-    holder.openSession(menu("root"), null);
+    holder.openSession(menu("root"), null, Map.of());
     holder.navigateSession(menu("alpha"), new NavigationRequest(NavigationMode.PUSH, "alpha"));
 
     assertEquals(NavigationResult.NO_HISTORY, holder.navigateSession(
@@ -215,7 +215,7 @@ public class SessionHolderSnapshotTest {
   @Test
   public void closingWithoutHistoryForgetsTheRootAsWell() {
     SessionHolder holder = holder(new PlayerSnapshotStore<>());
-    holder.openSession(menu("root"), null);
+    holder.openSession(menu("root"), null, Map.of());
     holder.navigateSession(menu("alpha"), new NavigationRequest(NavigationMode.PUSH, "alpha"));
 
     assertTrue(holder.closeSession(false, HoloCloseReason.CLOSED_BY_COMMAND));
@@ -229,7 +229,7 @@ public class SessionHolderSnapshotTest {
     PlayerSnapshotStore<String> openMenus = new PlayerSnapshotStore<>();
     SessionHolder holder = holder(openMenus);
 
-    holder.openSession(menu("alpha"), null);
+    holder.openSession(menu("alpha"), null, Map.of());
     assertEquals("alpha", openMenus.get(PLAYER));
 
     assertTrue(holder.closeSession(true, HoloCloseReason.CLOSED_BY_COMMAND));
@@ -244,7 +244,7 @@ public class SessionHolderSnapshotTest {
     PlayerSnapshotStore<String> openMenus = new PlayerSnapshotStore<>();
     SessionHolder holder = holder(openMenus);
 
-    holder.openSession(menu("alpha"), null);
+    holder.openSession(menu("alpha"), null, Map.of());
     holder.close(HoloCloseReason.QUIT);
 
     assertNull("tearing a holder down must not leave a stale entry behind", openMenus.get(PLAYER));
@@ -256,7 +256,7 @@ public class SessionHolderSnapshotTest {
     AtomicBoolean online = new AtomicBoolean(false);
     SessionHolder holder = new SessionHolder(player(new AtomicReference<>(PLAYER), new AtomicInteger(), online), openMenus);
 
-    holder.openSession(menu("alpha"), null);
+    holder.openSession(menu("alpha"), null, Map.of());
 
     assertFalse(holder.hasSession());
     assertNull(openMenus.get(PLAYER));
@@ -271,12 +271,12 @@ public class SessionHolderSnapshotTest {
     assertEquals(PlaceholderValues.FALSE, expansion.onRequest(offlinePlayer(), "menu.open"));
     assertEquals(PlaceholderValues.UNAVAILABLE, expansion.onRequest(offlinePlayer(), "menu.id"));
 
-    holder.openSession(menu("alpha"), null);
+    holder.openSession(menu("alpha"), null, Map.of());
 
     assertEquals(PlaceholderValues.TRUE, expansion.onRequest(offlinePlayer(), "menu.open"));
     assertEquals("alpha", expansion.onRequest(offlinePlayer(), "menu.id"));
 
-    holder.openSession(menu("beta"), null);
+    holder.openSession(menu("beta"), null, Map.of());
 
     assertEquals("beta", expansion.onRequest(offlinePlayer(), "menu.id"));
 
@@ -298,7 +298,7 @@ public class SessionHolderSnapshotTest {
       seenId.set(expansion.onRequest(offlinePlayer(), "menu.id"));
       seenOpen.set(expansion.onRequest(offlinePlayer(), "menu.open"));
       return null;
-    }), null);
+    }), null, Map.of());
 
     assertEquals("a toggle condition or icon built in the session constructor must resolve the menu id",
         "alpha", seenId.get());
@@ -314,7 +314,7 @@ public class SessionHolderSnapshotTest {
     try {
       holder.openSession(menu("alpha", () -> {
         throw new IllegalStateException("component blew up");
-      }), null);
+      }), null, Map.of());
       fail("a component that throws must not be swallowed by the holder");
     } catch (IllegalStateException expected) {
       assertEquals("component blew up", expected.getMessage());
@@ -336,14 +336,14 @@ public class SessionHolderSnapshotTest {
     ApiMenuHandle failed = handle("beta", failedReason);
 
     try {
-      holder.openSession(menu("root"), null);
-      holder.openSession(menu("alpha"), replaced);
+      holder.openSession(menu("root"), null, Map.of());
+      holder.openSession(menu("alpha"), replaced, Map.of());
       assertEquals(1, GlossTelemetry.menusOpen());
       assertEquals("root", holder.lastSessionId());
       assertEquals("root", holder.rootSessionId());
 
       try {
-        holder.openSession(failingOpenMenu("beta", closeCalls), failed);
+        holder.openSession(failingOpenMenu("beta", closeCalls), failed, Map.of());
         fail("an open failure must escape the holder");
       } catch (IllegalStateException expected) {
         assertEquals("component open failed", expected.getMessage());
@@ -374,7 +374,7 @@ public class SessionHolderSnapshotTest {
 
   private static MenuDefinitionData menu(String id, Vector offset) {
     MenuDefinitionData data = new MenuDefinitionData(offset, false, false, 8.0D, false, false,
-        List.<MenuComponentData>of(), List.of(), ShowCondition.ALWAYS);
+        List.<MenuComponentData>of(), List.of(), ShowCondition.ALWAYS, Map.of());
     data.setId(id);
     return data;
   }
@@ -382,7 +382,7 @@ public class SessionHolderSnapshotTest {
   private static MenuDefinitionData menu(String id, Supplier<MenuComponent<?>> onCreate) {
     MenuComponentData component = new MenuComponentData("probe", new Vector(0, 0, 0), new ProbeComponentData(onCreate), ShowCondition.ALWAYS);
     MenuDefinitionData data = new MenuDefinitionData(new Vector(0, 0, 0), false, false, 8.0D, false, false,
-        List.of(component), List.of(), ShowCondition.ALWAYS);
+        List.of(component), List.of(), ShowCondition.ALWAYS, Map.of());
     data.setId(id);
     return data;
   }
@@ -390,7 +390,7 @@ public class SessionHolderSnapshotTest {
   private static MenuDefinitionData failingOpenMenu(String id, AtomicInteger closeCalls) {
     MenuComponentData component = new MenuComponentData("probe", new Vector(), new OpeningFailureData(closeCalls), ShowCondition.ALWAYS);
     MenuDefinitionData data = new MenuDefinitionData(new Vector(), false, false, 8.0D, false, false,
-        List.of(component), List.of(), ShowCondition.ALWAYS);
+        List.of(component), List.of(), ShowCondition.ALWAYS, Map.of());
     data.setId(id);
     return data;
   }

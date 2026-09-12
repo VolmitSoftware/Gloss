@@ -3,7 +3,6 @@ package art.arcane.gloss.editor.sync;
 import art.arcane.gloss.doc.DocumentEnvelope;
 import art.arcane.gloss.panel.PanelDefinition;
 import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
@@ -29,6 +28,7 @@ import java.util.stream.Stream;
 
 final class EditorSyncContentSnapshotBuilder {
   static final String WORKSPACE_SUBJECT_ID = "workspace";
+  static final String SCHEMA_SKIPPED_CODE = "schema-skipped";
 
   private final Path dataDirectory;
 
@@ -38,8 +38,15 @@ final class EditorSyncContentSnapshotBuilder {
   }
 
   EditorSyncProject open(EditorSyncKind kind, String subjectId, int maximumBytes) {
+    return open(kind, subjectId, maximumBytes, new ServerSections() {
+    });
+  }
+
+  EditorSyncProject open(EditorSyncKind kind, String subjectId, int maximumBytes,
+                         ServerSections serverSections) {
     requireSubject(kind, subjectId);
-    Map<DocumentKey, EditorSyncDocuments.Entry> allDocuments = readScopedDocuments(kind);
+    List<String> skipped = new ArrayList<>();
+    Map<DocumentKey, EditorSyncDocuments.Entry> allDocuments = readScopedDocuments(kind, skipped);
     List<EditorSyncDocuments.Entry> documents = switch (kind) {
       case WORKSPACE -> sorted(allDocuments.values());
       case MENU -> menuDocuments(allDocuments, subjectId);
@@ -50,8 +57,12 @@ final class EditorSyncContentSnapshotBuilder {
         ? readAllImages(maximumBytes)
         : readReferencedImages(documents, maximumBytes);
     JsonObject constraints = constraints(kind, subjectId, documents);
-    List<String> warnings = warnings(documents);
-    return project(kind, subjectId, documents, images, constraints, warnings, maximumBytes);
+    List<String> warnings = new ArrayList<>(skipped);
+    warnings.addAll(warnings(documents));
+    warnings.addAll(serverSections.warnings(documents));
+    EditorSyncProjectSections sections = new EditorSyncProjectSections(warnings,
+        serverSections.history(documents), serverSections.schemas(), serverSections.defaults());
+    return project(kind, subjectId, documents, images, constraints, sections, maximumBytes);
   }
 
   List<String> subjectIds(EditorSyncKind kind) {
@@ -60,7 +71,7 @@ final class EditorSyncContentSnapshotBuilder {
     }
     EditorSyncDocumentKind documentKind = EditorSyncDocumentKind.forSubject(kind);
     List<String> ids = new ArrayList<>();
-    for (EditorSyncDocuments.Entry entry : readKind(documentKind)) {
+    for (EditorSyncDocuments.Entry entry : readKind(documentKind, new ArrayList<>())) {
       ids.add(entry.id());
     }
     ids.sort(String::compareTo);
@@ -77,9 +88,12 @@ final class EditorSyncContentSnapshotBuilder {
       List<EditorSyncDocuments.Entry> documents,
       Map<String, byte[]> images,
       JsonObject constraints,
-      List<String> warnings,
+      EditorSyncProjectSections sections,
       int maximumBytes) {
-    List<EditorSyncDocuments.Entry> orderedDocuments = sorted(documents);
+    List<EditorSyncDocuments.Entry> orderedDocuments = sorted(documents).stream()
+        .map(document -> document.withBaseRevision(
+            EditorSyncDocuments.contentRevision(document.json())))
+        .toList();
     JsonObject project = new JsonObject();
     project.addProperty("format", EditorSyncJson.PROJECT_FORMAT);
     project.addProperty("version", EditorSyncJson.PROTOCOL_VERSION);
@@ -108,7 +122,7 @@ final class EditorSyncContentSnapshotBuilder {
       throw new IllegalArgumentException("images exceed "
           + EditorSyncSnapshotBuilder.MAX_IMAGE_COUNT + " assets");
     }
-    List<String> menuSources = documents.stream()
+    List<String> menuSources = orderedDocuments.stream()
         .filter(document -> document.kind().equals(EditorSyncDocumentKind.MENU.wireName()))
         .map(EditorSyncDocuments.Entry::json)
         .toList();
@@ -117,7 +131,7 @@ final class EditorSyncContentSnapshotBuilder {
     project.add("images", imageArray);
     project.add("constraints", constraints.deepCopy());
     JsonArray warningArray = new JsonArray();
-    List<String> orderedWarnings = warnings.stream().sorted().toList();
+    List<String> orderedWarnings = sections.warnings().stream().sorted().toList();
     if (orderedWarnings.size() > EditorSyncSnapshotBuilder.MAX_WARNING_COUNT) {
       throw new IllegalArgumentException("sync project contains too many warnings");
     }
@@ -128,14 +142,23 @@ final class EditorSyncContentSnapshotBuilder {
       warningArray.add(warning);
     }
     project.add("warnings", warningArray);
+    if (!sections.history().isEmpty()) {
+      project.add("history", sections.history());
+    }
+    if (!sections.schemas().isEmpty()) {
+      project.add("schemas", sections.schemas());
+    }
+    if (!sections.defaults().isEmpty()) {
+      project.add("defaults", sections.defaults());
+    }
     project.addProperty("baseRevision", EditorSyncJson.revision(project));
     return EditorSyncProject.validated(project, maximumBytes);
   }
 
-  private Map<DocumentKey, EditorSyncDocuments.Entry> readDocuments() {
+  private Map<DocumentKey, EditorSyncDocuments.Entry> readDocuments(List<String> skipped) {
     Map<DocumentKey, EditorSyncDocuments.Entry> documents = new LinkedHashMap<>();
     for (EditorSyncDocumentKind kind : EditorSyncDocumentKind.ORDERED) {
-      for (EditorSyncDocuments.Entry entry : readKind(kind)) {
+      for (EditorSyncDocuments.Entry entry : readKind(kind, skipped)) {
         DocumentKey key = new DocumentKey(kind, entry.id());
         if (documents.putIfAbsent(key, entry) != null) {
           throw new IllegalStateException("duplicate sync document: " + entry.kind() + " " + entry.id());
@@ -149,30 +172,32 @@ final class EditorSyncContentSnapshotBuilder {
     return Map.copyOf(documents);
   }
 
-  private Map<DocumentKey, EditorSyncDocuments.Entry> readScopedDocuments(EditorSyncKind kind) {
+  private Map<DocumentKey, EditorSyncDocuments.Entry> readScopedDocuments(EditorSyncKind kind,
+                                                                          List<String> skipped) {
     if (kind == EditorSyncKind.WORKSPACE) {
-      return readDocuments();
+      return readDocuments(skipped);
     }
     List<EditorSyncDocumentKind> kinds = kind == EditorSyncKind.PANEL
         ? List.of(EditorSyncDocumentKind.MENU, EditorSyncDocumentKind.PANEL)
         : List.of(EditorSyncDocumentKind.forSubject(kind));
     Map<DocumentKey, EditorSyncDocuments.Entry> documents = new LinkedHashMap<>();
     for (EditorSyncDocumentKind documentKind : kinds) {
-      for (EditorSyncDocuments.Entry entry : readKind(documentKind)) {
+      for (EditorSyncDocuments.Entry entry : readKind(documentKind, skipped)) {
         documents.put(new DocumentKey(documentKind, entry.id()), entry);
       }
     }
     return Map.copyOf(documents);
   }
 
-  private List<EditorSyncDocuments.Entry> readKind(EditorSyncDocumentKind kind) {
+  private List<EditorSyncDocuments.Entry> readKind(EditorSyncDocumentKind kind,
+                                                   List<String> skipped) {
     Path target = dataDirectory.resolve(kind.storageName()).normalize();
     if (kind.layout() == EditorSyncDocumentKind.Layout.SINGLE) {
       if (!Files.exists(target, LinkOption.NOFOLLOW_LINKS)) {
         return List.of();
       }
-      String id = kind == EditorSyncDocumentKind.MOTD ? "motd" : "tablist";
-      return readSupportedDocument(kind, id, target).map(List::of).orElseGet(List::of);
+      String id = kind.singletonId();
+      return readSupportedDocument(kind, id, target, skipped).map(List::of).orElseGet(List::of);
     }
     if (!Files.exists(target, LinkOption.NOFOLLOW_LINKS)) {
       return List.of();
@@ -207,18 +232,20 @@ final class EditorSyncContentSnapshotBuilder {
       String relative = target.relativize(file).toString()
           .replace(java.io.File.separatorChar, '/');
       String id = relative.substring(0, relative.length() - ".json".length());
-      readSupportedDocument(kind, id, file).ifPresent(documents::add);
+      readSupportedDocument(kind, id, file, skipped).ifPresent(documents::add);
     }
     documents.sort(Comparator.comparing(EditorSyncDocuments.Entry::id));
     return List.copyOf(documents);
   }
 
   private Optional<EditorSyncDocuments.Entry> readSupportedDocument(
-      EditorSyncDocumentKind kind, String id, Path file) {
+      EditorSyncDocumentKind kind, String id, Path file, List<String> skipped) {
     try {
       return Optional.of(readDocument(kind, id, file));
     } catch (RuntimeException failure) {
       if (DocumentEnvelope.isUnsupportedSchemaVersion(failure)) {
+        skipped.add(SCHEMA_SKIPPED_CODE + "|" + kind.wireName() + "|" + id
+            + "||declares an unsupported schemaVersion");
         return Optional.empty();
       }
       throw failure;
@@ -239,7 +266,7 @@ final class EditorSyncContentSnapshotBuilder {
       EditorSyncDocumentKind.ParsedDocument parsed = kind.parse(id, source);
       String wireSource = kind.wireSource(id, source, parsed);
       return new EditorSyncDocuments.Entry(kind.wireName(), kind.canonicalId(id),
-          parsed.revision(), wireSource);
+          parsed.revision(), wireSource, EditorSyncDocuments.contentRevision(wireSource));
     } catch (IOException failure) {
       throw new IllegalStateException("cannot read sync document: " + file, failure);
     }
@@ -494,6 +521,28 @@ final class EditorSyncContentSnapshotBuilder {
         || normalized.endsWith(".swp") || normalized.endsWith(".swx")
         || normalized.endsWith(".bak") || normalized.contains(".tmp.")
         || normalized.contains(".temp.");
+  }
+
+  /**
+   * The server-owned sections a caller contributes to a snapshot. Every method has a do-nothing
+   * default so a builder with no plugin behind it still produces a valid project.
+   */
+  interface ServerSections {
+    default List<String> warnings(List<EditorSyncDocuments.Entry> documents) {
+      return List.of();
+    }
+
+    default JsonArray history(List<EditorSyncDocuments.Entry> documents) {
+      return new JsonArray();
+    }
+
+    default JsonObject schemas() {
+      return new JsonObject();
+    }
+
+    default JsonObject defaults() {
+      return new JsonObject();
+    }
   }
 
   record DocumentKey(EditorSyncDocumentKind kind, String id) {

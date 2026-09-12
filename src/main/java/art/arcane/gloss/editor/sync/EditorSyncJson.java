@@ -34,6 +34,23 @@ public final class EditorSyncJson {
     }
   }
 
+  /**
+   * The revision of just the documents and images a project carries. Warnings are advisory and are
+   * recomputed from live server state, so drift checks compare content and let warnings move.
+   */
+  public static String contentRevision(JsonObject project) {
+    JsonObject content = new JsonObject();
+    content.add("documents", project.get("documents"));
+    content.add("images", project.get("images"));
+    try {
+      MessageDigest digest = MessageDigest.getInstance("SHA-256");
+      return "sha256:" + HexFormat.of().formatHex(
+          digest.digest(canonical(content).getBytes(StandardCharsets.UTF_8)));
+    } catch (NoSuchAlgorithmException exception) {
+      throw new IllegalStateException("SHA-256 is unavailable", exception);
+    }
+  }
+
   public static String canonical(JsonElement element) {
     if (element == null || element.isJsonNull()) {
       return "null";

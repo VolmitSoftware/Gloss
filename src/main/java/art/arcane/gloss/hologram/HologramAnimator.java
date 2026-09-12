@@ -9,7 +9,6 @@ import art.arcane.gloss.util.common.TextUtils;
 import com.github.retrooper.packetevents.wrapper.PacketWrapper;
 import org.bukkit.entity.Player;
 
-import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.IdentityHashMap;
@@ -85,9 +84,6 @@ public final class HologramAnimator {
         }
     }
 
-    private record BudgetSample(long atMs, int recipients) {
-    }
-
     private record RecipientBatch(List<Player> viewers, boolean hasMore) {
     }
 
@@ -106,20 +102,12 @@ public final class HologramAnimator {
     private final Map<TargetKey, Publication> targets;
     private final Map<TargetKey, SendState> states;
     private final Map<DirectKey, DirectUpdate> directUpdates;
-    private final ArrayDeque<BudgetSample> budgetSamples;
+    private final AnimatorBudgetWindow budgetWindow;
     private final Object workerLock;
-    private final Object targetOrderLock;
-    private final Object directOrderLock;
+    private final RotatingOrder<TargetKey> targetOrder;
+    private final RotatingOrder<DirectKey> directOrder;
     private final AtomicLong targetMembershipGeneration;
     private final AtomicLong directMembershipGeneration;
-    private long budgetRecipients;
-    private long budgetTimeMs;
-    private volatile TargetKey[] targetOrder;
-    private volatile DirectKey[] directOrder;
-    private volatile long targetOrderGeneration;
-    private volatile long directOrderGeneration;
-    private int targetStartOffset;
-    private int directStartOffset;
     private boolean preferDirectUpdates;
     private Thread worker;
     private volatile boolean stopped;
@@ -149,18 +137,13 @@ public final class HologramAnimator {
         this.targets = new ConcurrentHashMap<>();
         this.states = new ConcurrentHashMap<>();
         this.directUpdates = new ConcurrentHashMap<>();
-        this.budgetSamples = new ArrayDeque<>();
+        this.budgetWindow = new AnimatorBudgetWindow(PACKET_BUDGET_WINDOW_MILLIS);
         this.workerLock = new Object();
-        this.targetOrderLock = new Object();
-        this.directOrderLock = new Object();
+        this.targetOrder = new RotatingOrder<>(EMPTY_TARGET_KEYS);
+        this.directOrder = new RotatingOrder<>(EMPTY_DIRECT_KEYS);
         this.targetMembershipGeneration = new AtomicLong();
         this.directMembershipGeneration = new AtomicLong();
-        this.targetOrder = EMPTY_TARGET_KEYS;
-        this.directOrder = EMPTY_DIRECT_KEYS;
-        this.targetOrderGeneration = -1L;
-        this.directOrderGeneration = -1L;
         this.preferDirectUpdates = true;
-        this.budgetTimeMs = Long.MIN_VALUE;
         this.stopped = true;
     }
 
@@ -315,9 +298,9 @@ public final class HologramAnimator {
 
     int pass(long nowMs) {
         int budget = Math.max(1, config.get().holograms().animationPacketBudget());
-        long currentBudgetTimeMs = advanceBudgetTime(nowMs);
-        discardExpiredBudgetSamples(currentBudgetTimeMs);
-        int remainingRecipients = (int) Math.max(0L, (long) budget - budgetRecipients);
+        long currentBudgetTimeMs = budgetWindow.advance(nowMs);
+        budgetWindow.discardExpired(currentBudgetTimeMs);
+        int remainingRecipients = (int) Math.max(0L, (long) budget - budgetWindow.recipientsInWindow());
         if (remainingRecipients == 0) {
             return 0;
         }
@@ -334,8 +317,8 @@ public final class HologramAnimator {
             remainingRecipients -= directSends;
         }
 
-        TargetKey[] order = targetOrder();
-        int start = order.length == 0 ? 0 : Math.floorMod(targetStartOffset, order.length);
+        TargetKey[] order = targetOrder.order(targets, targetMembershipGeneration);
+        int start = targetOrder.start(order);
         int visited = 0;
         try {
             while (visited < order.length && remainingRecipients > 0) {
@@ -410,9 +393,7 @@ public final class HologramAnimator {
                 }
             }
         } finally {
-            if (order.length > 0 && visited > 0) {
-                targetStartOffset = (start + visited) % order.length;
-            }
+            targetOrder.advance(start, visited, order.length);
             try {
                 if (!preferDirectUpdates && directAvailable && remainingRecipients > 0) {
                     int directSends = sendDirectUpdates(remainingRecipients);
@@ -424,7 +405,7 @@ public final class HologramAnimator {
                     preferDirectUpdates = !preferDirectUpdates;
                 }
             } finally {
-                recordBudgetSample(currentBudgetTimeMs, reservedRecipients);
+                budgetWindow.record(currentBudgetTimeMs, reservedRecipients);
             }
         }
 
@@ -432,11 +413,11 @@ public final class HologramAnimator {
     }
 
     private int sendDirectUpdates(int limit) {
-        DirectKey[] order = directOrder();
+        DirectKey[] order = directOrder.order(directUpdates, directMembershipGeneration);
         if (limit <= 0 || order.length == 0) {
             return 0;
         }
-        int start = Math.floorMod(directStartOffset, order.length);
+        int start = directOrder.start(order);
         int visited = 0;
         int sends = 0;
         while (visited < order.length && sends < limit) {
@@ -455,33 +436,8 @@ public final class HologramAnimator {
             }
             sends++;
         }
-        if (visited > 0) {
-            directStartOffset = (start + visited) % order.length;
-        }
+        directOrder.advance(start, visited, order.length);
         return sends;
-    }
-
-    private long advanceBudgetTime(long nowMs) {
-        if (budgetTimeMs == Long.MIN_VALUE || nowMs > budgetTimeMs) {
-            budgetTimeMs = nowMs;
-        }
-        return budgetTimeMs;
-    }
-
-    private void discardExpiredBudgetSamples(long nowMs) {
-        long cutoffMs = nowMs - PACKET_BUDGET_WINDOW_MILLIS;
-        while (!budgetSamples.isEmpty() && budgetSamples.peekFirst().atMs() <= cutoffMs) {
-            budgetRecipients -= budgetSamples.removeFirst().recipients();
-        }
-    }
-
-    private void recordBudgetSample(long nowMs, int recipients) {
-        if (recipients <= 0) {
-            return;
-        }
-
-        budgetSamples.addLast(new BudgetSample(nowMs, recipients));
-        budgetRecipients += recipients;
     }
 
     private long audienceRecipients() {
@@ -491,42 +447,6 @@ public final class HologramAnimator {
                 recipients + publication.target.viewers().size());
         }
         return recipients;
-    }
-
-    private TargetKey[] targetOrder() {
-        long generation = targetMembershipGeneration.get();
-        TargetKey[] cached = targetOrder;
-        if (targetOrderGeneration == generation) {
-            return cached;
-        }
-        synchronized (targetOrderLock) {
-            generation = targetMembershipGeneration.get();
-            if (targetOrderGeneration != generation) {
-                cached = targets.keySet().toArray(EMPTY_TARGET_KEYS);
-                targetOrder = cached;
-                targetOrderGeneration = generation;
-                targetStartOffset = cached.length == 0 ? 0 : Math.floorMod(targetStartOffset, cached.length);
-            }
-            return targetOrder;
-        }
-    }
-
-    private DirectKey[] directOrder() {
-        long generation = directMembershipGeneration.get();
-        DirectKey[] cached = directOrder;
-        if (directOrderGeneration == generation) {
-            return cached;
-        }
-        synchronized (directOrderLock) {
-            generation = directMembershipGeneration.get();
-            if (directOrderGeneration != generation) {
-                cached = directUpdates.keySet().toArray(EMPTY_DIRECT_KEYS);
-                directOrder = cached;
-                directOrderGeneration = generation;
-                directStartOffset = cached.length == 0 ? 0 : Math.floorMod(directStartOffset, cached.length);
-            }
-            return directOrder;
-        }
     }
 
     private boolean hasWork() {

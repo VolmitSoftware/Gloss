@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "revision": 1,
+  "show": "false",
+  "title": "&8Shop &7- {{ viewer.name }}",
+  "resolution": "9x6",
+  "mask": [
+    "#########",
+    "#.......#",
+    "#.......#",
+    "#.......#",
+    "#.......#",
+    "#<##X##>#"
+  ],
+  "keys": {
+    "#": { "type": "decoration", "icon": { "type": "item", "item": "minecraft:gray_stained_glass_pane", "name": " " } },
+    "<": { "type": "button", "icon": { "type": "item", "item": "minecraft:arrow", "name": "&7Previous" },
+           "actions": [ { "type": "navigate", "mode": "page", "target": "prev" } ] },
+    ">": { "type": "button", "icon": { "type": "item", "item": "minecraft:arrow", "name": "&7Next" },
+           "actions": [ { "type": "navigate", "mode": "page", "target": "next" } ] },
+    "X": { "type": "button", "icon": { "type": "item", "item": "minecraft:barrier", "name": "&cClose" },
+           "actions": [ { "type": "close" } ] }
+  },
+  "slots": {
+    "10": {
+      "type": "button",
+      "icon": { "type": "item", "item": "minecraft:diamond_sword", "name": "&bSword", "lore": ["&7100 coins"] },
+      "show": "viewer.level >= 5",
+      "actions": [
+        { "type": "message", "message": "&aThe shop is an example; edit inventories/example.json." }
+      ]
+    }
+  },
+  "list": {
+    "area": ".",
+    "var": "entry",
+    "source": "['stone','dirt','oak_log']",
+    "pageSize": 28,
+    "template": {
+      "type": "button",
+      "icon": { "type": "item", "item": "minecraft:stone", "name": "&f{{ entry }}" },
+      "actions": [ { "type": "message", "message": "&7You picked &f{{ entry }}&7." } ]
+    }
+  },
+  "closeOnTeleport": true,
+  "variants": []
+}
