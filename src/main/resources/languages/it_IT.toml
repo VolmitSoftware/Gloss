@@ -99,6 +99,7 @@
 #   {rotation}  Rotazione dell’elemento visualizzato
 #   {scale}  Scala dell’elemento visualizzato o dell’anteprima
 #   {seconds}  Tempo in secondi
+#   {section}  Sezione mostrata nell’editor di lingua
 #   {session}  Identificatore della sessione dell’editor
 #   {severity}  Gravità della diagnostica
 #   {skipped}  Numero di voci saltate
@@ -768,6 +769,7 @@ server-default-selected = "{plugin}: la tua lingua segue ora la lingua predefini
 
 [language.editor]
 loading = "Caricamento dei messaggi in {locale}..."
+title = "{plugin} / {section}"
 
 [language.editor.section]
 languages = "Lingue"

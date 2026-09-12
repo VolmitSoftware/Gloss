@@ -99,6 +99,7 @@
 #   {rotation}  Rotation de l’affichage
 #   {scale}  Échelle de l’affichage ou de l’aperçu
 #   {seconds}  Durée en secondes
+#   {section}  Section affichée dans l’éditeur de langue
 #   {session}  Identifiant de la session d’édition
 #   {severity}  Gravité du diagnostic
 #   {skipped}  Nombre d’entrées ignorées
@@ -768,6 +769,7 @@ server-default-selected = "{plugin} : votre langue suit désormais la langue par
 
 [language.editor]
 loading = "Chargement des messages en {locale}..."
+title = "{plugin} / {section}"
 
 [language.editor.section]
 languages = "Langues"

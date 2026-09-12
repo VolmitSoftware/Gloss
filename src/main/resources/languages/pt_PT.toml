@@ -99,6 +99,7 @@
 #   {rotation}  Rotação do elemento visual
 #   {scale}  Escala do elemento visual ou da pré-visualização
 #   {seconds}  Tempo em segundos
+#   {section}  Secção apresentada no editor de idiomas
 #   {session}  Identificador da sessão do editor
 #   {severity}  Gravidade do diagnóstico
 #   {skipped}  Número de entradas ignoradas
@@ -768,6 +769,7 @@ server-default-selected = "{plugin}: o seu idioma segue agora o idioma predefini
 
 [language.editor]
 loading = "A carregar as mensagens de {locale}..."
+title = "{plugin} / {section}"
 
 [language.editor.section]
 languages = "Idiomas"

@@ -99,6 +99,7 @@
 #   {rotation}  Obrót wyświetlanego obiektu
 #   {scale}  Skala wyświetlania lub podglądu
 #   {seconds}  Czas w sekundach
+#   {section}  Sekcja wyświetlana w edytorze języka
 #   {session}  Identyfikator sesji edytora
 #   {severity}  Poziom ważności komunikatu diagnostycznego
 #   {skipped}  Liczba pominiętych wpisów
@@ -768,6 +769,7 @@ server-default-selected = "{plugin}: twój język jest teraz zgodny z domyślnym
 
 [language.editor]
 loading = "Wczytywanie wiadomości w języku {locale}..."
+title = "{plugin} / {section}"
 
 [language.editor.section]
 languages = "Języki"

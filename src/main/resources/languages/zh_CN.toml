@@ -99,6 +99,7 @@
 #   {rotation}  显示旋转
 #   {scale}  显示或预览缩放比例
 #   {seconds}  时间（秒）
+#   {section}  语言编辑器中显示的分区
 #   {session}  编辑会话标识符
 #   {severity}  诊断严重程度
 #   {skipped}  已跳过条目数量
@@ -768,6 +769,7 @@ server-default-selected = "{plugin}：你的语言现在跟随服务器默认语
 
 [language.editor]
 loading = "正在加载 {locale} 的消息..."
+title = "{plugin} / {section}"
 
 [language.editor.section]
 languages = "语言"

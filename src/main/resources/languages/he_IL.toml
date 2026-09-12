@@ -99,6 +99,7 @@
 #   {rotation}  סיבוב התצוגה
 #   {scale}  קנה המידה של התצוגה או התצוגה המקדימה
 #   {seconds}  משך בשניות
+#   {section}  המקטע המוצג בעורך השפה
 #   {session}  מזהה הפעלת העורך
 #   {severity}  חומרת האבחון
 #   {skipped}  מספר הרשומות שדולגו
@@ -768,6 +769,7 @@ server-default-selected = "{plugin}: השפה שלך תואמת כעת לשפת 
 
 [language.editor]
 loading = "טוען הודעות עבור {locale}..."
+title = "{plugin} / {section}"
 
 [language.editor.section]
 languages = "שפות"

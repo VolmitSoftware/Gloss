@@ -99,6 +99,7 @@
 #   {rotation}  顯示旋轉
 #   {scale}  顯示或預覽縮放比例
 #   {seconds}  時間（秒）
+#   {section}  語言編輯器中顯示的區段
 #   {session}  編輯工作階段識別碼
 #   {severity}  診斷嚴重程度
 #   {skipped}  已略過項目數量
@@ -768,6 +769,7 @@ server-default-selected = "{plugin}：你的語言現在跟隨伺服器預設語
 
 [language.editor]
 loading = "正在載入 {locale} 的訊息..."
+title = "{plugin} / {section}"
 
 [language.editor.section]
 languages = "語言"

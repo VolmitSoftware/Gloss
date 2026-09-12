@@ -99,6 +99,7 @@
 #   {rotation}  表示の回転
 #   {scale}  表示またはプレビューの倍率
 #   {seconds}  時間（秒）
+#   {section}  言語エディターで表示中のセクション
 #   {session}  編集セッションの識別子
 #   {severity}  診断の重大度
 #   {skipped}  スキップした項目数
@@ -768,6 +769,7 @@ server-default-selected = "{plugin}: 個人言語はサーバーの既定の言�
 
 [language.editor]
 loading = "{locale}のメッセージを読み込んでいます..."
+title = "{plugin} / {section}"
 
 [language.editor.section]
 languages = "言語"

@@ -99,6 +99,7 @@
 #   {rotation}  Вращение отображения
 #   {scale}  Масштаб отображения или предпросмотра
 #   {seconds}  Время в секундах
+#   {section}  Раздел, показанный в редакторе языка
 #   {session}  Идентификатор сеанса редактора
 #   {severity}  Уровень важности диагностики
 #   {skipped}  Число пропущенных записей
@@ -768,6 +769,7 @@ server-default-selected = "{plugin}: теперь ваш язык соответ
 
 [language.editor]
 loading = "Загрузка сообщений для {locale}..."
+title = "{plugin} / {section}"
 
 [language.editor.section]
 languages = "Языки"

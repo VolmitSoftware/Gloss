@@ -99,6 +99,7 @@
 #   {rotation}  표시 회전
 #   {scale}  표시 또는 미리 보기 배율
 #   {seconds}  시간(초)
+#   {section}  언어 편집기에 표시되는 섹션
 #   {session}  편집 세션 식별자
 #   {severity}  진단 심각도
 #   {skipped}  건너뛴 항목 수
@@ -768,6 +769,7 @@ server-default-selected = "{plugin}: 개인 언어가 이제 서버 기본 언�
 
 [language.editor]
 loading = "{locale} 메시지를 불러오는 중..."
+title = "{plugin} / {section}"
 
 [language.editor.section]
 languages = "언어"

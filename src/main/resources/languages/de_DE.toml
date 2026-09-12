@@ -99,6 +99,7 @@
 #   {rotation}  Drehmodus beim Folgen
 #   {scale}  Darstellungsskalierung
 #   {seconds}  Dauer oder Frist in Sekunden
+#   {section}  Im Spracheditor angezeigter Abschnitt
 #   {session}  ID der Bearbeitungssitzung
 #   {severity}  Schweregrad des Problems
 #   {skipped}  Übersprungene Einträge
@@ -768,6 +769,7 @@ server-default-selected = "{plugin}: Deine Sprache folgt jetzt dem Serverstandar
 
 [language.editor]
 loading = "Nachrichten für {locale} werden geladen..."
+title = "{plugin} / {section}"
 
 [language.editor.section]
 languages = "Sprachen"

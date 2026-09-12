@@ -99,6 +99,7 @@
 #   {rotation}  Rodomo objekto pasukimas
 #   {scale}  Rodomo objekto arba peržiūros mastelis
 #   {seconds}  Laikas sekundėmis
+#   {section}  Kalbos rengyklėje rodomas skyrius
 #   {session}  Redaktoriaus seanso identifikatorius
 #   {severity}  Diagnostikos svarbos lygis
 #   {skipped}  Praleistų įrašų skaičius
@@ -768,6 +769,7 @@ server-default-selected = "{plugin}: jūsų kalba dabar atitinka numatytąją se
 
 [language.editor]
 loading = "Įkeliami kalbos {locale} pranešimai..."
+title = "{plugin} / {section}"
 
 [language.editor.section]
 languages = "Kalbos"

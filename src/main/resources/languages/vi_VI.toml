@@ -99,6 +99,7 @@
 #   {rotation}  Độ xoay phần hiển thị
 #   {scale}  Tỷ lệ hiển thị hoặc xem trước
 #   {seconds}  Thời gian tính bằng giây
+#   {section}  Mục hiển thị trong trình soạn thảo ngôn ngữ
 #   {session}  Mã định danh phiên chỉnh sửa
 #   {severity}  Mức độ nghiêm trọng của chẩn đoán
 #   {skipped}  Số mục đã bỏ qua
@@ -768,6 +769,7 @@ server-default-selected = "{plugin}: ngôn ngữ của bạn hiện theo ngôn n
 
 [language.editor]
 loading = "Đang tải tin nhắn cho {locale}..."
+title = "{plugin} / {section}"
 
 [language.editor.section]
 languages = "Ngôn ngữ"

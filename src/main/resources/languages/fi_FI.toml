@@ -99,6 +99,7 @@
 #   {rotation}  Näyttökohteen kierto
 #   {scale}  Näyttökohteen tai esikatselun mittakaava
 #   {seconds}  Aika sekunteina
+#   {section}  Kielieditorissa näytettävä osio
 #   {session}  Editori-istunnon tunniste
 #   {severity}  Diagnostiikan vakavuustaso
 #   {skipped}  Ohitettujen merkintöjen määrä
@@ -768,6 +769,7 @@ server-default-selected = "{plugin}: kielesi noudattaa nyt palvelimen oletuskiel
 
 [language.editor]
 loading = "Ladataan kielen {locale} viestejä..."
+title = "{plugin} / {section}"
 
 [language.editor.section]
 languages = "Kielet"

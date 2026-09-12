@@ -94,6 +94,7 @@ final class GlossLanguageReference {
         Map.entry("rotation", "Display rotation"),
         Map.entry("scale", "Display or preview scale"),
         Map.entry("seconds", "Time in seconds"),
+        Map.entry("section", "Section shown in the language editor"),
         Map.entry("session", "Editor session identifier"),
         Map.entry("severity", "Diagnostic severity"),
         Map.entry("skipped", "Number of skipped entries"),
