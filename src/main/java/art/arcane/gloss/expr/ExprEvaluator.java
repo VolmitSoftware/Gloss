@@ -21,7 +21,7 @@ public final class ExprEvaluator {
   private ExprEvaluator() {
   }
 
-  public static Object eval(Expr expr, ExprScope scope) {
+  public static Object eval(Expr expr, ExpressionScope scope) {
     return switch (expr) {
       case Expr.Num n -> n.value();
       case Expr.Str s -> s.value();
@@ -35,21 +35,21 @@ public final class ExprEvaluator {
     };
   }
 
-  public static double number(Expr expr, ExprScope scope) {
+  public static double number(Expr expr, ExpressionScope scope) {
     return requireNumber(eval(expr, scope));
   }
 
-  public static boolean bool(Expr expr, ExprScope scope) {
+  public static boolean bool(Expr expr, ExpressionScope scope) {
     return requireBoolean(eval(expr, scope));
   }
 
   /** Numbers render per the integral-string rule: {@code 54.0 -> "54"}, {@code 3.5 -> "3.5"}. */
-  public static String string(Expr expr, ExprScope scope) {
+  public static String string(Expr expr, ExpressionScope scope) {
     return stringify(eval(expr, scope));
   }
 
   /** Reinterprets the numeric ARGB value as a signed 32-bit int: {@code (int) (long) value}. */
-  public static int color(Expr expr, ExprScope scope) {
+  public static int color(Expr expr, ExpressionScope scope) {
     return (int) (long) number(expr, scope);
   }
 
@@ -72,7 +72,7 @@ public final class ExprEvaluator {
   // Node evaluation
   // ---------------------------------------------------------------------
 
-  private static List<Object> evalList(Expr.ListLiteral l, ExprScope scope) {
+  private static List<Object> evalList(Expr.ListLiteral l, ExpressionScope scope) {
     List<Object> constants = l.constantItems();
     if (constants != null) {
       return constants;
@@ -84,7 +84,7 @@ public final class ExprEvaluator {
     return items;
   }
 
-  private static Object evalVar(Expr.Var v, ExprScope scope) {
+  private static Object evalVar(Expr.Var v, ExpressionScope scope) {
     Object value = scope.variable(v.name());
     if (value == null) {
       throw new ExprException("unknown variable: " + v.name(), NO_POSITION);
@@ -92,7 +92,7 @@ public final class ExprEvaluator {
     return value;
   }
 
-  private static Object evalUnary(Expr.Unary u, ExprScope scope) {
+  private static Object evalUnary(Expr.Unary u, ExpressionScope scope) {
     Object value = eval(u.operand(), scope);
     return switch (u.op()) {
       case "-" -> -requireNumber(value);
@@ -101,12 +101,12 @@ public final class ExprEvaluator {
     };
   }
 
-  private static Object evalTernary(Expr.Ternary t, ExprScope scope) {
+  private static Object evalTernary(Expr.Ternary t, ExpressionScope scope) {
     boolean condition = requireBoolean(eval(t.condition(), scope));
     return condition ? eval(t.ifTrue(), scope) : eval(t.ifFalse(), scope);
   }
 
-  private static Object evalCall(Expr.Call c, ExprScope scope) {
+  private static Object evalCall(Expr.Call c, ExpressionScope scope) {
     List<Object> args = new ArrayList<>(c.args().size());
     for (Expr arg : c.args()) {
       args.add(eval(arg, scope));
@@ -118,7 +118,7 @@ public final class ExprEvaluator {
     return result;
   }
 
-  private static Object evalBinary(Expr.Binary b, ExprScope scope) {
+  private static Object evalBinary(Expr.Binary b, ExpressionScope scope) {
     String op = b.op();
     // && and || short-circuit: the right operand is only evaluated (and its variables/calls only
     // looked up) when the left operand does not already decide the result.

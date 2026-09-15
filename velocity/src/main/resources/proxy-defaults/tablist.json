@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 2,
+  "revision": 1,
+  "show": true,
+  "headerFooter": {
+    "enabled": true,
+    "show": true,
+    "presentation": { "header": "&d&lGloss", "footer": "&7$online players online" },
+    "variants": []
+  },
+  "listNames": {
+    "enabled": true,
+    "show": true,
+    "presentation": { "format": "&7[$server] &f$player" },
+    "variants": []
+  },
+  "sort": { "enabled": false, "weight": "0" }
+}

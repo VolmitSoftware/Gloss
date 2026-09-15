@@ -119,6 +119,20 @@ class TablistDeliveryRecoveryTest {
     }
 
     @Test
+    void ownershipRetirementDropsQueuedRefreshesAndRejectsNewOffers() {
+        TablistService.PlayerApplyQueue queue = new TablistService.PlayerApplyQueue();
+        TablistService.ApplyRequest request =
+            new TablistService.ApplyRequest(null, 1L, TablistService.APPLY_FULL, null);
+
+        assertTrue(queue.offer(request));
+        queue.retire();
+
+        assertTrue(queue.isRetired());
+        assertNull(queue.next());
+        assertFalse(queue.offer(request));
+    }
+
+    @Test
     void aNewDriverEpochReplacesStaleQueuedWork() {
         TablistService.PlayerApplyQueue queue = new TablistService.PlayerApplyQueue();
         TablistService.ApplyRequest old =

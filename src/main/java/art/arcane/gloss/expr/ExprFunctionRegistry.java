@@ -63,6 +63,10 @@ public final class ExprFunctionRegistry {
         }
     }
 
+    public static boolean isSupported(String name) {
+        return ExprFunctions.isBuiltIn(name) || GLOBAL.contains(name);
+    }
+
     public static ExprFunctionRegistry global() {
         return GLOBAL;
     }

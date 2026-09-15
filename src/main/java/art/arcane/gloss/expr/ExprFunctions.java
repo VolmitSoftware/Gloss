@@ -62,10 +62,6 @@ public final class ExprFunctions {
     };
   }
 
-  public static boolean isSupported(String name) {
-    return isBuiltIn(name) || ExprFunctionRegistry.global().contains(name);
-  }
-
   /** True for the static library and the text animation functions, never for registered names. */
   public static boolean isBuiltIn(String name) {
     return switch (name) {

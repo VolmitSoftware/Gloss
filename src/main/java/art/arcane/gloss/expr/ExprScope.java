@@ -8,7 +8,7 @@ import java.util.List;
  * function namespaces (context-specific names falling back to {@link ExprFunctions}) into the
  * tree-walking {@link ExprEvaluator}.
  */
-public interface ExprScope {
+public interface ExprScope extends ExpressionScope {
 
   /**
    * Resolves a possibly-dotted variable name (e.g. {@code "inventory.size"}).

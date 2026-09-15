@@ -5,6 +5,7 @@ import art.arcane.gloss.api.HologramPresentation;
 import art.arcane.gloss.expr.Expr;
 import art.arcane.gloss.expr.ExprEvaluator;
 import art.arcane.gloss.expr.ExprFunctions;
+import art.arcane.gloss.expr.ExprFunctionRegistry;
 import art.arcane.gloss.expr.ExprParser;
 import art.arcane.gloss.expr.ExprScope;
 
@@ -127,7 +128,7 @@ final class BubbleMotionPlan {
                 validateTree(ternary.ifFalse());
             }
             case Expr.Call call -> {
-                if (!ExprFunctions.isSupported(call.name())) {
+                if (!ExprFunctionRegistry.isSupported(call.name())) {
                     throw new IllegalArgumentException("unknown motion function: " + call.name());
                 }
                 call.args().forEach(BubbleMotionPlan::validateTree);

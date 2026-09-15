@@ -1,7 +1,6 @@
 package art.arcane.gloss.forge;
 
 import art.arcane.gloss.expr.ExprFunctionRegistry;
-import art.arcane.gloss.expr.ExprFunctions;
 import art.arcane.gloss.expr.ExprScope;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -92,7 +91,7 @@ class PixelFunctionsTest {
     void registersInTheGlobalRegistryWithSignatures() {
         functions.register(ExprFunctionRegistry.global());
         for (String name : PixelFunctions.NAMES) {
-            assertTrue(ExprFunctions.isSupported(name), name);
+            assertTrue(ExprFunctionRegistry.isSupported(name), name);
         }
         assertEquals(ExprFunctionRegistry.Kind.NUMBER, ExprFunctionRegistry.global().find("px").returns());
         assertEquals(ExprFunctionRegistry.Kind.STRING, ExprFunctionRegistry.global().find("column").returns());

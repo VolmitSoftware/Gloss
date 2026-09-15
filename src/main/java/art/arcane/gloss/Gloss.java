@@ -34,6 +34,7 @@ import art.arcane.volmlib.util.localization.BukkitLanguageSwitcher;
 import art.arcane.volmlib.util.localization.LocalizationSnapshot;
 import art.arcane.gloss.menu.MenuSessionManager;
 import art.arcane.gloss.motd.MotdService;
+import art.arcane.gloss.proxy.BackendProxyOwnership;
 import art.arcane.gloss.panel.PanelRuntimeManager;
 import art.arcane.gloss.panel.PanelRepository;
 import art.arcane.gloss.panel.PanelService;
@@ -131,6 +132,7 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
     private GroupService groups;
     private TablistService tablist;
     private MotdService motd;
+    private BackendProxyOwnership proxyOwnership;
     private ChatService chat;
     private ChatBubblesService bubbles;
     private DamageIndicatorsService indicators;
@@ -306,6 +308,7 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
             groups = new GroupService(this);
             tablist = new TablistService(this);
             motd = new MotdService(this);
+            proxyOwnership = new BackendProxyOwnership(this);
             chat = new ChatService(this);
             bubbles = new ChatBubblesService(this);
             indicators = new DamageIndicatorsService(this);
@@ -314,6 +317,7 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
             commands = new GlossCommandService(this);
             api = new GlossAPIImpl(this);
 
+            enableService("proxy-ownership", proxyOwnership::enable, proxyOwnership::disable);
             enableService("text", text::enable, text::disable);
             enableService("animations", animations::enable, animations::disable);
             enableService("emoji", emoji::enable, emoji::disable);
@@ -865,6 +869,10 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
 
     public TablistService tablist() {
         return tablist;
+    }
+
+    public BackendProxyOwnership proxyOwnership() {
+        return proxyOwnership;
     }
 
     public MotdService motd() {

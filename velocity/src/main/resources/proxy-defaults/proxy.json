@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 1,
+  "motd": { "enabled": true },
+  "tablist": { "enabled": true },
+  "scoreboards": { "enabled": true },
+  "refreshMillis": 500,
+  "networkTablist": true
+}

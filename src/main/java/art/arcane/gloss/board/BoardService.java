@@ -19,6 +19,7 @@ import art.arcane.gloss.expr.ExprScope;
 import art.arcane.volmlib.util.scheduling.SchedulerUtils;
 import art.arcane.gloss.text.TextPipeline;
 import art.arcane.volmlib.util.board.Board;
+import art.arcane.volmlib.util.scheduling.FoliaScheduler;
 import art.arcane.volmlib.util.board.BoardManager;
 import art.arcane.volmlib.util.board.BoardProvider;
 import art.arcane.volmlib.util.board.BoardSettings;
@@ -304,6 +305,24 @@ public final class BoardService implements Listener, Explainable, RegistryOwner 
         syncManager(player);
     }
 
+    public void refreshProxyOwnership(Player player) {
+        Runnable refresh = () -> {
+            if (!player.isOnline() || suppressForProxy(player)) {
+                return;
+            }
+            if (sticky.contains(player.getUniqueId())) {
+                resyncSelected(player);
+            } else {
+                selectAutomatically(player);
+            }
+        };
+        if (FoliaScheduler.isOwnedByCurrentRegion(player)) {
+            refresh.run();
+        } else {
+            plugin.scheduler().runEntity(player, refresh);
+        }
+    }
+
     public void reselectAll() {
         plugin.scheduler().s(this::selectAllAutomatically);
     }
@@ -383,6 +402,9 @@ public final class BoardService implements Listener, Explainable, RegistryOwner 
      * {@code show} condition with this scope, so the manager attach never re-evaluates it.
      */
     private void selectAutomatically(Player player) {
+        if (suppressForProxy(player)) {
+            return;
+        }
         GlossConditionScope scope = GlossConditionScope.viewer(plugin, player);
         String chosen = selectBoardId(boards(), scope, conditionErrors);
         UUID uuid = player.getUniqueId();
@@ -478,6 +500,9 @@ public final class BoardService implements Listener, Explainable, RegistryOwner 
 
     /** Refreshes the viewer's profile and manager for the board it is already on. */
     private void resyncSelected(Player player) {
+        if (suppressForProxy(player)) {
+            return;
+        }
         GlossBoardMeta meta = selectedMeta(player);
         GlossConditionScope scope = GlossConditionScope.viewer(plugin, player);
         refreshProfile(player, meta, scope);
@@ -485,6 +510,9 @@ public final class BoardService implements Listener, Explainable, RegistryOwner 
     }
 
     private void applyManager(Player player, GlossBoardMeta meta, boolean visible) {
+        if (suppressForProxy(player)) {
+            return;
+        }
         BoardManager<Board> activeOrdinaryManager = ordinaryManager;
         if (activeOrdinaryManager == null) {
             return;
@@ -510,6 +538,18 @@ public final class BoardService implements Listener, Explainable, RegistryOwner 
             activeAnimationManager.remove(player);
         }
         renderCache.forget(player.getUniqueId());
+    }
+
+    private boolean suppressForProxy(Player player) {
+        UUID uuid = player.getUniqueId();
+        if (plugin.proxyOwnership() == null || !plugin.proxyOwnership().ownsScoreboard(uuid)) {
+            return false;
+        }
+        removeFromManagers(player);
+        profiles.remove(uuid);
+        formatIndex.remove(uuid);
+        renderCache.forget(uuid);
+        return true;
     }
 
     private void removeFromManagers(Player player) {

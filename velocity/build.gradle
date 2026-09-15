@@ -1,0 +1,66 @@
+plugins {
+    id 'java'
+    id 'com.gradleup.shadow'
+}
+
+group = rootProject.group
+version = rootProject.version
+
+repositories {
+    mavenCentral()
+    maven { url = uri('https://repo.papermc.io/repository/maven-public/') }
+    maven { url = uri('https://repo.codemc.io/repository/maven-releases/') }
+}
+
+dependencies {
+    compileOnly('com.velocitypowered:velocity-api:3.4.0-SNAPSHOT')
+    annotationProcessor('com.velocitypowered:velocity-api:3.4.0-SNAPSHOT')
+    compileOnly('com.github.retrooper:packetevents-velocity:2.13.0')
+    implementation('com.google.code.gson:gson:2.11.0')
+    testImplementation('com.velocitypowered:velocity-api:3.4.0-SNAPSHOT')
+    testImplementation('com.github.retrooper:packetevents-velocity:2.13.0')
+    testImplementation('org.junit.jupiter:junit-jupiter:5.10.2')
+    testRuntimeOnly('org.junit.platform:junit-platform-launcher:1.10.2')
+    testImplementation('org.mockito:mockito-core:5.18.0')
+}
+
+java {
+    toolchain { languageVersion = JavaLanguageVersion.of(25) }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.release.set(25)
+    options.encoding = 'UTF-8'
+    options.compilerArgs.add('-parameters')
+}
+
+test { useJUnitPlatform() }
+
+tasks.named('jar') { enabled = false }
+
+shadowJar {
+    archiveBaseName.set('Gloss')
+    archiveClassifier.set('velocity')
+    destinationDirectory.set(layout.buildDirectory.dir('platform'))
+    relocate('art.arcane.gloss.expr', 'art.arcane.gloss.velocity.expr')
+    relocate('art.arcane.gloss.proxy', 'art.arcane.gloss.velocity.proxy')
+    relocate('com.google.gson', 'art.arcane.gloss.velocity.libs.gson')
+    filesMatching('velocity-plugin.json') {
+        filter { String line -> line.replace('@VERSION@', project.version.toString()) }
+    }
+}
+
+tasks.named('build') { dependsOn tasks.named('shadowJar') }
+
+sourceSets.main.java {
+    srcDir '../src/main/java'
+    include 'art/arcane/gloss/velocity/**'
+    include 'art/arcane/gloss/proxy/OwnershipProtocol.java'
+    include 'art/arcane/gloss/expr/Expr.java'
+    include 'art/arcane/gloss/expr/ExpressionScope.java'
+    include 'art/arcane/gloss/expr/ExprParser.java'
+    include 'art/arcane/gloss/expr/ExprEvaluator.java'
+    include 'art/arcane/gloss/expr/ExprException.java'
+    include 'art/arcane/gloss/expr/ExprFunctions.java'
+    include 'art/arcane/gloss/expr/TextAnimationFunctions.java'
+}

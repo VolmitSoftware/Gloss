@@ -68,6 +68,7 @@ public final class TablistService implements Listener, Explainable, RegistryOwne
     private final Set<UUID> fastOverridePlayers;
     private final Set<UUID> fastNamePlayers;
     private final Set<UUID> fastPlayers;
+    private final Set<UUID> proxyPlayers;
     private final FastDriverLifecycle fastDriverLifecycle;
     private final AtomicLong docGeneration;
     private final AtomicLong driverEpoch;
@@ -101,6 +102,7 @@ public final class TablistService implements Listener, Explainable, RegistryOwne
         this.fastOverridePlayers = ConcurrentHashMap.newKeySet();
         this.fastNamePlayers = ConcurrentHashMap.newKeySet();
         this.fastPlayers = ConcurrentHashMap.newKeySet();
+        this.proxyPlayers = ConcurrentHashMap.newKeySet();
         this.fastDriverLifecycle = new FastDriverLifecycle();
         this.docGeneration = new AtomicLong();
         this.driverEpoch = new AtomicLong();
@@ -110,7 +112,7 @@ public final class TablistService implements Listener, Explainable, RegistryOwne
         this.conditionErrors = BoundedConditionErrorCallback.bounded(100, error ->
             Gloss.logExceptionStackThrottled(false, "tablist-condition-" + error.path(), error.cause(),
                 "Tablist condition %s failed and was treated as false.", error.path()));
-        this.sorts = new TablistSortService();
+        this.sorts = new TablistSortService(this::sendSortOrders);
         this.layouts = new TablistLayoutService(new PacketLayoutSink(),
             raw -> plugin.text().renderStatic(raw));
         this.activeDoc = TablistDoc.DEFAULTS;
@@ -262,6 +264,20 @@ public final class TablistService implements Listener, Explainable, RegistryOwne
         pushNow(player);
     }
 
+    public void refreshProxyOwnership(Player player) {
+        Runnable refresh = () -> {
+            if (!player.isOnline() || suppressForProxy(player)) {
+                return;
+            }
+            invalidateAndPush(player);
+        };
+        if (FoliaScheduler.isOwnedByCurrentRegion(player)) {
+            refresh.run();
+        } else {
+            plugin.scheduler().runEntity(player, refresh);
+        }
+    }
+
     public void resetTab(Player player) {
         UUID uuid = player.getUniqueId();
         synchronized (fastDriverLifecycle) {
@@ -283,6 +299,7 @@ public final class TablistService implements Listener, Explainable, RegistryOwne
             fastPlayers.remove(uuid);
             reconcileFastDriverLocked();
         }
+        proxyPlayers.remove(uuid);
         sorts.forget(uuid);
         layouts.forget(uuid);
         appliedListNames.remove(uuid);
@@ -314,8 +331,11 @@ public final class TablistService implements Listener, Explainable, RegistryOwne
         TablistLayoutRuntime layout = activeLayout;
         List<Player> players = new ArrayList<>(Bukkit.getOnlinePlayers());
         for (Player viewer : players) {
-            plugin.scheduler().runEntity(viewer,
-                () -> layouts.apply(viewer, layout, players, this::sortScope, conditionErrors));
+            plugin.scheduler().runEntity(viewer, () -> {
+                if (viewer.isOnline() && !suppressForProxy(viewer)) {
+                    layouts.apply(viewer, layout, players, this::sortScope, conditionErrors);
+                }
+            });
         }
     }
 
@@ -341,7 +361,8 @@ public final class TablistService implements Listener, Explainable, RegistryOwne
         }
         if (wanted) {
             layoutListener = PacketEvents.getAPI().getEventManager()
-                .registerListener(new PlayerInfoRewriteListener(layouts::hasLayout, layouts::recordUnlisted));
+                .registerListener(new PlayerInfoRewriteListener(
+                    uuid -> !proxyOwnsTablist(uuid) && layouts.hasLayout(uuid), layouts::recordUnlisted));
             return;
         }
         PacketEvents.getAPI().getEventManager().unregisterListener(layoutListener);
@@ -361,7 +382,25 @@ public final class TablistService implements Listener, Explainable, RegistryOwne
         if (runtime.sortWeight() == null) {
             return;
         }
-        sorts.pass(runtime, new ArrayList<>(Bukkit.getOnlinePlayers()), this::sortScope, conditionErrors);
+        List<Player> players = new ArrayList<>(Bukkit.getOnlinePlayers());
+        players.removeIf(player -> proxyOwnsTablist(player.getUniqueId()));
+        sorts.pass(runtime, players, this::sortScope, conditionErrors);
+    }
+
+    private void sendSortOrders(List<Player> viewers, Map<UUID, Integer> orders) {
+        if (!FoliaScheduler.isFolia(plugin.getServer()) && FoliaScheduler.isPrimaryThread()) {
+            List<Player> localViewers = new ArrayList<>(viewers);
+            localViewers.removeIf(viewer -> !viewer.isOnline() || proxyOwnsTablist(viewer.getUniqueId()));
+            TablistSortService.sendListOrder(localViewers, orders);
+            return;
+        }
+        for (Player viewer : viewers) {
+            plugin.scheduler().runEntity(viewer, () -> {
+                if (viewer.isOnline() && !suppressForProxy(viewer)) {
+                    TablistSortService.sendListOrder(List.of(viewer), orders);
+                }
+            });
+        }
     }
 
     private GlossConditionScope sortScope(Player viewer, Player subject) {
@@ -646,7 +685,7 @@ public final class TablistService implements Listener, Explainable, RegistryOwne
     }
 
     private void apply(Player player, HeaderFooterHeartbeatCycle heartbeatCycle) {
-        if (!player.isOnline()) {
+        if (!player.isOnline() || suppressForProxy(player)) {
             return;
         }
         TablistDoc doc = doc();
@@ -702,7 +741,7 @@ public final class TablistService implements Listener, Explainable, RegistryOwne
     }
 
     private void applyFastPlayer(Player player) {
-        if (!player.isOnline()) {
+        if (!player.isOnline() || suppressForProxy(player)) {
             return;
         }
         UUID uuid = player.getUniqueId();
@@ -806,7 +845,11 @@ public final class TablistService implements Listener, Explainable, RegistryOwne
             if (player == null) {
                 continue;
             }
-            mutateOnEntityThread(player, () -> player.setPlayerListHeaderFooter("", ""));
+            mutateOnEntityThread(player, () -> {
+                if (!proxyOwnsTablist(uuid)) {
+                    player.setPlayerListHeaderFooter("", "");
+                }
+            });
         }
         appliedHeaderFooters.clear();
     }
@@ -817,7 +860,11 @@ public final class TablistService implements Listener, Explainable, RegistryOwne
             if (player == null) {
                 continue;
             }
-            mutateOnEntityThread(player, () -> player.setPlayerListName(null));
+            mutateOnEntityThread(player, () -> {
+                if (!proxyOwnsTablist(uuid)) {
+                    player.setPlayerListName(null);
+                }
+            });
         }
         appliedListNames.clear();
         listNameSources.clear();
@@ -836,6 +883,38 @@ public final class TablistService implements Listener, Explainable, RegistryOwne
         if (FoliaScheduler.isOwnedByCurrentRegion(player)) {
             guardedAction.run();
         }
+    }
+
+    private boolean proxyOwnsTablist(UUID uuid) {
+        return plugin.proxyOwnership() != null && plugin.proxyOwnership().ownsTablist(uuid);
+    }
+
+    private boolean suppressForProxy(Player player) {
+        UUID uuid = player.getUniqueId();
+        if (!proxyOwnsTablist(uuid)) {
+            if (proxyPlayers.remove(uuid)) {
+                sorts.forget(uuid);
+            }
+            return false;
+        }
+        if (!proxyPlayers.add(uuid)) {
+            return true;
+        }
+        PlayerApplyQueue queue = playerApplyQueues.remove(uuid);
+        if (queue != null) {
+            queue.retire();
+        }
+        layouts.restore(player);
+        sorts.forget(uuid);
+        listNameSources.remove(uuid);
+        if (appliedHeaderFooters.remove(uuid) != null) {
+            player.setPlayerListHeaderFooter("", "");
+        }
+        if (appliedListNames.remove(uuid) != null) {
+            player.setPlayerListName(null);
+        }
+        setFastNamePlayer(uuid, false);
+        return true;
     }
 
     private void invalidateAndPush(Player player) {

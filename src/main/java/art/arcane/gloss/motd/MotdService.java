@@ -120,6 +120,9 @@ public final class MotdService implements RegistryOwner {
     }
 
     private void handlePing(ServerListPingEvent event) {
+        if (plugin.proxyOwnership() != null && plugin.proxyOwnership().ownsMotd()) {
+            return;
+        }
         try {
             MotdDoc document = doc();
             if (!document.show().matches(plugin, null)) {

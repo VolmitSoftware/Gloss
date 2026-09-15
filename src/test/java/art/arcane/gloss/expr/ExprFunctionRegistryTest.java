@@ -36,7 +36,7 @@ class ExprFunctionRegistryTest {
             ExprFunctionRegistry.Kind.NUMBER, List.of(ExprFunctionRegistry.Kind.NUMBER), false,
             (scope, args) -> ((Double) args.get(0)) * 2.0D));
 
-        assertTrue(ExprFunctions.isSupported("double"));
+        assertTrue(ExprFunctionRegistry.isSupported("double"));
         assertFalse(ExprFunctions.isBuiltIn("double"));
         assertEquals(8.0D, ExprFunctionRegistry.global().call(EMPTY, "double", List.of(4.0D)));
     }

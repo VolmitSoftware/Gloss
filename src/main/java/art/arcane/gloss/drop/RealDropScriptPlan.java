@@ -6,6 +6,7 @@ import art.arcane.gloss.expr.Expr;
 import art.arcane.gloss.expr.ExprEvaluator;
 import art.arcane.gloss.expr.ExprException;
 import art.arcane.gloss.expr.ExprFunctions;
+import art.arcane.gloss.expr.ExprFunctionRegistry;
 import art.arcane.gloss.expr.ExprParser;
 import art.arcane.gloss.expr.ExprScope;
 
@@ -357,7 +358,7 @@ final class RealDropScriptPlan {
             }
             case Expr.Call call -> {
                 String name = call.name();
-                if (!FUNCTIONS.contains(name) && !ExprFunctions.isSupported(name)) {
+                if (!FUNCTIONS.contains(name) && !ExprFunctionRegistry.isSupported(name)) {
                     throw new IllegalArgumentException(path + ": unknown function '" + name + "' at position "
                         + Math.max(0, source.indexOf(name)));
                 }

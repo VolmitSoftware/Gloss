@@ -42,6 +42,23 @@ def languageSourceManifestTask = tasks.register('generateLanguageSourceManifest'
 }
 
 def shadowJarTask = tasks.named('shadowJar', com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar)
+evaluationDependsOn(':velocity')
+def velocityJarTask = project(':velocity').tasks.named('shadowJar')
+def universalJarTask = tasks.register('universalJar', Jar) {
+    group = 'build'
+    description = 'Packages the Bukkit and Velocity entry points in one Gloss plugin jar.'
+    archiveClassifier.set('')
+    duplicatesStrategy = DuplicatesStrategy.FAIL
+    dependsOn(shadowJarTask, velocityJarTask)
+    from(shadowJarTask.flatMap { it.archiveFile }.map { zipTree(it) }) {
+        exclude('META-INF/MANIFEST.MF')
+    }
+    from(velocityJarTask.flatMap { it.archiveFile }.map { zipTree(it) }) {
+        exclude('META-INF/MANIFEST.MF')
+    }
+}
+shadowJarTask.configure { finalizedBy(universalJarTask) }
+tasks.named('assemble') { dependsOn(universalJarTask) }
 tasks.named('slimJar').get()
 File pluginOutDirectory = layout.projectDirectory.dir('../PluginOuts').asFile
 
@@ -50,13 +67,13 @@ tasks.register('buildPsychoLT', Copy) {
     description = 'Builds and deploys Gloss to the managed Minecraft test-server dropins.'
     outputs.upToDateWhen { false }
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
-    dependsOn(tasks.named('check'), shadowJarTask)
-    from(shadowJarTask.flatMap { it.archiveFile })
+    dependsOn(tasks.named('check'), universalJarTask)
+    from(universalJarTask.flatMap { it.archiveFile })
     into(layout.projectDirectory.dir('../../[Minecraft Server]/consumers/plugin-consumers/dropins/plugins'))
     rename { String ignored -> 'Gloss.jar' }
     doLast {
         project.copy {
-            from(shadowJarTask.get().archiveFile.get().asFile)
+            from(universalJarTask.get().archiveFile.get().asFile)
             into(pluginOutDirectory)
         }
     }
@@ -67,8 +84,8 @@ tasks.register('buildSwiftSwamp', Copy) {
     description = 'Builds and deploys Gloss to the local BUILDS output directory.'
     outputs.upToDateWhen { false }
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
-    dependsOn(tasks.named('check'), shadowJarTask)
-    from(shadowJarTask.flatMap { it.archiveFile })
+    dependsOn(tasks.named('check'), universalJarTask)
+    from(universalJarTask.flatMap { it.archiveFile })
     into(file('C://VolmitSoftware/BUILDS'))
     rename { String ignored -> 'Gloss.jar' }
 }
@@ -88,11 +105,12 @@ def apiJarTask = tasks.register('apiJar', Jar) {
 }
 
 tasks.named('build').configure {
-    dependsOn(shadowJarTask, apiJarTask)
+    dependsOn(universalJarTask, apiJarTask)
 }
 
 shadowJarTask.configure {
-    archiveClassifier.set('')
+    destinationDirectory.set(layout.buildDirectory.dir('platform'))
+    archiveClassifier.set('bukkit')
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
     minimize()
     relocate('io.github.slimjar', "${lib}.slimjar")
@@ -310,10 +328,10 @@ if (!JavaVersion.current().isCompatibleWith(JavaVersion.VERSION_25)) {
 
 
 tasks.register('verifyLanguagePackaging') {
-    dependsOn(shadowJarTask)
-    inputs.file(shadowJarTask.flatMap { it.archiveFile })
+    dependsOn(universalJarTask)
+    inputs.file(universalJarTask.flatMap { it.archiveFile })
     doLast {
-        File artifact = shadowJarTask.get().archiveFile.get().asFile
+        File artifact = universalJarTask.get().archiveFile.get().asFile
         new java.util.jar.JarFile(artifact).withCloseable { java.util.jar.JarFile archive ->
             List<String> translations = archive.entries().findAll { java.util.jar.JarEntry entry ->
                 !entry.directory && entry.name.startsWith('languages/')
@@ -336,6 +354,21 @@ pluginPackaging {
     }
     artifacts {
         create('distribution') {
+            releaseCompression = true
+            taskName = 'universalJar'
+            policyName = 'Gloss'
+            shrink = false
+            forbiddenPrefixes = forbiddenPrefixes + ['com/velocitypowered/', 'com/google/inject/']
+            requiredEntries = requiredEntries + [
+                'velocity-plugin.json',
+                'art/arcane/gloss/velocity/GlossVelocity.class',
+                'art/arcane/gloss/velocity/ProxyScoreboards.class',
+                'art/arcane/gloss/velocity/expr/ExprEvaluator.class',
+                'art/arcane/gloss/velocity/libs/gson/Gson.class',
+                'proxy-defaults/proxy.json'
+            ]
+        }
+        create('bukkit') {
             taskName = 'shadowJar'
             policyName = 'Gloss'
             prunePrefixes = ['art/arcane/volmlib/']
@@ -352,3 +385,31 @@ pluginPackaging {
         }
     }
 }
+
+tasks.named('build') { dependsOn(':velocity:build') }
+
+
+tasks.register('verifyPlatformPackaging') {
+    dependsOn(universalJarTask)
+    inputs.file(universalJarTask.flatMap { it.archiveFile })
+    doLast {
+        File artifact = universalJarTask.get().archiveFile.get().asFile
+        new java.util.jar.JarFile(artifact).withCloseable { java.util.jar.JarFile archive ->
+            Map descriptor = new groovy.json.JsonSlurper().parse(archive.getInputStream(archive.getJarEntry('velocity-plugin.json')))
+            if (descriptor.main != 'art.arcane.gloss.velocity.GlossVelocity' || descriptor.version != project.version.toString()) {
+                throw new GradleException('Velocity descriptor must match the main Gloss release')
+            }
+            String scoreboard = new String(archive.getInputStream(archive.getJarEntry('art/arcane/gloss/velocity/ProxyScoreboards.class')).readAllBytes(), java.nio.charset.StandardCharsets.ISO_8859_1)
+            for (String reference : ['com/github/retrooper/packetevents/PacketEvents', 'net/kyori/adventure/text/Component']) {
+                if (!scoreboard.contains(reference)) {
+                    throw new GradleException("Velocity API reference was relocated: ${reference}")
+                }
+            }
+            if (scoreboard.contains('art/arcane/gloss/libs/')) {
+                throw new GradleException('Velocity bytecode must not reference Bukkit-relocated libraries')
+            }
+        }
+    }
+}
+
+tasks.named('check') { dependsOn(tasks.named('verifyPlatformPackaging')) }

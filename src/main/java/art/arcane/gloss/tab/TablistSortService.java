@@ -111,7 +111,7 @@ public final class TablistSortService {
         }
     }
 
-    private static void sendListOrder(List<Player> viewers, Map<UUID, Integer> orders) {
+    static void sendListOrder(List<Player> viewers, Map<UUID, Integer> orders) {
         List<WrapperPlayServerPlayerInfoUpdate.PlayerInfo> entries = new ArrayList<>(orders.size());
         for (Map.Entry<UUID, Integer> entry : orders.entrySet()) {
             UserProfile profile = new UserProfile(entry.getKey(), null);
