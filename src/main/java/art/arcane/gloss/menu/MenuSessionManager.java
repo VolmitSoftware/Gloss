@@ -15,7 +15,7 @@ import art.arcane.gloss.panel.PanelClickTarget;
 import art.arcane.gloss.panel.PanelRuntimeManager;
 import art.arcane.gloss.config.MenuDefinitionData;
 import art.arcane.gloss.enums.NavigationMode;
-import art.arcane.gloss.integration.protection.ContainerProtectionProbe;
+import art.arcane.volmlib.util.event.ProtectionProbe;
 import art.arcane.gloss.locale.GlossMessages;
 import art.arcane.gloss.menu.action.MenuNavigationHistory;
 import art.arcane.gloss.menu.action.NavigationRequest;
@@ -49,6 +49,7 @@ import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
+import org.bukkit.event.Event;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.entity.PlayerDeathEvent;
@@ -242,7 +243,9 @@ public final class MenuSessionManager {
    * read back as a denied preview.
    */
   static boolean isViewerClick(PlayerInteractEvent event) {
-    if (event.isCancelled() || ContainerProtectionProbe.isProbe(event)) return false;
+    if (ProtectionProbe.isProbe(event)
+        || event.useItemInHand() == Event.Result.DENY
+        || (event.getClickedBlock() != null && event.useInteractedBlock() == Event.Result.DENY)) return false;
     Action action = event.getAction();
     if (action != Action.LEFT_CLICK_AIR && action != Action.LEFT_CLICK_BLOCK
         && action != Action.RIGHT_CLICK_AIR && action != Action.RIGHT_CLICK_BLOCK) return false;

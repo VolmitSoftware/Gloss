@@ -1,11 +1,12 @@
 package art.arcane.gloss.menu;
 
-import art.arcane.gloss.integration.protection.ContainerProtectionProbe;
+import art.arcane.volmlib.util.event.ProtectionProbe;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
 import org.bukkit.entity.Player;
+import org.bukkit.event.Event;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.EquipmentSlot;
@@ -34,8 +35,21 @@ class MenuClickProbeTest {
         Player viewer = player();
         Block chest = block();
 
-        assertFalse(MenuSessionManager.isViewerClick(ContainerProtectionProbe.blockProbe(viewer, chest)),
+        assertFalse(MenuSessionManager.isViewerClick(ProtectionProbe.blockInteract(viewer, chest, EquipmentSlot.HAND)),
             "the access probe must not run the viewer's click actions");
+    }
+
+    @Test
+    void anotherPluginsProtectionProbeIsNotDispatchedAsAViewerClick() {
+        PlayerInteractEvent event = new PlayerInteractEvent(player(), Action.RIGHT_CLICK_BLOCK,
+            null, block(), BlockFace.UP, EquipmentSlot.HAND) {
+            @Override
+            public String getEventName() {
+                return "VolmLibProtectionProbe";
+            }
+        };
+
+        assertFalse(MenuSessionManager.isViewerClick(event));
     }
 
     @Test
@@ -44,6 +58,27 @@ class MenuClickProbeTest {
             block(), BlockFace.UP, EquipmentSlot.HAND);
 
         assertTrue(MenuSessionManager.isViewerClick(click));
+    }
+
+    @Test
+    void airClicksAreDispatchedUnlessItemUseIsExplicitlyDenied() {
+        for (Action action : new Action[] {Action.LEFT_CLICK_AIR, Action.RIGHT_CLICK_AIR}) {
+            PlayerInteractEvent click = new PlayerInteractEvent(player(), action, null,
+                null, BlockFace.SELF, EquipmentSlot.HAND);
+            assertTrue(click.isCancelled());
+            assertTrue(MenuSessionManager.isViewerClick(click));
+
+            click.setUseItemInHand(Event.Result.DENY);
+            assertFalse(MenuSessionManager.isViewerClick(click));
+        }
+    }
+
+    @Test
+    void explicitItemDenialAlsoBlocksBlockClicks() {
+        PlayerInteractEvent click = new PlayerInteractEvent(player(), Action.RIGHT_CLICK_BLOCK, null,
+            block(), BlockFace.UP, EquipmentSlot.HAND);
+        click.setUseItemInHand(Event.Result.DENY);
+        assertFalse(MenuSessionManager.isViewerClick(click));
     }
 
     @Test

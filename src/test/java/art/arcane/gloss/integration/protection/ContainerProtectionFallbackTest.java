@@ -1,5 +1,6 @@
 package art.arcane.gloss.integration.protection;
 
+import art.arcane.volmlib.util.event.ProtectionProbe;
 import org.bukkit.block.Block;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
@@ -90,16 +91,16 @@ class ContainerProtectionFallbackTest {
         assertInstanceOf(PlayerInteractEvent.class, fired.getFirst(),
             "other plugins must still see a plain interact event");
         assertInstanceOf(PlayerInteractEntityEvent.class, fired.get(1));
-        assertTrue(ContainerProtectionProbe.isProbe(fired.getFirst()));
-        assertTrue(ContainerProtectionProbe.isProbe(fired.get(1)));
+        assertTrue(ProtectionProbe.isProbe(fired.getFirst()));
+        assertTrue(ProtectionProbe.isProbe(fired.get(1)));
     }
 
     @Test
     void aViewersOwnClickIsNotMistakenForAProbe() {
-        assertFalse(ContainerProtectionProbe.isProbe(new PlayerInteractEvent(ProtectionFakes.player(),
+        assertFalse(ProtectionProbe.isProbe(new PlayerInteractEvent(ProtectionFakes.player(),
             org.bukkit.event.block.Action.RIGHT_CLICK_BLOCK, null, ProtectionFakes.block(),
             org.bukkit.block.BlockFace.UP)));
-        assertFalse(ContainerProtectionProbe.isProbe(
+        assertFalse(ProtectionProbe.isProbe(
             new PlayerInteractEntityEvent(ProtectionFakes.player(), ProtectionFakes.entity())));
     }
 
