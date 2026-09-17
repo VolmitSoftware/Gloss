@@ -44,6 +44,8 @@ shadowJar {
     destinationDirectory.set(layout.buildDirectory.dir('platform'))
     relocate('art.arcane.gloss.expr', 'art.arcane.gloss.velocity.expr')
     relocate('art.arcane.gloss.proxy', 'art.arcane.gloss.velocity.proxy')
+    relocate('art.arcane.gloss.animation', 'art.arcane.gloss.velocity.animation')
+    relocate('art.arcane.gloss.emoji', 'art.arcane.gloss.velocity.emoji')
     relocate('com.google.gson', 'art.arcane.gloss.velocity.libs.gson')
     filesMatching('velocity-plugin.json') {
         filter { String line -> line.replace('@VERSION@', project.version.toString()) }
@@ -63,4 +65,27 @@ sourceSets.main.java {
     include 'art/arcane/gloss/expr/ExprException.java'
     include 'art/arcane/gloss/expr/ExprFunctions.java'
     include 'art/arcane/gloss/expr/TextAnimationFunctions.java'
+    include 'art/arcane/gloss/animation/AnimationClip.java'
+    include 'art/arcane/gloss/animation/AnimationMode.java'
+    include 'art/arcane/gloss/emoji/UnicodeText.java'
+}
+
+// The proxy ships the server edition's emoji, animation and surface defaults unchanged, plus a
+// manifest so seeding never has to list resources inside a jar.
+tasks.named('processResources') {
+    from(rootProject.file('src/main/resources/defaults')) {
+        include 'emoji/**', 'animations/**', 'surfaces/**'
+        into 'proxy-defaults'
+    }
+    doLast {
+        File root = new File(destinationDir, 'proxy-defaults')
+        List<String> entries = []
+        root.eachFileRecurse(groovy.io.FileType.FILES) { File file ->
+            String relative = root.toPath().relativize(file.toPath()).toString().replace(File.separatorChar, '/' as char)
+            if (relative != 'manifest.txt') {
+                entries << relative
+            }
+        }
+        new File(root, 'manifest.txt').text = entries.sort().join('\n') + '\n'
+    }
 }

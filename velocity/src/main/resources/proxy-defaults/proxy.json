@@ -3,6 +3,10 @@
   "motd": { "enabled": true },
   "tablist": { "enabled": true },
   "scoreboards": { "enabled": true },
+  "surfaces": { "enabled": true },
+  "connections": { "enabled": true },
+  "emoji": { "enabled": true },
+  "animations": { "enabled": true },
   "refreshMillis": 500,
   "networkTablist": true
 }

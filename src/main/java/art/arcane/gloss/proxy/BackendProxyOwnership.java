@@ -1,6 +1,8 @@
 package art.arcane.gloss.proxy;
 
 import art.arcane.gloss.Gloss;
+import art.arcane.gloss.motd.MotdService;
+import art.arcane.gloss.surface.SurfaceService;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -26,6 +28,7 @@ public final class BackendProxyOwnership implements Listener, PluginMessageListe
     private final Map<UUID, Pending> pending = new ConcurrentHashMap<>();
     private byte[] key;
     private volatile boolean enabled;
+    private volatile int lastClaimedMask;
     private int task = -1;
     private int reportedMask;
 
@@ -64,6 +67,21 @@ public final class BackendProxyOwnership implements Listener, PluginMessageListe
         reportedMask = 0;
     }
 
+    /** Whether the proxy ownership channel is live, so a feature may still be waiting on a claim. */
+    public boolean enabled() {
+        return enabled;
+    }
+
+    /**
+     * Whether the last mask a proxy claim carried included connection messages. A lease lapses every
+     * fifteen seconds and a player who just joined has none yet, so a feature that must decide before
+     * the next handshake asks what the proxy claimed last rather than what it holds this instant. A
+     * proxy that never claimed connection messages — or none at all — never answers true.
+     */
+    public boolean proxyLastClaimedConnections() {
+        return (lastClaimedMask & OwnershipProtocol.CONNECTIONS) != 0;
+    }
+
     public boolean ownsTablist(UUID playerId) {
         return owns(playerId, OwnershipProtocol.TABLIST);
     }
@@ -72,10 +90,26 @@ public final class BackendProxyOwnership implements Listener, PluginMessageListe
         return owns(playerId, OwnershipProtocol.SCOREBOARD);
     }
 
+    public boolean ownsSurfaces(UUID playerId) {
+        return owns(playerId, OwnershipProtocol.SURFACES);
+    }
+
     public boolean ownsMotd() {
+        return ownsAnywhere(OwnershipProtocol.MOTD);
+    }
+
+    /**
+     * Connection messages are broadcasts, so like the MOTD they are owned server-wide as soon as
+     * any connected player carries a live proxy lease for them.
+     */
+    public boolean ownsConnections() {
+        return ownsAnywhere(OwnershipProtocol.CONNECTIONS);
+    }
+
+    private boolean ownsAnywhere(int feature) {
         long now = System.currentTimeMillis();
         for (Claim claim : claims.values()) {
-            if (claim.expiresAtMillis() > now && (claim.mask() & OwnershipProtocol.MOTD) != 0) {
+            if (claim.expiresAtMillis() > now && (claim.mask() & feature) != 0) {
                 return true;
             }
         }
@@ -166,7 +200,13 @@ public final class BackendProxyOwnership implements Listener, PluginMessageListe
             names.add("scoreboards (proxy-owned players)");
         }
         if ((mask & OwnershipProtocol.MOTD) != 0) {
-            names.add("MOTD");
+            names.add("MOTD and server links");
+        }
+        if ((mask & OwnershipProtocol.SURFACES) != 0) {
+            names.add("surfaces (proxy-owned players)");
+        }
+        if ((mask & OwnershipProtocol.CONNECTIONS) != 0) {
+            names.add("connection messages");
         }
         return names.toString();
     }
@@ -191,6 +231,9 @@ public final class BackendProxyOwnership implements Listener, PluginMessageListe
 
     private boolean apply(Player player, int mask, long expiresAtMillis) {
         UUID playerId = player.getUniqueId();
+        if (mask != 0) {
+            lastClaimedMask = mask;
+        }
         Claim previous = mask == 0 ? claims.remove(playerId) : claims.put(playerId, new Claim(mask, expiresAtMillis));
         int previousMask = previous == null ? 0 : previous.mask();
         if ((previousMask & OwnershipProtocol.TABLIST) != (mask & OwnershipProtocol.TABLIST)) {
@@ -198,6 +241,18 @@ public final class BackendProxyOwnership implements Listener, PluginMessageListe
         }
         if ((previousMask & OwnershipProtocol.SCOREBOARD) != (mask & OwnershipProtocol.SCOREBOARD)) {
             plugin.boards().refreshProxyOwnership(player);
+        }
+        if ((previousMask & OwnershipProtocol.SURFACES) != (mask & OwnershipProtocol.SURFACES)) {
+            SurfaceService surfaces = plugin.service(SurfaceService.class);
+            if (surfaces != null) {
+                surfaces.refreshProxyOwnership(player);
+            }
+        }
+        if ((previousMask & OwnershipProtocol.MOTD) != (mask & OwnershipProtocol.MOTD)) {
+            MotdService motd = plugin.motd();
+            if (motd != null) {
+                motd.refreshProxyOwnership();
+            }
         }
         return previousMask != mask;
     }

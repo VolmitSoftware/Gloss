@@ -100,7 +100,7 @@ class OwnershipProtocolTest {
     @Test
     void rejectsInvalidProducerArguments() {
         OwnershipProtocol.Request request = OwnershipProtocol.createRequest(UUID.randomUUID());
-        assertThrows(IllegalArgumentException.class, () -> OwnershipProtocol.reply(request, 8, NOW + 1, KEY));
+        assertThrows(IllegalArgumentException.class, () -> OwnershipProtocol.reply(request, 64, NOW + 1, KEY));
         assertThrows(IllegalArgumentException.class, () -> OwnershipProtocol.reply(request, -1, NOW + 1, KEY));
         assertThrows(IllegalArgumentException.class, () -> OwnershipProtocol.reply(request, 7, NOW + 1, new byte[0]));
         assertThrows(IllegalArgumentException.class, () -> new OwnershipProtocol.Request(UUID.randomUUID(), new byte[15]));

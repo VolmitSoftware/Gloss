@@ -285,6 +285,17 @@ public final class CommandGlossWebEdit {
     web.openSubject("glyph", id, sender);
   }
 
+  // --- lane:connections ---
+  @Director(name = "connections", description = "Open this live document in the web editor",
+      descriptionKey = "command.help.web.edit.document")
+  public void connections(
+      @Param(name = "id", description = "Live Gloss document id",
+          descriptionKey = "command.help.arg.web_subject",
+          customHandler = ConnectionsIdHandler.class) String id,
+      @Param(name = "sender", contextual = true) CommandSender sender) {
+    web.openSubject("connections", id, sender);
+  }
+
   // --- lane:fixes ---
 
   public abstract static class SubjectIdHandler implements DirectorParameterHandler<String> {
@@ -446,6 +457,11 @@ public final class CommandGlossWebEdit {
   // --- lane:forge ---
   public static final class GlyphIdHandler extends SubjectIdHandler {
     public GlyphIdHandler() { super("glyph"); }
+  }
+
+  // --- lane:connections ---
+  public static final class ConnectionsIdHandler extends SubjectIdHandler {
+    public ConnectionsIdHandler() { super("connections"); }
   }
 
   // --- lane:fixes ---

@@ -9,6 +9,8 @@ import art.arcane.gloss.chat.ChannelDoc;
 import art.arcane.gloss.chat.ChannelService;
 import art.arcane.gloss.bubble.BubbleStyleDoc;
 import art.arcane.gloss.config.menu.MenuDocumentParser;
+import art.arcane.gloss.connection.ConnectionsDoc;
+import art.arcane.gloss.connection.ConnectionsService;
 import art.arcane.gloss.dialog.DialogDoc;
 import art.arcane.gloss.dialog.DialogService;
 import art.arcane.gloss.inventory.InventoryDoc;
@@ -229,6 +231,12 @@ public enum EditorSyncDocumentKind {
           forge.reload();
         }
       }),
+
+  // --- lane:connections ---
+  CONNECTIONS("connections", "connections.json", Layout.SINGLE, true, ConnectionsDoc.KIND,
+      value -> requireSingleton(value, ConnectionsDoc.KIND),
+      (id, source) -> ConnectionsDoc.parse("connections.json", source),
+      gloss -> reloadLaneService(gloss, ConnectionsService.class)),
 
   // --- lane:fixes ---
 

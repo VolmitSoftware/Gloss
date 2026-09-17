@@ -78,6 +78,26 @@ public final class SurfaceDriver {
         delivery.forget(viewerId);
     }
 
+    /** Stands every surface this viewer currently holds down and forgets what was selected. */
+    public void clear(Player viewer) {
+        ViewerState state = states.remove(viewer.getUniqueId());
+        if (state == null) {
+            return;
+        }
+        String actionBar = state.selected.get(SurfaceKind.ACTIONBAR);
+        if (actionBar != null) {
+            delivery.clearActionBar(viewer, PURPOSE_PREFIX + actionBar);
+        }
+        String bossBar = state.selected.get(SurfaceKind.BOSSBAR);
+        if (bossBar != null) {
+            delivery.hideBossBar(viewer, PURPOSE_PREFIX + bossBar);
+        }
+        String title = state.selected.get(SurfaceKind.TITLE);
+        if (title != null) {
+            delivery.clearTitle(viewer, PURPOSE_PREFIX + title);
+        }
+    }
+
     public void clearAll() {
         states.clear();
     }

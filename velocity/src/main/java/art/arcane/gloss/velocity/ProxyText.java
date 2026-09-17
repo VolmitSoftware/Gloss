@@ -18,15 +18,26 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public final class ProxyText {
-    private static final Pattern TOKENS = Pattern.compile("\\$(player|server|ping|online|max)(?![A-Za-z0-9_])");
+    private static final String ANIMATION_PREFIX = "animation.";
+    private static final Pattern TOKENS = Pattern.compile("\\$(player|server|ping|online|max|from|to)(?![A-Za-z0-9_])");
     private static final Pattern HEX = Pattern.compile("\\[([0-9a-fA-F]{6})]");
     private static final LegacyComponentSerializer COLORS = LegacyComponentSerializer.builder()
         .character('&').hexColors().useUnusualXRepeatedCharacterHexFormat().build();
     private final ProxyServer proxy;
     private final Map<String, Expr> expressions = new ConcurrentHashMap<>();
+    private volatile ProxyTextDocuments.Content content = ProxyTextDocuments.Content.EMPTY;
 
     public ProxyText(ProxyServer proxy) {
         this.proxy = proxy;
+    }
+
+    /** Swaps in the emoji and animation catalogs of a freshly loaded document snapshot. */
+    public void content(ProxyTextDocuments.Content replacement) {
+        this.content = replacement == null ? ProxyTextDocuments.Content.EMPTY : replacement;
+    }
+
+    public ProxyTextDocuments.Content content() {
+        return content;
     }
 
     public static Expr parseExpression(String source) {
@@ -60,7 +71,8 @@ public final class ProxyText {
                 int dot = name.indexOf('.');
                 boolean player = dot > 0 && Set.of("viewer", "subject", "player").contains(name.substring(0, dot))
                     && Set.of("present", "name", "uuid", "ping", "server").contains(name.substring(dot + 1));
-                if (!player && !Set.of("server.online", "server.maxPlayers", "time.ms", "time.seconds", "time.ticks").contains(name)) {
+                if (!player && !Set.of("server.online", "server.maxPlayers", "time.ms", "time.seconds", "time.ticks",
+                    "connection.from", "connection.to").contains(name)) {
                     throw new IllegalArgumentException("Unknown proxy variable: " + name);
                 }
             }
@@ -87,7 +99,11 @@ public final class ProxyText {
     }
 
     public ExpressionScope scope(Player viewer, Player subject) {
-        return new Scope(viewer, subject == null ? viewer : subject, System.currentTimeMillis());
+        return scope(viewer, subject, System.currentTimeMillis());
+    }
+
+    ExpressionScope scope(Player viewer, Player subject, long nowMillis) {
+        return new Scope(viewer, subject == null ? viewer : subject, nowMillis);
     }
 
     public Component render(String input, ExpressionScope scope) {
@@ -98,6 +114,48 @@ public final class ProxyText {
     public String plain(String input, ExpressionScope scope) {
         if (input == null || input.isEmpty()) {
             return "";
+        }
+        ProxyTextDocuments.Content catalogs = content;
+        String expanded = expand(input, scope);
+        if (catalogs.animationsEnabled() && !catalogs.animations().isEmpty()) {
+            expanded = applyAnimations(expanded, scope, catalogs.animations());
+        }
+        if (catalogs.emojiEnabled() && !catalogs.emoji().isEmpty()) {
+            expanded = applyEmoji(expanded, scope, catalogs.emoji());
+        }
+        return expanded;
+    }
+
+    public boolean test(Expr expression, ExpressionScope scope) {
+        return ExprEvaluator.bool(expression, scope);
+    }
+
+    public <T> T select(ProxyDocuments.Surface<T> surface, ExpressionScope scope) {
+        if (!surface.enabled() || !test(surface.show(), scope)) {
+            return null;
+        }
+        return variant(surface.presentation(), surface.variants(), scope);
+    }
+
+    public ProxyDocuments.BoardPresentation select(ProxyDocuments.Board board, ExpressionScope scope) {
+        if (!test(board.show(), scope) || !test(board.when(), scope)) {
+            return null;
+        }
+        return variant(board.presentation(), board.variants(), scope);
+    }
+
+    private <T> T variant(T fallback, List<ProxyDocuments.Variant<T>> variants, ExpressionScope scope) {
+        for (ProxyDocuments.Variant<T> variant : variants) {
+            if (test(variant.when(), scope)) {
+                return variant.presentation();
+            }
+        }
+        return fallback;
+    }
+
+    private String expand(String input, ExpressionScope scope) {
+        if (input.isEmpty()) {
+            return input;
         }
         StringBuilder result = new StringBuilder(input.length());
         int cursor = 0;
@@ -129,35 +187,82 @@ public final class ProxyText {
             case "server" -> "subject.server";
             case "ping" -> "subject.ping";
             case "max" -> "server.maxPlayers";
+            case "from" -> "connection.from";
+            case "to" -> "connection.to";
             default -> "server.online";
         }))));
     }
 
-    public boolean test(Expr expression, ExpressionScope scope) {
-        return ExprEvaluator.bool(expression, scope);
-    }
-
-    public <T> T select(ProxyDocuments.Surface<T> surface, ExpressionScope scope) {
-        if (!surface.enabled() || !test(surface.show(), scope)) {
-            return null;
+    private String applyAnimations(String input, ExpressionScope scope, Map<String, ProxyTextDocuments.Animation> animations) {
+        int open = input.indexOf('|');
+        if (open < 0) {
+            return input;
         }
-        return variant(surface.presentation(), surface.variants(), scope);
-    }
-
-    public ProxyDocuments.BoardPresentation select(ProxyDocuments.Board board, ExpressionScope scope) {
-        if (!test(board.show(), scope) || !test(board.when(), scope)) {
-            return null;
-        }
-        return variant(board.presentation(), board.variants(), scope);
-    }
-
-    private <T> T variant(T fallback, List<ProxyDocuments.Variant<T>> variants, ExpressionScope scope) {
-        for (ProxyDocuments.Variant<T> variant : variants) {
-            if (test(variant.when(), scope)) {
-                return variant.presentation();
+        StringBuilder out = null;
+        int cursor = 0;
+        while (open >= 0) {
+            int close = input.indexOf('|', open + 1);
+            if (close < 0) {
+                break;
             }
+            ProxyTextDocuments.Animation animation = input.startsWith(ANIMATION_PREFIX, open + 1)
+                ? animations.get(input.substring(open + 1 + ANIMATION_PREFIX.length(), close))
+                : null;
+            if (animation == null) {
+                open = close;
+                continue;
+            }
+            if (out == null) {
+                out = new StringBuilder(input.length() + 16);
+            }
+            out.append(input, cursor, open).append(frame(animation, scope));
+            cursor = close + 1;
+            open = input.indexOf('|', cursor);
         }
-        return fallback;
+        if (out == null) {
+            return input;
+        }
+        out.append(input, cursor, input.length());
+        return out.toString();
+    }
+
+    private String frame(ProxyTextDocuments.Animation animation, ExpressionScope scope) {
+        if (!test(animation.show(), scope)) {
+            return "";
+        }
+        Object now = scope.variable("time.ms");
+        long nowMillis = now instanceof Number number ? number.longValue() : System.currentTimeMillis();
+        return expand(animation.clip().frameAt(nowMillis), scope);
+    }
+
+    private String applyEmoji(String input, ExpressionScope scope, List<ProxyTextDocuments.Emoji> entries) {
+        String out = input;
+        boolean tokens = hasTokenColons(out);
+        for (ProxyTextDocuments.Emoji entry : entries) {
+            if (!entry.enabled()) {
+                continue;
+            }
+            String trigger = entry.trigger();
+            String token = tokens ? entry.token() : null;
+            boolean hasTrigger = !trigger.isEmpty() && out.contains(trigger);
+            boolean hasToken = token != null && out.contains(token);
+            if ((!hasTrigger && !hasToken) || !test(entry.show(), scope)) {
+                continue;
+            }
+            if (hasTrigger) {
+                out = out.replace(trigger, entry.emoji());
+            }
+            if (hasToken) {
+                out = out.replace(token, entry.emoji());
+            }
+            tokens = hasTokenColons(out);
+        }
+        return out;
+    }
+
+    private static boolean hasTokenColons(String value) {
+        int first = value.indexOf(':');
+        return first >= 0 && value.indexOf(':', first + 1) > first;
     }
 
     private final class Scope implements ExpressionScope {

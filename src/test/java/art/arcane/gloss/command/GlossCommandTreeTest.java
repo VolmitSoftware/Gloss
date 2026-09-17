@@ -183,6 +183,7 @@ class GlossCommandTreeTest {
             List.of("forge", "serve"),
             List.of("forge", "reset"),
             List.of("web", "edit", "glyph"),
+            List.of("web", "edit", "connections"),
             List.of("channel"),
             List.of("channel", "list"),
             List.of("channel", "info"),

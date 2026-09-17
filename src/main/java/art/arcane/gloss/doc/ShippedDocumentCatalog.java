@@ -46,6 +46,9 @@ import art.arcane.gloss.behavior.BehaviorDoc;
 // --- lane:forge ---
 import art.arcane.gloss.forge.GlyphDoc;
 
+// --- lane:connections ---
+import art.arcane.gloss.connection.ConnectionsDoc;
+
 // --- lane:fixes ---
 
 
@@ -165,6 +168,12 @@ public final class ShippedDocumentCatalog {
 
     private static final List<Entry<?>> FORGE = List.of(GLYPHS);
 
+    // --- lane:connections ---
+    public static final Entry<ConnectionsDoc> CONNECTIONS =
+        new Entry<>(ConnectionsDoc.KIND, List.of(ConnectionsDoc.KIND), ConnectionsDoc::parse);
+
+    private static final List<Entry<?>> CONNECTIONS_LANE = List.of(CONNECTIONS);
+
     // --- lane:fixes ---
     private static final List<Entry<?>> FIXES = List.of();
 
@@ -178,6 +187,7 @@ public final class ShippedDocumentCatalog {
         all.addAll(BEHAVIORS);
         all.addAll(AUTHORING);
         all.addAll(FORGE);
+        all.addAll(CONNECTIONS_LANE);
         all.addAll(FIXES);
         return List.copyOf(all);
     }

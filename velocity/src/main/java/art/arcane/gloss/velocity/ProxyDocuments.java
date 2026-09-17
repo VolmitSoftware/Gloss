@@ -8,20 +8,29 @@ import com.google.gson.JsonParser;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Stream;
 
 public final class ProxyDocuments {
+    private static final int MAX_LINKS = 16;
+    private static final Set<String> LINK_TYPES = Set.of("report_bug", "community_guidelines", "support",
+        "status", "feedback", "community", "website", "forums", "news", "announcements");
+
     private ProxyDocuments() {
     }
 
     public static void seed(Path directory) throws IOException {
-        for (String name : List.of("proxy.json", "motd.json", "tablist.json", "boards/default.json")) {
+        for (String name : bundledDefaults()) {
             Path target = directory.resolve(name);
             if (Files.exists(target)) {
                 continue;
@@ -36,12 +45,34 @@ public final class ProxyDocuments {
         }
     }
 
+    /** Every bundled proxy default, from the manifest the build writes next to them. */
+    static List<String> bundledDefaults() throws IOException {
+        try (InputStream input = ProxyDocuments.class.getResourceAsStream("/proxy-defaults/manifest.txt")) {
+            if (input == null) {
+                throw new IOException("Missing bundled proxy default manifest");
+            }
+            List<String> names = new ArrayList<>();
+            for (String line : new String(input.readAllBytes(), StandardCharsets.UTF_8).split("\n")) {
+                String name = line.trim();
+                if (!name.isEmpty()) {
+                    names.add(name);
+                }
+            }
+            return List.copyOf(names);
+        }
+    }
+
     public static Snapshot load(Path directory) throws IOException {
         JsonObject config = read(directory.resolve("proxy.json"), 1);
         Settings settings = new Settings(enabled(config, "motd"), enabled(config, "tablist"),
-            enabled(config, "scoreboards"), Math.clamp(integer(config, "refreshMillis", 500), 50, 60000),
-            bool(config, "networkTablist", true));
+            enabled(config, "scoreboards"), enabled(config, "surfaces"), enabled(config, "connections"),
+            enabled(config, "emoji"), enabled(config, "animations"),
+            Math.clamp(integer(config, "refreshMillis", 500), 50, 60000), bool(config, "networkTablist", true));
         JsonObject motd = read(directory.resolve("motd.json"), 1);
+        String motdFavicon = string(motd, "favicon", null);
+        if (motdFavicon != null && motdFavicon.isBlank()) {
+            motdFavicon = null;
+        }
         List<MotdEntry> entries = new ArrayList<>();
         for (JsonElement element : array(motd, "entries")) {
             JsonObject entry = element.getAsJsonObject();
@@ -58,6 +89,16 @@ public final class ProxyDocuments {
         }
         if (!motd.isEmpty() && entries.isEmpty()) {
             throw new IllegalArgumentException("MOTD requires at least one entry");
+        }
+        JsonArray linkArray = array(motd, "links");
+        if (linkArray.size() > MAX_LINKS) {
+            throw new IllegalArgumentException("MOTD supports at most " + MAX_LINKS + " links");
+        }
+        List<MotdLink> links = new ArrayList<>(linkArray.size());
+        for (JsonElement element : linkArray) {
+            JsonObject link = element.getAsJsonObject();
+            links.add(new MotdLink(string(link, "type", null), string(link, "label", null),
+                string(link, "url", null)));
         }
         JsonObject tab = read(directory.resolve("tablist.json"), 2);
         JsonObject sorting = object(tab, "sort");
@@ -82,11 +123,13 @@ public final class ProxyDocuments {
             }
         }
         boards.sort(Comparator.comparingInt(Board::priority).reversed().thenComparing(Board::id));
-        return new Snapshot(settings, new Motd(expression(motd, "show", motd.isEmpty() ? "false" : "true"), List.copyOf(entries)),
-            tablist, List.copyOf(boards));
+        return new Snapshot(settings, new Motd(expression(motd, "show", motd.isEmpty() ? "false" : "true"),
+            motdFavicon, List.copyOf(entries), List.copyOf(links)), tablist, List.copyOf(boards),
+            ProxySurfaceDocuments.load(directory), ProxyConnectionDocuments.load(directory),
+            ProxyTextDocuments.load(directory, settings));
     }
 
-    private static JsonObject read(Path path, int schema) throws IOException {
+    static JsonObject read(Path path, int schema) throws IOException {
         if (!Files.exists(path)) {
             return new JsonObject();
         }
@@ -104,12 +147,12 @@ public final class ProxyDocuments {
         }
     }
 
-    private static <T> Surface<T> surface(JsonObject object, Function<JsonObject, T> parser) {
+    static <T> Surface<T> surface(JsonObject object, Function<JsonObject, T> parser) {
         return new Surface<>(bool(object, "enabled", false), expression(object, "show", "true"),
             parser.apply(object(object, "presentation")), variants(object, parser));
     }
 
-    private static <T> List<Variant<T>> variants(JsonObject object, Function<JsonObject, T> parser) {
+    static <T> List<Variant<T>> variants(JsonObject object, Function<JsonObject, T> parser) {
         List<Variant<T>> variants = new ArrayList<>();
         for (JsonElement element : array(object, "variants")) {
             JsonObject variant = element.getAsJsonObject();
@@ -138,7 +181,7 @@ public final class ProxyDocuments {
         return new BoardPresentation(string(object, "title", ""), List.copyOf(lines), bool(object, "hideNumbers", false));
     }
 
-    private static Expr expression(JsonObject object, String key, String fallback) {
+    static Expr expression(JsonObject object, String key, String fallback) {
         String source = string(object, key, fallback);
         if (source.length() > 1024) {
             throw new IllegalArgumentException("Expression exceeds 1024 characters: " + key);
@@ -146,19 +189,19 @@ public final class ProxyDocuments {
         return ProxyText.parseExpression(source);
     }
 
-    private static boolean enabled(JsonObject object, String key) {
+    static boolean enabled(JsonObject object, String key) {
         return bool(object(object, key), "enabled", true);
     }
 
-    private static JsonObject object(JsonObject object, String key) {
+    static JsonObject object(JsonObject object, String key) {
         return object.has(key) ? object.getAsJsonObject(key) : new JsonObject();
     }
 
-    private static JsonArray array(JsonObject object, String key) {
+    static JsonArray array(JsonObject object, String key) {
         return object.has(key) ? object.getAsJsonArray(key) : new JsonArray();
     }
 
-    private static String string(JsonObject object, String key, String fallback) {
+    static String string(JsonObject object, String key, String fallback) {
         String value = object.has(key) && !object.get(key).isJsonNull() ? object.get(key).getAsString() : fallback;
         ProxyText.validateTemplate(value);
         return value;
@@ -166,7 +209,7 @@ public final class ProxyDocuments {
 
     private static String count(JsonObject object, String key) {
         String value = string(object, key, null);
-        if (value != null && !value.contains("{{") && !value.contains("$")) {
+        if (value != null && !value.contains("{{") && !value.contains("$") && !value.contains("|")) {
             double count = Double.parseDouble(value);
             if (!Double.isFinite(count)) {
                 throw new IllegalArgumentException("MOTD " + key + " must be finite");
@@ -175,15 +218,23 @@ public final class ProxyDocuments {
         return value;
     }
 
-    private static int integer(JsonObject object, String key, int fallback) {
+    static int integer(JsonObject object, String key, int fallback) {
         return object.has(key) ? object.get(key).getAsInt() : fallback;
     }
 
-    private static boolean bool(JsonObject object, String key, boolean fallback) {
+    static boolean bool(JsonObject object, String key, boolean fallback) {
         return object.has(key) ? object.get(key).getAsBoolean() : fallback;
     }
 
-    private static List<String> strings(JsonArray array) {
+    static String trimToNull(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    static List<String> strings(JsonArray array) {
         List<String> result = new ArrayList<>(array.size());
         for (JsonElement element : array) {
             String value = element.getAsString();
@@ -193,9 +244,57 @@ public final class ProxyDocuments {
         return List.copyOf(result);
     }
 
-    public record Snapshot(Settings settings, Motd motd, Tablist tablist, List<Board> boards) {}
-    public record Settings(boolean motd, boolean tablist, boolean scoreboards, long refreshMillis, boolean networkTablist) {}
-    public record Motd(Expr show, List<MotdEntry> entries) {}
+    public record Snapshot(Settings settings, Motd motd, Tablist tablist, List<Board> boards,
+                           List<ProxySurfaceDocuments.Document> surfaces, ProxyConnectionDocuments.Document connections,
+                           ProxyTextDocuments.Content content) {}
+    public record Settings(boolean motd, boolean tablist, boolean scoreboards, boolean surfaces, boolean connections,
+                           boolean emoji, boolean animations, long refreshMillis, boolean networkTablist) {}
+    public record Motd(Expr show, String favicon, List<MotdEntry> entries, List<MotdLink> links) {}
+    /** One pause-menu link: a client-known {@code type} or a custom {@code label}, and an http(s) url. */
+    public record MotdLink(String type, String label, String url) {
+        public MotdLink {
+            type = normalizeType(type);
+            label = trimToNull(label);
+            url = normalizeUrl(url);
+            if (type == null && label == null) {
+                throw new IllegalArgumentException("MOTD link requires a known type or a label: " + url);
+            }
+        }
+
+        public boolean isLabelled() {
+            return type == null;
+        }
+
+        private static String normalizeType(String type) {
+            String normalized = trimToNull(type);
+            if (normalized == null) {
+                return null;
+            }
+            String lower = normalized.toLowerCase(Locale.ROOT);
+            if (!LINK_TYPES.contains(lower)) {
+                throw new IllegalArgumentException("MOTD link type must be one of " + LINK_TYPES + ": " + type);
+            }
+            return lower;
+        }
+
+        private static String normalizeUrl(String url) {
+            String normalized = trimToNull(url);
+            if (normalized == null) {
+                throw new IllegalArgumentException("MOTD link requires a url");
+            }
+            URI parsed;
+            try {
+                parsed = new URI(normalized);
+            } catch (URISyntaxException failure) {
+                throw new IllegalArgumentException("MOTD link url is not a valid URI: " + url, failure);
+            }
+            String scheme = parsed.getScheme() == null ? "" : parsed.getScheme().toLowerCase(Locale.ROOT);
+            if (!scheme.equals("http") && !scheme.equals("https") || parsed.getHost() == null) {
+                throw new IllegalArgumentException("MOTD link url must be an http or https address: " + url);
+            }
+            return normalized;
+        }
+    }
     public record MotdEntry(List<String> lines, String favicon, List<String> sample, String online, String max, String version) {}
     public record Tablist(Expr show, Surface<HeaderFooter> headerFooter, Surface<ListName> listNames, Expr sortWeight) {}
     public record Surface<T>(boolean enabled, Expr show, T presentation, List<Variant<T>> variants) {}

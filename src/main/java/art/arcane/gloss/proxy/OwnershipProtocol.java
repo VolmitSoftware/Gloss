@@ -17,6 +17,8 @@ public final class OwnershipProtocol {
     public static final int MOTD = 1;
     public static final int TABLIST = 2;
     public static final int SCOREBOARD = 4;
+    public static final int SURFACES = 8;
+    public static final int CONNECTIONS = 16;
 
     private static final int MAGIC = 0x474C4F53;
     private static final byte VERSION = 1;
@@ -26,7 +28,7 @@ public final class OwnershipProtocol {
     private static final int REQUEST_LENGTH = 38;
     private static final int PAYLOAD_LENGTH = 50;
     private static final int REPLY_LENGTH = 82;
-    private static final int ALL_FEATURES = MOTD | TABLIST | SCOREBOARD;
+    private static final int ALL_FEATURES = MOTD | TABLIST | SCOREBOARD | SURFACES | CONNECTIONS;
     private static final byte[] DOMAIN = "Gloss proxy ownership v1\0".getBytes(StandardCharsets.UTF_8);
     private static final SecureRandom RANDOM = new SecureRandom();
 

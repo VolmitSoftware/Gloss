@@ -925,6 +925,9 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
 
     /** The lane service of the given type, or null when no lane registered one. */
     public <T extends GlossService> T service(Class<T> type) {
+        if (laneServices == null) {
+            return null;
+        }
         for (GlossService service : laneServices) {
             if (type.isInstance(service)) {
                 return type.cast(service);

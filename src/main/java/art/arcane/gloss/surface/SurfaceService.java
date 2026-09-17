@@ -13,6 +13,7 @@ import art.arcane.gloss.doc.ShippedDefaults;
 import art.arcane.gloss.doc.ShippedDocumentCatalog;
 import art.arcane.gloss.expr.ExprScope;
 import art.arcane.gloss.service.GlossService;
+import art.arcane.volmlib.util.scheduling.FoliaScheduler;
 import art.arcane.volmlib.util.scheduling.SchedulerUtils;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
@@ -115,6 +116,20 @@ public final class SurfaceService implements GlossService, Listener, TitleProvid
 
     public List<SurfaceRuntime> runtimes() {
         return runtimes;
+    }
+
+    /** Called when the proxy claims or releases this viewer's surfaces. */
+    public void refreshProxyOwnership(Player player) {
+        Runnable refresh = () -> {
+            if (player.isOnline()) {
+                apply(player);
+            }
+        };
+        if (FoliaScheduler.isOwnedByCurrentRegion(player)) {
+            refresh.run();
+        } else {
+            plugin.scheduler().runEntity(player, refresh);
+        }
     }
 
     public SurfaceRuntime runtime(String id) {
@@ -248,8 +263,20 @@ public final class SurfaceService implements GlossService, Listener, TitleProvid
     }
 
     private void apply(Player viewer) {
+        if (suppressForProxy(viewer)) {
+            return;
+        }
         driver.apply(viewer, GlossConditionScope.viewer(plugin, viewer), byKind,
             plugin.cfg().modules().surfaces().refreshIntervalTicks(), tick, conditionErrors);
+    }
+
+    /** Velocity Gloss owns this viewer's screen slots: stand our surfaces down and stay off them. */
+    private boolean suppressForProxy(Player viewer) {
+        if (plugin.proxyOwnership() == null || !plugin.proxyOwnership().ownsSurfaces(viewer.getUniqueId())) {
+            return false;
+        }
+        driver.clear(viewer);
+        return true;
     }
 
     private String render(Player viewer, String raw, ExprScope scope) {

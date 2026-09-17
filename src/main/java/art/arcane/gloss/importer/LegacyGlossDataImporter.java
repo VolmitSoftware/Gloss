@@ -320,7 +320,7 @@ public final class LegacyGlossDataImporter {
                 return;
             }
             MotdDoc updated = new MotdDoc(MotdDoc.CURRENT_SCHEMA_VERSION, DocumentEnvelope.INITIAL_REVISION, ShowCondition.ALWAYS,
-                motdEntries, List.of());
+                null, motdEntries, List.of());
             writeDocument(motdFile.toPath(), updated);
             entries.add(Entry.of("config", LEGACY_CONFIG_FILE_NAME + ":motd.texts", Status.OVERLAID));
         } catch (IOException | RuntimeException failure) {

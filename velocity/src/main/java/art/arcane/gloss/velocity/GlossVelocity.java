@@ -36,7 +36,8 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
-@Plugin(id = "gloss", name = "Gloss", version = "@VERSION@", description = "Network tablists, scoreboards and MOTD",
+@Plugin(id = "gloss", name = "Gloss", version = "@VERSION@",
+    description = "Network tablists, scoreboards, MOTD, surfaces and connection messages",
     authors = {"VolmitSoftware"}, dependencies = {@Dependency(id = "packetevents")})
 public final class GlossVelocity {
     private final ProxyServer proxy;
@@ -48,6 +49,9 @@ public final class GlossVelocity {
     private ProxyText text;
     private ProxyTablists tabs;
     private ProxyScoreboards boards;
+    private ProxyServerLinks links;
+    private ProxySurfaces surfaces;
+    private ProxyConnections connections;
     private ProxyOwnership ownership;
     private ScheduledTask refresh;
     private volatile boolean pingFailed;
@@ -68,11 +72,14 @@ public final class GlossVelocity {
             ownership = new ProxyOwnership(proxy, ProxyOwnership.loadKey(new ProxyOwnership.KeySource(proxy, logger, directory)));
             tabs = new ProxyTablists(proxy, text, logger);
             boards = new ProxyScoreboards(logger);
+            links = new ProxyServerLinks(text);
+            surfaces = new ProxySurfaces(text, logger);
+            connections = new ProxyConnections(proxy, text, logger);
             config = loaded;
             schedule();
             proxy.getCommandManager().register(proxy.getCommandManager().metaBuilder("gloss").plugin(this).build(),
                 new GlossCommand());
-            logger.info("Gloss enabled: Velocity MOTD, tablists and scoreboards.");
+            logger.info("Gloss enabled: Velocity MOTD, tablists, scoreboards, surfaces and connection messages.");
         } catch (IOException | RuntimeException failure) {
             logger.error("Gloss could not initialize its Velocity services.", failure);
             shutdownServices();
@@ -97,19 +104,41 @@ public final class GlossVelocity {
 
     @Subscribe
     public synchronized void connected(ServerPostConnectEvent event) {
-        if (config == null) {
+        RuntimeConfig current = config;
+        if (current == null) {
             return;
         }
         Player player = event.getPlayer();
         ownership.forget(player.getUniqueId());
         tabs.forget(player.getUniqueId());
         boards.reset(player);
+        surfaces.reset(player);
         failedPlayers.remove(player.getUniqueId());
+        try {
+            links.send(player, current.documents());
+            if (event.getPreviousServer() == null) {
+                connections.joined(player, current.documents());
+            } else {
+                connections.switched(player, event.getPreviousServer().getServerInfo().getName(), current.documents());
+            }
+        } catch (RuntimeException failure) {
+            if (failedPlayers.add(player.getUniqueId())) {
+                logger.error("Gloss connection handling failed for {}.", player.getUniqueId(), failure);
+            }
+        }
     }
 
     @Subscribe
     public synchronized void disconnected(DisconnectEvent event) {
         UUID id = event.getPlayer().getUniqueId();
+        RuntimeConfig current = config;
+        if (current != null && connections != null) {
+            try {
+                connections.left(event, current.documents());
+            } catch (RuntimeException failure) {
+                logger.error("Gloss leave message failed for {}.", id, failure);
+            }
+        }
         hiddenBoards.remove(id);
         failedPlayers.remove(id);
         if (tabs != null) {
@@ -117,6 +146,9 @@ public final class GlossVelocity {
         }
         if (boards != null) {
             boards.forget(id);
+        }
+        if (surfaces != null) {
+            surfaces.forget(id);
         }
         if (ownership != null) {
             ownership.forget(id);
@@ -131,7 +163,9 @@ public final class GlossVelocity {
         ProxyDocuments.Settings settings = config.documents().settings();
         int mask = (settings.motd() ? OwnershipProtocol.MOTD : 0)
             | (settings.tablist() ? OwnershipProtocol.TABLIST : 0)
-            | (settings.scoreboards() ? OwnershipProtocol.SCOREBOARD : 0);
+            | (settings.scoreboards() ? OwnershipProtocol.SCOREBOARD : 0)
+            | (settings.surfaces() ? OwnershipProtocol.SURFACES : 0)
+            | (settings.connections() ? OwnershipProtocol.CONNECTIONS : 0);
         int restored = ownership.handle(event, mask);
         if (restored == 0 || !(event.getSource() instanceof ServerConnection connection)) {
             return;
@@ -143,6 +177,9 @@ public final class GlossVelocity {
         if ((restored & OwnershipProtocol.SCOREBOARD) != 0) {
             boards.reset(player);
         }
+        if ((restored & OwnershipProtocol.SURFACES) != 0) {
+            surfaces.reset(player);
+        }
     }
 
     @Subscribe
@@ -152,7 +189,9 @@ public final class GlossVelocity {
 
     private RuntimeConfig load() throws IOException {
         ProxyDocuments.Snapshot documents = ProxyDocuments.load(directory);
-        return new RuntimeConfig(documents, new ProxyMotd(text, directory, documents.motd()));
+        RuntimeConfig loaded = new RuntimeConfig(documents, new ProxyMotd(text, directory, documents.motd()));
+        text.content(documents.content());
+        return loaded;
     }
 
     private void schedule() {
@@ -179,6 +218,7 @@ public final class GlossVelocity {
             try {
                 tabs.render(player, current.documents());
                 renderBoard(player, current.documents());
+                surfaces.render(player, current.documents());
             } catch (RuntimeException failure) {
                 if (failedPlayers.add(player.getUniqueId())) {
                     logger.error("Gloss display update failed for {}.", player.getUniqueId(), failure);
@@ -244,6 +284,15 @@ public final class GlossVelocity {
             boards.close();
             boards = null;
         }
+        if (surfaces != null) {
+            surfaces.close();
+            surfaces = null;
+        }
+        links = null;
+        connections = null;
+        if (text != null) {
+            text.content(ProxyTextDocuments.Content.EMPTY);
+        }
         hiddenBoards.clear();
         failedPlayers.clear();
     }
@@ -286,7 +335,7 @@ public final class GlossVelocity {
                     }
                     return;
                 }
-                invocation.source().sendMessage(Component.text("Gloss Velocity: MOTD, tablists, scoreboards. /gloss reload | /gloss board toggle"));
+                invocation.source().sendMessage(Component.text("Gloss Velocity: MOTD, tablists, scoreboards, surfaces, connection messages. /gloss reload | /gloss board toggle"));
             }
         }
 

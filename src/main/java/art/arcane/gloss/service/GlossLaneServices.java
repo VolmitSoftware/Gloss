@@ -6,6 +6,7 @@ import art.arcane.gloss.behavior.BehaviorService;
 import art.arcane.gloss.camera.CameraService;
 import art.arcane.gloss.chat.ChannelService;
 import art.arcane.gloss.condition.ConditionHooks;
+import art.arcane.gloss.connection.ConnectionsService;
 import art.arcane.gloss.dialog.DialogService;
 import art.arcane.gloss.forge.GlyphService;
 import art.arcane.gloss.glosspack.GlossPackService;
@@ -88,6 +89,9 @@ public final class GlossLaneServices {
 
         // --- lane:forge ---
         services.add(new GlyphService(plugin));
+
+        // --- lane:connections ---
+        services.add(new ConnectionsService(plugin));
 
         // --- lane:fixes ---
         services.add(new ConditionHooks(plugin));

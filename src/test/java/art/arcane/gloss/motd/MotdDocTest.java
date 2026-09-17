@@ -13,6 +13,7 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -41,9 +42,10 @@ class MotdDocTest {
 
     @Test
     void gsonRoundTripPreservesAllFields() {
-        MotdDoc original = new MotdDoc(1, 4L, ShowCondition.ALWAYS, List.of(
+        MotdDoc original = new MotdDoc(1, 4L, ShowCondition.ALWAYS, "icons/default.png", List.of(
             MotdDoc.MotdEntry.ofLines(List.of("&aHello")),
-            MotdDoc.MotdEntry.ofLines(List.of("&aHello", "&7World"))), List.of());
+            new MotdDoc.MotdEntry(List.of("&aHello", "&7World"), "icons/season4.png", null, null, null, null)),
+            List.of());
 
         MotdDoc decoded = MotdDoc.parse("motd.json", BukkitJson.GSON.toJson(original));
 
@@ -101,15 +103,16 @@ class MotdDocTest {
     void revisionBoundsAreEnforced() {
         List<MotdDoc.MotdEntry> entries = List.of(MotdDoc.MotdEntry.ofLines(List.of("hi")));
 
-        assertThrows(IllegalArgumentException.class, () -> new MotdDoc(1, 0L, ShowCondition.ALWAYS, entries, List.of()));
+        assertThrows(IllegalArgumentException.class, () -> new MotdDoc(1, 0L, ShowCondition.ALWAYS, null, entries, List.of()));
         assertThrows(IllegalArgumentException.class,
-            () -> new MotdDoc(1, DocumentEnvelope.MAX_SAFE_REVISION + 1L, ShowCondition.ALWAYS, entries, List.of()));
+            () -> new MotdDoc(1, DocumentEnvelope.MAX_SAFE_REVISION + 1L, ShowCondition.ALWAYS, null, entries,
+                List.of()));
     }
 
     @Test
     void atLeastOneEntryIsRequired() {
-        assertThrows(IllegalArgumentException.class, () -> new MotdDoc(1, 1L, ShowCondition.ALWAYS, null, List.of()));
-        assertThrows(IllegalArgumentException.class, () -> new MotdDoc(1, 1L, ShowCondition.ALWAYS, List.of(), List.of()));
+        assertThrows(IllegalArgumentException.class, () -> new MotdDoc(1, 1L, ShowCondition.ALWAYS, null, null, List.of()));
+        assertThrows(IllegalArgumentException.class, () -> new MotdDoc(1, 1L, ShowCondition.ALWAYS, null, List.of(), List.of()));
     }
 
     @Test
@@ -157,6 +160,34 @@ class MotdDocTest {
     }
 
     @Test
+    void aDocumentFaviconIsTheDefaultIconAndAnEntryOverridesIt() {
+        MotdDoc doc = MotdDoc.parse("motd.json", """
+            { "schemaVersion": 1, "revision": 1, "favicon": "icons/default.png",
+              "entries": [ { "lines": ["&aPlain"] },
+                           { "lines": ["&aOwn icon"], "favicon": "icons/season4.png" } ] }
+            """);
+
+        assertEquals("icons/default.png", doc.favicon());
+        assertEquals("icons/default.png", doc.faviconFor(doc.entries().get(0)));
+        assertEquals("icons/season4.png", doc.faviconFor(doc.entries().get(1)));
+    }
+
+    @Test
+    void aBlankOrAbsentDocumentFaviconLeavesNoDefault() {
+        MotdDoc blank = MotdDoc.parse("motd.json", """
+            {"schemaVersion":1,"revision":1,"favicon":"   ","entries":[{"lines":["hi"]}]}
+            """);
+        MotdDoc absent = MotdDoc.parse("motd.json", """
+            {"schemaVersion":1,"revision":1,"entries":[{"lines":["hi"]}]}
+            """);
+
+        assertNull(blank.favicon());
+        assertNull(blank.faviconFor(blank.entries().get(0)));
+        assertNull(absent.favicon());
+        assertNull(absent.faviconFor(absent.entries().get(0)));
+    }
+
+    @Test
     void serverLinksParseWithTheirTypeLabelAndUrl() {
         MotdDoc doc = MotdDoc.parse("motd.json", """
             { "schemaVersion": 1, "revision": 1,
@@ -195,7 +226,7 @@ class MotdDocTest {
 
     @Test
     void linksDefaultToNoneAndRoundTrip() {
-        MotdDoc doc = new MotdDoc(1, 1L, ShowCondition.ALWAYS,
+        MotdDoc doc = new MotdDoc(1, 1L, ShowCondition.ALWAYS, null,
             List.of(MotdDoc.MotdEntry.ofLines(List.of("hi"))), null);
 
         assertEquals(List.of(), doc.links());

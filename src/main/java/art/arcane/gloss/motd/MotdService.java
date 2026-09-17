@@ -112,11 +112,21 @@ public final class MotdService implements RegistryOwner {
         publishLinks();
     }
 
+    /** Re-evaluates the published server links after the proxy claims or releases the MOTD. */
+    public void refreshProxyOwnership() {
+        publishLinks();
+    }
+
     private void publishLinks() {
         ServerLinksPublisher publisher = serverLinks;
-        if (publisher != null) {
-            publisher.publish(doc().links());
+        if (publisher == null) {
+            return;
         }
+        if (plugin.proxyOwnership() != null && plugin.proxyOwnership().ownsMotd()) {
+            publisher.clear();
+            return;
+        }
+        publisher.publish(doc().links());
     }
 
     private void handlePing(ServerListPingEvent event) {
@@ -240,7 +250,7 @@ public final class MotdService implements RegistryOwner {
         Extras[] extras = new Extras[entries.size()];
         for (int index = 0; index < icons.length; index++) {
             MotdDoc.MotdEntry entry = entries.get(index);
-            icons[index] = favicons.iconFor(entry.favicon(), generation);
+            icons[index] = favicons.iconFor(document.faviconFor(entry), generation);
             extras[index] = extrasVary(entry) ? null : render(entry);
         }
         MotdMemo built = new MotdMemo(generation, emojiGeneration, entries, rendered, icons, extras);

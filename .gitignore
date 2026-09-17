@@ -26,3 +26,6 @@ AGENTS.md
 # Local build tooling, not part of the project
 build-lt.sh
 BUILDS/
+
+# Agent lane worktrees
+.worktrees/

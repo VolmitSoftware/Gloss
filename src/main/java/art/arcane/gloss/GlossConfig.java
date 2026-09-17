@@ -96,6 +96,8 @@ public record GlossConfig(
         History history,
         // --- lane:forge ---
         Forge forge,
+        // --- lane:connections ---
+        Connections connections,
         // --- lane:fixes ---
         Bedrock bedrock
     ) {
@@ -158,6 +160,9 @@ public record GlossConfig(
 
     public record Forge(boolean enabled, String url, boolean serve, String serveBind, int servePort, boolean required,
                         String prompt, int packFormat, int codepointBase) {
+    }
+
+    public record Connections(boolean enabled) {
     }
 
     public record Bedrock(String detection, boolean hideHolograms, boolean hidePanels, boolean hideBubbles,
@@ -737,6 +742,8 @@ public record GlossConfig(
                 new Forge(source.features.forge, source.forge.url, source.forge.serve, source.forge.serveBind,
                     source.forge.servePort, source.forge.required, source.forge.prompt, source.forge.packFormat,
                     source.forge.codepointBase),
+                // --- lane:connections ---
+                new Connections(source.features.connections),
                 // --- lane:fixes ---
                 new Bedrock(source.bedrock.detection, source.bedrock.hideHolograms, source.bedrock.hidePanels,
                     source.bedrock.hideBubbles, source.bedrock.hideIndicators, source.bedrock.hideDrops,

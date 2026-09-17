@@ -1,5 +1,8 @@
 package art.arcane.gloss.motd;
 
+import org.apache.commons.imaging.ImageFormat;
+import org.apache.commons.imaging.ImageFormats;
+import org.apache.commons.lang3.tuple.Pair;
 import org.bukkit.util.CachedServerIcon;
 import org.junit.jupiter.api.Test;
 
@@ -14,6 +17,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * A favicon is decoded once per document generation, never per ping, and a file that is not the
@@ -22,6 +26,8 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 class FaviconCacheTest {
     private final List<BufferedImage> encoded = new ArrayList<>();
     private final List<String> refusals = new ArrayList<>();
+    private final List<String> reasons = new ArrayList<>();
+    private final List<String> requested = new ArrayList<>();
 
     @Test
     void aSquare64IconIsEncodedOnceAndServedFromTheMemo() {
@@ -53,6 +59,23 @@ class FaviconCacheTest {
         assertNull(cache.iconFor("icons/small.png", 1L));
         assertEquals(List.of("icons/small.png"), refusals);
         assertEquals(List.of(), encoded);
+        assertTrue(reasons.getFirst().contains("64x64") && reasons.getFirst().contains("32x32"), reasons.getFirst());
+    }
+
+    @Test
+    void aSixtyFourIconThatIsNotAPngIsRefused() {
+        FaviconCache cache = new FaviconCache(path -> Pair.of(ImageFormats.JPEG, image(64, 64)), image -> {
+            encoded.add(image);
+            return icon();
+        }, (path, reason) -> {
+            refusals.add(path);
+            reasons.add(reason);
+        });
+
+        assertNull(cache.iconFor("icons/photo.jpg", 1L));
+        assertEquals(List.of("icons/photo.jpg"), refusals);
+        assertEquals(List.of(), encoded);
+        assertTrue(reasons.getFirst().contains("PNG") && reasons.getFirst().contains("JPEG"), reasons.getFirst());
     }
 
     @Test
@@ -82,17 +105,39 @@ class FaviconCacheTest {
         assertEquals(List.of(), refusals);
     }
 
+    @Test
+    void anEntryWithoutItsOwnIconAsksForTheDocumentDefault() {
+        MotdDoc document = MotdDoc.parse("motd.json", """
+            { "schemaVersion": 1, "revision": 1, "favicon": "icons/default.png",
+              "entries": [ { "lines": ["plain"] },
+                           { "lines": ["own icon"], "favicon": "icons/season4.png" } ] }
+            """);
+        FaviconCache cache = cache(Map.of("icons/default.png", image(64, 64),
+            "icons/season4.png", image(64, 64)));
+
+        for (MotdDoc.MotdEntry entry : document.entries()) {
+            cache.iconFor(document.faviconFor(entry), 1L);
+        }
+
+        assertEquals(List.of("icons/default.png", "icons/season4.png"), requested);
+        assertEquals(List.of(), refusals);
+    }
+
     private FaviconCache cache(Map<String, BufferedImage> files) {
         return new FaviconCache(path -> {
+            requested.add(path);
             BufferedImage image = files.get(path);
             if (image == null) {
                 throw new IOException("no such image " + path);
             }
-            return image;
+            return Pair.<ImageFormat, BufferedImage>of(ImageFormats.PNG, image);
         }, image -> {
             encoded.add(image);
             return icon();
-        }, (path, reason) -> refusals.add(path));
+        }, (path, reason) -> {
+            refusals.add(path);
+            reasons.add(reason);
+        });
     }
 
     private static BufferedImage image(int width, int height) {

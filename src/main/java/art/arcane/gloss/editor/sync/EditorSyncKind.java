@@ -48,6 +48,9 @@ public enum EditorSyncKind {
   // --- lane:forge ---
   GLYPH("glyph"),
 
+  // --- lane:connections ---
+  CONNECTIONS("connections"),
+
   // --- lane:fixes ---
 
   WORKSPACE("workspace");

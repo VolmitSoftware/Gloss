@@ -13,6 +13,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -33,6 +34,41 @@ final class ProxyDocumentsTest {
         Files.writeString(directory.resolve("motd.json"), "{}");
         ProxyDocuments.seed(directory);
         assertEquals("{}", Files.readString(directory.resolve("motd.json")));
+    }
+
+    @Test
+    void seedingWritesEveryBundledDefaultFromTheManifest() throws IOException {
+        ProxyDocuments.seed(directory);
+        for (String name : List.of("connections.json", "surfaces/welcome.json", "animations/marquee.json",
+            "emoji/heart.json")) {
+            assertTrue(Files.isRegularFile(directory.resolve(name)), name);
+        }
+        assertTrue(ProxyDocuments.bundledDefaults().contains("proxy.json"));
+        assertFalse(ProxyDocuments.bundledDefaults().contains("manifest.txt"));
+        Files.writeString(directory.resolve("connections.json"), "{}");
+        ProxyDocuments.seed(directory);
+        assertEquals("{}", Files.readString(directory.resolve("connections.json")));
+    }
+
+    @Test
+    void newFeatureSwitchesDefaultOnAndReadTheirEnabledFlags() throws IOException {
+        ProxyDocuments.seed(directory);
+        ProxyDocuments.Snapshot seeded = ProxyDocuments.load(directory);
+        assertTrue(seeded.settings().surfaces());
+        assertTrue(seeded.settings().connections());
+        assertTrue(seeded.settings().emoji());
+        assertTrue(seeded.settings().animations());
+        assertTrue(seeded.motd().links().isEmpty());
+        Files.writeString(directory.resolve("proxy.json"), """
+            {"schemaVersion":1,"surfaces":{"enabled":false},"connections":{"enabled":false},
+             "emoji":{"enabled":false},"animations":{"enabled":false}}
+            """);
+        ProxyDocuments.Snapshot switched = ProxyDocuments.load(directory);
+        assertFalse(switched.settings().surfaces());
+        assertFalse(switched.settings().connections());
+        assertFalse(switched.settings().emoji());
+        assertFalse(switched.settings().animations());
+        assertTrue(switched.settings().motd());
     }
 
     @Test
@@ -99,6 +135,35 @@ final class ProxyDocumentsTest {
     }
 
     @Test
+    void countsAcceptFunctionTokensLikeTheServerEditionAndStillRejectBadLiterals() throws IOException {
+        ProxyDocuments.seed(directory);
+        Files.writeString(directory.resolve("motd.json"), """
+            {"schemaVersion":1,"entries":[{"lines":["Network"],"online":"|animation.marquee|","max":"{{ server.maxPlayers }}"}]}
+            """);
+        ProxyDocuments.MotdEntry entry = ProxyDocuments.load(directory).motd().entries().getFirst();
+        assertEquals("|animation.marquee|", entry.online());
+        assertEquals("{{ server.maxPlayers }}", entry.max());
+        Files.writeString(directory.resolve("motd.json"), """
+            {"schemaVersion":1,"entries":[{"lines":["Network"],"online":"lots"}]}
+            """);
+        assertThrows(NumberFormatException.class, () -> ProxyDocuments.load(directory));
+    }
+
+    @Test
+    void parsesTheDocumentFaviconAndTreatsBlankAsAbsent() throws IOException {
+        ProxyDocuments.seed(directory);
+        Files.writeString(directory.resolve("motd.json"),
+            "{\"schemaVersion\":1,\"favicon\":\"icons/default.png\",\"entries\":[{\"lines\":[\"Network\"]}]}");
+        assertEquals("icons/default.png", ProxyDocuments.load(directory).motd().favicon());
+        Files.writeString(directory.resolve("motd.json"),
+            "{\"schemaVersion\":1,\"favicon\":\"   \",\"entries\":[{\"lines\":[\"Network\"]}]}");
+        assertNull(ProxyDocuments.load(directory).motd().favicon());
+        Files.writeString(directory.resolve("motd.json"),
+            "{\"schemaVersion\":1,\"entries\":[{\"lines\":[\"Network\"]}]}");
+        assertNull(ProxyDocuments.load(directory).motd().favicon());
+    }
+
+    @Test
     void rejectsInvalidStaticMotdCounts() throws IOException {
         ProxyDocuments.seed(directory);
         for (String value : List.of("invalid", "NaN", "Infinity")) {
@@ -106,6 +171,64 @@ final class ProxyDocumentsTest {
                 "{\"schemaVersion\":1,\"entries\":[{\"lines\":[\"Network\"],\"online\":\"" + value + "\"}]}");
             assertThrows(IllegalArgumentException.class, () -> ProxyDocuments.load(directory));
         }
+    }
+
+    @Test
+    void parsesServerLinksWithTypesLabelsAndBlankTrimming() throws IOException {
+        ProxyDocuments.seed(directory);
+        Files.writeString(directory.resolve("motd.json"), """
+            {"schemaVersion":1,"entries":[{"lines":["Network"]}],
+             "links":[{"type":"WEBSITE","url":"https://example.org"},
+                      {"type":"  ","label":"&dDiscord","url":" https://discord.gg/example "},
+                      {"type":"report_bug","label":"   ","url":"https://example.org/bugs"}]}
+            """);
+        List<ProxyDocuments.MotdLink> links = ProxyDocuments.load(directory).motd().links();
+        assertEquals(3, links.size());
+        assertEquals("website", links.get(0).type());
+        assertNull(links.get(0).label());
+        assertEquals("https://example.org", links.get(0).url());
+        assertFalse(links.get(0).isLabelled());
+        assertNull(links.get(1).type());
+        assertEquals("&dDiscord", links.get(1).label());
+        assertEquals("https://discord.gg/example", links.get(1).url());
+        assertTrue(links.get(1).isLabelled());
+        assertEquals("report_bug", links.get(2).type());
+        assertNull(links.get(2).label());
+        assertThrows(UnsupportedOperationException.class, links::clear);
+    }
+
+    @Test
+    void rejectsUnknownLinkTypesBadUrlsAndLinksWithoutTypeOrLabel() throws IOException {
+        ProxyDocuments.seed(directory);
+        for (String link : List.of("{\"type\":\"teleport\",\"url\":\"https://example.org\"}",
+            "{\"type\":\"website\",\"url\":\"javascript:alert(1)\"}",
+            "{\"type\":\"website\",\"url\":\"not a url\"}",
+            "{\"type\":\"website\",\"url\":\"https:///bugs\"}",
+            "{\"type\":\"website\",\"url\":\"   \"}",
+            "{\"type\":\"website\"}",
+            "{\"label\":\"   \",\"url\":\"https://example.org\"}")) {
+            Files.writeString(directory.resolve("motd.json"),
+                "{\"schemaVersion\":1,\"entries\":[{\"lines\":[\"Network\"]}],\"links\":[" + link + "]}");
+            assertThrows(IllegalArgumentException.class, () -> ProxyDocuments.load(directory), link);
+        }
+    }
+
+    @Test
+    void refusesMoreThanSixteenLinksAndMalformedLabelTemplates() throws IOException {
+        ProxyDocuments.seed(directory);
+        StringBuilder many = new StringBuilder();
+        for (int index = 0; index < 17; index++) {
+            many.append(index == 0 ? "" : ",").append("{\"label\":\"Link ").append(index)
+                .append("\",\"url\":\"https://example.org/").append(index).append("\"}");
+        }
+        Files.writeString(directory.resolve("motd.json"),
+            "{\"schemaVersion\":1,\"entries\":[{\"lines\":[\"Network\"]}],\"links\":[" + many + "]}");
+        assertThrows(IllegalArgumentException.class, () -> ProxyDocuments.load(directory));
+        Files.writeString(directory.resolve("motd.json"), """
+            {"schemaVersion":1,"entries":[{"lines":["Network"]}],
+             "links":[{"label":"{{ missing","url":"https://example.org"}]}
+            """);
+        assertThrows(IllegalArgumentException.class, () -> ProxyDocuments.load(directory));
     }
 
     private static ExpressionScope emptyScope() {

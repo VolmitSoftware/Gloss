@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "revision": 1,
+  "show": true,
+  "join": {
+    "enabled": true,
+    "show": true,
+    "audience": "network",
+    "presentation": { "text": "&a+ &f$player &7joined the network" },
+    "variants": []
+  },
+  "switch": {
+    "enabled": true,
+    "show": true,
+    "audience": "network",
+    "presentation": { "text": "&e> &f$player &7moved to &f$to" },
+    "variants": []
+  },
+  "leave": {
+    "enabled": true,
+    "show": true,
+    "audience": "network",
+    "presentation": { "text": "&c- &f$player &7left the network" },
+    "variants": []
+  }
+}

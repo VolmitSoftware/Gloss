@@ -2,6 +2,9 @@ package art.arcane.gloss.motd;
 
 import art.arcane.gloss.Gloss;
 import art.arcane.gloss.image.ImageAssets;
+import org.apache.commons.imaging.ImageFormat;
+import org.apache.commons.imaging.ImageFormats;
+import org.apache.commons.lang3.tuple.Pair;
 import org.bukkit.Bukkit;
 import org.bukkit.util.CachedServerIcon;
 
@@ -25,7 +28,7 @@ public final class FaviconCache {
     private final Map<String, Entry> cache = new ConcurrentHashMap<>();
 
     public FaviconCache(ImageAssets assets) {
-        this(path -> assets.get(path).getValue(), FaviconCache::encode, FaviconCache::logRefusal);
+        this(path -> assets.get(path), FaviconCache::encode, FaviconCache::logRefusal);
     }
 
     FaviconCache(ImageSource images, Function<BufferedImage, CachedServerIcon> encoder,
@@ -53,13 +56,19 @@ public final class FaviconCache {
     }
 
     private Entry decode(String path) {
-        BufferedImage image;
+        Pair<ImageFormat, BufferedImage> loaded;
         try {
-            image = images.load(path);
+            loaded = images.load(path);
         } catch (IOException | RuntimeException failure) {
             onRefused.accept(path, failure.getMessage());
             return new Entry(0L, null);
         }
+        if (loaded == null || loaded.getKey() != ImageFormats.PNG) {
+            onRefused.accept(path, "the server list icon must be a PNG file, this one is "
+                + (loaded == null || loaded.getKey() == null ? "not a recognised image" : loaded.getKey().getName()));
+            return new Entry(0L, null);
+        }
+        BufferedImage image = loaded.getValue();
         if (image == null) {
             onRefused.accept(path, "the file could not be decoded");
             return new Entry(0L, null);
@@ -91,7 +100,7 @@ public final class FaviconCache {
 
     @FunctionalInterface
     public interface ImageSource {
-        BufferedImage load(String path) throws IOException;
+        Pair<ImageFormat, BufferedImage> load(String path) throws IOException;
     }
 
     private record Entry(long docGeneration, CachedServerIcon icon) {

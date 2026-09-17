@@ -12,8 +12,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 
-public record MotdDoc(int schemaVersion, long revision, ShowCondition show, List<MotdEntry> entries,
-                      List<MotdLink> links) {
+public record MotdDoc(int schemaVersion, long revision, ShowCondition show, String favicon,
+                      List<MotdEntry> entries, List<MotdLink> links) {
     public static final String KIND = "motd";
     public static final int CURRENT_SCHEMA_VERSION = 1;
     public static final int MAX_LINES_PER_ENTRY = 2;
@@ -23,10 +23,11 @@ public record MotdDoc(int schemaVersion, long revision, ShowCondition show, List
         "status", "feedback", "community", "website", "forums", "news", "announcements");
 
     public static final MotdDoc DEFAULTS = new MotdDoc(CURRENT_SCHEMA_VERSION, DocumentEnvelope.INITIAL_REVISION,
-        ShowCondition.ALWAYS, List.of(MotdEntry.ofLines(List.of("&dA glossy server"))), List.of());
+        ShowCondition.ALWAYS, null, List.of(MotdEntry.ofLines(List.of("&dA glossy server"))), List.of());
 
     public MotdDoc {
         show = show == null ? ShowCondition.ALWAYS : show;
+        favicon = trimToNull(favicon);
         DocumentEnvelope.requireSchemaVersion(KIND, schemaVersion, CURRENT_SCHEMA_VERSION);
         DocumentEnvelope.requireRevision(KIND, revision);
         if (entries == null || entries.isEmpty()) {
@@ -38,6 +39,10 @@ public record MotdDoc(int schemaVersion, long revision, ShowCondition show, List
 
     public static MotdDoc parse(String fileName, String raw) {
         return DocumentParsers.parseJson(fileName, raw, MotdDoc.class);
+    }
+
+    public String faviconFor(MotdEntry entry) {
+        return entry.favicon() == null ? favicon : entry.favicon();
     }
 
     private static List<MotdLink> copyLinks(List<MotdLink> links) {

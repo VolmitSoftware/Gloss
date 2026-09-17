@@ -143,6 +143,9 @@ public final class GlossConfigFile {
         @ConfigDoc("Enables the custom server list MOTD.")
         public boolean motd = false;
 
+        @ConfigDoc("Enables join and leave messages from connections.json.")
+        public boolean connections = false;
+
         @ConfigDoc("Enables particle layers attached to in-world renders.")
         public boolean particles = true;
 

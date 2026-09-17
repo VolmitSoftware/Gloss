@@ -287,6 +287,43 @@ class BackendProxyOwnershipTest {
         }
     }
 
+    @Test
+    void surfaceClaimsArePerPlayerAndConnectionClaimsAreServerWide() throws Exception {
+        apply(OwnershipProtocol.SURFACES, System.currentTimeMillis() + 15_000L);
+        assertTrue(ownership.ownsSurfaces(playerId));
+        assertFalse(ownership.ownsSurfaces(UUID.randomUUID()));
+        assertFalse(ownership.ownsConnections());
+        apply(OwnershipProtocol.SURFACES | OwnershipProtocol.CONNECTIONS, System.currentTimeMillis() + 15_000L);
+        assertTrue(ownership.ownsConnections());
+        apply(OwnershipProtocol.CONNECTIONS, System.currentTimeMillis() - 1L);
+        assertFalse(ownership.ownsSurfaces(playerId));
+        assertFalse(ownership.ownsConnections());
+        apply(0, 0L);
+        assertFalse(ownership.ownsConnections());
+    }
+
+    @Test
+    void theLastClaimedMaskRemembersWhetherTheProxyEverOwnedConnections() throws Exception {
+        assertFalse(ownership.proxyLastClaimedConnections());
+
+        apply(OwnershipProtocol.TABLIST, System.currentTimeMillis() + 15_000L);
+        assertFalse(ownership.proxyLastClaimedConnections());
+
+        apply(OwnershipProtocol.TABLIST | OwnershipProtocol.CONNECTIONS, System.currentTimeMillis() + 15_000L);
+        assertTrue(ownership.proxyLastClaimedConnections());
+
+        apply(OwnershipProtocol.CONNECTIONS, System.currentTimeMillis() - 1L);
+        assertFalse(ownership.ownsConnections());
+        assertTrue(ownership.proxyLastClaimedConnections());
+
+        ownership.onQuit(new PlayerQuitEvent(player, ""));
+        assertFalse(ownership.ownsConnections());
+        assertTrue(ownership.proxyLastClaimedConnections());
+
+        apply(OwnershipProtocol.TABLIST, System.currentTimeMillis() + 15_000L);
+        assertFalse(ownership.proxyLastClaimedConnections());
+    }
+
     private byte[] reply(int mask) throws Exception {
         invoke(ownership, "refresh", new Class<?>[]{Player.class}, player);
         OwnershipProtocol.Request request = OwnershipProtocol.decodeRequest(messages.getLast());
