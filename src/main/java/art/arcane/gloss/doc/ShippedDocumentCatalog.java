@@ -28,12 +28,7 @@ import art.arcane.gloss.leaderboard.LeaderboardDoc;
 import art.arcane.gloss.strings.StringsDoc;
 
 // --- lane:forms ---
-import art.arcane.gloss.dialog.DialogDoc;
 import art.arcane.gloss.inventory.InventoryDoc;
-
-// --- lane:rigs ---
-import art.arcane.gloss.motion.MotionDoc;
-import art.arcane.gloss.rig.RigDoc;
 
 // --- lane:world ---
 import art.arcane.gloss.nameplate.NameplateDoc;
@@ -50,7 +45,6 @@ import art.arcane.gloss.forge.GlyphDoc;
 import art.arcane.gloss.connection.ConnectionsDoc;
 
 // --- lane:fixes ---
-
 
 public final class ShippedDocumentCatalog {
     public record Entry<T>(String kind, List<String> names, DocumentParser<T> parser) {
@@ -133,20 +127,11 @@ public final class ShippedDocumentCatalog {
     private static final List<Entry<?>> CHAT = List.of(CHANNELS, STRINGS, LEADERBOARDS);
 
     // --- lane:forms ---
-    public static final Entry<DialogDoc> DIALOGS =
-        new Entry<>(DialogDoc.KIND, List.of("example"), DialogDoc::parse);
 
     public static final Entry<InventoryDoc> INVENTORIES =
         new Entry<>(InventoryDoc.KIND, List.of("example"), InventoryDoc::parse);
 
-    private static final List<Entry<?>> FORMS = List.of(DIALOGS, INVENTORIES);
-
-    // --- lane:rigs ---
-    public static final Entry<MotionDoc> MOTION =
-        new Entry<>(MotionDoc.KIND, List.of("breathe", "spin"), MotionDoc::parse);
-    public static final Entry<RigDoc> RIGS_ENTRY =
-        new Entry<>(RigDoc.KIND, List.of("pedestal"), RigDoc::parse);
-    private static final List<Entry<?>> RIGS = List.of(MOTION, RIGS_ENTRY);
+    private static final List<Entry<?>> FORMS = List.of(INVENTORIES);
 
     // --- lane:world ---
     public static final Entry<NameplateDoc> NAMEPLATES =
@@ -182,7 +167,6 @@ public final class ShippedDocumentCatalog {
         all.addAll(SCREEN);
         all.addAll(CHAT);
         all.addAll(FORMS);
-        all.addAll(RIGS);
         all.addAll(WORLD);
         all.addAll(BEHAVIORS);
         all.addAll(AUTHORING);

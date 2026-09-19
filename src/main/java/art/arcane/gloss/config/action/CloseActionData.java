@@ -5,7 +5,7 @@ import art.arcane.gloss.enums.MenuActionType;
 import art.arcane.gloss.menu.action.CloseMenuAction;
 import art.arcane.gloss.menu.action.MenuAction;
 
-/** Closes whichever surface the click came from: a menu session, an inventory window or a dialog. */
+/** Closes whichever surface the click came from: a menu session or an inventory window. */
 public record CloseActionData(HoloClickTrigger trigger, String when,
                               Integer cooldownTicks) implements MenuActionData {
   @Override

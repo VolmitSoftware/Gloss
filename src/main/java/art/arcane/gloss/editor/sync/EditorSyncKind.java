@@ -26,18 +26,11 @@ public enum EditorSyncKind {
   LEADERBOARD("leaderboard"),
 
   // --- lane:forms ---
-  DIALOG("dialog"),
   INVENTORY("inventory"),
-
-  // --- lane:rigs ---
-  MOTION("motion"),
-  RIG("rig"),
-  RIG_INSTANCE("rig-instance"),
 
   // --- lane:world ---
   MARKER("marker"),
   WAYPOINT("waypoint"),
-  ZONE("zone"),
   NAMEPLATE("nameplate"),
 
   // --- lane:behaviors ---

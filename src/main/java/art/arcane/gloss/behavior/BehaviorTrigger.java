@@ -28,7 +28,6 @@ public enum BehaviorTrigger {
     MENU_OPEN("menu_open", Set.of("menu"), Set.of(), true),
     MENU_CLOSE("menu_close", Set.of("menu"), Set.of(), true),
     MENU_CLICK("menu_click", Set.of("menu", "component"), Set.of(), true),
-    DIALOG_SUBMIT("dialog_submit", Set.of("dialog"), Set.of(), true),
     INVENTORY_CLICK("inventory_click", Set.of("menu", "component"), Set.of(), true),
     INTERVAL("interval", Set.of("everyTicks", "scope"), Set.of("everyTicks"), false),
     SERVER_START("server_start", Set.of(), Set.of(), false),

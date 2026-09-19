@@ -5,7 +5,7 @@ import art.arcane.gloss.expr.ExprParser;
 import art.arcane.gloss.expr.ExprScope;
 
 /**
- * The amount a shop action moves. Amounts are expressions because a dialog's quantity input feeds
+ * The amount a shop action moves. Amounts are expressions because a prompt's quantity input feeds
  * them; a broken one resolves to one rather than zero, so a misconfigured shop trades wrongly
  * instead of silently trading nothing.
  */

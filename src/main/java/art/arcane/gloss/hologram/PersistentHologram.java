@@ -1,7 +1,6 @@
 package art.arcane.gloss.hologram;
 
 import art.arcane.gloss.Gloss;
-import art.arcane.gloss.animation.clip.ClipSample;
 import art.arcane.gloss.bedrock.BedrockPolicy;
 import art.arcane.gloss.bedrock.BedrockSurface;
 import art.arcane.gloss.api.AnchoredHologram;
@@ -12,19 +11,14 @@ import art.arcane.gloss.config.action.MenuActionData;
 import art.arcane.gloss.doc.DocumentEnvelope;
 import art.arcane.gloss.api.ParticleLayer;
 import art.arcane.gloss.condition.ShowCondition;
-import art.arcane.gloss.motion.MotionClipHandle;
-import art.arcane.gloss.motion.TransformFrameSource;
-import art.arcane.gloss.motion.TransformStreamer;
 import art.arcane.gloss.particle.ParticleFrame;
 import art.arcane.gloss.particle.ParticleRect;
 import art.arcane.gloss.particle.ParticleText;
 import art.arcane.gloss.particle.ParticleTextLayout;
-import art.arcane.gloss.rig.Quaternions;
 import art.arcane.gloss.text.TextPipeline;
 import art.arcane.gloss.util.common.DisplayEntity;
 import art.arcane.gloss.util.common.PacketUtils;
 import art.arcane.gloss.util.common.TextUtils;
-import com.github.retrooper.packetevents.util.Quaternion4f;
 import com.github.retrooper.packetevents.wrapper.PacketWrapper;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
@@ -49,9 +43,6 @@ import java.util.function.UnaryOperator;
 
 final class PersistentHologram implements AnchoredHologram {
     private static final double POSITION_EPSILON_SQUARED = 1.0E-6D;
-    private static final double MILLIS_PER_TICK = 50.0D;
-    /** Motion applies to a hologram as the single bone every motion document defaults to. */
-    private static final String MOTION_BONE = "root";
     /**
      * One resolved line list: the authored source, the text rows and their per-line show
      * conditions, and the object lines drawn as their own display entities. A paged hologram keeps
@@ -117,16 +108,11 @@ final class PersistentHologram implements AnchoredHologram {
     private final Map<String, List<HologramLineRenderer.ObjectLine>> objectsByPage = new ConcurrentHashMap<>();
     private final Map<UUID, SpawnedObjects> objectViewers = new ConcurrentHashMap<>();
     private final Map<Long, StaticSegments> staticSegmentsByGeneration = new ConcurrentHashMap<>();
-    private final MotionClipHandle clip;
-    private final MotionStream motionStream = new MotionStream();
     private long lineGenerations;
     private volatile LineSet lineSet;
     private volatile List<HologramPage> pages = List.of();
     private volatile List<MenuActionData> actions = List.of();
     private volatile HologramDoc.Hitbox hitbox;
-    private volatile String motionId;
-    private volatile List<Player> motionViewers = List.of();
-    private volatile boolean motionPublished;
     private volatile Location objectAnchor;
     private volatile long objectLinesGeneration = Long.MIN_VALUE;
     private volatile AnchorState anchorState;
@@ -159,7 +145,6 @@ final class PersistentHologram implements AnchoredHologram {
         this.boxWorkKey = id + "#box";
         this.linesLock = new Object();
         this.lineSet = EMPTY_LINES;
-        this.clip = service.newClipHandle();
         this.viewerRendered = new ConcurrentHashMap<>();
         this.viewerAnimations = new ConcurrentHashMap<>();
         this.activeViewers = new ConcurrentHashMap<>();
@@ -183,7 +168,6 @@ final class PersistentHologram implements AnchoredHologram {
         this.boxWorkKey = id + "#box";
         this.linesLock = new Object();
         this.lineSet = EMPTY_LINES;
-        this.clip = service.newClipHandle();
         this.viewerRendered = new ConcurrentHashMap<>();
         this.viewerAnimations = new ConcurrentHashMap<>();
         this.activeViewers = new ConcurrentHashMap<>();
@@ -334,7 +318,6 @@ final class PersistentHologram implements AnchoredHologram {
         synchronized (linesLock) {
             publishDocument(doc.lines(), doc.pages());
         }
-        setMotion(doc.motion());
         if (styleChanged) {
             applyStyle();
         }
@@ -350,7 +333,7 @@ final class PersistentHologram implements AnchoredHologram {
         return new HologramDoc(HologramDoc.CURRENT_SCHEMA_VERSION, revision,
             new HologramDoc.Anchor(anchor.worldName(), new Vector(anchor.x(), anchor.y(), anchor.z())),
             currentPages.isEmpty() ? lineSet.source() : List.of(), style, box, yaw, pitch, particleLayers, show,
-            currentPages, actions, hitbox, motionId);
+            currentPages, actions, hitbox);
     }
 
     List<MenuActionData> actions() {
@@ -368,16 +351,6 @@ final class PersistentHologram implements AnchoredHologram {
 
     List<HologramPage> pages() {
         return pages;
-    }
-
-    String motionId() {
-        return motionId;
-    }
-
-    /** Switches the clip this hologram plays and writes the change to disk. */
-    void applyMotion(String motion) {
-        setMotion(motion == null || motion.isBlank() ? null : motion.trim());
-        service.persist(this);
     }
 
     /** The number of hitboxes a per-line hologram registers: one per rendered row. */
@@ -545,7 +518,6 @@ final class PersistentHologram implements AnchoredHologram {
         updateDecorations(tickAnchor, anchor, snapshot, viewers);
         emitParticles(anchor, snapshot, viewers);
         updateObjectLines(anchor, snapshot, viewers);
-        updateMotion(viewers);
     }
 
     /** Pages and per-line show conditions give every viewer their own line list. */
@@ -600,7 +572,6 @@ final class PersistentHologram implements AnchoredHologram {
 
     void despawnAll() {
         clearObjectLines();
-        stopMotion();
         if (sharedDisplay == null && activeViewers.isEmpty()) {
             return;
         }
@@ -1515,117 +1486,4 @@ final class PersistentHologram implements AnchoredHologram {
         objectLinesGeneration = Long.MIN_VALUE;
     }
 
-    private void setMotion(String motion) {
-        if (Objects.equals(motionId, motion)) {
-            return;
-        }
-        motionId = motion;
-        stopMotion();
-    }
-
-    private void updateMotion(List<HologramTick.Viewer> viewers) {
-        String motion = motionId;
-        if (motion == null || viewers.isEmpty() || sharedEntityId == 0) {
-            stopMotion();
-            return;
-        }
-        motionViewers = captureViewers(viewers);
-        if (!clip.playing() && !clip.play(motion, System.currentTimeMillis())) {
-            Gloss.warnThrottled("hologram-motion-" + id + "-" + motion,
-                "Hologram %s references unknown motion %s.", id, motion);
-            return;
-        }
-        TransformStreamer streamer = service.streamer();
-        if (streamer != null && !motionPublished) {
-            motionPublished = true;
-            streamer.publish(motionStreamKey(), motionStream);
-        }
-    }
-
-    private void stopMotion() {
-        motionViewers = List.of();
-        if (motionPublished) {
-            motionPublished = false;
-            TransformStreamer streamer = service.streamer();
-            if (streamer != null) {
-                streamer.remove(motionStreamKey());
-            }
-        }
-        clip.stop();
-    }
-
-    private String motionStreamKey() {
-        return "hologram:" + id;
-    }
-
-    boolean motionPlaying() {
-        return clip.playing();
-    }
-
-    long motionStartedAtMs() {
-        return clip.startedAtMs();
-    }
-
-    List<Player> motionViewers() {
-        return motionViewers;
-    }
-
-    /**
-     * The transform frame for this hologram at {@code nowMs}: the text display and every object
-     * line move together as bone {@code root}. Never touches the text animator.
-     */
-    List<PacketWrapper<?>> motionFrame(long nowMs) {
-        int entityId = sharedEntityId;
-        if (!clip.playing() || entityId == 0) {
-            return List.of();
-        }
-        ClipSample sample = clip.sampleBones(List.of(MOTION_BONE), nowMs).get(MOTION_BONE);
-        if (sample == null) {
-            return List.of();
-        }
-        IconDisplayStyle current = style;
-        int frameTicks = Math.max(1, (int) Math.round(1000.0D / Math.max(1, clip.fps()) / MILLIS_PER_TICK));
-        com.github.retrooper.packetevents.util.Vector3f translation =
-            new com.github.retrooper.packetevents.util.Vector3f((float) sample.offsetX(), (float) sample.offsetY(),
-                (float) sample.offsetZ());
-        Quaternion4f rotation = Quaternions.fromEulerDegrees((float) sample.rotationX(), (float) sample.rotationY(),
-            (float) sample.rotationZ());
-        List<PacketWrapper<?>> packets = new ArrayList<>();
-        packets.add(DisplayEntity.transformUpdate(entityId, translation,
-            new com.github.retrooper.packetevents.util.Vector3f(current.scaleX() * (float) sample.scaleX(),
-                current.scaleY() * (float) sample.scaleY(), current.scaleZ() * (float) sample.scaleZ()),
-            rotation, Quaternions.identity(), 0, frameTicks));
-        for (List<HologramLineRenderer.ObjectLine> lines : objectsByPage.values()) {
-            for (HologramLineRenderer.ObjectLine line : lines) {
-                float scale = (float) line.source().scale();
-                packets.add(DisplayEntity.transformUpdate(line.display().id(), translation,
-                    new com.github.retrooper.packetevents.util.Vector3f(scale * (float) sample.scaleX(),
-                        scale * (float) sample.scaleY(), scale * (float) sample.scaleZ()),
-                    rotation, Quaternions.identity(), 0, frameTicks));
-            }
-        }
-        return packets;
-    }
-
-    private final class MotionStream implements TransformFrameSource {
-        @Override
-        public List<PacketWrapper<?>> compose(long nowMs) {
-            return motionFrame(nowMs);
-        }
-
-        @Override
-        public List<Player> viewers() {
-            return motionViewers;
-        }
-
-        @Override
-        public boolean live() {
-            return clip.playing();
-        }
-
-        @Override
-        public int fps() {
-            return Math.max(1, clip.fps());
-        }
-    }
 }

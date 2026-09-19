@@ -2,7 +2,7 @@ package art.arcane.gloss.prompt;
 
 import art.arcane.gloss.Gloss;
 import art.arcane.gloss.chat.ChatCapture;
-import art.arcane.gloss.dialog.InputNamespace;
+import art.arcane.gloss.expr.ExprVariableNamespaces;
 import art.arcane.gloss.locale.GlossMessages;
 import art.arcane.gloss.menu.SessionVariables;
 import art.arcane.gloss.menu.action.MenuAction;
@@ -53,6 +53,11 @@ public final class PromptService implements GlossService, Listener {
     }
 
     @Override
+    public void contribute() {
+        ExprVariableNamespaces.global().register(new InputNamespace());
+    }
+
+    @Override
     public void enable() {
         sign.enable();
         anvil.enable();
@@ -63,6 +68,7 @@ public final class PromptService implements GlossService, Listener {
 
     @Override
     public void disable() {
+        ExprVariableNamespaces.global().unregister(InputNamespace.PREFIX);
         sign.disable();
         anvil.disable();
         HandlerList.unregisterAll(this);
@@ -109,7 +115,7 @@ public final class PromptService implements GlossService, Listener {
         if (request.then().isEmpty()) {
             return;
         }
-        InputNamespace.bind(request.variable(), Map.of("value", value),
+        InputNamespace.bind(Map.of("value", value),
             () -> MenuAction.execute(request.then(), request.origin()));
     }
 

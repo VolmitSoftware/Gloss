@@ -14,7 +14,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Resolves a particle key and colour once per key instead of per emitted point, and spawns it for
- * one viewer only. Zones, beams and marker trails all draw through here.
+ * one viewer only. Beams and marker trails all draw through here.
  */
 public final class ViewerParticles {
     public record Resolved(Particle particle, Object data) {

@@ -11,8 +11,6 @@ import art.arcane.gloss.bubble.BubbleStyleDoc;
 import art.arcane.gloss.config.menu.MenuDocumentParser;
 import art.arcane.gloss.connection.ConnectionsDoc;
 import art.arcane.gloss.connection.ConnectionsService;
-import art.arcane.gloss.dialog.DialogDoc;
-import art.arcane.gloss.dialog.DialogService;
 import art.arcane.gloss.inventory.InventoryDoc;
 import art.arcane.gloss.inventory.InventoryMenuService;
 import art.arcane.gloss.config.menu.MenuIds;
@@ -34,20 +32,13 @@ import art.arcane.gloss.nameplate.NameplateService;
 import art.arcane.gloss.service.GlossService;
 import art.arcane.gloss.waypoint.WaypointDoc;
 import art.arcane.gloss.waypoint.WaypointService;
-import art.arcane.gloss.zone.ZoneDoc;
-import art.arcane.gloss.zone.ZoneService;
 import art.arcane.gloss.motd.MotdDoc;
-import art.arcane.gloss.motion.MotionDoc;
-import art.arcane.gloss.motion.MotionService;
 import art.arcane.gloss.nametag.NametagDoc;
 import art.arcane.gloss.nametag.NametagService;
 import art.arcane.gloss.panel.PanelDefinition;
 import art.arcane.gloss.panel.PanelIds;
 import art.arcane.gloss.preview.doc.PreviewDocumentParser;
 import art.arcane.gloss.preview.doc.PreviewDocumentRegistry;
-import art.arcane.gloss.rig.RigDoc;
-import art.arcane.gloss.rig.RigInstanceDoc;
-import art.arcane.gloss.rig.RigService;
 import art.arcane.gloss.service.GlossService;
 import art.arcane.gloss.strings.StringsDoc;
 import art.arcane.gloss.strings.StringsService;
@@ -162,15 +153,6 @@ public enum EditorSyncDocumentKind {
       gloss -> reloadService(gloss, LeaderboardService.class)),
 
   // --- lane:forms ---
-  DIALOG("dialog", "dialogs", Layout.FOLDER, true, null,
-      EditorSyncDocumentKind::requireFlatId,
-      (id, source) -> DialogDoc.parse(id + ".json", source),
-      gloss -> {
-        DialogService dialogs = gloss.service(DialogService.class);
-        if (dialogs != null) {
-          dialogs.reload();
-        }
-      }),
   INVENTORY("inventory", "inventories", Layout.FOLDER, true, null,
       EditorSyncDocumentKind::requireFlatId,
       (id, source) -> InventoryDoc.parse(id + ".json", source),
@@ -180,20 +162,6 @@ public enum EditorSyncDocumentKind {
           inventories.reload();
         }
       }),
-
-  // --- lane:rigs ---
-  MOTION("motion", "motion", Layout.FOLDER, true, null,
-      EditorSyncDocumentKind::requireFlatId,
-      (id, source) -> MotionDoc.parse(id + ".json", source),
-      gloss -> reloadService(gloss, MotionService.class)),
-  RIG("rig", "rigs", Layout.FOLDER, true, null,
-      EditorSyncDocumentKind::requireFlatId,
-      (id, source) -> RigDoc.parse(id + ".json", source),
-      gloss -> reloadService(gloss, RigService.class)),
-  RIG_INSTANCE("rig-instance", "rig-instances", Layout.FOLDER, true, null,
-      EditorSyncDocumentKind::requireFlatId,
-      (id, source) -> RigInstanceDoc.parse(id + ".json", source),
-      gloss -> reloadService(gloss, RigService.class)),
 
   // --- lane:world ---
   MARKER("marker", "markers", Layout.FOLDER, true, null,
@@ -208,10 +176,6 @@ public enum EditorSyncDocumentKind {
       EditorSyncDocumentKind::requireFlatId,
       (id, source) -> WaypointDoc.parse(id + ".json", source),
       gloss -> reloadLaneService(gloss, WaypointService.class)),
-  ZONE("zone", "zones", Layout.FOLDER, true, null,
-      EditorSyncDocumentKind::requireFlatId,
-      (id, source) -> ZoneDoc.parse(id + ".json", source),
-      gloss -> reloadLaneService(gloss, ZoneService.class)),
 
   // --- lane:behaviors ---
   BEHAVIOR("behavior", "behaviors", Layout.FOLDER, true, null,

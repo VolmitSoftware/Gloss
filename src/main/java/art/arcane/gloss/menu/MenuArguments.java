@@ -5,7 +5,7 @@ import java.util.Map;
 import java.util.regex.Pattern;
 
 /**
- * The {@code key=value} argument list a menu, inventory or dialog is opened with. Arguments are
+ * The {@code key=value} argument list a menu or inventory is opened with. Arguments are
  * operator or player input that ends up inside rendered text and, for a {@code server} command,
  * inside console authority, so the shape is strict and refusals are loud.
  */

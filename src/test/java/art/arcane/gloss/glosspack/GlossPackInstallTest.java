@@ -103,13 +103,13 @@ public class GlossPackInstallTest {
   public void aDocumentKindThisServerDoesNotKnowIsReportedNotSilentlyDropped() throws Exception {
     Path data = temp.newFolder("unknown-kind").toPath();
     GlossPackInstaller installer = installer(data, false);
-    GlossPackArchive archive = archive(Map.of("rigs/pedestal.json", "{\"schemaVersion\":1}"));
+    GlossPackArchive archive = archive(Map.of("unsupported/sample.json", "{\"schemaVersion\":1}"));
 
     List<GlossPackPreview.Outcome> preview = installer.preview(archive);
 
     assertEquals(GlossPackPreview.Disposition.SKIP_REQUIREMENT,
         preview.getFirst().disposition());
-    assertTrue(preview.getFirst().reason(), preview.getFirst().reason().contains("rigs"));
+    assertTrue(preview.getFirst().reason(), preview.getFirst().reason().contains("unsupported"));
   }
 
   @Test

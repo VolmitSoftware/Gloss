@@ -60,11 +60,6 @@
     "hitbox": {
       "$ref": "#/$defs/hitbox"
     },
-    "motion": {
-      "description": "Motion document played on this hologram as bone root.",
-      "type": "string",
-      "minLength": 1
-    },
     "style": {
       "$ref": "#/$defs/iconDisplayStyle"
     },

@@ -10,11 +10,9 @@ import art.arcane.gloss.config.action.ChanceActionData;
 import art.arcane.gloss.config.action.ClearStateActionData;
 import art.arcane.gloss.config.action.CloseActionData;
 import art.arcane.gloss.config.action.CommandActionData;
-import art.arcane.gloss.config.action.ConfirmActionData;
 import art.arcane.gloss.config.action.ConnectActionData;
 import art.arcane.gloss.config.action.CooldownActionData;
 import art.arcane.gloss.config.action.DelayActionData;
-import art.arcane.gloss.config.action.DialogActionData;
 import art.arcane.gloss.config.action.EconomyActionData;
 import art.arcane.gloss.config.action.EffectActionData;
 import art.arcane.gloss.config.action.EmitActionData;
@@ -29,9 +27,7 @@ import art.arcane.gloss.config.action.ParallelActionData;
 import art.arcane.gloss.config.action.ParticleActionData;
 import art.arcane.gloss.config.action.PromptActionData;
 import art.arcane.gloss.config.action.RepeatActionData;
-import art.arcane.gloss.config.action.RigStateActionData;
 import art.arcane.gloss.config.action.SequenceActionData;
-import art.arcane.gloss.config.action.SetRigActionData;
 import art.arcane.gloss.config.action.SetSessionActionData;
 import art.arcane.gloss.config.action.SetStateActionData;
 import art.arcane.gloss.config.action.SkyActionData;
@@ -57,8 +53,6 @@ public enum MenuActionType implements EnumType.Values<MenuActionData> {
   BOSSBAR("bossbar", BossBarActionData.class),
 
   // --- lane:forms ---
-  DIALOG("dialog", DialogActionData.class),
-  CONFIRM("confirm", ConfirmActionData.class),
   CLOSE("close", CloseActionData.class),
   INVENTORY("inventory", InventoryActionData.class),
   SET_SESSION("setSession", SetSessionActionData.class),
@@ -68,9 +62,6 @@ public enum MenuActionType implements EnumType.Values<MenuActionData> {
   TAKE("take", TakeActionData.class),
   ECONOMY("economy", EconomyActionData.class),
 
-  // --- lane:rigs ---
-  SET_RIG("setRig", SetRigActionData.class),
-  RIG_STATE("rigState", RigStateActionData.class),
 
   // --- lane:behaviors ---
   DELAY("delay", DelayActionData.class),

@@ -33,12 +33,11 @@ import java.util.Locale;
 /**
  * One MONITOR listener for every Bukkit-backed trigger. Handlers do a map lookup and hand the
  * event to the service on the thread the event arrived on (the player's region); chat arrives
- * asynchronously and is moved onto the sender's region first. Menu, dialog and inventory events
+ * asynchronously and is moved onto the sender's region first. Menu and inventory events
  * that other lanes publish are subscribed by class name so this lane runs without them.
  */
 final class BehaviorTriggers implements Listener {
     private static final String MENU_CLOSE_EVENT = "art.arcane.gloss.api.GlossMenuCloseEvent";
-    private static final String DIALOG_SUBMIT_EVENT = "art.arcane.gloss.api.GlossDialogSubmitEvent";
     private static final String INVENTORY_CLICK_EVENT = "art.arcane.gloss.api.GlossInventoryClickEvent";
 
     private final Gloss plugin;
@@ -57,7 +56,6 @@ final class BehaviorTriggers implements Listener {
             chatHooked = true;
         }
         subscribeOptional(MENU_CLOSE_EVENT, BehaviorTrigger.MENU_CLOSE, "getMenuId", null);
-        subscribeOptional(DIALOG_SUBMIT_EVENT, BehaviorTrigger.DIALOG_SUBMIT, "getDialogId", null);
         subscribeOptional(INVENTORY_CLICK_EVENT, BehaviorTrigger.INVENTORY_CLICK, "getInventoryId", "getSlot");
     }
 

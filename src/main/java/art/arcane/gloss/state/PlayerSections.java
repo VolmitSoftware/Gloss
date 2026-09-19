@@ -27,9 +27,7 @@ import java.util.concurrent.ConcurrentMap;
  * read as empty so one bad save never blocks a login.
  *
  * <p>The parsed file is held in memory once it has been touched, because render paths read it
- * every pass: zones ask for a viewer's hidden set once per zone per viewer on a 5-tick driver, and
- * re-reading and re-parsing the file for each of those was thousands of blocking reads a second on
- * the main thread. Memory is authoritative for this process; a write updates it and then persists
+ * every pass. Re-reading and re-parsing the file for each viewer would block the main thread. Memory is authoritative for this process; a write updates it and then persists
  * the whole file, and a write that changes nothing does not touch the disk at all. Entries are
  * dropped on quit through {@link #evict(UUID)}.
  */

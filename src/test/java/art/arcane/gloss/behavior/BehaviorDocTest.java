@@ -69,7 +69,6 @@ class BehaviorDocTest {
             + "{\"trigger\":\"menu_open\",\"menu\":\"shop\",\"do\":[]},"
             + "{\"trigger\":\"menu_close\",\"do\":[]},"
             + "{\"trigger\":\"menu_click\",\"menu\":\"shop\",\"component\":\"buy\",\"do\":[]},"
-            + "{\"trigger\":\"dialog_submit\",\"dialog\":\"survey\",\"do\":[]},"
             + "{\"trigger\":\"inventory_click\",\"do\":[]},"
             + "{\"trigger\":\"interval\",\"everyTicks\":1200,\"scope\":\"global\",\"do\":[]},"
             + "{\"trigger\":\"interval\",\"everyTicks\":20,\"do\":[]},"
@@ -86,11 +85,10 @@ class BehaviorDocTest {
         assertEquals("minecraft:apple", doc.on().get(11).material());
         assertEquals("spawn", doc.on().get(14).region());
         assertEquals("buy", doc.on().get(18).component());
-        assertEquals("survey", doc.on().get(19).dialog());
-        assertEquals(1200, doc.on().get(21).everyTicks());
-        assertTrue(doc.on().get(21).globalScope());
-        assertFalse(doc.on().get(22).globalScope());
-        assertEquals("quest.complete", doc.on().get(24).name());
+        assertEquals(1200, doc.on().get(20).everyTicks());
+        assertTrue(doc.on().get(20).globalScope());
+        assertFalse(doc.on().get(21).globalScope());
+        assertEquals("quest.complete", doc.on().get(23).name());
         assertNull(doc.on().get(0).when());
         assertNull(doc.on().get(0).permission());
     }

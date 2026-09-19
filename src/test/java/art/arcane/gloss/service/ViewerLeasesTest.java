@@ -12,7 +12,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ViewerLeasesTest {
-    private final ViewerLeases leases = new ViewerLeases(VisibilityGovernor.Surface.ZONE);
+    private final ViewerLeases leases = new ViewerLeases(VisibilityGovernor.Surface.MARKER);
 
     @Test
     void aRefusedViewerTearsDownWhatTheyAlreadyHadDrawn() {

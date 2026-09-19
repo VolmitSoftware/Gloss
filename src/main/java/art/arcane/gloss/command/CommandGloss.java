@@ -42,17 +42,11 @@ public class CommandGloss {
     private CommandGlossLeaderboard leaderboard;
 
     // --- lane:forms ---
-    private CommandGlossDialog dialog;
     private CommandGlossInventory inventory;
-
-    // --- lane:rigs ---
-    private CommandGlossRig rig;
-    private CommandGlossMotion motion;
 
     // --- lane:world ---
     private CommandGlossMarker marker;
     private CommandGlossWaypoint waypoint;
-    private CommandGlossZone zone;
     private CommandGlossCamera camera;
     private CommandGlossNameplate nameplate;
     private CommandGlossGlow glow;
@@ -108,7 +102,6 @@ public class CommandGloss {
 
     // --- lane:fixes ---
 
-
     public CommandGloss(Gloss plugin) {
         this.plugin = plugin;
         this.hologram = new CommandGlossHologram(plugin);
@@ -138,17 +131,11 @@ public class CommandGloss {
         this.leaderboard = new CommandGlossLeaderboard(plugin);
 
         // --- lane:forms ---
-        this.dialog = new CommandGlossDialog(plugin);
         this.inventory = new CommandGlossInventory(plugin);
-
-        // --- lane:rigs ---
-        this.rig = new CommandGlossRig(plugin);
-        this.motion = new CommandGlossMotion(plugin);
 
         // --- lane:world ---
         this.marker = new CommandGlossMarker(plugin);
         this.waypoint = new CommandGlossWaypoint(plugin);
-        this.zone = new CommandGlossZone(plugin);
         this.camera = new CommandGlossCamera(plugin);
         this.nameplate = new CommandGlossNameplate(plugin);
         this.glow = new CommandGlossGlow(plugin);

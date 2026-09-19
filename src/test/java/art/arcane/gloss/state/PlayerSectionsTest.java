@@ -89,11 +89,11 @@ class PlayerSectionsTest {
     void readsAfterTheFirstAreServedFromMemory() throws IOException {
         PlayerSections sections = new PlayerSections(dataFolder);
         UUID player = UUID.randomUUID();
-        sections.write(player, "zones", Map.of("arena", Boolean.TRUE));
-        Assertions.assertEquals(Map.of("arena", Boolean.TRUE), sections.read(player, "zones"));
+        sections.write(player, "preferences", Map.of("arena", Boolean.TRUE));
+        Assertions.assertEquals(Map.of("arena", Boolean.TRUE), sections.read(player, "preferences"));
         Files.delete(dataFolder.resolve("state").resolve("players").resolve(player + ".json"));
 
-        Assertions.assertEquals(Map.of("arena", Boolean.TRUE), sections.read(player, "zones"),
+        Assertions.assertEquals(Map.of("arena", Boolean.TRUE), sections.read(player, "preferences"),
             "the render path must not re-read and re-parse the player file on every call");
     }
 
@@ -101,13 +101,13 @@ class PlayerSectionsTest {
     void aWriteDoesNotReReadTheFileItAlreadyHolds() throws IOException {
         PlayerSections sections = new PlayerSections(dataFolder);
         UUID player = UUID.randomUUID();
-        sections.write(player, "zones", Map.of("arena", Boolean.TRUE));
+        sections.write(player, "preferences", Map.of("arena", Boolean.TRUE));
         Path file = dataFolder.resolve("state").resolve("players").resolve(player + ".json");
         Files.writeString(file, "{ this is not json", StandardCharsets.UTF_8);
 
         sections.write(player, "sky", Map.of("purpose", "arena"));
 
-        Assertions.assertEquals(Map.of("arena", Boolean.TRUE), sections.read(player, "zones"));
+        Assertions.assertEquals(Map.of("arena", Boolean.TRUE), sections.read(player, "preferences"));
         Assertions.assertEquals(Map.of("purpose", "arena"), sections.read(player, "sky"));
     }
 

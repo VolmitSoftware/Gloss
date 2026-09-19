@@ -19,10 +19,8 @@ public interface VisibilityGovernor {
         DROP,
         OVERLAY,
         PARTICLE,
-        RIG,
         MARKER,
         NAMEPLATE,
-        ZONE,
         WAYPOINT,
         SURFACE
     }
@@ -45,8 +43,7 @@ public interface VisibilityGovernor {
 
     /**
      * Enforces nothing. {@code entities} is ignored and no request is ever refused, so the only
-     * limits in the build are each surface's own: the rig part cap and instances per chunk, the
-     * marker cap per viewer, the zone cap and its panel count, the interaction hitbox cap, and the
+     * limits in the build are each surface's own: the marker cap per viewer, the interaction hitbox cap, and the
      * entity-overlay caps. Nothing arbitrates across surfaces. Read a call to {@link #admit} as a
      * seam waiting for an arbiter, never as a bound on the worst case.
      */

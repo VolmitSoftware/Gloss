@@ -2,7 +2,6 @@ package art.arcane.gloss.api.internal;
 
 import art.arcane.gloss.Gloss;
 import art.arcane.gloss.api.HoloClickTrigger;
-import art.arcane.gloss.api.GlossDialogSubmitEvent;
 import art.arcane.gloss.api.GlossInventoryClickEvent;
 import art.arcane.gloss.api.GlossMenuClickEvent;
 import art.arcane.gloss.api.GlossMenuCloseEvent;
@@ -41,15 +40,6 @@ public final class ApiEvents {
     }
 
     dispatch(new GlossMenuCloseEvent(player, menuId));
-  }
-
-  /** A dialog button's action list finished. */
-  public static void fireDialogSubmit(Player player, String dialogId, int button) {
-    if (GlossDialogSubmitEvent.getHandlerList().getRegisteredListeners().length == 0) {
-      return;
-    }
-
-    dispatch(new GlossDialogSubmitEvent(player, dialogId, button));
   }
 
   /** An inventory-menu slot's action list finished. */

@@ -55,6 +55,7 @@ def universalJarTask = tasks.register('universalJar', Jar) {
     }
     from(velocityJarTask.flatMap { it.archiveFile }.map { zipTree(it) }) {
         exclude('META-INF/MANIFEST.MF')
+        exclude('modules/loader-agent.isolated-jar')
     }
 }
 shadowJarTask.configure { finalizedBy(universalJarTask) }
@@ -361,10 +362,14 @@ pluginPackaging {
             forbiddenPrefixes = forbiddenPrefixes + ['com/velocitypowered/', 'com/google/inject/']
             requiredEntries = requiredEntries + [
                 'velocity-plugin.json',
+                'gloss-velocity-slimjar.dat',
+                'gloss-velocity-slimjar-resolutions.dat',
                 'art/arcane/gloss/velocity/GlossVelocity.class',
+                'art/arcane/gloss/velocity/ProxyPacketEvents.class',
                 'art/arcane/gloss/velocity/ProxyScoreboards.class',
                 'art/arcane/gloss/velocity/expr/ExprEvaluator.class',
                 'art/arcane/gloss/velocity/libs/gson/Gson.class',
+                'art/arcane/gloss/velocity/libs/slimjar/app/builder/InjectingApplicationBuilder.class',
                 'proxy-defaults/proxy.json'
             ]
         }
@@ -398,6 +403,20 @@ tasks.register('verifyPlatformPackaging') {
             Map descriptor = new groovy.json.JsonSlurper().parse(archive.getInputStream(archive.getJarEntry('velocity-plugin.json')))
             if (descriptor.main != 'art.arcane.gloss.velocity.GlossVelocity' || descriptor.version != project.version.toString()) {
                 throw new GradleException('Velocity descriptor must match the main Gloss release')
+            }
+            Object dependencies = descriptor.dependencies
+            if (dependencies instanceof Collection) {
+                boolean requiresPacketEvents = dependencies.any { Object entry ->
+                    String id = entry instanceof Map ? entry.id?.toString() : entry?.toString()
+                    return id == 'packetevents'
+                }
+                if (requiresPacketEvents) {
+                    throw new GradleException('Velocity Gloss must not require a PacketEvents plugin jar')
+                }
+            }
+            if (archive.getJarEntry('gloss-velocity-slimjar.dat') == null
+                    || archive.getJarEntry('gloss-velocity-slimjar-resolutions.dat') == null) {
+                throw new GradleException('Velocity Gloss must ship its PacketEvents slimjar manifests')
             }
             String scoreboard = new String(archive.getInputStream(archive.getJarEntry('art/arcane/gloss/velocity/ProxyScoreboards.class')).readAllBytes(), java.nio.charset.StandardCharsets.ISO_8859_1)
             for (String reference : ['com/github/retrooper/packetevents/PacketEvents', 'net/kyori/adventure/text/Component']) {

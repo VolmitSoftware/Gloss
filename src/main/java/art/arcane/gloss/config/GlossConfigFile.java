@@ -78,18 +78,12 @@ public final class GlossConfigFile {
     public Nametags nametags = new Nametags();
     @ConfigDoc("Ranked top-N snapshots from leaderboards/ documents.")
     public Leaderboards leaderboards = new Leaderboards();
-    @ConfigDoc("Native client dialogs from dialogs/ documents.")
-    public Dialogs dialogs = new Dialogs();
     @ConfigDoc("Chest-inventory menus from inventories/ documents.")
     public Inventories inventories = new Inventories();
-    @ConfigDoc("Multi-part display-entity models from rigs/ documents and their motion streaming budget.")
-    public Rigs rigs = new Rigs();
     @ConfigDoc("World markers, beams and trails from markers/ documents.")
     public Markers markers = new Markers();
     @ConfigDoc("Locator bar waypoints from waypoints/ documents.")
     public Waypoints waypoints = new Waypoints();
-    @ConfigDoc("Area outlines and ambience from zones/ documents.")
-    public Zones zones = new Zones();
     @ConfigDoc("Per-viewer camera rides driven by the camera action.")
     public Camera camera = new Camera();
     @ConfigDoc("Event-driven behaviors/ documents, their timers and persisted state.")
@@ -164,23 +158,14 @@ public final class GlossConfigFile {
         @ConfigDoc("Enables author-owned strings/ catalogs for lang() in content.")
         public boolean strings = true;
 
-        @ConfigDoc("Enables native client dialogs.")
-        public boolean dialogs = true;
-
         @ConfigDoc("Enables chest-inventory menus.")
         public boolean inventories = true;
-
-        @ConfigDoc("Enables rigs and motion documents.")
-        public boolean rigs = true;
 
         @ConfigDoc("Enables world markers.")
         public boolean markers = true;
 
         @ConfigDoc("Enables locator bar waypoints.")
         public boolean waypoints = true;
-
-        @ConfigDoc("Enables zone outlines and ambience.")
-        public boolean zones = true;
 
         @ConfigDoc("Enables camera rides.")
         public boolean camera = true;
@@ -456,32 +441,12 @@ public final class GlossConfigFile {
     }
 
     // --- lane:forms ---
-    public static final class Dialogs {
-        @ConfigDoc("Seconds a dialog waits for a response before its bound inputs are discarded. Clamped to 5..3600.")
-        public int responseTimeoutSeconds = 120;
-    }
-
     public static final class Inventories {
         @ConfigDoc("Closes an open inventory menu when its viewer teleports.")
         public boolean closeOnTeleport = true;
 
         @ConfigDoc("Item drawn in a chest slot for icon kinds that only exist as display entities (textImage, animatedTextImage, entity).")
         public String unsupportedIconItem = "minecraft:paper";
-    }
-
-    // --- lane:rigs ---
-    public static final class Rigs {
-        @ConfigDoc("Maximum display parts one rig may declare. Clamped to 1..256.")
-        public int maxPartsPerRig = 64;
-
-        @ConfigDoc("Maximum placed rig instances per chunk. Clamped to 1..64.")
-        public int maxInstancesPerChunk = 8;
-
-        @ConfigDoc("Transform packets per second allowed across every animated rig's audience. Clamped to 100..1000000.")
-        public int transformPacketBudget = 20000;
-
-        @ConfigDoc("Maximum frames per second the motion streaming thread targets. Clamped to 1..120.")
-        public int maxMotionFps = 60;
     }
 
     // --- lane:world ---
@@ -496,14 +461,6 @@ public final class GlossConfigFile {
     public static final class Waypoints {
         @ConfigDoc("Locator bar waypoints one viewer may track at once. Clamped to 1..64.")
         public int maxPerViewer = 16;
-    }
-
-    public static final class Zones {
-        @ConfigDoc("Distance in blocks at which zone outlines render. Clamped to 8..256.")
-        public double viewRange = 64.0D;
-
-        @ConfigDoc("Zone outline particles per viewer per tick. Clamped to 1..1024.")
-        public int particlesPerViewerPerTick = 64;
     }
 
     public static final class Camera {
@@ -663,23 +620,14 @@ public final class GlossConfigFile {
         if (leaderboards == null) {
             leaderboards = new Leaderboards();
         }
-        if (dialogs == null) {
-            dialogs = new Dialogs();
-        }
         if (inventories == null) {
             inventories = new Inventories();
-        }
-        if (rigs == null) {
-            rigs = new Rigs();
         }
         if (markers == null) {
             markers = new Markers();
         }
         if (waypoints == null) {
             waypoints = new Waypoints();
-        }
-        if (zones == null) {
-            zones = new Zones();
         }
         if (camera == null) {
             camera = new Camera();
@@ -760,23 +708,14 @@ public final class GlossConfigFile {
         leaderboards.maxEntries = clampInt(leaderboards.maxEntries, 1, 1000);
 
         // --- lane:forms ---
-        dialogs.responseTimeoutSeconds = clampInt(dialogs.responseTimeoutSeconds, 5, 3600);
         menus.maxListEntries = clampInt(menus.maxListEntries, 1, 512);
         inventories.unsupportedIconItem = inventories.unsupportedIconItem == null || inventories.unsupportedIconItem.isBlank()
             ? "minecraft:paper" : inventories.unsupportedIconItem.trim();
-
-        // --- lane:rigs ---
-        rigs.maxPartsPerRig = clampInt(rigs.maxPartsPerRig, 1, 256);
-        rigs.maxInstancesPerChunk = clampInt(rigs.maxInstancesPerChunk, 1, 64);
-        rigs.transformPacketBudget = clampInt(rigs.transformPacketBudget, 100, 1_000_000);
-        rigs.maxMotionFps = clampInt(rigs.maxMotionFps, 1, 120);
 
         // --- lane:world ---
         markers.maxPerViewer = clampInt(markers.maxPerViewer, 1, 64);
         markers.viewRange = clampDouble(markers.viewRange, 16.0D, 1024.0D, 256.0D);
         waypoints.maxPerViewer = clampInt(waypoints.maxPerViewer, 1, 64);
-        zones.viewRange = clampDouble(zones.viewRange, 8.0D, 256.0D, 64.0D);
-        zones.particlesPerViewerPerTick = clampInt(zones.particlesPerViewerPerTick, 1, 1024);
         camera.maxRideSeconds = clampInt(camera.maxRideSeconds, 1, 3600);
 
         // --- lane:behaviors ---

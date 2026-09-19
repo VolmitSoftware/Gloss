@@ -14,9 +14,6 @@ import art.arcane.gloss.doc.RegistryOwner;
 import art.arcane.gloss.interaction.InteractionHitboxService;
 import art.arcane.gloss.interaction.InteractionTarget;
 import art.arcane.gloss.menu.action.MenuAction;
-import art.arcane.gloss.motion.MotionClipHandle;
-import art.arcane.gloss.motion.MotionService;
-import art.arcane.gloss.motion.TransformStreamer;
 import art.arcane.gloss.particle.ParticleService;
 import art.arcane.gloss.text.TextDisplayLayout;
 import art.arcane.gloss.text.TextPipeline;
@@ -64,7 +61,6 @@ import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.Queue;
 import java.util.Set;
 import java.util.UUID;
@@ -901,22 +897,6 @@ public final class HologramService implements RegistryOwner {
         }
     }
 
-    MotionService motion() {
-        return plugin.laneServices() == null ? null : plugin.service(MotionService.class);
-    }
-
-    TransformStreamer streamer() {
-        MotionService motion = motion();
-        return motion == null ? null : motion.streamer();
-    }
-
-    MotionClipHandle newClipHandle() {
-        return new MotionClipHandle(id -> {
-            MotionService motion = motion();
-            return motion == null ? Optional.empty() : motion.compiled(id);
-        });
-    }
-
     InteractionHitboxService interaction() {
         return plugin.laneServices() == null ? null : plugin.service(InteractionHitboxService.class);
     }
@@ -959,22 +939,6 @@ public final class HologramService implements RegistryOwner {
             ids.add(page.id());
         }
         return List.copyOf(ids);
-    }
-
-    /** The motion clip a hologram plays, or null. */
-    public String motion(String hologramId) {
-        PersistentHologram hologram = holograms.get(hologramId);
-        return hologram == null ? null : hologram.motionId();
-    }
-
-    /** Plays {@code motion} on a hologram, or stops it when null. */
-    public boolean setMotion(String hologramId, String motion) {
-        PersistentHologram hologram = holograms.get(hologramId);
-        if (hologram == null) {
-            return false;
-        }
-        hologram.applyMotion(motion);
-        return true;
     }
 
     /** The actions a hologram runs on click, in document order. */

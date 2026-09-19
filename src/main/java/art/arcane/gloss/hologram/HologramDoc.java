@@ -19,8 +19,7 @@ import java.util.Set;
 public record HologramDoc(int schemaVersion, long revision, Anchor anchor, List<HologramLine> lines,
                           IconDisplayStyle style, HologramBox box, Double yaw, Double pitch,
                           List<ParticleLayer> particleLayers, ShowCondition show,
-                          List<HologramPage> pages, List<MenuActionData> actions, Hitbox hitbox,
-                          String motion) {
+                          List<HologramPage> pages, List<MenuActionData> actions, Hitbox hitbox) {
     public static final String KIND = "holograms";
     public static final int CURRENT_SCHEMA_VERSION = 3;
     public static final double DEFAULT_SCALE = 1.0D;
@@ -87,7 +86,6 @@ public record HologramDoc(int schemaVersion, long revision, Anchor anchor, List<
         particleLayers = ParticleLayer.copyLayers(particleLayers, "hologram");
         show = show == null ? ShowCondition.ALWAYS : show;
         actions = copyActions(actions);
-        motion = motion == null || motion.isBlank() ? null : motion.trim();
     }
 
     /** The text-only form used by the importer and by holograms created from commands. */
@@ -95,12 +93,12 @@ public record HologramDoc(int schemaVersion, long revision, Anchor anchor, List<
                        IconDisplayStyle style, HologramBox box, Double yaw, Double pitch,
                        List<ParticleLayer> particleLayers, ShowCondition show) {
         this(schemaVersion, revision, anchor, textLines(lines), style, box, yaw, pitch, particleLayers, show,
-            List.of(), List.of(), null, null);
+            List.of(), List.of(), null);
     }
 
     public HologramDoc withRevision(long revision) {
         return new HologramDoc(schemaVersion, revision, anchor, lines, style, box, yaw, pitch,
-            particleLayers, show, pages, actions, hitbox, motion);
+            particleLayers, show, pages, actions, hitbox);
     }
 
     public static HologramDoc parse(String fileName, String raw) {
@@ -127,10 +125,6 @@ public record HologramDoc(int schemaVersion, long revision, Anchor anchor, List<
 
     public boolean isPaged() {
         return !pages.isEmpty();
-    }
-
-    public boolean hasMotion() {
-        return motion != null;
     }
 
     public Hitbox hitboxOrDefault() {

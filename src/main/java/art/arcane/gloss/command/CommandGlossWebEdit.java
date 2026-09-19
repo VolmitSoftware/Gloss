@@ -184,13 +184,6 @@ public final class CommandGlossWebEdit {
   }
 
   // --- lane:forms ---
-  @Director(name = "dialog", description = "Open this live document in the web editor",
-      descriptionKey = "command.help.web.edit.document")
-  public void dialog(@Param(name = "id", description = "Live Gloss document id",
-                         descriptionKey = "command.help.arg.web_subject", customHandler = DialogIdHandler.class) String id,
-                     @Param(name = "sender", contextual = true) CommandSender sender) {
-    web.openSubject("dialog", id, sender);
-  }
 
   @Director(name = "inventory", description = "Open this live document in the web editor",
       descriptionKey = "command.help.web.edit.document")
@@ -198,31 +191,6 @@ public final class CommandGlossWebEdit {
                             descriptionKey = "command.help.arg.web_subject", customHandler = InventoryIdHandler.class) String id,
                         @Param(name = "sender", contextual = true) CommandSender sender) {
     web.openSubject("inventory", id, sender);
-  }
-
-  // --- lane:rigs ---
-  @Director(name = "motion", description = "Open this live document in the web editor",
-      descriptionKey = "command.help.web.edit.document")
-  public void motion(@Param(name = "id", description = "Live Gloss document id",
-                         descriptionKey = "command.help.arg.web_subject", customHandler = MotionIdHandler.class) String id,
-                     @Param(name = "sender", contextual = true) CommandSender sender) {
-    web.openSubject("motion", id, sender);
-  }
-
-  @Director(name = "rig", description = "Open this live document in the web editor",
-      descriptionKey = "command.help.web.edit.document")
-  public void rig(@Param(name = "id", description = "Live Gloss document id",
-                      descriptionKey = "command.help.arg.web_subject", customHandler = RigIdHandler.class) String id,
-                  @Param(name = "sender", contextual = true) CommandSender sender) {
-    web.openSubject("rig", id, sender);
-  }
-
-  @Director(name = "rig-instance", description = "Open this live document in the web editor",
-      descriptionKey = "command.help.web.edit.document")
-  public void rigInstance(@Param(name = "id", description = "Live Gloss document id",
-                              descriptionKey = "command.help.arg.web_subject", customHandler = RigInstanceIdHandler.class) String id,
-                          @Param(name = "sender", contextual = true) CommandSender sender) {
-    web.openSubject("rig-instance", id, sender);
   }
 
   // --- lane:world ---
@@ -242,15 +210,6 @@ public final class CommandGlossWebEdit {
                            customHandler = WaypointIdHandler.class) String id,
                        @Param(name = "sender", contextual = true) CommandSender sender) {
     web.openSubject("waypoint", id, sender);
-  }
-
-  @Director(name = "zone", description = "Open this live document in the web editor",
-      descriptionKey = "command.help.web.edit.document")
-  public void zone(@Param(name = "id", description = "Live Gloss document id",
-                       descriptionKey = "command.help.arg.web_subject",
-                       customHandler = ZoneIdHandler.class) String id,
-                   @Param(name = "sender", contextual = true) CommandSender sender) {
-    web.openSubject("zone", id, sender);
   }
 
   @Director(name = "nameplate", description = "Open this live document in the web editor",
@@ -409,25 +368,9 @@ public final class CommandGlossWebEdit {
   }
 
   // --- lane:forms ---
-  public static final class DialogIdHandler extends SubjectIdHandler {
-    public DialogIdHandler() { super("dialog"); }
-  }
 
   public static final class InventoryIdHandler extends SubjectIdHandler {
     public InventoryIdHandler() { super("inventory"); }
-  }
-
-  // --- lane:rigs ---
-  public static final class MotionIdHandler extends SubjectIdHandler {
-    public MotionIdHandler() { super("motion"); }
-  }
-
-  public static final class RigIdHandler extends SubjectIdHandler {
-    public RigIdHandler() { super("rig"); }
-  }
-
-  public static final class RigInstanceIdHandler extends SubjectIdHandler {
-    public RigInstanceIdHandler() { super("rig-instance"); }
   }
 
   // --- lane:world ---
@@ -437,10 +380,6 @@ public final class CommandGlossWebEdit {
 
   public static final class WaypointIdHandler extends SubjectIdHandler {
     public WaypointIdHandler() { super("waypoint"); }
-  }
-
-  public static final class ZoneIdHandler extends SubjectIdHandler {
-    public ZoneIdHandler() { super("zone"); }
   }
 
   public static final class NameplateIdHandler extends SubjectIdHandler {

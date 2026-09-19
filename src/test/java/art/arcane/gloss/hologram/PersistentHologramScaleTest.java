@@ -57,7 +57,7 @@ class PersistentHologramScaleTest {
         HologramDoc current = hologram.toDoc(2L);
         HologramDoc changed = new HologramDoc(HologramDoc.CURRENT_SCHEMA_VERSION, 3L,
             current.anchor(), current.lines(), current.style().withScale(4.5F, 4.5F, 4.5F), current.box(), current.yaw(), current.pitch(), current.particleLayers(), null,
-            current.pages(), current.actions(), current.hitbox(), current.motion());
+            current.pages(), current.actions(), current.hitbox());
 
         hologram.apply(changed);
 

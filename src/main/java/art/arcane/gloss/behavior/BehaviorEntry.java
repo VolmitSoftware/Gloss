@@ -90,10 +90,6 @@ public record BehaviorEntry(BehaviorTrigger trigger, Map<String, Object> options
         return string("component");
     }
 
-    public String dialog() {
-        return string("dialog");
-    }
-
     private String string(String option) {
         Object value = options.get(option);
         return value == null ? null : String.valueOf(value);
@@ -131,7 +127,7 @@ public record BehaviorEntry(BehaviorTrigger trigger, Map<String, Object> options
                 throw new IllegalArgumentException("pattern is not a valid regular expression: " + invalid.getDescription());
             }
         }
-        for (String option : List.of("region", "name", "menu", "component", "dialog", "material")) {
+        for (String option : List.of("region", "name", "menu", "component", "material")) {
             Object value = options.get(option);
             if (value != null && (!(value instanceof String text) || text.isBlank())) {
                 throw new IllegalArgumentException(option + " must be a non-empty string");

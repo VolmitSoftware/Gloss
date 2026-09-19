@@ -1,6 +1,5 @@
 package art.arcane.gloss.behavior;
 
-import art.arcane.gloss.api.GlossDialogSubmitEvent;
 import art.arcane.gloss.api.GlossInventoryClickEvent;
 import art.arcane.gloss.api.GlossMenuCloseEvent;
 import org.bukkit.entity.Player;
@@ -13,7 +12,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * {@code menu_close}, {@code dialog_submit} and {@code inventory_click} are subscribed reflectively,
+ * {@code menu_close} and {@code inventory_click} are subscribed reflectively,
  * by class and method name, so the behaviors lane compiles without the forms lane. Nothing else
  * would notice a rename on either side of that seam; this does.
  */
@@ -21,7 +20,6 @@ class BehaviorEventPublishersTest {
     @Test
     void everyOptionalTriggerFindsItsEventClassAndTheGettersItReadsThroughReflection() {
         assertReadable(GlossMenuCloseEvent.class, "getMenuId", null);
-        assertReadable(GlossDialogSubmitEvent.class, "getDialogId", null);
         assertReadable(GlossInventoryClickEvent.class, "getInventoryId", "getSlot");
     }
 
@@ -32,7 +30,6 @@ class BehaviorEventPublishersTest {
         assertEquals("shop", click.getClass().getMethod("getInventoryId").invoke(click));
         assertEquals(13, click.getClass().getMethod("getSlot").invoke(click));
         assertEquals("intro", new GlossMenuCloseEvent(viewer(), "intro").getMenuId());
-        assertEquals(2, new GlossDialogSubmitEvent(viewer(), "confirm", 2).getButton());
     }
 
     private static void assertReadable(Class<?> type, String idGetter, String secondaryGetter) {

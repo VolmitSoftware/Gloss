@@ -76,17 +76,12 @@ permissions:
       gloss.leaderboards: true
 
       # --- lane:forms ---
-      gloss.dialogs: true
       gloss.inventories: true
 
-      # --- lane:rigs ---
-      gloss.rigs: true
-      gloss.motion: true
 
       # --- lane:world ---
       gloss.markers: true
       gloss.waypoints: true
-      gloss.zones: true
       gloss.camera: true
       gloss.nameplates: true
       gloss.glow: true
@@ -350,18 +345,6 @@ permissions:
     default: op
 
   # --- lane:forms ---
-  gloss.dialogs:
-    description: Allows listing and inspecting dialog documents.
-    default: op
-  gloss.dialogs.info:
-    description: Allows inspecting a dialog document.
-    default: op
-  gloss.dialogs.open:
-    description: Allows opening a dialog for a player.
-    default: op
-  gloss.dialogs.reset:
-    description: Allows restoring the shipped dialog documents.
-    default: op
   gloss.inventories:
     description: Allows listing and inspecting inventory menus.
     default: op
@@ -373,36 +356,6 @@ permissions:
     default: op
   gloss.inventories.reset:
     description: Allows restoring the shipped inventory menus.
-    default: op
-
-  # --- lane:rigs ---
-  gloss.rigs:
-    description: Gives access to all Gloss rig permissions.
-    default: op
-    children:
-      gloss.rigs.place: true
-      gloss.rigs.edit: true
-      gloss.rigs.remove: true
-      gloss.rigs.import: true
-  gloss.rigs.place:
-    description: Allows placing rig instances.
-    default: op
-  gloss.rigs.edit:
-    description: Allows moving, rotating, scaling and driving rig instances and restoring shipped rigs.
-    default: op
-  gloss.rigs.remove:
-    description: Allows removing rig instances.
-    default: op
-  gloss.rigs.import:
-    description: Allows importing Blockbench models as rigs.
-    default: op
-  gloss.motion:
-    description: Gives access to all Gloss motion permissions.
-    default: op
-    children:
-      gloss.motion.reset: true
-  gloss.motion.reset:
-    description: Allows restoring the shipped motion documents.
     default: op
 
   # --- lane:world ---
@@ -446,27 +399,6 @@ permissions:
   gloss.waypoints.self:
     description: Allows saving and removing personal waypoints.
     default: true
-  gloss.zones:
-    description: Gives access to every zone command.
-    default: op
-    children:
-      gloss.zones.list: true
-      gloss.zones.info: true
-      gloss.zones.create: true
-      gloss.zones.remove: true
-      gloss.zones.toggle: true
-  gloss.zones.list:
-    description: Allows listing zones.
-    default: op
-  gloss.zones.info:
-    description: Allows inspecting one zone.
-    default: op
-  gloss.zones.create:
-    description: Allows writing a new zone document.
-    default: op
-  gloss.zones.remove:
-    description: Allows deleting a zone document.
-    default: op
   gloss.camera:
     description: Gives access to every camera ride command.
     default: op
@@ -511,10 +443,6 @@ permissions:
   gloss.glow.clear:
     description: Allows clearing a player's glow for you.
     default: op
-  gloss.zones.toggle:
-    description: Shows zone outlines to this player and allows toggling them.
-    default: true
-
   # --- lane:behaviors ---
   gloss.behaviors:
     description: Allows listing and inspecting behavior documents.

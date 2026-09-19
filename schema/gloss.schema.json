@@ -438,8 +438,6 @@
             "title",
             "actionbar",
             "bossbar",
-            "dialog",
-            "confirm",
             "close",
             "inventory",
             "setSession",
@@ -448,8 +446,6 @@
             "give",
             "take",
             "economy",
-            "setRig",
-            "rigState",
             "delay",
             "sequence",
             "parallel",
@@ -613,30 +609,6 @@
           "if": {
             "properties": {
               "type": {
-                "const": "dialog"
-              }
-            }
-          },
-          "then": {
-            "$ref": "#/$defs/dialogAction"
-          }
-        },
-        {
-          "if": {
-            "properties": {
-              "type": {
-                "const": "confirm"
-              }
-            }
-          },
-          "then": {
-            "$ref": "#/$defs/confirmAction"
-          }
-        },
-        {
-          "if": {
-            "properties": {
-              "type": {
                 "const": "close"
               }
             }
@@ -727,30 +699,6 @@
           },
           "then": {
             "$ref": "#/$defs/economyAction"
-          }
-        },
-        {
-          "if": {
-            "properties": {
-              "type": {
-                "const": "setRig"
-              }
-            }
-          },
-          "then": {
-            "$ref": "#/$defs/setRigAction"
-          }
-        },
-        {
-          "if": {
-            "properties": {
-              "type": {
-                "const": "rigState"
-              }
-            }
-          },
-          "then": {
-            "$ref": "#/$defs/rigStateAction"
           }
         },
         {
@@ -1904,54 +1852,6 @@
         }
       }
     },
-    "setRigAction": {
-      "title": "Rig Variable Action Data Object",
-      "description": "Sets a variable on a rig instance. The value is a Gloss expression evaluated for the clicking player.",
-      "type": "object",
-      "required": [
-        "var",
-        "value"
-      ],
-      "properties": {
-        "instance": {
-          "description": "Rig instance id, or self for the instance that owns the clicked hitbox.",
-          "type": "string",
-          "minLength": 1,
-          "default": "self"
-        },
-        "var": {
-          "description": "Variable name readable as rig.var.<name>.",
-          "type": "string",
-          "minLength": 1
-        },
-        "value": {
-          "description": "Gloss expression producing a number, boolean or string.",
-          "type": "string",
-          "minLength": 1
-        }
-      }
-    },
-    "rigStateAction": {
-      "title": "Rig State Action Data Object",
-      "description": "Switches a rig instance to a state declared in its graph.",
-      "type": "object",
-      "required": [
-        "state"
-      ],
-      "properties": {
-        "instance": {
-          "description": "Rig instance id, or self for the instance that owns the clicked hitbox.",
-          "type": "string",
-          "minLength": 1,
-          "default": "self"
-        },
-        "state": {
-          "description": "State name from the rig's graph.",
-          "type": "string",
-          "minLength": 1
-        }
-      }
-    },
     "navigationAction": {
       "title": "Navigation Action Data Object",
       "description": "Changes the current viewer's native menu page stack. Navigation is terminal for actions matching the current click trigger.",
@@ -2239,59 +2139,9 @@
       ],
       "description": "Boolean or Gloss boolean expression. Entity variables include entity.name, named, type, health, maxHealth, healthPercent (0..100), damage, damaged, attack, armor, stackCount, distance, and insight.active. Viewer, world, server, time, permissions, groups, regions and integration functions use the shared condition scope."
     },
-    "dialogAction": {
-      "title": "Dialog Action Data Object",
-      "description": "Opens a dialogs/ document for the clicking player. Terminal: the dialog owns the flow from here. A client older than 1.21.6 and a Bedrock viewer take the document's fallback instead.",
-      "type": "object",
-      "required": [
-        "id"
-      ],
-      "properties": {
-        "id": {
-          "description": "Dialog document id, without the .json suffix.",
-          "type": "string",
-          "minLength": 1,
-          "pattern": "\\S"
-        },
-        "args": {
-          "description": "Values seeded into the dialog's args.* namespace for this open.",
-          "type": "object",
-          "additionalProperties": true
-        }
-      }
-    },
-    "confirmAction": {
-      "title": "Confirm Action Data Object",
-      "description": "Shows an ad-hoc yes/no dialog. Terminal: the answer's action list runs when the player picks one.",
-      "type": "object",
-      "properties": {
-        "title": {
-          "description": "Dialog title.",
-          "type": "string"
-        },
-        "text": {
-          "description": "Body paragraph shown above the two answers.",
-          "type": "string"
-        },
-        "yes": {
-          "description": "Actions run when the player confirms.",
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/action"
-          }
-        },
-        "no": {
-          "description": "Actions run when the player cancels.",
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/action"
-          }
-        }
-      }
-    },
     "closeAction": {
       "title": "Close Action Data Object",
-      "description": "Closes the surface the click came from: a menu session, an inventory window or a dialog. Terminal.",
+      "description": "Closes the surface the click came from: a menu session or an inventory window. Terminal.",
       "type": "object",
       "properties": {}
     },

@@ -18,7 +18,7 @@ import org.bukkit.inventory.meta.ItemMeta;
 
 /**
  * The stack behind an icon, for the surfaces that draw items instead of display entities: chest
- * slots, dialog item bodies and the give/take actions. Only the icon kinds that have an item form
+ * slots and the give/take actions. Only the icon kinds that have an item form
  * resolve here; everything else is the caller's degradation to choose, so this returns null rather
  * than guessing one.
  */

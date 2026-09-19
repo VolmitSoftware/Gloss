@@ -77,14 +77,10 @@ public record GlossConfig(
         Channels channels,
         Strings strings,
         // --- lane:forms ---
-        Dialogs dialogs,
         Inventories inventories,
-        // --- lane:rigs ---
-        Rigs rigs,
         // --- lane:world ---
         Markers markers,
         Waypoints waypoints,
-        Zones zones,
         Camera camera,
         Sky sky,
         Nameplates nameplates,
@@ -118,23 +114,13 @@ public record GlossConfig(
     public record Strings(boolean enabled) {
     }
 
-    public record Dialogs(boolean enabled, int responseTimeoutSeconds) {
-    }
-
     public record Inventories(boolean enabled, boolean closeOnTeleport, String unsupportedIconItem) {
-    }
-
-    public record Rigs(boolean enabled, int maxPartsPerRig, int maxInstancesPerChunk, int transformPacketBudget,
-                       int maxMotionFps) {
     }
 
     public record Markers(boolean enabled, int maxPerViewer, double viewRange) {
     }
 
     public record Waypoints(boolean enabled, int maxPerViewer) {
-    }
-
-    public record Zones(boolean enabled, double viewRange, int particlesPerViewerPerTick) {
     }
 
     public record Camera(boolean enabled, int maxRideSeconds) {
@@ -718,16 +704,11 @@ public record GlossConfig(
                 new Channels(source.features.channels),
                 new Strings(source.features.strings),
                 // --- lane:forms ---
-                new Dialogs(source.features.dialogs, source.dialogs.responseTimeoutSeconds),
                 new Inventories(source.features.inventories, source.inventories.closeOnTeleport,
                     source.inventories.unsupportedIconItem),
-                // --- lane:rigs ---
-                new Rigs(source.features.rigs, source.rigs.maxPartsPerRig, source.rigs.maxInstancesPerChunk,
-                    source.rigs.transformPacketBudget, source.rigs.maxMotionFps),
                 // --- lane:world ---
                 new Markers(source.features.markers, source.markers.maxPerViewer, source.markers.viewRange),
                 new Waypoints(source.features.waypoints, source.waypoints.maxPerViewer),
-                new Zones(source.features.zones, source.zones.viewRange, source.zones.particlesPerViewerPerTick),
                 new Camera(source.features.camera, source.camera.maxRideSeconds),
                 new Sky(source.features.sky),
                 new Nameplates(source.features.nameplates),

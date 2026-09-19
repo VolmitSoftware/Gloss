@@ -9,15 +9,13 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Cross-kind id references: a motion, dialog or inventory named by an action or a field has to
+ * Cross-kind id references: an inventory named by an action or a field has to
  * exist. Each reference is checked only while this build actually has that kind, so a workspace on
  * a server without the kind reports nothing instead of reporting everything.
  */
 public final class ReferenceRules implements LintRule {
     public static final String CODE = "reference-unknown";
     private static final Map<String, Reference> REFERENCES = Map.of(
-            "motion", new Reference("motion", "motion-unknown", "motion"),
-            "dialog", new Reference("dialogs", "dialog-unknown", "dialog"),
             "inventory", new Reference("inventories", "inventory-unknown", "inventory"));
 
     @Override

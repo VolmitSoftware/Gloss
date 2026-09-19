@@ -55,7 +55,6 @@ public final class BehaviorDispatcher {
             case COMMAND, EMIT -> entry.name().equals(event.selector());
             case MENU_OPEN, MENU_CLOSE, MENU_CLICK, INVENTORY_CLICK -> matches(entry.menu(), event.selector())
                 && matches(entry.component(), event.secondary());
-            case DIALOG_SUBMIT -> matches(entry.dialog(), event.selector());
             default -> true;
         };
     }

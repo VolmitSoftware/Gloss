@@ -31,7 +31,7 @@ public interface ActionContext {
 
   /**
    * Closes the surface this click came from. Each surface knows how: a menu session ends, an
-   * inventory window closes, a dialog is cleared. A context with nothing to close does nothing.
+   * inventory window closes. A context with nothing to close does nothing.
    */
   default void closeSurface(Player player) {
   }

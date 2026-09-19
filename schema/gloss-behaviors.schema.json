@@ -94,7 +94,7 @@
       "additionalProperties": false,
       "properties": {
         "trigger": {
-          "description": "The event this entry listens to. join: A player joined. Roles: viewer and subject are the player. first_join: A player joined for the first time. Roles: viewer and subject are the player. quit: A player left. Roles: viewer and subject are the player. respawn: A player respawned. Roles: viewer and subject are the player. death: A player died. args.cause carries the damage cause. Roles: viewer and subject are the victim, source is the killer. kill: A player killed an entity. Roles: viewer and source are the killer, subject is the victim. damage: One entity damaged another. args.amount and args.cause describe the hit. Roles: subject is the victim, source is the damager, viewer is whichever of them is a player. chat: A player sent a chat message. args.message carries the line. Roles: viewer and subject are the sender. command: A /gloss do call named this entry. args carry the call's key=value pairs. Roles: viewer and subject are the caller, if any. block_break: A player broke a block. args.block carries the material key. Roles: viewer and subject are the player. block_place: A player placed a block. args.block carries the material key. Roles: viewer and subject are the player. pickup: A player picked an item up. args.material and args.amount describe the stack. Roles: viewer and subject are the player. drop: A player dropped an item. args.material and args.amount describe the stack. Roles: viewer and subject are the player. world_change: A player changed world. args.from and args.to carry the world names. Roles: viewer and subject are the player. region_enter: A player entered a WorldGuard region. args.region carries its id. Roles: viewer and subject are the player. region_leave: A player left a WorldGuard region. args.region carries its id. Roles: viewer and subject are the player. menu_open: A Gloss menu opened. args.menu carries its id. Roles: viewer and subject are the player. menu_close: A Gloss menu closed. args.menu carries its id. Roles: viewer and subject are the player. menu_click: A Gloss menu component was clicked. args.menu and args.component identify it. Roles: viewer and subject are the player. dialog_submit: A dialog was submitted. args.menu carries its id. Roles: viewer and subject are the player. inventory_click: An inventory slot was clicked. args.menu and args.component identify it. Roles: viewer and subject are the player. interval: A repeating timer. A player-scoped interval fires once per online player on that player's region; a global one fires once with no viewer. Roles: viewer and subject are the player for a player-scoped interval, and absent for a global one. server_start: The server finished loading. There is no viewer. Roles: no roles are set. emit: An emit action or the API fired this event name. args carry whatever the emitter passed. Roles: viewer and subject are the emitting player, if any.",
+          "description": "The event this entry listens to. join: A player joined. Roles: viewer and subject are the player. first_join: A player joined for the first time. Roles: viewer and subject are the player. quit: A player left. Roles: viewer and subject are the player. respawn: A player respawned. Roles: viewer and subject are the player. death: A player died. args.cause carries the damage cause. Roles: viewer and subject are the victim, source is the killer. kill: A player killed an entity. Roles: viewer and source are the killer, subject is the victim. damage: One entity damaged another. args.amount and args.cause describe the hit. Roles: subject is the victim, source is the damager, viewer is whichever of them is a player. chat: A player sent a chat message. args.message carries the line. Roles: viewer and subject are the sender. command: A /gloss do call named this entry. args carry the call's key=value pairs. Roles: viewer and subject are the caller, if any. block_break: A player broke a block. args.block carries the material key. Roles: viewer and subject are the player. block_place: A player placed a block. args.block carries the material key. Roles: viewer and subject are the player. pickup: A player picked an item up. args.material and args.amount describe the stack. Roles: viewer and subject are the player. drop: A player dropped an item. args.material and args.amount describe the stack. Roles: viewer and subject are the player. world_change: A player changed world. args.from and args.to carry the world names. Roles: viewer and subject are the player. region_enter: A player entered a WorldGuard region. args.region carries its id. Roles: viewer and subject are the player. region_leave: A player left a WorldGuard region. args.region carries its id. Roles: viewer and subject are the player. menu_open: A Gloss menu opened. args.menu carries its id. Roles: viewer and subject are the player. menu_close: A Gloss menu closed. args.menu carries its id. Roles: viewer and subject are the player. menu_click: A Gloss menu component was clicked. args.menu and args.component identify it. Roles: viewer and subject are the player. inventory_click: An inventory slot was clicked. args.menu and args.component identify it. Roles: viewer and subject are the player. interval: A repeating timer. A player-scoped interval fires once per online player on that player's region; a global one fires once with no viewer. Roles: viewer and subject are the player for a player-scoped interval, and absent for a global one. server_start: The server finished loading. There is no viewer. Roles: no roles are set. emit: An emit action or the API fired this event name. args carry whatever the emitter passed. Roles: viewer and subject are the emitting player, if any.",
           "type": "string",
           "enum": [
             "join",
@@ -116,7 +116,6 @@
             "menu_open",
             "menu_close",
             "menu_click",
-            "dialog_submit",
             "inventory_click",
             "interval",
             "server_start",
@@ -182,11 +181,6 @@
           "description": "Component or slot id filter. Omitted matches every one.",
           "type": "string",
           "minLength": 1
-        },
-        "dialog": {
-          "description": "Dialog id filter. Omitted matches every dialog.",
-          "type": "string",
-          "minLength": 1
         }
       },
       "allOf": [
@@ -242,11 +236,6 @@
                 {
                   "required": [
                     "component"
-                  ]
-                },
-                {
-                  "required": [
-                    "dialog"
                   ]
                 }
               ]
@@ -306,11 +295,6 @@
                   "required": [
                     "component"
                   ]
-                },
-                {
-                  "required": [
-                    "dialog"
-                  ]
                 }
               ]
             }
@@ -368,11 +352,6 @@
                 {
                   "required": [
                     "component"
-                  ]
-                },
-                {
-                  "required": [
-                    "dialog"
                   ]
                 }
               ]
@@ -432,11 +411,6 @@
                   "required": [
                     "component"
                   ]
-                },
-                {
-                  "required": [
-                    "dialog"
-                  ]
                 }
               ]
             }
@@ -495,11 +469,6 @@
                   "required": [
                     "component"
                   ]
-                },
-                {
-                  "required": [
-                    "dialog"
-                  ]
                 }
               ]
             }
@@ -552,11 +521,6 @@
                 {
                   "required": [
                     "component"
-                  ]
-                },
-                {
-                  "required": [
-                    "dialog"
                   ]
                 }
               ]
@@ -616,11 +580,6 @@
                   "required": [
                     "component"
                   ]
-                },
-                {
-                  "required": [
-                    "dialog"
-                  ]
                 }
               ]
             }
@@ -673,11 +632,6 @@
                 {
                   "required": [
                     "component"
-                  ]
-                },
-                {
-                  "required": [
-                    "dialog"
                   ]
                 }
               ]
@@ -735,11 +689,6 @@
                   "required": [
                     "component"
                   ]
-                },
-                {
-                  "required": [
-                    "dialog"
-                  ]
                 }
               ]
             }
@@ -792,11 +741,6 @@
                 {
                   "required": [
                     "component"
-                  ]
-                },
-                {
-                  "required": [
-                    "dialog"
                   ]
                 }
               ]
@@ -851,11 +795,6 @@
                   "required": [
                     "component"
                   ]
-                },
-                {
-                  "required": [
-                    "dialog"
-                  ]
                 }
               ]
             }
@@ -909,11 +848,6 @@
                   "required": [
                     "component"
                   ]
-                },
-                {
-                  "required": [
-                    "dialog"
-                  ]
                 }
               ]
             }
@@ -966,11 +900,6 @@
                 {
                   "required": [
                     "component"
-                  ]
-                },
-                {
-                  "required": [
-                    "dialog"
                   ]
                 }
               ]
@@ -1030,11 +959,6 @@
                   "required": [
                     "component"
                   ]
-                },
-                {
-                  "required": [
-                    "dialog"
-                  ]
                 }
               ]
             }
@@ -1090,11 +1014,6 @@
                 {
                   "required": [
                     "component"
-                  ]
-                },
-                {
-                  "required": [
-                    "dialog"
                   ]
                 }
               ]
@@ -1152,11 +1071,6 @@
                   "required": [
                     "component"
                   ]
-                },
-                {
-                  "required": [
-                    "dialog"
-                  ]
                 }
               ]
             }
@@ -1209,11 +1123,6 @@
                 {
                   "required": [
                     "component"
-                  ]
-                },
-                {
-                  "required": [
-                    "dialog"
                   ]
                 }
               ]
@@ -1268,11 +1177,6 @@
                   "required": [
                     "component"
                   ]
-                },
-                {
-                  "required": [
-                    "dialog"
-                  ]
                 }
               ]
             }
@@ -1321,69 +1225,6 @@
                   "required": [
                     "material"
                   ]
-                },
-                {
-                  "required": [
-                    "dialog"
-                  ]
-                }
-              ]
-            }
-          }
-        },
-        {
-          "if": {
-            "properties": {
-              "trigger": {
-                "const": "dialog_submit"
-              }
-            },
-            "required": [
-              "trigger"
-            ]
-          },
-          "then": {
-            "not": {
-              "anyOf": [
-                {
-                  "required": [
-                    "region"
-                  ]
-                },
-                {
-                  "required": [
-                    "everyTicks"
-                  ]
-                },
-                {
-                  "required": [
-                    "scope"
-                  ]
-                },
-                {
-                  "required": [
-                    "pattern"
-                  ]
-                },
-                {
-                  "required": [
-                    "name"
-                  ]
-                },
-                {
-                  "required": [
-                    "material"
-                  ]
-                },
-                {
-                  "required": [
-                    "menu"
-                  ]
-                },
-                {
-                  "required": [
-                    "component"
-                  ]
                 }
               ]
             }
@@ -1431,11 +1272,6 @@
                 {
                   "required": [
                     "material"
-                  ]
-                },
-                {
-                  "required": [
-                    "dialog"
                   ]
                 }
               ]
@@ -1487,11 +1323,6 @@
                 {
                   "required": [
                     "component"
-                  ]
-                },
-                {
-                  "required": [
-                    "dialog"
                   ]
                 }
               ]
@@ -1551,11 +1382,6 @@
                   "required": [
                     "component"
                   ]
-                },
-                {
-                  "required": [
-                    "dialog"
-                  ]
                 }
               ]
             }
@@ -1611,11 +1437,6 @@
                 {
                   "required": [
                     "component"
-                  ]
-                },
-                {
-                  "required": [
-                    "dialog"
                   ]
                 }
               ]

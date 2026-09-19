@@ -342,28 +342,6 @@ public class CommandGlossHologram {
                 MessageArgument.untrusted("id", id));
     }
 
-    @Director(name = "motion", sync = true, descriptionKey = "command.help.hologram.motion", description = "Play a motion clip on a hologram")
-    public void motion(@Param(name = "sender", contextual = true) CommandSender sender,
-                       @Param(name = "id", descriptionKey = "command.help.hologram.info.id", description = "Hologram id") String id,
-                       @Param(name = "motion", descriptionKey = "command.help.hologram.motion.motion", description = "Motion id, or clear to stop") String motion) {
-        if (GlossCommandMessages.denied(sender, "gloss.holograms.edit")) {
-            return;
-        }
-        if (find(sender, id) == null) {
-            return;
-        }
-        boolean clearing = motion.isBlank() || "clear".equalsIgnoreCase(motion) || "none".equalsIgnoreCase(motion);
-        plugin.holograms().setMotion(id, clearing ? null : motion);
-        if (clearing) {
-            GlossCommandMessages.send(sender, GlossMessages.HOLOGRAM_MOTION_CLEARED,
-                    MessageArgument.untrusted("id", id));
-            return;
-        }
-        GlossCommandMessages.send(sender, GlossMessages.HOLOGRAM_MOTION_SET,
-                MessageArgument.untrusted("id", id),
-                MessageArgument.untrusted("value", motion));
-    }
-
     @Director(name = "actions", descriptionKey = "command.help.hologram.actions", description = "List the actions a hologram runs on click")
     public void actions(@Param(name = "sender", contextual = true) CommandSender sender,
                         @Param(name = "id", descriptionKey = "command.help.hologram.info.id", description = "Hologram id") String id) {

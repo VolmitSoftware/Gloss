@@ -7,7 +7,6 @@ import art.arcane.gloss.camera.CameraService;
 import art.arcane.gloss.chat.ChannelService;
 import art.arcane.gloss.condition.ConditionHooks;
 import art.arcane.gloss.connection.ConnectionsService;
-import art.arcane.gloss.dialog.DialogService;
 import art.arcane.gloss.forge.GlyphService;
 import art.arcane.gloss.glosspack.GlossPackService;
 import art.arcane.gloss.glow.GlowService;
@@ -17,18 +16,15 @@ import art.arcane.gloss.inventory.InventoryMenuService;
 import art.arcane.gloss.leaderboard.LeaderboardService;
 import art.arcane.gloss.lint.WorkspaceLint;
 import art.arcane.gloss.marker.MarkerService;
-import art.arcane.gloss.motion.MotionService;
 import art.arcane.gloss.nameplate.NameplateService;
 import art.arcane.gloss.nametag.NametagService;
 import art.arcane.gloss.prompt.PromptService;
-import art.arcane.gloss.rig.RigService;
 import art.arcane.gloss.sky.SkyService;
 import art.arcane.gloss.state.PlayerSections;
 import art.arcane.gloss.state.StateStore;
 import art.arcane.gloss.strings.StringsService;
 import art.arcane.gloss.surface.SurfaceService;
 import art.arcane.gloss.waypoint.WaypointService;
-import art.arcane.gloss.zone.ZoneService;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -58,20 +54,15 @@ public final class GlossLaneServices {
         services.add(new LeaderboardService(plugin));
 
         // --- lane:forms ---
-        services.add(new DialogService(plugin));
         services.add(new InventoryMenuService(plugin));
         services.add(new PromptService(plugin));
 
-        // --- lane:rigs ---
-        services.add(new MotionService(plugin));
-        services.add(new RigService(plugin));
         services.add(new InteractionHitboxService(plugin));
 
         // --- lane:world ---
         PlayerSections worldSections = new PlayerSections(plugin.getDataFolder().toPath());
         services.add(new MarkerService(plugin, worldSections));
         services.add(new WaypointService(plugin));
-        services.add(new ZoneService(plugin, worldSections));
         services.add(new BeamService(plugin));
         services.add(new SkyService(plugin, worldSections));
         services.add(new CameraService(plugin, worldSections));

@@ -4,8 +4,6 @@ import art.arcane.gloss.Gloss;
 import art.arcane.gloss.api.HoloClickTrigger;
 import art.arcane.gloss.hologram.HologramService;
 import art.arcane.gloss.menu.action.MenuAction;
-import art.arcane.gloss.rig.RigService;
-import art.arcane.gloss.rig.RigViewerIndex;
 import art.arcane.gloss.service.GlossService;
 import art.arcane.gloss.util.common.DisplayEntity;
 import art.arcane.gloss.util.common.EntityIdAllocator;
@@ -49,7 +47,7 @@ public final class InteractionHitboxService implements GlossService, Listener {
     public static final int WALK_INTERVAL_TICKS = 5;
     /**
      * Hitboxes one viewer holds at once; beyond this the nearest win. An interactive hologram
-     * registers one, or one per line when {@code hitbox.perLine} is set, plus one per rig hitbox,
+     * registers one, or one per line when {@code hitbox.perLine} is set,
      * so a lobby with forty eight-line holograms around the spawn point would otherwise send every
      * viewer who stands there three hundred interaction entities with nothing bounding it.
      */
@@ -389,12 +387,6 @@ public final class InteractionHitboxService implements GlossService, Listener {
     private static ViewerSource viewersOf(Gloss plugin) {
         return (anchor, range) -> {
             Set<Player> found = new LinkedHashSet<>();
-            RigService rigs = plugin.service(RigService.class);
-            if (rigs != null) {
-                for (RigViewerIndex.Viewer viewer : rigs.viewerIndex().nearby(anchor, range)) {
-                    found.add(viewer.player());
-                }
-            }
             HologramService holograms = plugin.holograms();
             if (holograms != null) {
                 holograms.forEachNearbyViewer(anchor, range * range, found::add);

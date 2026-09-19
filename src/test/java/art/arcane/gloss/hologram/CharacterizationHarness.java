@@ -6,7 +6,6 @@ import art.arcane.gloss.animation.AnimationClip;
 import art.arcane.gloss.animation.AnimationMode;
 import art.arcane.gloss.animation.AnimationService;
 import art.arcane.gloss.config.GlossConfigFile;
-import art.arcane.gloss.motion.MotionService;
 import art.arcane.gloss.service.GlossService;
 import art.arcane.gloss.text.TextPipeline;
 import art.arcane.gloss.particle.ParticleService;
@@ -199,7 +198,6 @@ final class CharacterizationHarness implements AutoCloseable {
             setDeclaredField(gloss, JavaPlugin.class, "logger", Logger.getAnonymousLogger());
             setDeclaredField(gloss, JavaPlugin.class, "server", Bukkit.getServer());
             // Unsafe allocation skips field initializers, and reloadServices walks this list.
-            // motionService() replaces it for the suites that need a real lane service.
             setDeclaredField(gloss, Gloss.class, "laneServices", List.<GlossService>of());
 
             this.configFile = new GlossConfigFile();
@@ -348,22 +346,6 @@ final class CharacterizationHarness implements AutoCloseable {
 
     PersistentHologram persistent(String id, Location at) {
         return (PersistentHologram) service.create(id, at);
-    }
-
-    /**
-     * Registers a real {@link MotionService} as the plugin's lane services, so holograms with a
-     * {@code motion} resolve the shipped clips. Only the motion suites call this; without it the
-     * lane service list stays unset and the hologram engine behaves exactly as before.
-     */
-    MotionService motionService() {
-        MotionService motion = new MotionService(gloss);
-        try {
-            setDeclaredField(gloss, Gloss.class, "laneServices", List.<GlossService>of(motion));
-        } catch (ReflectiveOperationException failure) {
-            throw new IllegalStateException("Failed to publish the motion service", failure);
-        }
-        motion.reload();
-        return motion;
     }
 
     DisplayHandle onlySpawned(WorldState world) {

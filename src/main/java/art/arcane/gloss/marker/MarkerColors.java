@@ -3,7 +3,7 @@ package art.arcane.gloss.marker;
 import java.util.Locale;
 import java.util.regex.Pattern;
 
-/** Parses the {@code #RRGGBB} color strings marker, waypoint and zone documents carry. */
+/** Parses the {@code #RRGGBB} color strings marker and waypoint documents carry. */
 public final class MarkerColors {
     public static final int WHITE = 0xFFFFFF;
 

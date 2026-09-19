@@ -9,8 +9,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
 /**
- * One governor lease per viewer for a surface that redraws its whole set every pass, like markers
- * and zones. The old lease is released before the new request because the viewer is asking for
+ * One governor lease per viewer for a surface that redraws its whole set every pass, like markers. The old lease is released before the new request because the viewer is asking for
  * their whole allotment again, not for more on top of what they hold.
  *
  * <p>A refusal has to tear the render down. Entities left drawn that the governor no longer counts

@@ -1,6 +1,7 @@
 plugins {
     id 'java'
     id 'com.gradleup.shadow'
+    alias(libs.plugins.slimjar)
 }
 
 group = rootProject.group
@@ -15,10 +16,15 @@ repositories {
 dependencies {
     compileOnly('com.velocitypowered:velocity-api:3.4.0-SNAPSHOT')
     annotationProcessor('com.velocitypowered:velocity-api:3.4.0-SNAPSHOT')
-    compileOnly('com.github.retrooper:packetevents-velocity:2.13.0')
+    implementation slimjar('2.1.9')
+    slim(libs.packetevents.velocity) {
+        exclude(group: 'net.kyori')
+        exclude(group: 'com.velocitypowered')
+        exclude(group: 'io.netty')
+    }
     implementation('com.google.code.gson:gson:2.11.0')
     testImplementation('com.velocitypowered:velocity-api:3.4.0-SNAPSHOT')
-    testImplementation('com.github.retrooper:packetevents-velocity:2.13.0')
+    testImplementation(libs.packetevents.velocity)
     testImplementation('org.junit.jupiter:junit-jupiter:5.10.2')
     testRuntimeOnly('org.junit.platform:junit-platform-launcher:1.10.2')
     testImplementation('org.mockito:mockito-core:5.18.0')
@@ -38,15 +44,21 @@ test { useJUnitPlatform() }
 
 tasks.named('jar') { enabled = false }
 
+tasks.named('slimJar').get()
+
 shadowJar {
     archiveBaseName.set('Gloss')
     archiveClassifier.set('velocity')
     destinationDirectory.set(layout.buildDirectory.dir('platform'))
+    dependsOn(tasks.named('slimJar'))
     relocate('art.arcane.gloss.expr', 'art.arcane.gloss.velocity.expr')
     relocate('art.arcane.gloss.proxy', 'art.arcane.gloss.velocity.proxy')
     relocate('art.arcane.gloss.animation', 'art.arcane.gloss.velocity.animation')
     relocate('art.arcane.gloss.emoji', 'art.arcane.gloss.velocity.emoji')
     relocate('com.google.gson', 'art.arcane.gloss.velocity.libs.gson')
+    relocate('io.github.slimjar', 'art.arcane.gloss.velocity.libs.slimjar')
+    rename('slimjar.dat', 'gloss-velocity-slimjar.dat')
+    rename('slimjar-resolutions.dat', 'gloss-velocity-slimjar-resolutions.dat')
     filesMatching('velocity-plugin.json') {
         filter { String line -> line.replace('@VERSION@', project.version.toString()) }
     }

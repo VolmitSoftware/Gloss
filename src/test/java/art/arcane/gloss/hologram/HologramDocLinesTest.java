@@ -31,8 +31,7 @@ class HologramDocLinesTest {
             { "entity": "minecraft:villager", "scale": 0.7 }
           ],
           "actions": [ { "type": "message", "message": "&aHello", "trigger": "left_click" } ],
-          "hitbox": { "width": 1.2, "height": 0.35, "perLine": true },
-          "motion": "breathe"
+          "hitbox": { "width": 1.2, "height": 0.35, "perLine": true }
         }
         """;
 
@@ -60,7 +59,7 @@ class HologramDocLinesTest {
     }
 
     @Test
-    void actionsHitboxAndMotionParse() {
+    void actionsAndHitboxParse() {
         HologramDoc doc = HologramDoc.parse("shop.json", RICH);
 
         assertEquals(1, doc.actions().size());
@@ -69,7 +68,6 @@ class HologramDocLinesTest {
         assertEquals(1.2D, doc.hitbox().width(), 1.0E-9D);
         assertEquals(0.35D, doc.hitbox().height(), 1.0E-9D);
         assertTrue(doc.hitbox().perLine());
-        assertEquals("breathe", doc.motion());
     }
 
     @Test
@@ -100,7 +98,6 @@ class HologramDocLinesTest {
         HologramDoc restored = DocumentParsers.GSON.fromJson(encoded, HologramDoc.class);
         assertEquals(doc.lines(), restored.lines());
         assertEquals(doc.hitbox(), restored.hitbox());
-        assertEquals("breathe", restored.motion());
     }
 
     @Test
@@ -181,6 +178,5 @@ class HologramDocLinesTest {
         assertEquals(List.of("&dOne", "&7Two"), doc.textLines());
         assertTrue(doc.pages().isEmpty());
         assertTrue(doc.actions().isEmpty());
-        assertFalse(doc.hasMotion());
     }
 }

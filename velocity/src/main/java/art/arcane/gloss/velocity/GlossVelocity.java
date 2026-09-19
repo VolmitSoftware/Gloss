@@ -17,8 +17,8 @@ import com.velocitypowered.api.event.player.ServerPostConnectEvent;
 import com.velocitypowered.api.event.proxy.ProxyInitializeEvent;
 import com.velocitypowered.api.event.proxy.ProxyPingEvent;
 import com.velocitypowered.api.event.proxy.ProxyShutdownEvent;
-import com.velocitypowered.api.plugin.Dependency;
 import com.velocitypowered.api.plugin.Plugin;
+import com.velocitypowered.api.plugin.PluginContainer;
 import com.velocitypowered.api.plugin.annotation.DataDirectory;
 import com.velocitypowered.api.proxy.Player;
 import com.velocitypowered.api.proxy.ProxyServer;
@@ -38,10 +38,11 @@ import java.util.UUID;
 
 @Plugin(id = "gloss", name = "Gloss", version = "@VERSION@",
     description = "Network tablists, scoreboards, MOTD, surfaces and connection messages",
-    authors = {"VolmitSoftware"}, dependencies = {@Dependency(id = "packetevents")})
+    authors = {"VolmitSoftware"})
 public final class GlossVelocity {
     private final ProxyServer proxy;
     private final Logger logger;
+    private final PluginContainer plugin;
     private final Path directory;
     private final Set<UUID> hiddenBoards = new HashSet<>();
     private final Set<UUID> failedPlayers = new HashSet<>();
@@ -53,19 +54,23 @@ public final class GlossVelocity {
     private ProxySurfaces surfaces;
     private ProxyConnections connections;
     private ProxyOwnership ownership;
+    private ProxyPacketEvents packetEvents;
     private ScheduledTask refresh;
     private volatile boolean pingFailed;
 
     @Inject
-    public GlossVelocity(ProxyServer proxy, Logger logger, @DataDirectory Path directory) {
+    public GlossVelocity(
+            ProxyServer proxy, Logger logger, PluginContainer plugin, @DataDirectory Path directory) {
         this.proxy = proxy;
         this.logger = logger;
+        this.plugin = plugin;
         this.directory = directory;
     }
 
-    @Subscribe(order = PostOrder.LAST)
+    @Subscribe(order = PostOrder.FIRST)
     public synchronized void initialize(ProxyInitializeEvent event) {
         try {
+            packetEvents = ProxyPacketEvents.start(proxy, plugin, logger, directory);
             text = new ProxyText(proxy);
             ProxyDocuments.seed(directory);
             RuntimeConfig loaded = load();
@@ -75,6 +80,7 @@ public final class GlossVelocity {
             links = new ProxyServerLinks(text);
             surfaces = new ProxySurfaces(text, logger);
             connections = new ProxyConnections(proxy, text, logger);
+            packetEvents.init();
             config = loaded;
             schedule();
             proxy.getCommandManager().register(proxy.getCommandManager().metaBuilder("gloss").plugin(this).build(),
@@ -292,6 +298,10 @@ public final class GlossVelocity {
         connections = null;
         if (text != null) {
             text.content(ProxyTextDocuments.Content.EMPTY);
+        }
+        if (packetEvents != null) {
+            packetEvents.close();
+            packetEvents = null;
         }
         hiddenBoards.clear();
         failedPlayers.clear();

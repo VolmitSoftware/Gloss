@@ -161,6 +161,7 @@ public final class ParticleService {
     }
 
     public void clear() {
+        ViewerParticles.clear();
         particles.clear();
         samples.clear();
         viewerBudgets.clear();
