@@ -1,6 +1,8 @@
 package art.arcane.gloss.proxy;
 
 import art.arcane.gloss.Gloss;
+import art.arcane.volmlib.nativelib.NativeAdapters;
+import art.arcane.volmlib.nativelib.proxy.ProxyForwardingAccess;
 import art.arcane.gloss.motd.MotdService;
 import art.arcane.gloss.surface.SurfaceService;
 import org.bukkit.Bukkit;
@@ -17,6 +19,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.Map;
+import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.StringJoiner;
 import java.util.UUID;
@@ -266,8 +269,8 @@ public final class BackendProxyOwnership implements Listener, PluginMessageListe
             }
             return configured;
         }
-        Class<?> bridge = Class.forName("art.arcane.gloss.paper.PaperProxyForwardingKey");
-        return (byte[]) bridge.getMethod("load").invoke(null);
+        Optional<ProxyForwardingAccess> access = NativeAdapters.find(ProxyForwardingAccess.class);
+        return access.isPresent() ? access.get().velocityKey() : null;
     }
 
     private record Claim(int mask, long expiresAtMillis) {

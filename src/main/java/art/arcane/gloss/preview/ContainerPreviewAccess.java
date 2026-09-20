@@ -1,5 +1,7 @@
 package art.arcane.gloss.preview;
 
+import art.arcane.volmlib.nativelib.NativeAdapters;
+import art.arcane.volmlib.nativelib.block.BlockEntityAccess;
 import art.arcane.gloss.Gloss;
 import art.arcane.gloss.GlossConfig;
 import art.arcane.gloss.integration.protection.ContainerProtectionService;
@@ -20,7 +22,6 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.permissions.Permissible;
 import org.bukkit.util.BoundingBox;
 
-import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -39,7 +40,7 @@ public final class ContainerPreviewAccess {
   private static final Method ENDER_CHEST_IS_BLOCKED = paperStateMethod(EnderChest.class, "isBlocked");
   private static final Method SHULKER_BOX_IS_OPEN = paperStateMethod(ShulkerBox.class, "isOpen");
 
-  private static volatile LockReflection lockReflection;
+  private static volatile BlockEntityAccess nativeBlocks;
   private static volatile LockCheck lockCheck;
   private static volatile boolean lockCheckResolved;
 
@@ -235,31 +236,16 @@ public final class ContainerPreviewAccess {
 
   private static boolean matchesLock(BlockState state, ItemStack keyItem) {
     try {
-      LockReflection reflection = lockReflection;
-      if (reflection == null) {
-        reflection = resolveLockReflection(state);
-        lockReflection = reflection;
+      BlockEntityAccess blocks = nativeBlocks;
+      if (blocks == null) {
+        blocks = NativeAdapters.require(BlockEntityAccess.class);
+        nativeBlocks = blocks;
       }
-      Object blockEntity = reflection.getBlockEntity().invoke(state);
-      Object lockCode = reflection.lockKey().get(blockEntity);
-      Object nmsItem = reflection.asNmsCopy().invoke(null, keyItem);
-      return (boolean) reflection.unlocksWith().invoke(lockCode, nmsItem);
+      return blocks.matchesLock(state, keyItem);
     } catch (ReflectiveOperationException | RuntimeException | LinkageError ex) {
       logLockFailure(ex);
       return false;
     }
-  }
-
-  private static LockReflection resolveLockReflection(BlockState state) throws ReflectiveOperationException {
-    Method getBlockEntity = state.getClass().getMethod("getBlockEntity");
-    Object blockEntity = getBlockEntity.invoke(state);
-    Field lockKey = blockEntity.getClass().getField("lockKey");
-    Object lockCode = lockKey.get(blockEntity);
-    ClassLoader classLoader = state.getClass().getClassLoader();
-    Class<?> craftItemStackClass = Class.forName("org.bukkit.craftbukkit.inventory.CraftItemStack", true, classLoader);
-    Method asNmsCopy = craftItemStackClass.getMethod("asNMSCopy", ItemStack.class);
-    Method unlocksWith = lockCode.getClass().getMethod("unlocksWith", asNmsCopy.getReturnType());
-    return new LockReflection(getBlockEntity, lockKey, asNmsCopy, unlocksWith);
   }
 
   private static void logLockFailure(Throwable throwable) {
@@ -340,6 +326,4 @@ public final class ContainerPreviewAccess {
   public record LockCheckDecision(Event.Result result, ItemStack customKeyItem) {
   }
 
-  private record LockReflection(Method getBlockEntity, Field lockKey, Method asNmsCopy, Method unlocksWith) {
-  }
 }
