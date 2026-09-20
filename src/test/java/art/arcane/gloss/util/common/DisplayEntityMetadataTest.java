@@ -21,8 +21,10 @@ import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerTe
 import net.kyori.adventure.text.Component;
 import org.bukkit.Location;
 import org.bukkit.util.Vector;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 import org.junit.Test;
 
 import java.lang.reflect.Proxy;
@@ -35,15 +37,27 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 
+@RunWith(Parameterized.class)
 public class DisplayEntityMetadataTest {
+  private final ServerVersion version;
 
-  @BeforeClass
-  public static void installPacketEventsApi() {
-    PacketEvents.setAPI(new TestPacketEventsApi());
+  public DisplayEntityMetadataTest(ServerVersion version) {
+    this.version = version;
   }
 
-  @AfterClass
-  public static void clearPacketEventsApi() {
+  @Parameterized.Parameters(name = "{0}")
+  public static List<ServerVersion> versions() {
+    return List.of(ServerVersion.V_26_1_2, ServerVersion.V_26_2, ServerVersion.V_26_3);
+  }
+
+
+  @Before
+  public void installPacketEventsApi() {
+    PacketEvents.setAPI(new TestPacketEventsApi(version));
+  }
+
+  @After
+  public void clearPacketEventsApi() {
     PacketEvents.setAPI(null);
   }
 
@@ -279,6 +293,12 @@ public class DisplayEntityMetadataTest {
   }
 
   private static final class TestPacketEventsApi extends PacketEventsAPI<Object> {
+    private final ServerVersion version;
+
+    private TestPacketEventsApi(ServerVersion version) {
+      this.version = version;
+    }
+
     @Override
     public boolean isLoaded() {
       return true;
@@ -305,7 +325,7 @@ public class DisplayEntityMetadataTest {
 
     @Override
     public ServerManager getServerManager() {
-      return () -> ServerVersion.V_26_1_2;
+      return () -> version;
     }
 
     @Override

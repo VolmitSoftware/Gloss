@@ -120,8 +120,10 @@ final class RealDropAnimationEngine {
             state.consumePoseDirty(), pollDelay, interpolation);
     }
 
-    private static boolean sameRotation(Quaternionf first, Quaternionf second) {
-        return Math.abs(first.dot(second)) >= 0.999999F;
+    static boolean sameRotation(Quaternionf first, Quaternionf second) {
+        float dot = first.x() * second.x() + first.y() * second.y()
+            + first.z() * second.z() + first.w() * second.w();
+        return Math.abs(dot) >= 0.999999F;
     }
 
     private static float alignmentRadians(GlossConfig.RealDrops config) {

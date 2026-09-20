@@ -118,7 +118,12 @@ public final class PackBuilder {
 
     private static String mcmeta(int packFormat) {
         JsonObject pack = new JsonObject();
-        pack.addProperty("pack_format", packFormat);
+        if (packFormat >= 65) {
+            pack.addProperty("min_format", packFormat);
+            pack.addProperty("max_format", packFormat);
+        } else {
+            pack.addProperty("pack_format", packFormat);
+        }
         pack.addProperty("description", DESCRIPTION);
         JsonObject root = new JsonObject();
         root.add("pack", pack);

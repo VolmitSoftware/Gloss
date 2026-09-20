@@ -16,14 +16,15 @@ class PackFormatsTest {
 
     @Test
     void knownVersionsResolveFromTheTable() {
-        assertEquals(64, formats.forServer("26.2-R0.1-SNAPSHOT", 0));
-        assertEquals(63, formats.forServer("26.1.2-R0.1-SNAPSHOT", 0));
-        assertEquals(64, formats.forServer("26.2", 0));
+        assertEquals(88, formats.forServer("26.2-R0.1-SNAPSHOT", 0));
+        assertEquals(84, formats.forServer("26.1.2-R0.1-SNAPSHOT", 0));
+        assertEquals(88, formats.forServer("26.2", 0));
+        assertEquals(97, formats.forServer("26.3-R0.1-SNAPSHOT", 0));
     }
 
     @Test
     void anOlderUnknownVersionFallsBackToTheNearestOlderEntry() {
-        assertEquals(63, formats.forServer("26.1.9-R0.1-SNAPSHOT", 0));
+        assertEquals(84, formats.forServer("26.1.9-R0.1-SNAPSHOT", 0));
     }
 
     @Test

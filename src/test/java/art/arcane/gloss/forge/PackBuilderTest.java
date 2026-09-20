@@ -38,6 +38,15 @@ class PackBuilderTest {
     }
 
     @Test
+    void modernPackMetadataAcceptsTheCurrentMinorVersion() throws Exception {
+        PackArtifact artifact = new PackBuilder(FIXTURE_IMAGES).build(registry(BRAND), folder.resolve("modern"), 97);
+        String metadata = Files.readString(artifact.directory().resolve("pack.mcmeta"));
+        assertTrue(metadata.contains("\"min_format\": 97"), metadata);
+        assertTrue(metadata.contains("\"max_format\": 97"), metadata);
+        assertFalse(metadata.contains("\"pack_format\""), metadata);
+    }
+
+    @Test
     void writesTheDirectoryZipAndHash() throws IOException {
         PackArtifact artifact = new PackBuilder(FIXTURE_IMAGES).build(registry(BRAND), folder.resolve("out"), 64);
 

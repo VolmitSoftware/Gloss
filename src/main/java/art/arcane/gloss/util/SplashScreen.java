@@ -7,7 +7,7 @@ import net.md_5.bungee.api.ChatColor;
 import java.util.logging.Level;
 
 public final class SplashScreen {
-    private static final String SUPPORTED_MC_VERSION = "26.1.2 - 26.2";
+    private static final String SUPPORTED_MC_VERSION = "26.1.2 - 26.3";
     private static final String[] ART = {
         " ██████╗ ██╗      ██████╗ ███████╗███████╗",
         "██╔════╝ ██║     ██╔═══██╗██╔════╝██╔════╝",

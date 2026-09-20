@@ -304,6 +304,16 @@ java {
     }
 }
 
+allprojects {
+    configurations.configureEach {
+        resolutionStrategy.eachDependency { details ->
+            if (details.requested.group == 'com.github.retrooper' && details.requested.name.startsWith('packetevents-')) {
+                details.useVersion(libs.versions.packetevents.get())
+            }
+        }
+    }
+}
+
 configurations.configureEach {
     resolutionStrategy.cacheChangingModulesFor(0, 'seconds')
     resolutionStrategy.cacheDynamicVersionsFor(0, 'seconds')
@@ -344,8 +354,30 @@ tasks.register('verifyLanguagePackaging') {
     }
 }
 
+configurations {
+    modernJomlTestRuntime {
+        canBeConsumed = false
+        transitive = false
+    }
+}
+
+dependencies {
+    modernJomlTestRuntime('org.joml:joml:1.10.9')
+}
+
+tasks.register('testModernJoml', Test) {
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath.filter { File file -> !file.name.startsWith('joml-') } + configurations.modernJomlTestRuntime
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching('art.arcane.gloss.drop.RealDropRotationCompatibilityTest')
+        includeTestsMatching('art.arcane.gloss.drop.RealDropAnimationEngineTest.flatItemContinuouslySettlesOntoItsBroadFace')
+        includeTestsMatching('art.arcane.gloss.drop.RealDropAnimationEngineTest.settledFramesStopEmittingPoseChanges')
+    }
+}
+
 tasks.named('check').configure {
-    dependsOn(tasks.named('verifyLanguagePackaging'))
+    dependsOn(tasks.named('verifyLanguagePackaging'), tasks.named('testModernJoml'))
 }
 
 pluginPackaging {

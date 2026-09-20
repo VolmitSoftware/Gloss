@@ -27,7 +27,7 @@ Container-preview discovery uses a fair, deduplicated queue capped at ten player
 
 ## Requirements
 
-- A 26.1.2 – 26.2 server: Paper, Purpur, Leaf, Folia, Canvas or Spigot.
+- A 26.1.2 – 26.3 server: Paper, Purpur, Leaf, Folia, Canvas or Spigot, using a build available for that Minecraft version.
 - Java 25.
 - Optional: PlaceholderAPI (placeholders in any rendered line), Vault (permission-group tablist names and default boards).
 

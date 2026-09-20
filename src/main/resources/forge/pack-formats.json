@@ -1,8 +1,8 @@
 {
-  "source": "Minecraft client jar version.json, pack_version.resource_pack_version. Values not read from a client jar are marked provisional below; correct them from the running server's client jar or override them with [forge] packFormat.",
-  "provisional": ["26.1", "26.2"],
+  "source": "Minecraft client jar version.json, pack_version.resource_pack_version. Major format versions match the Minecraft Java release notes.",
   "formats": {
-    "26.1": 63,
-    "26.2": 64
+    "26.1": 84,
+    "26.2": 88,
+    "26.3": 97
   }
 }
