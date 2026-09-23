@@ -7,6 +7,9 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Map;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.io.IOException;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -20,6 +23,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * with holes in it, so they are refused at load instead.
  */
 class InventoryDocTest {
+
+    @Test
+    void gameplayInventoryHasUsableConfirmationAndCloseControls() throws IOException {
+        InventoryDoc doc = parse(Files.readString(Path.of("src/test/gameplay/fixtures/interaction-inventory.json")));
+        assertEquals(27, doc.size());
+        assertInstanceOf(ButtonComponentData.class, doc.resolveSlots().get(11));
+        assertInstanceOf(ButtonComponentData.class, doc.resolveSlots().get(15));
+    }
 
     @Test
     void aChestDocumentResolvesItsMaskAgainstItsKeys() {

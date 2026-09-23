@@ -1,0 +1,27 @@
+{
+  "show": true,
+  "offset": [0, 1.7, 2.5],
+  "lockPosition": false,
+  "followPlayer": false,
+  "closeOnDeath": true,
+  "closeOnTeleport": true,
+  "particleLayers": [],
+  "components": [
+    {
+      "id": "title", "offset": [0, 0.5, 0],
+      "data": { "type": "decoration", "icon": { "type": "text", "text": "&fInteraction check\n&7{{ player.name }}", "style": { "shadow": true, "backgroundArgb": "#EE20242A", "textAlignment": "center" } } }
+    },
+    {
+      "id": "confirm", "offset": [0, 0, 0],
+      "data": {
+        "type": "button", "hoverDurationTicks": 3,
+        "icon": { "type": "text", "text": "&aConfirm interaction", "style": { "shadow": true, "backgroundArgb": "#EE20242A", "textAlignment": "center" }, "box": { "enabled": true, "padding": 6, "borderWidth": 1, "backgroundArgb": "#EE20242A", "borderArgb": "#FF77BB88" } },
+        "actions": [{ "type": "message", "message": "GLOSS_QA_HOLOGRAM {{ player.name }}" }]
+      }
+    },
+    {
+      "id": "close", "offset": [0, -0.5, 0],
+      "data": { "type": "button", "icon": { "type": "text", "text": "&fClose menu", "style": { "shadow": true, "backgroundArgb": "#EE20242A" } }, "actions": [{ "type": "navigate", "mode": "close" }] }
+    }
+  ]
+}

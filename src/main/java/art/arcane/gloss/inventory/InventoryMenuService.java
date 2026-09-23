@@ -5,6 +5,7 @@ import art.arcane.gloss.api.internal.ApiEvents;
 import art.arcane.gloss.GlossConfig;
 import art.arcane.gloss.api.HoloClickTrigger;
 import art.arcane.gloss.doc.DocumentRegistry;
+import art.arcane.gloss.doc.DocumentDelta;
 import art.arcane.gloss.doc.GlossDocument;
 import art.arcane.gloss.doc.ShippedDefaults;
 import art.arcane.gloss.doc.ShippedDocumentCatalog;
@@ -24,6 +25,7 @@ import art.arcane.volmlib.util.inventorygui.UIElement;
 import art.arcane.volmlib.util.inventorygui.UIWindow;
 import art.arcane.volmlib.util.inventorygui.WindowResolution;
 import art.arcane.volmlib.util.scheduling.FoliaScheduler;
+import art.arcane.volmlib.util.scheduling.SchedulerUtils;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.HandlerList;
@@ -145,14 +147,24 @@ public final class InventoryMenuService implements GlossService, Listener {
     }
 
     private void poll() {
-        if (registry.poll() != null) {
-            rebuild();
+        DocumentDelta delta = registry.poll();
+        if (delta.isEmpty()) {
+            return;
+        }
+        if (!registry.dispatch(delta, task -> SchedulerUtils.runGlobal(plugin, task),
+            () -> rebuild(registry.snapshot(delta)))) {
+            Gloss.warnThrottled("inventory-hotload-scheduling",
+                "Inventory hot reload could not reach the server thread; the change will be retried.");
         }
     }
 
     private void rebuild() {
+        rebuild(registry.snapshot());
+    }
+
+    private void rebuild(Map<String, GlossDocument<InventoryDoc>> documents) {
         Map<String, InventoryRuntime> built = new LinkedHashMap<>();
-        for (Map.Entry<String, GlossDocument<InventoryDoc>> entry : registry.snapshot().entrySet()) {
+        for (Map.Entry<String, GlossDocument<InventoryDoc>> entry : documents.entrySet()) {
             try {
                 built.put(entry.getKey(), InventoryRuntime.compile(entry.getKey(), entry.getValue().value()));
             } catch (RuntimeException failure) {
