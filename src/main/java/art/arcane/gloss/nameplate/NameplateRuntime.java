@@ -29,10 +29,10 @@ public final class NameplateRuntime {
         this.id = Objects.requireNonNull(id, "id");
         this.doc = Objects.requireNonNull(doc, "doc");
         this.selection = ConditionCompiler.compile(
-            new ConditionSource("nameplates." + id + ".select.when", doc.select().when()));
+            ConditionSource.subjectPermission("nameplates." + id + ".select.when", doc.select().when(), doc.select().permission()));
         for (NameplateDoc.Variant variant : doc.variants()) {
             variantConditions.put(variant.id(), ConditionCompiler.compile(
-                new ConditionSource("nameplates." + id + ".variants." + variant.id(), variant.when())));
+                ConditionSource.subjectPermission("nameplates." + id + ".variants." + variant.id(), variant.when(), variant.permission())));
         }
         this.viewerDependent = computeViewerDependent(doc);
     }

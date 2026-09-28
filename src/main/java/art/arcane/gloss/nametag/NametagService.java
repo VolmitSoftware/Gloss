@@ -12,8 +12,11 @@ import art.arcane.gloss.doc.ShippedDefaults;
 import art.arcane.gloss.doc.ShippedDocumentCatalog;
 import art.arcane.gloss.expr.ExprScope;
 import art.arcane.gloss.service.GlossService;
+import art.arcane.gloss.util.common.TextUtils;
+import art.arcane.volmlib.util.scheduling.FoliaScheduler;
 import art.arcane.volmlib.util.scheduling.SchedulerUtils;
 import org.bukkit.Bukkit;
+import org.bukkit.ChatColor;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -27,7 +30,11 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.UnaryOperator;
 import java.util.logging.Level;
 
@@ -42,7 +49,11 @@ public final class NametagService implements GlossService, Listener {
     private final DocumentRegistry<NametagDoc> registry;
     private final NametagDriver driver;
     private final BoundedConditionErrorCallback conditionErrors;
+    private final ThreadLocal<Boolean> renderingIdentity = ThreadLocal.withInitial(() -> false);
+    private final Map<UUID, Identity> identities = new ConcurrentHashMap<>();
+    private final Set<UUID> pendingIdentities = ConcurrentHashMap.newKeySet();
     private volatile List<NametagRuntime> runtimes = List.of();
+    private volatile boolean viewerDependent;
     private int taskId = -1;
 
     public NametagService(Gloss plugin) {
@@ -91,6 +102,9 @@ public final class NametagService implements GlossService, Listener {
         driver.clear();
         registry.close();
         runtimes = List.of();
+        viewerDependent = false;
+        identities.clear();
+        pendingIdentities.clear();
     }
 
     @Override
@@ -108,6 +122,42 @@ public final class NametagService implements GlossService, Listener {
         return runtimes;
     }
 
+    public boolean viewerDependent() {
+        return plugin.cfg().modules().nametags().enabled() && viewerDependent;
+    }
+
+    public String displayName(Player viewer, Player subject) {
+        if (subject == null) {
+            return "";
+        }
+        if (renderingIdentity.get() || !plugin.cfg().modules().nametags().enabled() || runtimes.isEmpty()) {
+            return subject.getName();
+        }
+        if (!viewerDependent()) {
+            Identity cached = identities.get(subject.getUniqueId());
+            if (cached != null && cached.runtimes() == runtimes && cached.expiresAt() > System.currentTimeMillis()) {
+                return cached.name();
+            }
+            if (FoliaScheduler.isOwnedByCurrentRegion(subject)) {
+                return refreshIdentity(subject);
+            }
+            requestIdentity(subject);
+            return cached != null && cached.runtimes() == runtimes ? cached.name() : subject.getName();
+        }
+        return renderIdentity(viewer, subject);
+    }
+
+    static String formatName(String name, String color, String prefix, String suffix) {
+        ChatColor nameColor;
+        try {
+            nameColor = ChatColor.valueOf(color.toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException failure) {
+            nameColor = ChatColor.WHITE;
+        }
+        return TextUtils.renderLegacy(prefix) + ChatColor.RESET + nameColor + name
+            + TextUtils.renderLegacy(suffix) + ChatColor.RESET;
+    }
+
     public int unsupportedSchemaCount() {
         return registry.unsupportedSchemaDocuments().size();
     }
@@ -123,6 +173,9 @@ public final class NametagService implements GlossService, Listener {
 
     @EventHandler(priority = EventPriority.MONITOR)
     public void on(PlayerJoinEvent event) {
+        if (plugin.cfg().modules().nametags().enabled() && !viewerDependent()) {
+            refreshIdentity(event.getPlayer());
+        }
         plugin.scheduler().s(this::pass, 1);
     }
 
@@ -134,6 +187,8 @@ public final class NametagService implements GlossService, Listener {
     @EventHandler(priority = EventPriority.MONITOR)
     public void on(PlayerQuitEvent event) {
         driver.forget(event.getPlayer().getUniqueId());
+        identities.remove(event.getPlayer().getUniqueId());
+        pendingIdentities.remove(event.getPlayer().getUniqueId());
     }
 
     private void loadAll() {
@@ -152,7 +207,13 @@ public final class NametagService implements GlossService, Listener {
             }
         }
         compiled.sort(Comparator.comparing(NametagRuntime::id));
+        boolean personal = false;
+        for (NametagRuntime runtime : compiled) {
+            personal |= runtime.viewerDependent();
+        }
+        viewerDependent = personal;
         runtimes = List.copyOf(compiled);
+        identities.clear();
     }
 
     private void pollRegistry() {
@@ -182,15 +243,75 @@ public final class NametagService implements GlossService, Listener {
             return;
         }
         List<Player> players = new ArrayList<>(Bukkit.getOnlinePlayers());
+        if (!viewerDependent()) {
+            for (Player player : players) {
+                requestIdentity(player);
+            }
+        }
         driver.apply(players, players, active, this::scope, conditionErrors);
     }
 
+    private String renderIdentity(Player viewer, Player subject) {
+        renderingIdentity.set(true);
+        try {
+            ExprScope scope = scope(viewer, subject);
+            NametagRuntime runtime = NametagRuntime.pick(runtimes, scope, conditionErrors).orElse(null);
+            if (runtime == null) {
+                return subject.getName();
+            }
+            NametagDoc.Presentation presentation = runtime.profile(scope, conditionErrors).presentation();
+            return formatName(subject.getName(), presentation.color(),
+                render(viewer, presentation.prefix(), scope), render(viewer, presentation.suffix(), scope));
+        } finally {
+            renderingIdentity.remove();
+        }
+    }
+
+    private void requestIdentity(Player subject) {
+        UUID id = subject.getUniqueId();
+        if (!pendingIdentities.add(id)) {
+            return;
+        }
+        if (!FoliaScheduler.runEntity(plugin, subject, () -> {
+            try {
+                refreshIdentity(subject);
+            } finally {
+                pendingIdentities.remove(id);
+            }
+        }, 0L, () -> pendingIdentities.remove(id))) {
+            pendingIdentities.remove(id);
+        }
+    }
+
+    private String refreshIdentity(Player subject) {
+        List<NametagRuntime> generation = runtimes;
+        String name = renderIdentity(subject, subject);
+        if (generation == runtimes && subject.isOnline()) {
+            identities.put(subject.getUniqueId(), new Identity(generation, name, System.currentTimeMillis()
+                + plugin.cfg().modules().nametags().refreshIntervalTicks() * 50L));
+        }
+        return name;
+    }
+
     private String render(Player viewer, String raw, ExprScope scope) {
-        String rendered = plugin.text().renderScoped(viewer, raw, scope, UnaryOperator.identity());
-        return rendered == null ? "" : rendered;
+        boolean previous = renderingIdentity.get();
+        renderingIdentity.set(true);
+        try {
+            String rendered = plugin.text().renderScoped(viewer, raw, scope, UnaryOperator.identity());
+            return rendered == null ? "" : rendered;
+        } finally {
+            if (previous) {
+                renderingIdentity.set(true);
+            } else {
+                renderingIdentity.remove();
+            }
+        }
     }
 
     private ExprScope scope(Player viewer, Player subject) {
-        return new GlossConditionScope(plugin, GlossConditionContext.subject(viewer, subject, null, Map.of()));
+        return new GlossConditionScope(plugin, new GlossConditionContext(viewer, subject, null, null, Map.of()));
+    }
+
+    private record Identity(List<NametagRuntime> runtimes, String name, long expiresAt) {
     }
 }

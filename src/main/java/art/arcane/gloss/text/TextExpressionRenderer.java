@@ -28,7 +28,7 @@ public final class TextExpressionRenderer {
     public static final Set<String> STANDARD_VARIABLES = Set.of(
         "time.ms", "time.seconds", "time.ticks",
         "server.online", "server.maxPlayers", "server.tps",
-        "player.name", "player.ping", "player.health", "player.level", "player.bedrock");
+        "player.name", "player.displayName", "player.username", "player.ping", "player.health", "player.level", "player.bedrock");
     public static final Set<String> STANDARD_FUNCTIONS = Set.of("papi", "papiNumber", "metric");
 
     private static final int CACHE_LIMIT = 4096;
@@ -258,7 +258,7 @@ public final class TextExpressionRenderer {
                 case "server.online" -> (double) runtimeValues.onlinePlayers().getAsInt();
                 case "server.maxPlayers" -> (double) runtimeValues.maxPlayers().getAsInt();
                 case "server.tps" -> runtimeValues.serverTps().getAsDouble();
-                case "player.name" -> viewer == null ? null : viewer.getName();
+                case "player.name", "player.displayName", "player.username" -> viewer == null ? null : viewer.getName();
                 case "player.ping" -> viewer == null ? null : (double) viewer.getPing();
                 case "player.health" -> viewer == null ? null : viewer.getHealth();
                 case "player.level" -> viewer == null ? null : (double) viewer.getLevel();

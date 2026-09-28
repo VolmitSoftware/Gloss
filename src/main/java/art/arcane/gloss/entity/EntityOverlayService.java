@@ -7,6 +7,7 @@ import art.arcane.gloss.api.TemporaryHologram;
 import art.arcane.gloss.api.ParticleTextSpan;
 import art.arcane.gloss.particle.ParticleText;
 import art.arcane.gloss.text.TextPipeline;
+import art.arcane.gloss.nametag.NametagService;
 import art.arcane.gloss.doc.DocumentDelta;
 import art.arcane.gloss.doc.DocumentRegistry;
 import art.arcane.gloss.doc.GlossDocument;
@@ -365,11 +366,16 @@ public final class EntityOverlayService implements Listener, RegistryOwner {
             emojiGeneration = emoji;
             animationGeneration = animation;
         }
-        if (!drift && !refreshText && !trackDistance) {
+        boolean refreshPlayers = plugin.cfg().modules().nametags().enabled()
+            || plugin.cfg().modules().nameplates().enabled();
+        boolean refreshAll = drift || refreshText || trackDistance;
+        if (!refreshAll && !refreshPlayers) {
             return;
         }
         for (EntityOverlayTarget overlay : overlays.values()) {
-            overlay.dirty = true;
+            if (refreshAll || overlay.target instanceof Player) {
+                overlay.dirty = true;
+            }
         }
     }
 
@@ -606,7 +612,10 @@ public final class EntityOverlayService implements Listener, RegistryOwner {
         }
         overlay.target = target.entity();
         overlay.publish(target.snapshot(), target.anchor(), target.x(), target.y(), target.z());
-        boolean personal = personalText || insightFor(viewerId, target.targetId()) != null;
+        NametagService nametags = plugin.service(NametagService.class);
+        boolean personal = personalText || claimed(target.entity())
+            || target.entity() instanceof Player && nametags != null && nametags.viewerDependent()
+            || insightFor(viewerId, target.targetId()) != null;
         overlay.audience.put(viewerId, sequence);
         if (personal ? overlay.personalViewers.add(viewerId) : overlay.personalViewers.remove(viewerId)) {
             overlay.dirty = true;
@@ -788,13 +797,16 @@ public final class EntityOverlayService implements Listener, RegistryOwner {
     private boolean apply(EntityOverlayTarget overlay, EntityOverlayTarget.Render render, Player viewer,
                           LivingEntity target, EntityOverlayDoc current,
                           EntityOverlayText.Snapshot snapshot, List<String> details, Location anchor) {
+        if (target instanceof Player player) {
+            snapshot = snapshot.withName(plugin.text().playerName(viewer, player));
+        }
         long render0 = plugin.text().renderGeneration();
         long emoji = TextPipeline.emojiGeneration();
         long animation = plugin.animations().generation();
-        boolean prepare = render.prepared == null || refreshText || !snapshot.equals(render.snapshot)
+        EntityOverlaySource source = sourceFor(target);
+        boolean prepare = source != null || render.prepared == null || refreshText || !snapshot.equals(render.snapshot)
             || !details.equals(render.details) || render0 != render.renderGeneration
             || emoji != render.emojiGeneration || animation != render.animationGeneration;
-        EntityOverlaySource source = sourceFor(target);
         if (prepare) {
             textPreparations.incrementAndGet();
             EntityOverlaySource.Pane pane = source == null ? null : source.prepare(viewer, target, snapshot);

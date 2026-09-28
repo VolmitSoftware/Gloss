@@ -60,23 +60,25 @@ public record NameplateDoc(int schemaVersion, long revision, ShowCondition show,
         return List.copyOf(copied);
     }
 
-    public record Selection(int priority, String when) {
-        public static final Selection ALWAYS = new Selection(0, "true");
+    public record Selection(int priority, String when, String permission) {
+        public static final Selection ALWAYS = new Selection(0, "true", "");
 
         public Selection {
+            permission = permission == null ? "" : permission.trim();
             when = when == null || when.isBlank() ? "true" : when.trim();
-            ConditionCompiler.compile(new ConditionSource("nameplates.select.when", when));
+            ConditionCompiler.compile(ConditionSource.subjectPermission("nameplates.select.when", when, permission));
         }
     }
 
-    public record Variant(String id, int priority, String when, Presentation presentation) {
+    public record Variant(String id, int priority, String when, String permission, Presentation presentation) {
         public Variant {
+            permission = permission == null ? "" : permission.trim();
             id = Objects.requireNonNull(id, "nameplate variant id").trim();
             if (id.isEmpty() || id.length() > 64) {
                 throw new IllegalArgumentException("a nameplate variant id must be 1 to 64 characters");
             }
             when = when == null || when.isBlank() ? "true" : when.trim();
-            ConditionCompiler.compile(new ConditionSource("nameplates.variants." + id + ".when", when));
+            ConditionCompiler.compile(ConditionSource.subjectPermission("nameplates.variants." + id + ".when", when, permission));
             presentation = presentation == null ? Presentation.EMPTY : presentation;
         }
     }

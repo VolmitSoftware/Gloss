@@ -12,6 +12,7 @@ import art.arcane.gloss.expr.ExprVariableContext;
 import art.arcane.gloss.expr.ExprVariableNamespaces;
 import art.arcane.gloss.service.GlossService;
 import art.arcane.volmlib.util.scheduling.FoliaScheduler;
+import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 
 import java.io.File;
@@ -270,8 +271,10 @@ public final class LeaderboardService implements GlossService {
     }
 
     private String render(String template, String name, double value) {
+        Player player = Bukkit.getPlayerExact(name);
         return plugin.text().renderScoped(null, template,
-            new LeaderboardRowScope(plugin, name, value), UnaryOperator.identity());
+            new LeaderboardRowScope(plugin, player == null ? name : plugin.text().playerName(null, player), value),
+            UnaryOperator.identity());
     }
 
     private Collection<UUID> onlineIds() {
@@ -358,6 +361,10 @@ public final class LeaderboardService implements GlossService {
         LeaderboardNamespace namespace = new LeaderboardNamespace(this::view);
         plugin.text().registerFunction(function, viewer -> {
             Object value = namespace.resolve(id + "." + suffix, ExprVariableContext.viewer(viewer));
+            if (suffix.endsWith(".name") && value instanceof String name) {
+                Player subject = Bukkit.getPlayerExact(name);
+                return subject == null ? name : plugin.text().playerName(viewer, subject);
+            }
             return value == null ? "" : String.valueOf(ExprFunctions.call("str", List.of(value)));
         });
         pipeFunctions.add(function);

@@ -11,6 +11,22 @@ import java.util.Set;
 
 class NameplateSelectionTest {
     @Test
+    void explicitPermissionsGateDocumentsAndVariants() {
+        NameplateRuntime runtime = new NameplateRuntime("rank", NameplateDoc.parse("rank.json", """
+            {"schemaVersion":1,"revision":1,
+             "select":{"permission":"rank.member","when":"subject.op"},
+             "presentation":{"lines":[{"text":"member"}]},
+             "variants":[{"id":"staff","permission":"rank.staff",
+               "presentation":{"lines":[{"text":"staff"}]}}]}
+            """));
+        Assertions.assertFalse(runtime.matches(new TestScope(Map.of("subject.op", false), Set.of("rank.member"))));
+        Assertions.assertFalse(runtime.matches(new TestScope(Map.of("subject.op", true), Set.of())));
+        Assertions.assertTrue(runtime.matches(new TestScope(Map.of("subject.op", true), Set.of("rank.member"))));
+        Assertions.assertEquals("member", runtime.presentation(new TestScope(Map.of(), Set.of())).lines().getFirst().text());
+        Assertions.assertEquals("staff", runtime.presentation(new TestScope(Map.of(), Set.of("rank.staff"))).lines().getFirst().text());
+    }
+
+    @Test
     void theHighestPriorityMatchingDocumentWins() {
         List<NameplateRuntime> runtimes = List.of(
             runtime("ordinary", 10, "true"),

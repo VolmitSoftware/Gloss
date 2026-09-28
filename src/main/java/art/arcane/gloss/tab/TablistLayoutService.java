@@ -13,6 +13,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.UnaryOperator;
+import java.util.function.BiFunction;
 
 /**
  * Drives one grid of client-side tab entries per viewer. The first pass sends the whole grid, later
@@ -24,11 +25,14 @@ public final class TablistLayoutService {
 
     private final LayoutSink sink;
     private final UnaryOperator<String> renderer;
+    private final BiFunction<Player, Player, String> playerNames;
     private final Map<UUID, ViewerLayout> states = new ConcurrentHashMap<>();
 
-    public TablistLayoutService(LayoutSink sink, UnaryOperator<String> renderer) {
+    public TablistLayoutService(LayoutSink sink, UnaryOperator<String> renderer,
+                                BiFunction<Player, Player, String> playerNames) {
         this.sink = sink;
         this.renderer = renderer;
+        this.playerNames = playerNames;
     }
 
     public boolean hasLayout(UUID viewerId) {
@@ -141,7 +145,7 @@ public final class TablistLayoutService {
         for (int cell = 0; cell < capacity; cell++) {
             int index = cells.get(cell).index();
             if (cell < shown) {
-                texts[index] = render(listed.get(cell).getName());
+                texts[index] = render(playerNames.apply(viewer, listed.get(cell)));
             } else if (counts && listed.size() > capacity && cell == capacity - 1) {
                 texts[index] = OVERFLOW_PREFIX + (listed.size() - shown);
             } else {

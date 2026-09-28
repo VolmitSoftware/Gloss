@@ -13,9 +13,8 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * The Bukkit chat path, used on servers without Paper's per-viewer chat event. One format reaches
- * the whole audience, so viewer-dependent tokens resolve as the sender; the recipient set is still
- * narrowed to the channel's scope.
+ * The Bukkit chat path, used on servers without Paper's per-viewer chat event. Channel messages
+ * render for each recipient after the audience is narrowed to the channel's scope.
  */
 @SuppressWarnings("deprecation")
 final class ChatListener implements Listener {
@@ -25,7 +24,7 @@ final class ChatListener implements Listener {
         this.plugin = plugin;
     }
 
-    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onFormat(AsyncPlayerChatEvent event) {
         if (ChatCapture.consume(event.getPlayer().getUniqueId(), event.getMessage())) {
             event.setCancelled(true);
@@ -42,8 +41,12 @@ final class ChatListener implements Listener {
             return;
         }
         event.setMessage(sink.message);
-        event.setFormat(channels.spigotFormat(sink.channel, event.getPlayer(), sink.message));
         retainRecipients(event, sink.viewers);
+        event.setCancelled(true);
+        for (Player viewer : event.getRecipients()) {
+            channels.deliver(sink.channel, event.getPlayer(), viewer, sink.message);
+        }
+        channels.deliverConsole(sink.channel, event.getPlayer(), sink.message);
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)

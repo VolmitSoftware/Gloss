@@ -40,7 +40,7 @@ class NametagDocTest {
         assertEquals("white", doc.presentation().color());
         assertEquals("always", doc.presentation().nameTagVisibility());
         assertEquals("always", doc.presentation().collision());
-        assertEquals(NametagDoc.Selection.NEVER, doc.select());
+        assertEquals(NametagDoc.Selection.ALWAYS, doc.select());
     }
 
     @Test
@@ -83,10 +83,12 @@ class NametagDocTest {
     }
 
     @Test
-    void theShippedDefaultIsInertUntilAnOperatorSelectsIt() {
+    void theShippedDefaultSelectsByPermission() {
         NametagDoc doc = NametagDoc.parse("default.json", shipped());
 
-        assertEquals("false", doc.select().when());
+        assertEquals("true", doc.select().when());
+        assertEquals("gloss.nametag.default", doc.select().permission());
+        assertEquals("gloss.nametag.staff", doc.variants().getFirst().permission());
         assertEquals(1, doc.variants().size());
     }
 

@@ -114,7 +114,7 @@ public final class TablistService implements Listener, Explainable, RegistryOwne
                 "Tablist condition %s failed and was treated as false.", error.path()));
         this.sorts = new TablistSortService(this::sendSortOrders);
         this.layouts = new TablistLayoutService(new PacketLayoutSink(),
-            raw -> plugin.text().renderStatic(raw));
+            raw -> plugin.text().renderStatic(raw), plugin.text()::playerName);
         this.activeDoc = TablistDoc.DEFAULTS;
         this.activeRuntime = TablistRuntime.compile(activeDoc);
         this.activeLayout = TablistLayoutRuntime.compile(activeDoc.layout());
@@ -787,7 +787,7 @@ public final class TablistService implements Listener, Explainable, RegistryOwne
         // Resolving the Vault primary group is a blocking call on a cache miss; only the formats
         // that actually splice $group pay for it.
         String primaryGroup = profile.usesGroup() ? plugin.groups().primaryGroupFor(player).orElse(null) : null;
-        String substituted = substituteTokens(template, player.getName(), primaryGroup);
+        String substituted = substituteTokens(template, plugin.text().playerName(player, player), primaryGroup);
         setFastNamePlayer(uuid, plugin.cfg().text().functions() && profile.fastRefresh());
         if ((TextPipeline.classify(substituted) & VIEWER_DEPENDENT) == 0) {
             // Viewer-independent: the render is a pure function of the substituted text plus the

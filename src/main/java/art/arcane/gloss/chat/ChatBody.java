@@ -25,7 +25,7 @@ public final class ChatBody {
      * @param interactive     false for a viewer whose client has no click or hover (Bedrock)
      * @param item            the sender's held item, or null when the {@code [item]} token is inert
      */
-    public record Context(UnaryOperator<String> escape, String viewerName, boolean mentionsAllowed,
+    public record Context(UnaryOperator<String> escape, String viewerName, String viewerDisplayName, boolean mentionsAllowed,
                           boolean linksAllowed, boolean itemsAllowed, boolean interactive, Item item) {
     }
 
@@ -54,7 +54,7 @@ public final class ChatBody {
             }
             String name = matcher.group(ChannelRuntime.MENTION_NAME_GROUP);
             if (mentions(channel, context, name)) {
-                output.append(mention(channel, name));
+                output.append(mention(channel, context, name));
                 mentioned = true;
                 continue;
             }
@@ -77,8 +77,12 @@ public final class ChatBody {
             && name != null && name.equalsIgnoreCase(context.viewerName());
     }
 
-    private static String mention(ChannelRuntime channel, String name) {
-        return TextUtils.toMiniMessage(substitute(channel.doc().mentions().render(), "mention.name", name));
+    private static String mention(ChannelRuntime channel, Context context, String name) {
+        String displayName = context.viewerDisplayName();
+        String rendered = substitute(channel.doc().mentions().render(), "mention.name",
+            displayName == null || displayName.isEmpty() ? name
+                : ChatComponents.scopedMarkup(displayName));
+        return TextUtils.toMiniMessage(substitute(rendered, "mention.username", name));
     }
 
     private static String link(ChannelRuntime channel, Context context, String url) {

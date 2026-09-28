@@ -22,7 +22,7 @@ class ChatLinksItemsTest {
     @Test
     void aLinkIsPlainTextForAViewerWithNoClickSupport() {
         ChatBody.Body body = ChatBody.render(CHANNEL, "see https://volmit.com/docs now",
-            new ChatBody.Context(null, "Steve", true, true, true, false, null));
+            new ChatBody.Context(null, "Steve", "", true, true, true, false, null));
 
         assertEquals("see <reset><blue><underlined>volmit.com now", body.text());
     }
@@ -51,7 +51,7 @@ class ChatLinksItemsTest {
     void theItemTokenStaysLiteralWithoutAHeldItemOrPermission() {
         assertEquals("look at [item]!", ChatBody.render(CHANNEL, "look at [item]!", context(null)).text());
         assertEquals("look at [item]!", ChatBody.render(CHANNEL, "look at [item]!",
-            new ChatBody.Context(null, "Steve", true, true, false, true, SWORD)).text());
+            new ChatBody.Context(null, "Steve", "", true, true, false, true, SWORD)).text());
     }
 
     @Test
@@ -63,6 +63,6 @@ class ChatLinksItemsTest {
     }
 
     private static ChatBody.Context context(ChatBody.Item item) {
-        return new ChatBody.Context(null, "Steve", true, true, true, true, item);
+        return new ChatBody.Context(null, "Steve", "", true, true, true, true, item);
     }
 }

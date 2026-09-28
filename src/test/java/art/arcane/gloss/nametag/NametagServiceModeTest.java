@@ -126,7 +126,7 @@ class NametagServiceModeTest {
 
     private static NametagRuntime runtime(String when) {
         return NametagRuntime.compile("tags", new NametagDoc(NametagDoc.CURRENT_SCHEMA_VERSION,
-            DocumentEnvelope.INITIAL_REVISION, ShowCondition.ALWAYS, new NametagDoc.Selection(0, when),
+            DocumentEnvelope.INITIAL_REVISION, ShowCondition.ALWAYS, new NametagDoc.Selection(0, when, ""),
             new NametagDoc.Presentation("&7", "", "white", "always", "always"), List.of()));
     }
 

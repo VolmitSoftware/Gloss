@@ -42,7 +42,12 @@
         "when": {
           "description": "Condition deciding whether this document wants to tag the subject.",
           "type": "string",
-          "default": "false"
+          "default": "true"
+        },
+        "permission": {
+          "type": "string",
+          "default": "",
+          "description": "Permission required on the subject wearing this presentation, combined with when. Blank allows every subject."
         }
       }
     },
@@ -98,7 +103,6 @@
         "type": "object",
         "required": [
           "id",
-          "when",
           "presentation"
         ],
         "properties": {
@@ -114,7 +118,8 @@
           },
           "when": {
             "description": "Condition deciding whether this variant applies.",
-            "type": "string"
+            "type": "string",
+            "default": "true"
           },
           "presentation": {
             "title": "Nametag Presentation",
@@ -159,6 +164,11 @@
                 "default": "always"
               }
             }
+          },
+          "permission": {
+            "type": "string",
+            "default": "",
+            "description": "Permission required on the subject wearing this presentation, combined with when. Blank allows every subject."
           }
         }
       }

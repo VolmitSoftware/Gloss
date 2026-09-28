@@ -83,7 +83,7 @@ public final class EntityOverlayText {
      * resolve, so a nameplate writes the same line text an overlay would.
      */
     public static Prepared prepareLines(Gloss plugin, Player viewer, List<String> texts,
-                                        int healthSegments, Snapshot entity) {
+                                        int healthSegments, Snapshot entity, ExprScope scope) {
         if (texts.isEmpty()) {
             return Prepared.hidden();
         }
@@ -93,9 +93,6 @@ public final class EntityOverlayText {
         for (String text : texts) {
             lines.add(authored(text, tokens, "", literals));
         }
-        ExprScope standard = plugin.text().expressionScope(viewer);
-        ExprScope conditions = GlossConditionScope.viewer(plugin, viewer);
-        ExprScope scope = new ViewerScope(standard, conditions);
         String marked = ParticleText.parse(TextUtils.joinLegacyLines(lines)).marked();
         UnaryOperator<String> render = source -> plugin.text().renderScoped(viewer, source, scope, literals::add);
         AnimationTemplate animation = plugin.animator() == null ? null
@@ -245,6 +242,11 @@ public final class EntityOverlayText {
         public Snapshot {
             name = name == null ? "" : name;
             type = type == null ? "" : type;
+        }
+
+        public Snapshot withName(String name) {
+            return new Snapshot(name, health, maxHealth, previousHealth, damage, attack, armor,
+                stackCount, type, distance);
         }
     }
 

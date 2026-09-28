@@ -196,18 +196,24 @@ public record ChannelDoc(int schemaVersion, long revision, ShowCondition show, C
         }
     }
 
-    public record Mentions(Boolean enabled, String pattern, String render, String sound, String permission) {
-        public static final Mentions DEFAULTS = new Mentions(null, null, null, null, null);
+    public record Mentions(Boolean enabled, String pattern, String render, String messageFormat, String sound,
+                           String permission) {
+        public static final Mentions DEFAULTS = new Mentions(null, null, null, null, null, null);
         public static final String NAME_TOKEN = "{name}";
 
         public Mentions {
             enabled = enabled == null || enabled;
             pattern = pattern == null || pattern.isBlank() ? "@" + NAME_TOKEN : pattern.trim();
-            if (!pattern.contains(NAME_TOKEN)) {
-                throw new IllegalArgumentException("a mention pattern must contain " + NAME_TOKEN);
+            if (pattern.indexOf(NAME_TOKEN) < 0
+                || pattern.indexOf(NAME_TOKEN) != pattern.lastIndexOf(NAME_TOKEN)) {
+                throw new IllegalArgumentException("a mention pattern must contain exactly one " + NAME_TOKEN);
             }
-            render = render == null || render.isBlank() ? "&e@{{ mention.name }}&r" : render;
-            sound = sound == null ? "" : sound.trim();
+            render = render == null || render.isBlank()
+                ? "<gold><bold>@{{ mention.name }}</bold></gold>" : requireText(render, "mention render");
+            messageFormat = messageFormat == null || messageFormat.isBlank()
+                ? "<yellow>{{ sender.name }}: {{ message }}</yellow>"
+                : requireText(messageFormat, "mentioned message format");
+            sound = sound == null ? "minecraft:block.note_block.bell" : sound.trim();
             permission = permission == null || permission.isBlank() ? "gloss.chat.mention" : permission.trim();
         }
     }

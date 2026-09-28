@@ -205,6 +205,33 @@ class ChannelServiceTest {
     }
 
     @Test
+    void configReloadCanEnableDisableAndReenableChannels() throws Exception {
+        write("global", global(""));
+        Gloss gloss = ChatTestHarness.gloss(dataFolder.toFile(), online);
+        CharacterizationSupport.setField(gloss, "config", ChatTestHarness.configWithChannels(false));
+        previousInstance = CharacterizationSupport.installGloss(gloss);
+        installed = true;
+        ChannelService service = new ChannelService(gloss);
+        service.enable();
+        assertFalse(service.active());
+
+        CharacterizationSupport.setField(gloss, "config", ChatTestHarness.configWithChannels(true));
+        service.reload();
+        assertTrue(service.active());
+        assertNotNull(service.channelFor("global"));
+
+        CharacterizationSupport.setField(gloss, "config", ChatTestHarness.configWithChannels(false));
+        service.reload();
+        assertFalse(service.active());
+        assertTrue(service.channels().isEmpty());
+
+        CharacterizationSupport.setField(gloss, "config", ChatTestHarness.configWithChannels(true));
+        service.reload();
+        assertTrue(service.active());
+        assertNotNull(service.channelFor("global"));
+    }
+
+    @Test
     void theShippedPrivateChannelLoadsAlongsideTheAuthoredOnes() throws Exception {
         ChannelService service = service(global(""));
 

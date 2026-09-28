@@ -20,8 +20,9 @@
   "mentions": {
     "enabled": true,
     "pattern": "@{name}",
-    "render": "&e@{{ mention.name }}&r",
-    "sound": "minecraft:entity.experience_orb.pickup",
+    "render": "<gold><bold>@{{ mention.name }}</bold></gold>",
+    "messageFormat": "<yellow>{{ sender.name }}: {{ message }}</yellow>",
+    "sound": "minecraft:block.note_block.bell",
     "permission": "gloss.chat.mention"
   },
   "items": {

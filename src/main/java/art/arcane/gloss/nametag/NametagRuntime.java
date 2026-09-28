@@ -36,11 +36,11 @@ public final class NametagRuntime {
 
     public static NametagRuntime compile(String id, NametagDoc doc) {
         CompiledCondition selectWhen = ConditionCompiler.compile(
-            new ConditionSource("nametags." + id + ".select.when", doc.select().when()));
+            ConditionSource.subjectPermission("nametags." + id + ".select.when", doc.select().when(), doc.select().permission()));
         List<CompiledVariant> compiled = new ArrayList<>(doc.variants().size());
         for (NametagDoc.Variant variant : doc.variants()) {
-            compiled.add(new CompiledVariant(variant, ConditionCompiler.compile(new ConditionSource(
-                "nametags." + id + ".variants." + variant.id() + ".when", variant.when()))));
+            compiled.add(new CompiledVariant(variant, ConditionCompiler.compile(ConditionSource.subjectPermission(
+                "nametags." + id + ".variants." + variant.id() + ".when", variant.when(), variant.permission()))));
         }
         compiled.sort(Comparator
             .comparingInt((CompiledVariant value) -> value.variant().priority()).reversed()
@@ -96,7 +96,7 @@ public final class NametagRuntime {
 
     private static boolean viewerDependent(NametagDoc doc, CompiledCondition selectWhen,
                                            List<CompiledVariant> variants) {
-        if (readsViewer(doc.show().expression()) || readsViewer(selectWhen)) {
+        if (readsViewerCondition(doc.show().expression()) || readsViewer(selectWhen)) {
             return true;
         }
         if (readsViewer(doc.presentation())) {
@@ -112,11 +112,11 @@ public final class NametagRuntime {
 
     private static boolean readsViewer(CompiledCondition condition) {
         for (String variable : condition.references().variables()) {
-            if (variable.startsWith(VIEWER_PREFIX)) {
+            if (variable.startsWith(VIEWER_PREFIX) || variable.startsWith("player.")) {
                 return true;
             }
         }
-        return false;
+        return readsViewerCondition(condition.source().expression());
     }
 
     private static boolean readsViewer(NametagDoc.Presentation presentation) {
@@ -124,7 +124,29 @@ public final class NametagRuntime {
     }
 
     private static boolean readsViewer(String raw) {
-        return raw != null && raw.contains(VIEWER_PREFIX);
+        if (raw == null) {
+            return false;
+        }
+        if (readsViewerCondition(raw) || raw.contains("papi(") || raw.indexOf('%') >= 0) {
+            return true;
+        }
+        int open = raw.indexOf('|');
+        while (open >= 0) {
+            int close = raw.indexOf('|', open + 1);
+            if (close < 0) {
+                return false;
+            }
+            if (!raw.startsWith("animation.", open + 1)) {
+                return true;
+            }
+            open = raw.indexOf('|', close + 1);
+        }
+        return false;
+    }
+
+    private static boolean readsViewerCondition(String raw) {
+        return raw != null && (raw.contains(VIEWER_PREFIX) || raw.contains("player.")
+            || raw.contains("'viewer'") || raw.contains("\"viewer\""));
     }
 
     public record Profile(String id, NametagDoc.Presentation presentation) {

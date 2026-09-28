@@ -52,9 +52,17 @@ class ChannelDocTest {
         assertFalse(doc.channel().defaultChannel());
         assertEquals("@{name}", doc.mentions().pattern());
         assertEquals("gloss.chat.mention", doc.mentions().permission());
+        assertEquals("minecraft:block.note_block.bell", doc.mentions().sound());
+        assertEquals("<yellow>{{ sender.name }}: {{ message }}</yellow>", doc.mentions().messageFormat());
         assertEquals("gloss.chat.item", doc.items().permission());
         assertTrue(doc.card().isEmpty());
         assertTrue(doc.filters().isEmpty());
+    }
+
+    @Test
+    void repeatedNameTokensAreRefused() {
+        assertThrows(IllegalArgumentException.class,
+            () -> new ChannelDoc.Mentions(true, "@{name}{name}", null, null, null, null));
     }
 
     @Test

@@ -99,12 +99,17 @@
         },
         "render": {
           "type": "string",
-          "default": "&e@{{ mention.name }}&r",
-          "description": "Rendered only for the mentioned viewer. Reads mention.name."
+          "default": "<gold><bold>@{{ mention.name }}</bold></gold>",
+          "description": "Rendered only for the mentioned viewer. mention.name is the selected nametag identity; mention.username is the typed account name."
+        },
+        "messageFormat": {
+          "type": "string",
+          "default": "<yellow>{{ sender.name }}: {{ message }}</yellow>",
+          "description": "Complete message format shown to the mentioned recipient. Uses the ordinary channel format variables."
         },
         "sound": {
           "type": "string",
-          "default": "",
+          "default": "minecraft:block.note_block.bell",
           "description": "Namespaced sound played to the mentioned viewer; empty plays nothing."
         },
         "permission": { "type": "string", "default": "gloss.chat.mention" }

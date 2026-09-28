@@ -4,12 +4,13 @@
   "show": "true",
   "select": {
     "priority": 0,
-    "when": "true"
+    "when": "true",
+    "permission": ""
   },
   "presentation": {
     "lines": [
       {
-        "text": "&7[{{ subject.group }}] &f{{ subject.name }}",
+        "text": "{{ subject.name }}",
         "show": "true"
       },
       {

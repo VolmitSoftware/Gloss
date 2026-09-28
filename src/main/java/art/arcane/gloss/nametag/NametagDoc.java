@@ -18,14 +18,14 @@ public record NametagDoc(int schemaVersion, long revision, ShowCondition show, S
     public static final String KIND = "nametags";
     public static final int CURRENT_SCHEMA_VERSION = 1;
     public static final NametagDoc DEFAULTS = new NametagDoc(CURRENT_SCHEMA_VERSION,
-        DocumentEnvelope.INITIAL_REVISION, ShowCondition.ALWAYS, Selection.NEVER,
+        DocumentEnvelope.INITIAL_REVISION, ShowCondition.ALWAYS, Selection.ALWAYS,
         new Presentation("", "", "white", "always", "always"), List.of());
 
     public NametagDoc {
         DocumentEnvelope.requireSchemaVersion(KIND, schemaVersion, CURRENT_SCHEMA_VERSION);
         DocumentEnvelope.requireRevision(KIND, revision);
         show = show == null ? ShowCondition.ALWAYS : show;
-        select = select == null ? Selection.NEVER : select;
+        select = select == null ? Selection.ALWAYS : select;
         presentation = presentation == null ? Presentation.PLAIN : presentation;
         variants = copyVariants(variants);
     }
@@ -52,12 +52,13 @@ public record NametagDoc(int schemaVersion, long revision, ShowCondition show, S
         return List.copyOf(copied);
     }
 
-    public record Selection(int priority, String when) {
-        public static final Selection NEVER = new Selection(0, "false");
+    public record Selection(int priority, String when, String permission) {
+        public static final Selection ALWAYS = new Selection(0, "true", "");
 
         public Selection {
+            permission = permission == null ? "" : permission.trim();
             when = normalizeCondition(when, "nametag selection");
-            ConditionCompiler.compile(new ConditionSource("nametags.select.when", when));
+            ConditionCompiler.compile(ConditionSource.subjectPermission("nametags.select.when", when, permission));
         }
     }
 
@@ -94,11 +95,12 @@ public record NametagDoc(int schemaVersion, long revision, ShowCondition show, S
         }
     }
 
-    public record Variant(String id, int priority, String when, Presentation presentation) {
+    public record Variant(String id, int priority, String when, String permission, Presentation presentation) {
         public Variant {
+            permission = permission == null ? "" : permission.trim();
             id = normalizeId(id);
             when = normalizeCondition(when, "nametag variant " + id);
-            ConditionCompiler.compile(new ConditionSource("nametags.variants." + id + ".when", when));
+            ConditionCompiler.compile(ConditionSource.subjectPermission("nametags.variants." + id + ".when", when, permission));
             if (presentation == null) {
                 throw new IllegalArgumentException("nametag variant " + id + " requires a presentation");
             }
@@ -121,7 +123,7 @@ public record NametagDoc(int schemaVersion, long revision, ShowCondition show, S
     }
 
     private static String normalizeCondition(String when, String owner) {
-        String normalized = when == null ? "" : when.trim();
+        String normalized = when == null ? "true" : when.trim();
         if (normalized.isEmpty()) {
             throw new IllegalArgumentException(owner + " condition may not be blank");
         }

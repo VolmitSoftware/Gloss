@@ -73,7 +73,7 @@ class NametagRenderScopeTest {
 
     private static NametagRuntime runtime(String prefix) {
         return NametagRuntime.compile("tags", new NametagDoc(NametagDoc.CURRENT_SCHEMA_VERSION,
-            DocumentEnvelope.INITIAL_REVISION, ShowCondition.ALWAYS, new NametagDoc.Selection(0, "true"),
+            DocumentEnvelope.INITIAL_REVISION, ShowCondition.ALWAYS, new NametagDoc.Selection(0, "true", ""),
             new NametagDoc.Presentation(prefix, "", "white", "always", "always"), List.of()));
     }
 

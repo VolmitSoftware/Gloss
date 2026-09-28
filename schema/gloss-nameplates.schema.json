@@ -51,10 +51,16 @@
             "type": [
               "string",
               "boolean"
-            ]
+            ],
+            "default": "true"
           },
           "presentation": {
             "$ref": "#/$defs/presentation"
+          },
+          "permission": {
+            "type": "string",
+            "default": "",
+            "description": "Permission required on the subject wearing this presentation, combined with when. Blank allows every subject."
           }
         }
       }
@@ -72,7 +78,13 @@
           "type": [
             "string",
             "boolean"
-          ]
+          ],
+          "default": "true"
+        },
+        "permission": {
+          "type": "string",
+          "default": "",
+          "description": "Permission required on the subject wearing this presentation, combined with when. Blank allows every subject."
         }
       }
     },

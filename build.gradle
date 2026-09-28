@@ -56,6 +56,9 @@ def universalJarTask = tasks.register('universalJar', Jar) {
     from(velocityJarTask.flatMap { it.archiveFile }.map { zipTree(it) }) {
         exclude('META-INF/MANIFEST.MF')
         exclude('modules/loader-agent.isolated-jar')
+        exclude('assets/mappings/**')
+        exclude('META-INF/packetevents_api_version.txt')
+        exclude('META-INF/packetevents_netty-common_version.txt')
     }
 }
 shadowJarTask.configure { finalizedBy(universalJarTask) }
@@ -133,6 +136,7 @@ shadowJarTask.configure {
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
     minimize {
         exclude(dependency('com.github.VolmitSoftware.VolmLib:.*:.*'))
+        exclude(dependency('com.github.retrooper:packetevents-.*:.*'))
     }
     relocate('io.github.slimjar', "${lib}.slimjar")
     relocate('com.github.retrooper.packetevents', "${lib}.packetevents.api")
@@ -141,8 +145,6 @@ shadowJarTask.configure {
 }
 
 slimJar {
-    relocate('com.github.retrooper.packetevents', "${lib}.packetevents.api")
-    relocate('io.github.retrooper.packetevents', "${lib}.packetevents.impl")
     relocate('org.bstats', "${lib}.bstats")
     relocate('org.apache.commons', "${lib}.commons")
     relocate('net.kyori', "${lib}.kyori")
@@ -300,7 +302,7 @@ dependencies {
     compileOnly(libs.mythic) { transitive = false }
     compileOnly(libs.headDatabase) { transitive = false }
 
-    slim(libs.packetevents) {
+    implementation(libs.packetevents) {
         exclude(group: 'net.kyori')
     }
     slim(libs.adventure.minimessage)
@@ -419,20 +421,20 @@ pluginPackaging {
             forbiddenPrefixes = forbiddenPrefixes + ['com/velocitypowered/', 'com/google/inject/']
             requiredEntries = requiredEntries + [
                 'velocity-plugin.json',
-                'gloss-velocity-slimjar.dat',
-                'gloss-velocity-slimjar-resolutions.dat',
+                'art/arcane/gloss/velocity/libs/packetevents/api/PacketEvents.class',
+                'art/arcane/gloss/velocity/libs/packetevents/impl/velocity/factory/VelocityPacketEventsBuilder.class',
                 'art/arcane/gloss/velocity/GlossVelocity.class',
                 'art/arcane/gloss/velocity/ProxyPacketEvents.class',
                 'art/arcane/gloss/velocity/ProxyScoreboards.class',
                 'art/arcane/gloss/velocity/expr/ExprEvaluator.class',
                 'art/arcane/gloss/velocity/libs/gson/Gson.class',
-                'art/arcane/gloss/velocity/libs/slimjar/app/builder/InjectingApplicationBuilder.class',
                 'proxy-defaults/proxy.json'
             ]
         }
         create('bukkit') {
             taskName = 'shadowJar'
             policyName = 'Gloss'
+            intermediate = true
             prunePrefixes = ['art/arcane/volmlib/']
             keepPrefixes = ['art/arcane/volmlib/util/matter/slices/', 'art/arcane/volmlib/nativelib/']
             shrinkRules = [file('packaging/shrink.pro')]
@@ -471,14 +473,28 @@ tasks.register('verifyPlatformPackaging') {
                     throw new GradleException('Velocity Gloss must not require a PacketEvents plugin jar')
                 }
             }
-            if (archive.getJarEntry('gloss-velocity-slimjar.dat') == null
-                    || archive.getJarEntry('gloss-velocity-slimjar-resolutions.dat') == null) {
-                throw new GradleException('Velocity Gloss must ship its PacketEvents slimjar manifests')
+            for (String prefix : ['art/arcane/gloss/libs/packetevents', 'art/arcane/gloss/velocity/libs/packetevents']) {
+                for (String entry : ['api/PacketEvents.class', 'api/protocol/player/ClientVersion.class', 'impl/impl/netty/channel/ChannelOperatorImpl.class']) {
+                    if (archive.getJarEntry("${prefix}/${entry}") == null) {
+                        throw new GradleException("Gloss must bundle PacketEvents: ${prefix}/${entry}")
+                    }
+                }
+            }
+            for (String manifest : ['slimjar.dat', 'slimjar-resolutions.dat']) {
+                String contents = new String(archive.getInputStream(archive.getJarEntry(manifest)).readAllBytes(), java.nio.charset.StandardCharsets.ISO_8859_1)
+                if (contents.contains('com.github.retrooper')) {
+                    throw new GradleException("Gloss must not download PacketEvents at runtime: ${manifest}")
+                }
+            }
+            for (String mapping : ['assets/mappings/data/block_state/V_26_2.nbt', 'assets/mappings/registries/item.nbt']) {
+                if (archive.getJarEntry(mapping) == null) {
+                    throw new GradleException("Gloss must bundle PacketEvents mappings: ${mapping}")
+                }
             }
             String scoreboard = new String(archive.getInputStream(archive.getJarEntry('art/arcane/gloss/velocity/ProxyScoreboards.class')).readAllBytes(), java.nio.charset.StandardCharsets.ISO_8859_1)
-            for (String reference : ['com/github/retrooper/packetevents/PacketEvents', 'net/kyori/adventure/text/Component']) {
+            for (String reference : ['art/arcane/gloss/velocity/libs/packetevents/api/PacketEvents', 'net/kyori/adventure/text/Component']) {
                 if (!scoreboard.contains(reference)) {
-                    throw new GradleException("Velocity API reference was relocated: ${reference}")
+                    throw new GradleException("Velocity API reference is missing: ${reference}")
                 }
             }
             if (scoreboard.contains('art/arcane/gloss/libs/')) {

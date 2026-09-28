@@ -90,7 +90,14 @@ public final class ChannelService implements GlossService, Listener {
 
     @Override
     public void reload() {
+        if (!plugin.cfg().modules().channels().enabled()) {
+            if (started) {
+                disable();
+            }
+            return;
+        }
         if (!started) {
+            enable();
             return;
         }
         defaults.extractMissing();
@@ -235,21 +242,15 @@ public final class ChannelService implements GlossService, Listener {
             context.withItem(state.heldItem(sender.getUniqueId())));
     }
 
-    /**
-     * The Spigot fallback renders once, as the sender, because {@code AsyncPlayerChatEvent} carries
-     * one format for the whole audience. {@code %} is doubled: Bukkit runs the format through
-     * {@link String#format}.
-     */
-    public String spigotFormat(ChannelRuntime channel, Player sender, String message) {
-        String legacy = TextUtils.renderLegacy(
-            render(channel, sender, sender, message, ChatContext.PLAIN).miniMessage());
-        return legacy.replace("%", "%%");
+    public void deliverConsole(ChannelRuntime channel, Player sender, String message) {
+        ComponentMessenger.sendMarkup(plugin.getServer().getConsoleSender(),
+            render(channel, sender, null, message, ChatContext.PLAIN).miniMessage());
     }
 
     /** Plays the channel's mention cue on the mentioned viewer's own region thread. */
     public void playMentionCue(ChannelRuntime channel, Player viewer) {
         String sound = channel.doc().mentions().sound();
-        if (sound.isEmpty()) {
+        if (!channel.doc().mentions().enabled() || sound.isEmpty()) {
             return;
         }
         SchedulerUtils.runEntity(plugin, viewer,
@@ -286,7 +287,7 @@ public final class ChannelService implements GlossService, Listener {
         return false;
     }
 
-    private void deliver(ChannelRuntime channel, Player sender, Player viewer, String message) {
+    public void deliver(ChannelRuntime channel, Player sender, Player viewer, String message) {
         ChatMessageRenderer.Rendered rendered = render(channel, sender, viewer, message, ChatContext.PLAIN);
         ComponentMessenger.sendMarkup(viewer, rendered.miniMessage());
         if (rendered.mentioned()) {

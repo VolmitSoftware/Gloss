@@ -128,8 +128,9 @@ public final class ChannelRuntime {
 
     private static String mentionBody(String template, String nameGroup) {
         int token = template.indexOf(ChannelDoc.Mentions.NAME_TOKEN);
-        return Pattern.quote(template.substring(0, token)) + nameGroup
-            + Pattern.quote(template.substring(token + ChannelDoc.Mentions.NAME_TOKEN.length()));
+        return "(?<![A-Za-z0-9_@])" + Pattern.quote(template.substring(0, token)) + nameGroup
+            + Pattern.quote(template.substring(token + ChannelDoc.Mentions.NAME_TOKEN.length()))
+            + "(?![A-Za-z0-9_])";
     }
 
     public record CompiledFilter(Pattern pattern, String replace) {

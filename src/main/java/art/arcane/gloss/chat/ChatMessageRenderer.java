@@ -9,7 +9,6 @@ import org.bukkit.entity.Player;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.function.UnaryOperator;
 
 /**
  * One message as one viewer reads it, produced as a MiniMessage string.
@@ -45,8 +44,8 @@ public final class ChatMessageRenderer {
                            ChatContext context) {
         ChatScope scope = scope(channel, sender, viewer);
         ChatBody.Body body = ChatBody.render(channel, message, bodyContext(channel, sender, viewer, context));
-        String format = channel.format(scope, errors);
-        String rendered = plugin.text().renderScoped(viewer, format, scope, UnaryOperator.identity());
+        String format = body.mentioned() ? channel.doc().mentions().messageFormat() : channel.format(scope, errors);
+        String rendered = plugin.text().renderScoped(viewer, format, scope, ChatComponents::scopedMarkup);
         return new Rendered(splice(TextUtils.toMiniMessage(rendered), body.text(),
             card(channel, viewer, scope)), body.mentioned());
     }
@@ -86,6 +85,7 @@ public final class ChatMessageRenderer {
                                          ChatContext context) {
         ChannelDoc doc = channel.doc();
         return new ChatBody.Context(context.escape(), viewer == null ? "" : viewer.getName(),
+            plugin.text().playerName(viewer, viewer),
             sender != null && sender.hasPermission(doc.mentions().permission()),
             true,
             sender != null && sender.hasPermission(doc.items().permission()),
@@ -107,7 +107,7 @@ public final class ChatMessageRenderer {
                 card.append("<newline>");
             }
             card.append(TextUtils.toMiniMessage(
-                plugin.text().renderScoped(viewer, line, scope, UnaryOperator.identity())));
+                plugin.text().renderScoped(viewer, line, scope, ChatComponents::scopedMarkup)));
         }
         return card.toString().replace("\\", "\\\\").replace("'", "\\'");
     }

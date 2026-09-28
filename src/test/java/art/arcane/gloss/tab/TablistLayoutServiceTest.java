@@ -25,7 +25,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class TablistLayoutServiceTest {
     private final List<String> sends = new ArrayList<>();
     private final Map<UUID, String> names = new LinkedHashMap<>();
-    private final TablistLayoutService layouts = new TablistLayoutService(new RecordingSink(), skin -> skin);
+    private final TablistLayoutService layouts = new TablistLayoutService(new RecordingSink(), skin -> skin,
+        (viewer, subject) -> subject.getName());
 
     @Test
     void theFirstPassSendsTheWholeGridOnce() {

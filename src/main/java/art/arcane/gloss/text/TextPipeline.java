@@ -3,6 +3,7 @@ package art.arcane.gloss.text;
 import art.arcane.gloss.Gloss;
 import art.arcane.gloss.GlossConfig;
 import art.arcane.gloss.expr.ExprScope;
+import art.arcane.gloss.nametag.NametagService;
 import art.arcane.gloss.particle.ParticleText;
 import art.arcane.gloss.util.common.TextUtils;
 import art.arcane.volmlib.util.bukkit.Placeholders;
@@ -98,9 +99,15 @@ public final class TextPipeline implements TextRenderer {
             out = applyFunctions(viewer, out);
         }
         if (functionsEnabled() && out.indexOf("{{") >= 0) {
-            out = scope == null ? expressions.render(viewer, out) : expressions.render(scope, out, resolvedText);
+            ExprScope activeScope = scope == null ? expressions.scope(viewer) : scope;
+            out = expressions.render(new PlayerTextScope(activeScope, viewer, this::playerName), out, resolvedText);
         }
         if (viewer != null && placeholdersEnabled() && out.indexOf('%') >= 0) {
+            if (out.contains("%player_name%") || out.contains("%player_displayname%")) {
+                String name = playerName(viewer, viewer);
+                out = out.replace("%player_name%", name).replace("%player_displayname%", name);
+            }
+            out = out.replace("%player_username%", viewer.getName());
             out = Placeholders.setPlaceholders(viewer, out);
         }
         out = applyEmoji(viewer, out);
@@ -135,6 +142,14 @@ public final class TextPipeline implements TextRenderer {
 
     public ExprScope expressionScope(Player viewer) {
         return expressions.scope(viewer);
+    }
+
+    public String playerName(Player viewer, Player subject) {
+        if (subject == null) {
+            return "";
+        }
+        NametagService nametags = plugin == null ? null : plugin.service(NametagService.class);
+        return nametags == null ? subject.getName() : nametags.displayName(viewer, subject);
     }
 
     public static boolean viewerDependent(String raw) {
@@ -349,7 +364,8 @@ public final class TextPipeline implements TextRenderer {
     }
 
     public boolean hasFunction(String name) {
-        return name != null && functions.containsKey(name);
+        return name != null && (name.equals("player.name") || name.equals("player.displayName")
+            || name.equals("player.username") || functions.containsKey(name));
     }
 
     @Override
@@ -384,10 +400,6 @@ public final class TextPipeline implements TextRenderer {
     }
 
     private String applyFunctions(Player player, String input) {
-        if (functions.isEmpty()) {
-            return input;
-        }
-
         StringBuilder out = null;
         int cursor = 0;
         int open = input.indexOf('|');
@@ -399,6 +411,11 @@ public final class TextPipeline implements TextRenderer {
 
             String name = input.substring(open + 1, close);
             Function<Player, String> resolver = functions.get(name);
+            if (name.equals("player.name") || name.equals("player.displayName")) {
+                resolver = viewer -> playerName(viewer, viewer);
+            } else if (name.equals("player.username")) {
+                resolver = viewer -> viewer == null ? "" : viewer.getName();
+            }
             if (resolver == null) {
                 open = close;
                 continue;
