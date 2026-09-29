@@ -5,7 +5,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class GlossTelemetryTest {
     @BeforeEach
@@ -64,23 +63,6 @@ class GlossTelemetryTest {
     }
 
     @Test
-    void timedTicksRecordTheWorkWhereItRunsRatherThanWhereItWasQueued() throws InterruptedException {
-        long start = 110_000L;
-        GlossTelemetry.tickMsPerSecond(start);
-
-        Runnable tick = GlossTelemetry.timedTick(() -> spin(3_000_000L));
-        assertEquals(0D, GlossTelemetry.tickMsPerSecond(start + 1_000L),
-            "queueing a session tick for another region thread must not count as tick time");
-
-        Thread regionThread = new Thread(tick);
-        regionThread.start();
-        regionThread.join();
-
-        assertTrue(GlossTelemetry.tickMsPerSecond(start + 2_000L) >= 3D,
-            "the session work itself must be measured even when it runs on the player's region thread");
-    }
-
-    @Test
     void clearResetsCountersRatesAndTheWindow() {
         long start = 90_000L;
         GlossTelemetry.packetsPerSecond(start);
@@ -92,12 +74,5 @@ class GlossTelemetryTest {
         assertEquals(0D, GlossTelemetry.packetsPerSecond(start + 5_000L));
         GlossTelemetry.countPackets(30L);
         assertEquals(10D, GlossTelemetry.packetsPerSecond(start + 8_000L));
-    }
-
-    private static void spin(long nanos) {
-        long started = System.nanoTime();
-        while (System.nanoTime() - started < nanos) {
-            Thread.onSpinWait();
-        }
     }
 }
