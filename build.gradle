@@ -2,6 +2,7 @@ import org.gradle.api.tasks.Copy
 import org.gradle.api.tasks.WriteProperties
 import org.gradle.api.tasks.compile.JavaCompile
 import org.gradle.jvm.toolchain.JavaLanguageVersion
+import art.arcane.volmit.packaging.PackagingMode
 
 buildscript {
     repositories {
@@ -22,7 +23,7 @@ plugins {
 apply plugin: 'art.arcane.volmit-packaging'
 
 group = 'art.arcane'
-version = '3.0.4-26.2'
+version = '3.1.0-26.2'
 def apiVersion = '26.1'
 def main = 'art.arcane.gloss.Gloss'
 def lib = 'art.arcane.gloss.libs'
@@ -414,10 +415,28 @@ pluginPackaging {
     artifacts {
         create('distribution') {
             packed = true
-            releaseCompression = true
+            stripDirectories = true
+            stripLocalVariables = true
+            releaseCompression = providers.gradleProperty('compactRelease')
+                .map { String value -> value.toBoolean() }
+                .getOrElse(!PackagingMode.resolve(providers).development())
             taskName = 'universalJar'
             policyName = 'Gloss'
-            shrink = false
+            shrinkRules = [file('packaging/shrink.pro')]
+            shrinkLibraries.from(provider {
+                project(':velocity').configurations.compileClasspath.filter { File library ->
+                    !library.name.startsWith('packetevents-')
+                }
+            })
+            shrinkKeep = shrinkKeep + ['-keep class art.arcane.gloss.velocity.libs.gson.** { *; }']
+            shrinkRelocations = [
+                'com.github.retrooper.packetevents': "${lib}.packetevents.api",
+                'io.github.retrooper.packetevents' : "${lib}.packetevents.impl",
+                'org.bstats'                       : "${lib}.bstats",
+                'org.apache.commons'               : "${lib}.commons",
+                'net.kyori'                        : "${lib}.kyori",
+                'com.moandjiezana.toml'            : "${lib}.toml"
+            ]
             forbiddenPrefixes = forbiddenPrefixes + ['com/velocitypowered/', 'com/google/inject/']
             requiredEntries = requiredEntries + [
                 'velocity-plugin.json',
