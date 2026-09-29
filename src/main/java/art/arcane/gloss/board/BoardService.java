@@ -262,8 +262,8 @@ public final class BoardService implements Listener, Explainable, RegistryOwner 
         return published;
     }
 
-    public int boardCount() {
-        return metas.size();
+    public int activeBoardCount() {
+        return profiles.size();
     }
 
     public synchronized void saveBoard(GlossBoardMeta meta) {

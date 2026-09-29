@@ -56,6 +56,17 @@ public final class GlossTelemetry {
     }
   }
 
+  public static Runnable timedTick(Runnable work) {
+    return () -> {
+      long started = System.nanoTime();
+      try {
+        work.run();
+      } finally {
+        addTickNanos(System.nanoTime() - started);
+      }
+    };
+  }
+
   public static void countBubbleSpawn() {
     BUBBLES.incrementAndGet();
   }

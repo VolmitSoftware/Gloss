@@ -305,6 +305,16 @@ public final class HologramService implements RegistryOwner {
         return holograms.size();
     }
 
+    public int spawnedHologramCount() {
+        int spawned = 0;
+        for (PersistentHologram hologram : holograms.values()) {
+            if (hologram.hasSpawnedDisplay()) {
+                spawned++;
+            }
+        }
+        return spawned;
+    }
+
     public int temporaryCount() {
         return temporaries.size();
     }

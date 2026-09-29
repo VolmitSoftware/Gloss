@@ -134,10 +134,9 @@ public final class MenuSessionManager {
       if (holders.isEmpty()) {
         return;
       }
-      long tickStart = System.nanoTime();
       holders.values().forEach(holder -> {
         Player player = holder.player();
-        Runnable tickTask = () -> {
+        Runnable tickTask = GlossTelemetry.timedTick(() -> {
           boolean previewActive = holder.hasPreview();
           boolean disposable = holder.tick();
           if (previewActive && player.isOnline()) {
@@ -146,11 +145,10 @@ public final class MenuSessionManager {
           if (disposable) {
             disposeIfIdle(holder);
           }
-        };
+        });
 
         SchedulerUtils.runEntity(Gloss.instance, player, tickTask);
       });
-      GlossTelemetry.addTickNanos(System.nanoTime() - tickStart);
     }, false);
     Events.listen(Gloss.instance, PlayerMoveEvent.class, EventPriority.HIGHEST, e -> {
       if (holders.isEmpty() || e.isCancelled() || e.getTo() == null) return;

@@ -570,6 +570,10 @@ final class PersistentHologram implements AnchoredHologram {
         return resolved;
     }
 
+    boolean hasSpawnedDisplay() {
+        return sharedDisplay != null;
+    }
+
     void despawnAll() {
         clearObjectLines();
         if (sharedDisplay == null && activeViewers.isEmpty()) {
