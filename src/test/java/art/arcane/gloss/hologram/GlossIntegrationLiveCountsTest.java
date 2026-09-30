@@ -74,10 +74,75 @@ class GlossIntegrationLiveCountsTest {
                 value(samples, IntegrationMetricSchema.GLOSS_BOARDS_ACTIVE), 0D,
                 "boards-active counts players shown a sidebar, not board definitions"),
             () -> assertEquals(2D, value(samples, IntegrationMetricSchema.GLOSS_BOARDS_ACTIVE), 0D),
-            () -> assertEquals(harness.animator.targetCount(),
-                value(samples, IntegrationMetricSchema.GLOSS_ANIMATIONS_ACTIVE), 0D,
-                "animations-active counts animator targets, not loaded clips"),
-            () -> assertEquals(1D, value(samples, IntegrationMetricSchema.GLOSS_ANIMATIONS_ACTIVE), 0D));
+            () -> assertEquals(1D, value(samples, IntegrationMetricSchema.GLOSS_ANIMATIONS_ACTIVE), 0D,
+                "animations-active counts animating hologram targets, not loaded clips"));
+    }
+
+    @Test
+    void animationsActiveCountsTickDrivenClipsAlongsideAnimatorTargets() {
+        harness.configureAnimation("rainbow", 1000.0D / 53.0D, List.of("[FF0000]", "[00FF00]", "[0000FF]"));
+        harness.configureAnimation("marquee", 1.0D, List.of("&b{{ marquee('GLOSS REALMS', 12, floor(time.seconds * 4)) }}"));
+        harness.configureAnimation("still", 1.0D, List.of("z"));
+        spawned("fast-holo", 0.5D, CharacterizationHarness.FAST_CLIP_LINE);
+        spawned("rainbow-holo", 2.5D, "|animation.rainbow|&lREACT PERF");
+        spawned("marquee-holo", 4.5D, "|animation.marquee|");
+        spawned("still-holo", 6.5D, "|animation.still|");
+        spawned("plain-holo", 8.5D, "plain");
+        PersistentHologram far = harness.persistent("far-holo", harness.at(world, 900.5D, 64.0D, 900.5D));
+        far.setLines(List.of("|animation.rainbow|far"));
+        far.update();
+        harness.drainDelayed();
+
+        double animations = value(new GlossIntegrationService().sampleMetrics(
+            Set.of(IntegrationMetricSchema.GLOSS_ANIMATIONS_ACTIVE)), IntegrationMetricSchema.GLOSS_ANIMATIONS_ACTIVE);
+
+        assertAll(
+            () -> assertEquals(5, harness.service.spawnedHologramCount()),
+            () -> assertEquals(1, harness.animator.targetCount(), "only the fast clip rides the async animator"),
+            () -> assertEquals(3D, animations, 0D,
+                "the fast, rainbow and marquee holograms animate; the still clip, plain text and unspawned hologram do not"));
+    }
+
+    @Test
+    void animationsActiveCountsEachViewerOfAPersonalizedTickDrivenClip() {
+        harness.join("Bob", world, 2.0D, 64.0D, 2.0D);
+        harness.registerFunction("who", player -> player == null ? "console" : player.getName());
+        harness.configureAnimation("rainbow", 1000.0D / 53.0D, List.of("[FF0000]", "[00FF00]", "[0000FF]"));
+        spawned("personal-holo", 0.5D, "|animation.rainbow||who|");
+
+        double animations = value(new GlossIntegrationService().sampleMetrics(
+            Set.of(IntegrationMetricSchema.GLOSS_ANIMATIONS_ACTIVE)), IntegrationMetricSchema.GLOSS_ANIMATIONS_ACTIVE);
+
+        assertAll(
+            () -> assertEquals(0, harness.animator.targetCount()),
+            () -> assertEquals(2D, animations, 0D, "each viewer receives its own animated text"));
+    }
+
+    @Test
+    void animationsActiveCountsTickDrivenTemporaryHolograms() {
+        harness.configureAnimation("rainbow", 1000.0D / 53.0D, List.of("[FF0000]", "[00FF00]", "[0000FF]"));
+        TemporaryHologramDisplay animated = harness.temporary("temp-rainbow", harness.at(world, 0.5D, 64.0D, 0.5D), 60_000L);
+        animated.setLines(List.of("|animation.rainbow|temp"));
+        animated.drive(true);
+        TemporaryHologramDisplay plain = harness.temporary("temp-plain", harness.at(world, 2.5D, 64.0D, 0.5D), 60_000L);
+        plain.setLines(List.of("plain"));
+        plain.drive(true);
+        harness.drainDelayed();
+
+        double animations = value(new GlossIntegrationService().sampleMetrics(
+            Set.of(IntegrationMetricSchema.GLOSS_ANIMATIONS_ACTIVE)), IntegrationMetricSchema.GLOSS_ANIMATIONS_ACTIVE);
+
+        assertAll(
+            () -> assertEquals(2, harness.liveSpawned(world).size()),
+            () -> assertEquals(0, harness.animator.targetCount()),
+            () -> assertEquals(1D, animations, 0D, "only the temporary hologram with an animated clip counts"));
+    }
+
+    private void spawned(String id, double x, String line) {
+        PersistentHologram hologram = harness.persistent(id, harness.at(world, x, 64.0D, 0.5D));
+        hologram.setLines(List.of(line));
+        hologram.update();
+        harness.drainDelayed();
     }
 
     private BoardService boards(int shown, int defined) throws ReflectiveOperationException {

@@ -274,8 +274,12 @@ final class CharacterizationHarness implements AutoCloseable {
     }
 
     void configureAnimation(String id, List<String> frames) {
+        configureAnimation(id, 100.0D, frames);
+    }
+
+    void configureAnimation(String id, double framesPerSecond, List<String> frames) {
         animationClips.put("animation." + id,
-            new AnimationClip(id, 100.0D, AnimationMode.ASCEND, frames));
+            new AnimationClip(id, framesPerSecond, AnimationMode.ASCEND, frames));
         publishAnimationClips();
     }
 

@@ -315,6 +315,18 @@ public final class HologramService implements RegistryOwner {
         return spawned;
     }
 
+    public int animatedTargetCount() {
+        HologramAnimator animator = animator();
+        int targets = animator == null ? 0 : animator.targetCount();
+        for (PersistentHologram hologram : holograms.values()) {
+            targets += hologram.tickAnimatedTargets();
+        }
+        for (TemporaryHologramDisplay temporary : temporaries) {
+            targets += temporary.tickAnimatedTargets();
+        }
+        return targets;
+    }
+
     public int temporaryCount() {
         return temporaries.size();
     }
@@ -373,6 +385,11 @@ public final class HologramService implements RegistryOwner {
     boolean hasFastDynamicAnimationContent(List<String> lines) {
         AnimationService animations = plugin.animations();
         return animations != null && animations.hasFastDynamicAnimationContent(lines);
+    }
+
+    boolean hasAnimatedContent(List<String> lines) {
+        AnimationService animations = plugin.animations();
+        return animations != null && animations.hasAnimatedContent(lines);
     }
 
     boolean isActive(PersistentHologram hologram) {

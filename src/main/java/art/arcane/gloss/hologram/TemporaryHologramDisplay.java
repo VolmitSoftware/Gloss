@@ -65,6 +65,9 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
                                  long animationGeneration, AnimationTemplate template) {
     }
 
+    private record AnimatedMemo(LineSet lines, long animationGeneration, boolean animated) {
+    }
+
     /** The authored join and its particle-marker parse are per snapshot, never per viewer. */
     private record AuthoredText(LineSet snapshot, String authored, List<String> markedLines) {
     }
@@ -106,6 +109,7 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
     private volatile HologramPresentation appliedPresentation;
     private volatile int appliedTeleportTicks;
     private volatile AnimationMemo animationMemo;
+    private volatile AnimatedMemo animatedMemo;
     private volatile List<ParticleLayer> particleLayers;
     private volatile Predicate<Player> viewerCondition;
     private volatile IconDisplayStyle style;
@@ -1055,6 +1059,44 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
 
     boolean hasPublishedAnimation() {
         return animationPublished.get();
+    }
+
+    int tickAnimatedTargets() {
+        if (destroyed.get() || display == null) {
+            return 0;
+        }
+        if (personalized) {
+            return animated(lineSet) ? tickAnimatedViewers() : 0;
+        }
+        if (animationPublished.get()) {
+            return 0;
+        }
+        return frameComposer != null || animated(lineSet) ? 1 : 0;
+    }
+
+    private int tickAnimatedViewers() {
+        int viewers = 0;
+        for (ViewerText state : viewerTexts.values()) {
+            ViewerFrame frame = state.frame;
+            if (frame != null && frame.frames() == null) {
+                viewers++;
+            }
+        }
+        return viewers;
+    }
+
+    private boolean animated(LineSet snapshot) {
+        if ((snapshot.flags() & TextPipeline.HAS_FUNCTION) == 0) {
+            return false;
+        }
+        long animationGeneration = service.animationGeneration();
+        AnimatedMemo cached = animatedMemo;
+        if (cached != null && cached.lines() == snapshot && cached.animationGeneration() == animationGeneration) {
+            return cached.animated();
+        }
+        boolean animated = service.hasAnimatedContent(snapshot.lines());
+        animatedMemo = new AnimatedMemo(snapshot, animationGeneration, animated);
+        return animated;
     }
 
     private AnimationTemplate animationTemplate(LineSet snapshot) {

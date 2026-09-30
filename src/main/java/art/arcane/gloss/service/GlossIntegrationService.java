@@ -153,8 +153,8 @@ public final class GlossIntegrationService implements IntegrationServiceContract
             out.put(key, sampleService(key, now, Gloss::tablist,
                 "tablist-not-ready", service -> service.managedPlayerCount()));
         case IntegrationMetricSchema.GLOSS_ANIMATIONS_ACTIVE ->
-            out.put(key, sampleService(key, now, Gloss::animator,
-                "animator-not-ready", service -> service.targetCount()));
+            out.put(key, sampleService(key, now, Gloss::holograms,
+                "holograms-not-ready", service -> service.animatedTargetCount()));
         case IntegrationMetricSchema.GLOSS_BUBBLES_PER_SECOND ->
             out.put(key, available(key, GlossTelemetry.bubblesPerSecond(now), now));
         case IntegrationMetricSchema.GLOSS_INDICATORS_PER_SECOND ->
