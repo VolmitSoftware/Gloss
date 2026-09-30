@@ -121,10 +121,8 @@ export default {
           'Hidden hologram retained text or decoration')
       })
       await context.step('Real Drops labels share style, box and audience', async () => {
-        const naming = await readFile(path.join(root, 'gloss.toml'), 'utf8')
-        await save('gloss.toml', naming.replace(/^nameFormat\s*=.*$/m,
-          'nameFormat = "AUTHOR_DROP {{ player.name }} {count}x {type}"'))
         const drop = JSON.parse(await readFile(path.join(root, 'real-drops/default.json'), 'utf8'))
+        drop.presentation.labels.format = 'AUTHOR_DROP {{ player.name }} {count}x {type}'
         drop.presentation.labels.style = style
         drop.presentation.labels.box = box
         drop.revision++
@@ -164,9 +162,9 @@ export default {
       await context.step('Standalone drop names retain the same authored engine controls', async () => {
         const config = await readFile(path.join(root, 'gloss.toml'), 'utf8')
         context.expect(/realDrops\s*=\s*true/.test(config), 'Expected enabled Real Drops feature')
-        await save('gloss.toml', config.replace(/realDrops\s*=\s*true/, 'realDrops = false')
-          .replace(/^nameFormat\s*=.*$/m, 'nameFormat = "AUTHOR_DROP {{ player.name }} {count}x {type}"'))
+        await save('gloss.toml', config.replace(/realDrops\s*=\s*true/, 'realDrops = false'))
         const drop = JSON.parse(await readFile(path.join(root, 'real-drops/default.json'), 'utf8'))
+        drop.presentation.labels.format = 'AUTHOR_DROP {{ player.name }} {count}x {type}'
         await save('real-drops/default.json', { ...drop, revision: drop.revision + 1, show: true })
         await command('/summon minecraft:item 3 196 4 {Item:{id:"minecraft:emerald",count:7},NoGravity:1b,PickupDelay:32767s,Tags:["author_drop"]}', /summoned/i)
         const emerald = await expectStyle('Emerald')

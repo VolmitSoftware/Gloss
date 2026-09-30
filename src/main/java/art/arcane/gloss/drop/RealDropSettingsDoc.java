@@ -32,6 +32,11 @@ public record RealDropSettingsDoc(
     public static final String KIND = "real-drops";
     public static final String DEFAULT_ID = "default";
     public static final int CURRENT_SCHEMA_VERSION = 4;
+    public static final String NAME_FORMAT_DEFAULT = "&7{count}x {type}";
+    public static final String BUNDLE_FORMAT_DEFAULT = "&7Bundle &8(&7{total} items&8): &7{contents}";
+    public static final String BUNDLE_HEADER_FORMAT_DEFAULT = "&eBundle &8(&e{total} items&8)";
+    public static final String BUNDLE_ENTRY_FORMAT_DEFAULT = "&7- &f{count}x {type}";
+    public static final String BUNDLE_MORE_FORMAT_DEFAULT = "&8+{remaining} more";
 
     public static final RealDropSettingsDoc DEFAULTS = new RealDropSettingsDoc(
         CURRENT_SCHEMA_VERSION,
@@ -79,7 +84,7 @@ public record RealDropSettingsDoc(
                 null, null, null, null, null, null, null, null, null, null) : motion;
             landing = landing == null ? new Landing(
                 null, null, null, null, null, null, null, null) : landing;
-            labels = labels == null ? new Labels(null, null, null, null) : labels;
+            labels = labels == null ? new Labels(null, null, null, null, null, null, null, null) : labels;
             filters = filters == null ? new Filters(null, null, null) : filters;
             physics = physics == null ? new Physics(null, null, null, null, null) : physics;
             script = script == null ? new Script(null, null, null, null, null, null, null) : script;
@@ -121,8 +126,7 @@ public record RealDropSettingsDoc(
                     landing.movingFaceAttraction().floatValue(),
                     landing.alignmentDegrees().floatValue(),
                     landing.settleDelayTicks()),
-                new GlossConfig.RealDrops.Labels(labels.enabled(), labels.yOffset().floatValue(),
-                    labels.style(), labels.box()),
+                labels.toConfig(),
                 new GlossConfig.RealDrops.Filters(
                     filters.disabledWorlds(),
                     filters.materialBlacklist(),
@@ -229,18 +233,59 @@ public record RealDropSettingsDoc(
         }
     }
 
-    public record Labels(Boolean enabled, Double yOffset, IconDisplayStyle style, HologramBox box) {
+    public record Labels(
+        Boolean enabled,
+        Double yOffset,
+        String format,
+        Boolean useItemDisplayNames,
+        Map<String, String> names,
+        LabelBundle bundle,
+        IconDisplayStyle style,
+        HologramBox box
+    ) {
         public Labels {
             enabled = enabled == null || enabled;
             yOffset = clamp(yOffset, -4.0D, 16.0D, 0.55D);
+            format = text(format, NAME_FORMAT_DEFAULT);
+            useItemDisplayNames = useItemDisplayNames != null && useItemDisplayNames;
+            names = cleanNames(names);
+            bundle = bundle == null ? new LabelBundle(null, null, null, null, null, null) : bundle;
             style = style == null ? defaultStyle() : style;
             box = box == null ? HologramBox.defaults() : box;
+        }
+
+        GlossConfig.RealDrops.Labels toConfig() {
+            return new GlossConfig.RealDrops.Labels(enabled, yOffset.floatValue(), format, useItemDisplayNames,
+                names, bundle.toConfig(), style, box);
         }
 
         public static IconDisplayStyle defaultStyle() {
             return new IconDisplayStyle(IconBillboard.CENTER, true, true, IconTextAlignment.CENTER,
                 new IconArgbColor(0x50000000), 255, 16384, null, null, 0.5F,
                 0F, 0F, 0F, 0F, null, 0.85F, 0.85F, 0.85F);
+        }
+    }
+
+    public record LabelBundle(
+        String format,
+        Integer entryLimit,
+        Boolean vertical,
+        String headerFormat,
+        String entryFormat,
+        String moreFormat
+    ) {
+        public LabelBundle {
+            format = text(format, BUNDLE_FORMAT_DEFAULT);
+            entryLimit = clamp(entryLimit, 1, 10, 3);
+            vertical = vertical == null || vertical;
+            headerFormat = text(headerFormat, BUNDLE_HEADER_FORMAT_DEFAULT);
+            entryFormat = text(entryFormat, BUNDLE_ENTRY_FORMAT_DEFAULT);
+            moreFormat = text(moreFormat, BUNDLE_MORE_FORMAT_DEFAULT);
+        }
+
+        GlossConfig.RealDrops.LabelBundle toConfig() {
+            return new GlossConfig.RealDrops.LabelBundle(format, entryLimit, vertical,
+                headerFormat, entryFormat, moreFormat);
         }
     }
 
@@ -562,6 +607,24 @@ public record RealDropSettingsDoc(
             }
         }
         return allowed[0];
+    }
+
+    private static String text(String value, String fallback) {
+        return value == null || value.isBlank() ? fallback : value;
+    }
+
+    private static Map<String, String> cleanNames(Map<String, String> values) {
+        if (values == null || values.isEmpty()) {
+            return Map.of();
+        }
+        Map<String, String> cleaned = new LinkedHashMap<>(values.size());
+        for (Map.Entry<String, String> entry : values.entrySet()) {
+            String material = entry.getKey() == null ? "" : entry.getKey().trim().toUpperCase(Locale.ROOT);
+            if (!material.isEmpty() && entry.getValue() != null && !entry.getValue().isBlank()) {
+                cleaned.put(material, entry.getValue());
+            }
+        }
+        return Collections.unmodifiableMap(cleaned);
     }
 
     private static List<String> clean(List<String> values) {

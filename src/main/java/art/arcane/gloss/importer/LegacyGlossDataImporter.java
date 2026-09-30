@@ -9,6 +9,7 @@ import art.arcane.gloss.config.GlossConfigFile;
 import art.arcane.gloss.config.GlossConfigLoader;
 import art.arcane.gloss.doc.AtomicFiles;
 import art.arcane.gloss.doc.DocumentEnvelope;
+import art.arcane.gloss.drop.RealDropSettingsDoc;
 import art.arcane.gloss.emoji.EmojiDoc;
 import art.arcane.gloss.hologram.HologramDoc;
 import art.arcane.gloss.motd.MotdDoc;
@@ -192,6 +193,7 @@ public final class LegacyGlossDataImporter {
         overlayMechanics(yaml, config, entries);
         overlayBubbleContent(yaml, entries);
         overlayMotdContent(yaml, entries);
+        overlayDropLabelContent(yaml, entries);
         try {
             configLoader.save(config);
         } catch (IOException failure) {
@@ -234,7 +236,6 @@ public final class LegacyGlossDataImporter {
         overlay(yaml, "text.functions", entries, () -> config.text.functions = yaml.getBoolean("text.functions"));
         overlay(yaml, "chat.color", entries, () -> config.chat.color = yaml.getBoolean("chat.color"));
         overlay(yaml, "chat-bubbles.blacklist-worlds", entries, () -> config.chatBubbles.blacklistWorlds = new ArrayList<>(yaml.getStringList("chat-bubbles.blacklist-worlds")));
-        overlay(yaml, "drops.name-format", entries, () -> config.drops.nameFormat = yaml.getString("drops.name-format"));
         overlay(yaml, "commands.sounds", entries, () -> config.commands.sounds = yaml.getBoolean("commands.sounds"));
     }
 
@@ -325,6 +326,34 @@ public final class LegacyGlossDataImporter {
             entries.add(Entry.of("config", LEGACY_CONFIG_FILE_NAME + ":motd.texts", Status.OVERLAID));
         } catch (IOException | RuntimeException failure) {
             entries.add(new Entry("config", MotdDoc.KIND + JSON_EXTENSION, Status.ERROR, detail(failure)));
+        }
+    }
+
+    private void overlayDropLabelContent(YamlConfiguration yaml, List<Entry> entries) {
+        String format = yaml.getString("drops.name-format");
+        if (format == null || format.isBlank()) {
+            return;
+        }
+        String documentName = RealDropSettingsDoc.KIND + "/" + RealDropSettingsDoc.DEFAULT_ID + JSON_EXTENSION;
+        File documentFile = new File(new File(dataFolder, RealDropSettingsDoc.KIND),
+            RealDropSettingsDoc.DEFAULT_ID + JSON_EXTENSION);
+        try {
+            byte[] shipped = readResource("/defaults/" + documentName);
+            if (documentFile.isFile() && !Arrays.equals(shipped, Files.readAllBytes(documentFile.toPath()))) {
+                entries.add(new Entry("config", documentName, Status.SKIPPED_NOTE,
+                    documentName + " was already customized; config.yml drops.name-format not applied"));
+                return;
+            }
+            JsonObject document = JsonParser.parseString(new String(shipped, StandardCharsets.UTF_8)).getAsJsonObject();
+            document.addProperty("revision", document.get("revision").getAsLong() + 1L);
+            document.getAsJsonObject("presentation").getAsJsonObject("labels").addProperty("format", format);
+            String updated = DocumentParsers.GSON.toJson(document);
+            RealDropSettingsDoc.parse(documentName, updated);
+            AtomicFiles.replace(documentFile.toPath(),
+                (updated + System.lineSeparator()).getBytes(StandardCharsets.UTF_8));
+            entries.add(Entry.of("config", LEGACY_CONFIG_FILE_NAME + ":drops.name-format", Status.OVERLAID));
+        } catch (IOException | RuntimeException failure) {
+            entries.add(new Entry("config", documentName, Status.ERROR, detail(failure)));
         }
     }
 

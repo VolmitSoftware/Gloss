@@ -225,15 +225,7 @@ public record GlossConfig(
 
     public record Drops(
         boolean enabled,
-        String nameFormat,
-        String bundleFormat,
-        int bundleEntryLimit,
-        boolean bundleVerticalLabels,
-        String bundleHeaderFormat,
-        String bundleEntryFormat,
-        String bundleMoreFormat,
         boolean preserveCustomNames,
-        boolean useItemDisplayNames,
         ShowCondition show
     ) {
         public Drops {
@@ -293,7 +285,26 @@ public record GlossConfig(
         ) {
         }
 
-        public record Labels(boolean enabled, float yOffset, IconDisplayStyle style, HologramBox box) {
+        public record Labels(
+            boolean enabled,
+            float yOffset,
+            String format,
+            boolean useItemDisplayNames,
+            Map<String, String> names,
+            LabelBundle bundle,
+            IconDisplayStyle style,
+            HologramBox box
+        ) {
+        }
+
+        public record LabelBundle(
+            String format,
+            int entryLimit,
+            boolean vertical,
+            String headerFormat,
+            String entryFormat,
+            String moreFormat
+        ) {
         }
 
         public record Filters(
@@ -628,15 +639,7 @@ public record GlossConfig(
             ),
             new Drops(
                 source.features.drops,
-                source.drops.nameFormat,
-                source.drops.bundleFormat,
-                source.drops.bundleEntryLimit,
-                source.drops.bundleVerticalLabels,
-                source.drops.bundleHeaderFormat,
-                source.drops.bundleEntryFormat,
-                source.drops.bundleMoreFormat,
                 source.drops.preserveCustomNames,
-                source.drops.useItemDisplayNames,
                 ShowCondition.of(source.drops.show == null ? "true" : source.drops.show)
             ),
             RealDropSettingsDoc.DEFAULTS.toConfig(source.features.realDrops),

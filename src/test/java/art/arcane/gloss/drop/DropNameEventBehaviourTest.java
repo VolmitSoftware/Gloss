@@ -39,6 +39,24 @@ class DropNameEventBehaviourTest {
     }
 
     @Test
+    void labelTextAndMaterialNamesComeFromTheRealDropsDocument() throws ReflectiveOperationException {
+        DropFakes.Harness.setField(service, "realDropDoc", RealDropSettingsDoc.parse("default.json", """
+            {"schemaVersion":4,"revision":2,"presentation":{"labels":{
+              "format":"&f{type} &8x{count}","names":{"cobblestone":"Cobble"}}}}
+            """));
+        DropFakes.Harness.invoke(service, "refreshRealDropConfig", new Class<?>[0]);
+        DropFakes.ItemFake cobblestone = new DropFakes.ItemFake(world.proxy, DropFakes.stack(Material.COBBLESTONE, 5));
+        DropFakes.ItemFake log = new DropFakes.ItemFake(world.proxy, DropFakes.stack(Material.OAK_LOG, 2));
+
+        service.refresh(cobblestone.proxy);
+        service.refresh(log.proxy);
+        harness.runScheduled();
+
+        assertEquals("\u00a7fCobble \u00a78x5", cobblestone.customName());
+        assertEquals("\u00a7fOak Log \u00a78x2", log.customName());
+    }
+
+    @Test
     void anEntityRemovalDropsTheTrackedItemImmediately() {
         DropFakes.ItemFake item = new DropFakes.ItemFake(world.proxy, DropFakes.stack(Material.STONE, 2));
         service.refresh(item.proxy);
@@ -74,7 +92,7 @@ class DropNameEventBehaviourTest {
         assertEquals(1, target.calls("setCustomName"));
         assertTrue(target.customName().contains("3x"),
             "the survivor is named with the settled merged amount, got " + target.customName());
-        assertTrue(target.customName().contains("stone"), "name=" + target.customName());
+        assertTrue(target.customName().contains("3x Stone"), "name=" + target.customName());
         assertEquals(1, service.activeCount());
         assertEquals(0, harness.scheduled().size());
     }

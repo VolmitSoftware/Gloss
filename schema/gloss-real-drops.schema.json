@@ -530,6 +530,28 @@
           "default": 0.55,
           "description": "Vertical label offset in blocks, clamped to -4 through 16. Default 0.55."
         },
+        "format": {
+          "type": "string",
+          "default": "&7{count}x {type}",
+          "description": "Label text for a dropped stack. {count} is the stack size and {type} is the item name: the per-material name from names when one is set, otherwise the material name in Title Case (OAK_LOG becomes Oak Log), or the item's own display name when useItemDisplayNames is on. Color codes, emoji, |function| calls, %placeholders% and {{ expressions }} work as in any Gloss text. A blank value uses the default."
+        },
+        "useItemDisplayNames": {
+          "type": "boolean",
+          "default": false,
+          "description": "Uses the item's own display name, such as an anvil rename, as {type} when it has one."
+        },
+        "names": {
+          "type": "object",
+          "default": {},
+          "description": "Per-material names used as {type}, written as a material to name map such as {\"COBBLESTONE\": \"&7Cobble\"}. Keys are Bukkit material names and are matched without regard to case. Entries with a blank name are ignored. Applies to bundle contents too.",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "bundle": {
+          "$ref": "#/$defs/labelBundle",
+          "description": "Label text for dropped bundles that carry stacks. An empty bundle uses format."
+        },
         "style": {
           "$ref": "#/$defs/iconDisplayStyle",
           "description": "Native Gloss TextDisplay style. An omitted label style uses center billboard, shadow, see-through, background #50000000, view range 0.5, and scale 0.85 on every axis. Fields omitted from an explicit style use native IconDisplayStyle defaults."
@@ -537,6 +559,44 @@
         "box": {
           "$ref": "#/$defs/box",
           "description": "Shared label background, padding, and uniform border. Visible parts count against the chunk display budget."
+        }
+      }
+    },
+    "labelBundle": {
+      "title": "Bundle labels",
+      "type": "object",
+      "properties": {
+        "format": {
+          "type": "string",
+          "default": "&7Bundle &8(&7{total} items&8): &7{contents}",
+          "description": "Single-line bundle label and the native item name. {total} is the item count across all stacks and {contents} lists the largest entries. A blank value uses the default."
+        },
+        "entryLimit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10,
+          "default": 3,
+          "description": "Content entries shown before the rest collapse into a +N more entry, clamped to 1 through 10."
+        },
+        "vertical": {
+          "type": "boolean",
+          "default": true,
+          "description": "Draws the bundle label as one line per material using headerFormat, entryFormat and moreFormat."
+        },
+        "headerFormat": {
+          "type": "string",
+          "default": "&eBundle &8(&e{total} items&8)",
+          "description": "First line of a vertical bundle label. {total} is replaced. A blank value uses the default."
+        },
+        "entryFormat": {
+          "type": "string",
+          "default": "&7- &f{count}x {type}",
+          "description": "One vertical line per material. {count} and {type} are replaced, with {type} named the same way as the stack label. A blank value uses the default."
+        },
+        "moreFormat": {
+          "type": "string",
+          "default": "&8+{remaining} more",
+          "description": "Last vertical line when materials are hidden. {remaining} is the number of hidden materials. A blank value uses the default."
         }
       }
     },

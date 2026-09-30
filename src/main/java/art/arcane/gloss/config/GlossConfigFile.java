@@ -16,10 +16,6 @@ import java.util.logging.Level;
 @ConfigDescription("Gloss runtime configuration. Every knob is emitted with a comment, values outside their documented range are clamped back on load, and edits hot-reload while the server runs.")
 public final class GlossConfigFile {
     public static final String BUILDER_URL_DEFAULT = "https://gloss.volmitsoftware.com";
-    public static final String BUNDLE_ENTRY_FORMAT_DEFAULT = "&7- &f{count}x {type}";
-    public static final String BUNDLE_FORMAT_DEFAULT = "&7Bundle &8(&7{total} items&8): &7{contents}";
-    public static final String BUNDLE_HEADER_FORMAT_DEFAULT = "&eBundle &8(&e{total} items&8)";
-    public static final String BUNDLE_MORE_FORMAT_DEFAULT = "&8+{remaining} more";
     public static final String EDITOR_SYNC_ENDPOINT_DEFAULT = "https://sync.gloss.volmitsoftware.com/v3";
 
     @ConfigDoc("Default language for players without an override. Missing official translations download when selected; edit messages directly in languages/<locale>.toml. Blank values use en_US.")
@@ -295,32 +291,8 @@ public final class GlossConfigFile {
         @ConfigDoc("Boolean or boolean expression controlling drop-label visibility for each viewer.")
         public String show = "true";
 
-        @ConfigDoc("Name format for dropped item stacks; {count} and {type} are replaced.")
-        public String nameFormat = "&7{count}x {type}";
-
-        @ConfigDoc("Name format for dropped bundles that carry stacks; {total} and {contents} are replaced. Empty bundles use nameFormat.")
-        public String bundleFormat = BUNDLE_FORMAT_DEFAULT;
-
-        @ConfigDoc("Bundle content entries listed before the rest collapse into a +N more suffix. Clamped to 1..10.")
-        public int bundleEntryLimit = 3;
-
-        @ConfigDoc("Uses a vertical TextDisplay label for bundles while realDrops is enabled.")
-        public boolean bundleVerticalLabels = true;
-
-        @ConfigDoc("Header format for vertical bundle labels; {total} is replaced.")
-        public String bundleHeaderFormat = BUNDLE_HEADER_FORMAT_DEFAULT;
-
-        @ConfigDoc("Entry format for vertical bundle labels; {count} and {type} are replaced.")
-        public String bundleEntryFormat = BUNDLE_ENTRY_FORMAT_DEFAULT;
-
-        @ConfigDoc("Remainder format for vertical bundle labels; {remaining} is replaced with the hidden material count.")
-        public String bundleMoreFormat = BUNDLE_MORE_FORMAT_DEFAULT;
-
         @ConfigDoc("Leaves custom names other plugins already set on dropped items untouched.")
         public boolean preserveCustomNames = true;
-
-        @ConfigDoc("Uses an item's display name from its item meta as {type} instead of the material name when enabled.")
-        public boolean useItemDisplayNames = false;
     }
 
     public static final class Commands {
@@ -669,13 +641,6 @@ public final class GlossConfigFile {
         tablist.updateIntervalTicks = clampInt(tablist.updateIntervalTicks, 1, 400);
 
         chatBubbles.blacklistWorlds = cleanStrings(chatBubbles.blacklistWorlds);
-
-        drops.nameFormat = orDefault(drops.nameFormat, "&7{count}x {type}");
-        drops.bundleFormat = orDefault(drops.bundleFormat, BUNDLE_FORMAT_DEFAULT);
-        drops.bundleEntryLimit = clampInt(drops.bundleEntryLimit, 1, 10);
-        drops.bundleHeaderFormat = orDefault(drops.bundleHeaderFormat, BUNDLE_HEADER_FORMAT_DEFAULT);
-        drops.bundleEntryFormat = orDefault(drops.bundleEntryFormat, BUNDLE_ENTRY_FORMAT_DEFAULT);
-        drops.bundleMoreFormat = orDefault(drops.bundleMoreFormat, BUNDLE_MORE_FORMAT_DEFAULT);
 
         editor.builderUrl = sanitizeBuilderUrl(editor.builderUrl);
         editor.sync.endpoint = sanitizeSyncEndpoint(editor.sync.endpoint);

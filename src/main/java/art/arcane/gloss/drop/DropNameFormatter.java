@@ -4,12 +4,17 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.IntFunction;
 
 public final class DropNameFormatter {
     private static final String ENTRY_SEPARATOR = "&8, &7";
+    private static final Set<String> JOINING_WORDS = Set.of("a", "an", "and", "in", "o", "of", "on", "the", "with");
+    private static final Map<String, String> MATERIAL_NAMES = new ConcurrentHashMap<>();
 
     private DropNameFormatter() {
     }
@@ -26,6 +31,15 @@ public final class DropNameFormatter {
 
     public static boolean ownsExistingName(boolean marked, String lastRendered, String currentName) {
         return marked && (lastRendered == null || Objects.equals(lastRendered, currentName));
+    }
+
+    public static String typeName(Map<String, String> names, String materialKey) {
+        String authored = names.get(materialKey);
+        return authored == null ? materialName(materialKey) : authored;
+    }
+
+    public static String materialName(String materialKey) {
+        return MATERIAL_NAMES.computeIfAbsent(materialKey, DropNameFormatter::titleCase);
     }
 
     public static String typeLabel(boolean useItemDisplayNames, String displayName, String materialName) {
@@ -113,6 +127,26 @@ public final class DropNameFormatter {
             .comparingInt(BundleContent::amount).reversed()
             .thenComparing(BundleContent::type));
         return aggregated;
+    }
+
+    private static String titleCase(String materialKey) {
+        String[] words = materialKey.toLowerCase(Locale.ROOT).split("_");
+        StringBuilder name = new StringBuilder(materialKey.length());
+        for (String word : words) {
+            if (word.isEmpty()) {
+                continue;
+            }
+            boolean first = name.isEmpty();
+            if (!first) {
+                name.append(' ');
+            }
+            if (!first && JOINING_WORDS.contains(word)) {
+                name.append(word);
+            } else {
+                name.append(Character.toUpperCase(word.charAt(0))).append(word, 1, word.length());
+            }
+        }
+        return name.toString();
     }
 
     public record BundleContent(String type, int amount) {

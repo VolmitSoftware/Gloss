@@ -1,12 +1,12 @@
 package art.arcane.gloss.drop;
 
 import art.arcane.gloss.config.GlossConfigFile;
-import art.arcane.volmlib.util.format.Form;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.function.IntFunction;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -21,14 +21,25 @@ class DropNameFormatterTest {
     }
 
     private static String bundle(List<DropNameFormatter.BundleContent> contents, int entryLimit) {
-        return DropNameFormatter.formatBundle(GlossConfigFile.BUNDLE_FORMAT_DEFAULT, contents, entryLimit, MORE);
+        return DropNameFormatter.formatBundle(RealDropSettingsDoc.BUNDLE_FORMAT_DEFAULT, contents, entryLimit, MORE);
     }
 
     @Test
-    void prettyEnumNameLowercasesAndSplitsWords() {
-        assertEquals("diamond sword", Form.prettyEnumName("DIAMOND_SWORD"));
-        assertEquals("stone", Form.prettyEnumName("STONE"));
-        assertEquals("oak log", Form.prettyEnumName("OAK_LOG"));
+    void materialNameTitleCasesWordsAndKeepsJoiningWordsLower() {
+        assertEquals("Diamond Sword", DropNameFormatter.materialName("DIAMOND_SWORD"));
+        assertEquals("Cobblestone", DropNameFormatter.materialName("COBBLESTONE"));
+        assertEquals("Oak Log", DropNameFormatter.materialName("OAK_LOG"));
+        assertEquals("Heart of the Sea", DropNameFormatter.materialName("HEART_OF_THE_SEA"));
+        assertEquals("Music Disc 13", DropNameFormatter.materialName("MUSIC_DISC_13"));
+    }
+
+    @Test
+    void typeNamePrefersTheAuthoredMaterialName() {
+        Map<String, String> names = Map.of("COBBLESTONE", "&7Cobble");
+
+        assertEquals("&7Cobble", DropNameFormatter.typeName(names, "COBBLESTONE"));
+        assertEquals("Oak Log", DropNameFormatter.typeName(names, "OAK_LOG"));
+        assertEquals("Oak Log", DropNameFormatter.typeName(Map.of(), "OAK_LOG"));
     }
 
     @Test
@@ -130,9 +141,9 @@ class DropNameFormatterTest {
                 "&8+2 more"
             ),
             DropNameFormatter.formatBundleLines(
-                GlossConfigFile.BUNDLE_HEADER_FORMAT_DEFAULT,
-                GlossConfigFile.BUNDLE_ENTRY_FORMAT_DEFAULT,
-                GlossConfigFile.BUNDLE_MORE_FORMAT_DEFAULT,
+                RealDropSettingsDoc.BUNDLE_HEADER_FORMAT_DEFAULT,
+                RealDropSettingsDoc.BUNDLE_ENTRY_FORMAT_DEFAULT,
+                RealDropSettingsDoc.BUNDLE_MORE_FORMAT_DEFAULT,
                 List.of(
                     content("stone", 5),
                     content("dirt", 4),
@@ -150,10 +161,11 @@ class DropNameFormatterTest {
 
     @Test
     void shippedBundleFormatDeclaresBothTokensAndTheDefaultLimitIsThree() {
-        assertTrue(GlossConfigFile.BUNDLE_FORMAT_DEFAULT.contains("{total}"));
-        assertTrue(GlossConfigFile.BUNDLE_FORMAT_DEFAULT.contains("{contents}"));
-        assertEquals(3, new GlossConfigFile.Drops().bundleEntryLimit);
-        assertEquals(GlossConfigFile.BUNDLE_FORMAT_DEFAULT, new GlossConfigFile.Drops().bundleFormat);
+        assertTrue(RealDropSettingsDoc.BUNDLE_FORMAT_DEFAULT.contains("{total}"));
+        assertTrue(RealDropSettingsDoc.BUNDLE_FORMAT_DEFAULT.contains("{contents}"));
+        RealDropSettingsDoc.LabelBundle defaults = new RealDropSettingsDoc.LabelBundle(null, null, null, null, null, null);
+        assertEquals(3, defaults.entryLimit());
+        assertEquals(RealDropSettingsDoc.BUNDLE_FORMAT_DEFAULT, defaults.format());
     }
 
     @Test
@@ -185,6 +197,6 @@ class DropNameFormatterTest {
     @Test
     void itemDisplayNamesRequireExplicitOptIn() {
         assertTrue(new GlossConfigFile.Drops().preserveCustomNames);
-        assertFalse(new GlossConfigFile.Drops().useItemDisplayNames);
+        assertFalse(RealDropSettingsDoc.DEFAULTS.toConfig(true).labels().useItemDisplayNames());
     }
 }

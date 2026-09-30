@@ -20,7 +20,6 @@ import art.arcane.gloss.particle.ParticleRect;
 import art.arcane.gloss.particle.ParticleText;
 import art.arcane.gloss.particle.ParticleTextLayout;
 import art.arcane.gloss.text.TextPipeline;
-import art.arcane.volmlib.util.format.Form;
 import art.arcane.volmlib.util.localization.MessageArgument;
 import art.arcane.volmlib.util.scheduling.FoliaScheduler;
 import art.arcane.volmlib.util.scheduling.SchedulerUtils;
@@ -69,8 +68,6 @@ public final class DropNameService implements Listener, RegistryOwner {
     private static final int PRUNE_BUDGET = 64;
     private static final int REHYDRATE_CHUNK_BUDGET = 32;
     private static final int RENDER_MEMO_LIMIT = 256;
-
-    private static final Map<Material, String> PRETTY_NAMES = new ConcurrentHashMap<>();
 
     private final Gloss plugin;
     private final NamespacedKey nameKey;
@@ -311,6 +308,7 @@ public final class DropNameService implements Listener, RegistryOwner {
         RealDropConditionSnapshot snapshot = RealDropConditionSnapshot.capture(item, eventType, plan.fields());
         RealDropConditionPlan.Selection presentation = plan.select(plugin, item, snapshot);
         GlossConfig.Drops drops = plugin.cfg().drops();
+        GlossConfig.RealDrops.Labels labels = presentation.style().config().labels();
         boolean marked = item.getPersistentDataContainer().has(nameKey, PersistentDataType.BOOLEAN);
         String lastRendered = item.getPersistentDataContainer().get(renderedNameKey, PersistentDataType.STRING);
         boolean glossOwned = DropNameFormatter.ownsExistingName(marked, lastRendered, item.getCustomName());
@@ -338,12 +336,13 @@ public final class DropNameService implements Listener, RegistryOwner {
             return;
         }
 
-        List<DropNameFormatter.BundleContent> contents = bundleContents(stack);
+        List<DropNameFormatter.BundleContent> contents = bundleContents(stack, labels);
+        String type = typeLabel(labels, stack);
         String raw = contents.isEmpty()
-            ? DropNameFormatter.format(drops.nameFormat(), count, typeLabel(drops, stack))
-            : DropNameFormatter.formatBundle(
-                drops.bundleFormat(), contents, bundleEntryLimit(suppliedFormats, drops), DropNameService::renderMore);
-        String fallbackName = count + "x " + typeLabel(drops, stack);
+            ? DropNameFormatter.format(labels.format(), count, type)
+            : DropNameFormatter.formatBundle(labels.bundle().format(), contents,
+                bundleEntryLimit(suppliedFormats, labels.bundle()), DropNameService::renderMore);
+        String fallbackName = count + "x " + type;
         String rendered = renderNativeName(raw, fallbackName, this::renderName);
         if (!rendered.equals(item.getCustomName())) {
             item.setCustomName(rendered);
@@ -355,7 +354,7 @@ public final class DropNameService implements Listener, RegistryOwner {
         item.getPersistentDataContainer().set(renderedNameKey, PersistentDataType.STRING, rendered);
         track(item);
 
-        List<String> labelLines = verticalLabelLines(contents, suppliedFormats, drops, raw);
+        List<String> labelLines = verticalLabelLines(contents, suppliedFormats, labels.bundle(), raw);
         List<String> renderedLines = new ArrayList<>(labelLines.size());
         for (String line : labelLines) {
             renderedLines.add(renderNativeName(line, fallbackName, this::renderName));
@@ -433,17 +432,13 @@ public final class DropNameService implements Listener, RegistryOwner {
     }
 
     private List<String> verticalLabelLines(List<DropNameFormatter.BundleContent> contents,
-                                            BundleFormats suppliedFormats, GlossConfig.Drops drops,
-                                            String fallback) {
-        if (contents.isEmpty() || !drops.bundleVerticalLabels()) {
+                                            BundleFormats suppliedFormats,
+                                            GlossConfig.RealDrops.LabelBundle bundle, String fallback) {
+        if (contents.isEmpty() || !bundle.vertical()) {
             return List.of(fallback);
         }
         BundleFormats formats = suppliedFormats == null
-            ? new BundleFormats(
-                drops.bundleHeaderFormat(),
-                drops.bundleEntryFormat(),
-                drops.bundleMoreFormat(),
-                drops.bundleEntryLimit())
+            ? new BundleFormats(bundle.headerFormat(), bundle.entryFormat(), bundle.moreFormat(), bundle.entryLimit())
             : suppliedFormats;
         return DropNameFormatter.formatBundleLines(
             formats.header(), formats.entry(), formats.more(), contents, formats.entryLimit());
@@ -479,12 +474,7 @@ public final class DropNameService implements Listener, RegistryOwner {
     }
 
     private void refreshOnOwner(Item item, String eventType) {
-        GlossConfig.Drops drops = plugin.cfg().drops();
-        refreshOnOwner(item, new BundleFormats(
-            drops.bundleHeaderFormat(),
-            drops.bundleEntryFormat(),
-            drops.bundleMoreFormat(),
-            drops.bundleEntryLimit()), eventType);
+        refreshOnOwner(item, null, eventType);
     }
 
     private void refreshOnOwner(Item item, BundleFormats formats, String eventType) {
@@ -617,9 +607,9 @@ public final class DropNameService implements Listener, RegistryOwner {
         return RealDropConditionPlan.compile(document, enabled, errors, viewerShow);
     }
 
-    private static String typeLabel(GlossConfig.Drops drops, ItemStack stack) {
-        String materialName = prettyName(stack.getType());
-        if (!drops.useItemDisplayNames()) {
+    private static String typeLabel(GlossConfig.RealDrops.Labels labels, ItemStack stack) {
+        String materialName = DropNameFormatter.typeName(labels.names(), stack.getType().name());
+        if (!labels.useItemDisplayNames()) {
             return materialName;
         }
 
@@ -628,7 +618,8 @@ public final class DropNameService implements Listener, RegistryOwner {
         return DropNameFormatter.typeLabel(true, displayName, materialName);
     }
 
-    private static List<DropNameFormatter.BundleContent> bundleContents(ItemStack stack) {
+    private static List<DropNameFormatter.BundleContent> bundleContents(ItemStack stack,
+                                                                        GlossConfig.RealDrops.Labels labels) {
         if (stack.getType() != Material.BUNDLE || !(stack.getItemMeta() instanceof BundleMeta meta)) {
             return List.of();
         }
@@ -641,23 +632,20 @@ public final class DropNameService implements Listener, RegistryOwner {
         List<DropNameFormatter.BundleContent> contents = new ArrayList<>(items.size());
         for (ItemStack carried : items) {
             if (carried != null) {
-                contents.add(new DropNameFormatter.BundleContent(prettyName(carried.getType()), carried.getAmount()));
+                contents.add(new DropNameFormatter.BundleContent(
+                    DropNameFormatter.typeName(labels.names(), carried.getType().name()), carried.getAmount()));
             }
         }
         return contents;
     }
 
-    private static int bundleEntryLimit(BundleFormats formats, GlossConfig.Drops drops) {
-        return formats == null ? drops.bundleEntryLimit() : formats.entryLimit();
+    private static int bundleEntryLimit(BundleFormats formats, GlossConfig.RealDrops.LabelBundle bundle) {
+        return formats == null ? bundle.entryLimit() : formats.entryLimit();
     }
 
     private void clearNameOwnership(Item item) {
         item.getPersistentDataContainer().remove(nameKey);
         item.getPersistentDataContainer().remove(renderedNameKey);
-    }
-
-    private static String prettyName(Material material) {
-        return PRETTY_NAMES.computeIfAbsent(material, key -> Form.prettyEnumName(key.name()));
     }
 
     private static String renderMore(int remaining) {

@@ -4,6 +4,7 @@ import art.arcane.gloss.GlossConfig;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -35,7 +36,74 @@ class RealDropSettingsDocTest {
         assertEquals(0.55F, config.landing().faceAttraction());
         assertEquals(4, config.landing().settleDelayTicks());
         assertTrue(config.labels().style().seeThrough());
+        assertEquals("&7{count}x {type}", config.labels().format());
+        assertFalse(config.labels().useItemDisplayNames());
+        assertEquals(Map.of(), config.labels().names());
+        assertEquals(RealDropSettingsDoc.BUNDLE_FORMAT_DEFAULT, config.labels().bundle().format());
+        assertEquals(3, config.labels().bundle().entryLimit());
+        assertTrue(config.labels().bundle().vertical());
+        assertEquals(RealDropSettingsDoc.BUNDLE_HEADER_FORMAT_DEFAULT, config.labels().bundle().headerFormat());
+        assertEquals(RealDropSettingsDoc.BUNDLE_ENTRY_FORMAT_DEFAULT, config.labels().bundle().entryFormat());
+        assertEquals(RealDropSettingsDoc.BUNDLE_MORE_FORMAT_DEFAULT, config.labels().bundle().moreFormat());
         assertEquals(List.of("BEDROCK", "BARRIER"), config.filters().materialBlacklist());
+    }
+
+    @Test
+    void labelTextIsAuthoredInTheDocumentWithPerMaterialNames() {
+        RealDropSettingsDoc parsed = RealDropSettingsDoc.parse("default.json", """
+            {
+              "schemaVersion": 4,
+              "revision": 3,
+              "presentation": {
+                "labels": {
+                  "format": "&f{type} &8x{count}",
+                  "useItemDisplayNames": true,
+                  "names": {" cobblestone ": "&7Cobble", "IRON_BLOCK": "Block of Iron", "stone": " "},
+                  "bundle": {"format": "{total}: {contents}", "entryLimit": 99, "vertical": false,
+                    "headerFormat": "H{total}", "entryFormat": "{count} {type}", "moreFormat": "+{remaining}"}
+                }
+              }
+            }
+            """);
+        GlossConfig.RealDrops.Labels labels = parsed.toConfig(true).labels();
+
+        assertEquals("&f{type} &8x{count}", labels.format());
+        assertTrue(labels.useItemDisplayNames());
+        assertEquals(Map.of("COBBLESTONE", "&7Cobble", "IRON_BLOCK", "Block of Iron"), labels.names());
+        assertEquals("{total}: {contents}", labels.bundle().format());
+        assertEquals(10, labels.bundle().entryLimit());
+        assertFalse(labels.bundle().vertical());
+        assertEquals("H{total}", labels.bundle().headerFormat());
+        assertEquals("{count} {type}", labels.bundle().entryFormat());
+        assertEquals("+{remaining}", labels.bundle().moreFormat());
+    }
+
+    @Test
+    void blankLabelFormatsFallBackToTheShippedText() {
+        RealDropSettingsDoc parsed = RealDropSettingsDoc.parse("default.json", """
+            {"schemaVersion":4,"revision":1,"presentation":{"labels":{"format":" ",
+              "bundle":{"format":"","headerFormat":"","entryFormat":"","moreFormat":"","entryLimit":0}}}}
+            """);
+        GlossConfig.RealDrops.Labels labels = parsed.toConfig(true).labels();
+
+        assertEquals(RealDropSettingsDoc.NAME_FORMAT_DEFAULT, labels.format());
+        assertEquals(RealDropSettingsDoc.BUNDLE_FORMAT_DEFAULT, labels.bundle().format());
+        assertEquals(RealDropSettingsDoc.BUNDLE_HEADER_FORMAT_DEFAULT, labels.bundle().headerFormat());
+        assertEquals(RealDropSettingsDoc.BUNDLE_ENTRY_FORMAT_DEFAULT, labels.bundle().entryFormat());
+        assertEquals(RealDropSettingsDoc.BUNDLE_MORE_FORMAT_DEFAULT, labels.bundle().moreFormat());
+        assertEquals(1, labels.bundle().entryLimit());
+    }
+
+    @Test
+    void variantsCarryTheirOwnLabelText() {
+        RealDropSettingsDoc parsed = RealDropSettingsDoc.parse("default.json", """
+            {"schemaVersion":4,"revision":1,"variants":[{"id":"ores","when":"true",
+              "presentation":{"labels":{"format":"&b{type}","names":{"diamond":"Gem"}}}}]}
+            """);
+        GlossConfig.RealDrops.Labels labels = parsed.variants().get(0).presentation().toConfig(true).labels();
+
+        assertEquals("&b{type}", labels.format());
+        assertEquals(Map.of("DIAMOND", "Gem"), labels.names());
     }
 
     @Test

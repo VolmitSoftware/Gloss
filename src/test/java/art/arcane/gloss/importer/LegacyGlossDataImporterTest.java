@@ -7,6 +7,7 @@ import art.arcane.gloss.bubble.BubbleStyleDoc;
 import art.arcane.gloss.config.GlossConfigFile;
 import art.arcane.gloss.config.GlossConfigLoader;
 import art.arcane.gloss.doc.DocumentEnvelope;
+import art.arcane.gloss.drop.RealDropSettingsDoc;
 import art.arcane.gloss.emoji.EmojiDoc;
 import art.arcane.gloss.hologram.HologramDoc;
 import art.arcane.gloss.motd.MotdDoc;
@@ -198,7 +199,9 @@ class LegacyGlossDataImporterTest {
         assertEquals(0.5D, config.holograms.stackDistance);
         assertEquals(80, config.tablist.updateIntervalTicks);
         assertEquals(List.of("spawnhub"), config.chatBubbles.blacklistWorlds);
-        assertEquals("&e{count}x {type}", config.drops.nameFormat);
+        RealDropSettingsDoc realDrops = RealDropSettingsDoc.parse("default.json", read("real-drops/default.json"));
+        assertEquals("&e{count}x {type}", realDrops.toConfig(true).labels().format());
+        assertEquals(2L, realDrops.revision());
 
         String toml = read(GlossConfigLoader.FILE_NAME);
         assertTrue(toml.contains("stackDistance = 0.5"), "overlay must re-serialize gloss.toml");
