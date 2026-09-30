@@ -247,6 +247,24 @@ class CharacterizationHologramServiceTest {
     }
 
     @Test
+    void spawnedHologramCountTracksOnlyHologramsWithALiveDisplay() {
+        PersistentHologram near = harness.persistent("near-holo", harness.at(world, 0.5D, 64.0D, 0.5D));
+        near.setLines(List.of("near"));
+        PersistentHologram far = harness.persistent("far-holo", harness.at(world, 900.5D, 64.0D, 900.5D));
+        far.setLines(List.of("far"));
+        assertEquals(0, harness.service.spawnedHologramCount());
+
+        near.update();
+        far.update();
+
+        assertEquals(2, harness.service.hologramCount(), "definitions count every loaded hologram");
+        assertEquals(1, harness.service.spawnedHologramCount(), "only the hologram near a viewer is live");
+
+        near.despawnAll();
+        assertEquals(0, harness.service.spawnedHologramCount());
+    }
+
+    @Test
     void cleanupUsesCapturedEntityIdsAfterLeavingTheDisplayOwner() {
         TemporaryHologramDisplay temporary = harness.temporary("cached-id", harness.at(world, 0.5D, 64.0D, 0.5D), 60000L);
         temporary.setLines(List.of("text"));

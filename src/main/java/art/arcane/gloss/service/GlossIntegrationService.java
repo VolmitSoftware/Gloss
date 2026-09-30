@@ -140,28 +140,21 @@ public final class GlossIntegrationService implements IntegrationServiceContract
             out.put(key, available(key, GlossTelemetry.tickMsPerSecond(now), now));
         case IntegrationMetricSchema.GLOSS_PREVIEW_REFRESH_PER_SECOND ->
             out.put(key, available(key, GlossTelemetry.previewRefreshPerSecond(now), now));
-        // Gloss does not host the editor; the shared schema key stays, permanently unavailable
-        case IntegrationMetricSchema.GLOSS_BUILDER_SERVER_RUNNING ->
-            out.put(key, IntegrationMetricSample.unavailable(
-                IntegrationMetricSchema.descriptor(key),
-                "builder-server-removed",
-                now
-            ));
         case IntegrationMetricSchema.GLOSS_HOLOGRAMS_ACTIVE ->
             out.put(key, sampleService(key, now, Gloss::holograms,
-                "holograms-not-ready", service -> service.hologramCount()));
+                "holograms-not-ready", service -> service.spawnedHologramCount()));
         case IntegrationMetricSchema.GLOSS_PANELS_ACTIVE ->
             out.put(key, sampleService(key, now, Gloss::getPanelService,
                 "panels-not-ready", service -> service.size()));
         case IntegrationMetricSchema.GLOSS_BOARDS_ACTIVE ->
             out.put(key, sampleService(key, now, Gloss::boards,
-                "boards-not-ready", service -> service.boardCount()));
+                "boards-not-ready", service -> service.activeBoardCount()));
         case IntegrationMetricSchema.GLOSS_TABLIST_PLAYERS ->
             out.put(key, sampleService(key, now, Gloss::tablist,
                 "tablist-not-ready", service -> service.managedPlayerCount()));
         case IntegrationMetricSchema.GLOSS_ANIMATIONS_ACTIVE ->
-            out.put(key, sampleService(key, now, Gloss::animations,
-                "animations-not-ready", service -> service.names().size()));
+            out.put(key, sampleService(key, now, Gloss::holograms,
+                "holograms-not-ready", service -> service.animatedTargetCount()));
         case IntegrationMetricSchema.GLOSS_BUBBLES_PER_SECOND ->
             out.put(key, available(key, GlossTelemetry.bubblesPerSecond(now), now));
         case IntegrationMetricSchema.GLOSS_INDICATORS_PER_SECOND ->

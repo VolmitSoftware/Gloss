@@ -133,6 +133,15 @@ public final class AnimationService implements RegistryOwner {
         return false;
     }
 
+    public boolean hasAnimatedContent(List<String> lines) {
+        for (String line : lines) {
+            if (inspectAnimatedTokens(line, new HashSet<>())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public List<String> resetToDefault(String nameOrStar) {
         return defaults.resetToDefault(nameOrStar);
     }
@@ -247,6 +256,37 @@ public final class AnimationService implements RegistryOwner {
                         for (String frame : clip.frames()) {
                             if (TextPipeline.timeDependent(frame)
                                 || inspectAnimationTimeDependencies(frame, visiting)) {
+                                return true;
+                            }
+                        }
+                    } finally {
+                        visiting.remove(id);
+                    }
+                }
+            }
+            open = raw.indexOf('|', close + 1);
+        }
+        return false;
+    }
+
+    private boolean inspectAnimatedTokens(String raw, Set<String> visiting) {
+        int open = raw.indexOf('|');
+        while (open >= 0) {
+            int close = raw.indexOf('|', open + 1);
+            if (close < 0) {
+                return false;
+            }
+            String name = raw.substring(open + 1, close);
+            if (name.startsWith(FUNCTION_PREFIX)) {
+                String id = name.substring(FUNCTION_PREFIX.length());
+                AnimationClip clip = clipsById.get(id);
+                if (clip != null && visiting.add(id)) {
+                    try {
+                        if (clip.frames().size() > 1) {
+                            return true;
+                        }
+                        for (String frame : clip.frames()) {
+                            if (TextPipeline.timeDependent(frame) || inspectAnimatedTokens(frame, visiting)) {
                                 return true;
                             }
                         }

@@ -134,23 +134,8 @@ public final class MenuSessionManager {
       if (holders.isEmpty()) {
         return;
       }
-      long tickStart = System.nanoTime();
-      holders.values().forEach(holder -> {
-        Player player = holder.player();
-        Runnable tickTask = () -> {
-          boolean previewActive = holder.hasPreview();
-          boolean disposable = holder.tick();
-          if (previewActive && player.isOnline()) {
-            managePreviewEvents(player, false);
-          }
-          if (disposable) {
-            disposeIfIdle(holder);
-          }
-        };
-
-        SchedulerUtils.runEntity(Gloss.instance, player, tickTask);
-      });
-      GlossTelemetry.addTickNanos(System.nanoTime() - tickStart);
+      holders.values().forEach(holder ->
+          SchedulerUtils.runEntity(Gloss.instance, holder.player(), () -> tickHolder(holder)));
     }, false);
     Events.listen(Gloss.instance, PlayerMoveEvent.class, EventPriority.HIGHEST, e -> {
       if (holders.isEmpty() || e.isCancelled() || e.getTo() == null) return;
@@ -224,6 +209,23 @@ public final class MenuSessionManager {
             }
         );
     previewTask = listenToInventoryPreview();
+  }
+
+  void tickHolder(SessionHolder holder) {
+    long started = System.nanoTime();
+    try {
+      Player player = holder.player();
+      boolean previewActive = holder.hasPreview();
+      boolean disposable = holder.tick();
+      if (previewActive && player.isOnline()) {
+        managePreviewEvents(player, false);
+      }
+      if (disposable) {
+        disposeIfIdle(holder);
+      }
+    } finally {
+      GlossTelemetry.addTickNanos(System.nanoTime() - started);
+    }
   }
 
   /**

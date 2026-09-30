@@ -63,7 +63,8 @@ final class PersistentHologram implements AnchoredHologram {
     }
 
     private record DependencyMemo(long lineGeneration, long animationGeneration, long renderGeneration,
-                                  boolean viewerSpecific, boolean fastDynamic, boolean dynamicText) {
+                                  boolean viewerSpecific, boolean fastDynamic, boolean dynamicText,
+                                  boolean animated) {
     }
 
     private record AppliedAnchor(long generation, Location location) {
@@ -565,9 +566,23 @@ final class PersistentHologram implements AnchoredHologram {
         }
         DependencyMemo resolved = new DependencyMemo(snapshot.generation(), animationGeneration,
             renderGeneration, dependent, service.hasFastDynamicAnimationContent(snapshot.lines()),
-            hasDynamicText(snapshot));
+            hasDynamicText(snapshot), service.hasAnimatedContent(snapshot.lines()));
         dependencyMemo = resolved;
         return resolved;
+    }
+
+    boolean hasSpawnedDisplay() {
+        return sharedDisplay != null;
+    }
+
+    int tickAnimatedTargets() {
+        if (sharedDisplay == null || !dependencies(lineSet).animated()) {
+            return 0;
+        }
+        if (personalizedDisplay) {
+            return viewerRendered.size();
+        }
+        return sharedFrames == null ? 1 : 0;
     }
 
     void despawnAll() {
