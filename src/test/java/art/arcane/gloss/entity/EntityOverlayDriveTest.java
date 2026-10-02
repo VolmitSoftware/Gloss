@@ -1,6 +1,11 @@
 package art.arcane.gloss.entity;
 
 import org.bukkit.entity.EntityType;
+import art.arcane.gloss.Gloss;
+import art.arcane.gloss.names.NamesService;
+import art.arcane.gloss.doc.DataWatchdog;
+import art.arcane.gloss.menu.CharacterizationSupport;
+import java.nio.file.Files;
 import org.bukkit.event.entity.EntityRemoveEvent;
 import org.bukkit.plugin.Plugin;
 import org.junit.jupiter.api.Test;
@@ -23,6 +28,63 @@ class EntityOverlayDriveTest {
 
     @TempDir
     File dataFolder;
+
+    @Test
+    void catalogReloadRefreshesStationaryOverlayNames() throws Exception {
+        try (EntityOverlayHarness harness = new EntityOverlayHarness(dataFolder)) {
+            Gloss previous = CharacterizationSupport.installGloss(harness.gloss);
+            CharacterizationSupport.setField(harness.gloss, "watchdog", new DataWatchdog(harness.gloss));
+            NamesService names = new NamesService(harness.gloss);
+            CharacterizationSupport.setField(harness.gloss, "names", names);
+            try {
+                names.enable();
+                EntityOverlayHarness.WorldState world = harness.world("world");
+                harness.join("A", world, 0, 64, 0);
+                EntityOverlayHarness.MobHandle mob = harness.mob(world, EntityType.ZOMBIE, 4, 64, 0);
+                EntityOverlayService service = harness.service("""
+                    {"schemaVersion":2,"revision":1,"includePlayers":false,
+                     "lines":[{"id":"type","text":"{typeName}"}]}
+                    """);
+                harness.drive(service);
+                EntityOverlayTarget overlay = harness.overlays(service).get(mob.uuid);
+                assertEquals("Zombie", overlay.shared.frame.text());
+                EntityOverlayText.Snapshot initial = overlay.shared.snapshot;
+                Files.writeString(dataFolder.toPath().resolve("names.json"), """
+                    {"schemaVersion":1,"revision":2,"entities":{"zombie":"Walker"}}
+                    """);
+                names.reload();
+                harness.drive(service);
+                assertEquals(initial, overlay.shared.snapshot);
+                assertEquals("Walker", overlay.shared.frame.text());
+            } finally {
+                names.disable();
+                CharacterizationSupport.restoreGloss(previous);
+            }
+        }
+    }
+
+    @Test
+    void presentationVariantsKeepViewerTextAndStyleSeparate() {
+        try (EntityOverlayHarness harness = new EntityOverlayHarness(dataFolder)) {
+            EntityOverlayHarness.WorldState world = harness.world("world");
+            EntityOverlayHarness.PlayerHandle near = harness.join("A", world, 0, 64, 0);
+            EntityOverlayHarness.PlayerHandle far = harness.join("B", world, 2, 64, 0);
+            EntityOverlayHarness.MobHandle mob = harness.mob(world, EntityType.ZOMBIE, 4, 64, 0);
+            EntityOverlayService service = harness.service("""
+                {"schemaVersion":2,"revision":1,"includePlayers":false,
+                 "lines":[{"id":"base","text":"base"}],
+                 "variants":[{"id":"near","priority":10,"when":"player.x < 1 && entity.type == 'zombie'",
+                   "presentation":{"lines":[{"id":"near","text":"near"}],"style":{"scaleX":2},"verticalOffset":1.5}}]}
+                """);
+            harness.drive(service);
+            EntityOverlayTarget overlay = harness.overlays(service).get(mob.uuid);
+            assertEquals("near", overlay.personal.get(near.uuid).frame.text());
+            assertEquals("base", overlay.personal.get(far.uuid).frame.text());
+            assertEquals(2F, overlay.personal.get(near.uuid).presentation.style().scaleX());
+            assertEquals(EntityOverlayDoc.DEFAULT_STYLE, overlay.personal.get(far.uuid).presentation.style());
+            assertEquals(1.5D, overlay.personal.get(near.uuid).presentation.verticalOffset());
+        }
+    }
 
     @Test
     void everyViewerOfATargetSharesOneHologram() {

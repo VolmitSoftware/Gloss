@@ -78,6 +78,8 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
     private record PresentationBinding(Entity owner, Supplier<HologramPresentation> binder) {
     }
 
+    private volatile Double viewDistance;
+    private volatile UnaryOperator<String> textTransform;
     private final HologramService service;
     private final String id;
     private final String animatorGroup;
@@ -144,6 +146,23 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
         this.position = startingPosition;
         this.boundPresentation = HologramPresentation.identity();
         this.particleLayers = List.of();
+    }
+
+    void setTextTransform(UnaryOperator<String> transform) {
+        textTransform = Objects.requireNonNull(transform);
+        textDirty.set(true);
+    }
+
+    void setViewDistance(double distance) {
+        if (!Double.isFinite(distance) || distance < 4.0D || distance > 128.0D) {
+            throw new IllegalArgumentException("viewDistance must be within 4..128");
+        }
+        viewDistance = distance;
+    }
+
+    private double viewDistance() {
+        Double distance = viewDistance;
+        return distance == null ? service.viewRange() : distance;
     }
 
     @Override
@@ -660,6 +679,9 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
                     IconDisplayStyle currentStyle = style;
                     if (currentStyle != null) {
                         TextDisplayStyle.apply(spawned, currentStyle);
+                        if (viewDistance != null) {
+                            spawned.setViewRange(HologramMath.viewRangeMultiplier(viewDistance()));
+                        }
                     } else if (snapshot.rendered()) {
                         spawned.setLineWidth(RENDERED_LINE_WIDTH);
                         spawned.setAlignment(TextDisplay.TextAlignment.LEFT);
@@ -767,6 +789,9 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
             return;
         }
         TextDisplayStyle.apply(active, current);
+        if (viewDistance != null) {
+            active.setViewRange(HologramMath.viewRangeMultiplier(viewDistance()));
+        }
         appliedStyle = current;
         appliedPresentation = null;
     }
@@ -938,6 +963,10 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
                 state.sentText = null;
                 publishAnimation(viewerId.toString(), new HologramAnimator.Target(
                     state.entityId, frame.frames(), List.of(viewer)));
+            } else if (textTransform != null) {
+                String authored = frame.text();
+                publishAnimation(viewerId.toString(), new HologramAnimator.Target(
+                    state.entityId, ignored -> authored, List.of(viewer)));
             } else {
                 service.animator().remove(animatorGroup, viewerId.toString());
                 if (!frame.text().equals(state.sentText)) {
@@ -973,7 +1002,7 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
             state.decoration = new PacketTextDecoration(state.player);
         }
         IconDisplayStyle currentStyle = style == null ? IconDisplayStyle.hologramDefaults() : style;
-        state.decoration.update(PacketTextDecoration.Update.atAnchor(position, TextUtils.renderLegacy(text),
+        state.decoration.update(PacketTextDecoration.Update.atAnchor(position, transformLegacy(TextUtils.renderLegacy(text)),
             currentStyle, box, boundPresentation));
     }
 
@@ -1048,6 +1077,14 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
 
     private void publishAnimation(String sub, HologramAnimator.Target target) {
         animationPublished.set(true);
+        UnaryOperator<String> transform = textTransform;
+        if (transform != null) {
+            TextFrameSource source = target.frames();
+            TextCodec codec = target.codec();
+            target = new HologramAnimator.Target(target.entityId(), now -> transform.apply(
+                codec == TextCodec.LEGACY ? source.compose(now) : TextUtils.renderLegacy(source.compose(now))),
+                target.viewers(), TextCodec.LEGACY);
+        }
         service.animator().publish(animatorGroup, sub, target);
     }
 
@@ -1135,7 +1172,7 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
                     dispatchConditionalVisibility(active, viewer);
                 }
             }
-            service.forEachNearbyViewer(position, service.viewRange() * service.viewRange(), viewer -> {
+            service.forEachNearbyViewer(position, viewDistance() * viewDistance(), viewer -> {
                 if (!appliedVisibility.containsKey(viewer.getUniqueId())) {
                     dispatchConditionalVisibility(active, viewer);
                 }
@@ -1328,7 +1365,7 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
             Location viewerLocation = player.getLocation();
             Location anchor = position;
             boolean nearby = viewerLocation.getWorld() == anchor.getWorld()
-                && viewerLocation.distanceSquared(anchor) <= service.viewRange() * service.viewRange();
+                && viewerLocation.distanceSquared(anchor) <= viewDistance() * viewDistance();
             boolean visible = nearby && viewerList.isWhitelist() == viewerList.members().contains(viewerId)
                 && conditionMatches(player);
             Boolean previous = appliedVisibility.put(viewerId, visible);
@@ -1382,9 +1419,9 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
         boolean conditional = viewerCondition != null && display != null;
         if (members.isEmpty() && !conditional) {
             return whitelist ? List.of()
-                : withoutBedrock(policy, tick.temporaryPlayers(world, position, service.viewRange()));
+                : withoutBedrock(policy, tick.temporaryPlayers(world, position, viewDistance()));
         }
-        List<HologramTick.Viewer> candidates = tick.temporaryViewers(world, position, service.viewRange());
+        List<HologramTick.Viewer> candidates = tick.temporaryViewers(world, position, viewDistance());
         List<Player> viewers = new ArrayList<>(candidates.size());
         for (HologramTick.Viewer candidate : candidates) {
             if (policy != null && policy.hides(BedrockSurface.HOLOGRAM, candidate.player())) {
@@ -1447,8 +1484,13 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
         }
     }
 
+    private String transformLegacy(String text) {
+        UnaryOperator<String> transform = textTransform;
+        return transform == null ? text : transform.apply(text);
+    }
+
     private String renderLines(LineSet lines) {
-        return lines.rendered() ? TextUtils.joinLegacyLines(lines.lines()) : service.renderStaticLines(lines.lines());
+        return transformLegacy(lines.rendered() ? TextUtils.joinLegacyLines(lines.lines()) : service.renderStaticLines(lines.lines()));
     }
 
     private boolean replaceLine(int index, String line) {

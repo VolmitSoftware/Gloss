@@ -16,7 +16,8 @@ import java.util.List;
 public record BubbleStyleDoc(int schemaVersion, long revision, String prefix, Vector offset, int wordWrapChars,
                              long maxAliveMs, boolean followPlayer, boolean hideOwn, Motion motion,
                              Shimmer shimmer, Select select, List<ParticleLayer> particleLayers, ShowCondition show,
-                             IconDisplayStyle style, HologramBox box) {
+                             IconDisplayStyle style, HologramBox box, Double stackDistance, List<String> blacklistWorlds,
+                             Integer maxPerSender, String format) {
     public static final String KIND = "bubbles";
     public static final int CURRENT_SCHEMA_VERSION = 5;
     public static final String DEFAULT_TRANSLATION_Y =
@@ -32,11 +33,16 @@ public record BubbleStyleDoc(int schemaVersion, long revision, String prefix, Ve
 
     public static final BubbleStyleDoc DEFAULTS = new BubbleStyleDoc(CURRENT_SCHEMA_VERSION,
         DocumentEnvelope.INITIAL_REVISION, "&7", new Vector(0.0D, 0.3D, 0.0D), 32, 5000L,
-        true, true, DEFAULT_MOTION, DEFAULT_SHIMMER, null, List.of(), ShowCondition.ALWAYS, null, null);
+        true, true, DEFAULT_MOTION, DEFAULT_SHIMMER, null, List.of(), ShowCondition.ALWAYS, null, null, null, null, null, null);
 
     public BubbleStyleDoc {
         DocumentEnvelope.requireSchemaVersion(KIND, schemaVersion, CURRENT_SCHEMA_VERSION);
         DocumentEnvelope.requireRevision(KIND, revision);
+        stackDistance = stackDistance == null || !Double.isFinite(stackDistance) ? 0.26D
+            : Math.clamp(stackDistance, 0.05D, 2.0D);
+        blacklistWorlds = blacklistWorlds == null ? List.of() : List.copyOf(blacklistWorlds);
+        maxPerSender = maxPerSender == null ? 4 : Math.clamp(maxPerSender, 1, 64);
+        format = format == null ? "{message}" : format;
         prefix = prefix == null ? "&7" : prefix;
         offset = offset == null ? new Vector(0.0D, 0.3D, 0.0D) : offset.clone();
         wordWrapChars = clampInt(wordWrapChars, 8, 128);

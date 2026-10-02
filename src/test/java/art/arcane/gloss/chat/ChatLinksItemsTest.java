@@ -55,6 +55,17 @@ class ChatLinksItemsTest {
     }
 
     @Test
+    void authoredItemFormatKeepsItemNamesLiteral() {
+        ChannelRuntime channel = ChatTestChannels.runtime(null,
+            new ChannelDoc.Items(true, null, null, "<gold>{{ item.amount }} of {{ item.name }}</gold>"),
+            null, List.of(), null);
+        ChatBody.Item item = new ChatBody.Item("minecraft:paper", "<red>Receipt</red>{{ item.amount }}", 3);
+        String rendered = ChatBody.render(channel, "[item]", context(item)).text();
+
+        assertTrue(rendered.contains("<gold>3 of \\<red>Receipt\\</red>{{ item.amount }}</gold>"), rendered);
+    }
+
+    @Test
     void aUrlInsideAMentionScanDoesNotProduceANestedMention() {
         ChatBody.Body body = ChatBody.render(CHANNEL, "https://volmit.com/@Steve", context(null));
 

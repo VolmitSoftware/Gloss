@@ -17,6 +17,8 @@ import java.lang.reflect.Proxy;
 import java.util.List;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertSame;
+import art.arcane.gloss.menu.action.NavigationResult;
 
 public class MenuSessionComponentDeduplicationTest {
 
@@ -26,7 +28,7 @@ public class MenuSessionComponentDeduplicationTest {
         component("duplicate", "first"),
         component("duplicate", "second"),
         component("unique", "third")
-    ), List.of(), ShowCondition.ALWAYS, Map.of());
+    ), List.of(), ShowCondition.ALWAYS, Map.of(), List.of());
     menu.setId("test");
 
     Player player = player();
@@ -35,6 +37,33 @@ public class MenuSessionComponentDeduplicationTest {
     assertEquals(List.of("first", "third"), session.getComponents().stream()
         .map(component -> ((ProbeComponent) component).marker)
         .toList());
+  }
+
+  @Test
+  public void variantsChangeWithSessionStateWithoutDiscardingVariablesOrRebuildingStableSelections() {
+    MenuDefinitionData menu = new MenuDefinitionData(new Vector(), false, false, 8D, false, false,
+        List.of(component("base", "base")), List.of(), ShowCondition.NEVER, Map.of("page", "0"),
+        List.of(new MenuDefinitionData.Variant("details", 10, ShowCondition.of("session.page == 1"),
+            List.of(component("details", "details")), null)));
+    menu.setId("variant-test");
+    Player player = player();
+    MenuTransform transform = new MenuTransform(player.getLocation(), new Vector(), 0F, 0F, 0F, 1F);
+    MenuSession session = new MenuSession(menu, player,
+        MenuSessionOptions.positioned(transform, request -> NavigationResult.DENIED, 1F));
+    session.open();
+    assertEquals("base", session.getComponents().getFirst().getId());
+    session.variables().set("page", 1D);
+    session.variables().set("retained", "value");
+    session.tick();
+    MenuComponent<?> selected = session.getComponents().getFirst();
+    assertEquals("details", selected.getId());
+    session.tick();
+    assertSame(selected, session.getComponents().getFirst());
+    session.variables().set("page", 0D);
+    session.tick();
+    assertEquals("base", session.getComponents().getFirst().getId());
+    assertEquals("value", session.variables().get("retained"));
+    session.close();
   }
 
   private static MenuComponentData component(String id, String marker) {

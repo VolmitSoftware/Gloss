@@ -119,7 +119,7 @@ public final class EmojiReplacer {
             }
 
             if (hasTrigger) {
-                out = out.replace(trigger, values[entry]);
+                out = EmojiTriggers.replace(out, trigger, values[entry]);
             }
             if (hasToken) {
                 out = out.replace(tokens[entry], values[entry]);

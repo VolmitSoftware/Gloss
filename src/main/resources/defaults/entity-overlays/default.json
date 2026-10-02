@@ -77,5 +77,6 @@
     "backgroundArgb": "#B31B1B22",
     "borderArgb": "#FFAAAAAA"
   },
-  "particleLayers": []
+  "particleLayers": [],
+  "variants": []
 }

@@ -245,6 +245,37 @@
               "type": "number",
               "minimum": 0.01,
               "maximum": 4
+            },
+            "count": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 64,
+              "default": 1,
+              "description": "Particles emitted at each sampled point; every particle counts against the emission budget."
+            },
+            "speed": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 10,
+              "default": 0,
+              "description": "Particle velocity multiplier."
+            },
+            "spread": {
+              "type": "array",
+              "items": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 16,
+                "default": 0
+              },
+              "minItems": 3,
+              "maxItems": 3,
+              "default": [
+                0,
+                0,
+                0
+              ],
+              "description": "Random particle offsets along the x, y and z axes."
             }
           }
         },
@@ -282,6 +313,25 @@
           "type": "integer",
           "minimum": -1000,
           "maximum": 1000
+        },
+        "viewDistance": {
+          "type": "number",
+          "minimum": 4,
+          "maximum": 128,
+          "default": 48,
+          "description": "Maximum distance in blocks at which this layer emits for a viewer."
+        },
+        "show": {
+          "oneOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "default": true,
+          "description": "Boolean or viewer condition controlling whether this layer emits."
         }
       }
     },
@@ -559,6 +609,23 @@
         "box": {
           "$ref": "#/$defs/box",
           "description": "Shared label background, padding, and uniform border. Visible parts count against the chunk display budget."
+        },
+        "show": {
+          "oneOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "default": true,
+          "description": "Boolean or viewer condition controlling drop label visibility."
+        },
+        "preserveCustomNames": {
+          "type": "boolean",
+          "default": true,
+          "description": "Preserves custom item names when rendering drop labels."
         }
       }
     },

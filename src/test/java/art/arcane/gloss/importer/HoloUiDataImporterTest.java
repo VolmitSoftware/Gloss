@@ -158,13 +158,10 @@ class HoloUiDataImporterTest {
         assertEquals(7, config.editor.sync.pollSeconds);
         assertEquals(16, config.editor.sync.maxProjectMiB);
         assertFalse(config.features.previews);
-        assertEquals(14.5D, config.preview.lookDistance);
-        assertEquals(1.25D, config.preview.scale);
         assertEquals(2.0D, config.menus.uiScale);
         assertFalse(config.items.customItems);
         assertEquals(List.of("oraxen", "mmoitems", "nexo"), config.items.customItemProviders);
         String toml = Files.readString(dataFolder.resolve(GlossConfigLoader.FILE_NAME), StandardCharsets.UTF_8);
-        assertTrue(toml.contains("lookDistance = 14.5"));
         assertTrue(toml.contains(GlossConfigFile.EDITOR_SYNC_ENDPOINT_DEFAULT));
         assertTrue(toml.contains("#"), "comments must regenerate on overlay save");
         assertTrue(loader.isSelfWrite(), "overlay save must register as a self write");
@@ -186,7 +183,7 @@ class HoloUiDataImporterTest {
         assertEquals("copied", receiptDisposition(entries, "menus/main.json"));
         assertEquals("skipped-shipped-identical", receiptDisposition(entries, "previews/chest.json"));
         assertEquals("skipped-secret", receiptDisposition(entries, "editor-sync-sessions.json"));
-        assertEquals("overlaid-config-key", receiptDisposition(entries, "settings.json:previewScale"));
+        assertEquals("overlaid-config-key", receiptDisposition(entries, "settings.json:uiScale"));
     }
 
     @Test

@@ -126,13 +126,14 @@ public final class ConnectionsService implements GlossService, Listener, Registr
             return;
         }
         Player subject = event.getPlayer();
+        boolean firstJoin = !subject.hasPlayedBefore();
         if (ownership != null && ownership.enabled() && ownership.proxyLastClaimedConnections()) {
             String vanilla = event.getJoinMessage();
             event.setJoinMessage(null);
-            schedulePoll(subject, vanilla, 0);
+            schedulePoll(subject, vanilla, 0, firstJoin);
             return;
         }
-        if (announce(compiled.join(), subject)) {
+        if (announce(joinSection(firstJoin), subject)) {
             event.setJoinMessage(null);
         }
     }
@@ -154,12 +155,12 @@ public final class ConnectionsService implements GlossService, Listener, Registr
         return ownership != null && ownership.enabled();
     }
 
-    private void schedulePoll(Player subject, String vanilla, int elapsedTicks) {
+    private void schedulePoll(Player subject, String vanilla, int elapsedTicks, boolean firstJoin) {
         plugin.scheduler().runEntity(subject,
-            () -> poll(subject, vanilla, elapsedTicks + DEFERRED_POLL_TICKS), DEFERRED_POLL_TICKS);
+            () -> poll(subject, vanilla, elapsedTicks + DEFERRED_POLL_TICKS, firstJoin), DEFERRED_POLL_TICKS);
     }
 
-    private void poll(Player subject, String vanilla, int elapsedTicks) {
+    private void poll(Player subject, String vanilla, int elapsedTicks, boolean firstJoin) {
         if (!subject.isOnline()) {
             return;
         }
@@ -168,10 +169,10 @@ public final class ConnectionsService implements GlossService, Listener, Registr
             return;
         }
         if (elapsedTicks < DEFERRED_LIMIT_TICKS) {
-            schedulePoll(subject, vanilla, elapsedTicks);
+            schedulePoll(subject, vanilla, elapsedTicks, firstJoin);
             return;
         }
-        if (announce(compiled.join(), subject)) {
+        if (announce(joinSection(firstJoin), subject)) {
             return;
         }
         if (vanilla == null || vanilla.isEmpty()) {
@@ -180,6 +181,11 @@ public final class ConnectionsService implements GlossService, Listener, Registr
         for (Player recipient : Bukkit.getOnlinePlayers()) {
             ComponentMessenger.sendSection(recipient, vanilla);
         }
+    }
+
+    private CompiledSection joinSection(boolean firstJoin) {
+        Compiled current = compiled;
+        return firstJoin && current.firstJoin().section().active() ? current.firstJoin() : current.join();
     }
 
     private boolean announce(CompiledSection section, Player subject) {
@@ -237,10 +243,11 @@ public final class ConnectionsService implements GlossService, Listener, Registr
         compiled = Compiled.of(document == null ? ConnectionsDoc.DEFAULTS : document.value());
     }
 
-    private record Compiled(ShowCondition show, CompiledSection join, CompiledSection leave) {
+    private record Compiled(ShowCondition show, CompiledSection join, CompiledSection leave,
+                            CompiledSection firstJoin) {
         private static Compiled of(ConnectionsDoc document) {
             return new Compiled(document.show(), CompiledSection.of(document.join(), "join"),
-                CompiledSection.of(document.leave(), "leave"));
+                CompiledSection.of(document.leave(), "leave"), CompiledSection.of(document.firstJoin(), "firstJoin"));
         }
     }
 

@@ -38,7 +38,6 @@ public interface GlossAPI {
 
     TemporaryHologram createTemporaryHologram(String id, Location initial, long durationMs);
 
-    double stackSpread();
 
     String filter(Player player, String raw);
 

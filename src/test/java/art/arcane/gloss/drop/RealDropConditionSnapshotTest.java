@@ -74,12 +74,14 @@ class RealDropConditionSnapshotTest {
         RealDropSettingsDoc document = new RealDropSettingsDoc(
             RealDropSettingsDoc.CURRENT_SCHEMA_VERSION,
             1L,
-            RealDropSettingsDoc.DEFAULTS.presentation(),
+            new RealDropSettingsDoc.Presentation(null, null, null, null,
+                new RealDropSettingsDoc.Labels(null, null, null, null, null, null, null, null, viewerShow, null),
+                null, null, null, null, null),
             variants,
             new RealDropSettingsDoc.Audience(audience),
             ShowCondition.ALWAYS);
         return RealDropConditionPlan.compile(
-            document, true, BoundedConditionErrorCallback.silent(), viewerShow);
+            document, true, BoundedConditionErrorCallback.silent());
     }
 
     private static RealDropSettingsDoc.Variant variant(String id, int priority, String when) {

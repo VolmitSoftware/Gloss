@@ -63,7 +63,7 @@ public class IconFailureFallbackTest {
 
   @Test
   public void itemIconWithoutAResolvedMaterialFailsAsAMenuIconException() {
-    assertThrows(MenuIconException.class, () -> new ItemIconData(null, 1, 0, null, null, null).requireMaterial());
+    assertThrows(MenuIconException.class, () -> new ItemIconData(null, 1, 0, null, null, null, null).requireMaterial());
   }
 
   @Test
@@ -97,7 +97,7 @@ public class IconFailureFallbackTest {
         false,
         List.<MenuComponentData>of(),
         List.of(), ShowCondition.ALWAYS
-    , Map.of());
+    , Map.of(), List.of());
     data.setId("icon-test");
     Player player = (Player) Proxy.newProxyInstance(Player.class.getClassLoader(), new Class<?>[]{Player.class},
         (proxy, method, args) -> switch (method.getName()) {

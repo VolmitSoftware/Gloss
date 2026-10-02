@@ -9,7 +9,8 @@ public record CustomItemIconData(
     String provider,
     String item,
     int count,
-    IconDisplayStyle style
+    IconDisplayStyle style,
+    String countFormat
 ) implements MenuIconData {
   public MenuIconType getType() {
     return MenuIconType.CUSTOM_ITEM;

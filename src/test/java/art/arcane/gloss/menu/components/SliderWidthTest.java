@@ -29,7 +29,7 @@ class SliderWidthTest {
         Location anchor = new Location(null, 0D, 0D, 5D);
         MenuTransform transform = new MenuTransform(anchor, new Vector(), 0F, 0F, 0F, 2F);
         MenuDefinitionData definition = new MenuDefinitionData(new Vector(), false, false, null,
-            false, false, List.of(), List.of(), null, Map.of());
+            false, false, List.of(), List.of(), null, Map.of(), List.of());
         MenuSession session = new MenuSession(definition, null,
             MenuSessionOptions.positioned(transform, request -> NavigationResult.DENIED, 2F));
         SliderComponentData data = new SliderComponentData("volume", 0F, 100F, 1F, 3F, "Volume", null);

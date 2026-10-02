@@ -37,12 +37,15 @@ public class MenuSession {
   private final boolean closeOnDeath, closeOnTeleport;
   private final double maxDistance;
   private final double offsetDistance;
-  private final List<MenuComponent<?>> components;
-  private final List<ParticleLayer> particleLayers;
-  private final boolean readsEyePose;
+  private List<MenuComponent<?>> components = List.of();
+  private final MenuDefinitionData definition;
+  private final List<MenuDefinitionData.Variant> variants;
+  private MenuDefinitionData.Variant selectedVariant;
+  private List<ParticleLayer> particleLayers;
+  private boolean readsEyePose;
   private final ShowCondition show;
 
-  private final Map<String, MenuComponent<?>> componentsById;
+  private Map<String, MenuComponent<?>> componentsById;
 
   private final ApiMenuHandle apiHandle;
   private final MenuSessionOptions options;
@@ -82,8 +85,17 @@ public class MenuSession {
 
     this.transform = options.transform();
     this.variables = SessionVariables.of(SessionVariables.evaluateDeclarations(data.getVars()), options.args());
-    List<MenuComponentData> declared = MenuComponentExpansion.expand(data.getComponents(),
-        new SessionScope(p, variables));
+    this.definition = data;
+    this.variants = data.getVariants();
+    this.selectedVariant = selectVariant();
+    rebuildComponents(selectedVariant == null ? data.getComponents() : selectedVariant.components(),
+        selectedVariant == null || selectedVariant.particleLayers() == null
+            ? data.getParticleLayers() : selectedVariant.particleLayers());
+  }
+
+  private void rebuildComponents(List<MenuComponentData> declaredComponents, List<ParticleLayer> layers) {
+    List<MenuComponentData> declared = MenuComponentExpansion.expand(declaredComponents,
+        new SessionScope(player, variables));
     Map<String, MenuComponent<?>> uniqueComponents = new LinkedHashMap<>(declared.size());
     for (MenuComponentData componentData : declared) {
       MenuComponent<?> component = componentData.createComponent(this);
@@ -95,8 +107,9 @@ public class MenuSession {
             id, component.getId());
       }
     }
+    closeComponents();
     this.components = List.copyOf(new ArrayList<>(uniqueComponents.values()));
-    this.particleLayers = data.getParticleLayers();
+    this.particleLayers = layers;
     this.componentsById = uniqueComponents;
     boolean eyeReader = false;
     for (MenuComponent<?> component : this.components) {
@@ -106,6 +119,29 @@ public class MenuSession {
       }
     }
     this.readsEyePose = eyeReader;
+  }
+
+  private MenuDefinitionData.Variant selectVariant() {
+    if (variants.isEmpty()) {
+      return null;
+    }
+    SessionScope scope = new SessionScope(player, variables);
+    for (MenuDefinitionData.Variant variant : variants) {
+      if (variant.when().matches(scope)) {
+        return variant;
+      }
+    }
+    return null;
+  }
+
+  private void refreshVariant() {
+    MenuDefinitionData.Variant next = selectVariant();
+    if (next == selectedVariant) {
+      return;
+    }
+    rebuildComponents(next == null ? definition.getComponents() : next.components(),
+        next == null || next.particleLayers() == null ? definition.getParticleLayers() : next.particleLayers());
+    selectedVariant = next;
   }
 
   public String getId() {
@@ -258,6 +294,7 @@ public class MenuSession {
   }
 
   private void tickPass() {
+    refreshVariant();
     drainApiUpdates();
     boolean shown = isShown();
     for (MenuComponent<?> component : components) {
@@ -280,6 +317,7 @@ public class MenuSession {
   }
 
   public void open() {
+    refreshVariant();
     active = true;
     if (options.faceViewerOnOpen()) {
       this.transform = transform.withAnchorAndFacing(transform.anchor(), player.getEyeLocation().getYaw());
@@ -296,6 +334,10 @@ public class MenuSession {
 
   public void close() {
     active = false;
+    closeComponents();
+  }
+
+  private void closeComponents() {
     for (MenuComponent<?> component : components) {
       try {
         component.close();

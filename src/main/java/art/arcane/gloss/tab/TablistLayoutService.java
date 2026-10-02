@@ -24,7 +24,6 @@ import java.util.function.UnaryOperator;
  * live so the grid is the only thing the viewer sees.
  */
 public final class TablistLayoutService {
-    public static final String OVERFLOW_PREFIX = "+";
 
     private final LayoutSink sink;
     private final Renderers renderers;
@@ -167,7 +166,7 @@ public final class TablistLayoutService {
                 entries.set(index, entry(target, renderers.names().apply(viewer, subject),
                     subject.getName(), subject.getPing()));
             } else if (counts && listed.size() > capacity && cell == capacity - 1) {
-                entries.set(index, entry(target, OVERFLOW_PREFIX + (listed.size() - shown), null, 0));
+                entries.set(index, entry(target, render(runtime.layout().players().overflowFormat().replace("{count}", Integer.toString(listed.size() - shown))), null, 0));
             } else {
                 entries.set(index, entry(target, "", null, 0));
             }

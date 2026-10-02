@@ -1,0 +1,316 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://volmit.com/gloss/tablist.schema.json",
+  "title": "Gloss Tablist Document",
+  "type": "object",
+  "properties": {
+    "schemaVersion": {
+      "const": 2
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991
+    },
+    "show": {
+      "type": [
+        "string",
+        "boolean"
+      ],
+      "description": "Boolean or Gloss condition expression."
+    },
+    "headerFooter": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "show": {
+          "type": [
+            "string",
+            "boolean"
+          ],
+          "description": "Boolean or Gloss condition expression."
+        },
+        "presentation": {
+          "$ref": "#/$defs/headerFooterPresentation"
+        },
+        "variants": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "priority": {
+                "type": "integer"
+              },
+              "when": {
+                "type": "string",
+                "minLength": 1
+              },
+              "presentation": {
+                "$ref": "#/$defs/headerFooterPresentation"
+              }
+            },
+            "required": [
+              "id",
+              "when",
+              "presentation"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "listNames": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "show": {
+          "type": [
+            "string",
+            "boolean"
+          ],
+          "description": "Boolean or Gloss condition expression."
+        },
+        "presentation": {
+          "$ref": "#/$defs/listNamePresentation"
+        },
+        "variants": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "priority": {
+                "type": "integer"
+              },
+              "when": {
+                "type": "string",
+                "minLength": 1
+              },
+              "presentation": {
+                "$ref": "#/$defs/listNamePresentation"
+              }
+            },
+            "required": [
+              "id",
+              "when",
+              "presentation"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "sort": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "weight": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "enabled": {
+                "const": true
+              }
+            },
+            "required": [
+              "enabled"
+            ]
+          },
+          "then": {
+            "required": [
+              "weight"
+            ]
+          }
+        }
+      ]
+    },
+    "layout": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "show": {
+          "type": [
+            "string",
+            "boolean"
+          ],
+          "description": "Boolean or Gloss condition expression."
+        },
+        "columns": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4
+        },
+        "rows": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 20
+        },
+        "slots": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/slot"
+          }
+        },
+        "players": {
+          "$ref": "#/$defs/players"
+        }
+      },
+      "required": [],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "enabled": {
+                "const": true
+              }
+            },
+            "required": [
+              "enabled"
+            ]
+          },
+          "then": {
+            "properties": {
+              "columns": {
+                "minimum": 1
+              },
+              "rows": {
+                "minimum": 1
+              }
+            },
+            "required": [
+              "columns",
+              "rows"
+            ]
+          }
+        }
+      ]
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "revision"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "headerFooterPresentation": {
+      "type": "object",
+      "properties": {
+        "header": {
+          "type": "string"
+        },
+        "footer": {
+          "type": "string"
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "listNamePresentation": {
+      "type": "object",
+      "properties": {
+        "format": {
+          "type": "string"
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "slot": {
+      "type": "object",
+      "properties": {
+        "column": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 3
+        },
+        "row": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 19
+        },
+        "text": {
+          "type": "string"
+        },
+        "skin": {
+          "type": "string"
+        },
+        "ping": {
+          "type": "integer",
+          "minimum": -1,
+          "maximum": 10000
+        }
+      },
+      "required": [
+        "column",
+        "row"
+      ],
+      "additionalProperties": false
+    },
+    "players": {
+      "type": "object",
+      "properties": {
+        "column": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 3
+        },
+        "columns": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4
+        },
+        "rows": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 20
+        },
+        "filter": {
+          "type": "string",
+          "minLength": 1
+        },
+        "overflow": {
+          "enum": [
+            "hide",
+            "count"
+          ]
+        },
+        "overflowFormat": {
+          "type": "string",
+          "default": "+{count}",
+          "description": "Text for overflow=count; {count} is the number of unlisted players."
+        }
+      },
+      "required": [
+        "column"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

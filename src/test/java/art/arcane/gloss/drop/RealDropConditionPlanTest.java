@@ -62,7 +62,7 @@ class RealDropConditionPlanTest {
             variants,
             new RealDropSettingsDoc.Audience("true"), null);
         return RealDropConditionPlan.compile(
-            document, true, BoundedConditionErrorCallback.silent(), ShowCondition.ALWAYS);
+            document, true, BoundedConditionErrorCallback.silent());
     }
 
     private static RealDropSettingsDoc.Variant variant(String id, int priority, String when) {

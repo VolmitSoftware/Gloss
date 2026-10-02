@@ -1,6 +1,8 @@
 package art.arcane.gloss.indicator;
 
 import art.arcane.gloss.Gloss;
+import art.arcane.gloss.names.NameCategory;
+import art.arcane.gloss.names.NamesService;
 import art.arcane.volmlib.util.scheduling.FoliaScheduler;
 import org.bukkit.Location;
 import org.bukkit.entity.Damageable;
@@ -67,6 +69,7 @@ record DamageIndicatorEventSnapshot(boolean damage, String cause, double reporte
         Map<String, Object> values = new HashMap<String, Object>();
         values.put("event.type", damage ? "damage" : "healing");
         values.put("event.cause", cause);
+        values.put("event.causeName", NamesService.name(NameCategory.DAMAGE_CAUSES, cause));
         values.put("event.amount", observedAmount);
         values.put("event.reportedAmount", reportedAmount);
         values.put("event.damage", damage);
@@ -74,6 +77,7 @@ record DamageIndicatorEventSnapshot(boolean damage, String cause, double reporte
         values.put("event.critical", critical);
         values.put("event.criticalKnown", criticalKnown);
         values.put("event.directSourceType", directSourceType);
+        values.put("event.directSourceTypeName", NamesService.name(NameCategory.ENTITIES, directSourceType));
         EntityState.capture(subject, plugin).put(values, "subject.");
         source.put(values, "source.");
         return Map.copyOf(values);
@@ -218,6 +222,10 @@ record DamageIndicatorEventSnapshot(boolean damage, String cause, double reporte
         }
 
         private void put(Map<String, Object> target, String prefix) {
+            target.put(prefix + "typeName", NamesService.name(NameCategory.ENTITIES, (String) values.get("type")));
+            target.put(prefix + "worldName", NamesService.name(NameCategory.WORLDS, (String) values.get("world")));
+            target.put(prefix + "gameModeName", NamesService.name(NameCategory.GAME_MODES, (String) values.get("gameMode")));
+            target.put(prefix + "groupName", NamesService.name(NameCategory.GROUPS, (String) values.get("group")));
             for (Map.Entry<String, Object> entry : values.entrySet()) {
                 target.put(prefix + entry.getKey(), entry.getValue());
             }

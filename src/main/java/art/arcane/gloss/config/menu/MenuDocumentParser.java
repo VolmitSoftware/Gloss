@@ -31,24 +31,27 @@ public final class MenuDocumentParser {
       throw new IllegalArgumentException("menu document must not be null");
     }
     definition.setId(requiredId);
-    precompileActions(definition);
+    precompileActions(definition.getId(), definition.getComponents());
+    for (MenuDefinitionData.Variant variant : definition.getVariants()) {
+      precompileActions(definition.getId(), variant.components());
+    }
     return new MenuDocument(requiredId, MenuDocument.revisionOf(source), source, definition);
   }
 
-  private static void precompileActions(MenuDefinitionData menu) {
-    if (menu.getComponents() == null) {
+  private static void precompileActions(String menuId, List<MenuComponentData> components) {
+    if (components == null) {
       return;
     }
-    for (MenuComponentData component : menu.getComponents()) {
+    for (MenuComponentData component : components) {
       if (component == null || component.data() == null) {
         continue;
       }
       ComponentData data = component.data();
       if (data instanceof ButtonComponentData button) {
-        resolveActions(button.actions(), menu.getId(), component.id());
+        resolveActions(button.actions(), menuId, component.id());
       } else if (data instanceof ToggleComponentData toggle) {
-        resolveActions(toggle.trueActions(), menu.getId(), component.id());
-        resolveActions(toggle.falseActions(), menu.getId(), component.id());
+        resolveActions(toggle.trueActions(), menuId, component.id());
+        resolveActions(toggle.falseActions(), menuId, component.id());
       }
     }
   }

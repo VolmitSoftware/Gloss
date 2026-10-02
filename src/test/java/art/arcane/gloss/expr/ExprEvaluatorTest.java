@@ -440,8 +440,8 @@ public class ExprEvaluatorTest {
   @Test
   public void readableHandlesEmptySegmentsTheWayJavaSplitDoes() {
     Assert.assertEquals("Iron", eval("readable('IRON_')"));
-    Assert.assertEquals(" Iron", eval("readable('_IRON')"));
-    Assert.assertEquals("Iron  Ore", eval("readable('IRON__ORE')"));
+    Assert.assertEquals("Iron", eval("readable('_IRON')"));
+    Assert.assertEquals("Iron Ore", eval("readable('IRON__ORE')"));
   }
 
   @Test(expected = ExprException.class)

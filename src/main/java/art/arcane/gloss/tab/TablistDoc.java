@@ -140,7 +140,7 @@ public record TablistDoc(int schemaVersion, long revision, ShowCondition show, H
         }
     }
 
-    public record Players(int column, int columns, int rows, String filter, String overflow) {
+    public record Players(int column, int columns, int rows, String filter, String overflow, String overflowFormat) {
         public static final String OVERFLOW_HIDE = "hide";
         public static final String OVERFLOW_COUNT = "count";
 
@@ -150,6 +150,7 @@ public record TablistDoc(int schemaVersion, long revision, ShowCondition show, H
             filter = filter == null || filter.isBlank() ? "true" : filter.trim();
             ConditionCompiler.compile(new ConditionSource("tablist.layout.players.filter", filter));
             overflow = normalizeOverflow(overflow);
+            overflowFormat = overflowFormat == null ? "+{count}" : overflowFormat;
         }
 
         public boolean countsOverflow() {

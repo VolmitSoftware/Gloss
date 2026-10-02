@@ -1,6 +1,8 @@
 package art.arcane.gloss.marker;
 
 import art.arcane.gloss.api.MarkerAnchor;
+import art.arcane.gloss.api.IconDisplayStyle;
+import art.arcane.gloss.api.HologramBox;
 import art.arcane.gloss.condition.ShowCondition;
 import art.arcane.gloss.config.icon.MenuIconData;
 
@@ -13,7 +15,7 @@ import java.util.Objects;
 public record MarkerSpec(String id, MarkerAnchor anchor, String label, MenuIconData icon, int color,
                          String distanceScale, double hideWithin, double maxDistance,
                          Beam beam, Edge edge, Trail trail, ShowCondition audience,
-                         long lifetimeTicks, boolean waypoint) {
+                         long lifetimeTicks, boolean waypoint, IconDisplayStyle style, HologramBox box) {
     public static final double DEFAULT_MAX_DISTANCE = 256.0D;
 
     public MarkerSpec {
@@ -23,6 +25,8 @@ public record MarkerSpec(String id, MarkerAnchor anchor, String label, MenuIconD
         }
         anchor = Objects.requireNonNull(anchor, "marker anchor");
         label = label == null ? "" : label;
+        style = style == null ? IconDisplayStyle.hologramDefaults() : style;
+        box = box == null ? HologramBox.defaults() : box;
         color = color & 0xFFFFFF;
         distanceScale = distanceScale == null || distanceScale.isBlank() ? null : distanceScale.trim();
         hideWithin = clamp(hideWithin, 0.0D, 1024.0D, 0.0D);
@@ -36,23 +40,26 @@ public record MarkerSpec(String id, MarkerAnchor anchor, String label, MenuIconD
 
     public static MarkerSpec at(String id, String world, double x, double y, double z) {
         return new MarkerSpec(id, MarkerAnchor.position(world, x, y, z), "", null, MarkerColors.WHITE,
-            null, 0.0D, DEFAULT_MAX_DISTANCE, null, null, null, ShowCondition.ALWAYS, 0L, false);
+            null, 0.0D, DEFAULT_MAX_DISTANCE, null, null, null, ShowCondition.ALWAYS, 0L, false, null, null);
     }
 
     public MarkerSpec withLabel(String value) {
         return new MarkerSpec(id, anchor, value, icon, color, distanceScale, hideWithin, maxDistance,
-            beam, edge, trail, audience, lifetimeTicks, waypoint);
+            beam, edge, trail, audience, lifetimeTicks, waypoint, style, box);
     }
 
     public MarkerSpec asWaypoint() {
         return new MarkerSpec(id, anchor, label, icon, color, distanceScale, hideWithin, maxDistance,
-            beam, edge, trail, audience, lifetimeTicks, true);
+            beam, edge, trail, audience, lifetimeTicks, true, style, box);
     }
 
-    public record Beam(boolean enabled, double height, double width, String material) {
-        private static final Beam OFF = new Beam(false, 48.0D, 0.25D, "minecraft:white_stained_glass");
+    public record Beam(boolean enabled, double height, double width, String material, String glowColor) {
+        private static final Beam OFF = new Beam(false, 48.0D, 0.25D, "minecraft:white_stained_glass", null);
 
         public Beam {
+            if (glowColor != null) {
+                MarkerColors.parse(glowColor, "beam glowColor");
+            }
             height = clamp(height, 1.0D, 384.0D, 48.0D);
             width = clamp(width, 0.02D, 8.0D, 0.25D);
             material = material == null || material.isBlank() ? "minecraft:white_stained_glass" : material.trim();
@@ -76,10 +83,12 @@ public record MarkerSpec(String id, MarkerAnchor anchor, String label, MenuIconD
         }
     }
 
-    public record Trail(boolean enabled, String particle, double spacing, int maxPoints) {
-        private static final Trail OFF = new Trail(false, "minecraft:end_rod", 2.0D, 48);
+    public record Trail(boolean enabled, String particle, double spacing, int maxPoints, String color) {
+        private static final Trail OFF = new Trail(false, "minecraft:end_rod", 2.0D, 48, "#ffffff");
 
         public Trail {
+            color = color == null ? "#ffffff" : color;
+            MarkerColors.parse(color, "trail color");
             particle = particle == null || particle.isBlank() ? "minecraft:end_rod" : particle.trim();
             spacing = clamp(spacing, 0.25D, 16.0D, 2.0D);
             maxPoints = maxPoints <= 0 ? 48 : Math.clamp(maxPoints, 1, 256);

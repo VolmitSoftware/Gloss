@@ -63,8 +63,8 @@ class RealDropPresentationCostTest {
             new ParticleLayer.Target("model", null, null, null),
             new ParticleLayer.Geometry("point", null, null, null, null, null, null, null, null),
             null,
-            new ParticleLayer.ParticleSpec("minecraft:flame", null, null),
+            new ParticleLayer.ParticleSpec("minecraft:flame", null, null, null, null, null),
             new ParticleLayer.Emission(intervalTicks, null, null, null),
-            0);
+            0, null, null);
     }
 }

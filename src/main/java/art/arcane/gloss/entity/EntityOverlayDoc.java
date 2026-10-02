@@ -1,5 +1,6 @@
 package art.arcane.gloss.entity;
 
+import art.arcane.gloss.api.HealthBarStyle;
 import art.arcane.gloss.api.HologramBox;
 import art.arcane.gloss.api.ParticleLayer;
 import art.arcane.gloss.condition.ShowCondition;
@@ -9,6 +10,8 @@ import art.arcane.gloss.doc.DocumentEnvelope;
 import art.arcane.gloss.doc.DocumentParsers;
 import art.arcane.gloss.particle.ParticleText;
 
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
@@ -20,7 +23,7 @@ public record EntityOverlayDoc(
     Integer maxEntitiesPerViewer, Integer maxActiveOverlays, Boolean includePlayers, Double verticalOffset,
     Integer healthSegments, Long hitHighlightMs, List<String> blacklistWorlds,
     List<String> excludedEntityTypes, ShowCondition show, List<Line> lines,
-    IconDisplayStyle style, HologramBox box, List<ParticleLayer> particleLayers
+    IconDisplayStyle style, HologramBox box, List<ParticleLayer> particleLayers, HealthBarStyle healthBar, List<Variant> variants
 ) {
     public static final String KIND = "entity-overlays";
     public static final String DEFAULT_ID = "default";
@@ -38,7 +41,7 @@ public record EntityOverlayDoc(
         new Line("stats", "text", "&7ATK &f{attack} &8| &7ARM &f{armor}", null));
     public static final EntityOverlayDoc DEFAULTS = new EntityOverlayDoc(
         CURRENT_SCHEMA_VERSION, DocumentEnvelope.INITIAL_REVISION, null, null, null, null,
-        null, null, null, null, null, null, null, null, null, null, null, null);
+        null, null, null, null, null, null, null, null, null, null, null, null, null, null);
 
     public EntityOverlayDoc {
         DocumentEnvelope.requireSchemaVersion(KIND, schemaVersion, CURRENT_SCHEMA_VERSION);
@@ -60,10 +63,62 @@ public record EntityOverlayDoc(
         style = style == null ? DEFAULT_STYLE : style;
         box = box == null ? HologramBox.defaults() : box;
         particleLayers = ParticleLayer.copyLayers(particleLayers, KIND);
+        healthBar = healthBar == null ? HealthBarStyle.DEFAULTS : healthBar;
+        variants = copyVariants(variants);
     }
 
     public static EntityOverlayDoc parse(String fileName, String raw) {
         return DocumentParsers.parseJson(fileName, raw, EntityOverlayDoc.class);
+    }
+
+    public record Variant(String id, Integer priority, String when, Presentation presentation) {
+        public Variant {
+            if (id == null || !id.matches("[a-z0-9][a-z0-9._-]{0,63}")) {
+                throw new IllegalArgumentException("Invalid entity overlay variant id");
+            }
+            priority = priority == null ? 0 : Math.clamp(priority, -1000, 1000);
+            when = ShowCondition.of(Objects.requireNonNull(when, "variant when")).expression();
+            presentation = Objects.requireNonNull(presentation, "variant presentation");
+        }
+    }
+
+    public record Presentation(List<Line> lines, IconDisplayStyle style, HologramBox box,
+                               List<ParticleLayer> particleLayers, Double verticalOffset,
+                               Integer healthSegments, HealthBarStyle healthBar) {
+        public Presentation {
+            lines = lines == null ? null : copyLines(lines);
+            particleLayers = particleLayers == null ? null : ParticleLayer.copyLayers(particleLayers, KIND);
+        }
+
+        EntityOverlayDoc apply(EntityOverlayDoc base) {
+            return new EntityOverlayDoc(base.schemaVersion(), base.revision(), base.enabled(), base.range(),
+                base.updateIntervalTicks(), base.maxEntitiesPerViewer(), base.maxActiveOverlays(),
+                base.includePlayers(), verticalOffset == null ? base.verticalOffset() : verticalOffset,
+                healthSegments == null ? base.healthSegments() : healthSegments, base.hitHighlightMs(),
+                base.blacklistWorlds(), base.excludedEntityTypes(), base.show(), lines == null ? base.lines() : lines,
+                style == null ? base.style() : style, box == null ? base.box() : box,
+                particleLayers == null ? base.particleLayers() : particleLayers,
+                healthBar == null ? base.healthBar() : healthBar, List.of());
+        }
+    }
+
+    private static List<Variant> copyVariants(List<Variant> variants) {
+        if (variants == null) {
+            return List.of();
+        }
+        if (variants.size() > 64) {
+            throw new IllegalArgumentException("Entity overlays may declare at most 64 variants");
+        }
+        List<Variant> ordered = new ArrayList<>(variants);
+        Set<String> ids = new HashSet<>();
+        for (Variant variant : ordered) {
+            if (!ids.add(variant.id())) {
+                throw new IllegalArgumentException("Duplicate entity overlay variant: " + variant.id());
+            }
+        }
+        ordered.sort(Comparator.comparingInt((Variant variant) -> variant.priority()).reversed()
+            .thenComparing(Variant::id));
+        return List.copyOf(ordered);
     }
 
     private static List<Line> copyLines(List<Line> lines) {

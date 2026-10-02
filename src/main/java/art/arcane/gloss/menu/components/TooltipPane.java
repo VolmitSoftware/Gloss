@@ -59,7 +59,7 @@ public final class TooltipPane {
     private void show(Location anchor) {
         Location at = session.getTransform().localPosition(anchor,
             new Vector(0D, VERTICAL_OFFSET, FORWARD_OFFSET));
-        icon = MenuIcon.createIcon(session, at, new TextIconData(text(data.lines()), null, null, null), null);
+        icon = MenuIcon.createIcon(session, at, new TextIconData(text(data.lines()), data.style(), null, data.box()), null);
         if (icon != null) {
             icon.spawn();
         }

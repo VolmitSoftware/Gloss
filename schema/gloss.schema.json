@@ -204,6 +204,37 @@
               "type": "number",
               "minimum": 0.01,
               "maximum": 4
+            },
+            "count": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 64,
+              "default": 1,
+              "description": "Particles emitted at each sampled point; every particle counts against the emission budget."
+            },
+            "speed": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 10,
+              "default": 0,
+              "description": "Particle velocity multiplier."
+            },
+            "spread": {
+              "type": "array",
+              "items": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 16,
+                "default": 0
+              },
+              "minItems": 3,
+              "maxItems": 3,
+              "default": [
+                0,
+                0,
+                0
+              ],
+              "description": "Random particle offsets along the x, y and z axes."
             }
           }
         },
@@ -239,6 +270,25 @@
           "type": "integer",
           "minimum": -1000,
           "maximum": 1000
+        },
+        "viewDistance": {
+          "type": "number",
+          "minimum": 4,
+          "maximum": 128,
+          "default": 48,
+          "description": "Maximum distance in blocks at which this layer emits for a viewer."
+        },
+        "show": {
+          "oneOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "default": true,
+          "description": "Boolean or viewer condition controlling whether this layer emits."
         }
       }
     },
@@ -1460,6 +1510,12 @@
               "items": {
                 "type": "string"
               }
+            },
+            "style": {
+              "$ref": "#/$defs/iconDisplayStyle"
+            },
+            "box": {
+              "$ref": "#/$defs/box"
             }
           }
         }
@@ -2002,6 +2058,22 @@
         "customModelValue": {
           "description": "Defines the custom model data property for use with resource packs.",
           "type": "integer"
+        },
+        "name": {
+          "type": "string",
+          "description": "Display name for the inventory item. Supports expressions and colors."
+        },
+        "lore": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Inventory item lore. Supports expressions and colors."
+        },
+        "countFormat": {
+          "type": "string",
+          "default": "&f&l{count}",
+          "description": "Stack badge text. Supports {count}, colors and expressions."
         }
       }
     },
@@ -2026,6 +2098,11 @@
         "count": {
           "description": "Defines the count of the resolved item stack. Zero and negative values become 1.",
           "type": "integer"
+        },
+        "countFormat": {
+          "type": "string",
+          "default": "&f&l{count}",
+          "description": "Stack badge text. Supports {count}, colors and expressions."
         }
       }
     },
@@ -2041,6 +2118,17 @@
           "description": "Lowercase Bukkit material id. An omitted namespace defaults to minecraft. The resolved material must be a block.",
           "type": "string",
           "pattern": "^([a-z0-9_.-]+:)?[a-z0-9_./-]+$"
+        },
+        "name": {
+          "type": "string",
+          "description": "Display name for the inventory item. Supports expressions and colors."
+        },
+        "lore": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Inventory item lore. Supports expressions and colors."
         }
       }
     },
@@ -2093,6 +2181,17 @@
           "minimum": 0,
           "maximum": 1200,
           "default": 20
+        },
+        "name": {
+          "type": "string",
+          "description": "Display name for the inventory item. Supports expressions and colors."
+        },
+        "lore": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Inventory item lore. Supports expressions and colors."
         }
       }
     },

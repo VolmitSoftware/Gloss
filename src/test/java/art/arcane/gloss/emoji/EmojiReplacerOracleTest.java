@@ -124,7 +124,7 @@ class EmojiReplacerOracleTest {
                 continue;
             }
             if (hasTrigger) {
-                out = out.replace(trigger, entry.emoji());
+                out = EmojiTriggers.replace(out, trigger, entry.emoji());
             }
             if (hasToken) {
                 out = out.replace(entry.token(), entry.emoji());

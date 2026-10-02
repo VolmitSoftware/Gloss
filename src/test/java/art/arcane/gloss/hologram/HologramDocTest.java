@@ -26,7 +26,7 @@ class HologramDocTest {
               "lines": ["&dWelcome", "&7Line two"],
               "style": {"billboard": "horizontal", "seeThrough": true, "scaleX": 2.5, "scaleY": 0.5, "scaleZ": 4},
               "box": {"enabled": true, "padding": 8, "borderWidth": 3, "backgroundArgb": "#00334455", "borderArgb": "#FF123456"},
-              "yaw": -30, "pitch": 15
+              "yaw": -30, "pitch": 15, "viewDistance": 72, "refreshTicks": 7
             }
             """);
 
@@ -45,6 +45,8 @@ class HologramDocTest {
         assertEquals(0xFF123456, doc.box().borderArgb().argb());
         assertEquals(-30D, doc.yaw());
         assertEquals(15D, doc.pitch());
+        assertEquals(72D, doc.viewDistance());
+        assertEquals(7, doc.refreshTicks());
     }
 
     @Test
@@ -57,13 +59,19 @@ class HologramDocTest {
                 "id": "underline", "target": {"scope": "local"},
                 "geometry": {"type": "line", "from": [-1, -0.2, 0], "to": [1, -0.2, 0]},
                 "placement": {"layer": "behind", "depth": 0.05, "offset": [0.1, 0.2, 0.3]},
-                "particle": {"key": "minecraft:soul"}
+                "particle": {"key": "minecraft:soul", "count": 6, "spread": [1, 2, 3], "speed": 0.5},
+                "show": false, "viewDistance": 32
               }]
             }
             """);
         assertEquals(new Vector(-1D, -0.2D, 0D), doc.particleLayers().getFirst().geometry().from());
         assertEquals(new Vector(1D, -0.2D, 0D), doc.particleLayers().getFirst().geometry().to());
         assertEquals(new Vector(0.1D, 0.2D, 0.3D), doc.particleLayers().getFirst().placement().offset());
+        assertEquals(6, doc.particleLayers().getFirst().particle().count());
+        assertEquals(new Vector(1, 2, 3), doc.particleLayers().getFirst().particle().spread());
+        assertEquals(0.5D, doc.particleLayers().getFirst().particle().speed());
+        assertEquals(32D, doc.particleLayers().getFirst().viewDistance());
+        assertEquals("false", doc.particleLayers().getFirst().show());
     }
 
     @Test
@@ -72,7 +80,7 @@ class HologramDocTest {
             new HologramDoc.Anchor("world", new Vector(0D, -32.5D, 1000000.125D)),
             List.of("plain", "", "&x&f&f&0&0&f&fhex"),
             IconDisplayStyle.defaults().withScale(3.75F, 2F, 4F),
-            new HologramBox(true, 8, 2, null, null), -135.5D, 12.25D, List.of(), null);
+            new HologramBox(true, 8, 2, null, null), -135.5D, 12.25D, List.of(), null, null, null);
         String json = DocumentParsers.GSON.toJson(original);
         assertEquals(original, HologramDoc.parse("arena.json", json));
         assertTrue(json.replaceAll("\\s", "").contains("\"position\":[0.0,-32.5,1000000.125]"));
@@ -92,7 +100,7 @@ class HologramDocTest {
     @Test
     void missingAnchorIsRejected() {
         assertThrows(NullPointerException.class, () -> new HologramDoc(HologramDoc.CURRENT_SCHEMA_VERSION,
-            1L, null, List.of("x"), null, null, null, null, List.of(), null));
+            1L, null, List.of("x"), null, null, null, null, List.of(), null, null, null));
     }
 
     @Test
@@ -101,9 +109,9 @@ class HologramDocTest {
             () -> HologramDoc.parse("bare.json", "{\"revision\":1,\"lines\":[]}"));
         HologramDoc.Anchor anchor = new HologramDoc.Anchor("world", new Vector());
         assertThrows(IllegalArgumentException.class, () -> new HologramDoc(HologramDoc.CURRENT_SCHEMA_VERSION,
-            0L, anchor, List.of(), null, null, null, null, List.of(), null));
+            0L, anchor, List.of(), null, null, null, null, List.of(), null, null, null));
         assertThrows(IllegalArgumentException.class, () -> new HologramDoc(HologramDoc.CURRENT_SCHEMA_VERSION,
-            DocumentEnvelope.MAX_SAFE_REVISION + 1L, anchor, List.of(), null, null, null, null, List.of(), null));
+            DocumentEnvelope.MAX_SAFE_REVISION + 1L, anchor, List.of(), null, null, null, null, List.of(), null, null, null));
     }
 
     @Test
@@ -126,7 +134,7 @@ class HologramDocTest {
         List<String> lines = new ArrayList<>(List.of("one"));
         lines.add(null);
         HologramDoc doc = new HologramDoc(HologramDoc.CURRENT_SCHEMA_VERSION, 1L,
-            new HologramDoc.Anchor("world", new Vector()), lines, null, null, null, null, List.of(), null);
+            new HologramDoc.Anchor("world", new Vector()), lines, null, null, null, null, List.of(), null, null, null);
         lines.clear();
         assertEquals(List.of("one", ""), doc.textLines());
         assertThrows(UnsupportedOperationException.class, () -> doc.lines().add(HologramLine.text("two")));
@@ -137,7 +145,7 @@ class HologramDocTest {
         HologramDoc doc = new HologramDoc(HologramDoc.CURRENT_SCHEMA_VERSION, 1L,
             new HologramDoc.Anchor("world", new Vector(1, 2, 3)), List.of("x"),
             IconDisplayStyle.defaults().withScale(4F, 2F, 3F).withBillboard(IconBillboard.HORIZONTAL),
-            new HologramBox(true, 2, 6, null, null), 45D, -30D, List.of(), null);
+            new HologramBox(true, 2, 6, null, null), 45D, -30D, List.of(), null, null, null);
         HologramDoc bumped = doc.withRevision(2L);
         assertEquals(doc, bumped.withRevision(1L));
         assertEquals(2L, bumped.revision());
@@ -154,15 +162,15 @@ class HologramDocTest {
     void orientationBoundsAreEnforced() {
         HologramDoc.Anchor anchor = new HologramDoc.Anchor("world", new Vector());
         HologramDoc edge = new HologramDoc(HologramDoc.CURRENT_SCHEMA_VERSION, 1L, anchor, List.of("x"),
-            null, null, -180D, 90D, List.of(), null);
+            null, null, -180D, 90D, List.of(), null, null, null);
         assertEquals(-180D, edge.yaw());
         assertEquals(90D, edge.pitch());
         assertThrows(IllegalArgumentException.class, () -> new HologramDoc(HologramDoc.CURRENT_SCHEMA_VERSION,
-            1L, anchor, List.of("x"), null, null, 181D, 0D, List.of(), null));
+            1L, anchor, List.of("x"), null, null, 181D, 0D, List.of(), null, null, null));
         assertThrows(IllegalArgumentException.class, () -> new HologramDoc(HologramDoc.CURRENT_SCHEMA_VERSION,
-            1L, anchor, List.of("x"), null, null, 0D, -90.5D, List.of(), null));
+            1L, anchor, List.of("x"), null, null, 0D, -90.5D, List.of(), null, null, null));
         assertThrows(IllegalArgumentException.class, () -> new HologramDoc(HologramDoc.CURRENT_SCHEMA_VERSION,
-            1L, anchor, List.of("x"), null, null, Double.NaN, 0D, List.of(), null));
+            1L, anchor, List.of("x"), null, null, Double.NaN, 0D, List.of(), null, null, null));
     }
 
     @Test

@@ -84,7 +84,7 @@ public record RealDropSettingsDoc(
                 null, null, null, null, null, null, null, null, null, null) : motion;
             landing = landing == null ? new Landing(
                 null, null, null, null, null, null, null, null) : landing;
-            labels = labels == null ? new Labels(null, null, null, null, null, null, null, null) : labels;
+            labels = labels == null ? new Labels(null, null, null, null, null, null, null, null, null, null) : labels;
             filters = filters == null ? new Filters(null, null, null) : filters;
             physics = physics == null ? new Physics(null, null, null, null, null) : physics;
             script = script == null ? new Script(null, null, null, null, null, null, null) : script;
@@ -241,9 +241,13 @@ public record RealDropSettingsDoc(
         Map<String, String> names,
         LabelBundle bundle,
         IconDisplayStyle style,
-        HologramBox box
+        HologramBox box,
+        ShowCondition show,
+        Boolean preserveCustomNames
     ) {
         public Labels {
+            show = show == null ? ShowCondition.ALWAYS : show;
+            preserveCustomNames = preserveCustomNames == null || preserveCustomNames;
             enabled = enabled == null || enabled;
             yOffset = clamp(yOffset, -4.0D, 16.0D, 0.55D);
             format = text(format, NAME_FORMAT_DEFAULT);
@@ -256,7 +260,7 @@ public record RealDropSettingsDoc(
 
         GlossConfig.RealDrops.Labels toConfig() {
             return new GlossConfig.RealDrops.Labels(enabled, yOffset.floatValue(), format, useItemDisplayNames,
-                names, bundle.toConfig(), style, box);
+                names, bundle.toConfig(), style, box, show, preserveCustomNames);
         }
 
         public static IconDisplayStyle defaultStyle() {

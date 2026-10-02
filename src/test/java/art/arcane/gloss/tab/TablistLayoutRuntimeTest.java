@@ -46,7 +46,7 @@ class TablistLayoutRuntimeTest {
     @Test
     void thePlayerBlockReservesItsColumnsInReadingOrder() {
         TablistLayoutRuntime runtime = runtime(layout(4, 20, List.of(),
-            new TablistDoc.Players(1, 2, 20, "true", "hide")));
+            new TablistDoc.Players(1, 2, 20, "true", "hide", null)));
 
         assertEquals(40, runtime.playerCells().size());
         assertEquals(20, runtime.playerCells().get(0).index());
@@ -81,9 +81,9 @@ class TablistLayoutRuntimeTest {
     @Test
     void aPlayerBlockThatDoesNotFitIsRefused() {
         assertThrows(IllegalArgumentException.class,
-            () -> layout(2, 2, List.of(), new TablistDoc.Players(1, 2, 2, "true", "hide")));
+            () -> layout(2, 2, List.of(), new TablistDoc.Players(1, 2, 2, "true", "hide", null)));
         assertThrows(IllegalArgumentException.class,
-            () -> layout(2, 2, List.of(), new TablistDoc.Players(0, 1, 9, "true", "hide")));
+            () -> layout(2, 2, List.of(), new TablistDoc.Players(0, 1, 9, "true", "hide", null)));
     }
 
     @Test
@@ -95,9 +95,9 @@ class TablistLayoutRuntimeTest {
     @Test
     void anUnknownOverflowModeIsRefused() {
         assertThrows(IllegalArgumentException.class,
-            () -> new TablistDoc.Players(0, 1, 1, "true", "wrap"));
-        assertTrue(new TablistDoc.Players(0, 1, 1, "true", "count").countsOverflow());
-        assertFalse(new TablistDoc.Players(0, 1, 1, "true", null).countsOverflow());
+            () -> new TablistDoc.Players(0, 1, 1, "true", "wrap", null));
+        assertTrue(new TablistDoc.Players(0, 1, 1, "true", "count", null).countsOverflow());
+        assertFalse(new TablistDoc.Players(0, 1, 1, "true", null, null).countsOverflow());
     }
 
     @Test

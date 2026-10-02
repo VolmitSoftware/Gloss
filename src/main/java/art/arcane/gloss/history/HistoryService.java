@@ -232,6 +232,7 @@ public final class HistoryService implements GlossService {
         addOwner(owners, plugin.holograms());
         addOwner(owners, plugin.indicators());
         addOwner(owners, plugin.motd());
+        addOwner(owners, plugin.names());
         addOwner(owners, plugin.tablist());
         addOwner(owners, plugin.getMenuCatalog());
         addOwner(owners, plugin.getPreviewRegistry());

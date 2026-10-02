@@ -26,7 +26,7 @@ class MarkerSelectionTest {
     void dropsMarkersBeyondTheirOwnMaxDistance() {
         MarkerSpec close = MarkerSpec.at("close", "world", 0, 0, 0);
         MarkerSpec limited = new MarkerSpec("limited", MarkerAnchor.position("world", 0, 0, 0), "", null,
-            0xFFFFFF, null, 0, 32, null, null, null, ShowCondition.ALWAYS, 0, false);
+            0xFFFFFF, null, 0, 32, null, null, null, ShowCondition.ALWAYS, 0, false, null, null);
 
         List<MarkerCandidate> selected = MarkerSelection.select(List.of(
             new MarkerCandidate(MarkerRuntime.of(close), "world", 0, 0, 0, 40),
@@ -38,7 +38,7 @@ class MarkerSelectionTest {
     @Test
     void dropsMarkersInsideTheirHideWithinRadius() {
         MarkerSpec hidden = new MarkerSpec("hidden", MarkerAnchor.position("world", 0, 0, 0), "", null,
-            0xFFFFFF, null, 8, 256, null, null, null, ShowCondition.ALWAYS, 0, false);
+            0xFFFFFF, null, 8, 256, null, null, null, ShowCondition.ALWAYS, 0, false, null, null);
 
         List<MarkerCandidate> selected = MarkerSelection.select(List.of(
             new MarkerCandidate(MarkerRuntime.of(hidden), "world", 0, 0, 0, 4)), 8);
@@ -49,7 +49,7 @@ class MarkerSelectionTest {
     @Test
     void aMarkerAtExactlyItsMaxDistanceIsStillShown() {
         MarkerSpec limited = new MarkerSpec("limited", MarkerAnchor.position("world", 0, 0, 0), "", null,
-            0xFFFFFF, null, 0, 32, null, null, null, ShowCondition.ALWAYS, 0, false);
+            0xFFFFFF, null, 0, 32, null, null, null, ShowCondition.ALWAYS, 0, false, null, null);
 
         Assertions.assertEquals(1, MarkerSelection.select(List.of(
             new MarkerCandidate(MarkerRuntime.of(limited), "world", 0, 0, 0, 32)), 8).size());
@@ -59,7 +59,7 @@ class MarkerSelectionTest {
     void anAudienceConditionGatesTheMarker() {
         MarkerSpec staffOnly = new MarkerSpec("staff", MarkerAnchor.position("world", 0, 0, 0), "", null,
             0xFFFFFF, null, 0, 256, null, null, null,
-            ShowCondition.of("hasPermission('viewer', 'quests.mill')"), 0, false);
+            ShowCondition.of("hasPermission('viewer', 'quests.mill')"), 0, false, null, null);
         MarkerRuntime runtime = MarkerRuntime.of(staffOnly);
 
         Assertions.assertTrue(runtime.visible(new TestScope(Map.of(), Set.of("quests.mill"))));
@@ -79,7 +79,7 @@ class MarkerSelectionTest {
     void distanceScaleReadsTheMarkerNamespace() {
         MarkerSpec scaled = new MarkerSpec("scaled", MarkerAnchor.position("world", 0, 0, 0), "", null,
             0xFFFFFF, "clamp(marker.distance / 24, 1, 5)", 0, 256, null, null, null,
-            ShowCondition.ALWAYS, 0, false);
+            ShowCondition.ALWAYS, 0, false, null, null);
         MarkerRuntime runtime = MarkerRuntime.of(scaled);
         MarkerNamespace namespace = new MarkerNamespace();
         MarkerNamespace.push(new MarkerContext("scaled", 0, 0, 0, 96));

@@ -157,7 +157,7 @@ public final class LegacyGlossDataImporter {
             legacy.get("z").getAsDouble());
         HologramDoc.Anchor anchor = new HologramDoc.Anchor(legacy.get("world").getAsString(), position);
         return new HologramDoc(HologramDoc.CURRENT_SCHEMA_VERSION, DocumentEnvelope.INITIAL_REVISION,
-            anchor, stringList(legacy.getAsJsonArray("lines")), null, null, 0.0D, 0.0D, List.of(), ShowCondition.ALWAYS);
+            anchor, stringList(legacy.getAsJsonArray("lines")), null, null, 0.0D, 0.0D, List.of(), ShowCondition.ALWAYS, null, null);
     }
 
     private static EmojiDoc convertEmoji(JsonObject legacy) {
@@ -222,8 +222,6 @@ public final class LegacyGlossDataImporter {
         overlay(yaml, "features.drops", entries, () -> config.features.drops = yaml.getBoolean("features.drops"));
         overlay(yaml, "motd.enabled", entries, () -> config.features.motd = yaml.getBoolean("motd.enabled"));
         overlay(yaml, "hotload.watch-interval-ticks", entries, () -> config.hotload.watchIntervalTicks = yaml.getInt("hotload.watch-interval-ticks"));
-        overlay(yaml, "holograms.stack-distance", entries, () -> config.holograms.stackDistance = yaml.getDouble("holograms.stack-distance"));
-        overlay(yaml, "holograms.update-interval-ticks", entries, () -> config.holograms.updateIntervalTicks = yaml.getInt("holograms.update-interval-ticks"));
         overlay(yaml, "holograms.view-range", entries, () -> config.holograms.viewRange = yaml.getDouble("holograms.view-range"));
         overlay(yaml, "holograms.per-viewer-placeholders", entries, () -> config.holograms.perViewerPlaceholders = yaml.getBoolean("holograms.per-viewer-placeholders"));
         overlay(yaml, "holograms.temporary-update-interval-ticks", entries, () -> config.holograms.temporaryUpdateIntervalTicks = yaml.getInt("holograms.temporary-update-interval-ticks"));
@@ -235,7 +233,6 @@ public final class LegacyGlossDataImporter {
         overlay(yaml, "text.placeholders", entries, () -> config.text.placeholders = yaml.getBoolean("text.placeholders"));
         overlay(yaml, "text.functions", entries, () -> config.text.functions = yaml.getBoolean("text.functions"));
         overlay(yaml, "chat.color", entries, () -> config.chat.color = yaml.getBoolean("chat.color"));
-        overlay(yaml, "chat-bubbles.blacklist-worlds", entries, () -> config.chatBubbles.blacklistWorlds = new ArrayList<>(yaml.getStringList("chat-bubbles.blacklist-worlds")));
         overlay(yaml, "commands.sounds", entries, () -> config.commands.sounds = yaml.getBoolean("commands.sounds"));
     }
 
@@ -285,7 +282,7 @@ public final class LegacyGlossDataImporter {
                 motion,
                 base.shimmer(),
                 base.select(),
-                base.particleLayers(), base.show(), null, null);
+                base.particleLayers(), base.show(), null, null, null, null, null, null);
             writeDocument(styleFile.toPath(), updated);
             entries.add(Entry.of("config", LEGACY_CONFIG_FILE_NAME + ":chat-bubbles", Status.OVERLAID));
         } catch (IOException | RuntimeException failure) {

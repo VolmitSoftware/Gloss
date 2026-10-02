@@ -12,10 +12,10 @@
     "priority": 0,
     "cooldownTicks": 0
   },
-  "format": "<hover:show_text:'{{ card }}'>&7[{{ sender.group }}]</hover> &f{{ sender.name }}&8: &f{{ message }}",
+  "format": "<hover:show_text:'{{ card }}'>{{ sender.groupName != '' ? '&7[' + sender.groupName + ']' : '' }}</hover> &f{{ sender.name }}&8: &f{{ message }}",
   "card": [
     "&6{{ sender.name }}",
-    "&7World &f{{ sender.world }}"
+    "&7World &f{{ sender.worldName }}"
   ],
   "mentions": {
     "enabled": true,

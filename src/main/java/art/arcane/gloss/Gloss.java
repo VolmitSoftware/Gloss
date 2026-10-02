@@ -20,6 +20,7 @@ import art.arcane.gloss.editor.sync.EditorSyncDocumentKind;
 import art.arcane.gloss.emoji.EmojiService;
 import art.arcane.gloss.entity.EntityOverlayService;
 import art.arcane.gloss.group.GroupService;
+import art.arcane.gloss.names.NamesService;
 import art.arcane.gloss.hologram.HologramAnimator;
 import art.arcane.gloss.hologram.HologramService;
 import art.arcane.gloss.image.ImageAssets;
@@ -130,6 +131,7 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
     private HologramService holograms;
     private BoardService boards;
     private GroupService groups;
+    private NamesService names;
     private TablistService tablist;
     private MotdService motd;
     private BackendProxyOwnership proxyOwnership;
@@ -294,6 +296,8 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
             bedrockPolicy = new BedrockPolicy(bedrock, () -> cfg().modules().bedrock());
             teams = new PacketTeamAllocator();
             governor = VisibilityGovernor.passthrough();
+            names = new NamesService(this);
+            enableService("names", names::enable, names::disable);
             laneServices = GlossLaneServices.create(this);
             for (GlossService service : laneServices) {
                 service.contribute();
@@ -549,6 +553,7 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
             bedrock.detection(BedrockService.Detection.parse(next.modules().bedrock().detection()));
         }
         if (previous == null || cycleEveryService) {
+            names.reload();
             for (GlossService service : laneServices) {
                 service.reload();
             }
@@ -779,8 +784,7 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
             sessionManager.controlHitboxDebug(next.debug().hitbox());
             sessionManager.controlPositionDebug(next.debug().position());
         }
-        boolean scaleChanged = previous.previews().scale() != next.previews().scale()
-            || previous.menus().uiScale() != next.menus().uiScale();
+        boolean scaleChanged = previous.menus().uiScale() != next.menus().uiScale();
         if (scaleChanged) {
             if (itemProviders != null) {
                 itemProviders.invalidate();
@@ -861,6 +865,10 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
 
     public BoardService boards() {
         return boards;
+    }
+
+    public NamesService names() {
+        return names;
     }
 
     public GroupService groups() {

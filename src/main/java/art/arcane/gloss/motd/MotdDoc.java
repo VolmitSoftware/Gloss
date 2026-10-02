@@ -63,8 +63,13 @@ public record MotdDoc(int schemaVersion, long revision, ShowCondition show, Stri
     }
 
     public record MotdEntry(List<String> lines, String favicon, List<String> sample, String online, String max,
-                            String version) {
+                            String version, ShowCondition show, Integer weight) {
         public MotdEntry {
+            show = show == null ? ShowCondition.ALWAYS : show;
+            weight = weight == null ? 1 : weight;
+            if (weight < 1 || weight > 1_000_000) {
+                throw new IllegalArgumentException("motd entry weight must be within 1..1000000");
+            }
             if (lines == null || lines.isEmpty() || lines.size() > MAX_LINES_PER_ENTRY) {
                 throw new IllegalArgumentException("motd entry requires 1 to " + MAX_LINES_PER_ENTRY + " lines");
             }
@@ -78,7 +83,7 @@ public record MotdDoc(int schemaVersion, long revision, ShowCondition show, Stri
         }
 
         public static MotdEntry ofLines(List<String> lines) {
-            return new MotdEntry(lines, null, null, null, null, null);
+            return new MotdEntry(lines, null, null, null, null, null, ShowCondition.ALWAYS, 1);
         }
 
         public String joined() {

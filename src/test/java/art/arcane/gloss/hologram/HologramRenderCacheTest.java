@@ -120,13 +120,17 @@ class HologramRenderCacheTest {
 
     @Test
     void thePerViewerMemoExpiresAtTheConfiguredRefreshWindow() throws InterruptedException {
-        harness.configure(file -> file.holograms.updateIntervalTicks = 1);
         AtomicReference<String> value = new AtomicReference<>("one");
         harness.text.setEmojiFilter(raw -> {
             renders.add(raw);
             return raw.equals("%p% dynamic") ? "%p% " + value.get() : raw;
         });
         PersistentHologram hologram = hologram("h-memo-window", List.of("%p% dynamic"));
+        HologramDoc document = hologram.toDoc(1L);
+        hologram.apply(new HologramDoc(document.schemaVersion(), document.revision(), document.anchor(),
+            document.lines(), document.style(), document.box(), document.yaw(), document.pitch(),
+            document.particleLayers(), document.show(), document.pages(), document.actions(),
+            document.hitbox(), document.viewDistance(), 1, null));
         hologram.update();
         harness.drainDelayed();
         assertEquals(Set.of("%p% one"), new HashSet<>(latestViewerText().values()));

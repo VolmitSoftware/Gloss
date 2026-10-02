@@ -374,7 +374,7 @@ public class SessionHolderSnapshotTest {
 
   private static MenuDefinitionData menu(String id, Vector offset) {
     MenuDefinitionData data = new MenuDefinitionData(offset, false, false, 8.0D, false, false,
-        List.<MenuComponentData>of(), List.of(), ShowCondition.ALWAYS, Map.of());
+        List.<MenuComponentData>of(), List.of(), ShowCondition.ALWAYS, Map.of(), List.of());
     data.setId(id);
     return data;
   }
@@ -382,7 +382,7 @@ public class SessionHolderSnapshotTest {
   private static MenuDefinitionData menu(String id, Supplier<MenuComponent<?>> onCreate) {
     MenuComponentData component = new MenuComponentData("probe", new Vector(0, 0, 0), new ProbeComponentData(onCreate), ShowCondition.ALWAYS);
     MenuDefinitionData data = new MenuDefinitionData(new Vector(0, 0, 0), false, false, 8.0D, false, false,
-        List.of(component), List.of(), ShowCondition.ALWAYS, Map.of());
+        List.of(component), List.of(), ShowCondition.ALWAYS, Map.of(), List.of());
     data.setId(id);
     return data;
   }
@@ -390,7 +390,7 @@ public class SessionHolderSnapshotTest {
   private static MenuDefinitionData failingOpenMenu(String id, AtomicInteger closeCalls) {
     MenuComponentData component = new MenuComponentData("probe", new Vector(), new OpeningFailureData(closeCalls), ShowCondition.ALWAYS);
     MenuDefinitionData data = new MenuDefinitionData(new Vector(), false, false, 8.0D, false, false,
-        List.of(component), List.of(), ShowCondition.ALWAYS, Map.of());
+        List.of(component), List.of(), ShowCondition.ALWAYS, Map.of(), List.of());
     data.setId(id);
     return data;
   }

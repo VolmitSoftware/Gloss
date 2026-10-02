@@ -1,5 +1,8 @@
 package art.arcane.gloss.preview.doc;
 
+import art.arcane.gloss.names.NameCategory;
+import art.arcane.gloss.names.NamesService;
+
 import art.arcane.gloss.expr.ExprVariableNamespaces;
 import art.arcane.gloss.expr.ExprFunctions;
 import org.bukkit.Material;
@@ -77,7 +80,7 @@ final class PreviewStateAdapters {
 
   static Map<String, Set<String>> catalog() {
     Map<String, Set<String>> catalog = new LinkedHashMap<>();
-    catalog.put(GROUP_UNIVERSAL, names("time", "world.name", "world.time", "blockType", "customName"));
+    catalog.put(GROUP_UNIVERSAL, names("time", "world.name", "world.displayName", "world.environmentName", "world.time", "blockType", "blockTypeName", "entityTypeName", "customName"));
     catalog.put(CATEGORY_INVENTORY, names("inventory.size", "inventory.occupied"));
     catalog.put(CATEGORY_FURNACE, names(
         "cookTime", "cookTimeTotal", "burnTime", "fuelSeconds", "bankedXp", "lit", "surge.active", "surge.gain"));
@@ -193,7 +196,11 @@ final class PreviewStateAdapters {
     // The universal group is published unconditionally so every cataloged universal name resolves
     // in every context; a target with no material (a bare ender-chest inventory, or statics) gets
     // the empty string rather than a missing variable, which documents branch on as `blockType != ""`.
-    out.put("blockType", blockType(block, entity));
+    String blockType = blockType(block, entity);
+    out.put("blockType", blockType);
+    out.put("blockTypeName", NamesService.name(NameCategory.MATERIALS, blockType));
+    out.put("entityTypeName", NamesService.name(NameCategory.ENTITIES,
+        entity == null ? "" : entity.getType().getKey().toString()));
     out.put("customName", customName(state, entity));
     if (inventory != null) {
       sampleInventory(inventory, out);
@@ -338,7 +345,7 @@ final class PreviewStateAdapters {
     boolean hasRecord = jukebox.hasRecord();
     out.put("playing", hasRecord && jukebox.isPlaying());
     // Empty string rather than absent, so documents can branch on `record != ""`.
-    out.put("record", hasRecord ? ExprFunctions.readable(jukebox.getRecord().getType().name()) : "");
+    out.put("record", hasRecord ? NamesService.name(NameCategory.MATERIALS, jukebox.getRecord().getType().name()) : "");
   }
 
   private static void samplePoweredMinecart(Entity entity, Map<String, Object> out) {

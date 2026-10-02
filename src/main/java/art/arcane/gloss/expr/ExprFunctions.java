@@ -1,5 +1,7 @@
 package art.arcane.gloss.expr;
 
+import art.arcane.gloss.names.NameFallback;
+
 import java.util.List;
 import java.util.Locale;
 import java.util.regex.Matcher;
@@ -318,16 +320,7 @@ public final class ExprFunctions {
    * material names into variables before any expression sees them.
    */
   public static String readable(String value) {
-    String[] words = value.toLowerCase(Locale.ENGLISH).split("_");
-    StringBuilder out = new StringBuilder();
-    for (int index = 0; index < words.length; index++) {
-      if (index > 0) {
-        out.append(' ');
-      }
-      String word = words[index];
-      out.append(word.isEmpty() ? word : Character.toUpperCase(word.charAt(0)) + word.substring(1));
-    }
-    return out.toString();
+    return NameFallback.titleCase(value);
   }
 
   private static String align(String name, List<Object> args) {

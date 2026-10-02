@@ -148,12 +148,23 @@ public final class PreviewDocumentParser {
 
     int priority = doc.match != null && doc.match.priority != null ? doc.match.priority : 0;
     return new CompiledPreviewDocument(documentName, priority, match, variants, vars, show, card, elements,
-        particleLayers);
+        particleLayers, viewingNumber(doc.scale, 0.65D, 0.25D, 4.0D, "scale"),
+        viewingNumber(doc.viewDistance, 10.0D, 1.0D, 24.0D, "viewDistance"));
   }
 
   // ---------------------------------------------------------------------
   // Match / variants
   // ---------------------------------------------------------------------
+
+  private double viewingNumber(Double value, double fallback, double minimum, double maximum, String path) {
+    if (value == null) {
+      return fallback;
+    }
+    if (!Double.isFinite(value) || value < minimum || value > maximum) {
+      throw fail(path, "must be within " + minimum + ".." + maximum, null);
+    }
+    return value;
+  }
 
   private List<CompiledVariant> compileVariants(List<VariantDef> variants) {
     if (variants == null) {

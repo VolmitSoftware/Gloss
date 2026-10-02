@@ -140,7 +140,7 @@ public class ApiMenuTranslatorTest {
 
   @Test
   public void blockIconsMapToThePacketBlockDisplayConfigType() {
-    assertEquals(new BlockIconData(Material.STONE, null),
+    assertEquals(new BlockIconData(Material.STONE, null, null, null),
         ApiMenuTranslator.iconData(HoloIcon.block(Material.STONE)));
   }
 }

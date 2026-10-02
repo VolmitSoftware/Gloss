@@ -1,6 +1,8 @@
 package art.arcane.gloss.preview.doc;
 
 import art.arcane.gloss.Gloss;
+import art.arcane.gloss.names.NameCategory;
+import art.arcane.gloss.names.NamesService;
 import art.arcane.gloss.api.PreviewStateProvider;
 import art.arcane.gloss.api.PreviewStateProviders;
 import art.arcane.gloss.expr.ExprException;
@@ -82,7 +84,7 @@ public final class PreviewStateContext implements ExprScope {
    * {@code functions} section against this set.
    */
   static final Set<String> CONTEXT_FUNCTIONS = Set.of(
-      "lang", "count", "occupied", "item", "papi", "papiNumber", "metric");
+      "lang", "count", "occupied", "item", "itemName", "papi", "papiNumber", "metric");
 
   private final Block block;
   private final Entity entity;
@@ -188,6 +190,7 @@ public final class PreviewStateContext implements ExprScope {
       case "count" -> count(args);
       case "occupied" -> occupied(args);
       case "item" -> item(args);
+      case "itemName" -> NamesService.name(NameCategory.MATERIALS, item(args));
       default -> standardScope == null ? ExprFunctions.call(name, args) : standardScope.call(name, args);
     };
   }
@@ -208,6 +211,9 @@ public final class PreviewStateContext implements ExprScope {
     }
     Map<String, Object> values = new HashMap<>(SNAPSHOT_CAPACITY);
     values.put("world.name", world == null ? "" : world.getName());
+    values.put("world.displayName", NamesService.name(NameCategory.WORLDS, world == null ? "" : world.getName()));
+    values.put("world.environmentName", NamesService.name(NameCategory.DIMENSIONS,
+        world == null ? "" : world.getEnvironment().name()));
     values.put("world.time", world == null ? 0.0D : (double) world.getTime());
     PreviewStateAdapters.sample(category, block, entity, inventory, flow, tick, values);
     List<PreviewStateProvider> providers = PreviewStateProviders.all();

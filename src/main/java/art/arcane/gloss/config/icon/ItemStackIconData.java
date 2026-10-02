@@ -6,7 +6,7 @@ import org.bukkit.inventory.ItemStack;
 
 import java.util.Objects;
 
-public record ItemStackIconData(ItemStack stack, IconDisplayStyle style) implements MenuIconData {
+public record ItemStackIconData(ItemStack stack, IconDisplayStyle style, String countFormat) implements MenuIconData {
   public ItemStackIconData {
     Objects.requireNonNull(stack, "stack");
   }

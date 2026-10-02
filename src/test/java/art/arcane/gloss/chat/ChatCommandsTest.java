@@ -178,6 +178,26 @@ class ChatCommandsTest {
         assertTrue(steve.received.getLast().toLowerCase().contains("permission"), steve.received.getLast());
     }
 
+    @Test
+    void senderVariantsFilterOnceWhileRecipientVariantsChooseTheirOwnPresentation() throws Exception {
+        write("private", """
+            {"schemaVersion":1,"revision":1,"channel":{"name":"private","scope":"direct"},
+             "format":"BASE {{ message }}","throttle":{"minIntervalTicks":0},
+             "variants":[
+               {"id":"sender","when":"viewer.name == 'Steve'","filters":[{"match":"raw","replace":"filtered"}]},
+               {"id":"recipient","when":"viewer.name == 'Alex'","format":"VIEW {{ message }}",
+                "filters":[{"match":"filtered","replace":"wrong"}]}]}
+            """);
+        boot();
+        ChatTestHarness.FakePlayer steve = join("Steve").allow("gloss.chat.msg");
+        ChatTestHarness.FakePlayer alex = join("Alex");
+        commands.execute(steve.proxy, "msg", new String[]{"Alex", "raw"});
+        assertEquals("BASE filtered",
+            PlainTextComponentSerializer.plainText().serialize(TextUtils.parse(steve.received.getFirst())));
+        assertEquals("VIEW filtered",
+            PlainTextComponentSerializer.plainText().serialize(TextUtils.parse(alex.received.getFirst())));
+    }
+
     private void writePrivate(String permission, String throttle) throws IOException {
         write("private", "{\"schemaVersion\":1,\"revision\":1,"
             + "\"channel\":{\"name\":\"private\",\"scope\":\"direct\"," + permission + "},"

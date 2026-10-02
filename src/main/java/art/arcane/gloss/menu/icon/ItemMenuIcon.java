@@ -9,13 +9,13 @@ import art.arcane.gloss.menu.MenuSession;
 import art.arcane.gloss.menu.MenuTransform;
 import art.arcane.gloss.util.common.DisplayEntity;
 import art.arcane.gloss.util.common.ItemUtils;
+import art.arcane.gloss.util.common.TextUtils;
+import art.arcane.gloss.text.TextPipeline;
 import art.arcane.gloss.util.common.math.CollisionPlane;
 import art.arcane.volmlib.util.bukkit.registry.RegistryUtil;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
-import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.inventory.ItemStack;
@@ -223,6 +223,7 @@ public class ItemMenuIcon extends MenuIcon<MenuIconData> {
   }
 
   private Component countText(int count) {
-    return Component.text(count).color(NamedTextColor.WHITE).decorate(TextDecoration.BOLD);
+    String format = data.countFormat() == null ? "&f&l{count}" : data.countFormat();
+    return TextUtils.parse(TextPipeline.menuText(session.getPlayer(), format.replace("{count}", Integer.toString(count))));
   }
 }

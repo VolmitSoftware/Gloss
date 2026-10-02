@@ -59,7 +59,7 @@ public class EntityMenuIconGeometryTest {
         false,
         List.of(),
         List.of(), ShowCondition.ALWAYS
-    , Map.of());
+    , Map.of(), List.of());
     MenuSession session = new MenuSession(
         definition,
         null,

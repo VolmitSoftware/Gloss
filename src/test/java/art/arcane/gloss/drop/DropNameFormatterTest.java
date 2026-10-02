@@ -196,7 +196,7 @@ class DropNameFormatterTest {
 
     @Test
     void itemDisplayNamesRequireExplicitOptIn() {
-        assertTrue(new GlossConfigFile.Drops().preserveCustomNames);
+        assertTrue(RealDropSettingsDoc.DEFAULTS.presentation().labels().preserveCustomNames());
         assertFalse(RealDropSettingsDoc.DEFAULTS.toConfig(true).labels().useItemDisplayNames());
     }
 }

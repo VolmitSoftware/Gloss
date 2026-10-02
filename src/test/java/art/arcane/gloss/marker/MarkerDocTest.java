@@ -14,12 +14,14 @@ class MarkerDocTest {
           "anchor": { "world": "world", "x": 120.5, "y": 71, "z": -33.5 },
           "label": "&6Old Mill",
           "color": "#FFAA00",
+          "style": {"shadow": true},
+          "box": {"enabled": true},
           "distanceScale": "clamp(marker.distance / 24, 1, 5)",
           "hideWithin": 4,
           "maxDistance": 256,
-          "beam": { "enabled": true, "height": 48, "width": 0.25, "material": "minecraft:yellow_stained_glass" },
+          "beam": { "enabled": true, "height": 48, "width": 0.25, "material": "minecraft:yellow_stained_glass", "glowColor": "#ff8800" },
           "edge": { "enabled": true, "margin": 0.8, "arrow": "&6>" },
-          "trail": { "enabled": false, "particle": "minecraft:end_rod", "spacing": 2, "maxPoints": 48 },
+          "trail": { "enabled": false, "particle": "minecraft:end_rod", "spacing": 2, "maxPoints": 48, "color": "#00aaff" },
           "audience": { "when": "hasPermission('viewer', 'quests.mill')" },
           "lifetimeTicks": 0
         }
@@ -38,6 +40,10 @@ class MarkerDocTest {
         Assertions.assertEquals("minecraft:yellow_stained_glass", doc.beam().material());
         Assertions.assertFalse(doc.trail().enabled());
         Assertions.assertFalse(doc.waypoint());
+        Assertions.assertEquals("#ff8800", doc.beam().glowColor());
+        Assertions.assertEquals("#00aaff", doc.trail().color());
+        Assertions.assertTrue(doc.style().shadow());
+        Assertions.assertTrue(doc.box().enabled());
     }
 
     @Test
@@ -48,6 +54,8 @@ class MarkerDocTest {
         Assertions.assertEquals("&6Old Mill", spec.label());
         Assertions.assertEquals(0.8D, spec.edge().margin());
         Assertions.assertEquals(4.0D, spec.hideWithin());
+        Assertions.assertTrue(spec.withLabel("Changed").style().shadow());
+        Assertions.assertTrue(spec.asWaypoint().box().enabled());
     }
 
     @Test

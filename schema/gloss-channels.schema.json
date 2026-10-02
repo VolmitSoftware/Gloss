@@ -21,13 +21,18 @@
       "maximum": 9007199254740991
     },
     "show": {
-      "type": ["string", "boolean"],
+      "type": [
+        "string",
+        "boolean"
+      ],
       "default": "true",
       "description": "Boolean expression gating whether a sender may talk in this channel."
     },
     "channel": {
       "type": "object",
-      "required": ["name"],
+      "required": [
+        "name"
+      ],
       "properties": {
         "name": {
           "type": "string",
@@ -48,7 +53,14 @@
         },
         "scope": {
           "type": "string",
-          "enum": ["global", "world", "radius", "permission", "direct", "party"],
+          "enum": [
+            "global",
+            "world",
+            "radius",
+            "permission",
+            "direct",
+            "party"
+          ],
           "default": "global",
           "description": "party is reserved and resolves to global until a party SPI exists."
         },
@@ -85,13 +97,18 @@
     "card": {
       "type": "array",
       "maxItems": 16,
-      "items": { "type": "string" },
+      "items": {
+        "type": "string"
+      },
       "description": "Hover-card lines rendered per viewer and joined with newlines into {{ card }}."
     },
     "mentions": {
       "type": "object",
       "properties": {
-        "enabled": { "type": "boolean", "default": true },
+        "enabled": {
+          "type": "boolean",
+          "default": true
+        },
         "pattern": {
           "type": "string",
           "default": "@{name}",
@@ -112,21 +129,40 @@
           "default": "minecraft:block.note_block.bell",
           "description": "Namespaced sound played to the mentioned viewer; empty plays nothing."
         },
-        "permission": { "type": "string", "default": "gloss.chat.mention" }
+        "permission": {
+          "type": "string",
+          "default": "gloss.chat.mention"
+        }
       }
     },
     "items": {
       "type": "object",
       "properties": {
-        "enabled": { "type": "boolean", "default": true },
-        "token": { "type": "string", "default": "[item]" },
-        "permission": { "type": "string", "default": "gloss.chat.item" }
+        "enabled": {
+          "type": "boolean",
+          "default": true
+        },
+        "token": {
+          "type": "string",
+          "default": "[item]"
+        },
+        "permission": {
+          "type": "string",
+          "default": "gloss.chat.item"
+        },
+        "render": {
+          "type": "string",
+          "description": "Item label template with {{ item.name }}, {{ item.amount }}, {{ item.id }} and {{ item.countSuffix }}."
+        }
       }
     },
     "links": {
       "type": "object",
       "properties": {
-        "enabled": { "type": "boolean", "default": true },
+        "enabled": {
+          "type": "boolean",
+          "default": true
+        },
         "render": {
           "type": "string",
           "default": "&9&n{{ link.host }}",
@@ -139,10 +175,18 @@
       "maxItems": 64,
       "items": {
         "type": "object",
-        "required": ["match"],
+        "required": [
+          "match"
+        ],
         "properties": {
-          "match": { "type": "string", "format": "regex" },
-          "replace": { "type": "string", "default": "" }
+          "match": {
+            "type": "string",
+            "format": "regex"
+          },
+          "replace": {
+            "type": "string",
+            "default": ""
+          }
         }
       },
       "description": "Applied in order to the plain message; a match that empties it cancels the message."
@@ -150,9 +194,24 @@
     "throttle": {
       "type": "object",
       "properties": {
-        "repeatWindowTicks": { "type": "integer", "minimum": 0, "maximum": 72000, "default": 100 },
-        "maxRepeats": { "type": "integer", "minimum": 1, "maximum": 64, "default": 1 },
-        "minIntervalTicks": { "type": "integer", "minimum": 0, "maximum": 72000, "default": 10 }
+        "repeatWindowTicks": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 72000,
+          "default": 100
+        },
+        "maxRepeats": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 64,
+          "default": 1
+        },
+        "minIntervalTicks": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 72000,
+          "default": 10
+        }
       }
     },
     "variants": {
@@ -160,15 +219,151 @@
       "maxItems": 32,
       "items": {
         "type": "object",
-        "required": ["id", "when", "format"],
+        "required": [
+          "id",
+          "when"
+        ],
         "properties": {
-          "id": { "type": "string" },
-          "priority": { "type": "integer", "minimum": -1000, "maximum": 1000, "default": 0 },
-          "when": { "type": "string" },
-          "format": { "type": "string", "maxLength": 4096 }
+          "id": {
+            "type": "string"
+          },
+          "priority": {
+            "type": "integer",
+            "minimum": -1000,
+            "maximum": 1000,
+            "default": 0
+          },
+          "when": {
+            "type": "string"
+          },
+          "format": {
+            "type": "string",
+            "maxLength": 4096,
+            "description": "The per-viewer line. Reads sender.*, viewer.*, message, card and channel.*."
+          },
+          "card": {
+            "type": "array",
+            "maxItems": 16,
+            "items": {
+              "type": "string"
+            },
+            "description": "Hover-card lines rendered per viewer and joined with newlines into {{ card }}."
+          },
+          "mentions": {
+            "type": "object",
+            "properties": {
+              "enabled": {
+                "type": "boolean",
+                "default": true
+              },
+              "pattern": {
+                "type": "string",
+                "default": "@{name}",
+                "description": "Must contain {name}; the literal halves may carry regex metacharacters."
+              },
+              "render": {
+                "type": "string",
+                "default": "<gold><bold>@{{ mention.name }}</bold></gold>",
+                "description": "Rendered only for the mentioned viewer. mention.name is the selected nametag identity; mention.username is the typed account name."
+              },
+              "messageFormat": {
+                "type": "string",
+                "default": "<yellow>{{ sender.name }}: {{ message }}</yellow>",
+                "description": "Complete message format shown to the mentioned recipient. Uses the ordinary channel format variables."
+              },
+              "sound": {
+                "type": "string",
+                "default": "minecraft:block.note_block.bell",
+                "description": "Namespaced sound played to the mentioned viewer; empty plays nothing."
+              },
+              "permission": {
+                "type": "string",
+                "default": "gloss.chat.mention"
+              }
+            }
+          },
+          "items": {
+            "type": "object",
+            "properties": {
+              "enabled": {
+                "type": "boolean",
+                "default": true
+              },
+              "token": {
+                "type": "string",
+                "default": "[item]"
+              },
+              "permission": {
+                "type": "string",
+                "default": "gloss.chat.item"
+              },
+              "render": {
+                "type": "string",
+                "description": "Item label template with {{ item.name }}, {{ item.amount }}, {{ item.id }} and {{ item.countSuffix }}."
+              }
+            }
+          },
+          "links": {
+            "type": "object",
+            "properties": {
+              "enabled": {
+                "type": "boolean",
+                "default": true
+              },
+              "render": {
+                "type": "string",
+                "default": "&9&n{{ link.host }}",
+                "description": "Reads link.host and link.url."
+              }
+            }
+          },
+          "filters": {
+            "type": "array",
+            "maxItems": 64,
+            "items": {
+              "type": "object",
+              "required": [
+                "match"
+              ],
+              "properties": {
+                "match": {
+                  "type": "string",
+                  "format": "regex"
+                },
+                "replace": {
+                  "type": "string",
+                  "default": ""
+                }
+              }
+            },
+            "description": "Applied in order to the plain message; a match that empties it cancels the message."
+          },
+          "throttle": {
+            "type": "object",
+            "properties": {
+              "repeatWindowTicks": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 72000,
+                "default": 100
+              },
+              "maxRepeats": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 64,
+                "default": 1
+              },
+              "minIntervalTicks": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 72000,
+                "default": 10
+              }
+            }
+          }
         }
       },
-      "description": "Highest priority matching variant replaces the base format whole; ties break on id."
+      "description": "Highest priority matching variant replaces each provided block; omitted blocks inherit. Filters and throttle use sender conditions; presentation uses each viewer."
     }
   }
 }

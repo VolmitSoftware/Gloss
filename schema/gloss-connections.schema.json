@@ -1,0 +1,103 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://volmit.com/gloss/connections.schema.json",
+  "title": "Gloss Connections Document",
+  "type": "object",
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991
+    },
+    "show": {
+      "type": [
+        "string",
+        "boolean"
+      ],
+      "description": "Boolean or Gloss condition expression."
+    },
+    "join": {
+      "$ref": "#/$defs/section"
+    },
+    "leave": {
+      "$ref": "#/$defs/section"
+    },
+    "firstJoin": {
+      "$ref": "#/$defs/section",
+      "description": "Server only: replaces join for players who have never joined this server when enabled."
+    },
+    "switch": {
+      "$ref": "#/$defs/section",
+      "description": "Velocity only: message when a player changes backend servers."
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "revision"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "section": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "show": {
+          "type": [
+            "string",
+            "boolean"
+          ],
+          "description": "Boolean or Gloss condition expression."
+        },
+        "audience": {
+          "enum": [
+            "network",
+            "server"
+          ]
+        },
+        "presentation": {
+          "$ref": "#/$defs/presentation"
+        },
+        "variants": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "priority": {
+                "type": "integer"
+              },
+              "when": {
+                "type": "string",
+                "minLength": 1
+              },
+              "presentation": {
+                "$ref": "#/$defs/presentation"
+              }
+            },
+            "required": [
+              "when",
+              "presentation"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "presentation": {
+      "type": "object",
+      "properties": {
+        "text": {
+          "type": "string"
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    }
+  }
+}

@@ -46,7 +46,7 @@ public final class ApiMenuTranslator {
         menu.closeOnDeath(),
         menu.closeOnTeleport(),
         List.copyOf(components),
-        menu.particleLayers(), ShowCondition.ALWAYS, Map.of());
+        menu.particleLayers(), ShowCondition.ALWAYS, Map.of(), List.of());
     definition.setId(menu.id());
     return definition;
   }
@@ -66,8 +66,8 @@ public final class ApiMenuTranslator {
   public static MenuIconData iconData(HoloIcon icon) {
     return switch (icon) {
       case HoloIcon.Text text -> new TextIconData(text.miniMessage(), text.style(), text.refreshTicks(), text.box());
-      case HoloIcon.Item item -> new ItemStackIconData(item.stack(), item.style());
-      case HoloIcon.Block block -> new BlockIconData(block.material(), block.style());
+      case HoloIcon.Item item -> new ItemStackIconData(item.stack(), item.style(), null);
+      case HoloIcon.Block block -> new BlockIconData(block.material(), block.style(), null, null);
       case HoloIcon.Image image -> new TextImageIconData(image.relativePath(), image.style());
       case HoloIcon.AnimatedImage animated -> new AnimatedImageData(animated.relativePaths(), animated.tickSpeed(), animated.style());
       case HoloIcon.Entity entity -> new EntityIconData(entity.entityType(), entity.width(), entity.height());

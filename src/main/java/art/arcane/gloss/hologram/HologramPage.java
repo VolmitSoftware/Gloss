@@ -1,15 +1,18 @@
 package art.arcane.gloss.hologram;
 
+import art.arcane.gloss.condition.ShowCondition;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
 /** One page of a paged hologram. Each viewer reads exactly one page at a time. */
-public record HologramPage(String id, List<HologramLine> lines) {
+public record HologramPage(String id, List<HologramLine> lines, ShowCondition show) {
     public static final String NEXT = "next";
     public static final String PREVIOUS = "prev";
 
     public HologramPage {
+        show = show == null ? ShowCondition.ALWAYS : show;
         if (id == null || id.isBlank()) {
             throw new IllegalArgumentException("hologram page needs an id");
         }

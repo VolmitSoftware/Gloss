@@ -26,7 +26,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Object lines drawn as packet display entities under the hologram's text column: an item, a head,
+ * Object lines drawn as packet display entities in the hologram's authored row order: an item, a head,
  * a block or a raw entity, each one row tall at its authored scale.
  */
 final class HologramLineRenderer {
@@ -40,27 +40,35 @@ final class HologramLineRenderer {
     }
 
     /**
-     * Builds one display entity per object line, stacked downwards under a text column of
-     * {@code textRows} rows. Lines that cannot be resolved are skipped.
+     * Builds one display entity per object line, reserving text rows around each object.
+     * Lines that cannot be resolved are skipped.
      */
     static List<ObjectLine> build(Gloss plugin, String hologramId, List<HologramLine> lines, Location anchor,
-                                  int textRows, float textScaleY) {
+                                  float textScaleY) {
         List<ObjectLine> built = new ArrayList<>();
-        double offset = -TEXT_ROW_HEIGHT * textRows * textScaleY / 2.0D;
+        int totalRows = 0;
         for (HologramLine line : lines) {
-            if (line.isText()) {
-                continue;
-            }
-            double height = line.scale();
+            totalRows += rows(line, textScaleY);
+        }
+        double rowHeight = TEXT_ROW_HEIGHT * textScaleY;
+        double offset = rowHeight * totalRows / 2.0D;
+        for (HologramLine line : lines) {
+            double height = rows(line, textScaleY) * rowHeight;
             offset -= height / 2.0D;
-            DisplayEntity display = display(plugin, hologramId, line, anchor, offset);
-            offset -= height / 2.0D;
-            if (display == null) {
-                continue;
+            if (!line.isText()) {
+                DisplayEntity display = display(plugin, hologramId, line, anchor, offset);
+                if (display != null) {
+                    built.add(new ObjectLine(line, display, height));
+                }
             }
-            built.add(new ObjectLine(line, display, height));
+            offset -= height / 2.0D;
         }
         return List.copyOf(built);
+    }
+
+    static int rows(HologramLine line, float textScaleY) {
+        return line.isText() ? line.text().split("\n", -1).length
+            : Math.max(1, (int) Math.ceil(line.scale() / (TEXT_ROW_HEIGHT * textScaleY)));
     }
 
     private static DisplayEntity display(Gloss plugin, String hologramId, HologramLine line, Location anchor,

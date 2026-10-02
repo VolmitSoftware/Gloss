@@ -86,7 +86,7 @@ class LegacyGlossDataImporterTest {
         assertEquals(LegacyGlossDataImporter.Status.MIGRATED, status(result, "holograms/spawn.json"));
         HologramDoc expected = new HologramDoc(HologramDoc.CURRENT_SCHEMA_VERSION, DocumentEnvelope.INITIAL_REVISION,
             new HologramDoc.Anchor("world", new Vector(10.5D, 70.0D, -4.25D)),
-            List.of("&aWelcome", "&7Second line"), null, null, 0.0D, 0.0D, List.of(), ShowCondition.ALWAYS);
+            List.of("&aWelcome", "&7Second line"), null, null, 0.0D, 0.0D, List.of(), ShowCondition.ALWAYS, null, null);
         assertEquals(document(expected), read("holograms/spawn.json"));
         assertFalse(read("holograms/spawn.json").contains("\"id\""));
         assertEquals(LEGACY_HOLOGRAM, backedUp(result, "holograms/spawn.json"));
@@ -196,15 +196,12 @@ class LegacyGlossDataImporterTest {
         assertFalse(config.features.chatBubbles);
         assertTrue(config.features.motd);
         assertEquals(20, config.hotload.watchIntervalTicks);
-        assertEquals(0.5D, config.holograms.stackDistance);
         assertEquals(80, config.tablist.updateIntervalTicks);
-        assertEquals(List.of("spawnhub"), config.chatBubbles.blacklistWorlds);
         RealDropSettingsDoc realDrops = RealDropSettingsDoc.parse("default.json", read("real-drops/default.json"));
         assertEquals("&e{count}x {type}", realDrops.toConfig(true).labels().format());
         assertEquals(2L, realDrops.revision());
 
         String toml = read(GlossConfigLoader.FILE_NAME);
-        assertTrue(toml.contains("stackDistance = 0.5"), "overlay must re-serialize gloss.toml");
 
         BubbleStyleDoc bubbles = BubbleStyleDoc.parse("default.json", read("bubbles/default.json"));
         assertEquals("&b", bubbles.prefix());
@@ -230,7 +227,7 @@ class LegacyGlossDataImporterTest {
     void customizedBubbleStyleBlocksConfigYmlBubbleContent() throws IOException {
         write("bubbles/default.json", document(new BubbleStyleDoc(BubbleStyleDoc.CURRENT_SCHEMA_VERSION, 5L,
             "&d", new Vector(0.0D, 2.0D, 0.0D), 48, 9000L, true, false,
-            BubbleStyleDoc.DEFAULTS.motion(), BubbleStyleDoc.DEFAULTS.shimmer(), null, List.of(), ShowCondition.ALWAYS, null, null)));
+            BubbleStyleDoc.DEFAULTS.motion(), BubbleStyleDoc.DEFAULTS.shimmer(), null, List.of(), ShowCondition.ALWAYS, null, null, null, null, null, null)));
         write("config.yml", """
             chat-bubbles:
               message:

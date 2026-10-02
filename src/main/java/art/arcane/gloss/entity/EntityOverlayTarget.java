@@ -18,6 +18,7 @@ final class EntityOverlayTarget {
     }
 
     static final class Render {
+        EntityOverlayDoc presentation;
         final Set<UUID> whitelist = ConcurrentHashMap.newKeySet();
         TemporaryHologram display;
         ParticleText.Rendered frame;

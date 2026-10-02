@@ -85,7 +85,8 @@ public final class ProxyDocuments {
                 throw new IllegalArgumentException("MOTD sample supports at most twelve lines");
             }
             entries.add(new MotdEntry(lines, string(entry, "favicon", null), sample,
-                count(entry, "online"), count(entry, "max"), string(entry, "version", null)));
+                count(entry, "online"), count(entry, "max"), string(entry, "version", null),
+                expression(entry, "show", "true"), integer(entry, "weight", 1)));
         }
         if (!motd.isEmpty() && entries.isEmpty()) {
             throw new IllegalArgumentException("MOTD requires at least one entry");
@@ -295,7 +296,14 @@ public final class ProxyDocuments {
             return normalized;
         }
     }
-    public record MotdEntry(List<String> lines, String favicon, List<String> sample, String online, String max, String version) {}
+    public record MotdEntry(List<String> lines, String favicon, List<String> sample, String online, String max,
+                            String version, Expr show, int weight) {
+        public MotdEntry {
+            if (weight < 1 || weight > 1_000_000) {
+                throw new IllegalArgumentException("MOTD entry weight must be within 1..1000000");
+            }
+        }
+    }
     public record Tablist(Expr show, Surface<HeaderFooter> headerFooter, Surface<ListName> listNames, Expr sortWeight) {}
     public record Surface<T>(boolean enabled, Expr show, T presentation, List<Variant<T>> variants) {}
     public record Variant<T>(int priority, Expr when, T presentation) {}

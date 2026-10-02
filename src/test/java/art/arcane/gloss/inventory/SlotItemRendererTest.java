@@ -50,7 +50,7 @@ class SlotItemRendererTest {
     @Test
     void anItemIconDrawsItsMaterialNameAndLore() {
         SlotItemRenderer.SlotItem slot = SlotItemRenderer.resolve(null,
-            new ItemIconData(Material.DIAMOND_SWORD, 3, 0, null, "&bSword", List.of("&7100 coins")), null);
+            new ItemIconData(Material.DIAMOND_SWORD, 3, 0, null, "&bSword", List.of("&7100 coins"), null), null);
         assertEquals(Material.DIAMOND_SWORD, slot.material());
         assertEquals(3, slot.amount());
         assertEquals("&bSword", slot.name());
@@ -61,15 +61,17 @@ class SlotItemRendererTest {
     @Test
     void anItemIconWithoutACountDrawsOne() {
         SlotItemRenderer.SlotItem slot = SlotItemRenderer.resolve(null,
-            new ItemIconData(Material.STONE, 0, 0, null, null, null), null);
+            new ItemIconData(Material.STONE, 0, 0, null, null, null, null), null);
         assertEquals(1, slot.amount());
     }
 
     @Test
     void aBlockIconDrawsItsBlockAsAnItem() {
         SlotItemRenderer.SlotItem slot = SlotItemRenderer.resolve(null,
-            new BlockIconData(Material.OAK_LOG, null), null);
+            new BlockIconData(Material.OAK_LOG, null, "&6Timber", List.of("&7Building")), null);
         assertEquals(Material.OAK_LOG, slot.material());
+        assertEquals("&6Timber", slot.name());
+        assertEquals(List.of("&7Building"), slot.lore());
         assertFalse(slot.unsupported());
     }
 
@@ -85,15 +87,17 @@ class SlotItemRendererTest {
     @Test
     void aPlayerHeadIconDrawsAHead() {
         SlotItemRenderer.SlotItem slot = SlotItemRenderer.resolve(null,
-            new PlayerHeadIconData("Notch", null, null), null);
+            new PlayerHeadIconData("Notch", null, null, "&bProfile", List.of("&7Inspect")), null);
         assertEquals(SlotItemRenderer.UNRESOLVED_HEAD, slot.material());
+        assertEquals("&bProfile", slot.name());
+        assertEquals(List.of("&7Inspect"), slot.lore());
         assertFalse(slot.unsupported());
     }
 
     @Test
     void anUnresolvableCustomItemDegradesWithANote() {
         SlotItemRenderer.SlotItem slot = SlotItemRenderer.resolve(null,
-            new CustomItemIconData("nexo", "ruby", 1, null), null);
+            new CustomItemIconData("nexo", "ruby", 1, null, null), null);
         assertTrue(slot.unsupported());
         assertEquals(SlotItemRenderer.defaultUnsupportedMaterial(), slot.material());
     }

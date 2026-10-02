@@ -1,5 +1,7 @@
 package art.arcane.gloss.config.components;
 
+import art.arcane.gloss.api.HologramBox;
+import art.arcane.gloss.api.IconDisplayStyle;
 import art.arcane.gloss.config.MenuComponentData;
 import art.arcane.gloss.config.action.MenuActionData;
 import art.arcane.gloss.config.icon.MenuIconData;
@@ -52,7 +54,7 @@ public record ButtonComponentData(
   }
 
   /** A secondary pane shown after the viewer has hovered this button for {@code delayTicks}. */
-  public record TooltipData(Integer delayTicks, java.util.List<String> lines) {
+  public record TooltipData(Integer delayTicks, List<String> lines, IconDisplayStyle style, HologramBox box) {
     public static final int DEFAULT_DELAY_TICKS = 10;
     public static final int MAX_DELAY_TICKS = 200;
 

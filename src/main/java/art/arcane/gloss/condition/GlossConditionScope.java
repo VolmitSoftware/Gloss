@@ -1,6 +1,8 @@
 package art.arcane.gloss.condition;
 
 import art.arcane.gloss.Gloss;
+import art.arcane.gloss.names.NameCategory;
+import art.arcane.gloss.names.NamesService;
 import art.arcane.gloss.bedrock.BedrockService;
 import art.arcane.gloss.expr.ExprFunctionRegistry;
 import art.arcane.gloss.expr.ExprFunctions;
@@ -105,6 +107,9 @@ public final class GlossConditionScope implements ExprScope {
             case "name" -> entity.getName();
             case "uuid" -> entity.getUniqueId().toString();
             case "type" -> entity.getType().getKey().getKey();
+            case "typeName" -> NamesService.name(NameCategory.ENTITIES, entity.getType().getKey().toString());
+            case "worldName" -> NamesService.name(NameCategory.WORLDS, entity.getWorld().getName());
+            case "dimensionName" -> NamesService.name(NameCategory.DIMENSIONS, entity.getWorld().getEnvironment().name());
             case "world" -> entity.getWorld().getName();
             case "dead" -> entity.isDead();
             case "onGround" -> entity.isOnGround();
@@ -189,6 +194,8 @@ public final class GlossConditionScope implements ExprScope {
             case "ping" -> (double) player.getPing();
             case "clientViewDistance" -> (double) player.getClientViewDistance();
             case "gameMode" -> player.getGameMode().name().toLowerCase(Locale.ROOT);
+            case "gameModeName" -> NamesService.name(NameCategory.GAME_MODES, player.getGameMode().name());
+            case "groupName" -> NamesService.name(NameCategory.GROUPS, plugin.groups().primaryGroupFor(player).orElse(""));
             case "locale" -> player.getLocale();
             case "bedrock" -> isBedrock(player);
             case "sneaking" -> player.isSneaking();
@@ -206,6 +213,8 @@ public final class GlossConditionScope implements ExprScope {
         }
         return switch (property) {
             case "name" -> world.getName();
+            case "displayName" -> NamesService.name(NameCategory.WORLDS, world.getName());
+            case "environmentName", "dimensionName" -> NamesService.name(NameCategory.DIMENSIONS, world.getEnvironment().name());
             case "uuid" -> world.getUID().toString();
             case "environment" -> world.getEnvironment().name().toLowerCase(Locale.ROOT);
             case "difficulty" -> world.getDifficulty().name().toLowerCase(Locale.ROOT);

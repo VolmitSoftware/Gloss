@@ -19,6 +19,8 @@ import java.util.Map;
  * the exact per-field rules.
  */
 final class PreviewDocument {
+  Double scale;
+  Double viewDistance;
   ShowCondition show = ShowCondition.ALWAYS;
   MatchDef match;
   List<VariantDef> variants;

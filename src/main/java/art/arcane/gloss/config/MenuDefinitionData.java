@@ -5,6 +5,11 @@ import art.arcane.gloss.condition.ShowCondition;
 import org.bukkit.util.Vector;
 
 import java.util.List;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.Objects;
+import java.util.Set;
 import java.util.Map;
 
 public class MenuDefinitionData {
@@ -18,11 +23,13 @@ public class MenuDefinitionData {
   private final List<ParticleLayer> particleLayers;
   private final ShowCondition show;
   private final Map<String, String> vars;
+  private final List<Variant> variants;
   private volatile String id;
 
   public MenuDefinitionData(Vector offset, boolean lockPosition, boolean followPlayer, Double maxDistance,
                             boolean closeOnDeath, boolean closeOnTeleport, List<MenuComponentData> components,
-                            List<ParticleLayer> particleLayers, ShowCondition show, Map<String, String> vars) {
+                            List<ParticleLayer> particleLayers, ShowCondition show, Map<String, String> vars,
+                            List<Variant> variants) {
     this.offset = offset;
     this.lockPosition = lockPosition;
     this.followPlayer = followPlayer;
@@ -33,6 +40,8 @@ public class MenuDefinitionData {
     this.particleLayers = ParticleLayer.copyLayers(particleLayers, "menu");
     this.show = show == null ? ShowCondition.ALWAYS : show;
     this.vars = vars == null ? Map.of() : Map.copyOf(vars);
+    this.variants = variants;
+    getVariants();
   }
 
   /** Declared session-variable defaults; each value is a constant expression. */
@@ -70,6 +79,39 @@ public class MenuDefinitionData {
 
   public List<ParticleLayer> getParticleLayers() {
     return ParticleLayer.copyLayers(particleLayers, "menu");
+  }
+
+  public List<Variant> getVariants() {
+    if (variants == null || variants.isEmpty()) {
+      return List.of();
+    }
+    if (variants.size() > 32) {
+      throw new IllegalArgumentException("a menu may declare at most 32 variants");
+    }
+    Set<String> ids = new HashSet<>();
+    List<Variant> ordered = new ArrayList<>(variants.size());
+    for (Variant variant : variants) {
+      Objects.requireNonNull(variant, "menu variants must not contain null entries");
+      if (!ids.add(variant.id())) {
+        throw new IllegalArgumentException("duplicate menu variant id: " + variant.id());
+      }
+      ordered.add(variant);
+    }
+    ordered.sort(Comparator.comparingInt(Variant::priority).reversed().thenComparing(Variant::id));
+    return List.copyOf(ordered);
+  }
+
+  public record Variant(String id, int priority, ShowCondition when, List<MenuComponentData> components,
+                        List<ParticleLayer> particleLayers) {
+    public Variant {
+      id = Objects.requireNonNull(id, "menu variant requires id").trim();
+      if (id.isEmpty()) {
+        throw new IllegalArgumentException("menu variant id must not be blank");
+      }
+      when = Objects.requireNonNull(when, "menu variant requires when");
+      components = List.copyOf(Objects.requireNonNull(components, "menu variant requires components"));
+      particleLayers = particleLayers == null ? null : ParticleLayer.copyLayers(particleLayers, "menu variant");
+    }
   }
 
   public String getId() {

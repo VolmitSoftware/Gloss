@@ -72,6 +72,37 @@ class ChannelSelectionTest {
         assertEquals("[item]", matcher.group(ChannelRuntime.ITEM_GROUP));
     }
 
+    @Test
+    void selectedVariantOverridesWholeBlocksAndKeepsUnspecifiedBaseValues() {
+        ChannelDoc document = ChannelDoc.parse("global.json", """
+            {"schemaVersion":1,"revision":1,"channel":{"name":"global"},
+             "format":"base-format","card":["base-card"],
+             "filters":[{"match":"bad","replace":"base"}],
+             "variants":[{"id":"special","priority":1,"when":"viewer.name == 'Alex'",
+               "card":[],"mentions":{"pattern":"!{name}","sound":"custom.cue"},
+               "items":{"token":"[hand]"},"links":{"enabled":false},
+               "filters":[{"match":"bad","replace":"variant"}],"throttle":{"minIntervalTicks":42}}]}
+            """);
+        ChannelRuntime runtime = ChannelRuntime.of("global", document);
+        ChannelRuntime selected = runtime.selected(new TestScope(Map.of("viewer.name", "Alex"), Set.of()),
+            BoundedConditionErrorCallback.silent());
+        assertEquals("base-format", selected.doc().format());
+        assertEquals(List.of(), selected.doc().card());
+        assertEquals("custom.cue", selected.doc().mentions().sound());
+        assertEquals(false, selected.doc().links().enabled());
+        assertEquals(42, selected.doc().throttle().minIntervalTicks());
+        assertEquals("variant", ChatFilters.apply(selected, "bad"));
+        Matcher scanner = selected.bodyScanner().matcher("!Alex [hand]");
+        assertTrue(scanner.find());
+        assertEquals("Alex", scanner.group(ChannelRuntime.MENTION_NAME_GROUP));
+        assertTrue(scanner.find());
+        assertEquals("[hand]", scanner.group(ChannelRuntime.ITEM_GROUP));
+        ChannelRuntime other = runtime.selected(new TestScope(Map.of("viewer.name", "Robin"), Set.of()),
+            BoundedConditionErrorCallback.silent());
+        assertEquals(List.of("base-card"), other.doc().card());
+        assertEquals("base", ChatFilters.apply(other, "bad"));
+    }
+
     private static ChannelRuntime runtime(ChannelDoc.Variant... variants) {
         ChannelDoc doc = new ChannelDoc(ChannelDoc.CURRENT_SCHEMA_VERSION, 1L, null,
             new ChannelDoc.Channel("global", List.of("g"), null, null, null, null, null, null),
@@ -81,7 +112,7 @@ class ChannelSelectionTest {
     }
 
     private static ChannelDoc.Variant variant(String id, int priority, String when, String format) {
-        return new ChannelDoc.Variant(id, priority, when, format);
+        return new ChannelDoc.Variant(id, priority, when, format, null, null, null, null, null, null);
     }
 
     private record TestScope(Map<String, Object> variables, Set<String> permissions) implements ExprScope {

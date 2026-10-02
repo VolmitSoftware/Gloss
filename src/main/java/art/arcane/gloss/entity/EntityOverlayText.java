@@ -1,6 +1,9 @@
 package art.arcane.gloss.entity;
 
 import art.arcane.gloss.Gloss;
+import art.arcane.gloss.names.NameCategory;
+import art.arcane.gloss.names.NamesService;
+import art.arcane.gloss.api.HealthBarStyle;
 import art.arcane.gloss.condition.GlossConditionScope;
 import art.arcane.gloss.expr.Expr;
 import art.arcane.gloss.expr.ExprParser;
@@ -17,8 +20,6 @@ import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver;
 import org.bukkit.entity.Player;
 
-import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -40,6 +41,10 @@ public final class EntityOverlayText {
         ExprScope conditions = GlossConditionScope.viewer(plugin, viewer);
         return prepare(plugin.text(), plugin.animator(), viewer, new ViewerScope(standard, conditions),
             settings, entity, insight);
+    }
+
+    static ExprScope variantScope(Gloss plugin, Player viewer, Snapshot entity, boolean insight) {
+        return new EntityScope(GlossConditionScope.viewer(plugin, viewer), entity, insight);
     }
 
     static Prepared prepare(TextPipeline pipeline, HologramAnimator animator, Player viewer, ExprScope parent,
@@ -83,12 +88,12 @@ public final class EntityOverlayText {
      * resolve, so a nameplate writes the same line text an overlay would.
      */
     public static Prepared prepareLines(Gloss plugin, Player viewer, List<String> texts,
-                                        int healthSegments, Snapshot entity, ExprScope scope) {
+                                        int healthSegments, HealthBarStyle healthBar, Snapshot entity, ExprScope scope) {
         if (texts.isEmpty()) {
             return Prepared.hidden();
         }
         LiteralValues literals = new LiteralValues();
-        Map<String, String> tokens = tokens(healthSegments, entity);
+        Map<String, String> tokens = tokens(healthSegments, healthBar, entity);
         List<String> lines = new ArrayList<>(texts.size());
         for (String text : texts) {
             lines.add(authored(text, tokens, "", literals));
@@ -103,6 +108,9 @@ public final class EntityOverlayText {
     }
 
     public static boolean refreshRequired(EntityOverlayDoc settings) {
+        if (!settings.variants().isEmpty()) {
+            return true;
+        }
         if (settings.show().isDynamic() && external(ExprParser.parse(settings.show().expression()))) {
             return true;
         }
@@ -122,6 +130,9 @@ public final class EntityOverlayText {
         if (usesDistance(settings)) {
             return true;
         }
+        if (!settings.variants().isEmpty()) {
+            return true;
+        }
         if (settings.show().isDynamic() && external(ExprParser.parse(settings.show().expression()))) {
             return true;
         }
@@ -138,6 +149,11 @@ public final class EntityOverlayText {
     }
 
     public static boolean usesDistance(EntityOverlayDoc settings) {
+        for (EntityOverlayDoc.Variant variant : settings.variants()) {
+            if (variant.when().contains("entity.distance") || usesDistance(variant.presentation().apply(settings))) {
+                return true;
+            }
+        }
         if (settings.show().expression().contains("entity.distance")) {
             return true;
         }
@@ -165,36 +181,27 @@ public final class EntityOverlayText {
     }
 
     static String bar(EntityOverlayDoc settings, Snapshot entity) {
-        return bar(settings.healthSegments(), entity);
-    }
-
-    private static String bar(int healthSegments, Snapshot entity) {
-        double fraction = entity.maxHealth() > 0 ? Math.clamp(entity.health() / entity.maxHealth(), 0, 1) : 0;
-        int filled = (int) Math.ceil(fraction * healthSegments);
-        double priorFraction = entity.maxHealth() > 0
-            ? Math.clamp(entity.previousHealth() / entity.maxHealth(), 0, 1) : fraction;
-        int prior = Math.max(filled, (int) Math.ceil(priorFraction * healthSegments));
-        String color = fraction >= 0.5 ? "&a" : fraction >= 0.25 ? "&e" : "&c";
-        return color + "|".repeat(filled) + "&c" + "|".repeat(prior - filled)
-            + "&8" + "|".repeat(healthSegments - prior);
+        return settings.healthBar().render(settings.healthSegments(), entity.health(), entity.maxHealth(),
+            entity.previousHealth());
     }
 
     private static Map<String, String> tokens(EntityOverlayDoc settings, Snapshot entity) {
-        return tokens(settings.healthSegments(), entity);
+        return tokens(settings.healthSegments(), settings.healthBar(), entity);
     }
 
-    private static Map<String, String> tokens(int healthSegments, Snapshot entity) {
+    private static Map<String, String> tokens(int healthSegments, HealthBarStyle healthBar, Snapshot entity) {
         return Map.ofEntries(
-            Map.entry("bar", bar(healthSegments, entity)),
-            Map.entry("health", number(entity.health())),
-            Map.entry("max_health", number(entity.maxHealth())),
+            Map.entry("bar", healthBar.render(healthSegments, entity.health(), entity.maxHealth(), entity.previousHealth())),
+            Map.entry("health", healthBar.number(entity.health())),
+            Map.entry("max_health", healthBar.number(entity.maxHealth())),
             Map.entry("count", Integer.toString(entity.stackCount())),
-            Map.entry("attack", number(entity.attack())),
-            Map.entry("armor", number(entity.armor())),
-            Map.entry("damage", number(entity.damage())),
+            Map.entry("attack", healthBar.number(entity.attack())),
+            Map.entry("armor", healthBar.number(entity.armor())),
+            Map.entry("damage", healthBar.number(entity.damage())),
             Map.entry("name", entity.name()),
             Map.entry("type", entity.type()),
-            Map.entry("distance", number(entity.distance())));
+            Map.entry("typeName", NamesService.name(NameCategory.ENTITIES, entity.type())),
+            Map.entry("distance", healthBar.number(entity.distance())));
     }
 
     private static String authored(String source, Map<String, String> tokens, String insight, LiteralValues literals) {
@@ -229,11 +236,6 @@ public final class EntityOverlayText {
             cursor = close + 1;
         }
         return output.toString();
-    }
-
-    private static String number(double value) {
-        return BigDecimal.valueOf(Double.isFinite(value) ? value : 0)
-            .setScale(1, RoundingMode.HALF_UP).stripTrailingZeros().toPlainString();
     }
 
     public record Snapshot(String name, double health, double maxHealth, double previousHealth,
@@ -327,6 +329,7 @@ public final class EntityOverlayText {
                 case "entity.name" -> entity.name();
                 case "entity.named" -> !entity.name().isBlank();
                 case "entity.type" -> entity.type();
+                case "entity.typeName" -> NamesService.name(NameCategory.ENTITIES, entity.type());
                 case "entity.health" -> entity.health();
                 case "entity.maxHealth" -> entity.maxHealth();
                 case "entity.healthPercent" -> entity.maxHealth() > 0

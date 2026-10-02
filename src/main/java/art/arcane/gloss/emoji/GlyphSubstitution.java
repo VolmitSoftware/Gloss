@@ -41,7 +41,7 @@ public interface GlyphSubstitution {
                 continue;
             }
             if (entry.hasTrigger()) {
-                out = out.replace(entry.trigger(), glyph.get());
+                out = EmojiTriggers.replace(out, entry.trigger(), glyph.get());
             }
             out = out.replace(entry.token(), glyph.get());
         }

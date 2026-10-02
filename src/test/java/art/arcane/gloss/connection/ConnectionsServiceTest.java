@@ -35,6 +35,7 @@ import java.lang.reflect.Proxy;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -62,6 +63,7 @@ class ConnectionsServiceTest {
     private Gloss plugin;
     private BackendProxyOwnership ownership;
     private ConnectionsService service;
+    private final Set<String> returning = new HashSet<>();
     private Player alex;
     private Player robin;
     private Object previousServer;
@@ -140,6 +142,22 @@ class ConnectionsServiceTest {
         assertNull(quit.getQuitMessage());
         assertEquals(List.of("§c- §fAlex §7left"), messages("Alex"));
         assertEquals(List.of("§c- §fAlex §7left"), messages("Robin"));
+    }
+
+    @Test
+    void firstJoinUsesItsOwnSectionAndReturningPlayersUseJoin() throws Exception {
+        document("""
+            {"schemaVersion":1,"revision":1,
+             "join":{"presentation":{"text":"Returning {{ subject.name }}"}},
+             "firstJoin":{"presentation":{"text":"Welcome {{ subject.name }}"}}}
+            """);
+        start();
+        service.onJoin(new PlayerJoinEvent(alex, VANILLA_JOIN));
+        assertEquals(List.of("Welcome Alex"), messages("Robin"));
+        received.clear();
+        returning.add("Alex");
+        service.onJoin(new PlayerJoinEvent(alex, VANILLA_JOIN));
+        assertEquals(List.of("Returning Alex"), messages("Robin"));
     }
 
     @Test
@@ -430,6 +448,7 @@ class ConnectionsServiceTest {
                 case "getName", "getDisplayName" -> name;
                 case "getLocation" -> new Location(null, 0, 64, 0);
                 case "isOnline" -> true;
+                case "hasPlayedBefore" -> returning.contains(name);
                 case "isOp" -> false;
                 case "hasPermission" -> false;
                 case "sendRichMessage" -> {

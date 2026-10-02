@@ -48,10 +48,9 @@ final class RealDropConditionPlan {
     }
 
     static RealDropConditionPlan compile(RealDropSettingsDoc document, boolean enabled,
-                                         BoundedConditionErrorCallback errors, ShowCondition viewerShow) {
+                                         BoundedConditionErrorCallback errors) {
         Objects.requireNonNull(document);
         Objects.requireNonNull(errors);
-        Objects.requireNonNull(viewerShow);
         ResolvedStyle base = resolve(BASE_ID, document.presentation(), enabled);
         List<ConditionalStyle> variants = new ArrayList<>(document.variants().size());
         Set<String> referenced = new HashSet<>();
@@ -59,6 +58,7 @@ final class RealDropConditionPlan {
             CompiledCondition condition = ConditionCompiler.compile(new ConditionSource(
                 "real-drops/default.json $.variants[" + variant.id() + "].when", variant.when()));
             referenced.addAll(condition.references().variables());
+            referenced.addAll(showReferences(variant.presentation().labels().show()));
             variants.add(new ConditionalStyle(
                 variant.id(), variant.priority(), condition,
                 resolve(variant.id(), variant.presentation(), enabled)));
@@ -69,7 +69,7 @@ final class RealDropConditionPlan {
             "real-drops/default.json $.audience.when", document.audience().when()));
         referenced.addAll(audience.references().variables());
         referenced.addAll(showReferences(document.show()));
-        referenced.addAll(showReferences(viewerShow));
+        referenced.addAll(showReferences(document.presentation().labels().show()));
         return new RealDropConditionPlan(base, List.copyOf(variants), audience, document.show(),
             RealDropConditionSnapshot.Fields.of(referenced), errors);
     }

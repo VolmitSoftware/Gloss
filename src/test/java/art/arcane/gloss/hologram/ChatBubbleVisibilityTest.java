@@ -126,7 +126,7 @@ class ChatBubbleVisibilityTest {
         BubbleStyleDoc style = new BubbleStyleDoc(defaults.schemaVersion(), defaults.revision(), defaults.prefix(),
             defaults.offset(), defaults.wordWrapChars(), 60000L, defaults.followPlayer(), hideOwn,
             defaults.motion(), defaults.shimmer(), defaults.select(), defaults.particleLayers(), show,
-            defaults.style(), defaults.box());
+            defaults.style(), defaults.box(), null, null, null, null);
         Path folder = directory.toPath().resolve(BubbleStyleDoc.KIND);
         Files.createDirectories(folder);
         Files.writeString(folder.resolve("default.json"), DocumentParsers.GSON.toJson(style));

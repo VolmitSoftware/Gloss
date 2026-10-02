@@ -47,18 +47,12 @@ public final class GlossConfigFile {
     public Text text = new Text();
     @ConfigDoc("Player chat formatting settings.")
     public Chat chat = new Chat();
-    @ConfigDoc("Global chat-bubble admission settings; authored styles live under bubbles/.")
-    public ChatBubbles chatBubbles = new ChatBubbles();
-    @ConfigDoc("Dropped-item label formatting and custom-name preservation.")
-    public Drops drops = new Drops();
     @ConfigDoc("Command feedback behavior.")
     public Commands commands = new Commands();
     @ConfigDoc("Operator diagnostics and visual debug overlays.")
     public Debug debug = new Debug();
     @ConfigDoc("Hosted editor and live relay connection settings.")
     public Editor editor = new Editor();
-    @ConfigDoc("Container-preview reach and base scale.")
-    public Preview preview = new Preview();
     @ConfigDoc("Shared holographic menu and panel rendering scale.")
     public Menus menus = new Menus();
     @ConfigDoc("Custom item-provider discovery and allowlisting.")
@@ -194,15 +188,6 @@ public final class GlossConfigFile {
     }
 
     public static final class Holograms {
-        @ConfigDoc("Vertical distance in blocks between stacked hologram lines. Clamped to 0.05..2.0.")
-        public double stackDistance = 0.26D;
-
-        @ConfigDoc(
-            "Ticks between ordinary hologram text refreshes. Clock-driven expressions and named animations "
-                + "automatically sample every tick. Clamped to 1..200."
-        )
-        public int updateIntervalTicks = 10;
-
         @ConfigDoc("Distance in blocks at which holograms become visible. Clamped to 4..128.")
         public double viewRange = 48.0D;
 
@@ -227,9 +212,6 @@ public final class GlossConfigFile {
     }
 
     public static final class Particles {
-        @ConfigDoc("Maximum distance in blocks at which particle layers emit. Clamped to 4..128.")
-        public double viewRange = 48.0D;
-
         @ConfigDoc("Particle samples admitted for one viewer in one tick. Clamped to 1..4096.")
         public int samplesPerViewerPerTick = 128;
 
@@ -282,19 +264,6 @@ public final class GlossConfigFile {
         public boolean color = true;
     }
 
-    public static final class ChatBubbles {
-        @ConfigDoc("World folder names where chat bubbles never appear.")
-        public List<String> blacklistWorlds = new ArrayList<>();
-    }
-
-    public static final class Drops {
-        @ConfigDoc("Boolean or boolean expression controlling drop-label visibility for each viewer.")
-        public String show = "true";
-
-        @ConfigDoc("Leaves custom names other plugins already set on dropped items untouched.")
-        public boolean preserveCustomNames = true;
-    }
-
     public static final class Commands {
         @ConfigDoc("Plays feedback sounds when command output is delivered.")
         public boolean sounds = true;
@@ -337,14 +306,6 @@ public final class GlossConfigFile {
             @ConfigDoc("Maximum editor sync project size in mebibytes. Clamped to 1..32.")
             public int maxProjectMiB = 8;
         }
-    }
-
-    public static final class Preview {
-        @ConfigDoc("Distance in blocks the look-at raycast reaches for container previews. Clamped to 1.0..24.0.")
-        public double lookDistance = 10.0D;
-
-        @ConfigDoc("Base render scale of container previews. Clamped to 0.25..4.0.")
-        public double scale = 0.65D;
     }
 
     public static final class Menus {
@@ -552,13 +513,6 @@ public final class GlossConfigFile {
         if (chat == null) {
             chat = new Chat();
         }
-        if (chatBubbles == null) {
-            chatBubbles = new ChatBubbles();
-        }
-        if (drops == null) {
-            drops = new Drops();
-        }
-        drops.show = ShowCondition.of(drops.show == null ? "true" : drops.show).expression();
         if (commands == null) {
             commands = new Commands();
         }
@@ -570,9 +524,6 @@ public final class GlossConfigFile {
         }
         if (editor.sync == null) {
             editor.sync = new Editor.Sync();
-        }
-        if (preview == null) {
-            preview = new Preview();
         }
         if (menus == null) {
             menus = new Menus();
@@ -624,14 +575,11 @@ public final class GlossConfigFile {
 
         integration.sampleIntervalTicks = clampInt(integration.sampleIntervalTicks, 1, 200);
 
-        holograms.stackDistance = clampDouble(holograms.stackDistance, 0.05D, 2.0D, 0.26D);
-        holograms.updateIntervalTicks = clampInt(holograms.updateIntervalTicks, 1, 200);
         holograms.viewRange = clampDouble(holograms.viewRange, 4.0D, 128.0D, 48.0D);
         holograms.temporaryUpdateIntervalTicks = clampInt(holograms.temporaryUpdateIntervalTicks, 1, 20);
         holograms.maxAnimationFps = clampInt(holograms.maxAnimationFps, 1, 240);
         holograms.animationPacketBudget = clampInt(holograms.animationPacketBudget, 100, 1_000_000);
 
-        particles.viewRange = clampDouble(particles.viewRange, 4.0D, 128.0D, 48.0D);
         particles.samplesPerViewerPerTick = clampInt(particles.samplesPerViewerPerTick, 1, 4096);
         particles.samplesPerTick = clampInt(particles.samplesPerTick, 16, 65536);
         particles.maxCachedSamplesPerLayer = clampInt(particles.maxCachedSamplesPerLayer, 4, 4096);
@@ -640,7 +588,6 @@ public final class GlossConfigFile {
 
         tablist.updateIntervalTicks = clampInt(tablist.updateIntervalTicks, 1, 400);
 
-        chatBubbles.blacklistWorlds = cleanStrings(chatBubbles.blacklistWorlds);
 
         editor.builderUrl = sanitizeBuilderUrl(editor.builderUrl);
         editor.sync.endpoint = sanitizeSyncEndpoint(editor.sync.endpoint);
@@ -649,8 +596,6 @@ public final class GlossConfigFile {
         editor.sync.pollSeconds = clampInt(editor.sync.pollSeconds, 1, 60);
         editor.sync.maxProjectMiB = clampInt(editor.sync.maxProjectMiB, 1, 32);
 
-        preview.lookDistance = clampDouble(preview.lookDistance, 1.0D, 24.0D, 10.0D);
-        preview.scale = clampDouble(preview.scale, 0.25D, 4.0D, 0.65D);
 
         menus.uiScale = clampDouble(menus.uiScale, 0.25D, 4.0D, 1.0D);
 

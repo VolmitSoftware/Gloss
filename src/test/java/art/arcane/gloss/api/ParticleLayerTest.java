@@ -16,9 +16,9 @@ class ParticleLayerTest {
             new ParticleLayer.Geometry("glyphFill", null, null, null,
                 null, null, null, 0.1D, 0.2D),
             null,
-            new ParticleLayer.ParticleSpec("minecraft:dust", "#00FF00", 1.25D),
+            new ParticleLayer.ParticleSpec("minecraft:dust", "#00FF00", 1.25D, null, null, null),
             null,
-            5000);
+            5000, null, null);
 
         assertEquals("green-word", layer.id());
         assertEquals("span", layer.target().scope());
@@ -35,7 +35,7 @@ class ParticleLayerTest {
         assertThrows(IllegalArgumentException.class,
             () -> new ParticleLayer.Target("line", null, null, null));
         assertThrows(IllegalArgumentException.class,
-            () -> new ParticleLayer.ParticleSpec("minecraft:soul", "#ffffff", null));
+            () -> new ParticleLayer.ParticleSpec("minecraft:soul", "#ffffff", null, null, null, null));
     }
 
     @Test
@@ -49,7 +49,7 @@ class ParticleLayerTest {
 
         ParticleLayer layer = new ParticleLayer("same",
             new ParticleLayer.Target("local", null, null, null), geometry, null,
-            new ParticleLayer.ParticleSpec("minecraft:soul", null, null), null, 0);
+            new ParticleLayer.ParticleSpec("minecraft:soul", null, null, null, null, null), null, 0, null, null);
         assertThrows(IllegalArgumentException.class,
             () -> ParticleLayer.copyLayers(List.of(layer, layer), "test"));
     }

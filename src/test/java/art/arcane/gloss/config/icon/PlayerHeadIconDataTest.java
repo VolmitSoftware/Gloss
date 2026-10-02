@@ -55,23 +55,23 @@ public class PlayerHeadIconDataTest {
 
   @Test
   public void aBlankNameIsABrokenIconRatherThanAFallbackHead() {
-    assertThrows(MenuIconException.class, () -> new PlayerHeadIconData(null, null, null).requirePlayer());
-    assertThrows(MenuIconException.class, () -> new PlayerHeadIconData("   ", null, null).requirePlayer());
+    assertThrows(MenuIconException.class, () -> new PlayerHeadIconData(null, null, null, null, null).requirePlayer());
+    assertThrows(MenuIconException.class, () -> new PlayerHeadIconData("   ", null, null, null, null).requirePlayer());
   }
 
   @Test
   public void authoredPaddingIsTrimmedOffTheName() throws MenuIconException {
-    assertEquals("Notch", new PlayerHeadIconData("  Notch  ", null, null).requirePlayer());
+    assertEquals("Notch", new PlayerHeadIconData("  Notch  ", null, null, null, null).requirePlayer());
   }
 
   @Test
   public void refreshTicksOutsideTheAcceptedRangeIsRejectedOnConstruction() {
-    assertThrows(IllegalArgumentException.class, () -> new PlayerHeadIconData("Notch", null, -1));
+    assertThrows(IllegalArgumentException.class, () -> new PlayerHeadIconData("Notch", null, -1, null, null));
     assertThrows(IllegalArgumentException.class,
-        () -> new PlayerHeadIconData("Notch", null, PlayerHeadIconData.MAX_REFRESH_TICKS + 1));
-    assertEquals(0, new PlayerHeadIconData("Notch", null, 0).resolvedRefreshTicks());
+        () -> new PlayerHeadIconData("Notch", null, PlayerHeadIconData.MAX_REFRESH_TICKS + 1, null, null));
+    assertEquals(0, new PlayerHeadIconData("Notch", null, 0, null, null).resolvedRefreshTicks());
     assertEquals(PlayerHeadIconData.MAX_REFRESH_TICKS,
-        new PlayerHeadIconData("Notch", null, PlayerHeadIconData.MAX_REFRESH_TICKS).resolvedRefreshTicks());
+        new PlayerHeadIconData("Notch", null, PlayerHeadIconData.MAX_REFRESH_TICKS, null, null).resolvedRefreshTicks());
   }
 
   @Test

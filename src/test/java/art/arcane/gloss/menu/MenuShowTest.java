@@ -216,7 +216,7 @@ public class MenuShowTest {
         });
     MenuDefinitionData definition = new MenuDefinitionData(new Vector(), true, false, 8D,
         false, false, List.of(new MenuComponentData("probe", new Vector(), new ProbeData(), componentShow)),
-        List.of(), show, Map.of());
+        List.of(), show, Map.of(), List.of());
     definition.setId("show-test");
     MenuTransform transform = new MenuTransform(player.getLocation(), new Vector(), 0F, 0F, 0F, 1F);
     return new MenuSession(definition, player,

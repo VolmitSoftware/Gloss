@@ -85,9 +85,9 @@ public final class SlotItemRenderer {
                 ? unsupported(viewer, "itemStack")
                 : new SlotItem(data.stack().getType(), data.stack().getAmount(), null, List.of(),
                     data.stack(), false);
-            case BlockIconData data -> block(viewer, data);
+            case BlockIconData data -> block(viewer, scope, data);
             case CustomItemIconData data -> customItem(viewer, data);
-            case PlayerHeadIconData data -> playerHead(viewer, data);
+            case PlayerHeadIconData data -> playerHead(viewer, scope, data);
             case TextIconData data -> new SlotItem(Material.PAPER, 1,
                 text(viewer, scope, data.text()), List.of(), null, false);
             default -> unsupported(viewer, icon.getType().getSerializedName());
@@ -125,15 +125,15 @@ public final class SlotItemRenderer {
      * material really is a block, which is unavailable outside a server; when the registry cannot
      * answer, the authored material is drawn as declared rather than degrading a correct icon.
      */
-    private static SlotItem block(Player viewer, BlockIconData data) {
+    private static SlotItem block(Player viewer, ExprScope scope, BlockIconData data) {
         try {
-            return new SlotItem(data.requireBlock(), 1, null, List.of(), null, false);
+            return new SlotItem(data.requireBlock(), 1, text(viewer, scope, data.name()), lore(viewer, scope, data.lore()), null, false);
         } catch (MenuIconException unknownBlock) {
             return unsupported(viewer, "block");
         } catch (RuntimeException | LinkageError unavailableRegistry) {
             return data.blockType() == null
                 ? unsupported(viewer, "block")
-                : new SlotItem(data.blockType(), 1, null, List.of(), null, false);
+                : new SlotItem(data.blockType(), 1, text(viewer, scope, data.name()), lore(viewer, scope, data.lore()), null, false);
         }
     }
 
@@ -145,11 +145,11 @@ public final class SlotItemRenderer {
         return new SlotItem(resolved.getType(), Math.max(1, data.count()), null, List.of(), resolved, false);
     }
 
-    private static SlotItem playerHead(Player viewer, PlayerHeadIconData data) {
+    private static SlotItem playerHead(Player viewer, ExprScope scope, PlayerHeadIconData data) {
         ItemStack resolved = IconItems.resolve(data, viewer);
         return resolved == null
-            ? new SlotItem(UNRESOLVED_HEAD, 1, null, List.of(), null, false)
-            : new SlotItem(resolved.getType(), 1, null, List.of(), resolved, false);
+            ? new SlotItem(UNRESOLVED_HEAD, 1, text(viewer, scope, data.name()), lore(viewer, scope, data.lore()), null, false)
+            : new SlotItem(resolved.getType(), 1, text(viewer, scope, data.name()), lore(viewer, scope, data.lore()), resolved, false);
     }
 
     private static SlotItem unsupported(Player viewer, String kind) {

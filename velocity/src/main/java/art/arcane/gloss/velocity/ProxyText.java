@@ -1,5 +1,6 @@
 package art.arcane.gloss.velocity;
 
+import art.arcane.gloss.emoji.EmojiTriggers;
 import art.arcane.gloss.expr.Expr;
 import art.arcane.gloss.expr.ExprEvaluator;
 import art.arcane.gloss.expr.ExprFunctions;
@@ -250,7 +251,7 @@ public final class ProxyText {
                 continue;
             }
             if (hasTrigger) {
-                out = out.replace(trigger, entry.emoji());
+                out = EmojiTriggers.replace(out, trigger, entry.emoji());
             }
             if (hasToken) {
                 out = out.replace(token, entry.emoji());

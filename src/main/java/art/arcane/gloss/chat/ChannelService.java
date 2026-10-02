@@ -1,6 +1,8 @@
 package art.arcane.gloss.chat;
 
 import art.arcane.gloss.Gloss;
+import art.arcane.gloss.names.NameCategory;
+import art.arcane.gloss.names.NamesService;
 import art.arcane.gloss.GlossConfig;
 import art.arcane.gloss.doc.DocumentDelta;
 import art.arcane.gloss.doc.DocumentRegistry;
@@ -180,12 +182,13 @@ public final class ChannelService implements GlossService, Listener {
         if (!mayUse(sender, channel)) {
             return PrivateResult.DENIED;
         }
-        String filtered = ChatFilters.apply(channel, rawMessage);
+        ChannelRuntime sending = renderer.selected(channel, sender, sender, target);
+        String filtered = ChatFilters.apply(sending, rawMessage);
         if (filtered == null) {
             return PrivateResult.FILTERED;
         }
         ChatThrottle.Verdict verdict = throttle.check(sender.getUniqueId(), normalize(filtered),
-            System.currentTimeMillis(), channel.doc().throttle());
+            System.currentTimeMillis(), sending.doc().throttle());
         if (verdict == ChatThrottle.Verdict.TOO_FAST) {
             return PrivateResult.TOO_FAST;
         }
@@ -223,12 +226,13 @@ public final class ChannelService implements GlossService, Listener {
             sink.dropped(ChatDrop.NO_CHANNEL);
             return false;
         }
-        String filtered = ChatFilters.apply(channel, rawMessage);
+        ChannelRuntime sending = renderer.selected(channel, sender, sender, null);
+        String filtered = ChatFilters.apply(sending, rawMessage);
         if (filtered == null) {
             return refuse(sender, sink, ChatDrop.FILTERED, GlossMessages.CHAT_FILTERED);
         }
         ChatThrottle.Verdict verdict = throttle.check(sender.getUniqueId(), normalize(filtered),
-            System.currentTimeMillis(), channel.doc().throttle());
+            System.currentTimeMillis(), sending.doc().throttle());
         if (verdict == ChatThrottle.Verdict.TOO_FAST) {
             return refuse(sender, sink, ChatDrop.TOO_FAST, GlossMessages.CHAT_TOO_FAST);
         }
@@ -253,9 +257,9 @@ public final class ChannelService implements GlossService, Listener {
     }
 
     /** Plays the channel's mention cue on the mentioned viewer's own region thread. */
-    public void playMentionCue(ChannelRuntime channel, Player viewer) {
-        String sound = channel.doc().mentions().sound();
-        if (!channel.doc().mentions().enabled() || sound.isEmpty()) {
+    public void playMentionCue(ChatMessageRenderer.Rendered rendered, Player viewer) {
+        String sound = rendered.mentionSound();
+        if (sound.isEmpty()) {
             return;
         }
         SchedulerUtils.runEntity(plugin, viewer,
@@ -296,7 +300,7 @@ public final class ChannelService implements GlossService, Listener {
         ChatMessageRenderer.Rendered rendered = render(channel, sender, viewer, message, context);
         ComponentMessenger.sendMarkup(viewer, rendered.miniMessage());
         if (rendered.mentioned()) {
-            playMentionCue(channel, viewer);
+            playMentionCue(rendered, viewer);
         }
     }
 
@@ -311,23 +315,8 @@ public final class ChannelService implements GlossService, Listener {
         }
         ItemMeta meta = stack.getItemMeta();
         String name = meta != null && meta.hasDisplayName() ? meta.getDisplayName()
-            : prettyName(stack.getType());
+            : NamesService.name(NameCategory.MATERIALS, stack.getType().getKey().toString());
         return new ChatBody.Item(stack.getType().getKey().toString(), name, stack.getAmount());
-    }
-
-    private static String prettyName(Material material) {
-        String[] words = material.getKey().getKey().split("_");
-        StringBuilder pretty = new StringBuilder(material.getKey().getKey().length());
-        for (String word : words) {
-            if (word.isEmpty()) {
-                continue;
-            }
-            if (!pretty.isEmpty()) {
-                pretty.append(' ');
-            }
-            pretty.append(Character.toUpperCase(word.charAt(0))).append(word.substring(1));
-        }
-        return pretty.toString();
     }
 
     /**

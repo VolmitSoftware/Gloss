@@ -38,17 +38,18 @@ public final class ChatMessageRenderer {
                 "Channel condition %s failed and was treated as false.", error.source()));
     }
 
-    public record Rendered(String miniMessage, boolean mentioned) {
+    public record Rendered(String miniMessage, boolean mentioned, String mentionSound) {
     }
 
     public Rendered render(ChannelRuntime channel, Player sender, Player viewer, String message,
                            ChatContext context) {
         ChatScope scope = scope(channel, sender, viewer, context.recipient());
+        channel = channel.selected(scope, errors);
         ChatBody.Body body = ChatBody.render(channel, message, bodyContext(channel, sender, viewer, context));
-        String format = body.mentioned() ? channel.doc().mentions().messageFormat() : channel.format(scope, errors);
+        String format = body.mentioned() ? channel.doc().mentions().messageFormat() : channel.doc().format();
         String rendered = plugin.text().renderScoped(viewer, format, scope, ChatComponents::scopedMarkup);
         return new Rendered(splice(TextUtils.toMiniMessage(rendered), body.text(),
-            card(channel, viewer, scope)), body.mentioned());
+            card(channel, viewer, scope)), body.mentioned(), body.mentioned() ? channel.doc().mentions().sound() : "");
     }
 
     /**
@@ -71,6 +72,10 @@ public final class ChatMessageRenderer {
             cursor = next + (isMessage ? MESSAGE_MARKER : CARD_MARKER).length();
         }
         return out.append(template, cursor, template.length()).toString();
+    }
+
+    ChannelRuntime selected(ChannelRuntime channel, Player sender, Player viewer, Player recipient) {
+        return channel.selected(scope(channel, sender, viewer, recipient), errors);
     }
 
     private ChatScope scope(ChannelRuntime channel, Player sender, Player viewer, Player recipient) {

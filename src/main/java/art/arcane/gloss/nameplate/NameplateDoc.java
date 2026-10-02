@@ -1,5 +1,6 @@
 package art.arcane.gloss.nameplate;
 
+import art.arcane.gloss.api.HealthBarStyle;
 import art.arcane.gloss.api.HologramBox;
 import art.arcane.gloss.api.IconBillboard;
 import art.arcane.gloss.api.IconDisplayStyle;
@@ -84,8 +85,8 @@ public record NameplateDoc(int schemaVersion, long revision, ShowCondition show,
     }
 
     public record Presentation(List<Line> lines, IconDisplayStyle style, HologramBox box, Double offset,
-                               Boolean hideSneaking, List<Relation> relations) {
-        public static final Presentation EMPTY = new Presentation(null, null, null, null, null, null);
+                               Boolean hideSneaking, List<Relation> relations, HealthBarStyle healthBar) {
+        public static final Presentation EMPTY = new Presentation(null, null, null, null, null, null, null);
 
         public Presentation {
             lines = copyLines(lines);
@@ -94,6 +95,7 @@ public record NameplateDoc(int schemaVersion, long revision, ShowCondition show,
             offset = offset == null ? DEFAULT_OFFSET : Math.clamp(offset, -2.0D, 8.0D);
             hideSneaking = hideSneaking == null || hideSneaking;
             relations = relations == null ? List.of() : List.copyOf(relations);
+            healthBar = healthBar == null ? HealthBarStyle.DEFAULTS : healthBar;
         }
 
         private static List<Line> copyLines(List<Line> lines) {

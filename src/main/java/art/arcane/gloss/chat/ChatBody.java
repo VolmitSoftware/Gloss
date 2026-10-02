@@ -6,6 +6,7 @@ import net.kyori.adventure.text.minimessage.MiniMessage;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Locale;
+import java.util.function.Function;
 import java.util.function.UnaryOperator;
 import java.util.regex.Matcher;
 
@@ -104,9 +105,13 @@ public final class ChatBody {
         if (!items.enabled() || !context.itemsAllowed() || held == null) {
             return token;
         }
-        String label = escapeTags(held.amount() <= 1
-            ? "[" + held.name() + "]"
-            : "[" + held.name() + "] x" + held.amount());
+        String label = substitute(TextUtils.toMiniMessage(items.render()), key -> switch (key) {
+            case "item.name" -> escapeTags(held.name());
+            case "item.id" -> escapeTags(held.id());
+            case "item.amount" -> Integer.toString(held.amount());
+            case "item.countSuffix" -> held.amount() > 1 ? " x" + held.amount() : "";
+            default -> null;
+        });
         if (!context.interactive()) {
             return label;
         }
@@ -133,18 +138,23 @@ public final class ChatBody {
      * directly rather than through the expression pipeline: they run once per match per viewer.
      */
     private static String substitute(String template, String name, String value) {
+        return substitute(template, key -> key.equals(name) ? value : null);
+    }
+
+    private static String substitute(String template, Function<String, String> values) {
         int open = template.indexOf("{{");
         if (open < 0) {
             return template;
         }
-        StringBuilder output = new StringBuilder(template.length() + value.length());
+        StringBuilder output = new StringBuilder(template.length() + 32);
         int cursor = 0;
         while (open >= 0) {
             int close = template.indexOf("}}", open + 2);
             if (close < 0) {
                 break;
             }
-            if (!template.substring(open + 2, close).trim().equals(name)) {
+            String value = values.apply(template.substring(open + 2, close).trim());
+            if (value == null) {
                 open = template.indexOf("{{", close + 2);
                 continue;
             }

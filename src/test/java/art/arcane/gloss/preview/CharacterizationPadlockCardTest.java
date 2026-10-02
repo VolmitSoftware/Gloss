@@ -6,6 +6,7 @@ import art.arcane.gloss.preview.doc.PreviewDocumentRegistry;
 import art.arcane.gloss.preview.doc.PreviewFakes;
 import org.bukkit.GameMode;
 import org.bukkit.Material;
+import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.entity.Entity;
@@ -111,7 +112,7 @@ public class CharacterizationPadlockCardTest {
         Player.class, Block.class, Entity.class, Vector.class, List.class, List.class,
         boolean.class);
     constructor.setAccessible(true);
-    return constructor.newInstance(viewer, null, null, new Vector(0.5D, 0.5D, 0.5D),
+    return constructor.newInstance(viewer, null, null, new Vector(10.5D, 64.5D, 10.5D),
         List.<PreviewElement>of(), List.of(), showsContents);
   }
 
@@ -142,6 +143,7 @@ public class CharacterizationPadlockCardTest {
         (proxy, method, args) -> switch (method.getName()) {
           case "hasPermission" -> false;
           case "getGameMode" -> GameMode.SURVIVAL;
+          case "getEyeLocation" -> new Location(null, 10.0D, 65.5D, 10.0D);
           case "getInventory" -> inventory;
           case "getName" -> "unpermitted";
           case "getUniqueId" -> java.util.UUID.fromString("00000000-0000-0000-0000-00000000ca7d");

@@ -28,7 +28,7 @@ public record DamageIndicatorSettingsDoc(
     public static final int CURRENT_SCHEMA_VERSION = 4;
 
     private static final String DEFAULT_AUDIENCE_PERMISSION = "gloss.indicators.show";
-    private static final Limits DEFAULT_LIMITS = new Limits(null, null, null, null);
+    private static final Limits DEFAULT_LIMITS = new Limits(null, null, null, null, null, null);
     private static final IndicatorPresentation DEFAULT_DAMAGE_PRESENTATION = new IndicatorPresentation(
         "&c&l{amount}",
         new Vector(0.0D, 0.7D, 0.0D),
@@ -76,8 +76,10 @@ public record DamageIndicatorSettingsDoc(
         return DocumentParsers.parseJson(fileName, raw, DamageIndicatorSettingsDoc.class);
     }
 
-    public record Limits(Integer maxPerSecond, Long lifetimeMs, Double minimumDelta, Integer decimals) {
+    public record Limits(Integer maxPerSecond, Long lifetimeMs, Double minimumDelta, Integer decimals, Double viewRange, Long debounceMs) {
         public Limits {
+            viewRange = clamp(viewRange, 4.0D, 128.0D, 48.0D);
+            debounceMs = clamp(debounceMs, 0L, 60000L, 150L);
             maxPerSecond = clamp(maxPerSecond, 1, 1000, 40);
             lifetimeMs = clamp(lifetimeMs, 250L, 30000L, 3000L);
             minimumDelta = clamp(minimumDelta, 0.0D, 1000.0D, 0.009D);

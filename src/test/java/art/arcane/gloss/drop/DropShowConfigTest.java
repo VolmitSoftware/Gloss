@@ -1,12 +1,6 @@
 package art.arcane.gloss.drop;
 
-import art.arcane.gloss.GlossConfig;
-import art.arcane.gloss.config.GlossConfigFile;
-import art.arcane.volmlib.util.config.ConfigExposePolicy;
-import art.arcane.volmlib.util.config.TomlCodec;
 import org.junit.jupiter.api.Test;
-
-import java.io.IOException;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -15,25 +9,23 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class DropShowConfigTest {
     @Test
-    void tomlBooleanAndExpressionCompileAndRoundTrip() throws IOException {
-        GlossConfigFile hidden = TomlCodec.fromToml("[drops]\nshow = false\n", GlossConfigFile.class);
-        hidden.normalize();
-        assertFalse(GlossConfig.from(hidden).drops().show().isAlwaysVisible());
-        assertFalse(GlossConfig.from(hidden).drops().show().isDynamic());
-        GlossConfigFile dynamic = TomlCodec.fromToml(
-            "[drops]\nshow = \"{{ world.time > 12000 }}\"\n", GlossConfigFile.class);
-        dynamic.normalize();
-        String written = TomlCodec.toToml(dynamic, "gloss", ConfigExposePolicy.ALL);
-        GlossConfigFile roundTrip = TomlCodec.fromToml(written, GlossConfigFile.class);
-        roundTrip.normalize();
-        assertTrue(GlossConfig.from(roundTrip).drops().show().isDynamic());
-        assertEquals("world.time > 12000", GlossConfig.from(roundTrip).drops().show().expression());
+    void labelVisibilityAcceptsBooleansAndExpressions() {
+        RealDropSettingsDoc hidden = parse("false");
+        assertFalse(hidden.presentation().labels().show().isAlwaysVisible());
+        assertFalse(hidden.presentation().labels().show().isDynamic());
+        RealDropSettingsDoc dynamic = parse("\"world.time > 12000\"");
+        assertTrue(dynamic.presentation().labels().show().isDynamic());
+        assertEquals("world.time > 12000", dynamic.toConfig(true).labels().show().expression());
+        assertTrue(dynamic.presentation().labels().preserveCustomNames());
     }
 
     @Test
-    void invalidVisibilityFailsDuringNormalization() {
-        GlossConfigFile source = new GlossConfigFile();
-        source.drops.show = "42";
-        assertThrows(IllegalArgumentException.class, source::normalize);
+    void invalidVisibilityFailsDuringParsing() {
+        assertThrows(IllegalArgumentException.class, () -> parse("\"42\""));
+    }
+
+    private static RealDropSettingsDoc parse(String show) {
+        return RealDropSettingsDoc.parse("default.json", "{\"schemaVersion\":4,\"revision\":1,"
+            + "\"presentation\":{\"labels\":{\"show\":" + show + "}}}");
     }
 }

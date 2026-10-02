@@ -6,7 +6,9 @@
     "maxPerSecond": 40,
     "lifetimeMs": 3000,
     "minimumDelta": 0.009,
-    "decimals": 0
+    "decimals": 0,
+    "viewRange": 48,
+    "debounceMs": 150
   },
   "damage": {
     "when": "true",

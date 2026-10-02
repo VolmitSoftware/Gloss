@@ -162,7 +162,11 @@ public final class PreviewDocumentRegistry implements RegistryOwner {
         }
       }
     }
-    return new Snapshot(List.copyOf(ordered), blockTypes, entityTypes, inventoryHolderFallback);
+    double viewDistance = 1.0D;
+    for (CompiledPreviewDocument document : ordered) {
+      viewDistance = Math.max(viewDistance, document.viewDistance());
+    }
+    return new Snapshot(List.copyOf(ordered), blockTypes, entityTypes, inventoryHolderFallback, viewDistance);
   }
 
   private void publish(Snapshot replacement) {
@@ -295,6 +299,10 @@ public final class PreviewDocumentRegistry implements RegistryOwner {
   // ---------------------------------------------------------------------
 
   /** The document drawing this block material and the variables it matched with, or null. */
+  public double maxViewDistance() {
+    return snapshot.viewDistance();
+  }
+
   public Resolved forBlock(Material material) {
     if (material == null || material == Material.AIR) {
       return null;
@@ -473,10 +481,11 @@ public final class PreviewDocumentRegistry implements RegistryOwner {
       List<CompiledPreviewDocument> ordered,
       Set<Material> blockTypes,
       Set<EntityType> entityTypes,
-      boolean inventoryHolderFallback
+      boolean inventoryHolderFallback,
+      double viewDistance
   ) {
 
-    private static final Snapshot EMPTY = new Snapshot(List.of(), Set.of(), Set.of(), false);
+    private static final Snapshot EMPTY = new Snapshot(List.of(), Set.of(), Set.of(), false, 10.0D);
   }
 
   /**

@@ -103,7 +103,7 @@ public class CharacterizationHitboxOrientationTest {
     MenuDefinitionData data = new MenuDefinitionData(new Vector(0.0D, 0.0D, 2.0D), false, false,
         8.0D, false, false,
         List.of(new MenuComponentData("probe", new Vector(), new ProbeClickableData(), ShowCondition.ALWAYS)),
-        List.of(), ShowCondition.ALWAYS, Map.of());
+        List.of(), ShowCondition.ALWAYS, Map.of(), List.of());
     data.setId("hitbox-probe");
     Player player = player(playerAt);
     MenuSession session = new MenuSession(data, player, MenuSessionOptions.personal(data, player, null));

@@ -1,11 +1,20 @@
 package art.arcane.gloss.indicator;
 
 import org.junit.jupiter.api.Test;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
 class IndicatorTextFormatTest {
+    @Test
+    void namedTokensSpliceAfterRenderingAndKeepCapturedNamesLiteral() {
+        String template = IndicatorTextFormat.template("{amount} {cause}: {source} > {target}", "2.5");
+        assertEquals("2.5 Fire: <red>{{ evil }} > Zombie Villager", IndicatorTextFormat.names(template,
+            Map.of("event.causeName", "Fire", "source.name", "<red>{{ evil }}",
+                "subject.typeName", "Zombie Villager")));
+    }
+
     @Test
     void zeroDecimalsRendersIntegerText() {
         assertEquals("3", IndicatorTextFormat.format(3.2D, 0));

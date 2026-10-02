@@ -173,7 +173,7 @@ class HologramDocLinesTest {
     void textOnlyDocumentsKeepTheirShorterConstructor() {
         HologramDoc doc = new HologramDoc(HologramDoc.CURRENT_SCHEMA_VERSION, 1L,
             new HologramDoc.Anchor("world", new Vector(1, 2, 3)), List.of("&dOne", "&7Two"),
-            null, null, 0.0D, 0.0D, List.of(), null);
+            null, null, 0.0D, 0.0D, List.of(), null, null, null);
 
         assertEquals(List.of("&dOne", "&7Two"), doc.textLines());
         assertTrue(doc.pages().isEmpty());

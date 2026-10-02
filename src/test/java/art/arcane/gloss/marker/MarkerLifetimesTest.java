@@ -36,7 +36,7 @@ class MarkerLifetimesTest {
         MarkerSpec changed = new MarkerSpec(moved.id(),
             MarkerAnchor.position("world", 12D, 65D, 0D),
             moved.label(), moved.icon(), moved.color(), moved.distanceScale(), moved.hideWithin(),
-            moved.maxDistance(), moved.beam(), moved.edge(), moved.trail(), moved.audience(), 10L, false);
+            moved.maxDistance(), moved.beam(), moved.edge(), moved.trail(), moved.audience(), 10L, false, null, null);
         assertFalse(lifetimes.active(changed, 30L));
         assertTrue(lifetimes.active(marker(20L), 40L));
         assertTrue(lifetimes.active(marker(0L), Long.MAX_VALUE));
@@ -46,6 +46,6 @@ class MarkerLifetimesTest {
         MarkerSpec spec = MarkerSpec.at("target", "world", 0D, 64D, 0D);
         return new MarkerSpec(spec.id(), spec.anchor(), spec.label(), spec.icon(), spec.color(),
             spec.distanceScale(), spec.hideWithin(), spec.maxDistance(), spec.beam(), spec.edge(),
-            spec.trail(), spec.audience(), lifetimeTicks, spec.waypoint());
+            spec.trail(), spec.audience(), lifetimeTicks, spec.waypoint(), null, null);
     }
 }

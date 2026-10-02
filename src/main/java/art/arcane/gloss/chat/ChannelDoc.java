@@ -218,13 +218,14 @@ public record ChannelDoc(int schemaVersion, long revision, ShowCondition show, C
         }
     }
 
-    public record Items(Boolean enabled, String token, String permission) {
-        public static final Items DEFAULTS = new Items(null, null, null);
+    public record Items(Boolean enabled, String token, String permission, String render) {
+        public static final Items DEFAULTS = new Items(null, null, null, null);
 
         public Items {
             enabled = enabled == null || enabled;
             token = token == null || token.isBlank() ? "[item]" : token.trim();
             permission = permission == null || permission.isBlank() ? "gloss.chat.item" : permission.trim();
+            render = render == null ? "[{{ item.name }}]{{ item.countSuffix }}" : render;
         }
     }
 
@@ -256,13 +257,24 @@ public record ChannelDoc(int schemaVersion, long revision, ShowCondition show, C
         }
     }
 
-    public record Variant(String id, Integer priority, String when, String format) {
+    public record Variant(String id, Integer priority, String when, String format, List<String> card,
+                          Mentions mentions, Items items, Links links, List<Filter> filters, Throttle throttle) {
         public Variant {
             id = normalizeId(id);
             when = normalizeCondition(when, "channel variant " + id);
             ConditionCompiler.compile(new ConditionSource("channels.variants." + id + ".when", when));
             priority = clamp(priority, -1000, 1000, 0);
-            format = requireText(format, "channel variant " + id + " format");
+            format = format == null ? null : requireText(format, "channel variant " + id + " format");
+            card = card == null ? null : copyCard(card);
+            filters = filters == null ? null : copyFilters(filters);
+        }
+
+        ChannelDoc apply(ChannelDoc base) {
+            return new ChannelDoc(base.schemaVersion(), base.revision(), base.show(), base.channel(),
+                format == null ? base.format() : format, card == null ? base.card() : card,
+                mentions == null ? base.mentions() : mentions, items == null ? base.items() : items,
+                links == null ? base.links() : links, filters == null ? base.filters() : filters,
+                throttle == null ? base.throttle() : throttle, List.of());
         }
 
         private static String normalizeId(String id) {

@@ -1,6 +1,7 @@
 package art.arcane.gloss.config.icon;
 
 import art.arcane.gloss.api.IconDisplayStyle;
+import java.util.List;
 
 import art.arcane.gloss.enums.MenuIconType;
 import art.arcane.gloss.exceptions.MenuIconException;
@@ -21,8 +22,14 @@ public record BlockIconData(
     @SerializedName("block")
     @JsonAdapter(BlockIconData.MaterialAdapter.class)
     Material blockType,
-    IconDisplayStyle style
+    IconDisplayStyle style,
+    String name,
+    List<String> lore
 ) implements MenuIconData {
+  public BlockIconData {
+    lore = lore == null ? List.of() : List.copyOf(lore);
+  }
+
   @Override
   public MenuIconType getType() {
     return MenuIconType.BLOCK;

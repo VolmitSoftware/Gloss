@@ -78,7 +78,9 @@
         "borderWidth": 1,
         "backgroundArgb": "#B31B1B22",
         "borderArgb": "#FFAAAAAA"
-      }
+      },
+      "show": true,
+      "preserveCustomNames": true
     },
     "filters": {
       "disabledWorlds": [],

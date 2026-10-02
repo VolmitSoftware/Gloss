@@ -218,6 +218,7 @@ public final class PreviewFakes {
             case "getGameTime", "getFullTime" -> gameTime;
             case "getTime" -> worldTime;
             case "getName" -> worldName;
+            case "getEnvironment" -> World.Environment.NORMAL;
             default -> identity(proxy, method, arguments);
           };
         });
@@ -743,6 +744,7 @@ public final class PreviewFakes {
           case "getGameTime", "getFullTime" -> gameTime;
           case "getTime" -> Math.floorMod(gameTime, 24000L);
           case "getName" -> "fake";
+          case "getEnvironment" -> World.Environment.NORMAL;
           default -> identity(proxy, method, arguments);
         };
       });

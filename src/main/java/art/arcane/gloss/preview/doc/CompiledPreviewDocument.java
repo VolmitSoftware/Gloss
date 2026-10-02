@@ -72,6 +72,8 @@ public final class CompiledPreviewDocument {
   /** Last error log timestamp per document name; see the failure policy in the class javadoc. */
   private static final Map<String, Long> LAST_ERROR_LOG = new ConcurrentHashMap<>();
 
+  private final double scale;
+  private final double viewDistance;
   private final String name;
   private final int priority;
   private final CompiledMatch match;
@@ -91,9 +93,13 @@ public final class CompiledPreviewDocument {
       CompiledExpr show,
       CardTemplate card,
       List<ElementTemplate> elements,
-      List<ParticleLayer> particleLayers
+      List<ParticleLayer> particleLayers,
+      double scale,
+      double viewDistance
   ) {
     this.name = name;
+    this.scale = scale;
+    this.viewDistance = viewDistance;
     this.priority = priority;
     this.match = match;
     this.variants = variants;
@@ -105,6 +111,14 @@ public final class CompiledPreviewDocument {
   }
 
   /** The name the document was parsed under (typically its file name); used for logging. */
+  public double scale() {
+    return scale;
+  }
+
+  public double viewDistance() {
+    return viewDistance;
+  }
+
   public String name() {
     return name;
   }

@@ -77,7 +77,7 @@ public class PlayerHeadMenuIconTest {
 
   @Test
   public void twoViewersOfTheSameIconGetTheirOwnName() {
-    PlayerHeadIconData data = new PlayerHeadIconData("%player_name%", null, null);
+    PlayerHeadIconData data = new PlayerHeadIconData("%player_name%", null, null, null, null);
 
     assertEquals("Notch", PlayerHeadMenuIcon.viewerName(player("Notch"), data.player()));
     assertEquals("jeb_", PlayerHeadMenuIcon.viewerName(player("jeb_"), data.player()));
@@ -103,7 +103,7 @@ public class PlayerHeadMenuIconTest {
   @Test
   public void eachViewerOfOnePlaceholderIconResolvesTheirOwnProfile() throws Exception {
     installService(name -> CompletableFuture.completedFuture(Optional.of(profile(name))));
-    PlayerHeadIconData data = new PlayerHeadIconData("%player_name%", null, null);
+    PlayerHeadIconData data = new PlayerHeadIconData("%player_name%", null, null, null, null);
 
     PlayerHeadLookup notch = PlayerHeadMenuIcon.lookupFor(player("Notch"), data);
     PlayerHeadLookup jeb = PlayerHeadMenuIcon.lookupFor(player("jeb_"), data);
@@ -123,7 +123,7 @@ public class PlayerHeadMenuIconTest {
     });
 
     PlayerHeadLookup lookup = PlayerHeadMenuIcon.lookupFor(
-        player("Notch"), new PlayerHeadIconData("%some_other_plugin_name%", null, null));
+        player("Notch"), new PlayerHeadIconData("%some_other_plugin_name%", null, null, null, null));
 
     assertEquals(PlayerHeadLookup.State.UNKNOWN, lookup.state());
     assertEquals(0L, calls.get());
@@ -134,7 +134,7 @@ public class PlayerHeadMenuIconTest {
     installService(name -> CompletableFuture.completedFuture(Optional.of(profile(name))));
 
     assertEquals(PlayerHeadLookup.State.UNKNOWN,
-        PlayerHeadMenuIcon.lookupFor(player("Notch"), new PlayerHeadIconData("  ", null, null)).state());
+        PlayerHeadMenuIcon.lookupFor(player("Notch"), new PlayerHeadIconData("  ", null, null, null, null)).state());
   }
 
   @Test
@@ -147,7 +147,7 @@ public class PlayerHeadMenuIconTest {
     CharacterizationSupport.setField(gloss, "config", withHeadsEnabled(false));
 
     PlayerHeadLookup lookup = PlayerHeadMenuIcon.lookupFor(
-        player("Notch"), new PlayerHeadIconData("Notch", null, null));
+        player("Notch"), new PlayerHeadIconData("Notch", null, null, null, null));
 
     assertEquals(PlayerHeadLookup.State.UNKNOWN, lookup.state());
     assertEquals(0L, calls.get());
@@ -156,7 +156,7 @@ public class PlayerHeadMenuIconTest {
   @Test
   public void beforeTheServiceExistsEveryHeadIsUnknownInsteadOfAnError() {
     assertEquals(PlayerHeadLookup.State.UNKNOWN,
-        PlayerHeadMenuIcon.lookupFor(player("Notch"), new PlayerHeadIconData("Notch", null, null)).state());
+        PlayerHeadMenuIcon.lookupFor(player("Notch"), new PlayerHeadIconData("Notch", null, null, null, null)).state());
   }
 
   @Test
@@ -167,7 +167,7 @@ public class PlayerHeadMenuIconTest {
       calls.incrementAndGet();
       return answer;
     });
-    PlayerHeadIconData data = new PlayerHeadIconData("Notch", null, null);
+    PlayerHeadIconData data = new PlayerHeadIconData("Notch", null, null, null, null);
 
     assertTrue(PlayerHeadMenuIcon.lookupFor(player("Viewer"), data).isPending());
 

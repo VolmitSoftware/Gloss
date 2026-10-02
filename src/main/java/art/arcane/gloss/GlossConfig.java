@@ -158,8 +158,6 @@ public record GlossConfig(
 
     public record Holograms(
         boolean enabled,
-        double stackDistance,
-        int updateIntervalTicks,
         double viewRange,
         boolean perViewerPlaceholders,
         int temporaryUpdateIntervalTicks,
@@ -172,7 +170,6 @@ public record GlossConfig(
 
     public record Particles(
         boolean enabled,
-        double viewRange,
         int samplesPerViewerPerTick,
         int samplesPerTick,
         int maxCachedSamplesPerLayer
@@ -215,22 +212,14 @@ public record GlossConfig(
     }
 
     public record Bubbles(
-        boolean enabled,
-        List<String> blacklistWorlds
+        boolean enabled
     ) {
     }
 
     public record Indicators(boolean enabled) {
     }
 
-    public record Drops(
-        boolean enabled,
-        boolean preserveCustomNames,
-        ShowCondition show
-    ) {
-        public Drops {
-            show = show == null ? ShowCondition.ALWAYS : show;
-        }
+    public record Drops(boolean enabled) {
     }
 
     public record RealDrops(
@@ -293,7 +282,9 @@ public record GlossConfig(
             Map<String, String> names,
             LabelBundle bundle,
             IconDisplayStyle style,
-            HologramBox box
+            HologramBox box,
+            ShowCondition show,
+            boolean preserveCustomNames
         ) {
         }
 
@@ -532,11 +523,7 @@ public record GlossConfig(
     ) {
     }
 
-    public record Previews(
-        boolean enabled,
-        double lookDistance,
-        float scale
-    ) {
+    public record Previews(boolean enabled) {
     }
 
     public record EditorSync(
@@ -590,8 +577,6 @@ public record GlossConfig(
             source.splashScreen,
             new Holograms(
                 source.features.holograms,
-                source.holograms.stackDistance,
-                source.holograms.updateIntervalTicks,
                 source.holograms.viewRange,
                 source.holograms.perViewerPlaceholders,
                 source.holograms.temporaryUpdateIntervalTicks,
@@ -602,7 +587,6 @@ public record GlossConfig(
             ),
             new Particles(
                 source.features.particles,
-                source.particles.viewRange,
                 source.particles.samplesPerViewerPerTick,
                 source.particles.samplesPerTick,
                 source.particles.maxCachedSamplesPerLayer
@@ -631,16 +615,13 @@ public record GlossConfig(
                 source.text.functions
             ),
             new Bubbles(
-                source.features.chatBubbles,
-                List.copyOf(source.chatBubbles.blacklistWorlds)
+                source.features.chatBubbles
             ),
             new Indicators(
                 source.features.damageIndicators
             ),
             new Drops(
-                source.features.drops,
-                source.drops.preserveCustomNames,
-                ShowCondition.of(source.drops.show == null ? "true" : source.drops.show)
+                source.features.drops
             ),
             RealDropSettingsDoc.DEFAULTS.toConfig(source.features.realDrops),
             new Motd(
@@ -664,9 +645,7 @@ public record GlossConfig(
                 source.features.panels
             ),
             new Previews(
-                source.features.previews,
-                source.preview.lookDistance,
-                (float) source.preview.scale
+                source.features.previews
             ),
             new EditorSync(
                 source.editor.builderUrl,

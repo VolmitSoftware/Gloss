@@ -73,6 +73,7 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.UnaryOperator;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.logging.Level;
@@ -114,6 +115,7 @@ public final class HologramService implements RegistryOwner {
         }
     };
 
+    private long persistentTick;
     private final Gloss plugin;
     private final NamespacedKey markerKey;
     private final DocumentRegistry<HologramDoc> registry;
@@ -290,6 +292,20 @@ public final class HologramService implements RegistryOwner {
         return temporary;
     }
 
+    public void setTextTransform(TemporaryHologram hologram, UnaryOperator<String> transform) {
+        if (!(hologram instanceof TemporaryHologramDisplay display) || !temporaries.contains(display)) {
+            throw new IllegalArgumentException("Temporary hologram does not belong to this service.");
+        }
+        display.setTextTransform(transform);
+    }
+
+    public void setViewDistance(TemporaryHologram hologram, double viewDistance) {
+        if (!(hologram instanceof TemporaryHologramDisplay display) || !temporaries.contains(display)) {
+            throw new IllegalArgumentException("Temporary hologram does not belong to this service.");
+        }
+        display.setViewDistance(viewDistance);
+    }
+
     public void setViewerCondition(TemporaryHologram hologram, Predicate<Player> condition) {
         if (!(hologram instanceof TemporaryHologramDisplay display) || !temporaries.contains(display)) {
             throw new IllegalArgumentException("Temporary hologram does not belong to this service.");
@@ -297,9 +313,6 @@ public final class HologramService implements RegistryOwner {
         display.setViewerCondition(condition);
     }
 
-    public double stackSpread() {
-        return plugin.cfg().holograms().stackDistance();
-    }
 
     public int hologramCount() {
         return holograms.size();
@@ -360,7 +373,7 @@ public final class HologramService implements RegistryOwner {
     }
 
     int persistentUpdateIntervalTicks() {
-        return plugin.cfg().holograms().updateIntervalTicks();
+        return persistentDriverInterval();
     }
 
     boolean highFrequencyAnimations() {
@@ -752,7 +765,7 @@ public final class HologramService implements RegistryOwner {
 
     private void startTasks() {
         driverRunning = true;
-        driverIntervalTicks = plugin.cfg().holograms().updateIntervalTicks();
+        driverIntervalTicks = persistentDriverInterval();
         driverTaskId = plugin.scheduler().sr(() -> driveHolograms(false), driverIntervalTicks);
         reconcileFastDriver();
         temporaryTaskId = plugin.scheduler().sr(this::driveTemporaries, plugin.cfg().holograms().temporaryUpdateIntervalTicks());
@@ -792,6 +805,9 @@ public final class HologramService implements RegistryOwner {
     }
 
     private void driveHolograms(boolean fast) {
+        if (!fast) {
+            persistentTick += driverIntervalTicks > 0 ? driverIntervalTicks : persistentDriverInterval();
+        }
         if (!plugin.cfg().holograms().enabled()) {
             if (!fast) {
                 for (PersistentHologram hologram : holograms.values()) {
@@ -808,7 +824,9 @@ public final class HologramService implements RegistryOwner {
             if (partitioned && hologram.requiresFastRefresh() != fast) {
                 continue;
             }
-            schedulePersistentTick(hologram, tick);
+            if (fast || hologram.requiresFastRefresh() || hologram.refreshDue(persistentTick)) {
+                schedulePersistentTick(hologram, tick);
+            }
         }
 
         if (!fast) {
@@ -829,7 +847,7 @@ public final class HologramService implements RegistryOwner {
             hologram.despawnAll();
             return;
         }
-        if (!viewerIndex.anyNearby(tickAnchor.location(), viewRange())) {
+        if (!viewerIndex.anyNearby(tickAnchor.location(), hologram.viewDistance())) {
             persistentTicks.remove(hologram);
             hologram.despawnAll();
             return;
@@ -866,11 +884,24 @@ public final class HologramService implements RegistryOwner {
         }
     }
 
+    private int persistentDriverInterval() {
+        int interval = 0;
+        for (PersistentHologram hologram : holograms.values()) {
+            int next = hologram.refreshTicks();
+            while (next != 0) {
+                int remainder = interval % next;
+                interval = next;
+                next = remainder;
+            }
+        }
+        return holograms.isEmpty() ? 10 : interval;
+    }
+
     private void reconcileDriverInterval() {
         if (!driverRunning) {
             return;
         }
-        int intervalTicks = plugin.cfg().holograms().updateIntervalTicks();
+        int intervalTicks = persistentDriverInterval();
         if (driverTaskId != NO_TASK && driverIntervalTicks == intervalTicks) {
             reconcileFastDriver();
             return;
@@ -947,7 +978,7 @@ public final class HologramService implements RegistryOwner {
         if (hologram == null) {
             return false;
         }
-        String resolved = HologramPage.resolve(hologram.pages(), viewerIndex.page(viewerId, hologramId), target);
+        String resolved = HologramPage.resolve(hologram.visiblePages(viewerId), viewerIndex.page(viewerId, hologramId), target);
         if (resolved == null) {
             return false;
         }

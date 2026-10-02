@@ -14,6 +14,10 @@ public interface MenuIconData extends EnumType.Object<MenuIconData> {
     return null;
   }
 
+  default String countFormat() {
+    return null;
+  }
+
   class Adapter extends EnumType<MenuIconData, MenuIconType> {
     public Adapter() {
       super(MenuIconData.class, MenuIconType.class);

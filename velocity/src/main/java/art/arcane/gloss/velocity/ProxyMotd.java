@@ -40,8 +40,20 @@ public final class ProxyMotd {
         if (!snapshot.settings().motd() || !text.test(snapshot.motd().show(), scope)) {
             return original;
         }
-        ProxyDocuments.MotdEntry entry = snapshot.motd().entries()
-            .get(ThreadLocalRandom.current().nextInt(snapshot.motd().entries().size()));
+        ProxyDocuments.MotdEntry entry = null;
+        long total = 0L;
+        for (ProxyDocuments.MotdEntry candidate : snapshot.motd().entries()) {
+            if (!text.test(candidate.show(), scope)) {
+                continue;
+            }
+            total += candidate.weight();
+            if (ThreadLocalRandom.current().nextLong(total) < candidate.weight()) {
+                entry = candidate;
+            }
+        }
+        if (entry == null) {
+            return original;
+        }
         ServerPing.Builder builder = original.asBuilder()
             .description(text.render(String.join("\n&r", entry.lines()), scope));
         if (entry.online() != null) {

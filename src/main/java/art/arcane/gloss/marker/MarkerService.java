@@ -261,7 +261,7 @@ public final class MarkerService implements GlossService, Listener {
             return;
         }
         beams.trail(viewer, candidate.id(), eye, anchor, trail.particle(), trail.spacing(),
-            trail.maxPoints());
+            trail.maxPoints(), MarkerColors.parse(trail.color(), "trail color"));
     }
 
     private void publishWaypoints(Player viewer, List<MarkerCandidate> selected) {

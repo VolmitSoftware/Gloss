@@ -1,6 +1,9 @@
 package art.arcane.gloss.motd;
 
 import art.arcane.gloss.Gloss;
+import art.arcane.gloss.condition.GlossConditionScope;
+import art.arcane.gloss.expr.ExprScope;
+import java.util.random.RandomGenerator;
 import art.arcane.gloss.doc.DocumentDelta;
 import art.arcane.gloss.doc.DocumentRegistry;
 import art.arcane.gloss.doc.GlossDocument;
@@ -139,7 +142,11 @@ public final class MotdService implements RegistryOwner {
                 return;
             }
             MotdMemo current = memo(document);
-            int index = ThreadLocalRandom.current().nextInt(current.entries().size());
+            int index = selectEntry(current.entries(), GlossConditionScope.viewer(plugin, null),
+                ThreadLocalRandom.current());
+            if (index < 0) {
+                return;
+            }
             String cached = current.rendered()[index];
             MotdDoc.MotdEntry entry = current.entries().get(index);
             event.setMotd(cached == null
@@ -152,6 +159,22 @@ public final class MotdService implements RegistryOwner {
                 Gloss.logExceptionStack(false, failure, "MOTD render failed; keeping the server default.");
             }
         }
+    }
+
+    static int selectEntry(List<MotdDoc.MotdEntry> entries, ExprScope scope, RandomGenerator random) {
+        long total = 0L;
+        int selected = -1;
+        for (int index = 0; index < entries.size(); index++) {
+            MotdDoc.MotdEntry entry = entries.get(index);
+            if (!entry.show().matches(scope)) {
+                continue;
+            }
+            total += entry.weight();
+            if (random.nextLong(total) < entry.weight()) {
+                selected = index;
+            }
+        }
+        return selected;
     }
 
     private void applyExtras(ServerListPingEvent event, MotdDoc.MotdEntry entry, MotdMemo memo, int index) {

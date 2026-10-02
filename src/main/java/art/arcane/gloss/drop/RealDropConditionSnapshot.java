@@ -1,5 +1,8 @@
 package art.arcane.gloss.drop;
 
+import art.arcane.gloss.names.NameCategory;
+import art.arcane.gloss.names.NamesService;
+
 import art.arcane.gloss.condition.GlossConditionContext;
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -74,9 +77,11 @@ record RealDropConditionSnapshot(Location location, Map<String, Object> values) 
         values.put("drop.id", id);
         values.put("drop.uuid", id);
         values.put("drop.material", stack.getType().name());
+        values.put("drop.materialName", NamesService.name(NameCategory.MATERIALS, stack.getType().name()));
         values.put("drop.amount", (double) stack.getAmount());
         values.put("drop.maxStackSize", (double) stack.getMaxStackSize());
         values.put("drop.world", item.getWorld().getName());
+        values.put("drop.worldName", NamesService.name(NameCategory.WORLDS, item.getWorld().getName()));
         values.put("drop.x", location.getX());
         values.put("drop.y", location.getY());
         values.put("drop.z", location.getZ());
@@ -99,6 +104,8 @@ record RealDropConditionSnapshot(Location location, Map<String, Object> values) 
         }
         values.put("subject.uuid", item.getUniqueId().toString());
         values.put("subject.type", item.getType().getKey().getKey());
+        values.put("subject.typeName", NamesService.name(NameCategory.ENTITIES, item.getType().getKey().toString()));
+        values.put("subject.worldName", NamesService.name(NameCategory.WORLDS, item.getWorld().getName()));
         values.put("subject.world", item.getWorld().getName());
         values.put("subject.x", location.getX());
         values.put("subject.y", location.getY());
@@ -118,12 +125,15 @@ record RealDropConditionSnapshot(Location location, Map<String, Object> values) 
         boolean present = thrower != null;
         values.put("source.present", present);
         values.put("source.type", present ? "player" : "unknown");
+        values.put("source.typeName", NamesService.name(NameCategory.ENTITIES, present ? "player" : "unknown"));
         values.put("source.id", present ? thrower.toString() : "");
         values.put("source.uuid", present ? thrower.toString() : "");
     }
 
     private static void putWorldValues(Map<String, Object> values, World world, Fields fields) {
         values.put("world.name", world.getName());
+        values.put("world.displayName", NamesService.name(NameCategory.WORLDS, world.getName()));
+        values.put("world.environmentName", NamesService.name(NameCategory.DIMENSIONS, world.getEnvironment().name()));
         values.put("world.uuid", world.getUID().toString());
         values.put("world.environment", world.getEnvironment().name().toLowerCase(Locale.ROOT));
         values.put("world.difficulty", world.getDifficulty().name().toLowerCase(Locale.ROOT));

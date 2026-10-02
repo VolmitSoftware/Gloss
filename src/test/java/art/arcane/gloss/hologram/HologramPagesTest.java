@@ -86,6 +86,59 @@ class HologramPagesTest {
         }
     }
 
+    @Test
+    void variantsSelectIndependentlyAndChangeWhenTheViewerMoves() throws InterruptedException {
+        try (CharacterizationHarness harness = new CharacterizationHarness(directory)) {
+            WorldState world = harness.world("world");
+            PlayerHandle alice = harness.join("Alice", world, 0, 64, 0);
+            PlayerHandle bob = harness.join("Bob", world, 2, 64, 0);
+            PersistentHologram hologram = harness.persistent("variants", harness.at(world, 0, 64, 0));
+            hologram.apply(HologramDoc.parse("variants.json", """
+                {"schemaVersion":3,"revision":1,"anchor":{"world":"world","position":[0,64,0]},
+                 "lines":["base"],"variants":[
+                   {"id":"fallback","when":"true","presentation":{"lines":["fallback"]}},
+                   {"id":"near","priority":10,"when":"player.x < 1","presentation":{"lines":["near"]}}
+                 ]}
+                """));
+            hologram.update();
+            harness.drainDelayed();
+            harness.animator.pass(System.currentTimeMillis());
+            assertEquals("near", lastTextFor(harness, alice));
+            assertEquals("fallback", lastTextFor(harness, bob));
+            harness.moveTo(alice, world, 3, 64, 0);
+            Thread.sleep(55L);
+            hologram.update();
+            harness.drainDelayed();
+            harness.animator.pass(System.currentTimeMillis());
+            assertEquals("fallback", lastTextFor(harness, alice));
+            assertEquals("fallback", lastTextFor(harness, bob));
+            assertTrue(harness.schedulerErrors.isEmpty());
+        }
+    }
+
+    @Test
+    void hiddenPagesAreSkippedForEachViewer() {
+        try (CharacterizationHarness harness = new CharacterizationHarness(directory)) {
+            WorldState world = harness.world("world");
+            PlayerHandle alice = harness.join("Alice", world, 0, 64, 0);
+            PlayerHandle bob = harness.join("Bob", world, 2, 64, 0);
+            PersistentHologram hologram = harness.persistent("pages", harness.at(world, 0, 64, 0));
+            hologram.apply(HologramDoc.parse("pages.json", """
+                {"schemaVersion":3,"revision":1,"anchor":{"world":"world","position":[0,64,0]},
+                 "pages":[{"id":"near","show":"player.x < 1","lines":["near"]},
+                          {"id":"public","lines":["public"]}]}
+                """));
+            hologram.update();
+            harness.drainDelayed();
+            harness.animator.pass(System.currentTimeMillis());
+            assertEquals("near", lastTextFor(harness, alice));
+            assertEquals("public", lastTextFor(harness, bob));
+            assertEquals(List.of("public"), hologram.visiblePages(bob.uuid).stream().map(HologramPage::id).toList());
+            assertTrue(harness.service.setPage("pages", bob.uuid, "next"));
+            assertEquals("public", harness.service.viewerPage("pages", bob.uuid));
+        }
+    }
+
     private static String lastTextFor(CharacterizationHarness harness, PlayerHandle viewer) {
         List<String> texts = new ArrayList<>();
         for (CharacterizationHarness.Sent sent : harness.sender.sent) {

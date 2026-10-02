@@ -1276,7 +1276,10 @@ final class RealDropService {
         ParticleEmission emission = new ParticleEmission(state, itemOrigin, labelOrigin,
             state.labelAuthoredText, state.labelText, hasLabel, config, tick,
             TextPipeline.viewerSpecific(state.labelAuthoredText), new AtomicReference<>());
-        double range = plugin.cfg().particles().viewRange();
+        double range = 0.0D;
+        for (ParticleLayer layer : config.particleLayers()) {
+            range = Math.max(range, layer.viewDistance());
+        }
         if (itemParticles) {
             plugin.holograms().forEachNearbyViewer(itemOrigin, range * range,
                 viewer -> plugin.scheduler().runEntity(viewer,

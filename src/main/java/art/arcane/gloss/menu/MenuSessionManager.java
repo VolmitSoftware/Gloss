@@ -928,6 +928,11 @@ public final class MenuSessionManager {
    * gate, so a caller can test one specific document's own matcher against whatever block the
    * player is actually looking at — which is what {@code /gloss preview dump} needs.
    */
+  private double previewViewDistance() {
+    PreviewDocumentRegistry registry = previewRegistry();
+    return registry == null ? 10.0D : registry.maxViewDistance();
+  }
+
   public Block lookedAtBlock(Player player) {
     Location eyeLocation = player.getEyeLocation();
     World world = eyeLocation.getWorld();
@@ -937,7 +942,7 @@ public final class MenuSessionManager {
     RayTraceResult blockResult = world.rayTraceBlocks(
         eyeLocation,
         eyeLocation.getDirection(),
-        GlossConfig.current().previews().lookDistance(),
+        previewViewDistance(),
         FluidCollisionMode.NEVER,
         true
     );
@@ -971,7 +976,7 @@ public final class MenuSessionManager {
     if (world == null) {
       return null;
     }
-    double lookDistance = GlossConfig.current().previews().lookDistance();
+    double lookDistance = previewViewDistance();
     Vector direction = eyeLocation.getDirection();
     RayTraceResult blockResult = world.rayTraceBlocks(
         eyeLocation,
@@ -987,6 +992,13 @@ public final class MenuSessionManager {
         : null;
 
     PreviewDocumentRegistry registry = previewRegistry();
+    if (blockTarget != null && registry != null) {
+      CompiledPreviewDocument.Resolved resolved = targetBlock.getType() == Material.ENDER_CHEST
+          ? registry.special(PreviewDocumentRegistry.SPECIAL_ENDER_CHEST) : registry.forBlock(targetBlock.getType());
+      if (resolved != null && hitDistanceSquared(eyeLocation, blockResult) > resolved.doc().viewDistance() * resolved.doc().viewDistance()) {
+        blockTarget = null;
+      }
+    }
     if (!traceEntities || registry == null || !registry.hasEntityMatchers()) {
       return blockTarget;
     }
@@ -1007,6 +1019,10 @@ public final class MenuSessionManager {
       return blockTarget;
     }
     if (occluding && blockDistance + 0.01D < hitDistanceSquared(eyeLocation, entityResult)) {
+      return blockTarget;
+    }
+    CompiledPreviewDocument.Resolved resolved = registry.forEntity(targetEntity);
+    if (resolved != null && hitDistanceSquared(eyeLocation, entityResult) > resolved.doc().viewDistance() * resolved.doc().viewDistance()) {
       return blockTarget;
     }
     return PreviewTarget.entity(targetEntity);

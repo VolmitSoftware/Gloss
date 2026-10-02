@@ -16,16 +16,16 @@ class MotdExtrasMemoTest {
     @Test
     void aPlainEntrysSampleCountsAndVersionAreMemoised() {
         assertFalse(MotdService.extrasVary(new MotdDoc.MotdEntry(List.of("&aHello"), null,
-            List.of("&7A line", "&7Another"), "12", "100", "&bGloss")));
+            List.of("&7A line", "&7Another"), "12", "100", "&bGloss", null, null)));
     }
 
     @Test
     void anEntryWhoseSampleOrVersionCallsAFunctionIsRenderedEveryPing() {
         assertTrue(MotdService.extrasVary(new MotdDoc.MotdEntry(List.of("&aHello"), null,
-            List.of("|animation.rainbow|"), "12", "100", "&bGloss")));
+            List.of("|animation.rainbow|"), "12", "100", "&bGloss", null, null)));
         assertTrue(MotdService.extrasVary(new MotdDoc.MotdEntry(List.of("&aHello"), null,
-            List.of("&7A line"), "12", "100", "|animation.rainbow|")));
+            List.of("&7A line"), "12", "100", "|animation.rainbow|", null, null)));
         assertTrue(MotdService.extrasVary(new MotdDoc.MotdEntry(List.of("&aHello"), null,
-            List.of(), "|animation.rainbow|", "100", "&bGloss")));
+            List.of(), "|animation.rainbow|", "100", "&bGloss", null, null)));
     }
 }

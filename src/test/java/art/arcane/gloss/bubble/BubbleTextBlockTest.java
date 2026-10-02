@@ -13,6 +13,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class BubbleTextBlockTest {
     @Test
+    void formatSurroundsLiteralPlayerMessageAfterTrustedRendering() {
+        assertEquals(List.of("§e[<red>{{ fail() }}]"), ChatBubblesService.renderTextBlock(
+            "", "&e[{message}]", "<red>{{ fail() }}", 64, text -> text.replace("&e", "§e")));
+    }
+
+    @Test
     void wrapsDuplicateWordsInOrderInsideOneTextBlock() {
         assertEquals(List.of("hello world", "hello world"), BubbleTextBlock.wrap("", "hello world hello world", 11));
         assertEquals(List.of("aaa", "bbb", "aaa"), BubbleTextBlock.wrap("", "aaa bbb aaa", 3));
@@ -79,10 +85,10 @@ class BubbleTextBlockTest {
         AtomicInteger frame = new AtomicInteger();
         String message = "|animation.rainbow| &1literal";
 
-        List<String> first = ChatBubblesService.renderTextBlock("|animation.prefix|", message, 64,
-            prefix -> frame.getAndIncrement() == 0 ? "§c" : "§b");
-        List<String> second = ChatBubblesService.renderTextBlock("|animation.prefix|", message, 64,
-            prefix -> frame.getAndIncrement() == 1 ? "§b" : "§a");
+        List<String> first = ChatBubblesService.renderTextBlock("|animation.prefix|","{message}",  message, 64,
+            prefix -> prefix.replace("|animation.prefix|", frame.getAndIncrement() == 0 ? "§c" : "§b"));
+        List<String> second = ChatBubblesService.renderTextBlock("|animation.prefix|","{message}",  message, 64,
+            prefix -> prefix.replace("|animation.prefix|", frame.getAndIncrement() == 1 ? "§b" : "§a"));
 
         assertEquals(List.of("§c" + message), first);
         assertEquals(List.of("§b" + message), second);
@@ -92,7 +98,7 @@ class BubbleTextBlockTest {
     @Test
     void configuredParticleSpansSurviveWrappingWithoutParsingPlayerText() {
         ParticleText.Rendered rendered = ChatBubblesService.renderParticleTextBlock(
-            "<particles:rank>&4VIP</particles> ",
+            "<particles:rank>&4VIP</particles> ","{message}",
             "<particles:injected>hello</particles>", 64,
             prefix -> prefix.replace("&4", "§4"));
 
@@ -105,11 +111,11 @@ class BubbleTextBlockTest {
 
     @Test
     void trustedRichPrefixPreservesColorOnlyAndClosedTagStates() {
-        assertEquals(List.of("§cHello"), ChatBubblesService.renderTextBlock("<red>", "Hello", 64,
+        assertEquals(List.of("§cHello"), ChatBubblesService.renderTextBlock("<red>","{message}",  "Hello", 64,
             prefix -> prefix));
-        assertEquals(List.of("§cVIP§r Hello"), ChatBubblesService.renderTextBlock("<red>VIP</red> ",
+        assertEquals(List.of("§cVIP§r Hello"), ChatBubblesService.renderTextBlock("<red>VIP</red> ","{message}",
             "Hello", 64, prefix -> prefix));
-        assertEquals(List.of("§7Hello"), ChatBubblesService.renderTextBlock("&7", "Hello", 64,
+        assertEquals(List.of("§7Hello"), ChatBubblesService.renderTextBlock("&7","{message}",  "Hello", 64,
             prefix -> prefix));
     }
 
@@ -117,7 +123,7 @@ class BubbleTextBlockTest {
     void richPrefixKeepsParticleRangesAndPlayerMarkupLiteral() {
         String message = "<red>chat</red> |animation.fast| &a";
         ParticleText.Rendered rendered = ChatBubblesService.renderParticleTextBlock(
-            "<particles:rank><gradient:#ff0000:#0000ff>VIP</gradient></particles> ",
+            "<particles:rank><gradient:#ff0000:#0000ff>VIP</gradient></particles> ","{message}",
             message, 128, prefix -> prefix);
 
         assertEquals("VIP " + message, TextUtils.content(TextUtils.parseLegacy(rendered.text())));

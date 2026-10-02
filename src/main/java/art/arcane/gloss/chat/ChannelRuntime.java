@@ -57,7 +57,8 @@ public final class ChannelRuntime {
         List<CompiledVariant> variants = new ArrayList<>(ordered.size());
         for (ChannelDoc.Variant variant : ordered) {
             variants.add(new CompiledVariant(variant, ConditionCompiler.compile(
-                new ConditionSource("channels." + id + ".variants." + variant.id() + ".when", variant.when()))));
+                new ConditionSource("channels." + id + ".variants." + variant.id() + ".when", variant.when())),
+                of(id, variant.apply(doc))));
         }
         return new ChannelRuntime(id, doc, List.copyOf(filters), List.copyOf(variants), bodyScanner(doc));
     }
@@ -110,8 +111,16 @@ public final class ChannelRuntime {
     }
 
     public String format(ExprScope scope, BoundedConditionErrorCallback errors) {
-        ChannelDoc.Variant variant = activeVariant(scope, errors);
-        return variant == null ? doc.format() : variant.format();
+        return selected(scope, errors).doc().format();
+    }
+
+    public ChannelRuntime selected(ExprScope scope, BoundedConditionErrorCallback errors) {
+        for (CompiledVariant variant : variants) {
+            if (variant.condition().matches(scope, errors)) {
+                return variant.runtime();
+            }
+        }
+        return this;
     }
 
     /**
@@ -136,6 +145,6 @@ public final class ChannelRuntime {
     public record CompiledFilter(Pattern pattern, String replace) {
     }
 
-    private record CompiledVariant(ChannelDoc.Variant variant, CompiledCondition condition) {
+    private record CompiledVariant(ChannelDoc.Variant variant, CompiledCondition condition, ChannelRuntime runtime) {
     }
 }

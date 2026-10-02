@@ -13,6 +13,8 @@ import art.arcane.gloss.doc.DocumentRegistry;
 import art.arcane.gloss.doc.GlossDocument;
 import art.arcane.gloss.doc.RegistryOwner;
 import art.arcane.gloss.doc.ShippedDefaults;
+import art.arcane.gloss.condition.ShowCondition;
+import art.arcane.gloss.expr.ExprScope;
 import art.arcane.gloss.doc.ShippedDocumentCatalog;
 import art.arcane.volmlib.util.scheduling.FoliaScheduler;
 import art.arcane.volmlib.util.scheduling.SchedulerUtils;
@@ -74,6 +76,9 @@ public final class EntityOverlayService implements Listener, RegistryOwner {
     private final AtomicLong removalMutations = new AtomicLong();
     private final AtomicLong driveSequence = new AtomicLong();
     private volatile EntityOverlayDoc settings;
+    private volatile List<PresentationVariant> presentationVariants = List.of();
+
+    private record PresentationVariant(ShowCondition condition, EntityOverlayDoc document) {}
     private volatile boolean started;
     private volatile boolean reactPresent;
     private volatile boolean refreshText;
@@ -290,6 +295,13 @@ public final class EntityOverlayService implements Listener, RegistryOwner {
     private void applySettings(EntityOverlayDoc updated) {
         stopDriver();
         settings = updated;
+        List<PresentationVariant> variants = new ArrayList<>();
+        if (updated != null) {
+            for (EntityOverlayDoc.Variant variant : updated.variants()) {
+                variants.add(new PresentationVariant(ShowCondition.of(variant.when()), variant.presentation().apply(updated)));
+            }
+        }
+        presentationVariants = List.copyOf(variants);
         refreshText = updated != null && EntityOverlayText.refreshRequired(updated);
         trackDistance = updated != null && EntityOverlayText.usesDistance(updated);
         personalText = updated != null && EntityOverlayText.personalRequired(updated,
@@ -800,11 +812,23 @@ public final class EntityOverlayService implements Listener, RegistryOwner {
         if (target instanceof Player player) {
             snapshot = snapshot.withName(plugin.text().playerName(viewer, player));
         }
+        EntityOverlayDoc selected = current;
+        if (!presentationVariants.isEmpty()) {
+            ExprScope scope = EntityOverlayText.variantScope(plugin, viewer, snapshot, !details.isEmpty());
+            for (PresentationVariant variant : presentationVariants) {
+                if (variant.condition().matches(scope)) {
+                    selected = variant.document();
+                    break;
+                }
+            }
+        }
+        boolean presentationChanged = render.presentation != selected;
+        current = selected;
         long render0 = plugin.text().renderGeneration();
         long emoji = TextPipeline.emojiGeneration();
         long animation = plugin.animations().generation();
         EntityOverlaySource source = sourceFor(target);
-        boolean prepare = source != null || render.prepared == null || refreshText || !snapshot.equals(render.snapshot)
+        boolean prepare = source != null || presentationChanged || render.prepared == null || refreshText || !snapshot.equals(render.snapshot)
             || !details.equals(render.details) || render0 != render.renderGeneration
             || emoji != render.emojiGeneration || animation != render.animationGeneration;
         if (prepare) {
@@ -831,9 +855,18 @@ public final class EntityOverlayService implements Listener, RegistryOwner {
             return false;
         }
         EntityOverlaySource.Pane pane = render.pane;
-        if (!overlay.attach(render, () -> createDisplay(target, current, anchor, pane))) {
+        EntityOverlayDoc presentation = current;
+        if (!overlay.attach(render, () -> createDisplay(target, presentation, anchor, pane))) {
             return false;
         }
+        if (presentationChanged && pane == null) {
+            render.display.setStyle(current.style());
+            render.display.setBox(current.box());
+            render.display.setParticleLayers(current.particleLayers());
+            double offset = current.verticalOffset();
+            render.display.bindPosition(target, () -> target.getLocation().add(0, target.getHeight() + offset, 0));
+        }
+        render.presentation = current;
         if (!frame.equals(render.frame)) {
             render.display.setRenderedLines(lines(frame.text()));
             List<ParticleTextSpan> spans = new ArrayList<>(frame.spans().size());

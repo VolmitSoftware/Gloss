@@ -11,6 +11,7 @@ import art.arcane.gloss.drop.RealDropSettingsDoc;
 import art.arcane.gloss.indicator.DamageIndicatorSettingsDoc;
 import art.arcane.gloss.entity.EntityOverlayDoc;
 import art.arcane.gloss.motd.MotdDoc;
+import art.arcane.gloss.names.NamesDoc;
 import art.arcane.gloss.tab.TablistDoc;
 
 import java.util.ArrayList;
@@ -79,6 +80,9 @@ public final class ShippedDocumentCatalog {
     public static final Entry<TablistDoc> TABLIST =
         new Entry<>(TablistDoc.KIND, List.of("tablist"), TablistDoc::parse);
 
+    public static final Entry<NamesDoc> NAMES =
+        new Entry<>(NamesDoc.KIND, List.of("names"), NamesDoc::parse);
+
     public static final Entry<MotdDoc> MOTD =
         new Entry<>(MotdDoc.KIND, List.of("motd"), MotdDoc::parse);
 
@@ -100,7 +104,7 @@ public final class ShippedDocumentCatalog {
     private ShippedDocumentCatalog() {
     }
 
-    private static final List<Entry<?>> CORE = List.of(EMOJI, ANIMATIONS, BOARDS, BUBBLES, TABLIST, MOTD,
+    private static final List<Entry<?>> CORE = List.of(NAMES, EMOJI, ANIMATIONS, BOARDS, BUBBLES, TABLIST, MOTD,
         REAL_DROPS, DAMAGE_INDICATORS, ENTITY_OVERLAYS, MENUS);
 
     // Lane catalogs: a lane declares its Entry constants and lists them in its own constant so no

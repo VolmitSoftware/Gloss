@@ -10,6 +10,7 @@ import art.arcane.gloss.config.action.MenuActionData;
 import org.bukkit.util.Vector;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
@@ -19,7 +20,8 @@ import java.util.Set;
 public record HologramDoc(int schemaVersion, long revision, Anchor anchor, List<HologramLine> lines,
                           IconDisplayStyle style, HologramBox box, Double yaw, Double pitch,
                           List<ParticleLayer> particleLayers, ShowCondition show,
-                          List<HologramPage> pages, List<MenuActionData> actions, Hitbox hitbox) {
+                          List<HologramPage> pages, List<MenuActionData> actions, Hitbox hitbox,
+                          Double viewDistance, Integer refreshTicks, List<Variant> variants) {
     public static final String KIND = "holograms";
     public static final int CURRENT_SCHEMA_VERSION = 3;
     public static final double DEFAULT_SCALE = 1.0D;
@@ -73,6 +75,14 @@ public record HologramDoc(int schemaVersion, long revision, Anchor anchor, List<
     public HologramDoc {
         DocumentEnvelope.requireSchemaVersion(KIND, schemaVersion, CURRENT_SCHEMA_VERSION);
         DocumentEnvelope.requireRevision(KIND, revision);
+        viewDistance = viewDistance == null ? 48.0D : viewDistance;
+        refreshTicks = refreshTicks == null ? 10 : refreshTicks;
+        if (!Double.isFinite(viewDistance) || viewDistance < 4.0D || viewDistance > 128.0D) {
+            throw new IllegalArgumentException("hologram viewDistance must be within 4..128");
+        }
+        if (refreshTicks < 1 || refreshTicks > 200) {
+            throw new IllegalArgumentException("hologram refreshTicks must be within 1..200");
+        }
         anchor = Objects.requireNonNull(anchor, "hologram requires an anchor");
         lines = copyLines(lines);
         pages = copyPages(pages);
@@ -86,19 +96,58 @@ public record HologramDoc(int schemaVersion, long revision, Anchor anchor, List<
         particleLayers = ParticleLayer.copyLayers(particleLayers, "hologram");
         show = show == null ? ShowCondition.ALWAYS : show;
         actions = copyActions(actions);
+        variants = copyVariants(variants);
     }
 
     /** The text-only form used by the importer and by holograms created from commands. */
     public HologramDoc(int schemaVersion, long revision, Anchor anchor, List<String> lines,
                        IconDisplayStyle style, HologramBox box, Double yaw, Double pitch,
-                       List<ParticleLayer> particleLayers, ShowCondition show) {
+                       List<ParticleLayer> particleLayers, ShowCondition show, Double viewDistance, Integer refreshTicks) {
         this(schemaVersion, revision, anchor, textLines(lines), style, box, yaw, pitch, particleLayers, show,
-            List.of(), List.of(), null);
+            List.of(), List.of(), null, viewDistance, refreshTicks, List.of());
     }
 
     public HologramDoc withRevision(long revision) {
         return new HologramDoc(schemaVersion, revision, anchor, lines, style, box, yaw, pitch,
-            particleLayers, show, pages, actions, hitbox);
+            particleLayers, show, pages, actions, hitbox, viewDistance, refreshTicks, variants);
+    }
+
+    public record Variant(String id, Integer priority, String when, Presentation presentation) {
+        public Variant {
+            if (id == null || !id.matches("[a-z0-9][a-z0-9._-]{0,63}")) {
+                throw new IllegalArgumentException("Invalid hologram variant id");
+            }
+            priority = priority == null ? 0 : Math.clamp(priority, -1000, 1000);
+            when = ShowCondition.of(Objects.requireNonNull(when, "variant when")).expression();
+            presentation = Objects.requireNonNull(presentation, "variant presentation");
+        }
+    }
+
+    public record Presentation(List<HologramLine> lines, IconDisplayStyle style, HologramBox box,
+                               List<ParticleLayer> particleLayers) {
+        public Presentation {
+            lines = lines == null ? null : copyLines(lines);
+            particleLayers = particleLayers == null ? null : ParticleLayer.copyLayers(particleLayers, KIND);
+        }
+    }
+
+    private static List<Variant> copyVariants(List<Variant> variants) {
+        if (variants == null) {
+            return List.of();
+        }
+        if (variants.size() > 64) {
+            throw new IllegalArgumentException("Holograms may declare at most 64 variants");
+        }
+        List<Variant> ordered = new ArrayList<>(variants);
+        Set<String> ids = new HashSet<>();
+        for (Variant variant : ordered) {
+            if (!ids.add(variant.id())) {
+                throw new IllegalArgumentException("Duplicate hologram variant: " + variant.id());
+            }
+        }
+        ordered.sort(Comparator.comparingInt((Variant variant) -> variant.priority()).reversed()
+            .thenComparing(Variant::id));
+        return List.copyOf(ordered);
     }
 
     public static HologramDoc parse(String fileName, String raw) {

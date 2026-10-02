@@ -174,9 +174,6 @@ public record HologramLine(Kind kind, String value, MenuIconData item, ShowCondi
                 throw new IllegalArgumentException("hologram line needs text, item, head, block or entity at "
                     + in.getPath());
             }
-            if (kind != Kind.TEXT && show != null) {
-                throw new IllegalArgumentException("only text hologram lines accept show at " + in.getPath());
-            }
             return new HologramLine(kind, value, item, show, scale);
         }
 

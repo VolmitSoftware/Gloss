@@ -1,6 +1,7 @@
 package art.arcane.gloss.config.icon;
 
 import art.arcane.gloss.api.IconDisplayStyle;
+import java.util.List;
 
 import art.arcane.gloss.enums.MenuIconType;
 import art.arcane.gloss.exceptions.MenuIconException;
@@ -8,7 +9,9 @@ import art.arcane.gloss.exceptions.MenuIconException;
 public record PlayerHeadIconData(
     String player,
     IconDisplayStyle style,
-    Integer refreshTicks
+    Integer refreshTicks,
+    String name,
+    List<String> lore
 ) implements MenuIconData {
   /**
    * One second. A head is worth re-reading far less often than a text line, but the first render of
@@ -21,6 +24,7 @@ public record PlayerHeadIconData(
   public static final int MAX_REFRESH_TICKS = 1200;
 
   public PlayerHeadIconData {
+    lore = lore == null ? List.of() : List.copyOf(lore);
     if (refreshTicks != null && (refreshTicks < 0 || refreshTicks > MAX_REFRESH_TICKS)) {
       throw new IllegalArgumentException("refreshTicks must be between 0 and " + MAX_REFRESH_TICKS);
     }

@@ -25,23 +25,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class GlossConfigTest {
     @Test
-    void dropShowAcceptsTomlBooleansAndExpressions() throws IOException {
-        GlossConfigFile hidden = TomlCodec.fromToml("[drops]\nshow = false\n", GlossConfigFile.class);
-        hidden.normalize();
-        assertFalse(GlossConfig.from(hidden).drops().show().matches(null));
-
-        GlossConfigFile dynamic = TomlCodec.fromToml("[drops]\nshow = \"world.time > 12000\"\n", GlossConfigFile.class);
-        dynamic.normalize();
-        GlossConfigFile restored = TomlCodec.fromToml(
-            TomlCodec.toToml(dynamic, "gloss", ConfigExposePolicy.ALL), GlossConfigFile.class);
-        restored.normalize();
-        assertEquals("world.time > 12000", GlossConfig.from(restored).drops().show().expression());
-
-        GlossConfigFile invalid = TomlCodec.fromToml("[drops]\nshow = 7\n", GlossConfigFile.class);
-        assertThrows(IllegalArgumentException.class, invalid::normalize);
-    }
-
-    @Test
     void defaultsRoundTripThroughToml() throws IOException {
         GlossConfigFile defaults = new GlossConfigFile();
         defaults.normalize();
@@ -58,7 +41,6 @@ class GlossConfigTest {
         assertTrue(snapshot.splashScreen());
         assertTrue(snapshot.metrics());
         assertEquals(5, snapshot.hotload().watchIntervalTicks());
-        assertEquals(0.26D, snapshot.holograms().stackDistance());
         assertEquals(2, snapshot.holograms().temporaryUpdateIntervalTicks());
         assertTrue(snapshot.holograms().interpolatedMotion());
         assertTrue(snapshot.holograms().highFrequencyAnimations());
@@ -67,14 +49,11 @@ class GlossConfigTest {
         assertEquals(40, snapshot.tablist().updateIntervalTicks());
         assertTrue(snapshot.groups().useVault());
         assertTrue(snapshot.bubbles().enabled());
-        assertTrue(snapshot.bubbles().blacklistWorlds().isEmpty());
         assertTrue(snapshot.indicators().enabled());
         assertTrue(snapshot.commands().sounds());
         assertFalse(snapshot.motd().enabled());
         assertEquals(1.0F, snapshot.menus().uiScale());
         assertTrue(snapshot.previews().enabled());
-        assertEquals(10.0D, snapshot.previews().lookDistance());
-        assertEquals(0.65F, snapshot.previews().scale());
         assertEquals(GlossConfigFile.BUILDER_URL_DEFAULT, snapshot.editorSync().builderUrl());
         assertEquals(GlossConfigFile.EDITOR_SYNC_ENDPOINT_DEFAULT, snapshot.editorSync().endpoint());
         assertEquals("", snapshot.editorSync().createToken());
@@ -82,7 +61,6 @@ class GlossConfigTest {
         assertFalse(snapshot.debug().hitbox());
         assertFalse(snapshot.debug().position());
         assertFalse(snapshot.debug().animator());
-        assertTrue(snapshot.drops().preserveCustomNames());
         assertTrue(snapshot.realDrops().enabled());
         assertEquals(2, snapshot.realDrops().limits().updateIntervalTicks());
         assertEquals(20, snapshot.realDrops().limits().settledPollIntervalTicks());
@@ -127,9 +105,6 @@ class GlossConfigTest {
             [editor.sync]
             sessionMinutes = 1
 
-            [preview]
-            scale = 99.0
-
             [menus]
             uiScale = 0.01
 
@@ -146,7 +121,6 @@ class GlossConfigTest {
         assertEquals(240, loaded.holograms.maxAnimationFps);
         assertEquals(100, loaded.holograms.animationPacketBudget);
         assertEquals(5, loaded.editor.sync.sessionMinutes);
-        assertEquals(4.0D, loaded.preview.scale);
         assertEquals(0.25D, loaded.menus.uiScale);
         assertEquals(List.of("oraxen", "nexo"), loaded.items.customItemProviders);
 
@@ -157,7 +131,6 @@ class GlossConfigTest {
         assertTrue(rewritten.contains("maxAnimationFps = 240"));
         assertTrue(rewritten.contains("animationPacketBudget = 100"));
         assertTrue(rewritten.contains("sessionMinutes = 5"));
-        assertTrue(rewritten.contains("scale = 4.0"));
         assertTrue(rewritten.contains("uiScale = 0.25"));
         assertTrue(rewritten.contains("customItemProviders = [\"oraxen\", \"nexo\"]"));
     }

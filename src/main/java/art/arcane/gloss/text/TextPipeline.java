@@ -312,6 +312,10 @@ public final class TextPipeline implements TextRenderer {
         return EMOJI_GENERATION.get();
     }
 
+    public void invalidateRendering() {
+        renderGeneration.incrementAndGet();
+    }
+
     public long renderGeneration() {
         return renderGeneration.get();
     }

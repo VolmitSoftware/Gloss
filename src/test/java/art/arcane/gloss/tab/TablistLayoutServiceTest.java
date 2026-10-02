@@ -64,7 +64,7 @@ class TablistLayoutServiceTest {
         Player second = player("second");
         TablistLayoutRuntime runtime = runtime(2, 1, List.of(
             new TablistDoc.Slot(0, 0, "&6Staff", null, null)),
-            new TablistDoc.Players(1, 1, 1, "true", "hide"));
+            new TablistDoc.Players(1, 1, 1, "true", "hide", null));
 
         layouts.apply(viewer, runtime, List.of(viewer), this::scope, silent());
         sends.clear();
@@ -81,9 +81,9 @@ class TablistLayoutServiceTest {
         Player second = player("bbb");
         Player third = player("ccc");
         TablistLayoutRuntime hide = runtime(1, 2, List.of(),
-            new TablistDoc.Players(0, 1, 2, "true", "hide"));
+            new TablistDoc.Players(0, 1, 2, "true", "hide", null));
         TablistLayoutRuntime count = runtime(1, 2, List.of(),
-            new TablistDoc.Players(0, 1, 2, "true", "count"));
+            new TablistDoc.Players(0, 1, 2, "true", "count", "and {count} more"));
 
         layouts.apply(viewer, hide, List.of(third, viewer, second), this::scope, silent());
         assertEquals("add aaa [ gloss_slot_0=aaa,  gloss_slot_1=bbb]", sends.get(0));
@@ -91,7 +91,7 @@ class TablistLayoutServiceTest {
         sends.clear();
         layouts.forget(viewer.getUniqueId());
         layouts.apply(viewer, count, List.of(third, viewer, second), this::scope, silent());
-        assertEquals("add aaa [ gloss_slot_0=aaa,  gloss_slot_1=+2]", sends.get(0));
+        assertEquals("add aaa [ gloss_slot_0=aaa,  gloss_slot_1=and 2 more]", sends.get(0));
     }
 
     @Test
@@ -99,7 +99,7 @@ class TablistLayoutServiceTest {
         Player viewer = player("aaa");
         Player hidden = player("bbb");
         TablistLayoutRuntime runtime = runtime(1, 2, List.of(),
-            new TablistDoc.Players(0, 1, 2, "subject.name != 'bbb'", "hide"));
+            new TablistDoc.Players(0, 1, 2, "subject.name != 'bbb'", "hide", null));
 
         layouts.apply(viewer, runtime, List.of(viewer, hidden), this::scope, silent());
 
@@ -154,7 +154,7 @@ class TablistLayoutServiceTest {
                 (observer, subject) -> "[Staff] " + subject.getName(),
                 (observer, subject) -> subject == staff ? 10 : 0));
         TablistLayoutRuntime runtime = runtime(1, 2, List.of(),
-            new TablistDoc.Players(0, 1, 2, "true", "hide"));
+            new TablistDoc.Players(0, 1, 2, "true", "hide", null));
 
         weighted.apply(viewer, runtime, List.of(viewer, staff), this::scope, silent());
 
@@ -177,7 +177,7 @@ class TablistLayoutServiceTest {
             new TablistLayoutService.Renderers(text -> text, (observer, subject) -> "Same",
                 (observer, subject) -> 0));
         TablistLayoutRuntime runtime = runtime(1, 1, List.of(),
-            new TablistDoc.Players(0, 1, 1, "true", "hide"));
+            new TablistDoc.Players(0, 1, 1, "true", "hide", null));
         identicalNames.apply(viewer, runtime, List.of(viewer), this::scope, silent());
         sends.clear();
         written.clear();

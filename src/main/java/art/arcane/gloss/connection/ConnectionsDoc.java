@@ -17,7 +17,7 @@ import java.util.Locale;
  * {@code audience} are read without complaint and have no meaning here — one server is the whole
  * network, and a backend never sees a server switch.
  */
-public record ConnectionsDoc(int schemaVersion, long revision, ShowCondition show, Section join, Section leave) {
+public record ConnectionsDoc(int schemaVersion, long revision, ShowCondition show, Section join, Section leave, Section firstJoin) {
     public static final String KIND = "connections";
     public static final int CURRENT_SCHEMA_VERSION = 1;
     public static final String AUDIENCE_NETWORK = "network";
@@ -29,7 +29,7 @@ public record ConnectionsDoc(int schemaVersion, long revision, ShowCondition sho
         new Section(Boolean.TRUE, ShowCondition.ALWAYS, AUDIENCE_NETWORK,
             new Presentation("&a+ &f{{ subject.name }} &7joined"), List.of()),
         new Section(Boolean.TRUE, ShowCondition.ALWAYS, AUDIENCE_NETWORK,
-            new Presentation("&c- &f{{ subject.name }} &7left"), List.of()));
+            new Presentation("&c- &f{{ subject.name }} &7left"), List.of()), Section.DISABLED);
 
     public ConnectionsDoc {
         show = show == null ? ShowCondition.ALWAYS : show;
@@ -37,6 +37,7 @@ public record ConnectionsDoc(int schemaVersion, long revision, ShowCondition sho
         DocumentEnvelope.requireRevision(KIND, revision);
         join = join == null ? Section.DISABLED : join;
         leave = leave == null ? Section.DISABLED : leave;
+        firstJoin = firstJoin == null ? Section.DISABLED : firstJoin;
     }
 
     public static ConnectionsDoc parse(String fileName, String raw) {

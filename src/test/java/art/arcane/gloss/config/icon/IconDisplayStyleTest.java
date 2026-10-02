@@ -123,7 +123,7 @@ public class IconDisplayStyleTest {
   private static MenuSession session() {
     MenuDefinitionData data = new MenuDefinitionData(
         new Vector(), false, false, 8D, false, false, List.<MenuComponentData>of(), List.of(), ShowCondition.ALWAYS
-    , Map.of());
+    , Map.of(), List.of());
     data.setId("style-test");
     Player player = (Player) Proxy.newProxyInstance(
         Player.class.getClassLoader(),

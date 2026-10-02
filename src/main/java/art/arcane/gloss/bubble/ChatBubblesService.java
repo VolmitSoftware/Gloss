@@ -57,7 +57,6 @@ public final class ChatBubblesService implements Listener, RegistryOwner {
     private static final String STATE_FILE_NAME = "bubble-styles.json";
     private static final int STYLE_PERSIST_DELAY_TICKS = 40;
     static final int EXPIRY_SWEEP_INTERVAL_TICKS = 20;
-    private static final int MAX_BUBBLES_PER_SENDER = 4;
     private static final int MAX_ACTIVE_BUBBLES = 2048;
     private final Gloss plugin;
     private final ShippedDefaults defaults;
@@ -238,19 +237,19 @@ public final class ChatBubblesService implements Listener, RegistryOwner {
         if (!plugin.cfg().bubbles().enabled() || !sender.isOnline()) {
             return;
         }
-        if (plugin.cfg().bubbles().blacklistWorlds().contains(sender.getWorld().getName())) {
-            return;
-        }
         if (!sender.hasPermission(SEND_PERMISSION)) {
             return;
         }
 
         ResolvedStyle resolved = resolveStyle(sender);
         BubbleStyleDoc style = resolved.document();
+        if (style.blacklistWorlds().contains(sender.getWorld().getName())) {
+            return;
+        }
         if (!style.show().isDynamic() && !style.show().isAlwaysVisible()) {
             return;
         }
-        ParticleText.Rendered particleText = renderParticleTextBlock(style.prefix(), message,
+        ParticleText.Rendered particleText = renderParticleTextBlock(style.prefix(), style.format(), message,
             style.wordWrapChars(), prefix -> plugin.text().render(sender, prefix));
         List<String> lines = List.of(particleText.text().split("\n", -1));
         if (!lines.isEmpty()) {
@@ -322,13 +321,13 @@ public final class ChatBubblesService implements Listener, RegistryOwner {
 
             record = new BubbleRecord(hologram, captured, offset, resolved.motion(), resolved.shimmer(),
                 style.followPlayer(), startedAtMs, style.maxAliveMs(), startedAtMs + style.maxAliveMs(), lines.size(),
-                seed(senderId, startedAtMs, sequence), style.prefix(), message, style.wordWrapChars(), lines,
-                particleText);
+                seed(senderId, startedAtMs, sequence), style.prefix(), style.format(), message, style.wordWrapChars(), lines,
+                particleText, style.stackDistance());
             publishInitialText(record, startedAtMs);
             SenderPublication publication;
             synchronized (bubbleLifecycleLock) {
                 publication = acceptingBubbles
-                    ? publishBubble(bubbles, senderId, eyePoint, record, MAX_BUBBLES_PER_SENDER)
+                    ? publishBubble(bubbles, senderId, eyePoint, record, style.maxPerSender())
                     : null;
             }
             if (publication == null) {
@@ -387,7 +386,7 @@ public final class ChatBubblesService implements Listener, RegistryOwner {
 
     private BubbleFrame sampleFrame(SenderState state, BubbleRecord record) {
         int stackedLineCount = state.stackedLineCount(record);
-        double stackY = BubbleStackMath.offsetY(plugin.holograms().stackSpread(), stackedLineCount);
+        double stackY = BubbleStackMath.offsetY(record.stackDistance, stackedLineCount);
         long remainingMs = Math.max(0L, record.hologram.remainingMs());
         double ageMs = Math.max(0.0D, record.durationMs - remainingMs);
         double t = Math.max(0.0D, Math.min(1.0D, ageMs / record.durationMs));
@@ -407,16 +406,18 @@ public final class ChatBubblesService implements Listener, RegistryOwner {
         return (mixed >>> 11) * 0x1.0p-53;
     }
 
-    static List<String> renderTextBlock(String prefix, String message, int wrapChars, UnaryOperator<String> renderer) {
-        String rendered = renderer.apply(prefix);
-        String legacy = TextUtils.renderLegacy((rendered == null ? "" : rendered) + '\uE000');
-        return BubbleTextBlock.wrap(legacy.substring(0, legacy.length() - 1), message, wrapChars);
+    static List<String> renderTextBlock(String prefix, String format, String message, int wrapChars, UnaryOperator<String> renderer) {
+        String marker = "\uE000";
+        String template = prefix + format.replace("{message}", marker);
+        String rendered = renderer.apply(template);
+        String legacy = TextUtils.renderLegacy(rendered == null ? "" : rendered);
+        return BubbleTextBlock.wrap("", legacy.replace(marker, message == null ? "" : message), wrapChars);
     }
 
-    static ParticleText.Rendered renderParticleTextBlock(String prefix, String message, int wrapChars,
+    static ParticleText.Rendered renderParticleTextBlock(String prefix, String format, String message, int wrapChars,
                                                           UnaryOperator<String> renderer) {
-        return ParticleText.render(prefix, marked -> String.join("\n",
-            renderTextBlock(marked, message, wrapChars, renderer)));
+        return ParticleText.render(prefix + format, marked -> String.join("\n",
+            renderTextBlock("", marked, message, wrapChars, renderer)));
     }
 
     private void drive() {
@@ -440,7 +441,7 @@ public final class ChatBubblesService implements Listener, RegistryOwner {
         if (!record.dynamicPrefix) {
             return;
         }
-        ParticleText.Rendered particleText = renderParticleTextBlock(record.prefix, record.message,
+        ParticleText.Rendered particleText = renderParticleTextBlock(record.prefix, record.format, record.message,
             record.wrapChars, prefix -> plugin.text().render(sender, prefix));
         List<String> lines = List.of(particleText.text().split("\n", -1));
         if (lines.isEmpty() || lines.equals(record.renderedLines)) {
@@ -713,7 +714,9 @@ public final class ChatBubblesService implements Listener, RegistryOwner {
         final long durationMs;
         final long expiresAtMs;
         final double seed;
+        final double stackDistance;
         final String prefix;
+        final String format;
         final String message;
         final int wrapChars;
         final boolean dynamicPrefix;
@@ -729,8 +732,8 @@ public final class ChatBubblesService implements Listener, RegistryOwner {
 
         BubbleRecord(TemporaryHologram hologram, Location captured, Vector offset, BubbleMotionPlan motion,
                      BubbleShimmerPlan shimmer, boolean followPlayer, long startedAtMs, long durationMs,
-                     long expiresAtMs, int lineCount, double seed, String prefix, String message, int wrapChars,
-                     List<String> renderedLines, ParticleText.Rendered particleText) {
+                     long expiresAtMs, int lineCount, double seed, String prefix, String format, String message, int wrapChars,
+                     List<String> renderedLines, ParticleText.Rendered particleText, double stackDistance) {
             this.hologram = hologram;
             this.captured = captured;
             this.offset = offset.clone();
@@ -742,10 +745,12 @@ public final class ChatBubblesService implements Listener, RegistryOwner {
             this.expiresAtMs = expiresAtMs;
             this.lineCount = Math.max(1, lineCount);
             this.seed = seed;
+            this.stackDistance = stackDistance;
             this.prefix = prefix;
+            this.format = format;
             this.message = message;
             this.wrapChars = wrapChars;
-            this.dynamicPrefix = TextPipeline.viewerDependent(prefix);
+            this.dynamicPrefix = TextPipeline.viewerDependent(prefix + format);
             this.renderedLines = List.copyOf(renderedLines);
             this.particleText = particleText;
             this.shimmerBase = this.renderedLines;

@@ -106,7 +106,7 @@ public final class DropNameService implements Listener, RegistryOwner {
         this.nativeParticleLabels = new ConcurrentHashMap<>();
         this.rehydrateChunks = new ConcurrentLinkedDeque<>();
         this.realDropDoc = RealDropSettingsDoc.DEFAULTS;
-        this.realDropPlan = compileRealDropPlan(realDropDoc, false, ShowCondition.ALWAYS);
+        this.realDropPlan = compileRealDropPlan(realDropDoc, false);
     }
 
     public void enable() {
@@ -329,7 +329,7 @@ public final class DropNameService implements Listener, RegistryOwner {
         }
 
         if (DropNameFormatter.preservesExistingName(
-            drops.preserveCustomNames(), item.getCustomName() != null, glossOwned)) {
+            labels.preserveCustomNames(), item.getCustomName() != null, glossOwned)) {
             RealDropService.Label preserved = realDrops.preservedLabel(item);
             trackNativeParticles(item, preserved, presentation);
             realDrops.present(item, preserved, presentation);
@@ -361,17 +361,17 @@ public final class DropNameService implements Listener, RegistryOwner {
         }
         RealDropService.Label label = new RealDropService.Label(labelLines, renderedLines);
         trackNativeParticles(item, label, presentation);
-        if (!drops.show().isAlwaysVisible()) {
+        if (!labels.show().isAlwaysVisible()) {
             item.setCustomNameVisible(false);
         }
-        realDrops.present(item, drops.show().isAlwaysVisible() ? label : RealDropService.Label.none(), presentation);
+        realDrops.present(item, labels.show().isAlwaysVisible() ? label : RealDropService.Label.none(), presentation);
         applyStyledLabel(item, label, presentation);
     }
 
     private void applyStyledLabel(Item item, RealDropService.Label label,
                                        RealDropConditionPlan.Selection selection) {
         UUID itemId = item.getUniqueId();
-        ShowCondition show = plugin.cfg().drops().show();
+        ShowCondition show = selection.style().config().labels().show();
         if (show.isAlwaysVisible() && selection.style().config().enabled()) {
             removeConditionalLabel(itemId);
             return;
@@ -391,7 +391,7 @@ public final class DropNameService implements Listener, RegistryOwner {
             conditionalLabels.put(itemId, current);
             ConditionalLabel bound = current;
             plugin.holograms().setViewerCondition(hologram,
-                viewer -> plugin.cfg().drops().show().matches(
+                viewer -> bound.selection.style().config().labels().show().matches(
                     new GlossConditionScope(plugin, bound.selection.snapshot().viewerContext(viewer)))
                     && (!bound.selection.style().config().enabled() || bound.selection.visibleTo(plugin, viewer)));
             hologram.bindPosition(item, () -> {
@@ -573,9 +573,13 @@ public final class DropNameService implements Listener, RegistryOwner {
         }
     }
 
+    public void refreshNames() {
+        renderedNames.clear();
+        reloadPresentations();
+    }
+
     private void refreshRealDropConfig() {
-        realDropPlan = compileRealDropPlan(realDropDoc, plugin.cfg().realDrops().enabled(),
-            plugin.cfg().drops().show());
+        realDropPlan = compileRealDropPlan(realDropDoc, plugin.cfg().realDrops().enabled());
     }
 
     private void reloadPresentations() {
@@ -601,10 +605,10 @@ public final class DropNameService implements Listener, RegistryOwner {
     }
 
     private static RealDropConditionPlan compileRealDropPlan(RealDropSettingsDoc document,
-                                                             boolean enabled, ShowCondition viewerShow) {
+                                                             boolean enabled) {
         BoundedConditionErrorCallback errors = BoundedConditionErrorCallback.bounded(8, error ->
             Gloss.warn("Real-drop condition %s failed closed: %s", error.path(), error.message()));
-        return RealDropConditionPlan.compile(document, enabled, errors, viewerShow);
+        return RealDropConditionPlan.compile(document, enabled, errors);
     }
 
     private static String typeLabel(GlossConfig.RealDrops.Labels labels, ItemStack stack) {
@@ -693,10 +697,13 @@ public final class DropNameService implements Listener, RegistryOwner {
             return;
         }
         GlossConfig.RealDrops config = state.selection().style().config();
-        if (!plugin.cfg().drops().show().isAlwaysVisible()) {
+        if (!config.labels().show().isAlwaysVisible()) {
             return;
         }
-        double range = plugin.cfg().particles().viewRange();
+        double range = 0.0D;
+        for (ParticleLayer layer : config.particleLayers()) {
+            range = Math.max(range, layer.viewDistance());
+        }
         Location origin = item.getLocation().clone().add(0.0D, config.labels().yOffset(), 0.0D);
         boolean viewerText = TextPipeline.viewerSpecific(state.authored());
         AtomicReference<NativeParticleFrame> shared = new AtomicReference<>();

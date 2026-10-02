@@ -64,6 +64,26 @@ final class ProxyMotdTest {
     }
 
     @Test
+    void entryConditionsExcludeHiddenWeightsAndPreserveTheOriginalWhenNoneMatch() throws IOException {
+        ProxyDocuments.seed(directory);
+        Files.writeString(directory.resolve("motd.json"), """
+            {"schemaVersion":1,"entries":[
+              {"lines":["Hidden"],"show":false,"weight":1000000},
+              {"lines":["Visible"],"show":"server.online > 0","weight":1}]}
+            """);
+        ProxyDocuments.Snapshot snapshot = ProxyDocuments.load(directory);
+        ProxyServer proxy = mock(ProxyServer.class);
+        ProxyText text = new ProxyText(proxy);
+        ProxyMotd service = new ProxyMotd(text, directory, snapshot.motd());
+        ServerPing original = original();
+        assertSame(original, service.render(original, snapshot));
+        when(proxy.getPlayerCount()).thenReturn(1);
+        for (int index = 0; index < 20; index++) {
+            assertEquals(Component.text("Visible"), service.render(original, snapshot).getDescriptionComponent());
+        }
+    }
+
+    @Test
     void invalidFaviconRejectsSnapshotActivation() throws IOException {
         ProxyDocuments.seed(directory);
         Files.createDirectories(directory.resolve("images"));

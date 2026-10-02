@@ -1,0 +1,141 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://volmit.com/gloss/motd.schema.json",
+  "title": "Gloss MOTD Document",
+  "type": "object",
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991
+    },
+    "show": {
+      "type": [
+        "string",
+        "boolean"
+      ],
+      "description": "Boolean or Gloss condition expression."
+    },
+    "favicon": {
+      "type": "string"
+    },
+    "entries": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/entry"
+      },
+      "minItems": 1
+    },
+    "links": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/link"
+      },
+      "maxItems": 16
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "revision",
+    "entries"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "entry": {
+      "type": "object",
+      "properties": {
+        "lines": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "maxItems": 2
+        },
+        "favicon": {
+          "type": "string"
+        },
+        "sample": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 12
+        },
+        "online": {
+          "type": "string"
+        },
+        "max": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        },
+        "show": {
+          "type": [
+            "string",
+            "boolean"
+          ],
+          "description": "Boolean or Gloss condition expression."
+        },
+        "weight": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000000,
+          "default": 1
+        }
+      },
+      "required": [
+        "lines"
+      ],
+      "additionalProperties": false
+    },
+    "link": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "enum": [
+            "report_bug",
+            "community_guidelines",
+            "support",
+            "status",
+            "feedback",
+            "community",
+            "website",
+            "forums",
+            "news",
+            "announcements"
+          ]
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1
+        },
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "pattern": "^https?://"
+        }
+      },
+      "required": [
+        "url"
+      ],
+      "additionalProperties": false,
+      "anyOf": [
+        {
+          "required": [
+            "type"
+          ]
+        },
+        {
+          "required": [
+            "label"
+          ]
+        }
+      ]
+    }
+  }
+}

@@ -752,7 +752,7 @@ public class PreviewStateContextTest {
         Set.of("universal", "inventory", "furnace", "brewing", "beehive", "cauldron", "jukebox", "poweredMinecart"),
         catalog.keySet()
     );
-    assertEquals(names("time", "world.name", "world.time", "blockType", "customName"), catalog.get("universal"));
+    assertEquals(names("time", "world.name", "world.displayName", "world.environmentName", "world.time", "blockType", "blockTypeName", "entityTypeName", "customName"), catalog.get("universal"));
     assertEquals(names("inventory.size", "inventory.occupied"), catalog.get("inventory"));
     assertEquals(
         names("cookTime", "cookTimeTotal", "burnTime", "fuelSeconds", "bankedXp", "lit", "surge.active", "surge.gain"),

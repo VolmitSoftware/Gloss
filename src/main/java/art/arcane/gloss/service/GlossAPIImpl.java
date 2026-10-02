@@ -118,10 +118,6 @@ public final class GlossAPIImpl implements GlossAPI {
         return plugin.holograms().createTemporary(id, initial, durationMs);
     }
 
-    @Override
-    public double stackSpread() {
-        return plugin.holograms().stackSpread();
-    }
 
     @Override
     public String filter(Player player, String raw) {

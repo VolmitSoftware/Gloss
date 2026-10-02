@@ -160,7 +160,7 @@ public final class PaperChatListener implements Listener {
             ChatMessageRenderer.Rendered result = channels.render(channel, sender, viewer, message,
                 new ChatContext(ServerAdventure::escape, null, null));
             if (result.mentioned()) {
-                channels.playMentionCue(channel, viewer);
+                channels.playMentionCue(result, viewer);
             }
             return result.miniMessage();
         }

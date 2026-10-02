@@ -89,7 +89,7 @@ public final class NameplateSource implements EntityOverlaySource {
         List<String> colored = relation.isEmpty() ? lines : prefix(lines, relation);
         admit(viewer, subject);
         return new Pane(EntityOverlayText.prepareLines(Gloss.instance, viewer, colored,
-            HEALTH_SEGMENTS, snapshot, scope), presentation.style(), presentation.box(), presentation.offset());
+            HEALTH_SEGMENTS, presentation.healthBar(), snapshot, scope), presentation.style(), presentation.box(), presentation.offset());
     }
 
     private static List<String> prefix(List<String> lines, String color) {

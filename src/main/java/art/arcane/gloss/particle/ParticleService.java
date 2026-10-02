@@ -2,6 +2,7 @@ package art.arcane.gloss.particle;
 
 import art.arcane.gloss.Gloss;
 import art.arcane.gloss.api.ParticleLayer;
+import art.arcane.gloss.condition.ShowCondition;
 import art.arcane.volmlib.util.bukkit.registry.RegistryUtil;
 import org.bukkit.Color;
 import org.bukkit.Location;
@@ -69,6 +70,7 @@ public final class ParticleService {
     private final Gloss plugin;
     private final Map<ParticleLayer.ParticleSpec, ResolvedParticle> particles;
     private final BoundedCache<SampleKey, List<Vector>> samples;
+    private final BoundedCache<String, ShowCondition> conditions;
     private final Map<UUID, Budget> viewerBudgets;
     private final Map<UUID, Map<Object, Cadence>> viewerCadences;
     private final Budget globalBudget;
@@ -77,6 +79,7 @@ public final class ParticleService {
         this.plugin = plugin;
         this.particles = new ConcurrentHashMap<>();
         this.samples = new BoundedCache<>(MAX_SAMPLE_CACHE_ENTRIES);
+        this.conditions = new BoundedCache<>(MAX_SAMPLE_CACHE_ENTRIES);
         this.viewerBudgets = new ConcurrentHashMap<>();
         this.viewerCadences = new ConcurrentHashMap<>();
         this.globalBudget = new Budget();
@@ -88,13 +91,13 @@ public final class ParticleService {
 
     public void emit(Player viewer, Object source, ParticleFrame frame, ParticleLayer layer,
                      List<ParticleRect> targets, long tick) {
-        if (!plugin.cfg().particles().enabled() || !viewer.isOnline()) {
+        if (!plugin.cfg().particles().enabled() || !viewer.isOnline() || !conditions.get(layer.show(), ShowCondition::of).matches(plugin, viewer)) {
             return;
         }
         Location origin = frame.origin();
         Location viewerLocation = viewer.getLocation();
         if (origin.getWorld() != viewerLocation.getWorld()
-            || origin.distanceSquared(viewerLocation) > square(plugin.cfg().particles().viewRange())) {
+            || origin.distanceSquared(viewerLocation) > square(layer.viewDistance())) {
             return;
         }
         Cadence cadence = cadence(viewer.getUniqueId(), source);
@@ -106,14 +109,17 @@ public final class ParticleService {
         List<Vector> sampled = samples.get(new SampleKey(layer.geometry(), stableTargets, cachedLimit),
             key -> ParticleGeometrySampler.sample(key.geometry(), key.targets(), key.limit()));
         List<Vector> selected = select(sampled, layer.emission(), tick);
-        int admitted = reserve(viewer.getUniqueId(), selected.size());
+        int count = layer.particle().count();
+        int admitted = reserve(viewer.getUniqueId(), selected.size() * count);
         if (admitted == 0) {
             return;
         }
         ResolvedParticle resolved = particles.computeIfAbsent(layer.particle(), this::resolve);
-        for (int index = 0; index < admitted; index++) {
+        Vector spread = layer.particle().spread();
+        for (int index = 0; index * count < admitted; index++) {
             Location point = frame.world(selected.get(index), layer.placement());
-            viewer.spawnParticle(resolved.particle(), point, 1, 0.0D, 0.0D, 0.0D, 0.0D, resolved.data());
+            viewer.spawnParticle(resolved.particle(), point, Math.min(count, admitted - index * count),
+                spread.getX(), spread.getY(), spread.getZ(), layer.particle().speed(), resolved.data());
         }
         cadence.emitted(layer, tick);
     }
@@ -124,7 +130,7 @@ public final class ParticleService {
      */
     public void renderWorld(Player viewer, ParticleLayer layer,
                             ParticleGeometrySampler.AnchorResolver resolver, long tick) {
-        if (!plugin.cfg().particles().enabled() || !viewer.isOnline()
+        if (!plugin.cfg().particles().enabled() || !viewer.isOnline() || !conditions.get(layer.show(), ShowCondition::of).matches(plugin, viewer)
             || tick % layer.emission().intervalTicks() != 0L) {
             return;
         }
@@ -134,24 +140,23 @@ public final class ParticleService {
             return;
         }
         List<Vector> selected = select(sampled, layer.emission(), tick);
-        int admitted = reserve(viewer.getUniqueId(), selected.size());
+        int count = layer.particle().count();
+        int admitted = reserve(viewer.getUniqueId(), selected.size() * count);
         if (admitted == 0) {
             return;
         }
         ResolvedParticle resolved = particles.computeIfAbsent(layer.particle(), this::resolve);
         Location viewerLocation = viewer.getLocation();
-        double rangeSquared = square(plugin.cfg().particles().viewRange());
-        for (int index = 0; index < admitted; index++) {
+        double rangeSquared = square(layer.viewDistance());
+        Vector spread = layer.particle().spread();
+        for (int index = 0; index * count < admitted; index++) {
             Vector point = selected.get(index);
             Location at = new Location(viewerLocation.getWorld(), point.getX(), point.getY(), point.getZ());
             if (at.distanceSquared(viewerLocation) > rangeSquared) {
                 continue;
             }
-            if (resolved.data() == null) {
-                viewer.spawnParticle(resolved.particle(), at, 1);
-            } else {
-                viewer.spawnParticle(resolved.particle(), at, 1, resolved.data());
-            }
+            viewer.spawnParticle(resolved.particle(), at, Math.min(count, admitted - index * count),
+                spread.getX(), spread.getY(), spread.getZ(), layer.particle().speed(), resolved.data());
         }
     }
 
@@ -164,6 +169,7 @@ public final class ParticleService {
         ViewerParticles.clear();
         particles.clear();
         samples.clear();
+        conditions.clear();
         viewerBudgets.clear();
         viewerCadences.clear();
         ParticleTextLayout.clearCaches();

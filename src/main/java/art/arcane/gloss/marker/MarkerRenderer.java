@@ -43,6 +43,7 @@ public final class MarkerRenderer {
         private MenuSession icon;
         private MenuIconData iconData;
         private String labelText = "";
+        private MarkerSpec spec;
         private double scale = 1.0D;
 
         void destroy(Player viewer) {
@@ -111,6 +112,14 @@ public final class MarkerRenderer {
     public void apply(MarkerCandidate candidate, Location anchor, String labelText, double scale,
                       EdgeIndicatorMath.Indicator indicator) {
         Render render = renders.computeIfAbsent(candidate.id(), ignored -> new Render());
+        MarkerSpec spec = candidate.spec();
+        if (render.spec != null && (!Objects.equals(render.spec.style(), spec.style())
+            || !Objects.equals(render.spec.box(), spec.box())
+            || !Objects.equals(render.spec.beam(), spec.beam())
+            || !Objects.equals(render.spec.edge(), spec.edge()))) {
+            render.destroy(viewer);
+        }
+        render.spec = spec;
         applyLabel(render, candidate, anchor, labelText, scale);
         applyIcon(render, candidate, anchor, scale);
         applyBeam(render, candidate, anchor);
@@ -132,6 +141,8 @@ public final class MarkerRenderer {
         }
         if (render.label == null) {
             render.label = create("gloss-marker:" + candidate.id(), anchor);
+            render.label.setStyle(candidate.spec().style());
+            render.label.setBox(candidate.spec().box());
             render.labelText = "";
             render.scale = Double.NaN;
         }
@@ -165,7 +176,7 @@ public final class MarkerRenderer {
         if (render.icon == null) {
             MenuDefinitionData definition = new MenuDefinitionData(new Vector(), false, false, null,
                 false, false, List.of(new MenuComponentData("icon", new Vector(),
-                    new DecoComponentData(icon), null)), List.of(), null, Map.of());
+                    new DecoComponentData(icon), null)), List.of(), null, Map.of(), List.of());
             definition.setId("marker:" + candidate.id());
             MenuTransform transform = new MenuTransform(position, new Vector(), position.getYaw(),
                 0F, 0F, (float) scale);
@@ -200,6 +211,10 @@ public final class MarkerRenderer {
         DisplayEntity display = DisplayEntity.Builder.blockDisplay(data, base);
         display.scale(new Vector3f((float) beam.width(), (float) beam.height(), (float) beam.width()));
         display.translation(new Vector3f((float) (-beam.width() / 2.0D), 0.0F, (float) (-beam.width() / 2.0D)));
+        if (beam.glowColor() != null) {
+            display.entityFlags((byte) (display.entityFlags() | 0x40));
+            display.glowColorOverride(MarkerColors.parse(beam.glowColor(), "beam glowColor"));
+        }
         List<PacketWrapper<?>> packets = new ArrayList<>(display.spawn());
         PacketUtils.send(viewer, packets);
         render.beam = display;

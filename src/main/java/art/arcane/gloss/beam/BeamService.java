@@ -223,7 +223,7 @@ public final class BeamService implements GlossService, Listener {
      */
     public void trail(Player viewer, Location from, Location to, String particle, double spacing,
                       int maxPoints) {
-        trail(viewer, destinationId(to), from, to, particle, spacing, maxPoints);
+        trail(viewer, destinationId(to), from, to, particle, spacing, maxPoints, 0xFFFFFF);
     }
 
     /**
@@ -231,11 +231,11 @@ public final class BeamService implements GlossService, Listener {
      *     own resample origin instead of the second one being skipped as unmoved
      */
     public void trail(Player viewer, String trailId, Location from, Location to, String particle,
-                      double spacing, int maxPoints) {
+                      double spacing, int maxPoints, int color) {
         if (from.getWorld() == null || from.getWorld() != to.getWorld()) {
             return;
         }
-        ViewerParticles.Resolved resolved = ViewerParticles.resolve(particle, 0xFFFFFF);
+        ViewerParticles.Resolved resolved = ViewerParticles.resolve(particle, color);
         if (resolved == null) {
             Gloss.warnThrottled("beam-trail-particle:" + particle,
                 "Trail particle %s is not a particle this server knows; the trail was skipped.", particle);

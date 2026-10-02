@@ -1,5 +1,7 @@
 package art.arcane.gloss.api;
 
+import art.arcane.gloss.condition.ShowCondition;
+
 import com.google.gson.annotations.SerializedName;
 import org.bukkit.NamespacedKey;
 import org.bukkit.util.Vector;
@@ -13,7 +15,7 @@ import java.util.Objects;
 import java.util.Set;
 
 public record ParticleLayer(String id, Target target, Geometry geometry, Placement placement,
-                            ParticleSpec particle, Emission emission, int priority) {
+                            ParticleSpec particle, Emission emission, int priority, Double viewDistance, String show) {
     public static final int MAX_LAYERS = 64;
 
     private static final Set<String> TARGET_SCOPES = Set.of(
@@ -26,6 +28,11 @@ public record ParticleLayer(String id, Target target, Geometry geometry, Placeme
         "steady", "chase", "pulse", "twinkle", "scan", "corners");
 
     public ParticleLayer {
+        viewDistance = viewDistance == null ? 48.0D : viewDistance;
+        if (!Double.isFinite(viewDistance) || viewDistance < 4.0D || viewDistance > 128.0D) {
+            throw new IllegalArgumentException("particle layer viewDistance must be within 4..128");
+        }
+        show = ShowCondition.of(show == null ? "true" : show).expression();
         id = requireId(id);
         target = Objects.requireNonNull(target, "particle layer requires a target");
         geometry = Objects.requireNonNull(geometry, "particle layer requires geometry");
@@ -156,8 +163,17 @@ public record ParticleLayer(String id, Target target, Geometry geometry, Placeme
         }
     }
 
-    public record ParticleSpec(String key, String color, Double size) {
+    public record ParticleSpec(String key, String color, Double size, Integer count, Vector spread, Double speed) {
         public ParticleSpec {
+            count = count == null ? 1 : count;
+            if (count < 1 || count > 64) {
+                throw new IllegalArgumentException("particle count must be within 1..64");
+            }
+            spread = spread == null ? new Vector() : spread.clone();
+            finiteRange(spread.getX(), 0.0D, 16.0D, "particle spread x");
+            finiteRange(spread.getY(), 0.0D, 16.0D, "particle spread y");
+            finiteRange(spread.getZ(), 0.0D, 16.0D, "particle spread z");
+            speed = finiteRange(speed == null ? 0.0D : speed, 0.0D, 10.0D, "particle speed");
             key = normalizeKey(key);
             boolean dust = key.equals("minecraft:dust");
             if (dust) {
@@ -168,6 +184,10 @@ public record ParticleLayer(String id, Target target, Geometry geometry, Placeme
                     throw new IllegalArgumentException("particle color and size are only valid for minecraft:dust");
                 }
             }
+        }
+        @Override
+        public Vector spread() {
+            return spread.clone();
         }
     }
 

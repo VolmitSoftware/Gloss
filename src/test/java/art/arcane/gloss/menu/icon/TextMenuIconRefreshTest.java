@@ -52,7 +52,7 @@ class TextMenuIconRefreshTest {
 
     private static TextMenuIcon icon(Integer refreshTicks) throws MenuIconException {
         MenuDefinitionData definition = new MenuDefinitionData(new Vector(), false, false, 8D,
-            false, false, List.of(), List.of(), ShowCondition.ALWAYS, Map.of());
+            false, false, List.of(), List.of(), ShowCondition.ALWAYS, Map.of(), List.of());
         definition.setId("text-refresh");
         Player player = (Player) Proxy.newProxyInstance(Player.class.getClassLoader(),
             new Class<?>[]{Player.class}, (proxy, method, args) -> switch (method.getName()) {

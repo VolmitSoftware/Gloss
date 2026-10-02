@@ -32,8 +32,8 @@ class ChatBubblesShimmerRuntimeTest {
                                                           BubbleStyleDoc.Shimmer shimmer) {
         return new ChatBubblesService.BubbleRecord(hologram, null, new Vector(),
             BubbleMotionPlan.compile(BubbleStyleDoc.DEFAULTS.motion()), BubbleShimmerPlan.compile(shimmer),
-            false, BORN_AT_MS, LIFETIME_MS, BORN_AT_MS + LIFETIME_MS, 1, 0.5D, "&7", "message", 32,
-            List.of("§7abcdefgh"), new ParticleText.Rendered("§7abcdefgh", List.of()));
+            false, BORN_AT_MS, LIFETIME_MS, BORN_AT_MS + LIFETIME_MS, 1, 0.5D, "&7","{message}",  "message", 32,
+            List.of("§7abcdefgh"), new ParticleText.Rendered("§7abcdefgh", List.of()), 0.26D);
     }
 
     @Test

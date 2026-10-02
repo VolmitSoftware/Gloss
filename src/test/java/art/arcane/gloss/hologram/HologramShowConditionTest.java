@@ -179,6 +179,6 @@ class HologramShowConditionTest {
             """);
         return new HologramDoc(base.schemaVersion(), base.revision(), base.anchor(), base.lines(),
             base.style(), base.box(), base.yaw(), base.pitch(),
-            base.particleLayers(), ShowCondition.of(expression), base.pages(), base.actions(), base.hitbox());
+            base.particleLayers(), ShowCondition.of(expression), base.pages(), base.actions(), base.hitbox(), null, null, null);
     }
 }

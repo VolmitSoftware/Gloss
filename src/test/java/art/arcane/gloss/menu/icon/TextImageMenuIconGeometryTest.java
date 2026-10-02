@@ -40,7 +40,7 @@ public class TextImageMenuIconGeometryTest {
         false,
         List.<MenuComponentData>of(),
         List.of(), ShowCondition.ALWAYS
-    , Map.of());
+    , Map.of(), List.of());
     definition.setId("image-geometry");
     MenuSession session = new MenuSession(
         definition,

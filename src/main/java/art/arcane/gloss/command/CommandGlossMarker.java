@@ -90,7 +90,7 @@ public final class CommandGlossMarker {
         Location at = player.getLocation();
         MarkerDoc doc = new MarkerDoc(MarkerDoc.CURRENT_SCHEMA_VERSION, 1L, null,
             MarkerAnchor.position(at.getWorld().getName(), at.getX(), at.getY(), at.getZ()),
-            label, null, null, null, null, null, null, null, null, null, null, null);
+            label, null, null, null, null, null, null, null, null, null, null, null, null, null);
         try {
             store().write(id, doc);
         } catch (IOException | IllegalArgumentException failure) {

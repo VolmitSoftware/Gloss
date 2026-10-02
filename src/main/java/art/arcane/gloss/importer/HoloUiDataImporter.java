@@ -258,8 +258,6 @@ public final class HoloUiDataImporter {
         overlayInt(settings, "editorSyncPollSeconds", value -> config.editor.sync.pollSeconds = value, entries);
         overlayInt(settings, "editorSyncMaxProjectMiB", value -> config.editor.sync.maxProjectMiB = value, entries);
         overlayBoolean(settings, "previewEnabled", value -> config.features.previews = value, entries);
-        overlayDouble(settings, "previewLookDistance", value -> config.preview.lookDistance = value, entries);
-        overlayDouble(settings, "previewScale", value -> config.preview.scale = value, entries);
         overlayDouble(settings, "uiScale", value -> config.menus.uiScale = value, entries);
         overlayBoolean(settings, "customItems", value -> config.items.customItems = value, entries);
         overlayString(settings, "customItemProviders",

@@ -26,7 +26,8 @@ public record ItemIconData(
     int customModelValue,
     IconDisplayStyle style,
     String name,
-    List<String> lore
+    List<String> lore,
+    String countFormat
 ) implements MenuIconData {
   public ItemIconData {
     lore = lore == null ? List.of() : List.copyOf(lore);
@@ -34,9 +35,9 @@ public record ItemIconData(
 
   public static ItemIconData of(ItemStack stack, boolean facing) {
     if (stack.hasItemMeta() && stack.getItemMeta().hasCustomModelData())
-      return new ItemIconData(stack.getType(), stack.getAmount(), stack.getItemMeta().getCustomModelData(), null, null, null);
+      return new ItemIconData(stack.getType(), stack.getAmount(), stack.getItemMeta().getCustomModelData(), null, null, null, null);
     else
-      return new ItemIconData(stack.getType(), stack.getAmount(), 0, null, null, null);
+      return new ItemIconData(stack.getType(), stack.getAmount(), 0, null, null, null, null);
   }
 
   public MenuIconType getType() {

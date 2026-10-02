@@ -33,6 +33,7 @@ import art.arcane.gloss.service.GlossService;
 import art.arcane.gloss.waypoint.WaypointDoc;
 import art.arcane.gloss.waypoint.WaypointService;
 import art.arcane.gloss.motd.MotdDoc;
+import art.arcane.gloss.names.NamesDoc;
 import art.arcane.gloss.nametag.NametagDoc;
 import art.arcane.gloss.nametag.NametagService;
 import art.arcane.gloss.panel.PanelDefinition;
@@ -108,6 +109,10 @@ public enum EditorSyncDocumentKind {
       (id, source) -> MenuDocumentParser.parse(id, source),
       gloss -> {
       }),
+  NAMES("names", "names.json", Layout.SINGLE, true, "names",
+      value -> requireSingleton(value, "names"),
+      (id, source) -> NamesDoc.parse("names.json", source),
+      gloss -> gloss.names().reload()),
   MOTD("motd", "motd.json", Layout.SINGLE, true, "motd",
       value -> requireSingleton(value, "motd"),
       (id, source) -> MotdDoc.parse("motd.json", source),

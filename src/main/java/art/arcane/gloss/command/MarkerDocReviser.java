@@ -20,6 +20,6 @@ final class MarkerDocReviser implements DocumentReviser<MarkerDoc> {
         return new MarkerDoc(value.schemaVersion(), revision, value.show(), value.anchor(), value.label(),
             value.icon(), value.color(), value.distanceScale(), value.hideWithin(), value.maxDistance(),
             value.beam(), value.edge(), value.trail(), value.audience(), value.lifetimeTicks(),
-            value.waypoint());
+            value.waypoint(), value.style(), value.box());
     }
 }

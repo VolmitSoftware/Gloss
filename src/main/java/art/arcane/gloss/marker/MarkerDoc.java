@@ -1,6 +1,8 @@
 package art.arcane.gloss.marker;
 
 import art.arcane.gloss.api.MarkerAnchor;
+import art.arcane.gloss.api.IconDisplayStyle;
+import art.arcane.gloss.api.HologramBox;
 import art.arcane.gloss.condition.ShowCondition;
 import art.arcane.gloss.config.icon.MenuIconData;
 import art.arcane.gloss.doc.DocumentEnvelope;
@@ -11,7 +13,7 @@ import java.util.Objects;
 public record MarkerDoc(int schemaVersion, long revision, ShowCondition show, MarkerAnchor anchor,
                         String label, MenuIconData icon, String color, String distanceScale,
                         Double hideWithin, Double maxDistance, MarkerSpec.Beam beam, MarkerSpec.Edge edge,
-                        MarkerSpec.Trail trail, Audience audience, Long lifetimeTicks, Boolean waypoint) {
+                        MarkerSpec.Trail trail, Audience audience, Long lifetimeTicks, Boolean waypoint, IconDisplayStyle style, HologramBox box) {
     public static final String KIND = "markers";
     public static final int CURRENT_SCHEMA_VERSION = 1;
 
@@ -21,6 +23,8 @@ public record MarkerDoc(int schemaVersion, long revision, ShowCondition show, Ma
         show = show == null ? ShowCondition.ALWAYS : show;
         anchor = Objects.requireNonNull(anchor, "a marker requires an anchor");
         label = label == null ? "" : label;
+        style = style == null ? IconDisplayStyle.hologramDefaults() : style;
+        box = box == null ? HologramBox.defaults() : box;
         MarkerColors.parse(color, "marker color");
         distanceScale = distanceScale == null || distanceScale.isBlank() ? null : distanceScale.trim();
         hideWithin = hideWithin == null ? 0.0D : hideWithin;
@@ -43,6 +47,6 @@ public record MarkerDoc(int schemaVersion, long revision, ShowCondition show, Ma
 
     public MarkerSpec toSpec(String id) {
         return new MarkerSpec(id, anchor, label, icon, rgb(), distanceScale, hideWithin, maxDistance,
-            beam, edge, trail, audience.when(), lifetimeTicks, waypoint);
+            beam, edge, trail, audience.when(), lifetimeTicks, waypoint, style, box);
     }
 }

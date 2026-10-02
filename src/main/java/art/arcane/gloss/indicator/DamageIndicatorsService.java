@@ -50,7 +50,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Supplier;
 
 public final class DamageIndicatorsService implements Listener, RegistryOwner {
-    private static final long DEBOUNCE_MS = 150L;
     private static final long SAMPLE_DELAY_TICKS = 2L;
     private static final int DRIVER_INTERVAL_TICKS = 2;
     private static final long BUDGET_WINDOW_MS = 1000L;
@@ -300,7 +299,7 @@ public final class DamageIndicatorsService implements Listener, RegistryOwner {
         if (budget.saturated(nowMs, maxPerSecond)) {
             return null;
         }
-        if (!claimDebounce(debounce, entityId, nowMs, DEBOUNCE_MS)) {
+        if (!claimDebounce(debounce, entityId, nowMs, activeSettings.document().limits().debounceMs())) {
             return null;
         }
         return eventSnapshot.get();
@@ -376,11 +375,13 @@ public final class DamageIndicatorsService implements Listener, RegistryOwner {
             id = (damage ? "dmg-" : "heal-") + target.getUniqueId() + "-"
                 + M.ms() + "-" + sequence.incrementAndGet();
             hologram = plugin.holograms().createTemporary(id, initial, limits.lifetimeMs());
+            plugin.holograms().setViewDistance(hologram, limits.viewRange());
             hologram.setStyle(presentation.style());
             hologram.setBox(presentation.box());
             hologram.setParticleLayers(presentation.particleLayers());
             String formatted = IndicatorTextFormat.format(amount, limits.decimals());
-            hologram.addLine(presentation.format().replace("{amount}", formatted));
+            hologram.addLine(IndicatorTextFormat.template(presentation.format(), formatted));
+            plugin.holograms().setTextTransform(hologram, rendered -> IndicatorTextFormat.names(rendered, eventValues));
             hologram.viewers().whitelist();
 
             hologram.bindPosition(target, () -> {
@@ -405,7 +406,7 @@ public final class DamageIndicatorsService implements Listener, RegistryOwner {
                 snapshot.conditions(),
                 eventValues,
                 anchor,
-                plugin.cfg().holograms().viewRange());
+                limits.viewRange());
             live.put(id, candidate);
             candidate.index();
             if (!spawnStillCurrent(

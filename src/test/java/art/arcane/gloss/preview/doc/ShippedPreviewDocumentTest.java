@@ -100,6 +100,9 @@ public class ShippedPreviewDocumentTest {
         if (name.equals("customName")) {
           return "";
         }
+        if (name.equals("blockTypeName")) {
+          return "Chest";
+        }
         if (name.equals("blockType")) {
           return Material.CHEST.name();
         }

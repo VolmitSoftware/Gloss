@@ -34,8 +34,8 @@ class BubbleSenderStateTest {
     private static BubbleRecord record(boolean followPlayer, long expiresAtMs, int lineCount, String prefix) {
         return new BubbleRecord(null, null, new Vector(), BubbleMotionPlan.compile(BubbleStyleDoc.DEFAULTS.motion()),
             BubbleShimmerPlan.compile(BubbleStyleDoc.DEFAULTS.shimmer()), followPlayer, 0L, 5000L, expiresAtMs,
-            lineCount, 0.5D, prefix, "message", 32,
-            List.of("message"), new ParticleText.Rendered("message", List.of()));
+            lineCount, 0.5D, prefix,"{message}",  "message", 32,
+            List.of("message"), new ParticleText.Rendered("message", List.of()), 0.26D);
     }
 
     private static int indexOfViaScan(SenderState state, BubbleRecord record) {

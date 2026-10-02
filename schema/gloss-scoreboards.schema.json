@@ -1,0 +1,124 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://volmit.com/gloss/scoreboards.schema.json",
+  "title": "Gloss Scoreboard Document",
+  "type": "object",
+  "properties": {
+    "schemaVersion": {
+      "const": 2
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991
+    },
+    "show": {
+      "type": [
+        "string",
+        "boolean"
+      ],
+      "description": "Boolean or Gloss condition expression."
+    },
+    "select": {
+      "type": "object",
+      "properties": {
+        "priority": {
+          "type": "integer"
+        },
+        "when": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "when"
+      ],
+      "additionalProperties": false
+    },
+    "presentation": {
+      "$ref": "#/$defs/presentation"
+    },
+    "variants": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "priority": {
+            "type": "integer"
+          },
+          "when": {
+            "type": "string",
+            "minLength": 1
+          },
+          "presentation": {
+            "$ref": "#/$defs/presentation"
+          }
+        },
+        "required": [
+          "id",
+          "when",
+          "presentation"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "revision"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "presentation": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "lines": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "$ref": "#/$defs/line"
+              }
+            ]
+          }
+        },
+        "hideNumbers": {
+          "type": "boolean"
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "line": {
+      "type": "object",
+      "properties": {
+        "text": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        },
+        "format": {
+          "enum": [
+            "blank",
+            "fixed",
+            "styled",
+            "number"
+          ]
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    }
+  }
+}

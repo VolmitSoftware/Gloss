@@ -44,7 +44,7 @@ class MotdDocTest {
     void gsonRoundTripPreservesAllFields() {
         MotdDoc original = new MotdDoc(1, 4L, ShowCondition.ALWAYS, "icons/default.png", List.of(
             MotdDoc.MotdEntry.ofLines(List.of("&aHello")),
-            new MotdDoc.MotdEntry(List.of("&aHello", "&7World"), "icons/season4.png", null, null, null, null)),
+            new MotdDoc.MotdEntry(List.of("&aHello", "&7World"), "icons/season4.png", null, null, null, null, null, null)),
             List.of());
 
         MotdDoc decoded = MotdDoc.parse("motd.json", BukkitJson.GSON.toJson(original));

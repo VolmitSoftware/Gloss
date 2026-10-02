@@ -101,6 +101,8 @@ public final class ContainerPreview {
   private final Object particleSource = new Object();
   private final boolean showsContents;
   private volatile List<Rendered> rendered = List.of();
+  private double documentScale = 0.65D;
+  private double viewDistance = 10.0D;
   private CompiledPreviewDocument document;
   private PreviewStateContext context;
   private CompiledPreviewDocument.Visibility visibility;
@@ -157,6 +159,8 @@ public final class ContainerPreview {
   }
 
   private void trackVisibility(CompiledPreviewDocument document, PreviewStateContext context) {
+    documentScale = document.scale();
+    viewDistance = document.viewDistance();
     if (document.hasDynamicVisibility()) {
       this.document = document;
       this.context = context;
@@ -265,6 +269,7 @@ public final class ContainerPreview {
 
   public boolean canView() {
     return ContainerPreviewAccess.isEnabled()
+        && player.getEyeLocation().toVector().distanceSquared(targetCenter) <= Math.pow(viewDistance + 0.9D, 2)
         && accessStateMatches
         && (!showsContents || ContainerPreviewAccess.canView(player));
   }
@@ -1070,7 +1075,7 @@ public final class ContainerPreview {
     double anchorDistance = Math.max(MIN_DISTANCE, Math.min(COMFORT_DISTANCE, surfaceDistance - EDGE_MARGIN));
     double distanceFactor = Math.max(MIN_SCALE_FACTOR, Math.min(1.0, anchorDistance / COMFORT_DISTANCE));
 
-    this.scaleTarget = GlossConfig.current().previews().scale() * viewerScale * distanceFactor;
+    this.scaleTarget = documentScale * viewerScale * distanceFactor;
     this.right = computedRight;
     this.up = computedUp;
     this.eye = eye;

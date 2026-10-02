@@ -145,6 +145,52 @@
               }
             }
           }
+        },
+        "healthBar": {
+          "$ref": "#/$defs/healthBar"
+        }
+      }
+    },
+    "healthBar": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "glyph": {
+          "type": "string"
+        },
+        "emptyGlyph": {
+          "type": "string"
+        },
+        "healthyColor": {
+          "type": "string"
+        },
+        "warningColor": {
+          "type": "string"
+        },
+        "criticalColor": {
+          "type": "string"
+        },
+        "damageColor": {
+          "type": "string"
+        },
+        "emptyColor": {
+          "type": "string"
+        },
+        "warningThreshold": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "criticalThreshold": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "decimals": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 6,
+          "default": 1
         }
       }
     }
