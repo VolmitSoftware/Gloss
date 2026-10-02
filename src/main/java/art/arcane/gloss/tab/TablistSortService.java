@@ -69,6 +69,11 @@ public final class TablistSortService {
         }
     }
 
+    int publishedOrder(UUID viewer, UUID subject, boolean viewerDependent) {
+        Map<UUID, Integer> orders = viewerDependent ? lastViewerOrder.get(viewer) : lastOrder;
+        return orders == null ? 0 : orders.getOrDefault(subject, 0);
+    }
+
     public void forget(UUID playerId) {
         lastOrder.remove(playerId);
         lastViewerOrder.remove(playerId);

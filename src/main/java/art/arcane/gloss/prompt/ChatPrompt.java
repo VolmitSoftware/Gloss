@@ -1,6 +1,10 @@
 package art.arcane.gloss.prompt;
 
 import art.arcane.gloss.chat.ChatCapture;
+import art.arcane.volmlib.util.plugin.ComponentMessenger;
+import art.arcane.volmlib.util.plugin.ComponentText;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.event.ClickEvent;
 import art.arcane.volmlib.util.scheduling.FoliaScheduler;
 import org.bukkit.entity.Player;
 
@@ -22,6 +26,10 @@ public final class ChatPrompt {
             message -> service.complete(viewer, request, message),
             request.timeoutTicks() * TICK_MS)) {
             return false;
+        }
+        if (!request.initial().isEmpty()) {
+            ComponentMessenger.send(viewer, ComponentText.component(
+                Component.text(request.initial()).clickEvent(ClickEvent.suggestCommand(request.initial()))));
         }
         FoliaScheduler.runEntity(service.plugin(), viewer, () -> service.timeout(viewer, request),
             request.timeoutTicks());

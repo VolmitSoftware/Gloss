@@ -3,6 +3,14 @@ package art.arcane.gloss.marker;
 import art.arcane.gloss.Gloss;
 import art.arcane.gloss.api.HologramPresentation;
 import art.arcane.gloss.api.TemporaryHologram;
+import art.arcane.gloss.config.MenuComponentData;
+import art.arcane.gloss.config.MenuDefinitionData;
+import art.arcane.gloss.config.components.DecoComponentData;
+import art.arcane.gloss.config.icon.MenuIconData;
+import art.arcane.gloss.menu.MenuSession;
+import art.arcane.gloss.menu.MenuSessionOptions;
+import art.arcane.gloss.menu.MenuTransform;
+import art.arcane.gloss.menu.action.NavigationResult;
 import art.arcane.gloss.util.common.DisplayEntity;
 import art.arcane.gloss.util.common.PacketUtils;
 import com.github.retrooper.packetevents.util.Vector3f;
@@ -11,6 +19,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.block.data.BlockData;
 import org.bukkit.entity.Player;
+import org.bukkit.util.Vector;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -31,6 +40,8 @@ public final class MarkerRenderer {
         private TemporaryHologram label;
         private TemporaryHologram edge;
         private DisplayEntity beam;
+        private MenuSession icon;
+        private MenuIconData iconData;
         private String labelText = "";
         private double scale = 1.0D;
 
@@ -43,6 +54,10 @@ public final class MarkerRenderer {
                 edge.destroy();
                 edge = null;
             }
+            if (icon != null) {
+                icon.close();
+                icon = null;
+            }
             if (beam != null) {
                 PacketUtils.send(viewer, beam.remove());
                 beam = null;
@@ -50,7 +65,7 @@ public final class MarkerRenderer {
         }
 
         int entityCount() {
-            return (label == null ? 0 : 1) + (edge == null ? 0 : 1) + (beam == null ? 0 : 1);
+            return (label == null ? 0 : 1) + (edge == null ? 0 : 1) + (beam == null ? 0 : 1) + (icon == null ? 0 : 1);
         }
     }
 
@@ -97,6 +112,7 @@ public final class MarkerRenderer {
                       EdgeIndicatorMath.Indicator indicator) {
         Render render = renders.computeIfAbsent(candidate.id(), ignored -> new Render());
         applyLabel(render, candidate, anchor, labelText, scale);
+        applyIcon(render, candidate, anchor, scale);
         applyBeam(render, candidate, anchor);
         applyEdge(render, candidate, indicator);
     }
@@ -129,6 +145,37 @@ public final class MarkerRenderer {
             render.label.bindPresentation(viewer,
                 () -> new HologramPresentation(applied, applied, applied, 0, 0, 0, 1));
             render.scale = scale;
+        }
+    }
+
+    private void applyIcon(Render render, MarkerCandidate candidate, Location anchor, double scale) {
+        MenuIconData icon = candidate.spec().icon();
+        if (!Objects.equals(render.iconData, icon)) {
+            if (render.icon != null) {
+                render.icon.close();
+                render.icon = null;
+            }
+            render.iconData = icon;
+        }
+        if (icon == null) {
+            return;
+        }
+        Location position = anchor.clone().add(0.0D, 0.75D * scale, 0.0D);
+        position.setYaw(viewer.getEyeLocation().getYaw());
+        if (render.icon == null) {
+            MenuDefinitionData definition = new MenuDefinitionData(new Vector(), false, false, null,
+                false, false, List.of(new MenuComponentData("icon", new Vector(),
+                    new DecoComponentData(icon), null)), List.of(), null, Map.of());
+            definition.setId("marker:" + candidate.id());
+            MenuTransform transform = new MenuTransform(position, new Vector(), position.getYaw(),
+                0F, 0F, (float) scale);
+            render.icon = new MenuSession(definition, viewer,
+                MenuSessionOptions.positioned(transform, request -> NavigationResult.DENIED, (float) scale));
+            render.icon.open();
+        } else {
+            render.icon.applyTransform(new MenuTransform(position, new Vector(), position.getYaw(),
+                0F, 0F, (float) scale), (float) scale);
+            render.icon.tick();
         }
     }
 
@@ -170,14 +217,25 @@ public final class MarkerRenderer {
         if (render.edge == null) {
             render.edge = create("gloss-marker-edge:" + candidate.id(), edgePoint(indicator));
             render.edge.setRenderedLines(List.of(edge.arrow()));
-            render.edge.bindPosition(viewer, () -> edgePoint(latest(candidate)));
         }
+        render.edge.bindPosition(viewer, () -> edgePoint(latest(candidate)));
+        render.edge.bindPresentation(viewer, () -> edgePresentation(latest(candidate).bearing()));
+    }
+
+    static HologramPresentation edgePresentation(EdgeIndicatorMath.Bearing bearing) {
+        double rotation = switch (bearing) {
+            case RIGHT -> 0.0D;
+            case UP -> 90.0D;
+            case LEFT -> 180.0D;
+            case DOWN -> 270.0D;
+        };
+        return new HologramPresentation(1.0D, 1.0D, 1.0D, 0.0D, 0.0D, rotation, 1.0D);
     }
 
     private EdgeIndicatorMath.Indicator latest(MarkerCandidate candidate) {
         Location eye = viewer.getEyeLocation();
         return EdgeIndicatorMath.resolve(eye.getYaw(), eye.getPitch(),
-            new org.bukkit.util.Vector(candidate.x() - eye.getX(), candidate.y() - eye.getY(),
+            new Vector(candidate.x() - eye.getX(), candidate.y() - eye.getY(),
                 candidate.z() - eye.getZ()), candidate.spec().edge().margin());
     }
 

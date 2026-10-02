@@ -7,6 +7,7 @@ import art.arcane.gloss.config.icon.TextIconData;
 import art.arcane.gloss.menu.MenuSession;
 import art.arcane.gloss.menu.SessionVariables;
 import art.arcane.gloss.menu.icon.MenuIcon;
+import art.arcane.gloss.util.common.math.CollisionPlane;
 
 /**
  * A value the viewer nudges by clicking. Left adds a step, right subtracts one, and holding shift
@@ -53,6 +54,13 @@ public final class SliderComponent extends ClickableComponent<SliderComponentDat
   @Override
   public MenuIcon<?> createIcon() {
     return MenuIcon.createIcon(session, location, new TextIconData(data.label(), data.style(), null, null), this);
+  }
+
+  @Override
+  protected CollisionPlane createHitbox() {
+    CollisionPlane hitbox = super.createHitbox();
+    hitbox.resize(data.width() * session.getTransform().scale(), hitbox.getHeight());
+    return hitbox;
   }
 
   @Override

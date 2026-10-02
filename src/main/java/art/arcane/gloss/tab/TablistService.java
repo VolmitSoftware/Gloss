@@ -114,7 +114,8 @@ public final class TablistService implements Listener, Explainable, RegistryOwne
                 "Tablist condition %s failed and was treated as false.", error.path()));
         this.sorts = new TablistSortService(this::sendSortOrders);
         this.layouts = new TablistLayoutService(new PacketLayoutSink(),
-            raw -> plugin.text().renderStatic(raw), plugin.text()::playerName);
+            new TablistLayoutService.Renderers(raw -> plugin.text().renderStatic(raw),
+                (viewer, subject) -> layoutPlayerName(subject, appliedListNames), this::layoutPlayerOrder));
         this.activeDoc = TablistDoc.DEFAULTS;
         this.activeRuntime = TablistRuntime.compile(activeDoc);
         this.activeLayout = TablistLayoutRuntime.compile(activeDoc.layout());
@@ -401,6 +402,17 @@ public final class TablistService implements Listener, Explainable, RegistryOwne
                 }
             });
         }
+    }
+
+    static String layoutPlayerName(Player subject, Map<UUID, String> names) {
+        String rendered = names.get(subject.getUniqueId());
+        return rendered == null ? subject.getName() : rendered;
+    }
+
+    private int layoutPlayerOrder(Player viewer, Player subject) {
+        TablistRuntime runtime = activeRuntime;
+        return runtime.sortWeight() == null ? 0
+            : sorts.publishedOrder(viewer.getUniqueId(), subject.getUniqueId(), runtime.sortViewerDependent());
     }
 
     private GlossConditionScope sortScope(Player viewer, Player subject) {

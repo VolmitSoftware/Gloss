@@ -36,8 +36,11 @@ class TextExpressionRendererTest {
     }
 
     @Test
-    void leavesInvalidOrUnclosedExpressionsEditable() {
-        assertEquals("A {{ nope() }} B", renderer.render(null, "A {{ nope() }} B"));
+    void hidesFailedExpressionsAndPreservesSurroundingText() {
+        assertEquals("A  B", renderer.render(null, "A {{ nope() }} B"));
+        assertEquals("A  3  B", renderer.render(null, "A {{ nope() }} {{ 1 + 2 }} {{ 1 + }} B"));
+        assertEquals("AB", renderer.render(null, "A{{ }}B"));
+        assertEquals("AB", renderer.render(null, "A{{ " + "x".repeat(1025) + " }}B"));
         assertEquals("A {{ 1 + 2", renderer.render(null, "A {{ 1 + 2"));
     }
 

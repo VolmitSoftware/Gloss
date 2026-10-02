@@ -1,8 +1,10 @@
 package art.arcane.gloss.prompt;
 
 import art.arcane.gloss.Gloss;
+import art.arcane.gloss.text.TextPipeline;
 import art.arcane.volmlib.util.scheduling.FoliaScheduler;
 import org.bukkit.Bukkit;
+import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -15,8 +17,11 @@ import org.bukkit.event.inventory.PrepareAnvilEvent;
 import org.bukkit.inventory.AnvilInventory;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryView;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.ItemMeta;
 
 import java.lang.reflect.Method;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -33,6 +38,7 @@ public final class AnvilPrompt implements Listener {
     private final Gloss plugin;
     private final PromptService service;
     private final ConcurrentMap<UUID, String> typed = new ConcurrentHashMap<>();
+    private final ConcurrentMap<UUID, Inventory> inventories = new ConcurrentHashMap<>();
     private final Set<UUID> answering = ConcurrentHashMap.newKeySet();
 
     AnvilPrompt(Gloss plugin, PromptService service) {
@@ -48,13 +54,34 @@ public final class AnvilPrompt implements Listener {
 
     void disable() {
         HandlerList.unregisterAll(this);
+        for (Map.Entry<UUID, Inventory> entry : inventories.entrySet()) {
+            Player viewer = Bukkit.getPlayer(entry.getKey());
+            if (viewer == null) {
+                continue;
+            }
+            Inventory inventory = entry.getValue();
+            if (FoliaScheduler.isOwnedByCurrentRegion(viewer)) {
+                inventory.clear();
+            } else {
+                FoliaScheduler.runEntity(plugin, viewer, inventory::clear);
+            }
+        }
+        inventories.clear();
         typed.clear();
         answering.clear();
     }
 
     boolean open(Player viewer, PromptRequest request) {
-        Inventory anvil = Bukkit.createInventory(null, InventoryType.ANVIL);
+        Inventory anvil = request.label().isBlank()
+            ? Bukkit.createInventory(null, InventoryType.ANVIL)
+            : Bukkit.createInventory(null, InventoryType.ANVIL, TextPipeline.menuText(viewer, request.label()));
+        ItemStack input = new ItemStack(Material.PAPER);
+        ItemMeta meta = input.getItemMeta();
+        meta.setDisplayName(request.initial());
+        input.setItemMeta(meta);
+        anvil.setItem(0, input);
         typed.put(viewer.getUniqueId(), request.initial());
+        inventories.put(viewer.getUniqueId(), anvil);
         viewer.openInventory(anvil);
         FoliaScheduler.runEntity(plugin, viewer, () -> service.timeout(viewer, request), request.timeoutTicks());
         return true;
@@ -78,10 +105,13 @@ public final class AnvilPrompt implements Listener {
             return;
         }
         PromptRequest request = service.pending(viewer.getUniqueId());
-        if (!owns(request) || event.getInventory().getType() != InventoryType.ANVIL) {
+        if (inventories.get(viewer.getUniqueId()) != event.getInventory()) {
             return;
         }
         event.setCancelled(true);
+        if (!owns(request)) {
+            return;
+        }
         if (event.getRawSlot() != RESULT_SLOT) {
             return;
         }
@@ -107,9 +137,20 @@ public final class AnvilPrompt implements Listener {
     public void onClose(InventoryCloseEvent event) {
         if (event.getPlayer() instanceof Player viewer
             && event.getInventory().getType() == InventoryType.ANVIL) {
-            typed.remove(viewer.getUniqueId());
-            closed(viewer);
+            if (inventories.remove(viewer.getUniqueId(), event.getInventory())) {
+                event.getInventory().clear();
+                typed.remove(viewer.getUniqueId());
+                closed(viewer);
+            }
         }
+    }
+
+    void release(UUID viewer) {
+        Inventory inventory = inventories.get(viewer);
+        if (inventory != null) {
+            inventory.clear();
+        }
+        typed.remove(viewer);
     }
 
     /**

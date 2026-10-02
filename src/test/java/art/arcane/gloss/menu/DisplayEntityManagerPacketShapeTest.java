@@ -23,6 +23,7 @@ import com.github.retrooper.packetevents.protocol.entity.data.EntityData;
 import com.github.retrooper.packetevents.protocol.entity.type.EntityType;
 import com.github.retrooper.packetevents.util.Quaternion4f;
 import com.github.retrooper.packetevents.util.Vector3f;
+import com.github.retrooper.packetevents.util.Vector3d;
 import com.github.retrooper.packetevents.wrapper.PacketWrapper;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerDestroyEntities;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityMetadata;
@@ -293,6 +294,29 @@ public class DisplayEntityManagerPacketShapeTest {
     assertEquals("an unchanged orientation must not put anything on the wire",
         afterFirst, SENT.size());
 
+    DisplayEntityManager.delete(key, viewer);
+  }
+
+  @Test
+  public void rescalingKeepsTheDisplayIdentityAndScalesItsOffsetAndTranslation() {
+    Player viewer = viewer();
+    Location anchor = new Location(null, 0D, 0D, 0D);
+    DisplayEntity display = textDisplay();
+    display.location(new Vector3d(0D, 2D, 0D));
+    display.scale(new Vector3f(1F, 2F, 3F));
+    display.translation(new Vector3f(0F, -0.5F, 0F));
+    UUID key = DisplayEntityManager.add(display);
+    DisplayEntityManager.spawn(key, viewer);
+    SENT.clear();
+
+    DisplayEntityManager.rescale(key, anchor, 2F);
+
+    assertEquals(4D, display.location().getY(), 0D);
+    assertEquals(new Vector3f(2F, 4F, 6F), display.scale());
+    assertEquals(new Vector3f(0F, -1F, 0F), display.translation());
+    assertEquals(2, SENT.size());
+    assertTrue(SENT.stream().noneMatch(WrapperPlayServerSpawnEntity.class::isInstance));
+    assertTrue(SENT.stream().noneMatch(WrapperPlayServerDestroyEntities.class::isInstance));
     DisplayEntityManager.delete(key, viewer);
   }
 

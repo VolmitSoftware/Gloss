@@ -2,6 +2,8 @@ package art.arcane.gloss.chat;
 
 import art.arcane.gloss.Gloss;
 import art.arcane.gloss.menu.CharacterizationSupport;
+import art.arcane.gloss.util.common.TextUtils;
+import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
 import org.junit.jupiter.api.AfterEach;
@@ -48,6 +50,10 @@ class ChatCommandsTest {
 
         assertEquals(1, steve.received.size());
         assertEquals(1, alex.received.size());
+        assertEquals("[Steve -> Alex] hello there",
+            PlainTextComponentSerializer.plainText().serialize(TextUtils.parse(steve.received.getFirst())));
+        assertEquals("[Steve -> Alex] hello there",
+            PlainTextComponentSerializer.plainText().serialize(TextUtils.parse(alex.received.getFirst())));
         assertTrue(alex.received.getFirst().contains("hello there"), alex.received.getFirst());
         assertEquals(alex.id, channels.state().partnerOf(steve.id));
         assertEquals(steve.id, channels.state().partnerOf(alex.id));
@@ -175,7 +181,7 @@ class ChatCommandsTest {
     private void writePrivate(String permission, String throttle) throws IOException {
         write("private", "{\"schemaVersion\":1,\"revision\":1,"
             + "\"channel\":{\"name\":\"private\",\"scope\":\"direct\"," + permission + "},"
-            + "\"format\":\"&7[{{ sender.name }} -> {{ viewer.name }}] &f{{ message }}\","
+            + "\"format\":\"&7[{{ sender.name }} -> {{ recipient.name }}] &f{{ message }}\","
             + "\"throttle\":" + throttle + "}");
     }
 

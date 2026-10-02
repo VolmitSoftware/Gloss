@@ -34,6 +34,9 @@ public record SliderComponentData(
     }
     step = step == null || step <= 0F ? 1F : step;
     width = width == null || width <= 0F ? 2.0F : width;
+    if (!Float.isFinite(width)) {
+      throw new IllegalArgumentException("slider " + variable + " width must be finite");
+    }
     label = label == null ? "" : label;
   }
 

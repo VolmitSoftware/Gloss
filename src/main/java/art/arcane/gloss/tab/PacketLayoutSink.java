@@ -41,13 +41,14 @@ public final class PacketLayoutSink implements TablistLayoutService.LayoutSink {
     }
 
     @Override
-    public void updateTexts(Player viewer, List<TablistLayoutService.SlotEntry> entries) {
+    public void updateSlots(Player viewer, List<TablistLayoutService.SlotEntry> entries) {
         List<WrapperPlayServerPlayerInfoUpdate.PlayerInfo> infos = new ArrayList<>(entries.size());
         for (TablistLayoutService.SlotEntry entry : entries) {
             infos.add(info(entry));
         }
         send(viewer, new WrapperPlayServerPlayerInfoUpdate(
-            WrapperPlayServerPlayerInfoUpdate.Action.UPDATE_DISPLAY_NAME, infos));
+            EnumSet.of(WrapperPlayServerPlayerInfoUpdate.Action.UPDATE_DISPLAY_NAME,
+                WrapperPlayServerPlayerInfoUpdate.Action.UPDATE_LATENCY), infos));
     }
 
     @Override

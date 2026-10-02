@@ -82,9 +82,17 @@ public final class SignPrompt {
         }
         editors.put(viewer.getUniqueId(), new Editor(position, block));
         PacketUtils.send(viewer, new WrapperPlayServerBlockChange(position, state));
+        viewer.sendSignChange(block, initialLines(request.initial()));
         PacketUtils.send(viewer, new WrapperPlayServerOpenSignEditor(position, true));
         scheduleTimeout(viewer, request);
         return true;
+    }
+
+    static String[] initialLines(String initial) {
+        String[] lines = new String[]{"", "", "", ""};
+        String[] source = initial.split("\\R", 4);
+        System.arraycopy(source, 0, lines, 0, source.length);
+        return lines;
     }
 
     private void onUpdateSign(Player viewer, WrapperPlayClientUpdateSign packet) {

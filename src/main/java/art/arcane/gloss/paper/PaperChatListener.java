@@ -158,7 +158,7 @@ public final class PaperChatListener implements Listener {
 
         private String renderViewer(Player viewer) {
             ChatMessageRenderer.Rendered result = channels.render(channel, sender, viewer, message,
-                new ChatContext(ServerAdventure::escape, null));
+                new ChatContext(ServerAdventure::escape, null, null));
             if (result.mentioned()) {
                 channels.playMentionCue(channel, viewer);
             }
@@ -168,7 +168,7 @@ public final class PaperChatListener implements Listener {
         /** A console or plugin audience reads the sender's own render. */
         private String sharedRender() {
             return channels.render(channel, sender, sender, message,
-                new ChatContext(ServerAdventure::escape, null)).miniMessage();
+                new ChatContext(ServerAdventure::escape, null, null)).miniMessage();
         }
     }
 }

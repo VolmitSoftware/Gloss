@@ -45,6 +45,27 @@ class TablistSortServiceTest {
     }
 
     @Test
+    void layoutsReadThePublishedOrderWithoutEvaluatingAnotherScope() {
+        Player admin = player("admin");
+        Player member = player("member");
+        assertEquals(0, sorts.publishedOrder(member.getUniqueId(), admin.getUniqueId(), false));
+        sorts.pass(compile("subject.op ? 1000 : 0"), List.of(admin, member), this::scope, silent());
+        assertEquals(1000, sorts.publishedOrder(member.getUniqueId(), admin.getUniqueId(), false));
+        sorts.clear();
+        assertEquals(0, sorts.publishedOrder(member.getUniqueId(), admin.getUniqueId(), false));
+    }
+
+    @Test
+    void layoutsReadTheObserversPublishedOrder() {
+        Player admin = player("admin");
+        Player member = player("member");
+        sorts.pass(compile("viewer.op ? 1000 : 0"), List.of(admin, member),
+            this::scope, silent());
+        assertEquals(1000, sorts.publishedOrder(admin.getUniqueId(), admin.getUniqueId(), true));
+        assertEquals(0, sorts.publishedOrder(member.getUniqueId(), admin.getUniqueId(), true));
+    }
+
+    @Test
     void onlyChangedOrdersAreSentOnTheNextPass() {
         Player admin = player("admin");
         Player member = player("member");

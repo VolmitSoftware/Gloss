@@ -33,7 +33,7 @@
       "type": "string"
     },
     "icon": {
-      "description": "Optional icon line drawn with the label.",
+      "description": "Shared icon rendered above the anchor, with its size and offset following distanceScale.",
       "type": "object"
     },
     "color": {
@@ -87,7 +87,8 @@
           "maximum": 1
         },
         "arrow": {
-          "type": "string"
+          "type": "string",
+          "description": "Right-pointing glyph rotated toward the off-screen marker; empty hides the arrow."
         }
       }
     },
@@ -117,7 +118,8 @@
     },
     "lifetimeTicks": {
       "type": "integer",
-      "minimum": 0
+      "minimum": 0,
+      "description": "Per-viewer duration from first availability, in ticks; 0 is unlimited. Hidden time counts. Moving the anchor does not restart the duration."
     },
     "waypoint": {
       "description": "Also publishes this marker to the client's locator bar, which is the only navigation a Bedrock viewer gets.",

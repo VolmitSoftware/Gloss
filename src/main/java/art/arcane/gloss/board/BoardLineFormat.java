@@ -1,9 +1,12 @@
 package art.arcane.gloss.board;
 
+import art.arcane.gloss.util.common.TextUtils;
+import com.github.retrooper.packetevents.protocol.score.ScoreFormat;
 import com.google.gson.TypeAdapter;
 import com.google.gson.annotations.JsonAdapter;
 import com.google.gson.stream.JsonReader;
 import com.google.gson.stream.JsonWriter;
+import net.kyori.adventure.text.format.Style;
 
 import java.io.IOException;
 import java.util.Locale;
@@ -15,6 +18,16 @@ public enum BoardLineFormat {
     FIXED,
     STYLED,
     NUMBER;
+
+    ScoreFormat scoreFormat(String value) {
+        String rendered = value == null ? "" : value;
+        return switch (this) {
+            case BLANK -> ScoreFormat.blankScore();
+            case NUMBER -> ScoreFormat.styledScore(Style.empty());
+            case STYLED -> ScoreFormat.styledScore(TextUtils.parse(rendered).style());
+            case FIXED -> ScoreFormat.fixedScore(TextUtils.parse(rendered));
+        };
+    }
 
     public String wireName() {
         return name().toLowerCase(Locale.ROOT);

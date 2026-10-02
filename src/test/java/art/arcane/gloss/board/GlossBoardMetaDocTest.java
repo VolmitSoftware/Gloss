@@ -36,13 +36,13 @@ class GlossBoardMetaDocTest {
     }
 
     @Test
-    void fromDocWithBlankTitleFallsBackToTheId() {
+    void fromDocPreservesBlankTitle() {
         BoardDoc doc = new BoardDoc(2, 1L, ShowCondition.ALWAYS, BoardDoc.Selection.NEVER,
             BoardDoc.Presentation.ofStrings("", List.of(), false), List.of());
 
         GlossBoardMeta meta = GlossBoardMeta.fromDoc("bare", doc);
 
-        assertEquals("bare", meta.title());
+        assertEquals("", meta.title());
         assertEquals(BoardDoc.Selection.NEVER, meta.selection());
     }
 

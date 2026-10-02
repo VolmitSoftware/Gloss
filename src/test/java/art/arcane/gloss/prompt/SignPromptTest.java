@@ -3,12 +3,21 @@ package art.arcane.gloss.prompt;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 
 /**
  * What a sign editor gives back. The client returns four lines whatever the player typed, so the
  * join is what decides whether a blank second line becomes a double space in the answer.
  */
 class SignPromptTest {
+
+    @Test
+    void initialTextSeedsFourClientLines() {
+        assertArrayEquals(new String[]{"hello", "", "", ""}, SignPrompt.initialLines("hello"));
+        assertArrayEquals(new String[]{"one", "two", "three", "four"},
+            SignPrompt.initialLines("one\ntwo\nthree\nfour"));
+        assertArrayEquals(new String[]{"", "", "", ""}, SignPrompt.initialLines(""));
+    }
 
     @Test
     void theFourLinesJoinIntoOneAnswer() {

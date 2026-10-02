@@ -7,6 +7,10 @@ import art.arcane.gloss.locale.GlossMessages;
 import art.arcane.gloss.menu.SessionVariables;
 import art.arcane.gloss.menu.action.MenuAction;
 import art.arcane.gloss.service.GlossService;
+import art.arcane.gloss.text.TextPipeline;
+import art.arcane.gloss.util.common.TextUtils;
+import art.arcane.volmlib.util.plugin.ComponentMessenger;
+import art.arcane.volmlib.util.plugin.ComponentText;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -95,6 +99,10 @@ public final class PromptService implements GlossService, Listener {
         if (!opened) {
             pending.remove(viewer.getUniqueId(), request);
         }
+        if (opened && !request.label().isBlank() && !PromptRequest.ANVIL.equals(request.kind())) {
+            ComponentMessenger.send(viewer, ComponentText.component(
+                TextUtils.parse(TextPipeline.menuText(viewer, request.label()))));
+        }
         return opened;
     }
 
@@ -149,6 +157,8 @@ public final class PromptService implements GlossService, Listener {
     private void release(UUID viewer, PromptRequest request) {
         if (PromptRequest.CHAT.equals(request.kind())) {
             ChatCapture.release(viewer);
+        } else if (PromptRequest.ANVIL.equals(request.kind())) {
+            anvil.release(viewer);
         }
     }
 

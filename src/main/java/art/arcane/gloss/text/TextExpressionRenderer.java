@@ -68,14 +68,12 @@ public final class TextExpressionRenderer {
             }
             String source = input.substring(open + 2, close).trim();
             String resolved = resolve(scope, source);
-            if (resolved != null) {
-                if (output == null) {
-                    output = new StringBuilder(input.length() + 16);
-                }
-                output.append(input, cursor, open);
-                output.append(resolvedText.apply(resolved));
-                cursor = close + 2;
+            if (output == null) {
+                output = new StringBuilder(input.length() + 16);
             }
+            output.append(input, cursor, open);
+            output.append(resolvedText.apply(resolved));
+            cursor = close + 2;
             open = input.indexOf("{{", close + 2);
         }
         if (output == null) {
@@ -214,7 +212,7 @@ public final class TextExpressionRenderer {
 
     private String resolve(ExprScope scope, String source) {
         if (source.isEmpty() || source.length() > SOURCE_LIMIT) {
-            return null;
+            return "";
         }
         try {
             Expr expression = cached(source);
@@ -223,7 +221,7 @@ public final class TextExpressionRenderer {
             if (failed.add(source)) {
                 Gloss.logExceptionStack(false, failure, "Text expression {{ %s }} failed.", source);
             }
-            return null;
+            return "";
         }
     }
 

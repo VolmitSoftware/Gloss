@@ -51,7 +51,7 @@ public final class GlossBoardMeta {
     public static GlossBoardMeta fromDoc(String id, BoardDoc doc) {
         GlossBoardMeta meta = new GlossBoardMeta(id);
         BoardDoc.Presentation presentation = doc.presentation();
-        meta.setTitle(presentation.title().isEmpty() ? id : presentation.title());
+        meta.setTitle(presentation.title());
         for (BoardLine line : presentation.lines()) {
             meta.addLine(line);
         }

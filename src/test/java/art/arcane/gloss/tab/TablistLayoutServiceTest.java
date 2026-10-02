@@ -25,8 +25,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class TablistLayoutServiceTest {
     private final List<String> sends = new ArrayList<>();
     private final Map<UUID, String> names = new LinkedHashMap<>();
-    private final TablistLayoutService layouts = new TablistLayoutService(new RecordingSink(), skin -> skin,
-        (viewer, subject) -> subject.getName());
+    private final Map<UUID, Integer> pings = new LinkedHashMap<>();
+    private final List<TablistLayoutService.SlotEntry> written = new ArrayList<>();
+    private final TablistLayoutService layouts = new TablistLayoutService(new RecordingSink(),
+        new TablistLayoutService.Renderers(skin -> skin, (viewer, subject) -> subject.getName(),
+            (viewer, subject) -> 0));
 
     @Test
     void theFirstPassSendsTheWholeGridOnce() {
@@ -67,7 +70,8 @@ class TablistLayoutServiceTest {
         sends.clear();
         layouts.apply(viewer, runtime, List.of(viewer, second), this::scope, silent());
 
-        assertEquals(List.of("text viewer [ gloss_slot_1=second]", "unlist viewer [second]"), sends,
+        assertEquals(List.of("remove viewer [ gloss_slot_1]", "add viewer [ gloss_slot_1=second]",
+            "unlist viewer [second]"), sends,
             "the player cell moved, the static row did not");
     }
 
@@ -140,6 +144,75 @@ class TablistLayoutServiceTest {
         assertTrue(!layouts.hasLayout(viewer.getUniqueId()));
     }
 
+    @Test
+    void playerCellsUseThePresentationOrderSkinAndLatency() {
+        Player viewer = player("aaa");
+        Player staff = player("zzz");
+        pings.put(staff.getUniqueId(), 73);
+        TablistLayoutService weighted = new TablistLayoutService(new RecordingSink(),
+            new TablistLayoutService.Renderers(text -> text,
+                (observer, subject) -> "[Staff] " + subject.getName(),
+                (observer, subject) -> subject == staff ? 10 : 0));
+        TablistLayoutRuntime runtime = runtime(1, 2, List.of(),
+            new TablistDoc.Players(0, 1, 2, "true", "hide"));
+
+        weighted.apply(viewer, runtime, List.of(viewer, staff), this::scope, silent());
+
+        TablistLayoutService.SlotEntry first = written.getFirst();
+        assertEquals("[Staff] zzz", first.text());
+        assertEquals("zzz", first.skin());
+        assertEquals(73, first.ping());
+        written.clear();
+        pings.put(staff.getUniqueId(), 95);
+        weighted.apply(viewer, runtime, List.of(viewer, staff), this::scope, silent());
+        assertEquals(1, written.size());
+        assertEquals(95, written.getFirst().ping());
+    }
+
+    @Test
+    void replacingAPlayerWithTheSameDisplayNameRefreshesItsSkin() {
+        Player viewer = player("aaa");
+        Player replacement = player("bbb");
+        TablistLayoutService identicalNames = new TablistLayoutService(new RecordingSink(),
+            new TablistLayoutService.Renderers(text -> text, (observer, subject) -> "Same",
+                (observer, subject) -> 0));
+        TablistLayoutRuntime runtime = runtime(1, 1, List.of(),
+            new TablistDoc.Players(0, 1, 1, "true", "hide"));
+        identicalNames.apply(viewer, runtime, List.of(viewer), this::scope, silent());
+        sends.clear();
+        written.clear();
+
+        identicalNames.apply(viewer, runtime, List.of(replacement), this::scope, silent());
+
+        assertEquals("remove aaa [ gloss_slot_0]", sends.getFirst());
+        assertEquals("bbb", written.getFirst().skin());
+    }
+
+    @Test
+    void resizingTheLayoutReplacesTheGrid() {
+        Player viewer = player("viewer");
+        layouts.apply(viewer, runtime(1, 1, List.of(), null), List.of(viewer), this::scope, silent());
+        sends.clear();
+
+        layouts.apply(viewer, runtime(1, 2, List.of(), null), List.of(viewer), this::scope, silent());
+
+        assertEquals(List.of("remove viewer [ gloss_slot_0]", "relist viewer [viewer]",
+            "add viewer [ gloss_slot_0=,  gloss_slot_1=]", "unlist viewer [viewer]"), sends);
+    }
+
+    @Test
+    void listNamesUseThePublishedSubjectRenderWithoutReadingPlayerState() {
+        Player subject = player("ListedPlayer");
+        Map<UUID, String> rendered = new LinkedHashMap<>();
+        assertEquals("ListedPlayer", TablistService.layoutPlayerName(subject, rendered));
+
+        rendered.put(subject.getUniqueId(), "&a[Staff] ListedPlayer");
+        assertEquals("&a[Staff] ListedPlayer", TablistService.layoutPlayerName(subject, rendered));
+
+        rendered.put(subject.getUniqueId(), "&b[Member] ListedPlayer");
+        assertEquals("&b[Member] ListedPlayer", TablistService.layoutPlayerName(subject, rendered));
+    }
+
     private TablistLayoutRuntime runtime(int columns, int rows, List<TablistDoc.Slot> slots,
                                          TablistDoc.Players players) {
         return TablistLayoutRuntime.compile(new TablistDoc.Layout(true, columns, rows, slots, players, null));
@@ -161,6 +234,7 @@ class TablistLayoutServiceTest {
             (proxy, method, args) -> switch (method.getName()) {
                 case "getUniqueId" -> id;
                 case "getName" -> name;
+                case "getPing" -> pings.getOrDefault(id, 0);
                 case "hashCode" -> System.identityHashCode(proxy);
                 case "equals" -> proxy == args[0];
                 case "toString" -> name;
@@ -183,11 +257,13 @@ class TablistLayoutServiceTest {
     private final class RecordingSink implements TablistLayoutService.LayoutSink {
         @Override
         public void addSlots(Player viewer, List<TablistLayoutService.SlotEntry> entries) {
+            written.addAll(entries);
             sends.add("add " + viewer.getName() + " " + render(entries));
         }
 
         @Override
-        public void updateTexts(Player viewer, List<TablistLayoutService.SlotEntry> entries) {
+        public void updateSlots(Player viewer, List<TablistLayoutService.SlotEntry> entries) {
+            written.addAll(entries);
             sends.add("text " + viewer.getName() + " " + render(entries));
         }
 

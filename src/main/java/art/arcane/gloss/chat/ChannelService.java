@@ -64,6 +64,11 @@ public final class ChannelService implements GlossService, Listener {
     }
 
     @Override
+    public void contribute() {
+        registerCommands();
+    }
+
+    @Override
     public void enable() {
         if (!plugin.cfg().modules().channels().enabled()) {
             return;
@@ -73,7 +78,6 @@ public final class ChannelService implements GlossService, Listener {
         registry.reload();
         rebuild(registry.snapshot());
         plugin.getServer().getPluginManager().registerEvents(this, plugin);
-        registerCommands();
         plugin.watchdog().register(ChannelDoc.KIND, this::poll);
     }
 
@@ -188,8 +192,9 @@ public final class ChannelService implements GlossService, Listener {
         if (verdict == ChatThrottle.Verdict.REPEAT) {
             return PrivateResult.REPEAT;
         }
-        deliver(channel, sender, target, filtered);
-        deliver(channel, sender, sender, filtered);
+        ChatContext context = new ChatContext(null, null, target);
+        deliver(channel, sender, target, filtered, context);
+        deliver(channel, sender, sender, filtered, context);
         state.pairConversation(sender.getUniqueId(), target.getUniqueId());
         return PrivateResult.SENT;
     }
@@ -287,8 +292,8 @@ public final class ChannelService implements GlossService, Listener {
         return false;
     }
 
-    public void deliver(ChannelRuntime channel, Player sender, Player viewer, String message) {
-        ChatMessageRenderer.Rendered rendered = render(channel, sender, viewer, message, ChatContext.PLAIN);
+    public void deliver(ChannelRuntime channel, Player sender, Player viewer, String message, ChatContext context) {
+        ChatMessageRenderer.Rendered rendered = render(channel, sender, viewer, message, context);
         ComponentMessenger.sendMarkup(viewer, rendered.miniMessage());
         if (rendered.mentioned()) {
             playMentionCue(channel, viewer);

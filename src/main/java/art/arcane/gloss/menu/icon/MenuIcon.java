@@ -44,6 +44,7 @@ public abstract class MenuIcon<D extends MenuIconData> {
   protected List<UUID> displayEntities;
   protected Location position;
   private long geometryRevision;
+  private float renderedScale;
 
   public MenuIcon(MenuSession session, Location loc, D data) throws MenuIconException {
     this.session = session;
@@ -246,6 +247,7 @@ public abstract class MenuIcon<D extends MenuIconData> {
     remove();
     Location spawnLocation = session.getTransform().localPosition(position, new Vector(0F, -localLineHeight(), 0F));
     displayEntities = createDisplayEntities(spawnLocation);
+    renderedScale = uiScale();
     applyOrientation();
     displayEntities.forEach(entity -> DisplayEntityManager.spawn(entity, session.getPlayer()));
   }
@@ -266,6 +268,15 @@ public abstract class MenuIcon<D extends MenuIconData> {
   }
 
   public void applyTransform(Location loc) {
+    float nextScale = uiScale();
+    if (displayEntities != null && renderedScale > 0F && renderedScale != nextScale) {
+      float ratio = nextScale / renderedScale;
+      for (UUID entity : displayEntities) {
+        DisplayEntityManager.rescale(entity, position, ratio);
+      }
+      renderedScale = nextScale;
+      markGeometryChanged();
+    }
     applyVisualOffset(loc, new Vector());
   }
 

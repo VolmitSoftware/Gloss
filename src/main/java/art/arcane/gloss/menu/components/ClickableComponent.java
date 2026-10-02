@@ -143,10 +143,14 @@ public abstract class ClickableComponent<T extends ComponentData> extends MenuCo
     ParticleUtils.playParticle(w, upLeft, Color.BLUE);
   }
 
+  protected CollisionPlane createHitbox() {
+    return currentIcon.createBoundingBox(location);
+  }
+
   private void refreshPlane() {
     if (currentIcon == null)
       return;
-    CollisionPlane next = currentIcon.createBoundingBox(location);
+    CollisionPlane next = createHitbox();
     this.planeOrigin = next.getCenter().clone();
     if (hitbox != null && hitbox.hasCustomSize()) {
       float scale = session.getTransform().scale();

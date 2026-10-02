@@ -27,7 +27,6 @@ import art.arcane.volmlib.util.board.ScoreDirection;
 import com.github.retrooper.packetevents.PacketEvents;
 import com.github.retrooper.packetevents.event.PacketListenerCommon;
 import com.github.retrooper.packetevents.protocol.score.ScoreFormat;
-import art.arcane.gloss.util.common.TextUtils;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -747,15 +746,12 @@ public final class BoardService implements Listener, Explainable, RegistryOwner 
 
         private ScoreFormat scoreFormat(Player player, BoardLineFormat format, GlossBoardMeta.RenderPlan plan,
                                         int index) {
-            return switch (format) {
-                case BLANK -> ScoreFormat.blankScore();
-                case NUMBER, STYLED -> null;
-                case FIXED -> {
-                    String cached = plan.staticValue(index);
-                    String value = cached != null ? cached : render(player, plan.rawValue(index));
-                    yield ScoreFormat.fixedScore(TextUtils.parse(value));
-                }
-            };
+            if (format == BoardLineFormat.BLANK || format == BoardLineFormat.NUMBER) {
+                return format.scoreFormat(null);
+            }
+            String cached = plan.staticValue(index);
+            String value = cached != null ? cached : render(player, plan.rawValue(index));
+            return format.scoreFormat(value);
         }
 
         @Override

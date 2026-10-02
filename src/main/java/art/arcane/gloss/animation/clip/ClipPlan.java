@@ -251,7 +251,7 @@ public final class ClipPlan {
             }
             List<CompiledTrack> tracks = compileTracks(clip);
             grouped.computeIfAbsent(clip.trigger(), ignored -> new ArrayList<>())
-                .add(new CompiledClip(clip.durationTicks(), clip.loop(), tracks));
+                .add(new CompiledClip(clip.durationTicks(), clip.loopMode(), tracks));
         }
         Map<Trigger, List<CompiledClip>> immutable = new HashMap<>(grouped.size() * 2);
         for (Map.Entry<Trigger, List<CompiledClip>> entry : grouped.entrySet()) {
@@ -418,15 +418,22 @@ public final class ClipPlan {
         }
     }
 
-    private record CompiledClip(double durationTicks, boolean loop, List<CompiledTrack> tracks) {
+    private record CompiledClip(double durationTicks, LoopMode loopMode, List<CompiledTrack> tracks) {
+        private double sampleTick(double elapsedTicks) {
+            double tick = Math.max(0.0D, elapsedTicks);
+            if (durationTicks <= 0.0D) {
+                return 0.0D;
+            }
+            if (loopMode == LoopMode.PINGPONG) {
+                double phase = tick % (durationTicks * 2.0D);
+                return phase <= durationTicks ? phase : durationTicks * 2.0D - phase;
+            }
+            return loopMode == LoopMode.LOOP ? tick % durationTicks : Math.min(durationTicks, tick);
+        }
+
         boolean apply(String material, double elapsedTicks, double[] values, Map<String, MaterialMap> properties,
                       String bone) {
-            double tick = Math.max(0.0D, elapsedTicks);
-            if (loop && durationTicks > 0.0D) {
-                tick %= durationTicks;
-            } else {
-                tick = Math.min(durationTicks, tick);
-            }
+            double tick = sampleTick(elapsedTicks);
             boolean touched = false;
             for (CompiledTrack track : tracks) {
                 if (bone != null && !track.appliesTo(bone)) {
@@ -439,12 +446,12 @@ public final class ClipPlan {
         }
 
         boolean requiresContinuousUpdates(String material, double elapsedTicks, Map<String, MaterialMap> properties) {
-            if (!loop && elapsedTicks >= durationTicks) {
+            if (durationTicks <= 0.0D || (loopMode != LoopMode.LOOP && loopMode != LoopMode.PINGPONG && elapsedTicks >= durationTicks)) {
                 return false;
             }
-            double tick = Math.max(0.0D, elapsedTicks);
-            if (loop && durationTicks > 0.0D) {
-                tick %= durationTicks;
+            double tick = sampleTick(elapsedTicks);
+            if (loopMode == LoopMode.PINGPONG && tick >= durationTicks) {
+                tick = Math.nextDown(durationTicks);
             }
             for (CompiledTrack track : tracks) {
                 if (track.requiresContinuousUpdates(material, tick, properties)) {

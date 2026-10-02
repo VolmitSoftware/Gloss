@@ -2272,7 +2272,7 @@
           "exclusiveMinimum": 0
         },
         "width": {
-          "description": "Rendered width in menu-local units.",
+          "description": "Horizontal click-area width in menu-local units, scaled with the menu.",
           "type": "number",
           "exclusiveMinimum": 0
         },

@@ -12,7 +12,7 @@
     "priority": 100,
     "cooldownTicks": 0
   },
-  "format": "&7[&d{{ sender.name }} &7-> &d{{ viewer.name }}&7] &f{{ message }}",
+  "format": "&7[&d{{ sender.name }} &7-> &d{{ recipient.name }}&7] &f{{ message }}",
   "card": [],
   "mentions": {
     "enabled": false

@@ -3,6 +3,7 @@ package art.arcane.gloss.chat;
 import art.arcane.gloss.Gloss;
 import art.arcane.gloss.bedrock.BedrockService;
 import art.arcane.gloss.condition.BoundedConditionErrorCallback;
+import art.arcane.gloss.condition.GlossConditionContext;
 import art.arcane.gloss.util.common.TextUtils;
 import org.bukkit.entity.Player;
 
@@ -42,7 +43,7 @@ public final class ChatMessageRenderer {
 
     public Rendered render(ChannelRuntime channel, Player sender, Player viewer, String message,
                            ChatContext context) {
-        ChatScope scope = scope(channel, sender, viewer);
+        ChatScope scope = scope(channel, sender, viewer, context.recipient());
         ChatBody.Body body = ChatBody.render(channel, message, bodyContext(channel, sender, viewer, context));
         String format = body.mentioned() ? channel.doc().mentions().messageFormat() : channel.format(scope, errors);
         String rendered = plugin.text().renderScoped(viewer, format, scope, ChatComponents::scopedMarkup);
@@ -72,13 +73,14 @@ public final class ChatMessageRenderer {
         return out.append(template, cursor, template.length()).toString();
     }
 
-    private ChatScope scope(ChannelRuntime channel, Player sender, Player viewer) {
+    private ChatScope scope(ChannelRuntime channel, Player sender, Player viewer, Player recipient) {
         Map<String, Object> values = new HashMap<>(4);
         values.put("message", MESSAGE_MARKER);
         values.put("card", CARD_MARKER);
         values.put("channel.id", channel.id());
         values.put("channel.name", channel.name());
-        return new ChatScope(plugin, viewer, sender, values);
+        return new ChatScope(plugin, GlossConditionContext.subject(viewer,
+            recipient == null ? viewer : recipient, sender, values));
     }
 
     private ChatBody.Context bodyContext(ChannelRuntime channel, Player sender, Player viewer,

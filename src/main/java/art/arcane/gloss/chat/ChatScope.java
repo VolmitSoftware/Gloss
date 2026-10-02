@@ -5,10 +5,8 @@ import art.arcane.gloss.condition.GlossConditionContext;
 import art.arcane.gloss.condition.GlossConditionScope;
 import art.arcane.gloss.expr.ExprScope;
 import art.arcane.gloss.expr.ExprVariableContext;
-import org.bukkit.entity.Player;
 
 import java.util.List;
-import java.util.Map;
 
 /**
  * The expression scope one rendered chat message sees. The sender is the condition engine's
@@ -21,13 +19,15 @@ public final class ChatScope implements ExprScope {
 
     private final GlossConditionScope delegate;
 
-    public ChatScope(Gloss plugin, Player viewer, Player sender, Map<String, Object> values) {
-        this.delegate = new GlossConditionScope(plugin,
-            new GlossConditionContext(viewer, viewer, sender, location(viewer, sender), values));
+    public ChatScope(Gloss plugin, GlossConditionContext context) {
+        this.delegate = new GlossConditionScope(plugin, context);
     }
 
     @Override
     public Object variable(String dottedName) {
+        if (dottedName.startsWith("recipient.")) {
+            return delegate.variable("subject." + dottedName.substring("recipient.".length()));
+        }
         return delegate.variable(dottedName.startsWith(SENDER_PREFIX)
             ? SOURCE_PREFIX + dottedName.substring(SENDER_PREFIX.length())
             : dottedName);
@@ -45,18 +45,19 @@ public final class ChatScope implements ExprScope {
 
     /** {@code hasPermission('sender', ...)} reads the same role the variables do. */
     private static List<Object> rewriteRoles(List<Object> args) {
-        if (args.isEmpty() || !"sender".equals(args.getFirst())) {
+        if (args.isEmpty() || !(args.getFirst() instanceof String role)) {
+            return args;
+        }
+        String mapped = switch (role) {
+            case "sender" -> "source";
+            case "recipient" -> "subject";
+            default -> role;
+        };
+        if (mapped.equals(role)) {
             return args;
         }
         Object[] rewritten = args.toArray();
-        rewritten[0] = "source";
+        rewritten[0] = mapped;
         return List.of(rewritten);
-    }
-
-    private static org.bukkit.Location location(Player viewer, Player sender) {
-        if (viewer != null) {
-            return viewer.getLocation();
-        }
-        return sender == null ? null : sender.getLocation();
     }
 }

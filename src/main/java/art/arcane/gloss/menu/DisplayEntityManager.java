@@ -410,6 +410,32 @@ public class DisplayEntityManager {
     return displayEntity.metadataPacket(MetadataIndex.TEXT_BACKGROUND);
   }
 
+  public static void rescale(UUID uuid, Location anchor, float ratio) {
+    DisplayEntity display = displayEntities.get(uuid);
+    if (display == null || unsupportedVersion()) {
+      return;
+    }
+    Player player = playerVisibility.get(uuid);
+    Vector3d previous = display.location();
+    Location position = anchor.clone().add(
+        (previous.getX() - anchor.getX()) * ratio,
+        (previous.getY() - anchor.getY()) * ratio,
+        (previous.getZ() - anchor.getZ()) * ratio);
+    List<PacketWrapper<?>> packets = new ArrayList<>(2);
+    packets.add(display.goTo(position));
+    if (!display.isRawEntity()) {
+      Vector3f scale = display.scale();
+      Vector3f translation = display.translation();
+      display.scale(new Vector3f(scale.getX() * ratio, scale.getY() * ratio, scale.getZ() * ratio));
+      display.translation(new Vector3f(translation.getX() * ratio, translation.getY() * ratio,
+          translation.getZ() * ratio));
+      packets.add(display.metadataPacket(MetadataIndex.TRANSLATION, MetadataIndex.SCALE));
+    }
+    if (player != null) {
+      PacketUtils.send(player, packets);
+    }
+  }
+
   public static void changeScale(UUID uuid, float x, float y, float z) {
     if (unsupportedVersion())
       return;

@@ -50,6 +50,8 @@ public final class MarkerService implements GlossService, Listener {
     private final DocumentRegistry<MarkerDoc> registry;
     private final PersonalMarkers personal;
     private final MarkerNamespace namespace = new MarkerNamespace();
+    private final ConcurrentMap<UUID, MarkerLifetimes> lifetimes = new ConcurrentHashMap<>();
+    private volatile long lifetimeTick;
     private final ConcurrentMap<UUID, MarkerRenderer> renderers = new ConcurrentHashMap<>();
     private final ViewerLeases leases = new ViewerLeases(VisibilityGovernor.Surface.MARKER);
     private volatile List<MarkerRuntime> documents = List.of();
@@ -79,7 +81,7 @@ public final class MarkerService implements GlossService, Listener {
     @Override
     public void enable() {
         registry.reload();
-        rebuild();
+        rebuild(registry.snapshot());
         plugin.watchdog().register(MarkerDoc.KIND, this::poll);
         plugin.getServer().getPluginManager().registerEvents(this, plugin);
         if (enabled()) {
@@ -103,7 +105,7 @@ public final class MarkerService implements GlossService, Listener {
     @Override
     public void reload() {
         registry.reload();
-        rebuild();
+        rebuild(registry.snapshot());
         if (!enabled()) {
             stopDriver();
             destroyAll();
@@ -135,6 +137,7 @@ public final class MarkerService implements GlossService, Listener {
 
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
+        lifetimes.remove(event.getPlayer().getUniqueId());
         forget(event.getPlayer().getUniqueId());
     }
 
@@ -151,11 +154,10 @@ public final class MarkerService implements GlossService, Listener {
         if (delta.isEmpty()) {
             return;
         }
-        registry.apply(delta, this::rebuild);
+        registry.apply(delta, () -> rebuild(registry.snapshot(delta)));
     }
 
-    private void rebuild() {
-        Map<String, GlossDocument<MarkerDoc>> snapshot = registry.snapshot();
+    private void rebuild(Map<String, GlossDocument<MarkerDoc>> snapshot) {
         List<MarkerRuntime> runtimes = new ArrayList<>(snapshot.size());
         for (Map.Entry<String, GlossDocument<MarkerDoc>> entry : snapshot.entrySet()) {
             MarkerDoc doc = entry.getValue().value();
@@ -180,6 +182,7 @@ public final class MarkerService implements GlossService, Listener {
     }
 
     private void drive() {
+        lifetimeTick += DRIVE_INTERVAL_TICKS;
         if (!enabled()) {
             return;
         }
@@ -281,15 +284,24 @@ public final class MarkerService implements GlossService, Listener {
         double viewRange = plugin.cfg().modules().markers().viewRange();
         ExprScope scope = GlossConditionScope.viewer(plugin, viewer);
         List<MarkerCandidate> candidates = new ArrayList<>();
+        MarkerLifetimes lifetime = lifetimes.computeIfAbsent(viewer.getUniqueId(), ignored -> new MarkerLifetimes());
+        long tick = lifetimeTick;
         for (MarkerRuntime runtime : documents) {
-            add(candidates, runtime, viewer, world, eye, viewRange, scope);
+            if (lifetime.active(runtime.spec(), tick)) {
+                add(candidates, runtime, viewer, world, eye, viewRange, scope);
+            }
         }
         for (MarkerSpec spec : MarkerProviders.collect(viewer)) {
-            add(candidates, MarkerRuntime.of(spec), viewer, world, eye, viewRange, scope);
+            if (lifetime.active(spec, tick)) {
+                add(candidates, MarkerRuntime.of(spec), viewer, world, eye, viewRange, scope);
+            }
         }
         for (MarkerSpec spec : personal.list(viewer.getUniqueId())) {
-            add(candidates, MarkerRuntime.of(spec), viewer, world, eye, viewRange, scope);
+            if (lifetime.active(spec, tick)) {
+                add(candidates, MarkerRuntime.of(spec), viewer, world, eye, viewRange, scope);
+            }
         }
+        lifetime.retireAbsent(tick);
         return candidates;
     }
 
@@ -346,6 +358,7 @@ public final class MarkerService implements GlossService, Listener {
     }
 
     private void destroyAll() {
+        lifetimes.clear();
         for (UUID viewerId : List.copyOf(renderers.keySet())) {
             forget(viewerId);
         }

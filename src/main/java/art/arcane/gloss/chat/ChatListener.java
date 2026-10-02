@@ -44,7 +44,7 @@ final class ChatListener implements Listener {
         retainRecipients(event, sink.viewers);
         event.setCancelled(true);
         for (Player viewer : event.getRecipients()) {
-            channels.deliver(sink.channel, event.getPlayer(), viewer, sink.message);
+            channels.deliver(sink.channel, event.getPlayer(), viewer, sink.message, ChatContext.PLAIN);
         }
         channels.deliverConsole(sink.channel, event.getPlayer(), sink.message);
     }
