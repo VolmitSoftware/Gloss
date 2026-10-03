@@ -74,7 +74,8 @@ class HologramVariantPacketTest {
             assertEquals(EntityTypes.COW, aliceSpawns.get(0).getEntityType());
             assertEquals(EntityTypes.PIG, aliceSpawns.get(1).getEntityType());
             assertTrue(aliceSpawns.get(0).getPosition().getY() > 64);
-            assertTrue(aliceSpawns.get(1).getPosition().getY() < 64);
+            assertTrue(aliceSpawns.get(1).getPosition().getY() > 64);
+            assertTrue(aliceSpawns.get(0).getPosition().getY() > aliceSpawns.get(1).getPosition().getY());
             assertEquals(1, bobSpawns.size());
             assertEquals(EntityTypes.PIG, bobSpawns.getFirst().getEntityType());
             packets.clear();
@@ -85,6 +86,39 @@ class HologramVariantPacketTest {
             assertFalse(packets.sentTo(alice.proxy, WrapperPlayServerDestroyEntities.class).isEmpty());
             assertEquals(List.of(EntityTypes.PIG), packets.sentTo(alice.proxy, WrapperPlayServerSpawnEntity.class)
                 .stream().map(WrapperPlayServerSpawnEntity::getEntityType).toList());
+            assertTrue(harness.schedulerErrors.isEmpty());
+        } finally {
+            PacketEventsStub.uninstall();
+        }
+    }
+
+    @Test
+    void changingNativeTextScaleRebuildsMixedRowsAndTheirObjectPositions() {
+        PacketEventsStub packets = PacketEventsStub.install();
+        try (CharacterizationHarness harness = new CharacterizationHarness(directory)) {
+            CharacterizationHarness.WorldState world = harness.world("world");
+            CharacterizationHarness.PlayerHandle viewer = harness.join("Alice", world, 0, 64, 0);
+            PersistentHologram hologram = harness.persistent("objects", harness.at(world, 0, 64, 0));
+            hologram.apply(HologramDoc.parse("objects.json", """
+                {"schemaVersion":3,"revision":1,"anchor":{"world":"world","position":[0,64,0]},
+                 "lines":["Title",{"entity":"minecraft:cow","scale":0.6},"Footer"]}
+                """));
+            hologram.update();
+            harness.drainDelayed();
+            List<WrapperPlayServerSpawnEntity> original = packets.sentTo(viewer.proxy,
+                WrapperPlayServerSpawnEntity.class);
+            assertEquals(1, original.size());
+            assertEquals(64.455D, original.getFirst().getPosition().getY(), 1.0E-6D);
+
+            packets.clear();
+            hologram.setStyle(hologram.style().withScale(2F, 2F, 2F));
+            hologram.update();
+            harness.drainDelayed();
+            List<WrapperPlayServerSpawnEntity> scaled = packets.sentTo(viewer.proxy,
+                WrapperPlayServerSpawnEntity.class);
+            assertEquals(1, scaled.size());
+            assertEquals(64.83D, scaled.getFirst().getPosition().getY(), 1.0E-6D);
+            assertFalse(packets.sentTo(viewer.proxy, WrapperPlayServerDestroyEntities.class).isEmpty());
             assertTrue(harness.schedulerErrors.isEmpty());
         } finally {
             PacketEventsStub.uninstall();

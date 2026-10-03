@@ -15,12 +15,12 @@ import art.arcane.gloss.service.GlossService;
 import art.arcane.gloss.util.common.TextUtils;
 import art.arcane.volmlib.util.plugin.ComponentMessenger;
 import art.arcane.volmlib.util.scheduling.SchedulerUtils;
+import art.arcane.volmlib.util.scheduling.FoliaScheduler;
 import org.bukkit.Material;
 import org.bukkit.command.PluginCommand;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.HandlerList;
 import org.bukkit.event.Listener;
-import org.bukkit.event.player.PlayerItemHeldEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
@@ -195,7 +195,7 @@ public final class ChannelService implements GlossService, Listener {
         if (verdict == ChatThrottle.Verdict.REPEAT) {
             return PrivateResult.REPEAT;
         }
-        ChatContext context = new ChatContext(null, null, target);
+        ChatContext context = new ChatContext(null, snapshotItem(channel, sender, filtered), target);
         deliver(channel, sender, target, filtered, context);
         deliver(channel, sender, sender, filtered, context);
         state.pairConversation(sender.getUniqueId(), target.getUniqueId());
@@ -239,21 +239,21 @@ public final class ChannelService implements GlossService, Listener {
         if (verdict == ChatThrottle.Verdict.REPEAT) {
             return refuse(sender, sink, ChatDrop.REPEAT, GlossMessages.CHAT_REPEAT);
         }
+        ChatContext context = ChatContext.PLAIN.withItem(snapshotItem(channel, sender, filtered));
         plugin.chat().dispatchHooks(sender, filtered);
-        sink.audience(channel, filtered, ChatAudience.viewers(channel, sender,
-            plugin.getServer().getOnlinePlayers()));
+        sink.audience(new ChatDispatch(channel, filtered, ChatAudience.viewers(channel, sender,
+            plugin.getServer().getOnlinePlayers()), context));
         return true;
     }
 
     public ChatMessageRenderer.Rendered render(ChannelRuntime channel, Player sender, Player viewer,
                                                String message, ChatContext context) {
-        return renderer.render(channel, sender, viewer, message,
-            context.withItem(state.heldItem(sender.getUniqueId())));
+        return renderer.render(channel, sender, viewer, message, context);
     }
 
-    public void deliverConsole(ChannelRuntime channel, Player sender, String message) {
+    public void deliverConsole(ChannelRuntime channel, Player sender, String message, ChatContext context) {
         ComponentMessenger.sendMarkup(plugin.getServer().getConsoleSender(),
-            render(channel, sender, null, message, ChatContext.PLAIN).miniMessage());
+            render(channel, sender, null, message, context).miniMessage());
     }
 
     /** Plays the channel's mention cue on the mentioned viewer's own region thread. */
@@ -264,13 +264,6 @@ public final class ChannelService implements GlossService, Listener {
         }
         SchedulerUtils.runEntity(plugin, viewer,
             () -> viewer.playSound(viewer.getLocation(), sound, 1.0F, 1.0F));
-    }
-
-    @EventHandler
-    public void onItemHeld(PlayerItemHeldEvent event) {
-        Player player = event.getPlayer();
-        state.setHeldItem(player.getUniqueId(),
-            itemToken(player.getInventory().getItem(event.getNewSlot())));
     }
 
     @EventHandler
@@ -306,6 +299,62 @@ public final class ChannelService implements GlossService, Listener {
 
     private static String normalize(String message) {
         return message.toLowerCase(Locale.ROOT).replaceAll("\\s+", " ").trim();
+    }
+
+    public boolean needsItemSnapshot(Player sender, String message) {
+        ChannelRuntime channel = activeChannel(sender);
+        if (channel == null) {
+            return false;
+        }
+        String filtered = ChatFilters.apply(renderer.selected(channel, sender, sender, null), message);
+        return filtered != null && hasItemToken(channel.doc(), filtered);
+    }
+
+    public void dispatchDeferred(Player sender, String message, ChatSink sink) {
+        if (!FoliaScheduler.runEntity(plugin, sender,
+            () -> dispatchAfterOwnerTransfer(sender, message, sink), 0L,
+            () -> sink.dropped(ChatDrop.NO_CHANNEL))) {
+            sink.dropped(ChatDrop.NO_CHANNEL);
+        }
+    }
+
+    public void deliverDeferred(ChatDispatch dispatch, Player sender, Player viewer) {
+        FoliaScheduler.runEntity(plugin, viewer, () -> {
+            if (active() && plugin.isEnabled() && viewer.isOnline()) {
+                deliver(dispatch.channel(), sender, viewer, dispatch.message(), dispatch.context());
+            }
+        });
+    }
+
+    private void dispatchAfterOwnerTransfer(Player sender, String message, ChatSink sink) {
+        if (!active() || !plugin.isEnabled() || !sender.isOnline()) {
+            sink.dropped(ChatDrop.NO_CHANNEL);
+            return;
+        }
+        dispatch(sender, message, sink);
+    }
+
+    private ChatBody.Item snapshotItem(ChannelRuntime channel, Player sender, String message) {
+        if (!hasItemToken(channel.doc(), message)) {
+            return null;
+        }
+        if (!FoliaScheduler.isOwnedByCurrentRegion(sender)) {
+            throw new IllegalStateException("Chat item snapshots require the sender's owning thread");
+        }
+        return itemToken(sender.getInventory().getItemInMainHand());
+    }
+
+    private static boolean hasItemToken(ChannelDoc document, String message) {
+        if (document.items().enabled() && message.contains(document.items().token())) {
+            return true;
+        }
+        for (ChannelDoc.Variant variant : document.variants()) {
+            ChannelDoc.Items items = variant.items();
+            if (items != null && items.enabled() && message.contains(items.token())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @SuppressWarnings("deprecation")

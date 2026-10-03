@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "revision": 1,
+  "surface": "title",
+  "show": true,
+  "select": {
+    "priority": 100,
+    "when": false
+  },
+  "presentation": {
+    "title": "&6Gloss surfaces",
+    "subtitle": "&fAction bar, boss bar and title",
+    "trigger": "select",
+    "stayTicks": 80,
+    "fadeInTicks": 10,
+    "fadeOutTicks": 10
+  },
+  "variants": []
+}

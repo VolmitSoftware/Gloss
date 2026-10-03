@@ -182,12 +182,12 @@ public final class SurfaceService implements GlossService, Listener, TitleProvid
 
     private void loadAll() {
         registry.reload();
-        rebuildRuntimes();
+        rebuildRuntimes(registry.snapshot());
     }
 
-    private void rebuildRuntimes() {
+    private void rebuildRuntimes(Map<String, GlossDocument<SurfaceDoc>> snapshot) {
         List<SurfaceRuntime> compiled = new ArrayList<>();
-        for (GlossDocument<SurfaceDoc> document : registry.snapshot().values()) {
+        for (GlossDocument<SurfaceDoc> document : snapshot.values()) {
             try {
                 compiled.add(SurfaceRuntime.compile(document.id(), document.value()));
             } catch (RuntimeException failure) {
@@ -215,7 +215,7 @@ public final class SurfaceService implements GlossService, Listener, TitleProvid
         for (String id : delta.loaded()) {
             Gloss.log(Level.INFO, "Surface document \"%s\" changed and was reloaded.", id);
         }
-        rebuildRuntimes();
+        rebuildRuntimes(registry.snapshot(delta));
     }
 
     private void sweepStripe() {

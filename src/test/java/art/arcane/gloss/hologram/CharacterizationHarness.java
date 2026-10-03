@@ -184,6 +184,7 @@ final class CharacterizationHarness implements AutoCloseable {
     private final Object previousServer;
 
     CharacterizationHarness(File dataFolder) {
+        NativeEntityDimensionsFixture.install();
         try {
             this.dataFolder = dataFolder;
             this.previousServer = serverField().get(null);

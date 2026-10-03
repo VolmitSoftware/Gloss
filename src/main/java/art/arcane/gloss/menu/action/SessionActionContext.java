@@ -1,6 +1,7 @@
 package art.arcane.gloss.menu.action;
 
 import art.arcane.gloss.menu.SessionVariables;
+import art.arcane.gloss.expr.ExprScope;
 import art.arcane.gloss.api.HoloClickTrigger;
 import art.arcane.gloss.enums.NavigationMode;
 import art.arcane.gloss.menu.MenuSession;
@@ -45,6 +46,11 @@ public final class SessionActionContext implements ActionContext {
   @Override
   public NavigationResult navigate(NavigationRequest request) {
     return navigator.navigate(request);
+  }
+
+  @Override
+  public ExprScope conditionScope() {
+    return session.componentScope(componentId);
   }
 
   @Override

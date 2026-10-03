@@ -14,7 +14,7 @@ public record GlossConditionContext(Player viewer, Entity subject, Entity source
     }
 
     public static GlossConditionContext viewer(Player player) {
-        return new GlossConditionContext(player, player, null, player.getLocation(), Map.of());
+        return new GlossConditionContext(player, player, null, player == null ? null : player.getLocation(), Map.of());
     }
 
     public static GlossConditionContext subject(Entity subject) {

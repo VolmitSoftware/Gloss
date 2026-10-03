@@ -65,7 +65,7 @@ class TextMenuIconRefreshTest {
         MenuTransform transform = new MenuTransform(anchor, new Vector(), 0F, 0F, 0F, 1F);
         MenuSession session = new MenuSession(definition, player,
             MenuSessionOptions.positioned(transform, request -> NavigationResult.DENIED, 1F));
-        return new TextMenuIcon(session, anchor, text(refreshTicks));
+        return new TextMenuIcon(session, anchor, text(refreshTicks), null);
     }
 
     private static TextIconData text(Integer refreshTicks) {

@@ -29,3 +29,6 @@ BUILDS/
 
 # Agent lane worktrees
 .worktrees/
+
+__pycache__/
+*.pyc

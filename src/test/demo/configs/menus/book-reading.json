@@ -1,0 +1,41 @@
+{
+  "offset": [
+    0,
+    1.6,
+    3
+  ],
+  "lockPosition": true,
+  "components": [
+    {
+      "id": "action",
+      "offset": [
+        0,
+        0.2,
+        0
+      ],
+      "data": {
+        "type": "button",
+        "icon": {
+          "type": "text",
+          "text": "&6Read the guide",
+          "style": {
+            "scaleX": 0.8,
+            "scaleY": 0.8,
+            "scaleZ": 0.8
+          }
+        },
+        "actions": [
+          {
+            "type": "book",
+            "title": "Garden guide",
+            "author": "Gloss",
+            "pages": [
+              "&6Garden guide\n\n&0Read a written book from a menu action.",
+              "&0The next page completes the guide."
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

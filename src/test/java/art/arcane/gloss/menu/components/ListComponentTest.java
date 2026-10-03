@@ -5,6 +5,10 @@ import art.arcane.gloss.config.components.ButtonComponentData;
 import art.arcane.gloss.config.components.ListComponentData;
 import art.arcane.gloss.config.icon.TextIconData;
 import art.arcane.gloss.expr.ExprScope;
+import art.arcane.gloss.menu.ExpandedMenuComponent;
+import art.arcane.gloss.menu.MenuExpressions;
+import art.arcane.gloss.expr.ExprParser;
+import art.arcane.gloss.expr.ExprEvaluator;
 import org.bukkit.util.Vector;
 import org.junit.jupiter.api.Test;
 
@@ -23,21 +27,21 @@ class ListComponentTest {
 
     @Test
     void entriesFlowLeftToRightThenDown() {
-        List<MenuComponentData> expanded = expand(entries("a", "b", "c", "d", "e"),
+        List<ExpandedMenuComponent> expanded = expand(entries("a", "b", "c", "d", "e"),
             new ListComponentData.Flow(2, 1.0F, 0.5F, -0.5F, 1.0F), 6, 0, 64);
 
         assertEquals(5, expanded.size());
-        assertEquals(new Vector(-0.5D, 1.0D, 0.0D), expanded.get(0).offset());
-        assertEquals(new Vector(0.5D, 1.0D, 0.0D), expanded.get(1).offset());
-        assertEquals(new Vector(-0.5D, 0.5D, 0.0D), expanded.get(2).offset());
-        assertEquals(new Vector(0.5D, 0.5D, 0.0D), expanded.get(3).offset());
-        assertEquals(new Vector(-0.5D, 0.0D, 0.0D), expanded.get(4).offset());
+        assertEquals(new Vector(-0.5D, 1.0D, 0.0D), expanded.get(0).data().offset());
+        assertEquals(new Vector(0.5D, 1.0D, 0.0D), expanded.get(1).data().offset());
+        assertEquals(new Vector(-0.5D, 0.5D, 0.0D), expanded.get(2).data().offset());
+        assertEquals(new Vector(0.5D, 0.5D, 0.0D), expanded.get(3).data().offset());
+        assertEquals(new Vector(-0.5D, 0.0D, 0.0D), expanded.get(4).data().offset());
     }
 
     @Test
     void everyExpandedComponentHasItsOwnId() {
-        List<MenuComponentData> expanded = expand(entries("a", "b", "c"), flow(), 6, 0, 64);
-        List<String> ids = expanded.stream().map(MenuComponentData::id).toList();
+        List<ExpandedMenuComponent> expanded = expand(entries("a", "b", "c"), flow(), 6, 0, 64);
+        List<String> ids = expanded.stream().map(entry -> entry.data().id()).toList();
         assertEquals(3, ids.size());
         assertEquals(3, ids.stream().distinct().count());
         assertTrue(ids.getFirst().startsWith("items"), ids.getFirst());
@@ -67,7 +71,20 @@ class ListComponentTest {
         assertEquals(List.of(), ListComponent.expand(component(data), scopeOf("not a list"), 0, 64));
     }
 
-    private static List<MenuComponentData> expand(List<Object> source, ListComponentData.Flow flow,
+    @Test
+    void entryTextAndActionExpressionsKeepTheirOwnContext() {
+        List<ExpandedMenuComponent> expanded = expand(entries("Oak", "Birch", "Spruce"), flow(), 2, 0, 64);
+        assertEquals("Oak", MenuExpressions.substitute("{{item}}", expanded.get(0).scope()));
+        assertEquals("Birch", MenuExpressions.substitute("{{item}}", expanded.get(1).scope()));
+        assertEquals("buy Birch", MenuExpressions.substitute("buy {{item}}", expanded.get(1).scope()));
+        assertEquals(true, ExprEvaluator.eval(ExprParser.parse("item == 'Birch'"), expanded.get(1).scope()));
+        assertEquals(false, ExprEvaluator.eval(ExprParser.parse("item == 'Birch'"), expanded.get(0).scope()));
+        List<ExpandedMenuComponent> secondPage = expand(entries("Oak", "Birch", "Spruce"), flow(), 2, 1, 64);
+        assertEquals("Spruce", MenuExpressions.substitute("{{item}}", secondPage.getFirst().scope()));
+        assertEquals("items[2]", secondPage.getFirst().data().id());
+    }
+
+    private static List<ExpandedMenuComponent> expand(List<Object> source, ListComponentData.Flow flow,
                                                   int pageSize, int page, int cap) {
         return ListComponent.expand(component(listData(flow, pageSize)), scopeOf(source), page, cap);
     }

@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "revision": 1,
+  "entries": [
+    {
+      "lines": [
+        "&6&lGloss garden",
+        "&fDisplays, menus and chat"
+      ],
+      "sample": [
+        "&aGarden studio",
+        "&7Native client showcase"
+      ],
+      "online": "{{ server.online }}",
+      "max": "20"
+    }
+  ],
+  "links": [
+    {
+      "type": "website",
+      "url": "https://volmitsoftware.com"
+    },
+    {
+      "label": "Garden guide",
+      "url": "https://example.com/guide"
+    }
+  ]
+}

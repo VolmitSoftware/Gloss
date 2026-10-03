@@ -1,0 +1,5074 @@
+[
+  {
+    "id": "holograms",
+    "perspectives": [
+      "pov",
+      "observer"
+    ],
+    "trigger": "Navigate authored mixed hologram pages with an actual right click",
+    "visibleResult": "Text, diamond and amethyst rows followed by second page and return",
+    "setup": [
+      {
+        "op": "dismiss",
+        "wait": 0.1
+      },
+      {
+        "op": "chat",
+        "command": "gloss menu close",
+        "wait": 0.5
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:chicken]",
+        "wait": 0.1
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:zombie]",
+        "wait": 0.1
+      },
+      {
+        "op": "document",
+        "path": "nametags/identity.json",
+        "values": {
+          "show": false
+        },
+        "wait": 0.3
+      },
+      {
+        "op": "document",
+        "path": "nameplates/identity.json",
+        "values": {
+          "show": false
+        },
+        "wait": 0.3
+      },
+      {
+        "op": "document",
+        "path": "entity-overlays/default.json",
+        "values": {
+          "includePlayers": false
+        },
+        "wait": 1
+      },
+      {
+        "op": "rcon",
+        "command": "gamerule block_drops false",
+        "wait": 0.1
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:pig]",
+        "wait": 0.2
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:item]",
+        "wait": 0.2
+      },
+      {
+        "op": "rcon",
+        "command": "fill -4 71 0 4 72 8 minecraft:air",
+        "wait": 0.2
+      },
+      {
+        "op": "document",
+        "path": "holograms/native-bounds.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1
+      },
+      {
+        "op": "rcon",
+        "command": "tp GlossGuide 0.5 71 0.5 0 0",
+        "wait": 1
+      },
+      {
+        "op": "rcon",
+        "command": "tp GlossVisitor 12.5 71 -9.5",
+        "wait": 0.3
+      },
+      {
+        "op": "document",
+        "path": "holograms/showcase.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "document",
+        "path": "holograms/particles.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "document",
+        "path": "boards/showcase.json",
+        "values": {
+          "select.when": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "document",
+        "path": "markers/garden.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "document",
+        "path": "holograms/showcase.json",
+        "values": {
+          "show": true
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "look-at",
+        "x": 0.5,
+        "y": 74,
+        "z": 6.5,
+        "ticks": 0,
+        "wait": 1
+      }
+    ],
+    "beats": [
+      {
+        "op": "wait",
+        "wait": 3
+      },
+      {
+        "op": "click",
+        "key": "use",
+        "wait": 3
+      },
+      {
+        "op": "click",
+        "key": "use",
+        "wait": 3
+      },
+      {
+        "op": "look-at",
+        "x": 0.5,
+        "y": 72,
+        "z": 5,
+        "ticks": 20,
+        "wait": 1.5
+      }
+    ],
+    "observer": {
+      "position": [
+        5,
+        72,
+        0.5
+      ],
+      "target": [
+        0.5,
+        72.5,
+        4
+      ]
+    }
+  },
+  {
+    "id": "particle-layers",
+    "perspectives": [
+      "pov",
+      "observer"
+    ],
+    "trigger": "Look at measured particle text and frame",
+    "visibleResult": "Gold frame and white glyph outlines follow the authored text",
+    "setup": [
+      {
+        "op": "dismiss",
+        "wait": 0.1
+      },
+      {
+        "op": "chat",
+        "command": "gloss menu close",
+        "wait": 0.5
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:chicken]",
+        "wait": 0.1
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:zombie]",
+        "wait": 0.1
+      },
+      {
+        "op": "document",
+        "path": "nametags/identity.json",
+        "values": {
+          "show": false
+        },
+        "wait": 0.3
+      },
+      {
+        "op": "document",
+        "path": "nameplates/identity.json",
+        "values": {
+          "show": false
+        },
+        "wait": 0.3
+      },
+      {
+        "op": "document",
+        "path": "entity-overlays/default.json",
+        "values": {
+          "includePlayers": false
+        },
+        "wait": 1
+      },
+      {
+        "op": "rcon",
+        "command": "gamerule block_drops false",
+        "wait": 0.1
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:pig]",
+        "wait": 0.2
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:item]",
+        "wait": 0.2
+      },
+      {
+        "op": "rcon",
+        "command": "fill -4 71 0 4 72 8 minecraft:air",
+        "wait": 0.2
+      },
+      {
+        "op": "document",
+        "path": "holograms/native-bounds.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1
+      },
+      {
+        "op": "rcon",
+        "command": "tp GlossGuide 0.5 71 0.5 0 0",
+        "wait": 1
+      },
+      {
+        "op": "rcon",
+        "command": "tp GlossVisitor 12.5 71 -9.5",
+        "wait": 0.3
+      },
+      {
+        "op": "document",
+        "path": "holograms/showcase.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "document",
+        "path": "holograms/particles.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "document",
+        "path": "boards/showcase.json",
+        "values": {
+          "select.when": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "document",
+        "path": "markers/garden.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "document",
+        "path": "holograms/particles.json",
+        "values": {
+          "show": true
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "rcon",
+        "command": "tp GlossGuide -6 71 0 0 0",
+        "wait": 0.5
+      },
+      {
+        "op": "look-at",
+        "x": -6,
+        "y": 73.5,
+        "z": 6,
+        "ticks": 0,
+        "wait": 1
+      }
+    ],
+    "beats": [
+      {
+        "op": "wait",
+        "wait": 4
+      },
+      {
+        "op": "look-at",
+        "x": -6,
+        "y": 74,
+        "z": 6,
+        "ticks": 20,
+        "wait": 1
+      },
+      {
+        "op": "wait",
+        "wait": 3
+      },
+      {
+        "op": "look-at",
+        "x": -5.5,
+        "y": 73.5,
+        "z": 6,
+        "ticks": 20,
+        "wait": 1
+      },
+      {
+        "op": "wait",
+        "wait": 3
+      }
+    ],
+    "observer": {
+      "position": [
+        -1,
+        72,
+        0
+      ],
+      "target": [
+        -6,
+        73.5,
+        6
+      ]
+    }
+  },
+  {
+    "id": "personal-menus",
+    "perspectives": [
+      "pov"
+    ],
+    "trigger": "Open a personal menu and use its button toggle slider and chat field",
+    "visibleResult": "Hover tooltip, confirmation, toggle state, quantity and field answer change",
+    "setup": [
+      {
+        "op": "dismiss",
+        "wait": 0.1
+      },
+      {
+        "op": "chat",
+        "command": "gloss menu close",
+        "wait": 0.5
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:chicken]",
+        "wait": 0.1
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:zombie]",
+        "wait": 0.1
+      },
+      {
+        "op": "document",
+        "path": "nametags/identity.json",
+        "values": {
+          "show": false
+        },
+        "wait": 0.3
+      },
+      {
+        "op": "document",
+        "path": "nameplates/identity.json",
+        "values": {
+          "show": false
+        },
+        "wait": 0.3
+      },
+      {
+        "op": "document",
+        "path": "entity-overlays/default.json",
+        "values": {
+          "includePlayers": false
+        },
+        "wait": 1
+      },
+      {
+        "op": "rcon",
+        "command": "gamerule block_drops false",
+        "wait": 0.1
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:pig]",
+        "wait": 0.2
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:item]",
+        "wait": 0.2
+      },
+      {
+        "op": "rcon",
+        "command": "fill -4 71 0 4 72 8 minecraft:air",
+        "wait": 0.2
+      },
+      {
+        "op": "document",
+        "path": "holograms/native-bounds.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1
+      },
+      {
+        "op": "rcon",
+        "command": "tp GlossGuide 0.5 71 0.5 0 0",
+        "wait": 1
+      },
+      {
+        "op": "rcon",
+        "command": "tp GlossVisitor 12.5 71 -9.5",
+        "wait": 0.3
+      },
+      {
+        "op": "document",
+        "path": "holograms/showcase.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "document",
+        "path": "holograms/particles.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "document",
+        "path": "boards/showcase.json",
+        "values": {
+          "select.when": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "document",
+        "path": "markers/garden.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "look-at",
+        "x": 0.5,
+        "y": 72.6,
+        "z": 3.5,
+        "ticks": 0,
+        "wait": 1
+      },
+      {
+        "op": "rcon",
+        "command": "give GlossGuide minecraft:paper",
+        "wait": 0.3
+      },
+      {
+        "op": "slot",
+        "index": 0,
+        "wait": 0.3
+      }
+    ],
+    "beats": [
+      {
+        "op": "chat",
+        "command": "gloss menu open menu=showcase",
+        "wait": 2
+      },
+      {
+        "op": "look-at",
+        "x": 1.3,
+        "y": 72.58874999999999,
+        "z": 3.5,
+        "ticks": 16,
+        "wait": 1
+      },
+      {
+        "op": "wait",
+        "wait": 1
+      },
+      {
+        "op": "click",
+        "key": "attack",
+        "wait": 2
+      },
+      {
+        "op": "look-at",
+        "x": -0.3,
+        "y": 72.58874999999999,
+        "z": 3.5,
+        "ticks": 16,
+        "wait": 1
+      },
+      {
+        "op": "click",
+        "key": "attack",
+        "wait": 2
+      },
+      {
+        "op": "look-at",
+        "x": 0.5,
+        "y": 72.08874999999999,
+        "z": 3.5,
+        "ticks": 16,
+        "wait": 1
+      },
+      {
+        "op": "click",
+        "key": "attack",
+        "wait": 2
+      },
+      {
+        "op": "look-at",
+        "x": 0.5,
+        "y": 71.58874999999999,
+        "z": 3.5,
+        "ticks": 16,
+        "wait": 1
+      },
+      {
+        "op": "click",
+        "key": "attack",
+        "wait": 1
+      },
+      {
+        "op": "chat",
+        "text": "Garden",
+        "wait": 3
+      },
+      {
+        "op": "chat",
+        "command": "gloss menu close",
+        "wait": 1
+      }
+    ]
+  },
+  {
+    "id": "menu-catalog",
+    "perspectives": [
+      "pov"
+    ],
+    "trigger": "Use tabs to change a list-backed menu",
+    "visibleResult": "Tools list gives way to the block icon then returns",
+    "setup": [
+      {
+        "op": "dismiss",
+        "wait": 0.1
+      },
+      {
+        "op": "chat",
+        "command": "gloss menu close",
+        "wait": 0.5
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:chicken]",
+        "wait": 0.1
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:zombie]",
+        "wait": 0.1
+      },
+      {
+        "op": "document",
+        "path": "nametags/identity.json",
+        "values": {
+          "show": false
+        },
+        "wait": 0.3
+      },
+      {
+        "op": "document",
+        "path": "nameplates/identity.json",
+        "values": {
+          "show": false
+        },
+        "wait": 0.3
+      },
+      {
+        "op": "document",
+        "path": "entity-overlays/default.json",
+        "values": {
+          "includePlayers": false
+        },
+        "wait": 1
+      },
+      {
+        "op": "rcon",
+        "command": "gamerule block_drops false",
+        "wait": 0.1
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:pig]",
+        "wait": 0.2
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:item]",
+        "wait": 0.2
+      },
+      {
+        "op": "rcon",
+        "command": "fill -4 71 0 4 72 8 minecraft:air",
+        "wait": 0.2
+      },
+      {
+        "op": "document",
+        "path": "holograms/native-bounds.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1
+      },
+      {
+        "op": "rcon",
+        "command": "tp GlossGuide 0.5 71 0.5 0 0",
+        "wait": 1
+      },
+      {
+        "op": "rcon",
+        "command": "tp GlossVisitor 12.5 71 -9.5",
+        "wait": 0.3
+      },
+      {
+        "op": "document",
+        "path": "holograms/showcase.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "document",
+        "path": "holograms/particles.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "document",
+        "path": "boards/showcase.json",
+        "values": {
+          "select.when": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "document",
+        "path": "markers/garden.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "look-at",
+        "x": 0.5,
+        "y": 72.6,
+        "z": 3.5,
+        "ticks": 0,
+        "wait": 1
+      },
+      {
+        "op": "rcon",
+        "command": "give GlossGuide minecraft:paper",
+        "wait": 0.3
+      },
+      {
+        "op": "slot",
+        "index": 0,
+        "wait": 0.3
+      }
+    ],
+    "beats": [
+      {
+        "op": "chat",
+        "command": "gloss menu open menu=catalog",
+        "wait": 2
+      },
+      {
+        "op": "look-at",
+        "x": 1.5,
+        "y": 72.125,
+        "z": 3.5,
+        "ticks": 16,
+        "wait": 1
+      },
+      {
+        "op": "click",
+        "key": "attack",
+        "wait": 2
+      },
+      {
+        "op": "look-at",
+        "x": 0.5,
+        "y": 72.625,
+        "z": 3.5,
+        "ticks": 16,
+        "wait": 1
+      },
+      {
+        "op": "click",
+        "key": "attack",
+        "wait": 3
+      },
+      {
+        "op": "chat",
+        "command": "gloss menu close",
+        "wait": 1
+      }
+    ]
+  },
+  {
+    "id": "inventory-menus",
+    "perspectives": [
+      "pov"
+    ],
+    "trigger": "Open a native Gloss inventory and hover/click a sword",
+    "visibleResult": "Readable custom item tooltip and selection message",
+    "setup": [
+      {
+        "op": "dismiss",
+        "wait": 0.1
+      },
+      {
+        "op": "chat",
+        "command": "gloss menu close",
+        "wait": 0.5
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:chicken]",
+        "wait": 0.1
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:zombie]",
+        "wait": 0.1
+      },
+      {
+        "op": "document",
+        "path": "nametags/identity.json",
+        "values": {
+          "show": false
+        },
+        "wait": 0.3
+      },
+      {
+        "op": "document",
+        "path": "nameplates/identity.json",
+        "values": {
+          "show": false
+        },
+        "wait": 0.3
+      },
+      {
+        "op": "document",
+        "path": "entity-overlays/default.json",
+        "values": {
+          "includePlayers": false
+        },
+        "wait": 1
+      },
+      {
+        "op": "rcon",
+        "command": "gamerule block_drops false",
+        "wait": 0.1
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:pig]",
+        "wait": 0.2
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:item]",
+        "wait": 0.2
+      },
+      {
+        "op": "rcon",
+        "command": "fill -4 71 0 4 72 8 minecraft:air",
+        "wait": 0.2
+      },
+      {
+        "op": "document",
+        "path": "holograms/native-bounds.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1
+      },
+      {
+        "op": "rcon",
+        "command": "tp GlossGuide 0.5 71 0.5 0 0",
+        "wait": 1
+      },
+      {
+        "op": "rcon",
+        "command": "tp GlossVisitor 12.5 71 -9.5",
+        "wait": 0.3
+      },
+      {
+        "op": "document",
+        "path": "holograms/showcase.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "document",
+        "path": "holograms/particles.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "document",
+        "path": "boards/showcase.json",
+        "values": {
+          "select.when": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "document",
+        "path": "markers/garden.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1.5
+      }
+    ],
+    "beats": [
+      {
+        "op": "chat",
+        "command": "gloss inventory open showcase player=GlossGuide",
+        "wait": 2
+      },
+      {
+        "op": "window",
+        "action": "hover",
+        "slot": 10,
+        "ticks": 15,
+        "wait": 3
+      },
+      {
+        "op": "window",
+        "action": "click",
+        "slot": 10,
+        "ticks": 10,
+        "wait": 2
+      },
+      {
+        "op": "window",
+        "action": "close",
+        "wait": 2
+      }
+    ]
+  },
+  {
+    "id": "entity-overlays",
+    "perspectives": [
+      "pov",
+      "observer"
+    ],
+    "trigger": "Damage and heal a named pig",
+    "visibleResult": "Health segments damage number warning colors and recovery",
+    "setup": [
+      {
+        "op": "dismiss",
+        "wait": 0.1
+      },
+      {
+        "op": "chat",
+        "command": "gloss menu close",
+        "wait": 0.5
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:chicken]",
+        "wait": 0.1
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:zombie]",
+        "wait": 0.1
+      },
+      {
+        "op": "document",
+        "path": "nametags/identity.json",
+        "values": {
+          "show": false
+        },
+        "wait": 0.3
+      },
+      {
+        "op": "document",
+        "path": "nameplates/identity.json",
+        "values": {
+          "show": false
+        },
+        "wait": 0.3
+      },
+      {
+        "op": "document",
+        "path": "entity-overlays/default.json",
+        "values": {
+          "includePlayers": false
+        },
+        "wait": 1
+      },
+      {
+        "op": "rcon",
+        "command": "gamerule block_drops false",
+        "wait": 0.1
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:pig]",
+        "wait": 0.2
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:item]",
+        "wait": 0.2
+      },
+      {
+        "op": "rcon",
+        "command": "fill -4 71 0 4 72 8 minecraft:air",
+        "wait": 0.2
+      },
+      {
+        "op": "document",
+        "path": "holograms/native-bounds.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1
+      },
+      {
+        "op": "rcon",
+        "command": "tp GlossGuide 0.5 71 0.5 0 0",
+        "wait": 1
+      },
+      {
+        "op": "rcon",
+        "command": "tp GlossVisitor 12.5 71 -9.5",
+        "wait": 0.3
+      },
+      {
+        "op": "document",
+        "path": "holograms/showcase.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "document",
+        "path": "holograms/particles.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "document",
+        "path": "boards/showcase.json",
+        "values": {
+          "select.when": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "document",
+        "path": "markers/garden.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:pig]",
+        "wait": 0.5
+      },
+      {
+        "op": "rcon",
+        "command": "summon minecraft:pig 0.5 71 5.5 {NoAI:1b,PersistenceRequired:1b,CustomName:{text:\"Garden Pig\"}}",
+        "wait": 0.5
+      },
+      {
+        "op": "look-at",
+        "x": 0.5,
+        "y": 73,
+        "z": 5.5,
+        "ticks": 0,
+        "wait": 1
+      }
+    ],
+    "beats": [
+      {
+        "op": "wait",
+        "wait": 3
+      },
+      {
+        "op": "rcon",
+        "command": "damage @e[type=minecraft:pig,limit=1] 3 minecraft:generic",
+        "wait": 3
+      },
+      {
+        "op": "rcon",
+        "command": "damage @e[type=minecraft:pig,limit=1] 5 minecraft:generic",
+        "wait": 3
+      },
+      {
+        "op": "rcon",
+        "command": "effect give @e[type=minecraft:pig,limit=1] minecraft:instant_health 1 1 true",
+        "wait": 3
+      }
+    ],
+    "observer": {
+      "position": [
+        5,
+        72,
+        0.5
+      ],
+      "target": [
+        0.5,
+        72.5,
+        4
+      ]
+    }
+  },
+  {
+    "id": "damage-healing",
+    "perspectives": [
+      "pov",
+      "observer"
+    ],
+    "trigger": "Damage then apply genuine healing to an entity",
+    "visibleResult": "Transient red damage and green healing indicators",
+    "setup": [
+      {
+        "op": "dismiss",
+        "wait": 0.1
+      },
+      {
+        "op": "chat",
+        "command": "gloss menu close",
+        "wait": 0.5
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:chicken]",
+        "wait": 0.1
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:zombie]",
+        "wait": 0.1
+      },
+      {
+        "op": "document",
+        "path": "nametags/identity.json",
+        "values": {
+          "show": false
+        },
+        "wait": 0.3
+      },
+      {
+        "op": "document",
+        "path": "nameplates/identity.json",
+        "values": {
+          "show": false
+        },
+        "wait": 0.3
+      },
+      {
+        "op": "document",
+        "path": "entity-overlays/default.json",
+        "values": {
+          "includePlayers": false
+        },
+        "wait": 1
+      },
+      {
+        "op": "rcon",
+        "command": "gamerule block_drops false",
+        "wait": 0.1
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:pig]",
+        "wait": 0.2
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:item]",
+        "wait": 0.2
+      },
+      {
+        "op": "rcon",
+        "command": "fill -4 71 0 4 72 8 minecraft:air",
+        "wait": 0.2
+      },
+      {
+        "op": "document",
+        "path": "holograms/native-bounds.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1
+      },
+      {
+        "op": "rcon",
+        "command": "tp GlossGuide 0.5 71 0.5 0 0",
+        "wait": 1
+      },
+      {
+        "op": "rcon",
+        "command": "tp GlossVisitor 12.5 71 -9.5",
+        "wait": 0.3
+      },
+      {
+        "op": "document",
+        "path": "holograms/showcase.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "document",
+        "path": "holograms/particles.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "document",
+        "path": "boards/showcase.json",
+        "values": {
+          "select.when": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "document",
+        "path": "markers/garden.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:pig]",
+        "wait": 0.5
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:item]",
+        "wait": 0.3
+      },
+      {
+        "op": "rcon",
+        "command": "summon minecraft:pig 0.5 71 4.5 {NoAI:1b,PersistenceRequired:1b}",
+        "wait": 0.5
+      },
+      {
+        "op": "look-at",
+        "x": 0.5,
+        "y": 72,
+        "z": 4.5,
+        "ticks": 0,
+        "wait": 1
+      }
+    ],
+    "beats": [
+      {
+        "op": "wait",
+        "wait": 2
+      },
+      {
+        "op": "rcon",
+        "command": "damage @e[type=minecraft:pig,limit=1] 6 minecraft:generic",
+        "wait": 2
+      },
+      {
+        "op": "rcon",
+        "command": "effect give @e[type=minecraft:pig,limit=1] minecraft:instant_health 1 1 true",
+        "wait": 3
+      }
+    ],
+    "observer": {
+      "position": [
+        5,
+        72,
+        0.5
+      ],
+      "target": [
+        0.5,
+        72.5,
+        4
+      ]
+    }
+  },
+  {
+    "id": "real-drops",
+    "perspectives": [
+      "pov",
+      "observer"
+    ],
+    "trigger": "Drop diamond items then walk to collect them",
+    "visibleResult": "Display models labels settling and pickup",
+    "setup": [
+      {
+        "op": "dismiss",
+        "wait": 0.1
+      },
+      {
+        "op": "chat",
+        "command": "gloss menu close",
+        "wait": 0.5
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:chicken]",
+        "wait": 0.1
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:zombie]",
+        "wait": 0.1
+      },
+      {
+        "op": "document",
+        "path": "nametags/identity.json",
+        "values": {
+          "show": false
+        },
+        "wait": 0.3
+      },
+      {
+        "op": "document",
+        "path": "nameplates/identity.json",
+        "values": {
+          "show": false
+        },
+        "wait": 0.3
+      },
+      {
+        "op": "document",
+        "path": "entity-overlays/default.json",
+        "values": {
+          "includePlayers": false
+        },
+        "wait": 1
+      },
+      {
+        "op": "rcon",
+        "command": "gamerule block_drops false",
+        "wait": 0.1
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:pig]",
+        "wait": 0.2
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:item]",
+        "wait": 0.2
+      },
+      {
+        "op": "rcon",
+        "command": "fill -4 71 0 4 72 8 minecraft:air",
+        "wait": 0.2
+      },
+      {
+        "op": "document",
+        "path": "holograms/native-bounds.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1
+      },
+      {
+        "op": "rcon",
+        "command": "tp GlossGuide 0.5 71 0.5 0 0",
+        "wait": 1
+      },
+      {
+        "op": "rcon",
+        "command": "tp GlossVisitor 12.5 71 -9.5",
+        "wait": 0.3
+      },
+      {
+        "op": "document",
+        "path": "holograms/showcase.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "document",
+        "path": "holograms/particles.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "document",
+        "path": "boards/showcase.json",
+        "values": {
+          "select.when": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "document",
+        "path": "markers/garden.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:item]",
+        "wait": 0.5
+      },
+      {
+        "op": "rcon",
+        "command": "item replace entity GlossGuide hotbar.0 with minecraft:diamond 4",
+        "wait": 0.5
+      },
+      {
+        "op": "slot",
+        "index": 0,
+        "wait": 0.3
+      },
+      {
+        "op": "look-at",
+        "x": 0.5,
+        "y": 71,
+        "z": 3,
+        "ticks": 0,
+        "wait": 1
+      }
+    ],
+    "beats": [
+      {
+        "op": "wait",
+        "wait": 2
+      },
+      {
+        "op": "click",
+        "key": "drop",
+        "wait": 3
+      },
+      {
+        "op": "keys",
+        "leaseTicks": 30,
+        "wait": 1,
+        "hold": [
+          "forward"
+        ]
+      },
+      {
+        "op": "release",
+        "wait": 2
+      }
+    ],
+    "observer": {
+      "position": [
+        5,
+        72,
+        0.5
+      ],
+      "target": [
+        0.5,
+        72.5,
+        4
+      ]
+    }
+  },
+  {
+    "id": "markers-waypoints",
+    "perspectives": [
+      "pov",
+      "observer"
+    ],
+    "trigger": "Enable a marker and turn past its edge",
+    "visibleResult": "Compass icon label beam trail and locator bar",
+    "setup": [
+      {
+        "op": "dismiss",
+        "wait": 0.1
+      },
+      {
+        "op": "chat",
+        "command": "gloss menu close",
+        "wait": 0.5
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:chicken]",
+        "wait": 0.1
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:zombie]",
+        "wait": 0.1
+      },
+      {
+        "op": "document",
+        "path": "nametags/identity.json",
+        "values": {
+          "show": false
+        },
+        "wait": 0.3
+      },
+      {
+        "op": "document",
+        "path": "nameplates/identity.json",
+        "values": {
+          "show": false
+        },
+        "wait": 0.3
+      },
+      {
+        "op": "document",
+        "path": "entity-overlays/default.json",
+        "values": {
+          "includePlayers": false
+        },
+        "wait": 1
+      },
+      {
+        "op": "rcon",
+        "command": "gamerule block_drops false",
+        "wait": 0.1
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:pig]",
+        "wait": 0.2
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:item]",
+        "wait": 0.2
+      },
+      {
+        "op": "rcon",
+        "command": "fill -4 71 0 4 72 8 minecraft:air",
+        "wait": 0.2
+      },
+      {
+        "op": "document",
+        "path": "holograms/native-bounds.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1
+      },
+      {
+        "op": "rcon",
+        "command": "tp GlossGuide 0.5 71 0.5 0 0",
+        "wait": 1
+      },
+      {
+        "op": "rcon",
+        "command": "tp GlossVisitor 12.5 71 -9.5",
+        "wait": 0.3
+      },
+      {
+        "op": "document",
+        "path": "holograms/showcase.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "document",
+        "path": "holograms/particles.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "document",
+        "path": "boards/showcase.json",
+        "values": {
+          "select.when": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "document",
+        "path": "markers/garden.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "document",
+        "path": "markers/garden.json",
+        "values": {
+          "show": true
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "rcon",
+        "command": "gamemode survival GlossGuide",
+        "wait": 0.5
+      },
+      {
+        "op": "look-at",
+        "x": 6,
+        "y": 75,
+        "z": 8,
+        "ticks": 0,
+        "wait": 1
+      },
+      {
+        "op": "rcon",
+        "command": "gamerule locator_bar true",
+        "wait": 0.2
+      },
+      {
+        "op": "rcon",
+        "command": "attribute GlossGuide minecraft:waypoint_receive_range base set 128",
+        "wait": 0.2
+      }
+    ],
+    "beats": [
+      {
+        "op": "wait",
+        "wait": 4
+      },
+      {
+        "op": "look-at",
+        "x": -8,
+        "y": 73,
+        "z": 8,
+        "ticks": 30,
+        "wait": 2
+      },
+      {
+        "op": "wait",
+        "wait": 3
+      },
+      {
+        "op": "look-at",
+        "x": 6,
+        "y": 75,
+        "z": 8,
+        "ticks": 30,
+        "wait": 2
+      },
+      {
+        "op": "wait",
+        "wait": 3
+      },
+      {
+        "op": "rcon",
+        "command": "gamemode creative GlossGuide",
+        "wait": 1
+      }
+    ],
+    "observer": {
+      "position": [
+        5,
+        72,
+        0.5
+      ],
+      "target": [
+        0.5,
+        72.5,
+        4
+      ]
+    }
+  },
+  {
+    "id": "boards-tablist",
+    "perspectives": [
+      "pov"
+    ],
+    "trigger": "Select a conditional animated board and hold the player list",
+    "visibleResult": "Sidebar and native list header/footer with synthetic players",
+    "setup": [
+      {
+        "op": "dismiss",
+        "wait": 0.1
+      },
+      {
+        "op": "chat",
+        "command": "gloss menu close",
+        "wait": 0.5
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:chicken]",
+        "wait": 0.1
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:zombie]",
+        "wait": 0.1
+      },
+      {
+        "op": "document",
+        "path": "nametags/identity.json",
+        "values": {
+          "show": false
+        },
+        "wait": 0.3
+      },
+      {
+        "op": "document",
+        "path": "nameplates/identity.json",
+        "values": {
+          "show": false
+        },
+        "wait": 0.3
+      },
+      {
+        "op": "document",
+        "path": "entity-overlays/default.json",
+        "values": {
+          "includePlayers": false
+        },
+        "wait": 1
+      },
+      {
+        "op": "rcon",
+        "command": "gamerule block_drops false",
+        "wait": 0.1
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:pig]",
+        "wait": 0.2
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:item]",
+        "wait": 0.2
+      },
+      {
+        "op": "rcon",
+        "command": "fill -4 71 0 4 72 8 minecraft:air",
+        "wait": 0.2
+      },
+      {
+        "op": "document",
+        "path": "holograms/native-bounds.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1
+      },
+      {
+        "op": "rcon",
+        "command": "tp GlossGuide 0.5 71 0.5 0 0",
+        "wait": 1
+      },
+      {
+        "op": "rcon",
+        "command": "tp GlossVisitor 12.5 71 -9.5",
+        "wait": 0.3
+      },
+      {
+        "op": "document",
+        "path": "holograms/showcase.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "document",
+        "path": "holograms/particles.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "document",
+        "path": "boards/showcase.json",
+        "values": {
+          "select.when": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "document",
+        "path": "markers/garden.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "document",
+        "path": "boards/showcase.json",
+        "values": {
+          "select.when": true
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "look-at",
+        "x": 0.5,
+        "y": 72,
+        "z": 6,
+        "ticks": 0,
+        "wait": 1
+      }
+    ],
+    "beats": [
+      {
+        "op": "wait",
+        "wait": 3
+      },
+      {
+        "op": "keys",
+        "leaseTicks": 120,
+        "wait": 4,
+        "hold": [
+          "playerList"
+        ]
+      },
+      {
+        "op": "release",
+        "wait": 2
+      }
+    ]
+  },
+  {
+    "id": "screen-surfaces",
+    "perspectives": [
+      "pov"
+    ],
+    "trigger": "Select actionbar bossbar and title documents",
+    "visibleResult": "Actual client actionbar progress bossbar and timed title",
+    "setup": [
+      {
+        "op": "dismiss",
+        "wait": 0.1
+      },
+      {
+        "op": "chat",
+        "command": "gloss menu close",
+        "wait": 0.5
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:chicken]",
+        "wait": 0.1
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:zombie]",
+        "wait": 0.1
+      },
+      {
+        "op": "document",
+        "path": "nametags/identity.json",
+        "values": {
+          "show": false
+        },
+        "wait": 0.3
+      },
+      {
+        "op": "document",
+        "path": "nameplates/identity.json",
+        "values": {
+          "show": false
+        },
+        "wait": 0.3
+      },
+      {
+        "op": "document",
+        "path": "entity-overlays/default.json",
+        "values": {
+          "includePlayers": false
+        },
+        "wait": 1
+      },
+      {
+        "op": "rcon",
+        "command": "gamerule block_drops false",
+        "wait": 0.1
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:pig]",
+        "wait": 0.2
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:item]",
+        "wait": 0.2
+      },
+      {
+        "op": "rcon",
+        "command": "fill -4 71 0 4 72 8 minecraft:air",
+        "wait": 0.2
+      },
+      {
+        "op": "document",
+        "path": "holograms/native-bounds.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1
+      },
+      {
+        "op": "rcon",
+        "command": "tp GlossGuide 0.5 71 0.5 0 0",
+        "wait": 1
+      },
+      {
+        "op": "rcon",
+        "command": "tp GlossVisitor 12.5 71 -9.5",
+        "wait": 0.3
+      },
+      {
+        "op": "document",
+        "path": "holograms/showcase.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "document",
+        "path": "holograms/particles.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "document",
+        "path": "boards/showcase.json",
+        "values": {
+          "select.when": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "document",
+        "path": "markers/garden.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1.5
+      }
+    ],
+    "beats": [
+      {
+        "op": "document",
+        "path": "surfaces/actionbar.json",
+        "values": {
+          "select.when": true
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "document",
+        "path": "surfaces/bossbar.json",
+        "values": {
+          "select.when": true
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "wait",
+        "wait": 3
+      },
+      {
+        "op": "document",
+        "path": "surfaces/title.json",
+        "values": {
+          "select.when": true
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "wait",
+        "wait": 6
+      },
+      {
+        "op": "document",
+        "path": "surfaces/actionbar.json",
+        "values": {
+          "select.when": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "document",
+        "path": "surfaces/bossbar.json",
+        "values": {
+          "select.when": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "document",
+        "path": "surfaces/title.json",
+        "values": {
+          "select.when": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "wait",
+        "wait": 2
+      }
+    ]
+  },
+  {
+    "id": "chat-bubbles",
+    "perspectives": [
+      "pov",
+      "observer"
+    ],
+    "trigger": "Second player sends genuine chat",
+    "visibleResult": "Temporary chat bubble appears above the sender then expires",
+    "setup": [
+      {
+        "op": "dismiss",
+        "wait": 0.1
+      },
+      {
+        "op": "chat",
+        "command": "gloss menu close",
+        "wait": 0.5
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:chicken]",
+        "wait": 0.1
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:zombie]",
+        "wait": 0.1
+      },
+      {
+        "op": "document",
+        "path": "nametags/identity.json",
+        "values": {
+          "show": false
+        },
+        "wait": 0.3
+      },
+      {
+        "op": "document",
+        "path": "nameplates/identity.json",
+        "values": {
+          "show": false
+        },
+        "wait": 0.3
+      },
+      {
+        "op": "document",
+        "path": "entity-overlays/default.json",
+        "values": {
+          "includePlayers": false
+        },
+        "wait": 1
+      },
+      {
+        "op": "rcon",
+        "command": "gamerule block_drops false",
+        "wait": 0.1
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:pig]",
+        "wait": 0.2
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:item]",
+        "wait": 0.2
+      },
+      {
+        "op": "rcon",
+        "command": "fill -4 71 0 4 72 8 minecraft:air",
+        "wait": 0.2
+      },
+      {
+        "op": "document",
+        "path": "holograms/native-bounds.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1
+      },
+      {
+        "op": "rcon",
+        "command": "tp GlossGuide 0.5 71 0.5 0 0",
+        "wait": 1
+      },
+      {
+        "op": "rcon",
+        "command": "tp GlossVisitor 12.5 71 -9.5",
+        "wait": 0.3
+      },
+      {
+        "op": "document",
+        "path": "holograms/showcase.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "document",
+        "path": "holograms/particles.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "document",
+        "path": "boards/showcase.json",
+        "values": {
+          "select.when": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "document",
+        "path": "markers/garden.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "rcon",
+        "command": "op GlossVisitor",
+        "wait": 0.5
+      },
+      {
+        "op": "rcon",
+        "command": "gamemode survival GlossVisitor",
+        "wait": 0.5
+      },
+      {
+        "op": "rcon",
+        "command": "tp GlossVisitor 0.5 71 5.5 180 0",
+        "wait": 0.5
+      },
+      {
+        "op": "look-at",
+        "x": 0.5,
+        "y": 73.5,
+        "z": 5.5,
+        "ticks": 0,
+        "wait": 1
+      }
+    ],
+    "beats": [
+      {
+        "op": "wait",
+        "wait": 2
+      },
+      {
+        "op": "visitor",
+        "action": "chat",
+        "text": "Welcome to the garden",
+        "wait": 6
+      },
+      {
+        "op": "wait",
+        "wait": 3
+      }
+    ],
+    "observer": {
+      "position": [
+        5,
+        72,
+        0.5
+      ],
+      "target": [
+        0.5,
+        72.5,
+        4
+      ]
+    }
+  },
+  {
+    "id": "chat-features",
+    "perspectives": [
+      "pov"
+    ],
+    "trigger": "Send emoji, mention, item, URL and private messages",
+    "visibleResult": "Chat formatting item link mention and private channel messages",
+    "setup": [
+      {
+        "op": "dismiss",
+        "wait": 0.1
+      },
+      {
+        "op": "chat",
+        "command": "gloss menu close",
+        "wait": 0.5
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:chicken]",
+        "wait": 0.1
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:zombie]",
+        "wait": 0.1
+      },
+      {
+        "op": "document",
+        "path": "nametags/identity.json",
+        "values": {
+          "show": false
+        },
+        "wait": 0.3
+      },
+      {
+        "op": "document",
+        "path": "nameplates/identity.json",
+        "values": {
+          "show": false
+        },
+        "wait": 0.3
+      },
+      {
+        "op": "document",
+        "path": "entity-overlays/default.json",
+        "values": {
+          "includePlayers": false
+        },
+        "wait": 1
+      },
+      {
+        "op": "rcon",
+        "command": "gamerule block_drops false",
+        "wait": 0.1
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:pig]",
+        "wait": 0.2
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:item]",
+        "wait": 0.2
+      },
+      {
+        "op": "rcon",
+        "command": "fill -4 71 0 4 72 8 minecraft:air",
+        "wait": 0.2
+      },
+      {
+        "op": "document",
+        "path": "holograms/native-bounds.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1
+      },
+      {
+        "op": "rcon",
+        "command": "tp GlossGuide 0.5 71 0.5 0 0",
+        "wait": 1
+      },
+      {
+        "op": "rcon",
+        "command": "tp GlossVisitor 12.5 71 -9.5",
+        "wait": 0.3
+      },
+      {
+        "op": "document",
+        "path": "holograms/showcase.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "document",
+        "path": "holograms/particles.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "document",
+        "path": "boards/showcase.json",
+        "values": {
+          "select.when": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "document",
+        "path": "markers/garden.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "rcon",
+        "command": "give GlossGuide minecraft:diamond_sword",
+        "wait": 0.5
+      },
+      {
+        "op": "look-at",
+        "x": 0.5,
+        "y": 72,
+        "z": 6,
+        "ticks": 0,
+        "wait": 1
+      },
+      {
+        "op": "rcon",
+        "command": "item replace entity GlossGuide hotbar.0 with minecraft:diamond_sword 1",
+        "wait": 0.5
+      },
+      {
+        "op": "slot",
+        "index": 0,
+        "wait": 0.5
+      },
+      {
+        "op": "clear-chat",
+        "wait": 0.2
+      }
+    ],
+    "beats": [
+      {
+        "op": "chat",
+        "text": "<3 Welcome @GlossVisitor",
+        "wait": 3
+      },
+      {
+        "op": "chat",
+        "text": "Inspect [item] and https://example.com/guide",
+        "wait": 3
+      },
+      {
+        "op": "chat",
+        "command": "msg GlossVisitor Quiet garden chat",
+        "wait": 3
+      },
+      {
+        "op": "chat-screen",
+        "wait": 1
+      },
+      {
+        "op": "cursor",
+        "x": 160,
+        "y": 307,
+        "ticks": 20,
+        "wait": 3
+      },
+      {
+        "op": "dismiss",
+        "wait": 1
+      }
+    ]
+  },
+  {
+    "id": "container-previews",
+    "perspectives": [
+      "pov"
+    ],
+    "trigger": "Aim at a stocked chest and working furnace",
+    "visibleResult": "Private container card includes items and live cooking progress",
+    "setup": [
+      {
+        "op": "dismiss",
+        "wait": 0.1
+      },
+      {
+        "op": "chat",
+        "command": "gloss menu close",
+        "wait": 0.5
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:chicken]",
+        "wait": 0.1
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:zombie]",
+        "wait": 0.1
+      },
+      {
+        "op": "document",
+        "path": "nametags/identity.json",
+        "values": {
+          "show": false
+        },
+        "wait": 0.3
+      },
+      {
+        "op": "document",
+        "path": "nameplates/identity.json",
+        "values": {
+          "show": false
+        },
+        "wait": 0.3
+      },
+      {
+        "op": "document",
+        "path": "entity-overlays/default.json",
+        "values": {
+          "includePlayers": false
+        },
+        "wait": 1
+      },
+      {
+        "op": "rcon",
+        "command": "gamerule block_drops false",
+        "wait": 0.1
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:pig]",
+        "wait": 0.2
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:item]",
+        "wait": 0.2
+      },
+      {
+        "op": "rcon",
+        "command": "fill -4 71 0 4 72 8 minecraft:air",
+        "wait": 0.2
+      },
+      {
+        "op": "document",
+        "path": "holograms/native-bounds.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1
+      },
+      {
+        "op": "rcon",
+        "command": "tp GlossGuide 0.5 71 0.5 0 0",
+        "wait": 1
+      },
+      {
+        "op": "rcon",
+        "command": "tp GlossVisitor 12.5 71 -9.5",
+        "wait": 0.3
+      },
+      {
+        "op": "document",
+        "path": "holograms/showcase.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "document",
+        "path": "holograms/particles.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "document",
+        "path": "boards/showcase.json",
+        "values": {
+          "select.when": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "document",
+        "path": "markers/garden.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "rcon",
+        "command": "setblock 0 71 5 minecraft:chest",
+        "wait": 0.5
+      },
+      {
+        "op": "rcon",
+        "command": "item replace block 0 71 5 container.0 with minecraft:diamond 16",
+        "wait": 0.5
+      },
+      {
+        "op": "rcon",
+        "command": "item replace block 0 71 5 container.4 with minecraft:oak_log 32",
+        "wait": 0.5
+      },
+      {
+        "op": "rcon",
+        "command": "setblock 4 71 5 minecraft:furnace",
+        "wait": 0.5
+      },
+      {
+        "op": "rcon",
+        "command": "item replace block 4 71 5 container.0 with minecraft:raw_iron 16",
+        "wait": 0.5
+      },
+      {
+        "op": "rcon",
+        "command": "item replace block 4 71 5 container.1 with minecraft:coal 8",
+        "wait": 0.5
+      },
+      {
+        "op": "slot",
+        "index": 8,
+        "wait": 0.2
+      },
+      {
+        "op": "look-at",
+        "x": 0.5,
+        "y": 71.5,
+        "z": 5.5,
+        "ticks": 0,
+        "wait": 1
+      }
+    ],
+    "beats": [
+      {
+        "op": "wait",
+        "wait": 3
+      },
+      {
+        "op": "look-at",
+        "x": 4.5,
+        "y": 71.5,
+        "z": 5.5,
+        "ticks": 30,
+        "wait": 2
+      },
+      {
+        "op": "keys",
+        "forward": true,
+        "leaseTicks": 20,
+        "wait": 1.3
+      },
+      {
+        "op": "release",
+        "wait": 0.5
+      },
+      {
+        "op": "look-at",
+        "x": 4.5,
+        "y": 71.5,
+        "z": 5.5,
+        "ticks": 0,
+        "wait": 8
+      },
+      {
+        "op": "rcon",
+        "command": "item replace block 4 71 5 container.0 with minecraft:air",
+        "wait": 0.2
+      },
+      {
+        "op": "rcon",
+        "command": "item replace block 4 71 5 container.1 with minecraft:air",
+        "wait": 0.2
+      },
+      {
+        "op": "rcon",
+        "command": "item replace block 4 71 5 container.2 with minecraft:air",
+        "wait": 4
+      }
+    ]
+  },
+  {
+    "id": "prompt-sign",
+    "perspectives": [
+      "pov"
+    ],
+    "trigger": "Open personal action menu and activate actual button",
+    "visibleResult": "Native sign input and saved answer",
+    "setup": [
+      {
+        "op": "dismiss",
+        "wait": 0.1
+      },
+      {
+        "op": "chat",
+        "command": "gloss menu close",
+        "wait": 0.5
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:chicken]",
+        "wait": 0.1
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:zombie]",
+        "wait": 0.1
+      },
+      {
+        "op": "document",
+        "path": "nametags/identity.json",
+        "values": {
+          "show": false
+        },
+        "wait": 0.3
+      },
+      {
+        "op": "document",
+        "path": "nameplates/identity.json",
+        "values": {
+          "show": false
+        },
+        "wait": 0.3
+      },
+      {
+        "op": "document",
+        "path": "entity-overlays/default.json",
+        "values": {
+          "includePlayers": false
+        },
+        "wait": 1
+      },
+      {
+        "op": "rcon",
+        "command": "gamerule block_drops false",
+        "wait": 0.1
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:pig]",
+        "wait": 0.2
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:item]",
+        "wait": 0.2
+      },
+      {
+        "op": "rcon",
+        "command": "fill -4 71 0 4 72 8 minecraft:air",
+        "wait": 0.2
+      },
+      {
+        "op": "document",
+        "path": "holograms/native-bounds.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1
+      },
+      {
+        "op": "rcon",
+        "command": "tp GlossGuide 0.5 71 0.5 0 0",
+        "wait": 1
+      },
+      {
+        "op": "rcon",
+        "command": "tp GlossVisitor 12.5 71 -9.5",
+        "wait": 0.3
+      },
+      {
+        "op": "document",
+        "path": "holograms/showcase.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "document",
+        "path": "holograms/particles.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "document",
+        "path": "boards/showcase.json",
+        "values": {
+          "select.when": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "document",
+        "path": "markers/garden.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "rcon",
+        "command": "tp GlossVisitor 12 71 -10",
+        "wait": 0.2
+      },
+      {
+        "op": "rcon",
+        "command": "item replace entity GlossGuide hotbar.0 with minecraft:paper",
+        "wait": 0.2
+      },
+      {
+        "op": "slot",
+        "index": 0,
+        "wait": 0.2
+      }
+    ],
+    "beats": [
+      {
+        "op": "chat",
+        "command": "gloss menu open menu=prompt-sign",
+        "wait": 2
+      },
+      {
+        "op": "look-at",
+        "x": 0.5,
+        "y": 72.54,
+        "z": 3.5,
+        "ticks": 18,
+        "wait": 1.2
+      },
+      {
+        "op": "click",
+        "key": "attack",
+        "wait": 2
+      },
+      {
+        "op": "sign-text",
+        "line": 0,
+        "text": "Sunlit Garden",
+        "ticksPerChar": 3,
+        "wait": 3
+      },
+      {
+        "op": "gui-widget",
+        "label": "Done",
+        "ticks": 18,
+        "wait": 3
+      },
+      {
+        "op": "dismiss",
+        "wait": 1
+      }
+    ]
+  },
+  {
+    "id": "prompt-anvil",
+    "perspectives": [
+      "pov"
+    ],
+    "trigger": "Open personal action menu and activate actual button",
+    "visibleResult": "Native anvil input and saved answer",
+    "setup": [
+      {
+        "op": "dismiss",
+        "wait": 0.1
+      },
+      {
+        "op": "chat",
+        "command": "gloss menu close",
+        "wait": 0.5
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:chicken]",
+        "wait": 0.1
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:zombie]",
+        "wait": 0.1
+      },
+      {
+        "op": "document",
+        "path": "nametags/identity.json",
+        "values": {
+          "show": false
+        },
+        "wait": 0.3
+      },
+      {
+        "op": "document",
+        "path": "nameplates/identity.json",
+        "values": {
+          "show": false
+        },
+        "wait": 0.3
+      },
+      {
+        "op": "document",
+        "path": "entity-overlays/default.json",
+        "values": {
+          "includePlayers": false
+        },
+        "wait": 1
+      },
+      {
+        "op": "rcon",
+        "command": "gamerule block_drops false",
+        "wait": 0.1
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:pig]",
+        "wait": 0.2
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:item]",
+        "wait": 0.2
+      },
+      {
+        "op": "rcon",
+        "command": "fill -4 71 0 4 72 8 minecraft:air",
+        "wait": 0.2
+      },
+      {
+        "op": "document",
+        "path": "holograms/native-bounds.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1
+      },
+      {
+        "op": "rcon",
+        "command": "tp GlossGuide 0.5 71 0.5 0 0",
+        "wait": 1
+      },
+      {
+        "op": "rcon",
+        "command": "tp GlossVisitor 12.5 71 -9.5",
+        "wait": 0.3
+      },
+      {
+        "op": "document",
+        "path": "holograms/showcase.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "document",
+        "path": "holograms/particles.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "document",
+        "path": "boards/showcase.json",
+        "values": {
+          "select.when": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "document",
+        "path": "markers/garden.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "rcon",
+        "command": "tp GlossVisitor 12 71 -10",
+        "wait": 0.2
+      },
+      {
+        "op": "rcon",
+        "command": "item replace entity GlossGuide hotbar.0 with minecraft:paper",
+        "wait": 0.2
+      },
+      {
+        "op": "slot",
+        "index": 0,
+        "wait": 0.2
+      },
+      {
+        "op": "rcon",
+        "command": "gamemode survival GlossGuide",
+        "wait": 0.3
+      },
+      {
+        "op": "rcon",
+        "command": "experience set GlossGuide 0 levels",
+        "wait": 0.1
+      },
+      {
+        "op": "rcon",
+        "command": "experience set GlossGuide 0 points",
+        "wait": 0.1
+      },
+      {
+        "op": "clear-chat",
+        "wait": 0.2
+      }
+    ],
+    "beats": [
+      {
+        "op": "chat",
+        "command": "gloss menu open menu=prompt-anvil",
+        "wait": 2
+      },
+      {
+        "op": "look-at",
+        "x": 0.5,
+        "y": 72.54,
+        "z": 3.5,
+        "ticks": 18,
+        "wait": 1.2
+      },
+      {
+        "op": "click",
+        "key": "attack",
+        "wait": 2
+      },
+      {
+        "op": "anvil-name",
+        "text": "Sunlit Garden",
+        "ticksPerChar": 3,
+        "wait": 3
+      },
+      {
+        "op": "window",
+        "action": "click",
+        "slot": 2,
+        "ticks": 15,
+        "wait": 3
+      },
+      {
+        "op": "dismiss",
+        "wait": 1
+      },
+      {
+        "op": "rcon",
+        "command": "gamemode creative GlossGuide",
+        "wait": 0.3
+      }
+    ]
+  },
+  {
+    "id": "prompt-chat",
+    "perspectives": [
+      "pov"
+    ],
+    "trigger": "Open personal action menu and activate actual button",
+    "visibleResult": "Native chat input and saved answer",
+    "setup": [
+      {
+        "op": "dismiss",
+        "wait": 0.1
+      },
+      {
+        "op": "chat",
+        "command": "gloss menu close",
+        "wait": 0.5
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:chicken]",
+        "wait": 0.1
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:zombie]",
+        "wait": 0.1
+      },
+      {
+        "op": "document",
+        "path": "nametags/identity.json",
+        "values": {
+          "show": false
+        },
+        "wait": 0.3
+      },
+      {
+        "op": "document",
+        "path": "nameplates/identity.json",
+        "values": {
+          "show": false
+        },
+        "wait": 0.3
+      },
+      {
+        "op": "document",
+        "path": "entity-overlays/default.json",
+        "values": {
+          "includePlayers": false
+        },
+        "wait": 1
+      },
+      {
+        "op": "rcon",
+        "command": "gamerule block_drops false",
+        "wait": 0.1
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:pig]",
+        "wait": 0.2
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:item]",
+        "wait": 0.2
+      },
+      {
+        "op": "rcon",
+        "command": "fill -4 71 0 4 72 8 minecraft:air",
+        "wait": 0.2
+      },
+      {
+        "op": "document",
+        "path": "holograms/native-bounds.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1
+      },
+      {
+        "op": "rcon",
+        "command": "tp GlossGuide 0.5 71 0.5 0 0",
+        "wait": 1
+      },
+      {
+        "op": "rcon",
+        "command": "tp GlossVisitor 12.5 71 -9.5",
+        "wait": 0.3
+      },
+      {
+        "op": "document",
+        "path": "holograms/showcase.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "document",
+        "path": "holograms/particles.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "document",
+        "path": "boards/showcase.json",
+        "values": {
+          "select.when": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "document",
+        "path": "markers/garden.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "rcon",
+        "command": "tp GlossVisitor 12 71 -10",
+        "wait": 0.2
+      },
+      {
+        "op": "rcon",
+        "command": "item replace entity GlossGuide hotbar.0 with minecraft:paper",
+        "wait": 0.2
+      },
+      {
+        "op": "slot",
+        "index": 0,
+        "wait": 0.2
+      }
+    ],
+    "beats": [
+      {
+        "op": "chat",
+        "command": "gloss menu open menu=prompt-chat",
+        "wait": 2
+      },
+      {
+        "op": "look-at",
+        "x": 0.5,
+        "y": 72.54,
+        "z": 3.5,
+        "ticks": 18,
+        "wait": 1.2
+      },
+      {
+        "op": "click",
+        "key": "attack",
+        "wait": 2
+      },
+      {
+        "op": "chat-screen",
+        "wait": 0.5
+      },
+      {
+        "op": "gui",
+        "action": "text",
+        "text": "Sunlit Garden",
+        "ticksPerChar": 3,
+        "wait": 3
+      },
+      {
+        "op": "gui",
+        "action": "key",
+        "key": "enter",
+        "wait": 3
+      },
+      {
+        "op": "dismiss",
+        "wait": 1
+      }
+    ]
+  },
+  {
+    "id": "book-reading",
+    "perspectives": [
+      "pov"
+    ],
+    "trigger": "Open personal action menu and activate actual button",
+    "visibleResult": "Native two-page written book",
+    "setup": [
+      {
+        "op": "dismiss",
+        "wait": 0.1
+      },
+      {
+        "op": "chat",
+        "command": "gloss menu close",
+        "wait": 0.5
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:chicken]",
+        "wait": 0.1
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:zombie]",
+        "wait": 0.1
+      },
+      {
+        "op": "document",
+        "path": "nametags/identity.json",
+        "values": {
+          "show": false
+        },
+        "wait": 0.3
+      },
+      {
+        "op": "document",
+        "path": "nameplates/identity.json",
+        "values": {
+          "show": false
+        },
+        "wait": 0.3
+      },
+      {
+        "op": "document",
+        "path": "entity-overlays/default.json",
+        "values": {
+          "includePlayers": false
+        },
+        "wait": 1
+      },
+      {
+        "op": "rcon",
+        "command": "gamerule block_drops false",
+        "wait": 0.1
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:pig]",
+        "wait": 0.2
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:item]",
+        "wait": 0.2
+      },
+      {
+        "op": "rcon",
+        "command": "fill -4 71 0 4 72 8 minecraft:air",
+        "wait": 0.2
+      },
+      {
+        "op": "document",
+        "path": "holograms/native-bounds.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1
+      },
+      {
+        "op": "rcon",
+        "command": "tp GlossGuide 0.5 71 0.5 0 0",
+        "wait": 1
+      },
+      {
+        "op": "rcon",
+        "command": "tp GlossVisitor 12.5 71 -9.5",
+        "wait": 0.3
+      },
+      {
+        "op": "document",
+        "path": "holograms/showcase.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "document",
+        "path": "holograms/particles.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "document",
+        "path": "boards/showcase.json",
+        "values": {
+          "select.when": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "document",
+        "path": "markers/garden.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "rcon",
+        "command": "tp GlossVisitor 12 71 -10",
+        "wait": 0.2
+      },
+      {
+        "op": "rcon",
+        "command": "item replace entity GlossGuide hotbar.0 with minecraft:paper",
+        "wait": 0.2
+      },
+      {
+        "op": "slot",
+        "index": 0,
+        "wait": 0.2
+      }
+    ],
+    "beats": [
+      {
+        "op": "chat",
+        "command": "gloss menu open menu=book-reading",
+        "wait": 2
+      },
+      {
+        "op": "look-at",
+        "x": 0.5,
+        "y": 72.54,
+        "z": 3.5,
+        "ticks": 18,
+        "wait": 1.2
+      },
+      {
+        "op": "click",
+        "key": "attack",
+        "wait": 2
+      },
+      {
+        "op": "wait",
+        "wait": 3
+      },
+      {
+        "op": "gui-widget",
+        "type": "PageButton",
+        "rightmost": true,
+        "ticks": 18,
+        "wait": 3
+      },
+      {
+        "op": "dismiss",
+        "wait": 2
+      }
+    ]
+  },
+  {
+    "id": "sky-transition",
+    "perspectives": [
+      "pov"
+    ],
+    "trigger": "Open personal action menu and activate actual button",
+    "visibleResult": "Per-viewer night sky fades from daylight",
+    "setup": [
+      {
+        "op": "dismiss",
+        "wait": 0.1
+      },
+      {
+        "op": "chat",
+        "command": "gloss menu close",
+        "wait": 0.5
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:chicken]",
+        "wait": 0.1
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:zombie]",
+        "wait": 0.1
+      },
+      {
+        "op": "document",
+        "path": "nametags/identity.json",
+        "values": {
+          "show": false
+        },
+        "wait": 0.3
+      },
+      {
+        "op": "document",
+        "path": "nameplates/identity.json",
+        "values": {
+          "show": false
+        },
+        "wait": 0.3
+      },
+      {
+        "op": "document",
+        "path": "entity-overlays/default.json",
+        "values": {
+          "includePlayers": false
+        },
+        "wait": 1
+      },
+      {
+        "op": "rcon",
+        "command": "gamerule block_drops false",
+        "wait": 0.1
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:pig]",
+        "wait": 0.2
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:item]",
+        "wait": 0.2
+      },
+      {
+        "op": "rcon",
+        "command": "fill -4 71 0 4 72 8 minecraft:air",
+        "wait": 0.2
+      },
+      {
+        "op": "document",
+        "path": "holograms/native-bounds.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1
+      },
+      {
+        "op": "rcon",
+        "command": "tp GlossGuide 0.5 71 0.5 0 0",
+        "wait": 1
+      },
+      {
+        "op": "rcon",
+        "command": "tp GlossVisitor 12.5 71 -9.5",
+        "wait": 0.3
+      },
+      {
+        "op": "document",
+        "path": "holograms/showcase.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "document",
+        "path": "holograms/particles.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "document",
+        "path": "boards/showcase.json",
+        "values": {
+          "select.when": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "document",
+        "path": "markers/garden.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "rcon",
+        "command": "tp GlossVisitor 12 71 -10",
+        "wait": 0.2
+      },
+      {
+        "op": "rcon",
+        "command": "item replace entity GlossGuide hotbar.0 with minecraft:paper",
+        "wait": 0.2
+      },
+      {
+        "op": "slot",
+        "index": 0,
+        "wait": 0.2
+      }
+    ],
+    "beats": [
+      {
+        "op": "chat",
+        "command": "gloss menu open menu=sky-transition",
+        "wait": 2
+      },
+      {
+        "op": "look-at",
+        "x": 0.5,
+        "y": 72.54,
+        "z": 3.5,
+        "ticks": 18,
+        "wait": 1.2
+      },
+      {
+        "op": "click",
+        "key": "attack",
+        "wait": 2
+      },
+      {
+        "op": "look-at",
+        "x": 0.5,
+        "y": 90,
+        "z": 12,
+        "ticks": 22,
+        "wait": 4
+      },
+      {
+        "op": "chat",
+        "command": "gloss menu close",
+        "wait": 1
+      }
+    ]
+  },
+  {
+    "id": "viewer-glow",
+    "perspectives": [
+      "pov"
+    ],
+    "trigger": "Claim and clear a native player glow",
+    "visibleResult": "GlossVisitor red outline begins and ends",
+    "setup": [
+      {
+        "op": "dismiss",
+        "wait": 0.1
+      },
+      {
+        "op": "chat",
+        "command": "gloss menu close",
+        "wait": 0.5
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:chicken]",
+        "wait": 0.1
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:zombie]",
+        "wait": 0.1
+      },
+      {
+        "op": "document",
+        "path": "nametags/identity.json",
+        "values": {
+          "show": false
+        },
+        "wait": 0.3
+      },
+      {
+        "op": "document",
+        "path": "nameplates/identity.json",
+        "values": {
+          "show": false
+        },
+        "wait": 0.3
+      },
+      {
+        "op": "document",
+        "path": "entity-overlays/default.json",
+        "values": {
+          "includePlayers": false
+        },
+        "wait": 1
+      },
+      {
+        "op": "rcon",
+        "command": "gamerule block_drops false",
+        "wait": 0.1
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:pig]",
+        "wait": 0.2
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:item]",
+        "wait": 0.2
+      },
+      {
+        "op": "rcon",
+        "command": "fill -4 71 0 4 72 8 minecraft:air",
+        "wait": 0.2
+      },
+      {
+        "op": "document",
+        "path": "holograms/native-bounds.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1
+      },
+      {
+        "op": "rcon",
+        "command": "tp GlossGuide 0.5 71 0.5 0 0",
+        "wait": 1
+      },
+      {
+        "op": "rcon",
+        "command": "tp GlossVisitor 12.5 71 -9.5",
+        "wait": 0.3
+      },
+      {
+        "op": "document",
+        "path": "holograms/showcase.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "document",
+        "path": "holograms/particles.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "document",
+        "path": "boards/showcase.json",
+        "values": {
+          "select.when": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "document",
+        "path": "markers/garden.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "rcon",
+        "command": "tp GlossVisitor 0.5 71 4",
+        "wait": 0.5
+      },
+      {
+        "op": "look-at",
+        "x": 0.5,
+        "y": 72,
+        "z": 4,
+        "ticks": 0,
+        "wait": 1
+      }
+    ],
+    "beats": [
+      {
+        "op": "wait",
+        "wait": 2
+      },
+      {
+        "op": "chat",
+        "command": "gloss glow set GlossVisitor value=red count=160",
+        "wait": 4
+      },
+      {
+        "op": "chat",
+        "command": "gloss glow clear GlossVisitor",
+        "wait": 3
+      }
+    ]
+  },
+  {
+    "id": "standalone-beam",
+    "perspectives": [
+      "pov",
+      "observer"
+    ],
+    "trigger": "Call current BeamService through the integration fixture",
+    "visibleResult": "Angled yellow block display beam and real end-rod trail",
+    "setup": [
+      {
+        "op": "dismiss",
+        "wait": 0.1
+      },
+      {
+        "op": "chat",
+        "command": "gloss menu close",
+        "wait": 0.5
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:chicken]",
+        "wait": 0.1
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:zombie]",
+        "wait": 0.1
+      },
+      {
+        "op": "document",
+        "path": "nametags/identity.json",
+        "values": {
+          "show": false
+        },
+        "wait": 0.3
+      },
+      {
+        "op": "document",
+        "path": "nameplates/identity.json",
+        "values": {
+          "show": false
+        },
+        "wait": 0.3
+      },
+      {
+        "op": "document",
+        "path": "entity-overlays/default.json",
+        "values": {
+          "includePlayers": false
+        },
+        "wait": 1
+      },
+      {
+        "op": "rcon",
+        "command": "gamerule block_drops false",
+        "wait": 0.1
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:pig]",
+        "wait": 0.2
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:item]",
+        "wait": 0.2
+      },
+      {
+        "op": "rcon",
+        "command": "fill -4 71 0 4 72 8 minecraft:air",
+        "wait": 0.2
+      },
+      {
+        "op": "document",
+        "path": "holograms/native-bounds.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1
+      },
+      {
+        "op": "rcon",
+        "command": "tp GlossGuide 0.5 71 0.5 0 0",
+        "wait": 1
+      },
+      {
+        "op": "rcon",
+        "command": "tp GlossVisitor 12.5 71 -9.5",
+        "wait": 0.3
+      },
+      {
+        "op": "document",
+        "path": "holograms/showcase.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "document",
+        "path": "holograms/particles.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "document",
+        "path": "boards/showcase.json",
+        "values": {
+          "select.when": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "document",
+        "path": "markers/garden.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "rcon",
+        "command": "tp GlossVisitor 12 71 -10",
+        "wait": 0.3
+      },
+      {
+        "op": "look-at",
+        "x": 0.5,
+        "y": 73,
+        "z": 6,
+        "ticks": 0,
+        "wait": 1
+      }
+    ],
+    "beats": [
+      {
+        "op": "wait",
+        "wait": 2
+      },
+      {
+        "op": "chat",
+        "command": "glossdemo beam",
+        "wait": 5
+      },
+      {
+        "op": "look-at",
+        "x": 2,
+        "y": 74,
+        "z": 8,
+        "ticks": 20,
+        "wait": 2
+      },
+      {
+        "op": "wait",
+        "wait": 5
+      }
+    ],
+    "observer": {
+      "position": [
+        -5,
+        72,
+        0
+      ],
+      "target": [
+        1,
+        73,
+        6
+      ]
+    }
+  },
+  {
+    "id": "world-panels",
+    "perspectives": [
+      "pov",
+      "observer"
+    ],
+    "observer": {
+      "position": [
+        -4,
+        72,
+        0
+      ],
+      "target": [
+        0.5,
+        73,
+        6.5
+      ]
+    },
+    "setup": [
+      {
+        "op": "dismiss",
+        "wait": 0.1
+      },
+      {
+        "op": "chat",
+        "command": "gloss menu close",
+        "wait": 0.5
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:chicken]",
+        "wait": 0.1
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:zombie]",
+        "wait": 0.1
+      },
+      {
+        "op": "document",
+        "path": "nametags/identity.json",
+        "values": {
+          "show": false
+        },
+        "wait": 0.3
+      },
+      {
+        "op": "document",
+        "path": "nameplates/identity.json",
+        "values": {
+          "show": false
+        },
+        "wait": 0.3
+      },
+      {
+        "op": "document",
+        "path": "entity-overlays/default.json",
+        "values": {
+          "includePlayers": false
+        },
+        "wait": 1
+      },
+      {
+        "op": "rcon",
+        "command": "gamerule block_drops false",
+        "wait": 0.1
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:pig]",
+        "wait": 0.2
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:item]",
+        "wait": 0.2
+      },
+      {
+        "op": "rcon",
+        "command": "fill -4 71 0 4 72 8 minecraft:air",
+        "wait": 0.2
+      },
+      {
+        "op": "document",
+        "path": "holograms/native-bounds.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1
+      },
+      {
+        "op": "rcon",
+        "command": "tp GlossGuide 0.5 71 0.5 0 0",
+        "wait": 1
+      },
+      {
+        "op": "rcon",
+        "command": "tp GlossVisitor 12.5 71 -9.5",
+        "wait": 0.3
+      },
+      {
+        "op": "document",
+        "path": "holograms/showcase.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "document",
+        "path": "holograms/particles.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "document",
+        "path": "boards/showcase.json",
+        "values": {
+          "select.when": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "document",
+        "path": "markers/garden.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "chat",
+        "command": "gloss panel delete garden-demo",
+        "wait": 0.3
+      },
+      {
+        "op": "chat",
+        "command": "gloss panel create garden-demo menu=panel-showcase",
+        "wait": 1
+      },
+      {
+        "op": "chat",
+        "command": "gloss panel move garden-demo .5 73 6.5",
+        "wait": 1
+      },
+      {
+        "op": "chat",
+        "command": "gloss panel rotate garden-demo 0 0 0",
+        "wait": 0.5
+      },
+      {
+        "op": "look-at",
+        "x": 0.5,
+        "y": 73,
+        "z": 6.5,
+        "ticks": 16,
+        "wait": 1
+      }
+    ],
+    "beats": [
+      {
+        "op": "wait",
+        "wait": 3
+      },
+      {
+        "op": "look-at",
+        "x": 0.5,
+        "y": 72.74,
+        "z": 6.5,
+        "ticks": 18,
+        "wait": 1
+      },
+      {
+        "op": "click",
+        "key": "attack",
+        "wait": 4
+      },
+      {
+        "op": "chat",
+        "command": "gloss panel scale garden-demo 1.25",
+        "wait": 2
+      },
+      {
+        "op": "chat",
+        "command": "gloss panel rotate garden-demo 25 0 0",
+        "wait": 2
+      },
+      {
+        "op": "chat",
+        "command": "gloss panel follow garden-demo GlossGuide yaw",
+        "wait": 1
+      },
+      {
+        "op": "keys",
+        "hold": [
+          "left"
+        ],
+        "leaseTicks": 30,
+        "wait": 2
+      },
+      {
+        "op": "release",
+        "wait": 2
+      },
+      {
+        "op": "chat",
+        "command": "gloss panel delete garden-demo",
+        "wait": 1
+      }
+    ]
+  },
+  {
+    "id": "connection-messages",
+    "setup": [
+      {
+        "op": "dismiss",
+        "wait": 0.1
+      },
+      {
+        "op": "chat",
+        "command": "gloss menu close",
+        "wait": 0.5
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:chicken]",
+        "wait": 0.1
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:zombie]",
+        "wait": 0.1
+      },
+      {
+        "op": "document",
+        "path": "nametags/identity.json",
+        "values": {
+          "show": false
+        },
+        "wait": 0.3
+      },
+      {
+        "op": "document",
+        "path": "nameplates/identity.json",
+        "values": {
+          "show": false
+        },
+        "wait": 0.3
+      },
+      {
+        "op": "document",
+        "path": "entity-overlays/default.json",
+        "values": {
+          "includePlayers": false
+        },
+        "wait": 1
+      },
+      {
+        "op": "rcon",
+        "command": "gamerule block_drops false",
+        "wait": 0.1
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:pig]",
+        "wait": 0.2
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:item]",
+        "wait": 0.2
+      },
+      {
+        "op": "rcon",
+        "command": "fill -4 71 0 4 72 8 minecraft:air",
+        "wait": 0.2
+      },
+      {
+        "op": "document",
+        "path": "holograms/native-bounds.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1
+      },
+      {
+        "op": "rcon",
+        "command": "tp GlossGuide 0.5 71 0.5 0 0",
+        "wait": 1
+      },
+      {
+        "op": "rcon",
+        "command": "tp GlossVisitor 12.5 71 -9.5",
+        "wait": 0.3
+      },
+      {
+        "op": "document",
+        "path": "holograms/showcase.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "document",
+        "path": "holograms/particles.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "document",
+        "path": "boards/showcase.json",
+        "values": {
+          "select.when": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "document",
+        "path": "markers/garden.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "look-at",
+        "x": 0.5,
+        "y": 72,
+        "z": 6,
+        "ticks": 0,
+        "wait": 1
+      }
+    ],
+    "beats": [
+      {
+        "op": "wait",
+        "wait": 2
+      },
+      {
+        "op": "visitor",
+        "action": "disconnect",
+        "wait": 3
+      },
+      {
+        "op": "visitor",
+        "action": "connect",
+        "address": "managed",
+        "wait": 7
+      },
+      {
+        "op": "wait",
+        "wait": 2
+      }
+    ]
+  },
+  {
+    "id": "server-list-motd",
+    "setup": [
+      {
+        "op": "dismiss",
+        "wait": 0.1
+      },
+      {
+        "op": "chat",
+        "command": "gloss menu close",
+        "wait": 0.5
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:chicken]",
+        "wait": 0.1
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:zombie]",
+        "wait": 0.1
+      },
+      {
+        "op": "document",
+        "path": "nametags/identity.json",
+        "values": {
+          "show": false
+        },
+        "wait": 0.3
+      },
+      {
+        "op": "document",
+        "path": "nameplates/identity.json",
+        "values": {
+          "show": false
+        },
+        "wait": 0.3
+      },
+      {
+        "op": "document",
+        "path": "entity-overlays/default.json",
+        "values": {
+          "includePlayers": false
+        },
+        "wait": 1
+      },
+      {
+        "op": "rcon",
+        "command": "gamerule block_drops false",
+        "wait": 0.1
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:pig]",
+        "wait": 0.2
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:item]",
+        "wait": 0.2
+      },
+      {
+        "op": "rcon",
+        "command": "fill -4 71 0 4 72 8 minecraft:air",
+        "wait": 0.2
+      },
+      {
+        "op": "document",
+        "path": "holograms/native-bounds.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1
+      },
+      {
+        "op": "rcon",
+        "command": "tp GlossGuide 0.5 71 0.5 0 0",
+        "wait": 1
+      },
+      {
+        "op": "rcon",
+        "command": "tp GlossVisitor 12.5 71 -9.5",
+        "wait": 0.3
+      },
+      {
+        "op": "document",
+        "path": "holograms/showcase.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "document",
+        "path": "holograms/particles.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "document",
+        "path": "boards/showcase.json",
+        "values": {
+          "select.when": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "document",
+        "path": "markers/garden.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "disconnect",
+        "wait": 2
+      },
+      {
+        "op": "server-list",
+        "address": "managed",
+        "name": "Gloss garden",
+        "wait": 5
+      }
+    ],
+    "beats": [
+      {
+        "op": "wait",
+        "wait": 3
+      },
+      {
+        "op": "cursor",
+        "x": 438,
+        "y": 42,
+        "ticks": 18,
+        "wait": 4
+      },
+      {
+        "op": "connect",
+        "address": "managed",
+        "wait": 7
+      }
+    ]
+  },
+  {
+    "id": "native-object-bounds",
+    "perspectives": [
+      "pov",
+      "observer"
+    ],
+    "observer": {
+      "position": [
+        -5,
+        73,
+        0
+      ],
+      "target": [
+        0.5,
+        75.5,
+        6.5
+      ]
+    },
+    "setup": [
+      {
+        "op": "dismiss",
+        "wait": 0.1
+      },
+      {
+        "op": "chat",
+        "command": "gloss menu close",
+        "wait": 0.5
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:chicken]",
+        "wait": 0.1
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:zombie]",
+        "wait": 0.1
+      },
+      {
+        "op": "document",
+        "path": "nametags/identity.json",
+        "values": {
+          "show": false
+        },
+        "wait": 0.3
+      },
+      {
+        "op": "document",
+        "path": "nameplates/identity.json",
+        "values": {
+          "show": false
+        },
+        "wait": 0.3
+      },
+      {
+        "op": "document",
+        "path": "entity-overlays/default.json",
+        "values": {
+          "includePlayers": false
+        },
+        "wait": 1
+      },
+      {
+        "op": "rcon",
+        "command": "gamerule block_drops false",
+        "wait": 0.1
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:pig]",
+        "wait": 0.2
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:item]",
+        "wait": 0.2
+      },
+      {
+        "op": "rcon",
+        "command": "fill -4 71 0 4 72 8 minecraft:air",
+        "wait": 0.2
+      },
+      {
+        "op": "rcon",
+        "command": "tp GlossGuide 0.5 71 0.5 0 0",
+        "wait": 1
+      },
+      {
+        "op": "rcon",
+        "command": "tp GlossVisitor 12.5 71 -9.5",
+        "wait": 0.3
+      },
+      {
+        "op": "document",
+        "path": "holograms/showcase.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "document",
+        "path": "holograms/particles.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "document",
+        "path": "boards/showcase.json",
+        "values": {
+          "select.when": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "document",
+        "path": "markers/garden.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "document",
+        "path": "holograms/native-bounds.json",
+        "values": {
+          "show": true
+        },
+        "wait": 2
+      },
+      {
+        "op": "rcon",
+        "command": "gamemode spectator GlossGuide",
+        "wait": 0.5
+      },
+      {
+        "op": "rcon",
+        "command": "tp GlossGuide .5 73 -2",
+        "wait": 0.5
+      },
+      {
+        "op": "look-at",
+        "x": 0.5,
+        "y": 75.5,
+        "z": 6.5,
+        "ticks": 20,
+        "wait": 1
+      }
+    ],
+    "beats": [
+      {
+        "op": "wait",
+        "wait": 4
+      },
+      {
+        "op": "rcon",
+        "command": "tp GlossGuide -5 73 0",
+        "wait": 0.5
+      },
+      {
+        "op": "look-at",
+        "x": 0.5,
+        "y": 75.5,
+        "z": 6.5,
+        "ticks": 24,
+        "wait": 4
+      },
+      {
+        "op": "rcon",
+        "command": "tp GlossGuide -4 78 -1",
+        "wait": 0.5
+      },
+      {
+        "op": "look-at",
+        "x": 0.5,
+        "y": 75.5,
+        "z": 6.5,
+        "ticks": 24,
+        "wait": 4
+      },
+      {
+        "op": "rcon",
+        "command": "gamemode creative GlossGuide",
+        "wait": 1
+      }
+    ]
+  },
+  {
+    "id": "player-identities",
+    "perspectives": [
+      "pov"
+    ],
+    "trigger": "Change the subject permission and replace nametag with nameplate",
+    "visibleResult": "Garden and Staff permissions produce real colored tags and viewer-facing nameplates",
+    "setup": [
+      {
+        "op": "dismiss",
+        "wait": 0.1
+      },
+      {
+        "op": "chat",
+        "command": "gloss menu close",
+        "wait": 0.5
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:chicken]",
+        "wait": 0.1
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:zombie]",
+        "wait": 0.1
+      },
+      {
+        "op": "document",
+        "path": "entity-overlays/default.json",
+        "values": {
+          "includePlayers": false
+        },
+        "wait": 1
+      },
+      {
+        "op": "rcon",
+        "command": "gamerule block_drops false",
+        "wait": 0.1
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:pig]",
+        "wait": 0.2
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:item]",
+        "wait": 0.2
+      },
+      {
+        "op": "rcon",
+        "command": "fill -4 71 0 4 72 8 minecraft:air",
+        "wait": 0.2
+      },
+      {
+        "op": "document",
+        "path": "holograms/native-bounds.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1
+      },
+      {
+        "op": "rcon",
+        "command": "tp GlossGuide 0.5 71 0.5 0 0",
+        "wait": 1
+      },
+      {
+        "op": "rcon",
+        "command": "tp GlossVisitor 12.5 71 -9.5",
+        "wait": 0.3
+      },
+      {
+        "op": "document",
+        "path": "holograms/showcase.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "document",
+        "path": "holograms/particles.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "document",
+        "path": "boards/showcase.json",
+        "values": {
+          "select.when": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "document",
+        "path": "markers/garden.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "look-at",
+        "x": 0.5,
+        "y": 72,
+        "z": 4,
+        "ticks": 0,
+        "wait": 1
+      },
+      {
+        "op": "document",
+        "path": "nametags/identity.json",
+        "values": {
+          "show": true
+        },
+        "wait": 1
+      },
+      {
+        "op": "document",
+        "path": "nameplates/identity.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1
+      },
+      {
+        "op": "visitor",
+        "action": "chat",
+        "command": "glossdemo identity",
+        "wait": 0.5
+      },
+      {
+        "op": "visitor",
+        "action": "chat",
+        "command": "glossdemo identity",
+        "wait": 0.5
+      },
+      {
+        "op": "rcon",
+        "command": "tp GlossVisitor .5 71 5.5",
+        "wait": 1
+      },
+      {
+        "op": "look-at",
+        "x": 0.5,
+        "y": 73.1,
+        "z": 5.5,
+        "ticks": 0,
+        "wait": 1
+      }
+    ],
+    "beats": [
+      {
+        "op": "wait",
+        "wait": 3
+      },
+      {
+        "op": "visitor",
+        "action": "chat",
+        "command": "glossdemo identity",
+        "wait": 3
+      },
+      {
+        "op": "document",
+        "path": "nametags/identity.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1
+      },
+      {
+        "op": "document",
+        "path": "nameplates/identity.json",
+        "values": {
+          "show": true
+        },
+        "wait": 4
+      },
+      {
+        "op": "visitor",
+        "action": "chat",
+        "command": "glossdemo identity",
+        "wait": 4
+      },
+      {
+        "op": "document",
+        "path": "nameplates/identity.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1
+      }
+    ]
+  },
+  {
+    "id": "editor-live-sync",
+    "perspectives": [
+      "pov"
+    ],
+    "trigger": "Publish authenticated local editor change",
+    "visibleResult": "Actual authored hologram text appears from accepted editor publication",
+    "setup": [
+      {
+        "op": "dismiss",
+        "wait": 0.1
+      },
+      {
+        "op": "chat",
+        "command": "gloss menu close",
+        "wait": 0.3
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:chicken]",
+        "wait": 0.1
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:zombie]",
+        "wait": 0.1
+      },
+      {
+        "op": "rcon",
+        "command": "tp GlossGuide .5 71 .5 0 0",
+        "wait": 0.5
+      },
+      {
+        "op": "rcon",
+        "command": "tp GlossVisitor 12.5 71 -9.5",
+        "wait": 0.3
+      },
+      {
+        "op": "look-at",
+        "x": 0.5,
+        "y": 74,
+        "z": 6.5,
+        "ticks": 0,
+        "wait": 0.3
+      },
+      {
+        "op": "clear-chat",
+        "wait": 0.3
+      }
+    ],
+    "beats": [
+      {
+        "op": "wait-document",
+        "path": "holograms/showcase.json",
+        "contains": "Edited live in Gloss",
+        "timeoutSeconds": 60,
+        "wait": 6
+      }
+    ]
+  },
+  {
+    "id": "chat-recipient",
+    "perspectives": [
+      "pov"
+    ],
+    "trigger": "Receive a highlighted mention, rich item link and private message",
+    "visibleResult": "Mention highlight is visible to the mentioned recipient with genuine item hover",
+    "setup": [
+      {
+        "op": "dismiss",
+        "wait": 0.1
+      },
+      {
+        "op": "chat",
+        "command": "gloss menu close",
+        "wait": 0.5
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:chicken]",
+        "wait": 0.1
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:zombie]",
+        "wait": 0.1
+      },
+      {
+        "op": "document",
+        "path": "nametags/identity.json",
+        "values": {
+          "show": false
+        },
+        "wait": 0.3
+      },
+      {
+        "op": "document",
+        "path": "nameplates/identity.json",
+        "values": {
+          "show": false
+        },
+        "wait": 0.3
+      },
+      {
+        "op": "document",
+        "path": "entity-overlays/default.json",
+        "values": {
+          "includePlayers": false
+        },
+        "wait": 1
+      },
+      {
+        "op": "rcon",
+        "command": "gamerule block_drops false",
+        "wait": 0.1
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:pig]",
+        "wait": 0.2
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:item]",
+        "wait": 0.2
+      },
+      {
+        "op": "rcon",
+        "command": "fill -4 71 0 4 72 8 minecraft:air",
+        "wait": 0.2
+      },
+      {
+        "op": "document",
+        "path": "holograms/native-bounds.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1
+      },
+      {
+        "op": "rcon",
+        "command": "tp GlossGuide 0.5 71 0.5 0 0",
+        "wait": 1
+      },
+      {
+        "op": "rcon",
+        "command": "tp GlossVisitor 12.5 71 -9.5",
+        "wait": 0.3
+      },
+      {
+        "op": "document",
+        "path": "holograms/showcase.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "document",
+        "path": "holograms/particles.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "document",
+        "path": "boards/showcase.json",
+        "values": {
+          "select.when": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "document",
+        "path": "markers/garden.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "rcon",
+        "command": "give GlossGuide minecraft:diamond_sword",
+        "wait": 0.5
+      },
+      {
+        "op": "look-at",
+        "x": 0.5,
+        "y": 72,
+        "z": 6,
+        "ticks": 0,
+        "wait": 1
+      },
+      {
+        "op": "rcon",
+        "command": "item replace entity GlossGuide hotbar.0 with minecraft:diamond_sword 1",
+        "wait": 0.5
+      },
+      {
+        "op": "slot",
+        "index": 0,
+        "wait": 0.5
+      },
+      {
+        "op": "clear-chat",
+        "wait": 0.2
+      },
+      {
+        "op": "rcon",
+        "command": "item replace entity GlossVisitor hotbar.0 with minecraft:diamond_sword 1",
+        "wait": 0.5
+      },
+      {
+        "op": "visitor",
+        "action": "slot",
+        "index": 0,
+        "wait": 0.5
+      }
+    ],
+    "beats": [
+      {
+        "op": "visitor",
+        "text": "<3 Welcome @GlossGuide",
+        "wait": 3,
+        "action": "chat"
+      },
+      {
+        "op": "visitor",
+        "text": "Inspect [item] and https://example.com/guide",
+        "wait": 3,
+        "action": "chat"
+      },
+      {
+        "op": "visitor",
+        "command": "msg GlossGuide Quiet garden chat",
+        "wait": 3,
+        "action": "chat"
+      },
+      {
+        "op": "chat-screen",
+        "wait": 1
+      },
+      {
+        "op": "cursor",
+        "x": 160,
+        "y": 307,
+        "ticks": 20,
+        "wait": 3
+      },
+      {
+        "op": "dismiss",
+        "wait": 1
+      }
+    ]
+  },
+  {
+    "id": "server-links",
+    "perspectives": [
+      "pov"
+    ],
+    "trigger": "Open native pause-menu server links",
+    "visibleResult": "Server advertises actual Website and Garden guide links",
+    "setup": [
+      {
+        "op": "dismiss",
+        "wait": 0.1
+      },
+      {
+        "op": "chat",
+        "command": "gloss menu close",
+        "wait": 0.5
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:chicken]",
+        "wait": 0.1
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:zombie]",
+        "wait": 0.1
+      },
+      {
+        "op": "document",
+        "path": "nametags/identity.json",
+        "values": {
+          "show": false
+        },
+        "wait": 0.3
+      },
+      {
+        "op": "document",
+        "path": "nameplates/identity.json",
+        "values": {
+          "show": false
+        },
+        "wait": 0.3
+      },
+      {
+        "op": "document",
+        "path": "entity-overlays/default.json",
+        "values": {
+          "includePlayers": false
+        },
+        "wait": 1
+      },
+      {
+        "op": "rcon",
+        "command": "gamerule block_drops false",
+        "wait": 0.1
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:pig]",
+        "wait": 0.2
+      },
+      {
+        "op": "rcon",
+        "command": "kill @e[type=minecraft:item]",
+        "wait": 0.2
+      },
+      {
+        "op": "rcon",
+        "command": "fill -4 71 0 4 72 8 minecraft:air",
+        "wait": 0.2
+      },
+      {
+        "op": "document",
+        "path": "holograms/native-bounds.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1
+      },
+      {
+        "op": "rcon",
+        "command": "tp GlossGuide 0.5 71 0.5 0 0",
+        "wait": 1
+      },
+      {
+        "op": "rcon",
+        "command": "tp GlossVisitor 12.5 71 -9.5",
+        "wait": 0.3
+      },
+      {
+        "op": "document",
+        "path": "holograms/showcase.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "document",
+        "path": "holograms/particles.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "document",
+        "path": "boards/showcase.json",
+        "values": {
+          "select.when": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "document",
+        "path": "markers/garden.json",
+        "values": {
+          "show": false
+        },
+        "wait": 1.5
+      },
+      {
+        "op": "rcon",
+        "command": "tp GlossVisitor 12 71 -10",
+        "wait": 0.2
+      },
+      {
+        "op": "clear-chat",
+        "wait": 0.3
+      }
+    ],
+    "beats": [
+      {
+        "op": "pause-screen",
+        "wait": 1.5
+      },
+      {
+        "op": "gui-widget",
+        "label": "Server Links...",
+        "wait": 3
+      },
+      {
+        "op": "wait",
+        "wait": 4
+      },
+      {
+        "op": "dismiss",
+        "wait": 1
+      }
+    ]
+  }
+]

@@ -110,7 +110,7 @@ class ChatHookFanoutTest {
         }
 
         @Override
-        public void audience(ChannelRuntime channel, String message, List<Player> viewers) {
+        public void audience(ChatDispatch dispatch) {
         }
     }
 }

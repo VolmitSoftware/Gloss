@@ -91,7 +91,8 @@ public final class ChatMessageRenderer {
     private ChatBody.Context bodyContext(ChannelRuntime channel, Player sender, Player viewer,
                                          ChatContext context) {
         ChannelDoc doc = channel.doc();
-        return new ChatBody.Context(context.escape(), viewer == null ? "" : viewer.getName(),
+        return new ChatBody.Context(context.escape(), raw -> plugin.text().chatEmoji(sender, raw),
+            viewer == null ? "" : viewer.getName(),
             plugin.text().playerName(viewer, viewer),
             sender != null && sender.hasPermission(doc.mentions().permission()),
             true,

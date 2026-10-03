@@ -1,0 +1,88 @@
+{
+  "offset": [
+    0,
+    0,
+    0
+  ],
+  "lockPosition": true,
+  "vars": {
+    "quantity": "1"
+  },
+  "components": [
+    {
+      "id": "heading",
+      "offset": [
+        0,
+        0.7,
+        0
+      ],
+      "data": {
+        "type": "decoration",
+        "icon": {
+          "type": "text",
+          "text": "&6&lGarden kiosk"
+        }
+      }
+    },
+    {
+      "id": "order",
+      "offset": [
+        0,
+        0,
+        0
+      ],
+      "data": {
+        "type": "button",
+        "icon": {
+          "type": "text",
+          "text": "&aPrepare order",
+          "style": {
+            "scaleX": 0.8,
+            "scaleY": 0.8,
+            "scaleZ": 0.8
+          }
+        },
+        "actions": [
+          {
+            "type": "if",
+            "when": "session.quantity > 0",
+            "then": [
+              {
+                "type": "message",
+                "message": "&ePreparing order"
+              },
+              {
+                "type": "delay",
+                "ticks": 20
+              },
+              {
+                "type": "message",
+                "message": "&aOrder ready"
+              }
+            ],
+            "else": [
+              {
+                "type": "message",
+                "message": "&cChoose quantity"
+              }
+            ]
+          },
+          {
+            "type": "repeat",
+            "times": 2,
+            "everyTicks": 20,
+            "steps": [
+              {
+                "type": "particle",
+                "particle": "minecraft:end_rod",
+                "count": 12,
+                "offset": 0.4,
+                "at": "viewer"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

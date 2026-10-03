@@ -80,7 +80,7 @@ public abstract class MenuComponent<T extends ComponentData> {
     if (epoch != 0L && showEpoch == epoch) {
       return showMemo;
     }
-    boolean matches = show.matches(Gloss.instance, session.getPlayer());
+    boolean matches = show.matches(session.componentScope(id));
     if (epoch != 0L) {
       showMemo = matches;
       showEpoch = epoch;

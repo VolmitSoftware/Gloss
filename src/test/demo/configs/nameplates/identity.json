@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 1,
+  "revision": 1,
+  "show": false,
+  "select": {
+    "priority": 20,
+    "when": "true",
+    "permission": ""
+  },
+  "presentation": {
+    "lines": [
+      {
+        "text": "&aGarden visitor",
+        "show": "true"
+      },
+      {
+        "text": "&f{{ subject.name }}",
+        "show": "true"
+      }
+    ],
+    "offset": 0.3,
+    "hideSneaking": true,
+    "relations": [
+      {
+        "when": "hasPermission('subject', 'server.staff')",
+        "color": "&c"
+      }
+    ]
+  },
+  "variants": [
+    {
+      "id": "staff",
+      "priority": 10,
+      "when": "true",
+      "permission": "gloss.demo.staff",
+      "presentation": {
+        "lines": [
+          {
+            "text": "&cGarden staff",
+            "show": "true"
+          },
+          {
+            "text": "&f{{ subject.name }}",
+            "show": "true"
+          }
+        ],
+        "offset": 0.35,
+        "hideSneaking": true
+      }
+    }
+  ]
+}

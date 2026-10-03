@@ -23,6 +23,8 @@ import org.bukkit.Location;
 import org.bukkit.entity.Player;
 import org.bukkit.util.Vector;
 
+import art.arcane.gloss.expr.ExprScope;
+import java.util.function.UnaryOperator;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -31,6 +33,7 @@ import java.util.UUID;
 public class TextMenuIcon extends MenuIcon<TextIconData> {
 
   private final List<Component> components;
+  private final ExprScope expressionScope;
   private PacketTextDecoration decoration;
   private int refreshInterval;
   /**
@@ -55,8 +58,9 @@ public class TextMenuIcon extends MenuIcon<TextIconData> {
   private double decorationY;
   private double decorationZ;
 
-  public TextMenuIcon(MenuSession session, Location loc, TextIconData data) throws MenuIconException {
+  public TextMenuIcon(MenuSession session, Location loc, TextIconData data, ExprScope expressionScope) throws MenuIconException {
     super(session, loc, data);
+    this.expressionScope = expressionScope;
     sourceText = data.text();
     dynamicSource = TextPipeline.viewerDependent(sourceText);
     parsedFrom = new ArrayList<>();
@@ -185,7 +189,7 @@ public class TextMenuIcon extends MenuIcon<TextIconData> {
 
   @Override
   public ParticleText.Rendered particleText() {
-    return ParticleText.renderLegacy(sourceText, text -> TextPipeline.menuText(session.getPlayer(), text));
+    return ParticleText.renderLegacy(sourceText, this::renderScopedText);
   }
 
   public boolean matchesAppearance(IconDisplayStyle nextStyle, HologramBox nextBox, Integer refreshTicks) {
@@ -238,14 +242,19 @@ public class TextMenuIcon extends MenuIcon<TextIconData> {
    * Renders one component per line, reusing the previous line's component whenever the text that
    * produced it is unchanged. Updates the parse cache as a side effect.
    */
+  private String renderScopedText(String text) {
+    Gloss plugin = Gloss.instance;
+    return plugin == null || plugin.text() == null ? text
+        : plugin.text().renderScoped(session.getPlayer(), text, expressionScope, UnaryOperator.identity());
+  }
+
   private List<Component> render(String text) {
-    Player player = session.getPlayer();
     String[] lines = (text == null ? "" : text).split("\n");
     List<Component> rendered = new ArrayList<>(lines.length);
     List<String> sources = new ArrayList<>(lines.length);
     int cached = Math.min(parsedFrom.size(), components.size());
     for (int index = 0; index < lines.length; index++) {
-      String piped = ParticleText.render(lines[index], value -> TextPipeline.menuText(player, value)).text();
+      String piped = ParticleText.render(lines[index], this::renderScopedText).text();
       sources.add(piped);
       if (index < cached && piped.equals(parsedFrom.get(index))) {
         rendered.add(components.get(index));

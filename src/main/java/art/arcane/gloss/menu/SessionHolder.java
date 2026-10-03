@@ -13,6 +13,8 @@ import art.arcane.gloss.menu.components.MenuComponent;
 import art.arcane.gloss.preview.ContainerPreview;
 import art.arcane.gloss.service.GlossTelemetry;
 import art.arcane.volmlib.util.bukkit.papi.PlayerSnapshotStore;
+import com.github.retrooper.packetevents.protocol.teleport.RelativeFlag;
+import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerPlayerPositionAndLook;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.Nullable;
@@ -26,6 +28,8 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 
 class SessionHolder {
+  private static final double MOVE_EVENT_DISTANCE_SQUARED = 1D / 256D;
+
   private final Object sessionLock = new Object();
   private final Object previewLock = new Object();
 
@@ -34,6 +38,7 @@ class SessionHolder {
   private final PlayerSnapshotStore<String> openMenus;
   private final MenuNavigationHistory navigation = new MenuNavigationHistory();
   private transient volatile MenuSession session;
+  private volatile AcceptedPosition acceptedPosition;
   private transient ContainerPreview preview;
   private String navigationRoot;
 
@@ -46,6 +51,52 @@ class SessionHolder {
     this.player = player;
     this.playerId = player.getUniqueId();
     this.openMenus = openMenus;
+  }
+
+  void recordAcceptedPosition(Location location) {
+    MenuSession current = session;
+    acceptedPosition = current == null ? null : new AcceptedPosition(current,
+        location.getX(), location.getY(), location.getZ());
+  }
+
+  ServerTeleport captureServerTeleport(WrapperPlayServerPlayerPositionAndLook packet) {
+    AcceptedPosition accepted = acceptedPosition;
+    if (accepted == null) {
+      return null;
+    }
+    double x = packet.getX() + (packet.isRelativeFlag(RelativeFlag.X) ? accepted.x() : 0D);
+    double y = packet.getY() + (packet.isRelativeFlag(RelativeFlag.Y) ? accepted.y() : 0D);
+    double z = packet.getZ() + (packet.isRelativeFlag(RelativeFlag.Z) ? accepted.z() : 0D);
+    double dx = x - accepted.x();
+    double dy = y - accepted.y();
+    double dz = z - accepted.z();
+    if (!Double.isFinite(x) || !Double.isFinite(y) || !Double.isFinite(z)
+        || dx * dx + dy * dy + dz * dz <= MOVE_EVENT_DISTANCE_SQUARED) {
+      return null;
+    }
+    return new ServerTeleport(accepted.session());
+  }
+
+  void applyServerTeleport(ServerTeleport teleport) {
+    inspectSession(current -> {
+      if (current != teleport.session()) {
+        return null;
+      }
+      return applyTeleport(current, player.getLocation());
+    });
+  }
+
+  HoloCloseReason applyTeleport(MenuSession current, Location destination) {
+    recordAcceptedPosition(destination);
+    if (!current.isValid(destination) || current.isCloseOnTeleport()) {
+      return HoloCloseReason.TELEPORT;
+    }
+    if (current.isFollowPlayer()) {
+      current.follow(destination);
+    } else {
+      current.move(destination);
+    }
+    return null;
   }
 
   Player player() {
@@ -366,6 +417,7 @@ class SessionHolder {
 
       commitNavigation(mode, data.getId(), previousMenuId);
       session = replacement;
+      recordAcceptedPosition(player.getLocation());
       if (handle != null) {
         handle.markOpen();
       }
@@ -417,6 +469,7 @@ class SessionHolder {
     ApiMenuHandle handle = session.getApiHandle();
     session.close();
     session = null;
+    acceptedPosition = null;
     openMenus.publish(playerId, null);
     GlossTelemetry.decrementMenusOpen();
     return new Detached(handle);
@@ -448,6 +501,12 @@ class SessionHolder {
       Detached detached = detachSession(false);
       return detached == null ? null : new Closed(detached.handle(), reason);
     }
+  }
+
+  private record AcceptedPosition(MenuSession session, double x, double y, double z) {
+  }
+
+  record ServerTeleport(MenuSession session) {
   }
 
   private record Detached(ApiMenuHandle handle) {

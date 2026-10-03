@@ -1,0 +1,62 @@
+{
+  "schemaVersion": 3,
+  "revision": 1,
+  "anchor": {
+    "world": "world",
+    "position": [
+      0.5,
+      72.5,
+      6.5
+    ]
+  },
+  "pages": [
+    {
+      "id": "bounds",
+      "lines": [
+        "&6&lNative objects",
+        {
+          "head": "Notch",
+          "scale": 0.8
+        },
+        "&fChicken 0.5",
+        {
+          "entity": "chicken",
+          "scale": 0.5
+        },
+        "&fChicken 1.5",
+        {
+          "entity": "chicken",
+          "scale": 1.5
+        },
+        "&fZombie 0.5",
+        {
+          "entity": "zombie",
+          "scale": 0.5
+        }
+      ]
+    }
+  ],
+  "style": {
+    "billboard": "center",
+    "shadow": false,
+    "seeThrough": false,
+    "scaleX": 1,
+    "scaleY": 1,
+    "scaleZ": 1,
+    "blockLight": 15,
+    "skyLight": 15
+  },
+  "box": {
+    "enabled": true,
+    "padding": 6,
+    "borderWidth": 1,
+    "backgroundArgb": "#D020262B",
+    "borderArgb": "#FFB8C1C8"
+  },
+  "actions": [],
+  "hitbox": {
+    "width": 3,
+    "height": 3
+  },
+  "show": false
+}

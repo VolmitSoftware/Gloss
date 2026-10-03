@@ -48,6 +48,16 @@ public final class ServerAdventure {
         return (String) invoke(require().gsonSerialize(), component);
     }
 
+    public static void sendMarkup(Object audience, String markup) {
+        try {
+            require().audienceSend().invoke(audience, fromMiniMessage(markup));
+        } catch (RuntimeException | Error failure) {
+            throw failure;
+        } catch (Throwable failure) {
+            throw new IllegalStateException("Server Adventure message delivery failed", failure);
+        }
+    }
+
     public static Object key(String namespacedKey) {
         return invoke(require().keyOf(), namespacedKey);
     }
@@ -105,7 +115,9 @@ public final class ServerAdventure {
 
             Class<?> key = Class.forName(adventurePackage + ".key.Key", true, loader);
             MethodHandle keyOf = lookup.unreflect(key.getMethod("key", String.class));
-            return new Resolved(component, miniDeserialize, miniEscape, gsonSerialize, gsonDeserialize, keyOf);
+            Class<?> audience = Class.forName(adventurePackage + ".audience.Audience", true, loader);
+            MethodHandle audienceSend = lookup.unreflect(audience.getMethod("sendMessage", component));
+            return new Resolved(component, miniDeserialize, miniEscape, gsonSerialize, gsonDeserialize, keyOf, audienceSend);
         } catch (ReflectiveOperationException | LinkageError | RuntimeException failure) {
             return null;
         }
@@ -127,6 +139,6 @@ public final class ServerAdventure {
 
     private record Resolved(Class<?> componentClass, MethodHandle miniMessageDeserialize,
                             MethodHandle miniMessageEscape, MethodHandle gsonSerialize,
-                            MethodHandle gsonDeserialize, MethodHandle keyOf) {
+                            MethodHandle gsonDeserialize, MethodHandle keyOf, MethodHandle audienceSend) {
     }
 }

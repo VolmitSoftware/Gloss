@@ -37,9 +37,11 @@ import com.github.retrooper.packetevents.event.PacketListenerAbstract;
 import com.github.retrooper.packetevents.event.PacketListenerCommon;
 import com.github.retrooper.packetevents.event.PacketListenerPriority;
 import com.github.retrooper.packetevents.event.PacketReceiveEvent;
+import com.github.retrooper.packetevents.event.PacketSendEvent;
 import com.github.retrooper.packetevents.protocol.packettype.PacketType;
 import com.github.retrooper.packetevents.protocol.player.InteractionHand;
 import com.github.retrooper.packetevents.wrapper.play.client.WrapperPlayClientInteractEntity;
+import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerPlayerPositionAndLook;
 import org.bukkit.Bukkit;
 import org.bukkit.Color;
 import org.bukkit.FluidCollisionMode;
@@ -117,6 +119,7 @@ public final class MenuSessionManager {
   private SchedulerUtils.TaskHandle debugHitbox, debugPos;
   private final SchedulerUtils.TaskHandle holderTask, previewTask;
   private final PacketListenerCommon entityInteractionListener;
+  private final PacketListenerCommon positionListener;
   private volatile boolean acceptingPreviewDiscovery = true;
   private int previewFallbackPhase;
 
@@ -146,6 +149,9 @@ public final class MenuSessionManager {
     Events.listen(Gloss.instance, PlayerMoveEvent.class, EventPriority.MONITOR, e -> {
       if (e instanceof PlayerTeleportEvent || e.isCancelled() || e.getTo() == null) return;
       SessionHolder holder = holders.get(e.getPlayer().getUniqueId());
+      if (holder != null) {
+        holder.recordAcceptedPosition(e.getTo());
+      }
       if (holder == null || !holder.hasPreview()) {
         queuePreviewDiscovery(e.getPlayer(), false);
       }
@@ -173,24 +179,7 @@ public final class MenuSessionManager {
         queuePreviewDiscovery(e.getPlayer(), false);
       }
     });
-    Events.listen(Gloss.instance, PlayerTeleportEvent.class, EventPriority.MONITOR, e -> {
-      SessionHolder holder = holders.get(e.getPlayer().getUniqueId());
-      if (holder != null && e.getTo() != null) {
-        holder.inspectSession(s -> {
-          if (s == null) return null;
-          if (!s.isValid(e.getTo()) || s.isCloseOnTeleport()) return HoloCloseReason.TELEPORT;
-          if (s.isFollowPlayer()) {
-            s.follow(e.getTo());
-          } else {
-            s.move(e.getTo());
-          }
-          return null;
-        });
-      }
-      if (!e.isCancelled() && e.getTo() != null && (holder == null || !holder.hasPreview())) {
-        queuePreviewDiscovery(e.getPlayer(), false);
-      }
-    });
+    Events.listen(Gloss.instance, PlayerTeleportEvent.class, EventPriority.MONITOR, this::dispatchTeleport);
     Events.listen(Gloss.instance, PlayerJoinEvent.class, EventPriority.MONITOR, e -> {
       queuePreviewDiscovery(e.getPlayer(), false);
     });
@@ -208,7 +197,52 @@ public final class MenuSessionManager {
               }
             }
         );
+    positionListener = PacketEvents.getAPI() == null
+        || PacketEvents.getAPI().getEventManager() == null
+        ? null
+        : PacketEvents.getAPI().getEventManager().registerListener(
+            new PacketListenerAbstract(PacketListenerPriority.MONITOR) {
+              @Override
+              public void onPacketSend(PacketSendEvent event) {
+                dispatchServerPosition(event);
+              }
+            }
+        );
     previewTask = listenToInventoryPreview();
+  }
+
+  void dispatchTeleport(PlayerTeleportEvent event) {
+    if (event.isCancelled() || event.getTo() == null) {
+      return;
+    }
+    SessionHolder holder = holders.get(event.getPlayer().getUniqueId());
+    if (holder != null) {
+      holder.inspectSession(session -> session == null ? null : holder.applyTeleport(session, event.getTo()));
+    }
+    if (holder == null || !holder.hasPreview()) {
+      queuePreviewDiscovery(event.getPlayer(), false);
+    }
+  }
+
+  void dispatchServerPosition(PacketSendEvent event) {
+    if (!acceptingPreviewDiscovery || event.isCancelled()
+        || event.getPacketType() != PacketType.Play.Server.PLAYER_POSITION_AND_LOOK
+        || event.getUser() == null) {
+      return;
+    }
+    SessionHolder holder = holders.get(event.getUser().getUUID());
+    if (holder == null) {
+      return;
+    }
+    SessionHolder.ServerTeleport teleport = holder.captureServerTeleport(
+        new WrapperPlayServerPlayerPositionAndLook(event));
+    if (teleport != null) {
+      SchedulerUtils.runEntity(Gloss.instance, holder.player(), () -> {
+        if (acceptingPreviewDiscovery && holders.get(holder.playerId()) == holder) {
+          holder.applyServerTeleport(teleport);
+        }
+      });
+    }
   }
 
   void tickHolder(SessionHolder holder) {
@@ -619,6 +653,10 @@ public final class MenuSessionManager {
         && PacketEvents.getAPI().getEventManager() != null
         && entityInteractionListener != null) {
       PacketEvents.getAPI().getEventManager().unregisterListener(entityInteractionListener);
+    }
+    if (PacketEvents.getAPI() != null && PacketEvents.getAPI().getEventManager() != null
+        && positionListener != null) {
+      PacketEvents.getAPI().getEventManager().unregisterListener(positionListener);
     }
     cancel(holderTask);
     cancel(previewTask);

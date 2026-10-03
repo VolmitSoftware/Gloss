@@ -3,6 +3,15 @@ package art.arcane.gloss.chat;
 import art.arcane.gloss.Gloss;
 import art.arcane.gloss.menu.CharacterizationSupport;
 import org.bukkit.World;
+import org.bukkit.Server;
+import org.bukkit.scheduler.BukkitScheduler;
+import org.bukkit.scheduler.BukkitTask;
+import java.lang.reflect.Proxy;
+import java.util.concurrent.atomic.AtomicBoolean;
+import org.bukkit.Material;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.ItemMeta;
+import java.util.Map;
 import org.bukkit.entity.Player;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -36,6 +45,93 @@ class ChannelServiceTest {
             installed = false;
         }
         ChatCapture.clear();
+    }
+
+    @Test
+    void eachMessageCapturesTheCurrentHeldStackOnceWithoutSlotChanges() throws Exception {
+        ChannelService service = service(global("\"throttle\":{\"minIntervalTicks\":0},"));
+        ChatTestHarness.FakePlayer steve = join("Steve");
+        RecordingSink sink = new RecordingSink();
+        Object previous = CharacterizationSupport.installServer(CharacterizationSupport.server(Map.of()));
+        try {
+            steve.heldItem = new HeldStack(Material.DIAMOND_SWORD, 1);
+            assertTrue(service.dispatch(steve.proxy, "First [item]", sink));
+            ChatContext first = sink.dispatches.getFirst().context();
+            assertEquals("minecraft:diamond_sword", first.item().id());
+            steve.heldItem = new HeldStack(Material.OAK_LOG, 32);
+            assertTrue(service.dispatch(steve.proxy, "Second [item]", sink));
+            assertEquals("minecraft:oak_log", sink.dispatches.getLast().context().item().id());
+            assertEquals(32, sink.dispatches.getLast().context().item().amount());
+            assertEquals("minecraft:diamond_sword", first.item().id());
+            assertEquals(2, steve.inventoryReads);
+            assertTrue(service.dispatch(steve.proxy, "No item token", sink));
+            assertEquals(2, steve.inventoryReads);
+        } finally {
+            CharacterizationSupport.restoreServer(previous);
+        }
+    }
+
+    @Test
+    void deferredItemMessagesReturnBeforeOwnershipTransferAndStopOnRetirementOrShutdown() throws Exception {
+        ChannelService service = service(global("\"throttle\":{\"minIntervalTicks\":0},"));
+        Gloss plugin = (Gloss) CharacterizationSupport.getField(service, "plugin");
+        CharacterizationSupport.setField(plugin, "isEnabled", true);
+        ChatTestHarness.FakePlayer steve = join("Steve");
+        steve.heldItem = new HeldStack(Material.DIAMOND_SWORD, 1);
+        List<Runnable> queued = new ArrayList<>();
+        AtomicBoolean owned = new AtomicBoolean(false);
+        Object previous = CharacterizationSupport.installServer(scheduledServer(queued, owned));
+        try {
+            RecordingSink sink = new RecordingSink();
+            service.dispatchDeferred(steve.proxy, "First [item]", sink);
+            assertTrue(sink.audiences.isEmpty());
+            assertEquals(0, steve.inventoryReads);
+            assertEquals(1, queued.size());
+            owned.set(true);
+            queued.removeFirst().run();
+            assertEquals(1, sink.audiences.size());
+            assertEquals("minecraft:diamond_sword", sink.dispatches.getFirst().context().item().id());
+            assertEquals(1, steve.inventoryReads);
+            owned.set(false);
+            service.dispatchDeferred(steve.proxy, "Retired [item]", sink);
+            steve.online = false;
+            owned.set(true);
+            queued.removeFirst().run();
+            assertEquals(1, sink.audiences.size());
+            assertEquals(1, steve.inventoryReads);
+            steve.online = true;
+            owned.set(false);
+            service.dispatchDeferred(steve.proxy, "Stopped [item]", sink);
+            CharacterizationSupport.setField(plugin, "isEnabled", false);
+            owned.set(true);
+            queued.removeFirst().run();
+            assertEquals(1, sink.audiences.size());
+            assertEquals(1, steve.inventoryReads);
+            assertEquals(List.of(ChatDrop.NO_CHANNEL, ChatDrop.NO_CHANNEL), sink.drops);
+        } finally {
+            CharacterizationSupport.restoreServer(previous);
+            CharacterizationSupport.setField(plugin, "isEnabled", false);
+        }
+    }
+
+    private static Server scheduledServer(List<Runnable> queued, AtomicBoolean owned) {
+        Server base = CharacterizationSupport.server(Map.of());
+        BukkitTask task = (BukkitTask) Proxy.newProxyInstance(BukkitTask.class.getClassLoader(),
+            new Class<?>[]{BukkitTask.class}, (proxy, method, args) -> null);
+        BukkitScheduler scheduler = (BukkitScheduler) Proxy.newProxyInstance(BukkitScheduler.class.getClassLoader(),
+            new Class<?>[]{BukkitScheduler.class}, (proxy, method, args) -> {
+                if (method.getName().equals("runTask")) {
+                    queued.add((Runnable) args[1]);
+                    return task;
+                }
+                throw new UnsupportedOperationException(method.getName());
+            });
+        return (Server) Proxy.newProxyInstance(Server.class.getClassLoader(), new Class<?>[]{Server.class},
+            (proxy, method, args) -> switch (method.getName()) {
+                case "isPrimaryThread", "isOwnedByCurrentRegion" -> owned.get();
+                case "getScheduler" -> scheduler;
+                default -> method.invoke(base, args);
+            });
     }
 
     @Test
@@ -276,9 +372,35 @@ class ChannelServiceTest {
         return player;
     }
 
+    private static final class HeldStack extends ItemStack {
+        private final Material type;
+        private final int amount;
+
+        private HeldStack(Material type, int amount) {
+            this.type = type;
+            this.amount = amount;
+        }
+
+        @Override
+        public Material getType() {
+            return type;
+        }
+
+        @Override
+        public int getAmount() {
+            return amount;
+        }
+
+        @Override
+        public ItemMeta getItemMeta() {
+            return null;
+        }
+    }
+
     private static final class RecordingSink implements ChatSink {
         private final List<ChatDrop> drops = new ArrayList<>();
         private final List<List<Player>> audiences = new ArrayList<>();
+        private final List<ChatDispatch> dispatches = new ArrayList<>();
 
         @Override
         public void dropped(ChatDrop reason) {
@@ -286,8 +408,9 @@ class ChannelServiceTest {
         }
 
         @Override
-        public void audience(ChannelRuntime channel, String message, List<Player> viewers) {
-            audiences.add(viewers);
+        public void audience(ChatDispatch dispatch) {
+            audiences.add(dispatch.viewers());
+            dispatches.add(dispatch);
         }
     }
 }

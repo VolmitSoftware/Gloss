@@ -590,25 +590,28 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
 
     private List<ParticleRect> particleTargets(ParticleLayer layer, ParticleText.Rendered rendered,
                                                 Vector3f scale) {
+        IconDisplayStyle currentStyle = style == null ? IconDisplayStyle.hologramDefaults() : style;
+        ParticleTextLayout.TextStyle textStyle = new ParticleTextLayout.TextStyle(currentStyle.lineWidth(), currentStyle.textAlignment());
         String scope = layer.target().scope();
         List<ParticleRect> targets;
         if (scope.equals("projection") || scope.equals("text") || scope.equals("label")) {
-            targets = List.of(ParticleTextLayout.textBounds(rendered.text(), 1D));
+            targets = List.of(ParticleTextLayout.styledTextBounds(rendered.text(), 1D, textStyle));
         } else if (scope.equals("line")) {
-            List<ParticleRect> lines = ParticleTextLayout.lineBounds(rendered.text(), 1D);
+            List<ParticleRect> lines = ParticleTextLayout.styledLineBounds(rendered.text(), 1D, textStyle);
             int index = layer.target().line() - 1;
             targets = index < lines.size() ? List.of(lines.get(index)) : List.of();
         } else if (scope.equals("span")) {
             boolean perLetter = layer.geometry().type().equals("letterBounds")
                 || layer.geometry().type().equals("glyphOutline")
                 || layer.geometry().type().equals("glyphFill");
-            targets = ParticleTextLayout.bounds(rendered, layer.target().name(), 1D, perLetter);
+            targets = ParticleTextLayout.styledBounds(rendered, layer.target().name(), 1D, perLetter, textStyle);
         } else {
             return List.of();
         }
+        double verticalOffset = ParticleTextLayout.styledTextBounds(rendered.text(), 1D, textStyle).height() / 2D;
         List<ParticleRect> scaled = new ArrayList<>(targets.size());
         for (ParticleRect target : targets) {
-            scaled.add(new ParticleRect(target.centerX() * scale.x, target.centerY() * scale.y,
+            scaled.add(new ParticleRect(target.centerX() * scale.x, (target.centerY() + verticalOffset) * scale.y,
                 target.centerZ() * scale.z, Math.min(256D, target.width() * scale.x),
                 Math.min(256D, target.height() * scale.y), Math.min(256D, target.depth() * scale.z)));
         }

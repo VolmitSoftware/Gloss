@@ -53,11 +53,11 @@ final class PersistentHologram implements AnchoredHologram {
      */
     private record LineSet(List<HologramLine> source, List<String> lines, List<ShowCondition> conditions,
                            List<HologramLine> objects, int flags, long generation, boolean fastRefresh,
-                           boolean conditional) {
+                           boolean conditional, boolean rawEntities) {
     }
 
     private static final LineSet EMPTY_LINES = new LineSet(List.of(), List.of(), List.of(), List.of(),
-        0, 0L, false, false);
+        0, 0L, false, false, false);
 
     private record AnchorState(String worldName, double x, double y, double z, long generation) {
     }
@@ -289,7 +289,11 @@ final class PersistentHologram implements AnchoredHologram {
     @Override
     public void setStyle(IconDisplayStyle style) {
         this.style = Objects.requireNonNull(style);
+        synchronized (linesLock) {
+            publishDocument(lineSet.source(), pages);
+        }
         applyStyle();
+        service.hologramContentChanged(this);
         service.persist(this);
     }
 
@@ -481,9 +485,11 @@ final class PersistentHologram implements AnchoredHologram {
         List<HologramLine> objects = new ArrayList<>();
         boolean conditional = false;
         boolean fastRefresh = false;
+        boolean rawEntities = false;
         for (HologramLine line : source) {
             if (!line.isText()) {
                 objects.add(line);
+                rawEntities |= line.kind() == HologramLine.Kind.ENTITY;
                 int rows = HologramLineRenderer.rows(line, scaleY);
                 for (int row = 0; row < rows; row++) {
                     text.add(" ");
@@ -499,7 +505,7 @@ final class PersistentHologram implements AnchoredHologram {
         }
         List<String> lines = List.copyOf(text);
         return new LineSet(List.copyOf(source), lines, List.copyOf(conditions), List.copyOf(objects),
-            HologramMath.classify(lines), lineGenerations.incrementAndGet(), fastRefresh, conditional);
+            HologramMath.classify(lines), lineGenerations.incrementAndGet(), fastRefresh, conditional, rawEntities);
     }
 
     private boolean replaceLine(int index, String line) {
@@ -650,6 +656,7 @@ final class PersistentHologram implements AnchoredHologram {
         untrackedViewers.remove(playerId);
         trackingChangedViewers.remove(playerId);
         objectViewers.remove(playerId);
+        objectsByPage.keySet().removeIf(key -> key.endsWith("@" + playerId));
         invalidateViewer(playerId, false);
     }
 
@@ -846,10 +853,11 @@ final class PersistentHologram implements AnchoredHologram {
     }
 
     private List<ParticleRect> particleTargets(ParticleLayer layer, ParticleText.Rendered rendered, IconDisplayStyle style) {
+        ParticleTextLayout.TextStyle textStyle = new ParticleTextLayout.TextStyle(style.lineWidth(), style.textAlignment());
         List<ParticleRect> targets = switch (layer.target().scope()) {
-            case "projection", "text" -> List.of(ParticleTextLayout.textBounds(rendered.text(), 1D));
+            case "projection", "text" -> List.of(ParticleTextLayout.styledTextBounds(rendered.text(), 1D, textStyle));
             case "line" -> {
-                List<ParticleRect> lines = ParticleTextLayout.lineBounds(rendered.text(), 1D);
+                List<ParticleRect> lines = ParticleTextLayout.styledLineBounds(rendered.text(), 1D, textStyle);
                 int index = layer.target().line() - 1;
                 yield index < lines.size() ? List.of(lines.get(index)) : List.of();
             }
@@ -857,14 +865,15 @@ final class PersistentHologram implements AnchoredHologram {
                 boolean perLetter = layer.geometry().type().equals("letterBounds")
                     || layer.geometry().type().equals("glyphOutline")
                     || layer.geometry().type().equals("glyphFill");
-                yield ParticleTextLayout.bounds(rendered, layer.target().name(), 1D, perLetter);
+                yield ParticleTextLayout.styledBounds(rendered, layer.target().name(), 1D, perLetter, textStyle);
             }
             default -> List.of();
         };
         Vector3f scale = new Vector3f(style.scaleX(), style.scaleY(), style.scaleZ());
+        double verticalOffset = ParticleTextLayout.styledTextBounds(rendered.text(), 1D, textStyle).height() / 2D;
         List<ParticleRect> transformed = new ArrayList<>(targets.size());
         for (ParticleRect target : targets) {
-            transformed.add(new ParticleRect(target.centerX() * scale.getX(), target.centerY() * scale.getY(),
+            transformed.add(new ParticleRect(target.centerX() * scale.getX(), (target.centerY() + verticalOffset) * scale.getY(),
                 target.centerZ() * scale.getZ(), Math.min(256D, target.width() * scale.getX()),
                 Math.min(256D, target.height() * scale.getY()), Math.min(256D, target.depth() * scale.getZ())));
         }
@@ -1609,7 +1618,7 @@ final class PersistentHologram implements AnchoredHologram {
         }
         for (UUID viewerId : List.copyOf(objectViewers.keySet())) {
             if (!present.contains(viewerId)) {
-                despawnObjectLines(viewerId);
+                despawnObjectLines(viewerId, null);
             }
         }
     }
@@ -1638,27 +1647,29 @@ final class PersistentHologram implements AnchoredHologram {
         objectLinesGeneration = snapshot.generation();
     }
 
-    private List<HologramLineRenderer.ObjectLine> buildObjectLines(LineSet set, Location anchor, float scaleY) {
+    private List<HologramLineRenderer.ObjectLine> buildObjectLines(LineSet set, Location anchor, IconDisplayStyle style) {
         if (set.objects().isEmpty()) {
             return List.of();
         }
-        return HologramLineRenderer.build(service.plugin(), id, set.source(), anchor, scaleY);
+        return HologramLineRenderer.build(service.plugin(), id, set.source(), anchor, style);
     }
 
     private void spawnObjectLines(UUID viewerId, Player player) {
         if (!player.isOnline() || !service.isActive(this) || !service.plugin().cfg().holograms().enabled()
             || service.isBedrock(viewerId) || !show.matches(service.plugin(), player)) {
-            despawnObjectLines(viewerId);
+            despawnObjectLines(viewerId, null);
             return;
         }
         ResolvedPresentation presentation = selectPresentation(player);
         Location anchor = objectAnchor;
         if (anchor == null || presentation.lines() == EMPTY_LINES) {
-            despawnObjectLines(viewerId);
+            despawnObjectLines(viewerId, null);
             return;
         }
-        List<HologramLineRenderer.ObjectLine> lines = objectsByPage.computeIfAbsent(presentation.key(),
-            ignored -> buildObjectLines(presentation.lines(), anchor, presentation.style().scaleY()));
+        String objectKey = presentation.lines().rawEntities()
+            ? presentation.key() + "@" + viewerId : presentation.key();
+        List<HologramLineRenderer.ObjectLine> lines = objectsByPage.computeIfAbsent(objectKey,
+            ignored -> buildObjectLines(presentation.lines(), anchor, presentation.style()));
         List<HologramLineRenderer.ObjectLine> visible = new ArrayList<>(lines.size());
         for (HologramLineRenderer.ObjectLine line : lines) {
             if (line.source().show().matches(service.plugin(), player)) {
@@ -1671,22 +1682,53 @@ final class PersistentHologram implements AnchoredHologram {
         }
         SpawnedObjects current = objectViewers.get(viewerId);
         if (current != null && current.player() == player && Arrays.equals(current.entityIds(), entityIds)) {
+            if (presentation.lines().rawEntities()) {
+                updateRawObjectPositions(player, anchor, presentation.style(), visible, true);
+            }
             return;
         }
-        despawnObjectLines(viewerId);
+        despawnObjectLines(viewerId, objectKey);
         if (visible.isEmpty()) {
             return;
+        }
+        if (presentation.lines().rawEntities()) {
+            updateRawObjectPositions(player, anchor, presentation.style(), visible, false);
         }
         List<PacketWrapper<?>> packets = new ArrayList<>(visible.size() * 2);
         for (HologramLineRenderer.ObjectLine line : visible) {
             packets.addAll(line.display().spawn());
         }
-        objectViewers.put(viewerId, new SpawnedObjects(player, presentation.key(), entityIds));
+        objectViewers.put(viewerId, new SpawnedObjects(player, objectKey, entityIds));
         PacketUtils.send(player, packets);
     }
 
-    private void despawnObjectLines(UUID viewerId) {
+    private void updateRawObjectPositions(Player player, Location anchor, IconDisplayStyle style,
+                                          List<HologramLineRenderer.ObjectLine> lines, boolean send) {
+        ParticleFrame frame = particleFrame(player, anchor, style);
+        Location eye = player.getEyeLocation();
+        List<PacketWrapper<?>> updates = new ArrayList<>();
+        for (HologramLineRenderer.ObjectLine line : lines) {
+            if (line.source().kind() != HologramLine.Kind.ENTITY) {
+                continue;
+            }
+            DisplayEntity display = line.display();
+            Location position = HologramLineRenderer.rawPosition(line, frame, eye);
+            if (display.location().subtract(PacketUtils.vector3d(position.toVector())).lengthSquared() > 1.0E-8D
+                || Math.abs(display.yaw() - position.getYaw()) > 0.001F) {
+                updates.add(display.goTo(position));
+                updates.add(display.headLook());
+            }
+        }
+        if (send && !updates.isEmpty()) {
+            PacketUtils.send(player, updates);
+        }
+    }
+
+    private void despawnObjectLines(UUID viewerId, String retainedKey) {
         SpawnedObjects removed = objectViewers.remove(viewerId);
+        if (removed != null && !removed.pageKey().equals(retainedKey) && removed.pageKey().endsWith("@" + viewerId)) {
+            objectsByPage.remove(removed.pageKey());
+        }
         if (removed == null || !removed.player().isOnline() || removed.entityIds().length == 0) {
             return;
         }
@@ -1695,7 +1737,7 @@ final class PersistentHologram implements AnchoredHologram {
 
     private void clearObjectLines() {
         for (UUID viewerId : List.copyOf(objectViewers.keySet())) {
-            despawnObjectLines(viewerId);
+            despawnObjectLines(viewerId, null);
         }
         objectsByPage.clear();
         objectAnchor = null;

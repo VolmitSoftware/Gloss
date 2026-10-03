@@ -9,6 +9,8 @@ import art.arcane.gloss.text.TextPipeline;
 import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.PlayerInventory;
 
 import java.io.File;
 import java.lang.reflect.Proxy;
@@ -115,6 +117,9 @@ final class ChatTestHarness {
         final Set<String> permissions = new HashSet<>();
         final Set<UUID> hidden = new HashSet<>();
         final List<String> received = new ArrayList<>();
+        ItemStack heldItem;
+        int inventoryReads;
+        boolean online = true;
         private final World world;
         private final double x;
 
@@ -125,13 +130,14 @@ final class ChatTestHarness {
             this.proxy = (Player) Proxy.newProxyInstance(ChatTestHarness.class.getClassLoader(),
                 new Class<?>[]{Player.class}, (target, method, args) -> switch (method.getName()) {
                     case "getUniqueId" -> id;
+                    case "getInventory" -> inventory();
                     case "getName", "getDisplayName" -> name;
                     case "getWorld" -> world;
                     case "getLocation" -> new Location(world, x, 64.0D, 0.0D);
                     case "hasPermission" -> permissions.contains(String.valueOf(args[0]));
                     case "isPermissionSet" -> permissions.contains(String.valueOf(args[0]));
                     case "canSee" -> !hidden.contains(((Player) args[0]).getUniqueId());
-                    case "isOnline" -> true;
+                    case "isOnline", "isValid" -> online;
                     case "getServer" -> null;
                     case "getLocale" -> "en_us";
                     case "sendMessage", "sendRichMessage" -> {
@@ -142,6 +148,17 @@ final class ChatTestHarness {
                     case "equals" -> target == args[0];
                     case "toString" -> "Player[" + name + "]";
                     default -> throw new UnsupportedOperationException("player." + method.getName());
+                });
+        }
+
+        private PlayerInventory inventory() {
+            return (PlayerInventory) Proxy.newProxyInstance(ChatTestHarness.class.getClassLoader(),
+                new Class<?>[]{PlayerInventory.class}, (proxy, method, args) -> switch (method.getName()) {
+                    case "getItemInMainHand" -> {
+                        inventoryReads++;
+                        yield heldItem;
+                    }
+                    default -> throw new UnsupportedOperationException("inventory." + method.getName());
                 });
         }
 

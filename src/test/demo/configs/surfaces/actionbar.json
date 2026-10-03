@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "revision": 1,
+  "surface": "actionbar",
+  "show": true,
+  "select": {
+    "priority": 100,
+    "when": false
+  },
+  "presentation": {
+    "text": "&6Gloss &f| &7Welcome, {{ viewer.name }}",
+    "priority": "ambient",
+    "ttlTicks": 40
+  },
+  "variants": []
+}

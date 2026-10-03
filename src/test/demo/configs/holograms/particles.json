@@ -1,0 +1,76 @@
+{
+  "schemaVersion": 3,
+  "revision": 1,
+  "anchor": {
+    "world": "world",
+    "position": [
+      -6,
+      73,
+      6
+    ]
+  },
+  "lines": [
+    "&6&lParticle layers",
+    "&f<particles:word>GLOSS</particles>",
+    "&7Measured text outline"
+  ],
+  "style": {
+    "billboard": "center",
+    "shadow": false,
+    "seeThrough": false,
+    "scaleX": 1.5,
+    "scaleY": 1.5,
+    "scaleZ": 1.5
+  },
+  "particleLayers": [
+    {
+      "id": "frame",
+      "target": {
+        "scope": "projection"
+      },
+      "geometry": {
+        "type": "outline",
+        "padding": 0.2,
+        "spacing": 0.1
+      },
+      "placement": {
+        "layer": "behind",
+        "depth": 0.04
+      },
+      "particle": {
+        "key": "minecraft:dust",
+        "color": "#E9B949",
+        "size": 0.6
+      },
+      "emission": {
+        "pattern": "steady",
+        "intervalTicks": 5
+      }
+    },
+    {
+      "id": "letters",
+      "target": {
+        "scope": "span",
+        "name": "word"
+      },
+      "geometry": {
+        "type": "glyphOutline",
+        "spacing": 0.05
+      },
+      "placement": {
+        "layer": "front",
+        "depth": 0.05
+      },
+      "particle": {
+        "key": "minecraft:dust",
+        "color": "#50D6D6",
+        "size": 0.4
+      },
+      "emission": {
+        "pattern": "steady",
+        "intervalTicks": 10
+      }
+    }
+  ],
+  "show": false
+}

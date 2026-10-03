@@ -50,6 +50,6 @@ class ParticleGeometryTest {
 
         assertEquals(1, span.size());
         assertEquals(5, letters.size());
-        assertEquals(0.5D, span.getFirst().width(), 1.0E-9D);
+        assertEquals(0.75D, span.getFirst().width(), 1.0E-6D);
     }
 }

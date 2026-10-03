@@ -1,6 +1,7 @@
 package art.arcane.gloss.util.common;
 
 import art.arcane.gloss.text.TextDisplayLayout;
+import com.github.retrooper.packetevents.protocol.attribute.Attributes;
 import com.github.retrooper.packetevents.protocol.entity.data.EntityData;
 import com.github.retrooper.packetevents.protocol.entity.data.EntityDataTypes;
 import com.github.retrooper.packetevents.protocol.entity.type.EntityType;
@@ -15,6 +16,7 @@ import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEn
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityTeleport;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerSpawnEntity;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerTeams;
+import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerUpdateAttributes;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Location;
@@ -63,6 +65,7 @@ public class DisplayEntity {
   private int teleportDuration = 0;
   private Vector3f translation = new Vector3f(0, 0, 0);
   private Vector3f scale = new Vector3f(1, 1, 1);
+  private Double rawScale;
   private Quaternion4f leftRotation = new Quaternion4f(0, 0, 0, 1);
   private Quaternion4f rightRotation = new Quaternion4f(0, 0, 0, 1);
   private byte billboard = 0;
@@ -210,6 +213,14 @@ public class DisplayEntity {
 
   public DisplayEntity scale(Vector3f scale) {
     this.scale = scale;
+    return this;
+  }
+
+  public DisplayEntity rawScale(double scale) {
+    if (!isRawEntity()) {
+      throw new IllegalStateException("Native entity scale applies only to raw entities");
+    }
+    this.rawScale = RawEntityDimensions.normalizedScale(entityType, scale);
     return this;
   }
 
@@ -383,6 +394,10 @@ public class DisplayEntity {
     packets.add(new WrapperPlayServerSpawnEntity(id, Optional.of(uuid), entityType,
         location, pitch, yaw, headYaw, 0, Optional.empty()));
     packets.add(dataPacket());
+    if (rawScale != null && RawEntityDimensions.supportsScale(entityType)) {
+      packets.add(new WrapperPlayServerUpdateAttributes(id, List.of(
+          new WrapperPlayServerUpdateAttributes.Property(Attributes.SCALE, rawScale, List.of()))));
+    }
     return packets;
   }
 

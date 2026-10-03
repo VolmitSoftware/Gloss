@@ -1,0 +1,152 @@
+{
+  "offset": [
+    0,
+    1.6,
+    3
+  ],
+  "lockPosition": true,
+  "followPlayer": false,
+  "components": [
+    {
+      "id": "heading",
+      "offset": [
+        0,
+        0.7,
+        0
+      ],
+      "data": {
+        "type": "decoration",
+        "icon": {
+          "type": "text",
+          "text": "&6&lPersonal menu",
+          "style": {
+            "scaleX": 0.65,
+            "scaleY": 0.65,
+            "scaleZ": 0.65
+          }
+        }
+      }
+    },
+    {
+      "id": "button",
+      "offset": [
+        -0.8,
+        0.2,
+        0
+      ],
+      "data": {
+        "type": "button",
+        "icon": {
+          "type": "text",
+          "text": "&aConfirm",
+          "style": {
+            "scaleX": 0.65,
+            "scaleY": 0.65,
+            "scaleZ": 0.65
+          }
+        },
+        "highlightModifier": 0.15,
+        "hoverDurationTicks": 8,
+        "tooltip": {
+          "delayTicks": 6,
+          "lines": [
+            "&fClick to show confirmation"
+          ]
+        },
+        "actions": [
+          {
+            "type": "message",
+            "message": "&aSelection confirmed."
+          }
+        ]
+      }
+    },
+    {
+      "id": "toggle",
+      "offset": [
+        0.8,
+        0.2,
+        0
+      ],
+      "data": {
+        "type": "toggle",
+        "condition": "false",
+        "expectedValue": "true",
+        "falseIcon": {
+          "type": "text",
+          "text": "&7Sound: off",
+          "style": {
+            "scaleX": 0.65,
+            "scaleY": 0.65,
+            "scaleZ": 0.65
+          }
+        },
+        "trueIcon": {
+          "type": "text",
+          "text": "&aSound: on",
+          "style": {
+            "scaleX": 0.65,
+            "scaleY": 0.65,
+            "scaleZ": 0.65
+          }
+        },
+        "trueActions": [
+          {
+            "type": "sound",
+            "sound": "ui.button.click",
+            "source": "master",
+            "volume": 1,
+            "pitch": 1
+          }
+        ],
+        "falseActions": []
+      }
+    },
+    {
+      "id": "slider",
+      "offset": [
+        0,
+        -0.3,
+        0
+      ],
+      "data": {
+        "type": "slider",
+        "var": "quantity",
+        "min": 1,
+        "max": 5,
+        "step": 1,
+        "width": 2,
+        "label": "&fQuantity: {{ session.quantity }}",
+        "style": {
+          "scaleX": 0.65,
+          "scaleY": 0.65,
+          "scaleZ": 0.65
+        }
+      }
+    },
+    {
+      "id": "field",
+      "offset": [
+        0,
+        -0.8,
+        0
+      ],
+      "data": {
+        "type": "field",
+        "var": "label",
+        "prompt": "chat",
+        "label": "&fLabel: {{ session.label }}",
+        "initial": "Sample",
+        "style": {
+          "scaleX": 0.65,
+          "scaleY": 0.65,
+          "scaleZ": 0.65
+        }
+      }
+    }
+  ],
+  "vars": {
+    "quantity": "1",
+    "label": "'Sample'"
+  }
+}

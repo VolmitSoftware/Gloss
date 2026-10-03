@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "revision": 1,
+  "show": false,
+  "anchor": {
+    "world": "world",
+    "x": 6,
+    "y": 71,
+    "z": 8
+  },
+  "label": "&6Garden destination",
+  "icon": {
+    "type": "item",
+    "item": "minecraft:compass"
+  },
+  "color": "#E9B949",
+  "beam": {
+    "enabled": true,
+    "height": 10,
+    "width": 0.2,
+    "material": "minecraft:yellow_stained_glass"
+  },
+  "edge": {
+    "enabled": true,
+    "margin": 0.8,
+    "arrow": "&f>"
+  },
+  "trail": {
+    "enabled": true,
+    "particle": "minecraft:dust",
+    "spacing": 0.5,
+    "maxPoints": 32,
+    "color": "#E9B949"
+  },
+  "waypoint": true
+}

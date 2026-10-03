@@ -3,6 +3,7 @@ package art.arcane.gloss.hologram;
 import art.arcane.gloss.api.HologramBox;
 import art.arcane.gloss.api.HologramPresentation;
 import art.arcane.gloss.api.IconDisplayStyle;
+import art.arcane.gloss.text.TextDisplayLayout;
 import org.bukkit.map.MapFont;
 import org.bukkit.map.MinecraftFont;
 import org.bukkit.util.Transformation;
@@ -14,7 +15,7 @@ import java.util.List;
 
 public record HologramBoxLayout(int textWidth, int textHeight, int panelWidth, int panelHeight,
                          int frameWidth, int frameHeight) {
-    private static final float PIXEL = 0.025F;
+    private static final float PIXEL = TextDisplayLayout.PIXEL_SIZE;
 
     /**
      * The projection of a string that {@link #measure} actually reads: glyphs, line breaks and the
@@ -105,8 +106,8 @@ public record HologramBoxLayout(int textWidth, int textHeight, int panelWidth, i
             }
             width += advance;
         }
-        int textWidth = Math.max(maximum, width) + 2;
-        int textHeight = lines * 9 + 1;
+        int textWidth = Math.max(maximum, width) + 1;
+        int textHeight = lines * TextDisplayLayout.ROW_PIXELS;
         int panelWidth = textWidth + box.padding() * 2;
         int panelHeight = textHeight + box.padding() * 2;
         return new HologramBoxLayout(textWidth, textHeight, panelWidth, panelHeight,

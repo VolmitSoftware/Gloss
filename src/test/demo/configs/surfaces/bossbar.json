@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "revision": 1,
+  "surface": "bossbar",
+  "show": true,
+  "select": {
+    "priority": 100,
+    "when": false
+  },
+  "presentation": {
+    "title": "&6Progress &f{{ player.health }}/20",
+    "progress": "player.health / 20",
+    "color": "yellow",
+    "style": "segmented_10"
+  },
+  "variants": []
+}

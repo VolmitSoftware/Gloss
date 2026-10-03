@@ -21,7 +21,7 @@ public class ButtonComponent extends ClickableComponent<ButtonComponentData> {
         ((ButtonComponentData) data.data()).resolvedHoverDurationTicks(),
         ((ButtonComponentData) data.data()).resolvedHoverEasing());
     this.actions = MenuAction.resolve(this.data.actions(), session.getId(), getId());
-    this.tooltip = this.data.tooltip() == null ? null : new TooltipPane(session, this.data.tooltip());
+    this.tooltip = this.data.tooltip() == null ? null : new TooltipPane(this, this.data.tooltip());
   }
 
   @Override

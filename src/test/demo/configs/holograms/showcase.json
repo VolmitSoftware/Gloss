@@ -1,0 +1,67 @@
+{
+  "schemaVersion": 3,
+  "revision": 1,
+  "anchor": {
+    "world": "world",
+    "position": [
+      0.5,
+      73,
+      6.5
+    ]
+  },
+  "pages": [
+    {
+      "id": "mixed",
+      "lines": [
+        "&6&lGloss mixed displays",
+        {
+          "item": {
+            "type": "item",
+            "item": "minecraft:diamond"
+          },
+          "scale": 0.6
+        },
+        "&fText and item in authored order",
+        {
+          "block": "minecraft:amethyst_block",
+          "scale": 0.6
+        }
+      ]
+    },
+    {
+      "id": "page-two",
+      "lines": [
+        "&a&lSecond page",
+        "&fViewer-specific page navigation",
+        "&7Click again to return"
+      ]
+    }
+  ],
+  "style": {
+    "billboard": "center",
+    "shadow": false,
+    "seeThrough": false,
+    "scaleX": 1.5,
+    "scaleY": 1.5,
+    "scaleZ": 1.5
+  },
+  "box": {
+    "enabled": true,
+    "padding": 6,
+    "borderWidth": 1,
+    "backgroundArgb": "#D020262B",
+    "borderArgb": "#FFB8C1C8"
+  },
+  "actions": [
+    {
+      "type": "navigate",
+      "mode": "page",
+      "target": "next"
+    }
+  ],
+  "hitbox": {
+    "width": 3,
+    "height": 3
+  },
+  "show": false
+}

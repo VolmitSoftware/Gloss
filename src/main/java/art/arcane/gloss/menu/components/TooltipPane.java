@@ -21,12 +21,14 @@ public final class TooltipPane {
     public static final double VERTICAL_OFFSET = 0.35D;
 
     private final MenuSession session;
+    private final MenuComponent<?> owner;
     private final ButtonComponentData.TooltipData data;
     private MenuIcon<?> icon;
     private int hoveredTicks;
 
-    public TooltipPane(MenuSession session, ButtonComponentData.TooltipData data) {
-        this.session = session;
+    public TooltipPane(MenuComponent<?> owner, ButtonComponentData.TooltipData data) {
+        this.owner = owner;
+        this.session = owner.session;
         this.data = data;
     }
 
@@ -59,7 +61,7 @@ public final class TooltipPane {
     private void show(Location anchor) {
         Location at = session.getTransform().localPosition(anchor,
             new Vector(0D, VERTICAL_OFFSET, FORWARD_OFFSET));
-        icon = MenuIcon.createIcon(session, at, new TextIconData(text(data.lines()), data.style(), null, data.box()), null);
+        icon = MenuIcon.createIcon(session, at, new TextIconData(text(data.lines()), data.style(), null, data.box()), owner);
         if (icon != null) {
             icon.spawn();
         }

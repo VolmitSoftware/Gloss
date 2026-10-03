@@ -39,7 +39,7 @@ class HologramBoxLayoutTest {
         assertTrue(wide.textWidth() > narrow.textWidth());
         assertEquals(wide.textWidth() + 3, bold.textWidth());
         assertEquals(wide.textWidth(), multiline.textWidth());
-        assertEquals(19, multiline.textHeight());
+        assertEquals(20, multiline.textHeight());
         assertEquals(multiline.textWidth() + 8, multiline.panelWidth());
         assertEquals(multiline.textHeight() + 8, multiline.panelHeight());
         assertEquals(multiline.panelWidth() + 4, multiline.frameWidth());
@@ -73,7 +73,7 @@ class HologramBoxLayoutTest {
         HologramBoxLayout word = HologramBoxLayout.measure("WW", 16384, box);
         HologramBoxLayout wrapped = HologramBoxLayout.measure("WW WW", 24, box);
         assertEquals(word.textWidth(), wrapped.textWidth());
-        assertEquals(19, wrapped.textHeight());
+        assertEquals(20, wrapped.textHeight());
     }
 
     @Test

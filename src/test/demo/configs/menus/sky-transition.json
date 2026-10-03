@@ -1,0 +1,39 @@
+{
+  "offset": [
+    0,
+    1.6,
+    3
+  ],
+  "lockPosition": true,
+  "components": [
+    {
+      "id": "action",
+      "offset": [
+        0,
+        0.2,
+        0
+      ],
+      "data": {
+        "type": "button",
+        "icon": {
+          "type": "text",
+          "text": "&6Night sky",
+          "style": {
+            "scaleX": 0.8,
+            "scaleY": 0.8,
+            "scaleZ": 0.8
+          }
+        },
+        "actions": [
+          {
+            "type": "sky",
+            "purpose": "garden-demo",
+            "time": "18000",
+            "weather": "clear",
+            "fadeTicks": 40
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -10,6 +10,7 @@ import art.arcane.gloss.text.TextPipeline;
 import org.bukkit.Bukkit;
 import org.bukkit.Server;
 import org.bukkit.entity.Player;
+import org.bukkit.event.server.ServerListPingEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -21,6 +22,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.nio.charset.StandardCharsets;
+import java.net.InetAddress;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
@@ -54,6 +56,8 @@ class MotdProxyLinksTest {
         Server server = (Server) Proxy.newProxyInstance(Server.class.getClassLoader(), new Class<?>[]{Server.class},
             (proxy, method, arguments) -> switch (method.getName()) {
                 case "isPrimaryThread", "isTickThread", "isGlobalTickThread", "isOwnedByCurrentRegion" -> true;
+                case "getOnlinePlayers" -> List.of();
+                case "getMaxPlayers" -> 40;
                 default -> null;
             });
         field(Bukkit.class, "server").set(null, server);
@@ -95,6 +99,29 @@ class MotdProxyLinksTest {
     void close() throws Exception {
         registry().close();
         field(Bukkit.class, "server").set(null, previousServer);
+    }
+
+    @Test
+    void unauthenticatedPingSelectsServerConditionsAndHidesPlayerConditions() throws Exception {
+        GlossConfigFile config = new GlossConfigFile();
+        config.normalize();
+        set(plugin, Gloss.class, "config", GlossConfig.from(config));
+        Files.writeString(new File(folder, "motd.json").toPath(), """
+            {"schemaVersion":1,"revision":5,"show":"server.maxPlayers == 40","entries":[
+              {"lines":["Player-only"],"show":"viewer.name == 'GardenGuide'","weight":1000000},
+              {"lines":["Garden {{ server.online }}/{{ server.maxPlayers }}"],
+               "show":"server.online == 0","max":"40"}]}
+            """);
+        registry().reload();
+        ServerListPingEvent event = new ServerListPingEvent("example.test", InetAddress.getLoopbackAddress(),
+            "Original", 20) {};
+        Method handler = MotdService.class.getDeclaredMethod("handlePing", ServerListPingEvent.class);
+        handler.setAccessible(true);
+        handler.invoke(motd, event);
+
+        assertEquals("Garden 0/40", event.getMotd());
+        assertEquals(40, event.getMaxPlayers());
+        assertFalse((boolean) field(MotdService.class, "failureLogged").get(motd));
     }
 
     @Test

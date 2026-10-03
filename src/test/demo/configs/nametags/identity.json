@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "revision": 1,
+  "show": false,
+  "select": {
+    "priority": 20,
+    "when": "true",
+    "permission": ""
+  },
+  "presentation": {
+    "prefix": "&a[Garden] ",
+    "suffix": "",
+    "color": "green",
+    "nameTagVisibility": "always",
+    "collision": "always"
+  },
+  "variants": [
+    {
+      "id": "staff",
+      "priority": 10,
+      "when": "true",
+      "permission": "gloss.demo.staff",
+      "presentation": {
+        "prefix": "&c[Staff] ",
+        "suffix": " &c*",
+        "color": "red",
+        "nameTagVisibility": "always",
+        "collision": "never"
+      }
+    }
+  ]
+}

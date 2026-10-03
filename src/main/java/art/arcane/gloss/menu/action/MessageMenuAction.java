@@ -1,6 +1,7 @@
 package art.arcane.gloss.menu.action;
 
 import art.arcane.gloss.config.action.MessageActionData;
+import art.arcane.gloss.menu.MenuExpressions;
 import art.arcane.gloss.text.TextPipeline;
 import art.arcane.gloss.util.common.TextUtils;
 import art.arcane.volmlib.util.plugin.ComponentMessenger;
@@ -24,7 +25,9 @@ public final class MessageMenuAction extends MenuAction<MessageActionData> {
   public ActionOutcome execute(ActionContext context) {
     Player player = context.player();
     String personalized = data.message().replace("%player%", player.getName());
-    String resolved = TextPipeline.menuText(player, personalized);
+    String scoped = personalized.contains("{{")
+        ? MenuExpressions.substitute(personalized, context.conditionScope()) : personalized;
+    String resolved = TextPipeline.menuText(player, scoped);
     deliver(player, sanitizeInteractions(TextUtils.parse(resolved)));
     return ActionOutcome.CONTINUE;
   }

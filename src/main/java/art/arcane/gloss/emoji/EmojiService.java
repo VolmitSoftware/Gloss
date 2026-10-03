@@ -10,6 +10,7 @@ import art.arcane.gloss.doc.RegistryOwner;
 import art.arcane.gloss.doc.ShippedDefaults;
 import art.arcane.gloss.doc.ShippedDocumentCatalog;
 import art.arcane.gloss.text.TextPipeline;
+import art.arcane.gloss.util.common.TextUtils;
 import art.arcane.volmlib.util.scheduling.FoliaScheduler;
 import art.arcane.volmlib.util.scheduling.SchedulerUtils;
 import org.bukkit.Bukkit;
@@ -32,6 +33,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Predicate;
+import java.util.function.UnaryOperator;
 
 public final class EmojiService implements Listener, RegistryOwner {
     static final long SHOW_REFRESH_TICKS = 10L;
@@ -71,6 +73,7 @@ public final class EmojiService implements Listener, RegistryOwner {
         rebuild(registry.snapshot());
         plugin.text().setEmojiFilter(this::apply);
         plugin.text().setViewerEmojiFilter(this::applyFor);
+        plugin.text().setViewerChatEmojiFilter(this::applyForChat);
         plugin.watchdog().register("emoji", this::pollRegistry);
     }
 
@@ -82,6 +85,7 @@ public final class EmojiService implements Listener, RegistryOwner {
         plugin.watchdog().unregister("emoji");
         registry.close();
         plugin.text().setViewerEmojiFilter(null);
+        plugin.text().setViewerChatEmojiFilter(null);
         plugin.text().setEmojiFilter(null);
         entries = List.of();
         replacer = new EmojiReplacer(List.of());
@@ -108,19 +112,27 @@ public final class EmojiService implements Listener, RegistryOwner {
     }
 
     public String applyFor(Player sender, String message) {
+        return applyFor(sender, message, UnaryOperator.identity());
+    }
+
+    public String applyForChat(Player sender, String message) {
+        return applyFor(sender, message, TextUtils::toMiniMessage);
+    }
+
+    private String applyFor(Player sender, String message, UnaryOperator<String> renderReplacement) {
         if (sender == null) {
-            return apply(message);
+            return counted(message, replacer.apply(message, null, show -> show.matches(plugin, null), renderReplacement));
         }
         Predicate<ShowCondition> visible = visibilityFor(sender);
         if (!plugin.cfg().emoji().emojiSpecificPermissions()) {
             String substituted = GlyphSubstitution.apply(glyphSubstitution, sender, message, entries, null, visible);
-            return counted(message, replacer.apply(substituted, null, visible));
+            return counted(message, replacer.apply(substituted, null, visible, renderReplacement));
         }
 
         Map<String, String> nodes = permissionNodes;
         Predicate<String> allowed = id -> sender.hasPermission(nodes.getOrDefault(id, PERMISSION_PREFIX + id));
         String substituted = GlyphSubstitution.apply(glyphSubstitution, sender, message, entries, allowed, visible);
-        return counted(message, replacer.apply(substituted, allowed, visible));
+        return counted(message, replacer.apply(substituted, allowed, visible, renderReplacement));
     }
 
     /**

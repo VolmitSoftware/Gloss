@@ -72,7 +72,7 @@ public final class WaypointService implements GlossService, Listener {
     @Override
     public void enable() {
         registry.reload();
-        rebuild();
+        rebuild(registry.snapshot());
         plugin.watchdog().register(WaypointDoc.KIND, this::poll);
         plugin.getServer().getPluginManager().registerEvents(this, plugin);
         if (enabled()) {
@@ -92,7 +92,7 @@ public final class WaypointService implements GlossService, Listener {
     @Override
     public void reload() {
         registry.reload();
-        rebuild();
+        rebuild(registry.snapshot());
         if (!enabled()) {
             stopDriver();
             untrackEveryone();
@@ -141,11 +141,10 @@ public final class WaypointService implements GlossService, Listener {
         if (delta.isEmpty()) {
             return;
         }
-        registry.apply(delta, this::rebuild);
+        registry.apply(delta, () -> rebuild(registry.snapshot(delta)));
     }
 
-    private void rebuild() {
-        Map<String, GlossDocument<WaypointDoc>> snapshot = registry.snapshot();
+    private void rebuild(Map<String, GlossDocument<WaypointDoc>> snapshot) {
         List<Entry> entries = new ArrayList<>(snapshot.size());
         for (Map.Entry<String, GlossDocument<WaypointDoc>> entry : snapshot.entrySet()) {
             WaypointDoc doc = entry.getValue().value();

@@ -1,0 +1,11 @@
+name: GlossDemo
+version: 1.0.0
+main: art.arcane.gloss.demo.GlossDemoPlugin
+api-version: '26.3'
+depend: [Gloss]
+commands:
+  glossdemo:
+    permission: glossdemo.run
+permissions:
+  glossdemo.run:
+    default: op

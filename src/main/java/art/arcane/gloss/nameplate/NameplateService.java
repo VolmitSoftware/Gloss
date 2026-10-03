@@ -57,7 +57,7 @@ public final class NameplateService implements GlossService, Listener {
             defaults.extractMissing();
         }
         registry.reload();
-        rebuild();
+        rebuild(registry.snapshot());
         plugin.watchdog().register(NameplateDoc.KIND, this::poll);
         plugin.getServer().getPluginManager().registerEvents(this, plugin);
         syncSource();
@@ -78,7 +78,7 @@ public final class NameplateService implements GlossService, Listener {
             defaults.extractMissing();
         }
         registry.reload();
-        rebuild();
+        rebuild(registry.snapshot());
         syncSource();
     }
 
@@ -103,7 +103,7 @@ public final class NameplateService implements GlossService, Listener {
         List<String> restored = defaults.resetToDefault(name);
         if (!restored.isEmpty()) {
             registry.reload();
-            rebuild();
+            rebuild(registry.snapshot());
         }
         return restored;
     }
@@ -111,7 +111,7 @@ public final class NameplateService implements GlossService, Listener {
     /** Drops every viewer's panes so the next overlay pass rebuilds them from the current documents. */
     public void refresh() {
         suppression.clear();
-        rebuild();
+        rebuild(registry.snapshot());
     }
 
     /**
@@ -130,11 +130,10 @@ public final class NameplateService implements GlossService, Listener {
         if (delta.isEmpty()) {
             return;
         }
-        registry.apply(delta, this::rebuild);
+        registry.apply(delta, () -> rebuild(registry.snapshot(delta)));
     }
 
-    private void rebuild() {
-        Map<String, GlossDocument<NameplateDoc>> snapshot = registry.snapshot();
+    private void rebuild(Map<String, GlossDocument<NameplateDoc>> snapshot) {
         List<NameplateRuntime> runtimes = new ArrayList<>(snapshot.size());
         for (Map.Entry<String, GlossDocument<NameplateDoc>> entry : snapshot.entrySet()) {
             runtimes.add(new NameplateRuntime(entry.getKey(), entry.getValue().value()));

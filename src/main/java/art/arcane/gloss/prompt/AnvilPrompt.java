@@ -18,9 +18,10 @@ import org.bukkit.inventory.AnvilInventory;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryView;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.MenuType;
 import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.inventory.view.AnvilView;
 
-import java.lang.reflect.Method;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -72,9 +73,9 @@ public final class AnvilPrompt implements Listener {
     }
 
     boolean open(Player viewer, PromptRequest request) {
-        Inventory anvil = request.label().isBlank()
-            ? Bukkit.createInventory(null, InventoryType.ANVIL)
-            : Bukkit.createInventory(null, InventoryType.ANVIL, TextPipeline.menuText(viewer, request.label()));
+        AnvilView view = MenuType.ANVIL.create(viewer, request.label().isBlank()
+            ? null : TextPipeline.menuText(viewer, request.label()));
+        AnvilInventory anvil = view.getTopInventory();
         ItemStack input = new ItemStack(Material.PAPER);
         ItemMeta meta = input.getItemMeta();
         meta.setDisplayName(request.initial());
@@ -82,7 +83,7 @@ public final class AnvilPrompt implements Listener {
         anvil.setItem(0, input);
         typed.put(viewer.getUniqueId(), request.initial());
         inventories.put(viewer.getUniqueId(), anvil);
-        viewer.openInventory(anvil);
+        viewer.openInventory(view);
         FoliaScheduler.runEntity(plugin, viewer, () -> service.timeout(viewer, request), request.timeoutTicks());
         return true;
     }
@@ -90,12 +91,16 @@ public final class AnvilPrompt implements Listener {
     @EventHandler(priority = EventPriority.MONITOR)
     public void onPrepare(PrepareAnvilEvent event) {
         if (!(event.getView().getPlayer() instanceof Player viewer)
-            || service.pending(viewer.getUniqueId()) == null) {
+            || inventories.get(viewer.getUniqueId()) != event.getInventory()
+            || !owns(service.pending(viewer.getUniqueId()))) {
             return;
         }
         String text = renameText(event.getView(), event.getInventory());
         if (text != null) {
             typed.put(viewer.getUniqueId(), text);
+        }
+        if (event.getView() instanceof AnvilView view) {
+            view.setRepairCost(0);
         }
     }
 
@@ -115,7 +120,11 @@ public final class AnvilPrompt implements Listener {
         if (event.getRawSlot() != RESULT_SLOT) {
             return;
         }
-        String answer = typed.remove(viewer.getUniqueId());
+        String answer = renameText(event.getView(), event.getInventory());
+        String cached = typed.remove(viewer.getUniqueId());
+        if (answer == null) {
+            answer = cached;
+        }
         answering.add(viewer.getUniqueId());
         try {
             viewer.closeInventory();
@@ -172,23 +181,12 @@ public final class AnvilPrompt implements Listener {
      * null when neither does, which is what an unmodified anvil with no typed text looks like.
      */
     public static String renameText(InventoryView view, Inventory inventory) {
-        String fromView = reflectiveRenameText(view);
-        if (fromView != null) {
-            return fromView;
+        if (view instanceof AnvilView anvilView) {
+            String text = anvilView.getRenameText();
+            if (text != null) {
+                return text;
+            }
         }
         return inventory instanceof AnvilInventory anvil ? anvil.getRenameText() : null;
-    }
-
-    private static String reflectiveRenameText(Object view) {
-        if (view == null) {
-            return null;
-        }
-        try {
-            Method getter = view.getClass().getMethod("getRenameText");
-            Object value = getter.invoke(view);
-            return value instanceof String text ? text : null;
-        } catch (ReflectiveOperationException | RuntimeException | LinkageError absent) {
-            return null;
-        }
     }
 }

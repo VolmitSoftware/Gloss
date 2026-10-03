@@ -42,6 +42,7 @@ public final class TextPipeline implements TextRenderer {
     private final ServerTickSampler serverTicks;
     private final TextExpressionRenderer expressions;
     private volatile UnaryOperator<String> emojiFilter;
+    private volatile BiFunction<Player, String, String> viewerChatEmojiFilter;
     private volatile BiFunction<Player, String, String> viewerEmojiFilter;
 
     public TextPipeline(Gloss plugin) {
@@ -62,6 +63,7 @@ public final class TextPipeline implements TextRenderer {
         failedFunctions.clear();
         emojiFilter = null;
         viewerEmojiFilter = null;
+        viewerChatEmojiFilter = null;
         serverTicks.disable();
         expressions.clear();
         renderGeneration.incrementAndGet();
@@ -356,6 +358,13 @@ public final class TextPipeline implements TextRenderer {
         return out;
     }
 
+    public String chatEmoji(Player sender, String message) {
+        if (sender == null || message == null || message.isEmpty()) {
+            return message == null ? "" : message;
+        }
+        return renderChat(sender, message, viewerChatEmojiFilter, plugin.cfg().emoji().enabled(), false);
+    }
+
     @Override
     public void registerFunction(String name, Function<Player, String> resolver) {
         if (name == null || name.isEmpty() || resolver == null) {
@@ -391,6 +400,10 @@ public final class TextPipeline implements TextRenderer {
     public void setViewerEmojiFilter(BiFunction<Player, String, String> filter) {
         viewerEmojiFilter = filter;
         renderGeneration.incrementAndGet();
+    }
+
+    public void setViewerChatEmojiFilter(BiFunction<Player, String, String> filter) {
+        viewerChatEmojiFilter = filter;
     }
 
     private boolean functionsEnabled() {

@@ -22,6 +22,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Routes a request for typed text to whichever editor the author asked for and delivers the answer
@@ -97,7 +98,7 @@ public final class PromptService implements GlossService, Listener {
             default -> sign.open(viewer, request);
         };
         if (!opened) {
-            pending.remove(viewer.getUniqueId(), request);
+            remove(viewer.getUniqueId(), request);
         }
         if (opened && !request.label().isBlank() && !PromptRequest.ANVIL.equals(request.kind())) {
             ComponentMessenger.send(viewer, ComponentText.component(
@@ -113,7 +114,7 @@ public final class PromptService implements GlossService, Listener {
 
     /** Delivers a completed answer: the session variable is written, then {@code then} runs. */
     public void complete(Player viewer, PromptRequest request, String value) {
-        if (viewer == null || request == null || !pending.remove(viewer.getUniqueId(), request)) {
+        if (viewer == null || request == null || !remove(viewer.getUniqueId(), request)) {
             return;
         }
         SessionVariables variables = request.origin() == null ? null : request.origin().sessionVariables();
@@ -129,7 +130,7 @@ public final class PromptService implements GlossService, Listener {
 
     /** Drops a request the player never answered and tells them why nothing happened. */
     public void timeout(Player viewer, PromptRequest request) {
-        if (viewer == null || request == null || !pending.remove(viewer.getUniqueId(), request)) {
+        if (viewer == null || request == null || !remove(viewer.getUniqueId(), request)) {
             return;
         }
         release(viewer.getUniqueId(), request);
@@ -153,12 +154,32 @@ public final class PromptService implements GlossService, Listener {
         cancel(event.getPlayer().getUniqueId());
     }
 
+    void cancel(UUID viewer, PromptRequest request) {
+        if (remove(viewer, request)) {
+            release(viewer, request);
+        }
+    }
+
+    private boolean remove(UUID viewer, PromptRequest request) {
+        AtomicBoolean removed = new AtomicBoolean();
+        pending.computeIfPresent(viewer, (id, current) -> {
+            if (current != request) {
+                return current;
+            }
+            removed.set(true);
+            return null;
+        });
+        return removed.get();
+    }
+
     /** Lets go of whatever the editor holds outside {@code pending}. */
     private void release(UUID viewer, PromptRequest request) {
         if (PromptRequest.CHAT.equals(request.kind())) {
             ChatCapture.release(viewer);
         } else if (PromptRequest.ANVIL.equals(request.kind())) {
             anvil.release(viewer);
+        } else {
+            sign.release(viewer, request);
         }
     }
 

@@ -5,6 +5,7 @@ import art.arcane.gloss.api.HoloClickTrigger;
 import art.arcane.gloss.GlossConfig;
 import art.arcane.gloss.api.internal.ApiMenuHandle;
 import art.arcane.gloss.config.MenuComponentData;
+import art.arcane.gloss.expr.ExprScope;
 import art.arcane.gloss.config.MenuDefinitionData;
 import art.arcane.gloss.condition.ShowCondition;
 import art.arcane.gloss.menu.action.ActionContext;
@@ -46,6 +47,7 @@ public class MenuSession {
   private final ShowCondition show;
 
   private Map<String, MenuComponent<?>> componentsById;
+  private Map<String, ExprScope> componentScopes = Map.of();
 
   private final ApiMenuHandle apiHandle;
   private final MenuSessionOptions options;
@@ -94,11 +96,16 @@ public class MenuSession {
   }
 
   private void rebuildComponents(List<MenuComponentData> declaredComponents, List<ParticleLayer> layers) {
-    List<MenuComponentData> declared = MenuComponentExpansion.expand(declaredComponents,
+    List<ExpandedMenuComponent> declared = MenuComponentExpansion.expand(declaredComponents,
         new SessionScope(player, variables));
     Map<String, MenuComponent<?>> uniqueComponents = new LinkedHashMap<>(declared.size());
-    for (MenuComponentData componentData : declared) {
-      MenuComponent<?> component = componentData.createComponent(this);
+    Map<String, ExprScope> scopes = new LinkedHashMap<>(declared.size());
+    for (ExpandedMenuComponent expanded : declared) {
+      scopes.putIfAbsent(expanded.data().id(), expanded.scope());
+    }
+    this.componentScopes = Map.copyOf(scopes);
+    for (ExpandedMenuComponent expanded : declared) {
+      MenuComponent<?> component = expanded.data().createComponent(this);
       if (component == null) {
         continue;
       }
@@ -142,6 +149,11 @@ public class MenuSession {
     rebuildComponents(next == null ? definition.getComponents() : next.components(),
         next == null || next.particleLayers() == null ? definition.getParticleLayers() : next.particleLayers());
     selectedVariant = next;
+  }
+
+  public ExprScope componentScope(String componentId) {
+    ExprScope scope = componentScopes.get(componentId);
+    return scope == null ? new SessionScope(player, variables) : scope;
   }
 
   public String getId() {

@@ -1,0 +1,92 @@
+{
+  "show": true,
+  "schemaVersion": 4,
+  "revision": 1,
+  "limits": {
+    "maxPerSecond": 40,
+    "lifetimeMs": 3000,
+    "minimumDelta": 0.009,
+    "decimals": 0,
+    "viewRange": 48,
+    "debounceMs": 150
+  },
+  "damage": {
+    "when": "true",
+    "presentation": {
+      "format": "&c-{amount} &7{cause}",
+      "offset": [
+        0.0,
+        0.7,
+        0.0
+      ],
+      "motion": {
+        "horizontalSpeed": 0.8,
+        "verticalSpeed": 1.3,
+        "verticalAcceleration": -0.93,
+        "spinDegreesPerSecond": 0.0
+      },
+      "transform": {
+        "startScale": 1.0,
+        "endScale": 0.82,
+        "fadeStartFraction": 0.68
+      },
+      "particleLayers": [],
+      "style": {
+        "billboard": "center",
+        "seeThrough": true,
+        "scaleX": 1.0,
+        "scaleY": 1.0,
+        "scaleZ": 1.0
+      },
+      "box": {
+        "enabled": false,
+        "padding": 4,
+        "borderWidth": 1,
+        "backgroundArgb": "#B31B1B22",
+        "borderArgb": "#FFAAAAAA"
+      }
+    },
+    "variants": []
+  },
+  "healing": {
+    "when": "true",
+    "presentation": {
+      "format": "&a+{amount} &7{target}",
+      "offset": [
+        0.0,
+        -0.1,
+        0.0
+      ],
+      "motion": {
+        "horizontalSpeed": 0.45,
+        "verticalSpeed": 0.65,
+        "verticalAcceleration": 0.05,
+        "spinDegreesPerSecond": 0.0
+      },
+      "transform": {
+        "startScale": 1.0,
+        "endScale": 1.1,
+        "fadeStartFraction": 0.62
+      },
+      "particleLayers": [],
+      "style": {
+        "billboard": "center",
+        "seeThrough": true,
+        "scaleX": 1.0,
+        "scaleY": 1.0,
+        "scaleZ": 1.0
+      },
+      "box": {
+        "enabled": false,
+        "padding": 4,
+        "borderWidth": 1,
+        "backgroundArgb": "#B31B1B22",
+        "borderArgb": "#FFAAAAAA"
+      }
+    },
+    "variants": []
+  },
+  "audience": {
+    "when": "hasPermission('viewer', 'gloss.indicators.show')"
+  }
+}

@@ -11,6 +11,8 @@ import com.github.retrooper.packetevents.manager.server.ServerVersion;
 import com.github.retrooper.packetevents.netty.NettyManager;
 import com.github.retrooper.packetevents.protocol.entity.data.EntityData;
 import com.github.retrooper.packetevents.protocol.entity.type.EntityType;
+import com.github.retrooper.packetevents.protocol.entity.type.EntityTypes;
+import com.github.retrooper.packetevents.protocol.attribute.Attributes;
 import com.github.retrooper.packetevents.wrapper.PacketWrapper;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerDestroyEntities;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityHeadLook;
@@ -18,6 +20,7 @@ import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEn
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityTeleport;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerSpawnEntity;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerTeams;
+import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerUpdateAttributes;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Location;
 import org.bukkit.util.Vector;
@@ -36,6 +39,7 @@ import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.assertThrows;
 
 @RunWith(Parameterized.class)
 public class DisplayEntityMetadataTest {
@@ -101,6 +105,30 @@ public class DisplayEntityMetadataTest {
     List<Integer> indexes = metadata.getEntityMetadata().stream().map(EntityData::getIndex).toList();
 
     assertEquals(List.of(0, 5), indexes);
+  }
+
+  @Test
+  public void livingEntityScaleUsesNativeAttributesAfterSpawn() {
+    DisplayEntity entity = DisplayEntity.Builder.entity(EntityTypes.CHICKEN, new Location(null, 1D, 2D, 3D))
+        .rawScale(1.5D);
+    List<PacketWrapper<?>> packets = entity.spawn();
+    WrapperPlayServerUpdateAttributes attributes = (WrapperPlayServerUpdateAttributes) packets.getLast();
+
+    assertEquals(entity.id(), attributes.getEntityId());
+    assertEquals(1, attributes.getProperties().size());
+    assertSame(Attributes.SCALE, attributes.getProperties().getFirst().getAttribute());
+    assertEquals(1.5D, attributes.getProperties().getFirst().getValue(), 0D);
+    assertEquals(List.of(0, 5), ((WrapperPlayServerEntityMetadata) packets.get(2)).getEntityMetadata()
+        .stream().map(EntityData::getIndex).toList());
+  }
+
+  @Test
+  public void nativeScaleClampsLivingEntitiesAndRejectsNonlivingMultipliers() {
+    assertEquals(0.0625D, RawEntityDimensions.normalizedScale(EntityTypes.CHICKEN, 0.01D), 0D);
+    assertEquals(16D, RawEntityDimensions.normalizedScale(EntityTypes.ZOMBIE, 64D), 0D);
+    assertEquals(1D, RawEntityDimensions.normalizedScale(EntityTypes.BOAT, 1D), 0D);
+    assertThrows(IllegalArgumentException.class, () -> RawEntityDimensions.normalizedScale(EntityTypes.BOAT, 2D));
+    assertThrows(IllegalArgumentException.class, () -> RawEntityDimensions.normalizedScale(EntityTypes.CHICKEN, Double.NaN));
   }
 
   @Test

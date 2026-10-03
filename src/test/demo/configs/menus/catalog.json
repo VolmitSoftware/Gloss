@@ -1,0 +1,100 @@
+{
+  "offset": [
+    0,
+    1.6,
+    3
+  ],
+  "lockPosition": true,
+  "components": [
+    {
+      "id": "heading",
+      "offset": [
+        0,
+        0.8,
+        0
+      ],
+      "data": {
+        "type": "decoration",
+        "icon": {
+          "type": "text",
+          "text": "&6&lMenu catalog"
+        }
+      }
+    },
+    {
+      "id": "tabs",
+      "offset": [
+        -0.5,
+        0.35,
+        0
+      ],
+      "data": {
+        "type": "tabs",
+        "var": "category",
+        "spacing": 1,
+        "tabs": [
+          {
+            "id": "tools",
+            "label": "&aTools"
+          },
+          {
+            "id": "blocks",
+            "label": "&fBlocks"
+          }
+        ]
+      }
+    },
+    {
+      "id": "list",
+      "offset": [
+        -1,
+        -0.15,
+        0
+      ],
+      "show": "session.category == 'tools'",
+      "data": {
+        "type": "list",
+        "var": "entry",
+        "source": "['Sword','Pickaxe','Bow']",
+        "pageSize": 3,
+        "flow": {
+          "columns": 3,
+          "spacingX": 1,
+          "spacingY": 0.5
+        },
+        "template": {
+          "type": "button",
+          "icon": {
+            "type": "text",
+            "text": "&f{{ entry }}"
+          },
+          "actions": [
+            {
+              "type": "message",
+              "message": "&aSelected {{ entry }}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "blocks",
+      "offset": [
+        0,
+        -0.15,
+        0
+      ],
+      "show": "session.category == 'blocks'",
+      "data": {
+        "type": "decoration",
+        "icon": {
+          "type": "item",
+          "item": "minecraft:amethyst_block"
+        }
+      }
+    }
+  ],
+  "vars": {
+    "category": "'tools'"
+  }
+}

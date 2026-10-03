@@ -34,7 +34,7 @@ class ChatMentionsTest {
     @Test
     void aSenderWithoutTheMentionPermissionHighlightsNothing() {
         ChatBody.Body body = ChatBody.render(CHANNEL, "hello @Steve",
-            new ChatBody.Context(null, "Steve", "", false, true, true, true, null));
+            new ChatBody.Context(null, null, "Steve", "", false, true, true, true, null));
 
         assertFalse(body.mentioned());
         assertEquals("hello @Steve", body.text());
@@ -89,7 +89,7 @@ class ChatMentionsTest {
 
     @Test
     void decoratedPlayerNamesPreserveTheTaggedMessageColor() {
-        ChatBody.Context context = new ChatBody.Context(null, "Steve", "§r§c[Staff] §fSteve§r",
+        ChatBody.Context context = new ChatBody.Context(null, null, "Steve", "§r§c[Staff] §fSteve§r",
             true, true, true, true, null);
         ChatBody.Body body = ChatBody.render(CHANNEL, "hello @Steve there", context);
         String sender = ChatComponents.scopedMarkup("§r§b[Member] Alex§r");
@@ -101,6 +101,6 @@ class ChatMentionsTest {
     }
 
     private static ChatBody.Context context(String viewerName) {
-        return new ChatBody.Context(null, viewerName, "", true, true, true, true, null);
+        return new ChatBody.Context(null, null, viewerName, "", true, true, true, true, null);
     }
 }

@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 2,
+  "revision": 1,
+  "show": true,
+  "select": {
+    "priority": 100,
+    "when": false
+  },
+  "presentation": {
+    "title": "&6&lGloss showcase",
+    "lines": [
+      "&fViewer: {{ viewer.name }}",
+      "&7Online: {{ server.online }}",
+      "&aHealth: {{ player.health }}",
+      "&f|animation.scanner|"
+    ],
+    "hideNumbers": true
+  },
+  "variants": []
+}

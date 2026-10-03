@@ -10,6 +10,15 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class TextPipelineChatTest {
     @Test
+    void chatEmojiReplacementRequiresBothFeatureAndSenderPermission() {
+        Player allowed = player(Set.of("gloss.emoji.use"));
+        Player denied = player(Set.of());
+        assertEquals("❤", TextPipeline.renderChat(allowed, "<3", (sender, raw) -> raw.replace("<3", "❤"), true, false));
+        assertEquals("<3", TextPipeline.renderChat(denied, "<3", (sender, raw) -> "❤", true, false));
+        assertEquals("<3", TextPipeline.renderChat(allowed, "<3", (sender, raw) -> "❤", false, false));
+    }
+
+    @Test
     void authorizedChatTranslatesSharedColorsWithoutParsingMiniMessage() {
         Player player = player(Set.of("gloss.chat.color"));
 

@@ -8,6 +8,8 @@ import art.arcane.gloss.expr.ExprEvaluator;
 import art.arcane.gloss.expr.ExprParser;
 import art.arcane.gloss.expr.ExprScope;
 import art.arcane.gloss.menu.MenuSession;
+import art.arcane.gloss.menu.ExpandedMenuComponent;
+import art.arcane.gloss.expr.RepeatScope;
 import art.arcane.gloss.menu.icon.MenuIcon;
 import org.bukkit.util.Vector;
 
@@ -33,7 +35,7 @@ public final class ListComponent extends MenuComponent<ListComponentData> {
    * @param page the zero-based page; a page past the end expands to nothing
    * @param cap  the hard ceiling on entries, so a runaway source cannot spawn a runaway menu
    */
-  public static List<MenuComponentData> expand(MenuComponentData data, ExprScope scope, int page, int cap) {
+  public static List<ExpandedMenuComponent> expand(MenuComponentData data, ExprScope scope, int page, int cap) {
     ListComponentData list = (ListComponentData) data.data();
     List<Object> entries = evaluate(data.id(), list, scope);
     if (entries.isEmpty()) {
@@ -46,11 +48,12 @@ public final class ListComponent extends MenuComponent<ListComponentData> {
     }
     int to = Math.min(entries.size(), from + pageSize);
     ListComponentData.Flow flow = list.flow();
-    List<MenuComponentData> expanded = new ArrayList<>(to - from);
+    List<ExpandedMenuComponent> expanded = new ArrayList<>(to - from);
     for (int index = from; index < to; index++) {
       int position = index - from;
-      expanded.add(new MenuComponentData(data.id() + "[" + index + "]",
-          offset(data.offset(), flow, position), list.template(), data.show()));
+      expanded.add(new ExpandedMenuComponent(new MenuComponentData(data.id() + "[" + index + "]",
+          offset(data.offset(), flow, position), list.template(), data.show()),
+          new RepeatScope(scope, list.variable(), entries.get(index))));
     }
     return List.copyOf(expanded);
   }

@@ -2,6 +2,7 @@ package art.arcane.gloss.chat;
 
 import art.arcane.gloss.util.common.TextUtils;
 import net.kyori.adventure.text.minimessage.MiniMessage;
+import net.kyori.adventure.text.event.ClickEvent;
 
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -17,6 +18,7 @@ import java.util.regex.Matcher;
  * which is what makes the same message render differently per recipient.
  */
 public final class ChatBody {
+    private static final MiniMessage INLINE_MARKUP = MiniMessage.builder().strict(true).build();
     private ChatBody() {
     }
 
@@ -26,7 +28,7 @@ public final class ChatBody {
      * @param interactive     false for a viewer whose client has no click or hover (Bedrock)
      * @param item            the sender's held item, or null when the {@code [item]} token is inert
      */
-    public record Context(UnaryOperator<String> escape, String viewerName, String viewerDisplayName, boolean mentionsAllowed,
+    public record Context(UnaryOperator<String> escape, UnaryOperator<String> emoji, String viewerName, String viewerDisplayName, boolean mentionsAllowed,
                           boolean linksAllowed, boolean itemsAllowed, boolean interactive, Item item) {
     }
 
@@ -43,7 +45,7 @@ public final class ChatBody {
         boolean mentioned = false;
         int cursor = 0;
         while (matcher.find()) {
-            output.append(escaped, cursor, matcher.start());
+            output.append(emoji(context, escaped.substring(cursor, matcher.start())));
             cursor = matcher.end();
             if (matcher.group(ChannelRuntime.LINK_GROUP) != null) {
                 output.append(link(channel, context, matcher.group()));
@@ -59,9 +61,13 @@ public final class ChatBody {
                 mentioned = true;
                 continue;
             }
-            output.append(matcher.group());
+            output.append(emoji(context, matcher.group()));
         }
-        return new Body(output.append(escaped, cursor, escaped.length()).toString(), mentioned);
+        return new Body(output.append(emoji(context, escaped.substring(cursor))).toString(), mentioned);
+    }
+
+    private static String emoji(Context context, String text) {
+        return context.emoji() == null ? text : context.emoji().apply(text);
     }
 
     /** The plugin's own MiniMessage escaper, for the Spigot path and for authored sub-templates. */
@@ -96,7 +102,8 @@ public final class ChatBody {
         if (!context.interactive()) {
             return text;
         }
-        return "<click:open_url:'" + argument(url) + "'>" + text + "</click>";
+        return INLINE_MARKUP.serialize(
+            MiniMessage.miniMessage().deserialize(text).clickEvent(ClickEvent.openUrl(url)));
     }
 
     private static String item(ChannelRuntime channel, Context context, String token) {

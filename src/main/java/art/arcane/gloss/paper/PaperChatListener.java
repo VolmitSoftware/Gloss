@@ -9,14 +9,16 @@ import art.arcane.gloss.chat.ChatContext;
 import art.arcane.gloss.chat.ChatDrop;
 import art.arcane.gloss.chat.ChatMessageRenderer;
 import art.arcane.gloss.chat.ChatSink;
+import art.arcane.gloss.chat.ChatDispatch;
 import io.papermc.paper.event.player.AsyncChatEvent;
+import art.arcane.volmlib.util.scheduling.FoliaScheduler;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 
 import java.lang.reflect.Method;
-import java.util.HashMap;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -55,6 +57,12 @@ public final class PaperChatListener implements Listener {
             return;
         }
         PaperChatSink sink = new PaperChatSink(channels, sender);
+        if (channels.needsItemSnapshot(sender, plain) && !FoliaScheduler.isOwnedByCurrentRegion(sender)) {
+            sink.deferTo(event.viewers());
+            event.setCancelled(true);
+            channels.dispatchDeferred(sender, plain, sink);
+            return;
+        }
         if (!channels.dispatch(sender, plain, sink)) {
             event.setCancelled(sink.reason != ChatDrop.NO_CHANNEL);
             return;
@@ -126,15 +134,37 @@ public final class PaperChatListener implements Listener {
     private final class PaperChatSink implements ChatSink {
         private final ChannelService channels;
         private final Player sender;
-        private final Map<UUID, String> rendered = new HashMap<>();
+        private final Map<UUID, String> rendered = new ConcurrentHashMap<>();
         private ChannelRuntime channel;
         private String message;
         private List<Player> viewers = List.of();
+        private ChatContext context = ChatContext.PLAIN;
+        private List<?> deferredAudiences;
         private ChatDrop reason;
 
         private PaperChatSink(ChannelService channels, Player sender) {
             this.channels = channels;
             this.sender = sender;
+        }
+
+        private void deferTo(Set<?> audiences) {
+            deferredAudiences = List.copyOf(audiences);
+        }
+
+        private void deliverDeferred(ChatDispatch dispatch) {
+            Set<UUID> allowed = new HashSet<>(viewers.size());
+            for (Player viewer : viewers) {
+                allowed.add(viewer.getUniqueId());
+            }
+            for (Object audience : deferredAudiences) {
+                if (audience instanceof Player viewer) {
+                    if (allowed.contains(viewer.getUniqueId())) {
+                        channels.deliverDeferred(dispatch, sender, viewer);
+                    }
+                } else {
+                    ServerAdventure.sendMarkup(audience, sharedRender());
+                }
+            }
         }
 
         @Override
@@ -143,10 +173,14 @@ public final class PaperChatListener implements Listener {
         }
 
         @Override
-        public void audience(ChannelRuntime channel, String message, List<Player> viewers) {
-            this.channel = channel;
-            this.message = message;
-            this.viewers = viewers;
+        public void audience(ChatDispatch dispatch) {
+            this.channel = dispatch.channel();
+            this.message = dispatch.message();
+            this.viewers = dispatch.viewers();
+            this.context = dispatch.context();
+            if (deferredAudiences != null) {
+                deliverDeferred(dispatch);
+            }
         }
 
         private String renderFor(Object audience) {
@@ -158,7 +192,7 @@ public final class PaperChatListener implements Listener {
 
         private String renderViewer(Player viewer) {
             ChatMessageRenderer.Rendered result = channels.render(channel, sender, viewer, message,
-                new ChatContext(ServerAdventure::escape, null, null));
+                new ChatContext(ServerAdventure::escape, context.item(), null));
             if (result.mentioned()) {
                 channels.playMentionCue(result, viewer);
             }
@@ -168,7 +202,7 @@ public final class PaperChatListener implements Listener {
         /** A console or plugin audience reads the sender's own render. */
         private String sharedRender() {
             return channels.render(channel, sender, sender, message,
-                new ChatContext(ServerAdventure::escape, null, null)).miniMessage();
+                new ChatContext(ServerAdventure::escape, context.item(), null)).miniMessage();
         }
     }
 }

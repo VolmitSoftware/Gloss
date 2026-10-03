@@ -193,12 +193,12 @@ public final class NametagService implements GlossService, Listener {
 
     private void loadAll() {
         registry.reload();
-        rebuildRuntimes();
+        rebuildRuntimes(registry.snapshot());
     }
 
-    private void rebuildRuntimes() {
+    private void rebuildRuntimes(Map<String, GlossDocument<NametagDoc>> snapshot) {
         List<NametagRuntime> compiled = new ArrayList<>();
-        for (GlossDocument<NametagDoc> document : registry.snapshot().values()) {
+        for (GlossDocument<NametagDoc> document : snapshot.values()) {
             try {
                 compiled.add(NametagRuntime.compile(document.id(), document.value()));
             } catch (RuntimeException failure) {
@@ -234,7 +234,7 @@ public final class NametagService implements GlossService, Listener {
         for (Player viewer : Bukkit.getOnlinePlayers()) {
             driver.releaseAll(viewer);
         }
-        rebuildRuntimes();
+        rebuildRuntimes(registry.snapshot(delta));
     }
 
     private void pass() {

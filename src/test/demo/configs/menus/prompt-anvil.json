@@ -1,0 +1,45 @@
+{
+  "offset": [
+    0,
+    1.6,
+    3
+  ],
+  "lockPosition": true,
+  "components": [
+    {
+      "id": "action",
+      "offset": [
+        0,
+        0.2,
+        0
+      ],
+      "data": {
+        "type": "button",
+        "icon": {
+          "type": "text",
+          "text": "&6Name the garden",
+          "style": {
+            "scaleX": 0.8,
+            "scaleY": 0.8,
+            "scaleZ": 0.8
+          }
+        },
+        "actions": [
+          {
+            "type": "prompt",
+            "kind": "anvil",
+            "label": "Garden name",
+            "initial": "Garden",
+            "var": "answer",
+            "then": [
+              {
+                "type": "message",
+                "message": "&aSaved {{ input.value }}"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -8,6 +8,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Predicate;
+import java.util.function.UnaryOperator;
 
 public final class EmojiReplacer {
     private static final int[] NO_CANDIDATES = new int[0];
@@ -97,6 +98,11 @@ public final class EmojiReplacer {
      * the candidates are recomputed for the entries that have not run yet.
      */
     public String apply(String message, Predicate<String> idAllowed, Predicate<ShowCondition> visible) {
+        return apply(message, idAllowed, visible, UnaryOperator.identity());
+    }
+
+    public String apply(String message, Predicate<String> idAllowed, Predicate<ShowCondition> visible,
+                        UnaryOperator<String> renderReplacement) {
         if (message == null || message.isEmpty() || ids.length == 0) {
             return message == null ? "" : message;
         }
@@ -118,11 +124,12 @@ public final class EmojiReplacer {
                 continue;
             }
 
+            String replacement = renderReplacement.apply(values[entry]);
             if (hasTrigger) {
-                out = EmojiTriggers.replace(out, trigger, values[entry]);
+                out = EmojiTriggers.replace(out, trigger, replacement);
             }
             if (hasToken) {
-                out = out.replace(tokens[entry], values[entry]);
+                out = out.replace(tokens[entry], replacement);
             }
             candidates = candidates(out, entry + 1);
             position = 0;

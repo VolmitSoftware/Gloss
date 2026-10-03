@@ -1,0 +1,61 @@
+{
+  "show": true,
+  "schemaVersion": 5,
+  "revision": 1,
+  "prefix": "&7",
+  "offset": [
+    0,
+    1.2,
+    0
+  ],
+  "wordWrapChars": 32,
+  "maxAliveMs": 5000,
+  "followPlayer": true,
+  "hideOwn": true,
+  "motion": {
+    "translation": {
+      "x": "0",
+      "y": "10 * pow(clamp((ageMs - lifetimeMs + 2000) / 2000, 0, 1), 16)",
+      "z": "0"
+    },
+    "scale": {
+      "x": "1",
+      "y": "1",
+      "z": "1"
+    },
+    "rotation": {
+      "x": "0",
+      "y": "0",
+      "z": "0"
+    },
+    "opacity": "1"
+  },
+  "shimmer": {
+    "spawn": true,
+    "flyAway": true,
+    "color": "#ffffff",
+    "width": 3,
+    "durationMs": 700,
+    "spawnDelayMs": 400,
+    "flyAwayLeadMs": 700
+  },
+  "particleLayers": [],
+  "style": {
+    "billboard": "center",
+    "seeThrough": true,
+    "scaleX": 1.0,
+    "scaleY": 1.0,
+    "scaleZ": 1.0
+  },
+  "box": {
+    "enabled": false,
+    "padding": 4,
+    "borderWidth": 1,
+    "backgroundArgb": "#B31B1B22",
+    "borderArgb": "#FFAAAAAA"
+  },
+  "stackDistance": 0.26,
+  "blacklistWorlds": [],
+  "maxPerSender": 4,
+  "format": "{message}"
+}

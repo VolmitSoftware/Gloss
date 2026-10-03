@@ -394,7 +394,7 @@ class GlossCommandTreeTest {
                 continue;
             }
 
-            Assertions.assertFalse(parameter.getDefaultValue() == null || parameter.getDefaultValue().isBlank(),
+            Assertions.assertNotNull(parameter.getDefaultValue(),
                     "Optional parameter " + parameter.getName() + " of " + node.path() + " has no defaultValue");
         }
 

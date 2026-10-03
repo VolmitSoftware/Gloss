@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "revision": 1,
+  "materials": {
+    "jack_o_lantern": "Jack o'Lantern",
+    "diamond": "Garden Gem"
+  },
+  "entities": {
+    "pig": "Garden Pig"
+  },
+  "worlds": {},
+  "gameModes": {},
+  "dimensions": {
+    "overworld": "Overworld",
+    "the_nether": "The Nether",
+    "the_end": "The End"
+  },
+  "damageCauses": {
+    "custom": "Garden Impact"
+  },
+  "effects": {},
+  "groups": {}
+}

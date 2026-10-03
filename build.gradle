@@ -23,7 +23,7 @@ plugins {
 apply plugin: 'art.arcane.volmit-packaging'
 
 group = 'art.arcane'
-version = '3.1.0-26.2'
+version = '3.2.0-26.2'
 def apiVersion = '26.1'
 def main = 'art.arcane.gloss.Gloss'
 def lib = 'art.arcane.gloss.libs'
@@ -310,6 +310,7 @@ dependencies {
     slim(libs.adventure.nbt)
     slim(libs.adventure.legacy)
     slim(libs.adventure.plain)
+    slim(libs.adventure.gson)
     slim(libs.commons.io)
     slim(libs.commons.imaging)
     slim(libs.toml4j) {
@@ -476,6 +477,17 @@ tasks.register('verifyPlatformPackaging') {
     dependsOn(universalJarTask)
     inputs.file(universalJarTask.flatMap { it.archiveFile })
     doLast {
+        List<java.net.URL> runtimeLibraries = configurations.slim.files.collect { File dependency -> dependency.toURI().toURL() }
+        new java.net.URLClassLoader(runtimeLibraries.toArray(new java.net.URL[0]), ClassLoader.getPlatformClassLoader()).withCloseable { java.net.URLClassLoader loader ->
+            Class<?> serializerType = loader.loadClass('net.kyori.adventure.text.serializer.gson.GsonComponentSerializer')
+            Object serializer = serializerType.getMethod('gson').invoke(null)
+            java.lang.reflect.Method deserialize = serializerType.methods.find { java.lang.reflect.Method method ->
+                method.name == 'deserialize' && method.parameterCount == 1 && method.parameterTypes[0].isAssignableFrom(String)
+            }
+            if (deserialize == null || deserialize.invoke(serializer, '{"text":"Gloss chat"}') == null) {
+                throw new GradleException('Declared Gloss chat libraries must deserialize native component JSON')
+            }
+        }
         File artifact = universalJarTask.get().archiveFile.get().asFile
         new java.util.jar.JarFile(artifact).withCloseable { java.util.jar.JarFile archive ->
             Map descriptor = new groovy.json.JsonSlurper().parse(archive.getInputStream(archive.getJarEntry('velocity-plugin.json')))
@@ -504,11 +516,19 @@ tasks.register('verifyPlatformPackaging') {
                 if (contents.contains('com.github.retrooper')) {
                     throw new GradleException("Gloss must not download PacketEvents at runtime: ${manifest}")
                 }
+                if (manifest == 'slimjar.dat' && (!contents.contains('adventure-text-serializer-gson')
+                        || !contents.contains('art.arcane.gloss.libs.kyori'))) {
+                    throw new GradleException('Gloss chat must declare its relocated Adventure Gson serializer')
+                }
             }
             for (String mapping : ['assets/mappings/data/block_state/V_26_2.nbt', 'assets/mappings/registries/item.nbt']) {
                 if (archive.getJarEntry(mapping) == null) {
                     throw new GradleException("Gloss must bundle PacketEvents mappings: ${mapping}")
                 }
+            }
+            String chat = new String(archive.getInputStream(archive.getJarEntry('art/arcane/gloss/chat/ChatComponents.class')).readAllBytes(), java.nio.charset.StandardCharsets.ISO_8859_1)
+            if (!chat.contains('art/arcane/gloss/libs/kyori/adventure/text/serializer/gson/GsonComponentSerializer')) {
+                throw new GradleException('Gloss chat must link its declared relocated Gson serializer')
             }
             String scoreboard = new String(archive.getInputStream(archive.getJarEntry('art/arcane/gloss/velocity/ProxyScoreboards.class')).readAllBytes(), java.nio.charset.StandardCharsets.ISO_8859_1)
             for (String reference : ['art/arcane/gloss/velocity/libs/packetevents/api/PacketEvents', 'net/kyori/adventure/text/Component']) {

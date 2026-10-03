@@ -66,7 +66,7 @@ public abstract class MenuIcon<D extends MenuIconData> {
       else if (data instanceof TextImageIconData d)
         return new TextImageMenuIcon(session, loc, d);
       else if (data instanceof TextIconData d)
-        return new TextMenuIcon(session, loc, d);
+        return new TextMenuIcon(session, loc, d, session.componentScope(component == null ? "" : component.getId()));
       else if (data instanceof AnimatedImageData d)
         return new AnimatedTextImageMenuIcon(session, loc, d);
       else if (data instanceof EntityIconData d)
