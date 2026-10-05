@@ -49,6 +49,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Function;
 
 final class RealDropService {
     private static final float DEG_TO_RAD = (float) (Math.PI / 180.0D);
@@ -278,6 +279,8 @@ final class RealDropService {
                 state.label = spawnLabel(state, label, config);
                 state.labelText = label.text();
                 state.labelAuthoredText = label.authoredText();
+                state.labelRenderer = label.renderer();
+                state.labelPersonalized = label.personalized();
                 state.labelReserved = labelVisualCount(config.labels().box());
             }
             item.getPersistentDataContainer().set(markerKey, PersistentDataType.BOOLEAN, true);
@@ -496,6 +499,8 @@ final class RealDropService {
                 state.label = null;
                 state.labelText = "";
                 state.labelAuthoredText = "";
+                state.labelRenderer = null;
+                state.labelPersonalized = false;
                 release(state.chunkKey, state.labelReserved);
                 state.reserved -= state.labelReserved;
                 state.labelReserved = 0;
@@ -514,14 +519,19 @@ final class RealDropService {
             state.label = spawnLabel(state, label, config);
             state.labelText = label.text();
             state.labelAuthoredText = label.authoredText();
+            state.labelRenderer = label.renderer();
+            state.labelPersonalized = label.personalized();
             return;
         }
         String text = label.text();
-        if (!text.equals(state.labelText) || !label.authoredText().equals(state.labelAuthoredText)) {
+        if (!text.equals(state.labelText) || !label.authoredText().equals(state.labelAuthoredText)
+            || label.renderer() != state.labelRenderer) {
             DropNameService.applyLabelText(state.label, label);
             state.labelText = text;
         }
         state.labelAuthoredText = label.authoredText();
+        state.labelRenderer = label.renderer();
+        state.labelPersonalized = label.personalized();
     }
 
     private void tick(State state) {
@@ -1275,7 +1285,8 @@ final class RealDropService {
         Location labelOrigin = itemOrigin.clone().add(0.0D, config.labels().yOffset(), 0.0D);
         ParticleEmission emission = new ParticleEmission(state, itemOrigin, labelOrigin,
             state.labelAuthoredText, state.labelText, hasLabel, config, tick,
-            TextPipeline.viewerSpecific(state.labelAuthoredText), new AtomicReference<>());
+            state.labelPersonalized || TextPipeline.viewerSpecific(state.labelAuthoredText),
+            state.labelRenderer, new AtomicReference<>());
         double range = 0.0D;
         for (ParticleLayer layer : config.particleLayers()) {
             range = Math.max(range, layer.viewDistance());
@@ -1302,7 +1313,7 @@ final class RealDropService {
         if (shared != null) {
             return shared;
         }
-        ParticleText.Rendered label = emission.authoredLabel().isEmpty()
+        ParticleText.Rendered label = emission.renderer() != null ? DropNameService.particleText(emission.renderer().apply(null)) : emission.authoredLabel().isEmpty()
             ? new ParticleText.Rendered(emission.renderedLabel(), List.of())
             : plugin.text().renderLegacyParticleText(null, emission.authoredLabel());
         shared = new ParticleLabel(label, particleTargets(emission, label));
@@ -1339,7 +1350,9 @@ final class RealDropService {
         }
         ParticleLabel shared = emission.viewerText() ? null : sharedParticleLabel(emission);
         ParticleText.Rendered label = shared == null
-            ? plugin.text().renderLegacyParticleText(viewer, emission.authoredLabel())
+            ? emission.renderer() == null
+                ? plugin.text().renderLegacyParticleText(viewer, emission.authoredLabel())
+                : DropNameService.particleText(emission.renderer().apply(viewer))
             : shared.label();
         Location origin = labelScope ? emission.labelOrigin() : emission.itemOrigin();
         ParticleFrame frame = labelScope
@@ -1852,18 +1865,19 @@ final class RealDropService {
         return false;
     }
 
-    record Label(List<String> authoredLines, List<String> lines) {
+    record Label(List<String> authoredLines, List<String> lines,
+                 Function<Player, TemporaryHologram.RenderedText> renderer, boolean personalized) {
         Label {
             authoredLines = authoredLines == null ? List.of() : List.copyOf(authoredLines);
             lines = lines == null ? List.of() : List.copyOf(lines);
         }
 
         static Label none() {
-            return new Label(List.of(), List.of());
+            return new Label(List.of(), List.of(), null, false);
         }
 
         static Label rendered(String text) {
-            return text == null || text.isEmpty() ? none() : new Label(List.of(), List.of(text));
+            return text == null || text.isEmpty() ? none() : new Label(List.of(), List.of(text), null, false);
         }
 
         String text() {
@@ -1898,6 +1912,8 @@ final class RealDropService {
         private int labelReserved;
         private String labelText = "";
         private String labelAuthoredText = "";
+        private Function<Player, TemporaryHologram.RenderedText> labelRenderer;
+        private boolean labelPersonalized;
         private RealDropModel.ModelKind modelKind;
         private RealDropAnimationState animation;
         private RealDropAnimationPlan.AnimationSample authoredSample;
@@ -1978,6 +1994,7 @@ final class RealDropService {
     private record ParticleEmission(State state, Location itemOrigin, Location labelOrigin,
                                     String authoredLabel, String renderedLabel, boolean hasLabel,
                                     GlossConfig.RealDrops config, long tick, boolean viewerText,
+                                    Function<Player, TemporaryHologram.RenderedText> renderer,
                                     AtomicReference<ParticleLabel> shared) {
     }
 

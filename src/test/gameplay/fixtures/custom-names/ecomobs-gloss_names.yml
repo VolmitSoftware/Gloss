@@ -1,0 +1,4 @@
+mob: cow health:40
+category: common
+display-name: '&aMeadow Keeper &f%health%/%max_health%'
+effects: {}

@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.function.UnaryOperator;
 import java.util.Map;
 import java.util.function.IntFunction;
 
@@ -21,7 +22,7 @@ class DropNameFormatterTest {
     }
 
     private static String bundle(List<DropNameFormatter.BundleContent> contents, int entryLimit) {
-        return DropNameFormatter.formatBundle(RealDropSettingsDoc.BUNDLE_FORMAT_DEFAULT, contents, entryLimit, MORE);
+        return DropNameFormatter.formatBundle(RealDropSettingsDoc.BUNDLE_FORMAT_DEFAULT, contents, entryLimit, MORE, UnaryOperator.identity());
     }
 
     @Test
@@ -114,7 +115,7 @@ class DropNameFormatterTest {
     @Test
     void formatBundleSupportsRepeatedAndUnknownTokens() {
         assertEquals("{other} 5 5x stone 5",
-            DropNameFormatter.formatBundle("{other} {total} {contents} {total}", List.of(content("stone", 5)), 3, MORE));
+            DropNameFormatter.formatBundle("{other} {total} {contents} {total}", List.of(content("stone", 5)), 3, MORE, UnaryOperator.identity()));
     }
 
     @Test
@@ -127,7 +128,7 @@ class DropNameFormatterTest {
             remaining -> {
                 observed.add(remaining);
                 return "+" + remaining + " more";
-            });
+            }, UnaryOperator.identity());
 
         assertEquals(List.of(2), observed);
     }
@@ -150,13 +151,13 @@ class DropNameFormatterTest {
                     content("oak log", 2),
                     content("sand", 1)
                 ),
-                2));
+                2, UnaryOperator.identity()));
     }
 
     @Test
     void formatBundleLinesReturnsEmptyForAnEmptyBundle() {
         assertTrue(DropNameFormatter.formatBundleLines("{total}", "{count} {type}",
-            "{remaining}", List.of(), 3).isEmpty());
+            "{remaining}", List.of(), 3, UnaryOperator.identity()).isEmpty());
     }
 
     @Test

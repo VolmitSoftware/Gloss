@@ -2,8 +2,11 @@ package art.arcane.gloss.api;
 
 import org.bukkit.Location;
 import org.bukkit.entity.Entity;
+import org.bukkit.entity.Player;
 
 import java.util.List;
+import java.util.Objects;
+import java.util.function.Function;
 import java.util.function.LongFunction;
 import java.util.function.Supplier;
 
@@ -24,6 +27,8 @@ public interface TemporaryHologram extends Hologram {
      */
     void bindRenderedFrames(LongFunction<List<String>> frames);
 
+    void bindRenderedViewerText(Function<Player, RenderedText> lines);
+
     /**
      * Samples the position binder on the owning entity's scheduler. Any Bukkit state read by the
      * binder must belong to that owner.
@@ -41,4 +46,16 @@ public interface TemporaryHologram extends Hologram {
     HologramViewers viewers();
 
     void destroy();
+
+    record RenderedText(String text, List<ParticleTextSpan> spans, LongFunction<String> frames) {
+        public RenderedText {
+            Objects.requireNonNull(text, "Rendered text may not be null.");
+            spans = List.copyOf(spans);
+            for (ParticleTextSpan span : spans) {
+                if (span.end() > text.length()) {
+                    throw new IllegalArgumentException("Rendered particle span exceeds the text length.");
+                }
+            }
+        }
+    }
 }

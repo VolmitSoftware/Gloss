@@ -41,6 +41,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.function.LongFunction;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
@@ -105,6 +106,7 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
     private volatile PresentationBinding presentationBinding;
     private volatile HologramPresentation boundPresentation;
     private volatile FrameComposer frameComposer;
+    private volatile Function<Player, RenderedText> viewerLineBinder;
     private volatile TextDisplay display;
     private volatile int displayEntityId;
     private volatile String rendered;
@@ -288,7 +290,20 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
 
     @Override
     public void bindRenderedFrames(LongFunction<List<String>> frames) {
+        if (frames != null) {
+            viewerLineBinder = null;
+        }
         this.frameComposer = frames == null ? null : new FrameComposer(frames);
+        textDirty.set(true);
+    }
+
+    @Override
+    public void bindRenderedViewerText(Function<Player, RenderedText> lines) {
+        if (lines != null) {
+            frameComposer = null;
+        }
+        viewerLineBinder = lines;
+        textDirty.set(true);
     }
 
     @Override
@@ -569,7 +584,12 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
             return;
         }
         ParticleText.Rendered override = renderedParticleText;
-        ParticleText.Rendered particleText = snapshot.rendered()
+        ViewerText viewerText = viewerTexts.get(viewer.getUniqueId());
+        ViewerFrame viewerFrame = viewerText == null ? null : viewerText.frame;
+        Function<Player, RenderedText> binder = viewerLineBinder;
+        ParticleText.Rendered particleText = binder != null
+            ? viewerParticleText(viewer, binder, viewerFrame)
+            : snapshot.rendered()
             ? override == null
                 ? new ParticleText.Rendered(TextUtils.joinLegacyLines(snapshot.lines()), List.of())
                 : override
@@ -586,6 +606,22 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
             }
             service.plugin().particles().emit(viewer, this, frame, layer, targets, tick);
         }
+    }
+
+    private ParticleText.Rendered viewerParticleText(Player viewer, Function<Player, RenderedText> binder,
+                                                     ViewerFrame frame) {
+        if (frame == null || frame.binder() != binder) {
+            return new ParticleText.Rendered("", List.of());
+        }
+        if (frame.frames() == null) {
+            return new ParticleText.Rendered(frame.text(), frame.spans());
+        }
+        RenderedText current = binder.apply(viewer);
+        List<ParticleText.Span> spans = new ArrayList<>(current.spans().size());
+        for (ParticleTextSpan span : current.spans()) {
+            spans.add(new ParticleText.Span(span.name(), span.start(), span.end()));
+        }
+        return new ParticleText.Rendered(current.text(), List.copyOf(spans));
     }
 
     private List<ParticleRect> particleTargets(ParticleLayer layer, ParticleText.Rendered rendered,
@@ -881,6 +917,9 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
     }
 
     private boolean viewerSpecific(LineSet snapshot) {
+        if (viewerLineBinder != null) {
+            return true;
+        }
         if (snapshot.rendered() || frameComposer != null || !service.perViewerPlaceholders()) {
             return false;
         }
@@ -924,6 +963,9 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
     }
 
     private void refreshViewerText(ViewerText state, LineSet snapshot) {
+        if (destroyed.get() || lineSet != snapshot) {
+            return;
+        }
         Player viewer = state.player;
         UUID viewerId = viewer.getUniqueId();
         if (!viewer.isOnline() || !conditionMatches(viewer)) {
@@ -939,7 +981,26 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
         long emojiGeneration = TextPipeline.emojiGeneration();
         long renderGeneration = service.plugin().text().renderGeneration();
         long animationGeneration = service.animationGeneration();
-        if (frame == null || frame.frames() == null || frame.snapshot() != snapshot || frame.emojiGeneration() != emojiGeneration
+        Function<Player, RenderedText> binder = viewerLineBinder;
+        if (binder != null) {
+            if (frame == null || frame.binder() != binder || frame.snapshot() != snapshot
+                || nowMs >= frame.refreshAfterMs()) {
+                try {
+                    RenderedText bound = binder.apply(viewer);
+                    List<ParticleText.Span> spans = new ArrayList<>(bound.spans().size());
+                    for (ParticleTextSpan span : bound.spans()) {
+                        spans.add(new ParticleText.Span(span.name(), span.start(), span.end()));
+                    }
+                    frame = new ViewerFrame(snapshot, emojiGeneration, renderGeneration, animationGeneration,
+                        nowMs + service.temporaryUpdateIntervalTicks() * 50L,
+                        bound.frames() == null ? null : bound.frames()::apply, bound.text(), binder, List.copyOf(spans));
+                } catch (RuntimeException failure) {
+                    Gloss.logExceptionStackThrottled(false, "temporary-viewer-lines:" + id, failure,
+                        "Failed to resolve viewer text for temporary hologram %s.", id);
+                    return;
+                }
+            }
+        } else if (frame == null || frame.binder() != null || frame.frames() == null || frame.snapshot() != snapshot || frame.emojiGeneration() != emojiGeneration
             || frame.renderGeneration() != renderGeneration || frame.animationGeneration() != animationGeneration
             || nowMs >= frame.refreshAfterMs()) {
             AuthoredText authored = authoredText(snapshot);
@@ -953,10 +1014,11 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
                 ? service.plugin().text().renderParticleText(viewer, authored.authored()).text()
                 : frames.compose(nowMs);
             frame = new ViewerFrame(snapshot, emojiGeneration, renderGeneration, animationGeneration,
-                nowMs + service.temporaryUpdateIntervalTicks() * 50L, frames, text);
+                nowMs + service.temporaryUpdateIntervalTicks() * 50L, frames, text, null, List.of());
         }
         synchronized (viewerTextLock) {
             if (destroyed.get() || !personalized || display != state.display || lineSet != snapshot
+                || viewerLineBinder != binder
                 || viewerTexts.get(viewerId) != state || untrackedViewers.contains(viewerId)) {
                 return;
             }
@@ -965,16 +1027,21 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
                 service.animator().discardText(viewerId, state.entityId);
                 state.sentText = null;
                 publishAnimation(viewerId.toString(), new HologramAnimator.Target(
-                    state.entityId, frame.frames(), List.of(viewer)));
+                    state.entityId, frame.frames(), List.of(viewer),
+                    binder == null ? TextCodec.AUTHORED : TextCodec.LEGACY));
             } else if (textTransform != null) {
                 String authored = frame.text();
                 publishAnimation(viewerId.toString(), new HologramAnimator.Target(
-                    state.entityId, ignored -> authored, List.of(viewer)));
+                    state.entityId, ignored -> authored, List.of(viewer),
+                    binder == null ? TextCodec.AUTHORED : TextCodec.LEGACY));
             } else {
                 service.animator().remove(animatorGroup, viewerId.toString());
-                if (!frame.text().equals(state.sentText)) {
-                    service.animator().sendText(viewer, viewerId, state.entityId, frame.text());
+                TextCodec codec = binder == null ? TextCodec.AUTHORED : TextCodec.LEGACY;
+                if (!frame.text().equals(state.sentText) || codec != state.sentCodec) {
+                    service.animator().sendText(viewer, viewerId, state.entityId, frame.text(),
+                        codec);
                     state.sentText = frame.text();
+                    state.sentCodec = codec;
                 }
             }
             updateViewerDecoration(state, frame.frames() == null ? frame.text() : frame.frames().compose(nowMs));
@@ -1005,7 +1072,8 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
             state.decoration = new PacketTextDecoration(state.player);
         }
         IconDisplayStyle currentStyle = style == null ? IconDisplayStyle.hologramDefaults() : style;
-        state.decoration.update(PacketTextDecoration.Update.atAnchor(position, transformLegacy(TextUtils.renderLegacy(text)),
+        String renderedText = state.frame != null && state.frame.binder() != null ? text : TextUtils.renderLegacy(text);
+        state.decoration.update(PacketTextDecoration.Update.atAnchor(position, transformLegacy(renderedText),
             currentStyle, box, boundPresentation));
     }
 
@@ -1397,7 +1465,8 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
     }
 
     private record ViewerFrame(LineSet snapshot, long emojiGeneration, long renderGeneration,
-                               long animationGeneration, long refreshAfterMs, TextFrameSource frames, String text) {
+                               long animationGeneration, long refreshAfterMs, TextFrameSource frames, String text,
+                               Function<Player, RenderedText> binder, List<ParticleText.Span> spans) {
     }
 
     private static final class ViewerText {
@@ -1406,6 +1475,7 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
         private final int entityId;
         private volatile ViewerFrame frame;
         private String sentText;
+        private TextCodec sentCodec;
         private PacketTextDecoration decoration;
 
         private ViewerText(Player player, TextDisplay display) {

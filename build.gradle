@@ -56,6 +56,7 @@ def universalJarTask = tasks.register('universalJar', Jar) {
     }
     from(velocityJarTask.flatMap { it.archiveFile }.map { zipTree(it) }) {
         exclude('META-INF/MANIFEST.MF')
+        exclude('com/google/errorprone/annotations/**')
         exclude('modules/loader-agent.isolated-jar')
         exclude('assets/mappings/**')
         exclude('META-INF/packetevents_api_version.txt')
@@ -266,8 +267,15 @@ repositories {
     maven {
         url = uri('https://nexus.phoenixdevt.fr/repository/maven-public/')
     }
-    maven {
-        url = uri('https://repo.auxilor.io/repository/maven-public/')
+    exclusiveContent {
+        forRepository {
+            maven {
+                url = uri('https://repo.auxilor.io/repository/maven-public/')
+            }
+        }
+        filter {
+            includeGroup('com.willfp')
+        }
     }
     maven {
         url = uri('https://mvn.lumine.io/repository/maven-public/')
@@ -299,6 +307,7 @@ dependencies {
     compileOnly(libs.mythiclib) { transitive = false }
     compileOnly(libs.score) { transitive = false }
     compileOnly(libs.eco) { transitive = false }
+    compileOnly(libs.ecoMobs) { transitive = false }
     compileOnly(libs.slimefun) { transitive = false }
     compileOnly(libs.mythic) { transitive = false }
     compileOnly(libs.headDatabase) { transitive = false }
@@ -320,6 +329,12 @@ dependencies {
     testImplementation('me.clip:placeholderapi:2.11.6') { transitive = false }
     testImplementation('com.github.MilkBowl:VaultAPI:1.7') { transitive = false }
     testImplementation(libs.paper)
+    testImplementation(libs.eco) { transitive = false }
+    testImplementation(libs.ecoMobs) { transitive = false }
+    testImplementation('com.willfp:libreforge-loader:2026.39') { transitive = false }
+    testImplementation('com.willfp:libreforge:2026.39:shadow') { transitive = false }
+    testImplementation('org.jetbrains.kotlin:kotlin-stdlib:2.3.0')
+    testRuntimeOnly('net.kyori:adventure-platform-bukkit:4.4.1')
     testImplementation(libs.junitJupiter)
     testImplementation(libs.junit4)
     testRuntimeOnly(libs.junitVintage)

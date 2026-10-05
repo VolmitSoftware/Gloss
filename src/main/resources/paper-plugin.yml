@@ -69,6 +69,10 @@ dependencies:
       load: BEFORE
       required: false
       join-classpath: true
+    EcoMobs:
+      load: BEFORE
+      required: false
+      join-classpath: true
     Slimefun:
       load: BEFORE
       required: false
@@ -596,4 +600,3 @@ permissions:
     default: op
 
   # --- lane:fixes ---
-

@@ -71,11 +71,13 @@ public final class HologramAnimator {
     private static final class DirectUpdate implements BooleanSupplier {
         private final List<Player> viewers;
         private final String text;
+        private final TextCodec codec;
         private volatile boolean retired;
 
-        private DirectUpdate(List<Player> viewers, String text) {
+        private DirectUpdate(List<Player> viewers, String text, TextCodec codec) {
             this.viewers = viewers;
             this.text = text;
+            this.codec = codec;
         }
 
         @Override
@@ -200,8 +202,12 @@ public final class HologramAnimator {
     }
 
     void sendText(Player viewer, UUID viewerId, int entityId, String text) {
+        sendText(viewer, viewerId, entityId, text, TextCodec.AUTHORED);
+    }
+
+    void sendText(Player viewer, UUID viewerId, int entityId, String text, TextCodec codec) {
         DirectKey key = new DirectKey(viewerId, entityId);
-        DirectUpdate previous = directUpdates.put(key, new DirectUpdate(List.of(viewer), text));
+        DirectUpdate previous = directUpdates.put(key, new DirectUpdate(List.of(viewer), text, codec));
         if (previous == null) {
             directMembershipGeneration.incrementAndGet();
         } else {
@@ -428,7 +434,7 @@ public final class HologramAnimator {
                 continue;
             }
             sender.send(new AnimationTextSender.Batch(update.viewers, key.entityId(), update.text,
-                TextCodec.AUTHORED, update));
+                update.codec, update));
             synchronized (update) {
                 if (directUpdates.remove(key, update)) {
                     directMembershipGeneration.incrementAndGet();

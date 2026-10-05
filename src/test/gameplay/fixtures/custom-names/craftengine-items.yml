@@ -1,0 +1,9 @@
+items:
+  gloss_names:server_name:
+    material: paper
+    data:
+      item-name: '<!i><gold>Amber Ticket'
+  gloss_names:server_custom:
+    material: paper
+    data:
+      custom-name: '<!i><green>Emerald Pass'

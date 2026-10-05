@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 2,
+  "revision": 1,
+  "enabled": true,
+  "range": 16.0,
+  "updateIntervalTicks": 5,
+  "maxEntitiesPerViewer": 16,
+  "maxActiveOverlays": 1024,
+  "includePlayers": true,
+  "verticalOffset": 0.35,
+  "healthSegments": 10,
+  "hitHighlightMs": 750,
+  "blacklistWorlds": [],
+  "excludedEntityTypes": [
+    "ARMOR_STAND"
+  ],
+  "show": true,
+  "lines": [
+    {
+      "id": "name",
+      "type": "text",
+      "text": "OVERLAY {name}",
+      "show": "entity.named"
+    }
+  ],
+  "style": {
+    "billboard": "center",
+    "shadow": false,
+    "seeThrough": false,
+    "textAlignment": "center",
+    "backgroundArgb": "#00000000",
+    "textOpacity": 255,
+    "lineWidth": 16384,
+    "viewRange": 1.0,
+    "shadowRadius": 0.0,
+    "shadowStrength": 0.0,
+    "cullingWidth": 0.0,
+    "cullingHeight": 0.0,
+    "scaleX": 0.75,
+    "scaleY": 0.75,
+    "scaleZ": 0.75
+  },
+  "box": {
+    "enabled": false,
+    "padding": 4,
+    "borderWidth": 1,
+    "backgroundArgb": "#B31B1B22",
+    "borderArgb": "#FFAAAAAA"
+  },
+  "particleLayers": [],
+  "variants": []
+}

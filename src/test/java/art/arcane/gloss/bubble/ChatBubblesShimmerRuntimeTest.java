@@ -10,11 +10,13 @@ import art.arcane.gloss.api.IconDisplayStyle;
 import art.arcane.gloss.particle.ParticleText;
 import org.bukkit.Location;
 import org.bukkit.entity.Entity;
+import org.bukkit.entity.Player;
 import org.bukkit.util.Vector;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.UUID;
+import java.util.function.Function;
 import java.util.function.LongFunction;
 import java.util.function.Supplier;
 
@@ -133,6 +135,10 @@ class ChatBubblesShimmerRuntimeTest {
         @Override
         public void bindRenderedFrames(LongFunction<List<String>> frames) {
             this.frames = frames;
+        }
+
+        @Override
+        public void bindRenderedViewerText(Function<Player, RenderedText> lines) {
         }
 
         @Override

@@ -1,6 +1,7 @@
 package art.arcane.gloss.entity;
 
 import art.arcane.gloss.Gloss;
+import art.arcane.gloss.integration.EcoMobsEntityNames;
 import art.arcane.gloss.bedrock.BedrockPolicy;
 import art.arcane.gloss.bedrock.BedrockSurface;
 import art.arcane.gloss.api.TemporaryHologram;
@@ -27,6 +28,7 @@ import org.bukkit.attribute.Attribute;
 import org.bukkit.attribute.AttributeInstance;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.LivingEntity;
+import org.bukkit.entity.Mob;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -81,6 +83,7 @@ public final class EntityOverlayService implements Listener, RegistryOwner {
     private record PresentationVariant(ShowCondition condition, EntityOverlayDoc document) {}
     private volatile boolean started;
     private volatile boolean reactPresent;
+    private volatile boolean ecoMobsPresent;
     private volatile boolean refreshText;
     private volatile boolean trackDistance;
     private volatile boolean personalText;
@@ -101,6 +104,7 @@ public final class EntityOverlayService implements Listener, RegistryOwner {
     public void enable() {
         started = true;
         reactPresent = plugin.getServer().getPluginManager().isPluginEnabled("React");
+        ecoMobsPresent = plugin.getServer().getPluginManager().isPluginEnabled("EcoMobs");
         plugin.getServer().getPluginManager().registerEvents(this, plugin);
         reload();
         plugin.watchdog().register(EntityOverlayDoc.KIND, this::poll);
@@ -108,6 +112,7 @@ public final class EntityOverlayService implements Listener, RegistryOwner {
 
     public void disable() {
         started = false;
+        ecoMobsPresent = false;
         plugin.watchdog().unregister(EntityOverlayDoc.KIND);
         HandlerList.unregisterAll(this);
         stopDriver();
@@ -269,12 +274,18 @@ public final class EntityOverlayService implements Listener, RegistryOwner {
             reactPresent = false;
             stackCounts.clear();
         }
+        if (owner.getName().equals("EcoMobs")) {
+            ecoMobsPresent = false;
+        }
     }
 
     @EventHandler(priority = EventPriority.MONITOR)
     public void onPluginEnable(PluginEnableEvent event) {
         if (event.getPlugin().getName().equals("React")) {
             reactPresent = true;
+        }
+        if (event.getPlugin().getName().equals("EcoMobs")) {
+            ecoMobsPresent = true;
         }
     }
 
@@ -552,7 +563,7 @@ public final class EntityOverlayService implements Listener, RegistryOwner {
             boolean struck = hit != null && hit.expiresAt() > now;
             double health = target.getHealth();
             EntityOverlayText.Snapshot snapshot = new EntityOverlayText.Snapshot(
-                target.getCustomName(), health, attribute(target, Attribute.MAX_HEALTH),
+                entityName(target), health, attribute(target, Attribute.MAX_HEALTH),
                 struck ? hit.previousHealth() : health, struck ? hit.damage() : 0,
                 attribute(target, Attribute.ATTACK_DAMAGE), attribute(target, Attribute.ARMOR),
                 stackCount(target), target.getType().getKey().getKey(), 0);
@@ -671,7 +682,7 @@ public final class EntityOverlayService implements Listener, RegistryOwner {
         boolean struck = hit != null && hit.expiresAt() > now;
         double health = target.getHealth();
         EntityOverlayText.Snapshot snapshot = new EntityOverlayText.Snapshot(
-            target.getCustomName(), health, attribute(target, Attribute.MAX_HEALTH),
+            entityName(target), health, attribute(target, Attribute.MAX_HEALTH),
             struck ? hit.previousHealth() : health, struck ? hit.damage() : 0,
             attribute(target, Attribute.ATTACK_DAMAGE), attribute(target, Attribute.ARMOR),
             stackCount(target), target.getType().getKey().getKey(), 0);
@@ -998,6 +1009,21 @@ public final class EntityOverlayService implements Listener, RegistryOwner {
     private static double attribute(LivingEntity entity, Attribute attribute) {
         AttributeInstance instance = entity.getAttribute(attribute);
         return instance == null ? 0 : instance.getValue();
+    }
+
+    private String entityName(LivingEntity entity) {
+        if (ecoMobsPresent && entity instanceof Mob mob) {
+            try {
+                String name = EcoMobsEntityNames.resolve(mob);
+                if (name != null) {
+                    return name;
+                }
+            } catch (RuntimeException | LinkageError failure) {
+                Gloss.logExceptionStackThrottled(false, "entity-overlay-ecomobs", failure,
+                    "Failed to resolve the EcoMobs name for %s.", entity.getUniqueId());
+            }
+        }
+        return entity.getCustomName();
     }
 
     private int stackCount(LivingEntity entity) {

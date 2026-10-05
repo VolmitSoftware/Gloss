@@ -16,7 +16,7 @@ class DropLabelTextTest {
     void authoredLabelsKeepViewerExpressionsAndParticleSpansForTheEngine() {
         List<String> authored = List.of("<particles:name>{{ player.name }}</particles>");
         List<Write> writes = new ArrayList<>();
-        DropNameService.applyLabelText(target(writes), new RealDropService.Label(authored, List.of("")));
+        DropNameService.applyLabelText(target(writes), new RealDropService.Label(authored, List.of(""), null, false));
 
         assertEquals(List.of(new Write("setLines", authored)), writes);
         ParticleText.Rendered rendered = ParticleText.render(writes.getFirst().lines().getFirst(),
@@ -59,6 +59,9 @@ class DropLabelTextTest {
     private static TemporaryHologram target(List<Write> writes) {
         return (TemporaryHologram) Proxy.newProxyInstance(TemporaryHologram.class.getClassLoader(),
             new Class<?>[]{TemporaryHologram.class}, (proxy, method, arguments) -> {
+                if (method.getName().equals("bindRenderedViewerText")) {
+                    return null;
+                }
                 if (method.getName().equals("setLines") || method.getName().equals("setRenderedLines")) {
                     writes.add(new Write(method.getName(), List.copyOf((List<String>) arguments[0])));
                     return null;

@@ -2,6 +2,7 @@ package art.arcane.gloss.hologram;
 
 import art.arcane.gloss.api.HologramBox;
 import art.arcane.gloss.api.HologramPresentation;
+import art.arcane.gloss.api.TemporaryHologram;
 import art.arcane.gloss.hologram.CharacterizationHarness.PlayerHandle;
 import art.arcane.gloss.hologram.CharacterizationHarness.WorldState;
 import art.arcane.gloss.menu.DisplayEntityManager;
@@ -39,6 +40,135 @@ class TemporaryHologramViewerTextTest {
     void clearPackets() {
         new DisplayEntityManagerPacketShapeTest().clearSent();
         DisplayEntityManagerPacketShapeTest.clearPacketEventsApi();
+    }
+
+    @Test
+    void renderedViewerBindingsPreserveLiteralNamesAndCanBeReplacedOrCleared() {
+        try (CharacterizationHarness harness = new CharacterizationHarness(directory)) {
+            harness.configure(config -> config.holograms.perViewerPlaceholders = false);
+            WorldState world = harness.world("world");
+            PlayerHandle alice = harness.join("Alice", world, 1, 64, 1);
+            PlayerHandle bob = harness.join("Bob", world, 2, 64, 1);
+            TemporaryHologramDisplay hologram = harness.temporary("bound", harness.at(world, 0, 64, 0), 60000L);
+            hologram.setRenderedLines(List.of("Fallback"));
+            hologram.bindRenderedViewerText(player -> new TemporaryHologram.RenderedText("§a" + player.getName()
+                + "\n<red>{{ player.name }}</red> |animation.fast| %player_name%", List.of(), null));
+            hologram.drive(true);
+            hologram.drive(true);
+            assertEquals(2, harness.animator.pass(0L));
+            assertEquals("Alice\n<red>{{ player.name }}</red> |animation.fast| %player_name%",
+                receivedText(harness, alice));
+            assertEquals("Bob\n<red>{{ player.name }}</red> |animation.fast| %player_name%",
+                receivedText(harness, bob));
+            assertTrue(harness.sender.sent.stream().allMatch(sent -> sent.codec() == TextCodec.LEGACY));
+
+            hologram.bindRenderedViewerText(player -> new TemporaryHologram.RenderedText("Changed " + player.getName(), List.of(), null));
+            hologram.drive(true);
+            assertEquals(2, harness.animator.pass(1L));
+            assertEquals("Changed Alice", receivedText(harness, alice));
+
+            hologram.bindRenderedViewerText(null);
+            hologram.drive(true);
+            assertEquals("Fallback", harness.onlySpawned(world).lastText());
+            assertEquals(0, harness.animator.pendingTextUpdateCount());
+            assertTrue(harness.schedulerErrors.isEmpty(), harness.schedulerErrors.toString());
+        }
+    }
+
+    @Test
+    void queuedViewerBindingReplacementCannotPublishStaleNames() {
+        try (CharacterizationHarness harness = new CharacterizationHarness(directory)) {
+            WorldState world = harness.world("world");
+            PlayerHandle viewer = harness.join("Viewer", world, 0, 64, 0);
+            TemporaryHologramDisplay hologram = harness.temporary("replace", harness.at(world, 0, 64, 0), 60000L);
+            hologram.bindRenderedViewerText(player -> {
+                hologram.bindRenderedViewerText(next -> new TemporaryHologram.RenderedText("Current", List.of(), null));
+                return new TemporaryHologram.RenderedText("Stale", List.of(), null);
+            });
+            hologram.drive(true);
+            hologram.drive(true);
+            assertEquals(0, harness.animator.pass(0L));
+            hologram.drive(true);
+            assertEquals(1, harness.animator.pass(1L));
+            assertEquals("Current", receivedText(harness, viewer));
+            hologram.bindRenderedFrames(now -> List.of("Shared"));
+            hologram.drive(true);
+            assertEquals(1, harness.animator.pass(2L));
+            assertEquals("Shared", receivedText(harness, viewer));
+            assertTrue(harness.schedulerErrors.isEmpty(), harness.schedulerErrors.toString());
+        }
+    }
+
+    @Test
+    void queuedViewerBindingDoesNotRunAfterDestruction() {
+        try (CharacterizationHarness harness = new CharacterizationHarness(directory)) {
+            WorldState world = harness.world("world");
+            harness.join("Viewer", world, 0, 64, 0);
+            AtomicBoolean called = new AtomicBoolean();
+            TemporaryHologramDisplay hologram = harness.temporary("destroy-bound", harness.at(world, 0, 64, 0), 60000L);
+            hologram.bindRenderedViewerText(player -> {
+                called.set(true);
+                return new TemporaryHologram.RenderedText("Removed", List.of(), null);
+            });
+            hologram.drive(true);
+            called.set(false);
+            harness.ownsThread = false;
+            harness.deferImmediateTasks = true;
+            hologram.drive(true);
+            hologram.destroy();
+            harness.drainImmediate();
+            harness.drainImmediate();
+            assertFalse(called.get());
+            assertEquals(0, harness.animator.pass(0L));
+            assertTrue(harness.liveSpawned(world).isEmpty());
+        }
+    }
+
+    @Test
+    void changingTextCodecResendsIdenticalViewerText() {
+        try (CharacterizationHarness harness = new CharacterizationHarness(directory)) {
+            WorldState world = harness.world("world");
+            harness.join("Viewer", world, 0, 64, 0);
+            TemporaryHologramDisplay hologram = harness.temporary("codec", harness.at(world, 0, 64, 0), 60000L);
+            hologram.setLines(List.of("{{ player.name }}"));
+            hologram.drive(true);
+            hologram.drive(true);
+            assertEquals(1, harness.animator.pass(0L));
+            assertEquals(TextCodec.AUTHORED, harness.sender.sent.getLast().codec());
+            hologram.bindRenderedViewerText(player -> new TemporaryHologram.RenderedText(player.getName(), List.of(), null));
+            hologram.drive(true);
+            assertEquals(1, harness.animator.pass(1L));
+            assertEquals(TextCodec.LEGACY, harness.sender.sent.getLast().codec());
+            hologram.bindRenderedViewerText(null);
+            hologram.drive(true);
+            assertEquals(1, harness.animator.pass(2L));
+            assertEquals(TextCodec.AUTHORED, harness.sender.sent.getLast().codec());
+        }
+    }
+
+    @Test
+    void boundAnimationFramesAdvanceWithoutResamplingViewerState() {
+        try (CharacterizationHarness harness = new CharacterizationHarness(directory)) {
+            WorldState world = harness.world("world");
+            PlayerHandle viewer = harness.join("Viewer", world, 0, 64, 0);
+            AtomicBoolean sampled = new AtomicBoolean();
+            TemporaryHologramDisplay hologram = harness.temporary("bound-animation", harness.at(world, 0, 64, 0), 60000L);
+            hologram.bindRenderedViewerText(player -> {
+                assertFalse(sampled.getAndSet(true));
+                String name = player.getName();
+                return new TemporaryHologram.RenderedText(name, List.of(),
+                    now -> name + " <red>" + now + "</red>");
+            });
+            hologram.drive(true);
+            hologram.drive(true);
+            assertEquals(1, harness.animator.pass(0L));
+            assertEquals("Viewer <red>0</red>", receivedText(harness, viewer));
+            assertEquals(1, harness.animator.pass(10L));
+            assertEquals("Viewer <red>10</red>", receivedText(harness, viewer));
+            assertEquals(TextCodec.LEGACY, harness.sender.sent.getLast().codec());
+            hologram.destroy();
+            assertEquals(0, harness.animator.targetCount());
+        }
     }
 
     @Test
@@ -263,7 +393,8 @@ class TemporaryHologramViewerTextTest {
         for (int index = harness.sender.sent.size() - 1; index >= 0; index--) {
             CharacterizationHarness.Sent sent = harness.sender.sent.get(index);
             if (sent.viewers().contains(viewer.proxy)) {
-                return TextUtils.content(TextUtils.parse(sent.text()));
+                return TextUtils.content(sent.codec() == TextCodec.LEGACY
+                    ? TextUtils.parseLegacy(sent.text()) : TextUtils.parse(sent.text()));
             }
         }
         throw new AssertionError("Viewer received no text");

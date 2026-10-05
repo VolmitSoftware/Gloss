@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.UnaryOperator;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -94,7 +95,7 @@ class CharacterizationDropNameLifecycleTest {
     void bundleEntriesJoinWithTheExactLegacySeparator() {
         String label = DropNameFormatter.formatBundle("{contents}", List.of(
             new DropNameFormatter.BundleContent("Dirt", 9),
-            new DropNameFormatter.BundleContent("Stone", 4)), 5, remaining -> "+" + remaining);
+            new DropNameFormatter.BundleContent("Stone", 4)), 5, remaining -> "+" + remaining, UnaryOperator.identity());
 
         assertEquals("9x Dirt&8, &74x Stone", label);
     }
@@ -105,7 +106,7 @@ class CharacterizationDropNameLifecycleTest {
             new DropNameFormatter.BundleContent("Dirt", 2),
             new DropNameFormatter.BundleContent("Stone", 1)), 3, remaining -> {
                 throw new AssertionError("moreRenderer must not run when entries <= limit");
-            });
+            }, UnaryOperator.identity());
 
         assertEquals("3: 2x Dirt&8, &71x Stone", label);
     }
@@ -123,7 +124,7 @@ class CharacterizationDropNameLifecycleTest {
         String label = DropNameFormatter.formatBundle("{contents}", contents, 2, remaining -> {
             remainders.add(remaining);
             return "and " + remaining + " more";
-        });
+        }, UnaryOperator.identity());
 
         assertEquals(List.of(3), remainders);
         assertEquals("5x A&8, &74x B&8, &7and 3 more", label);
@@ -134,17 +135,17 @@ class CharacterizationDropNameLifecycleTest {
         String label = DropNameFormatter.formatBundle("{total}", List.of(
             new DropNameFormatter.BundleContent("A", 5),
             new DropNameFormatter.BundleContent("B", 4),
-            new DropNameFormatter.BundleContent("C", 3)), 1, remaining -> "");
+            new DropNameFormatter.BundleContent("C", 3)), 1, remaining -> "", UnaryOperator.identity());
 
         assertEquals("12", label);
     }
 
     @Test
     void emptyOrFullyFilteredBundlesYieldEmptySoTheNormalNamePathApplies() {
-        assertEquals("", DropNameFormatter.formatBundle("{total}: {contents}", List.of(), 3, remaining -> ""));
+        assertEquals("", DropNameFormatter.formatBundle("{total}: {contents}", List.of(), 3, remaining -> "", UnaryOperator.identity()));
         List<DropNameFormatter.BundleContent> filtered = new ArrayList<>();
         filtered.add(null);
         filtered.add(new DropNameFormatter.BundleContent("Ghost", 0));
-        assertEquals("", DropNameFormatter.formatBundle("{total}: {contents}", filtered, 3, remaining -> ""));
+        assertEquals("", DropNameFormatter.formatBundle("{total}: {contents}", filtered, 3, remaining -> "", UnaryOperator.identity()));
     }
 }

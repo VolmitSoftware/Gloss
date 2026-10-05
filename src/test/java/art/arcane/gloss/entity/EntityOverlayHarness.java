@@ -22,6 +22,7 @@ import org.bukkit.attribute.AttributeInstance;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.LivingEntity;
+import org.bukkit.entity.Mob;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.TextDisplay;
 import org.bukkit.plugin.PluginDescriptionFile;
@@ -84,6 +85,7 @@ final class EntityOverlayHarness implements AutoCloseable {
         volatile double health = 20.0D;
         volatile double maxHealth = 20.0D;
         volatile String customName;
+        volatile String ecoMobId;
         volatile boolean valid = true;
         volatile boolean invisible;
         LivingEntity proxy;
@@ -482,7 +484,8 @@ final class EntityOverlayHarness implements AutoCloseable {
     private LivingEntity livingProxy(MobHandle handle) {
         Object dataContainer = Proxy.newProxyInstance(EntityOverlayHarness.class.getClassLoader(),
             new Class<?>[]{org.bukkit.persistence.PersistentDataContainer.class},
-            (proxy, method, args) -> method.getName().equals("get") ? null
+            (proxy, method, args) -> method.getName().equals("get")
+                ? args[0].toString().equals("ecomobs:mob") ? handle.ecoMobId : null
                 : fallback(proxy, method, args, "PersistentDataContainer"));
         InvocationHandler handler = (proxy, method, args) -> switch (method.getName()) {
             case "getUniqueId" -> handle.uuid;
@@ -504,7 +507,7 @@ final class EntityOverlayHarness implements AutoCloseable {
             default -> fallback(proxy, method, args, "LivingEntity[" + handle.type + "]");
         };
         return (LivingEntity) Proxy.newProxyInstance(EntityOverlayHarness.class.getClassLoader(),
-            new Class<?>[]{LivingEntity.class}, handler);
+            new Class<?>[]{Mob.class}, handler);
     }
 
     private static AttributeInstance attributeProxy(double value) {

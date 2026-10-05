@@ -23,6 +23,7 @@ import org.bukkit.persistence.PersistentDataContainer;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.PluginDescriptionFile;
 import org.bukkit.plugin.PluginLogger;
+import org.bukkit.plugin.PluginManager;
 import org.bukkit.scheduler.BukkitScheduler;
 import org.bukkit.scheduler.BukkitTask;
 
@@ -314,6 +315,13 @@ final class DropFakes {
                     case "getName", "getVersion", "getBukkitVersion" -> "drop-harness";
                     case "getLogger" -> logger;
                     case "getItemFactory" -> itemFactory();
+                    case "getPluginManager" -> Proxy.newProxyInstance(PluginManager.class.getClassLoader(),
+                        new Class<?>[]{PluginManager.class}, (manager, operation, values) -> {
+                            if (operation.getName().equals("getPlugin")) {
+                                return null;
+                            }
+                            throw new UnsupportedOperationException(operation.getName());
+                        });
                     case "isPrimaryThread", "isOwnedByCurrentRegion" -> true;
                     case "getScheduler" -> scheduler();
                     case "getOnlinePlayers" -> List.of();

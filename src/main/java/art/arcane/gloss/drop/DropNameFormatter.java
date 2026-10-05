@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.IntFunction;
+import java.util.function.UnaryOperator;
 
 public final class DropNameFormatter {
     private static final String ENTRY_SEPARATOR = "&8, &7";
@@ -48,8 +49,9 @@ public final class DropNameFormatter {
         return displayName;
     }
 
-    public static String formatBundle(String template, List<BundleContent> contents, int entryLimit, IntFunction<String> moreRenderer) {
-        List<BundleContent> aggregated = aggregate(contents);
+    public static String formatBundle(String template, List<BundleContent> contents, int entryLimit,
+                                       IntFunction<String> moreRenderer, UnaryOperator<String> name) {
+        List<BundleContent> aggregated = aggregate(contents, name);
         if (aggregated.isEmpty()) {
             return "";
         }
@@ -81,8 +83,8 @@ public final class DropNameFormatter {
 
     public static List<String> formatBundleLines(String headerTemplate, String entryTemplate,
                                                   String moreTemplate, List<BundleContent> contents,
-                                                  int entryLimit) {
-        List<BundleContent> aggregated = aggregate(contents);
+                                                  int entryLimit, UnaryOperator<String> name) {
+        List<BundleContent> aggregated = aggregate(contents, name);
         if (aggregated.isEmpty()) {
             return List.of();
         }
@@ -109,21 +111,28 @@ public final class DropNameFormatter {
     }
 
     public static List<BundleContent> aggregate(List<BundleContent> contents) {
+        return aggregate(contents, UnaryOperator.identity());
+    }
+
+    private static List<BundleContent> aggregate(List<BundleContent> contents, UnaryOperator<String> name) {
         Map<String, Integer> totals = new LinkedHashMap<>();
+        Map<String, String> labels = new LinkedHashMap<>();
         for (BundleContent content : contents) {
             if (content == null || content.amount() <= 0) {
                 continue;
             }
-            totals.merge(content.type(), content.amount(), Integer::sum);
+            String resolved = name.apply(content.type());
+            totals.merge(resolved, content.amount(), Integer::sum);
+            labels.putIfAbsent(resolved, content.type());
         }
 
         List<BundleContent> aggregated = new ArrayList<>(totals.size());
         for (Map.Entry<String, Integer> entry : totals.entrySet()) {
-            aggregated.add(new BundleContent(entry.getKey(), entry.getValue()));
+            aggregated.add(new BundleContent(labels.get(entry.getKey()), entry.getValue()));
         }
         aggregated.sort(Comparator
             .comparingInt(BundleContent::amount).reversed()
-            .thenComparing(BundleContent::type));
+            .thenComparing(content -> name.apply(content.type())));
         return aggregated;
     }
 
