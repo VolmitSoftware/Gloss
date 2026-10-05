@@ -19,7 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
  */
 class BedrockOverlayAudienceTest {
     private static final String MOBS_ONLY = """
-        {"schemaVersion":2,"revision":1,"includePlayers":false,"range":16.0}
+        {"schemaVersion":2,"revision":1,"includePlayers":false,"range":16.0,"overrideNametag":true}
         """;
     private static final UUID BEDROCK = new UUID(0L, 11L);
     private static final UUID JAVA = UUID.fromString("069a79f4-44e9-4726-a5be-fca90e38aaf5");
@@ -47,6 +47,8 @@ class BedrockOverlayAudienceTest {
             for (EntityOverlayTarget overlay : harness.overlays(service).values()) {
                 assertEquals(1, overlay.audience.size(), "only the Java viewer may hold an overlay");
                 assertFalse(overlay.audience.containsKey(BEDROCK), "the Bedrock viewer must be absent");
+                assertEquals(1, harness.teams.layersFor(JAVA, overlay.targetId().toString()).size());
+                assertEquals(0, harness.teams.layersFor(BEDROCK, overlay.targetId().toString()).size());
             }
         }
     }

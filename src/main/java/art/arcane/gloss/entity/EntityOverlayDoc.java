@@ -20,7 +20,7 @@ import java.util.Set;
 
 public record EntityOverlayDoc(
     int schemaVersion, long revision, Boolean enabled, Double range, Integer updateIntervalTicks,
-    Integer maxEntitiesPerViewer, Integer maxActiveOverlays, Boolean includePlayers, Double verticalOffset,
+    Integer maxEntitiesPerViewer, Integer maxActiveOverlays, Boolean includePlayers, Boolean overrideNametag, Double verticalOffset,
     Integer healthSegments, Long hitHighlightMs, List<String> blacklistWorlds,
     List<String> excludedEntityTypes, ShowCondition show, List<Line> lines,
     IconDisplayStyle style, HologramBox box, List<ParticleLayer> particleLayers, HealthBarStyle healthBar, List<Variant> variants
@@ -41,7 +41,7 @@ public record EntityOverlayDoc(
         new Line("stats", "text", "&7ATK &f{attack} &8| &7ARM &f{armor}", null));
     public static final EntityOverlayDoc DEFAULTS = new EntityOverlayDoc(
         CURRENT_SCHEMA_VERSION, DocumentEnvelope.INITIAL_REVISION, null, null, null, null,
-        null, null, null, null, null, null, null, null, null, null, null, null, null, null);
+        null, null, null, null, null, null, null, null, null, null, null, null, null, null, null);
 
     public EntityOverlayDoc {
         DocumentEnvelope.requireSchemaVersion(KIND, schemaVersion, CURRENT_SCHEMA_VERSION);
@@ -52,6 +52,7 @@ public record EntityOverlayDoc(
         maxEntitiesPerViewer = integer(maxEntitiesPerViewer, 1, 256, 16);
         maxActiveOverlays = integer(maxActiveOverlays, 16, 16384, 1024);
         includePlayers = includePlayers == null || includePlayers;
+        overrideNametag = Boolean.TRUE.equals(overrideNametag);
         verticalOffset = number(verticalOffset, -2, 8, 0.35);
         healthSegments = integer(healthSegments, 1, 40, 10);
         hitHighlightMs = hitHighlightMs == null ? 750L : Math.clamp(hitHighlightMs, 0L, 10000L);
@@ -93,7 +94,7 @@ public record EntityOverlayDoc(
         EntityOverlayDoc apply(EntityOverlayDoc base) {
             return new EntityOverlayDoc(base.schemaVersion(), base.revision(), base.enabled(), base.range(),
                 base.updateIntervalTicks(), base.maxEntitiesPerViewer(), base.maxActiveOverlays(),
-                base.includePlayers(), verticalOffset == null ? base.verticalOffset() : verticalOffset,
+                base.includePlayers(), base.overrideNametag(), verticalOffset == null ? base.verticalOffset() : verticalOffset,
                 healthSegments == null ? base.healthSegments() : healthSegments, base.hitHighlightMs(),
                 base.blacklistWorlds(), base.excludedEntityTypes(), base.show(), lines == null ? base.lines() : lines,
                 style == null ? base.style() : style, box == null ? base.box() : box,

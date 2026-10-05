@@ -7,6 +7,7 @@
   "maxEntitiesPerViewer": 16,
   "maxActiveOverlays": 1024,
   "includePlayers": true,
+  "overrideNametag": false,
   "verticalOffset": 0.35,
   "healthSegments": 10,
   "hitHighlightMs": 750,

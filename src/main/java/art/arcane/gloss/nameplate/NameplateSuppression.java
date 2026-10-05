@@ -1,6 +1,7 @@
 package art.arcane.gloss.nameplate;
 
 import art.arcane.gloss.util.common.TeamAllocator;
+import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 
 import java.util.List;
@@ -19,36 +20,38 @@ public final class NameplateSuppression {
     public static final String PURPOSE = "nameplate";
 
     private final TeamAllocator teams;
+    private final String purpose;
     private final ConcurrentMap<UUID, ConcurrentMap<UUID, TeamAllocator.TeamHandle>> claimed =
         new ConcurrentHashMap<>();
 
-    public NameplateSuppression(TeamAllocator teams) {
+    public NameplateSuppression(TeamAllocator teams, String purpose) {
         this.teams = Objects.requireNonNull(teams, "teams");
+        this.purpose = Objects.requireNonNull(purpose, "purpose");
     }
 
-    public void admit(Player viewer, Player target, boolean bedrockViewer) {
+    public void admit(Player viewer, Entity target, boolean bedrockViewer) {
         if (bedrockViewer) {
             return;
         }
-        ConcurrentMap<UUID, TeamAllocator.TeamHandle> handles = claimed.computeIfAbsent(
-            viewer.getUniqueId(), ignored -> new ConcurrentHashMap<>());
-        handles.computeIfAbsent(target.getUniqueId(), ignored -> teams.claim(viewer, PURPOSE,
-            target.getName(), new TeamAllocator.TeamStyle("", "", "white",
-                TeamAllocator.NameTagVisibility.NEVER, TeamAllocator.CollisionRule.ALWAYS)));
+        claimed.compute(viewer.getUniqueId(), (viewerId, existing) -> {
+            ConcurrentMap<UUID, TeamAllocator.TeamHandle> handles = existing == null
+                ? new ConcurrentHashMap<>() : existing;
+            handles.computeIfAbsent(target.getUniqueId(), ignored -> teams.claim(viewer, purpose,
+                target instanceof Player player ? player.getName() : target.getUniqueId().toString(),
+                new TeamAllocator.TeamStyle("", "", "white",
+                    TeamAllocator.NameTagVisibility.NEVER, TeamAllocator.CollisionRule.ALWAYS)));
+            return handles;
+        });
     }
 
     public void retire(UUID viewerId, UUID targetId) {
-        ConcurrentMap<UUID, TeamAllocator.TeamHandle> handles = claimed.get(viewerId);
-        if (handles == null) {
-            return;
-        }
-        TeamAllocator.TeamHandle handle = handles.remove(targetId);
-        if (handle != null) {
-            teams.release(handle);
-        }
-        if (handles.isEmpty()) {
-            claimed.remove(viewerId, handles);
-        }
+        claimed.computeIfPresent(viewerId, (ignored, handles) -> {
+            TeamAllocator.TeamHandle handle = handles.remove(targetId);
+            if (handle != null) {
+                teams.release(handle);
+            }
+            return handles.isEmpty() ? null : handles;
+        });
     }
 
     /** Releases every viewer's claim on one subject, for the subject leaving the server. */
@@ -59,10 +62,10 @@ public final class NameplateSuppression {
     }
 
     public void forget(Player viewer) {
-        ConcurrentMap<UUID, TeamAllocator.TeamHandle> handles = claimed.remove(viewer.getUniqueId());
-        if (handles != null && !handles.isEmpty()) {
-            teams.releaseAll(viewer, PURPOSE);
-        }
+        claimed.computeIfPresent(viewer.getUniqueId(), (ignored, handles) -> {
+            teams.releaseAll(viewer, purpose);
+            return null;
+        });
     }
 
     public int claimed(UUID viewerId) {
@@ -72,13 +75,12 @@ public final class NameplateSuppression {
 
     public void clear() {
         for (UUID viewerId : List.copyOf(claimed.keySet())) {
-            ConcurrentMap<UUID, TeamAllocator.TeamHandle> handles = claimed.remove(viewerId);
-            if (handles == null) {
-                continue;
-            }
-            for (TeamAllocator.TeamHandle handle : handles.values()) {
-                teams.release(handle);
-            }
+            claimed.computeIfPresent(viewerId, (ignored, handles) -> {
+                for (TeamAllocator.TeamHandle handle : handles.values()) {
+                    teams.release(handle);
+                }
+                return null;
+            });
         }
     }
 }

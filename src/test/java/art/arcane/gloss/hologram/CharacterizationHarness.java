@@ -8,6 +8,7 @@ import art.arcane.gloss.animation.AnimationService;
 import art.arcane.gloss.config.GlossConfigFile;
 import art.arcane.gloss.service.GlossService;
 import art.arcane.gloss.text.TextPipeline;
+import art.arcane.gloss.util.common.LayeredTeamAllocator;
 import art.arcane.gloss.particle.ParticleService;
 import art.arcane.volmlib.util.scheduling.SchedulerRuntime;
 import org.bukkit.Bukkit;
@@ -222,6 +223,7 @@ final class CharacterizationHarness implements AutoCloseable {
             setDeclaredField(gloss, Gloss.class, "animator", animator);
             setDeclaredField(gloss, Gloss.class, "animations", animations);
             setDeclaredField(gloss, Gloss.class, "particles", new ParticleService(gloss));
+            setDeclaredField(gloss, Gloss.class, "teams", new LayeredTeamAllocator());
 
             publishAnimationClips();
 

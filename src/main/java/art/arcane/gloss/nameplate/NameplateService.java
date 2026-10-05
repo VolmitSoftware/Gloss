@@ -42,7 +42,7 @@ public final class NameplateService implements GlossService, Listener {
             ShippedDocumentCatalog.NAMEPLATES.names());
         this.registry = DocumentRegistry.folder(NameplateDoc.KIND, folder, NameplateDoc::parse,
             NameplateDoc::revision);
-        this.suppression = new NameplateSuppression(plugin.teams());
+        this.suppression = new NameplateSuppression(plugin.teams(), NameplateSuppression.PURPOSE);
         this.source = new NameplateSource(this::enabled, this::documents, suppression);
     }
 

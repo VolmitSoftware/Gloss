@@ -36,6 +36,18 @@ class EntityOverlayTextTest {
     }
 
     @Test
+    void conditionalTypeNameShowsOnlyOnUnnamedMobs() {
+        EntityOverlayDoc settings = doc("""
+            "lines":[
+              {"id":"name","text":"&f{typeName}","show":"!entity.named"},
+              {"id":"health","text":"{health}/{max_health}"}
+            ]
+            """);
+        assertEquals("Zombie\n15/20", plain(render(settings, NAMED.withName(null), List.of())));
+        assertEquals("15/20", plain(render(settings, NAMED, List.of())));
+    }
+
+    @Test
     void arbitraryOrderCustomExpressionsAndSpacersUseTheSharedPipeline() {
         EntityOverlayDoc settings = doc("""
             "show":"entity.healthPercent == 75 && viewer.level > 1",

@@ -9,6 +9,7 @@ import art.arcane.gloss.api.ParticleTextSpan;
 import art.arcane.gloss.particle.ParticleText;
 import art.arcane.gloss.text.TextPipeline;
 import art.arcane.gloss.nametag.NametagService;
+import art.arcane.gloss.nameplate.NameplateSuppression;
 import art.arcane.gloss.doc.DocumentDelta;
 import art.arcane.gloss.doc.DocumentRegistry;
 import art.arcane.gloss.doc.GlossDocument;
@@ -65,6 +66,7 @@ public final class EntityOverlayService implements Listener, RegistryOwner {
     private final Gloss plugin;
     private final ShippedDefaults defaults;
     private final DocumentRegistry<EntityOverlayDoc> registry;
+    private final NameplateSuppression suppression;
     private final ConcurrentMap<UUID, EntityOverlayCell.Anchor> anchors = new ConcurrentHashMap<>();
     private final ConcurrentMap<UUID, EntityOverlayTarget> overlays = new ConcurrentHashMap<>();
     private final ConcurrentMap<UUID, Insight> insights = new ConcurrentHashMap<>();
@@ -94,6 +96,7 @@ public final class EntityOverlayService implements Listener, RegistryOwner {
 
     public EntityOverlayService(Gloss plugin) {
         this.plugin = plugin;
+        suppression = new NameplateSuppression(plugin.teams(), "entity-overlay");
         File folder = new File(plugin.getDataFolder(), EntityOverlayDoc.KIND);
         defaults = new ShippedDefaults(EntityOverlayDoc.KIND, folder,
             ShippedDocumentCatalog.ENTITY_OVERLAYS.names());
@@ -336,6 +339,7 @@ public final class EntityOverlayService implements Listener, RegistryOwner {
                 destroy(overlay);
             }
         }
+        suppression.clear();
     }
 
     private void drive() {
@@ -411,7 +415,7 @@ public final class EntityOverlayService implements Listener, RegistryOwner {
                 }
             }
             overlay.audience.keySet().removeAll(dropped);
-            retired(overlay.targetId(), dropped);
+            retired(overlay, dropped);
             if (overlay.audience.isEmpty()) {
                 if (overlays.remove(overlay.targetId(), overlay)) {
                     destroy(overlay);
@@ -429,7 +433,7 @@ public final class EntityOverlayService implements Listener, RegistryOwner {
     private void destroy(EntityOverlayTarget overlay) {
         List<UUID> audience = List.copyOf(overlay.audience.keySet());
         overlay.destroy();
-        retired(overlay.targetId(), audience);
+        retired(overlay, audience);
     }
 
     /**
@@ -437,13 +441,23 @@ public final class EntityOverlayService implements Listener, RegistryOwner {
      * nameplate suppression holds a scoreboard team that hides the vanilla tag - and never hear
      * about the subject walking out of range unless they are told here.
      */
-    private void retired(UUID targetId, List<UUID> viewerIds) {
-        if (viewerIds.isEmpty() || sources.isEmpty()) {
+    private void retired(EntityOverlayTarget overlay, List<UUID> viewerIds) {
+        if (viewerIds.isEmpty()) {
             return;
         }
+        overlays.compute(overlay.targetId(), (targetId, active) -> {
+            for (UUID viewerId : viewerIds) {
+                if (active == null || active == overlay) {
+                    suppression.retire(viewerId, targetId);
+                } else {
+                    updateNametag(active, viewerId);
+                }
+            }
+            return active;
+        });
         for (EntityOverlaySource source : sources) {
             for (UUID viewerId : viewerIds) {
-                source.retired(viewerId, targetId);
+                source.retired(viewerId, overlay.targetId());
             }
         }
     }
@@ -737,6 +751,11 @@ public final class EntityOverlayService implements Listener, RegistryOwner {
                     "Failed to render the entity overlay for %s.", overlay.targetId());
             }
         }
+        for (UUID viewerId : overlay.audience.keySet()) {
+            if (!overlay.personalViewers.contains(viewerId)) {
+                syncNametag(overlay, viewerId);
+            }
+        }
         for (UUID viewerId : overlay.personalViewers) {
             dispatchPersonal(overlay, viewerId, current);
         }
@@ -775,6 +794,7 @@ public final class EntityOverlayService implements Listener, RegistryOwner {
         }
         if (!FoliaScheduler.runEntity(plugin, viewer, () -> renderPersonal(overlay, viewer, current), 0, null)) {
             overlay.retirePersonal(viewerId);
+            syncNametag(overlay, viewerId);
         }
     }
 
@@ -802,6 +822,36 @@ public final class EntityOverlayService implements Listener, RegistryOwner {
                     "Failed to render an entity overlay for %s.", viewerId);
             }
         }
+        syncNametag(overlay, viewerId);
+    }
+
+    private void syncNametag(EntityOverlayTarget overlay, UUID viewerId) {
+        EntityOverlayDoc current = settings;
+        if (current == null || !current.overrideNametag()) {
+            return;
+        }
+        overlays.computeIfPresent(overlay.targetId(), (targetId, active) -> {
+            if (active == overlay) {
+                updateNametag(overlay, viewerId);
+            }
+            return active;
+        });
+    }
+
+    private void updateNametag(EntityOverlayTarget overlay, UUID viewerId) {
+        LivingEntity target = overlay.target;
+        EntityOverlayDoc current = settings;
+        EntityOverlayTarget.Render render = overlay.personalViewers.contains(viewerId)
+            ? overlay.personal.get(viewerId) : overlay.shared;
+        Player viewer = Bukkit.getPlayer(viewerId);
+        if (overlay.retired || !enabled() || current == null || !current.overrideNametag()
+            || target == null || target instanceof Player || !overlay.audience.containsKey(viewerId)
+            || render == null || render.display == null || !render.whitelist.contains(viewerId)
+            || viewer == null || plugin.bedrock() != null && plugin.bedrock().isBedrock(viewerId)) {
+            suppression.retire(viewerId, overlay.targetId());
+            return;
+        }
+        suppression.admit(viewer, target, false);
     }
 
     private EntityOverlayText.Snapshot personalSnapshot(EntityOverlayTarget.Sample sample, UUID viewerId) {
@@ -1075,7 +1125,7 @@ public final class EntityOverlayService implements Listener, RegistryOwner {
             if (overlay.audience.remove(viewerId) == null) {
                 continue;
             }
-            retired(overlay.targetId(), List.of(viewerId));
+            retired(overlay, List.of(viewerId));
             overlay.personalViewers.remove(viewerId);
             overlay.dirty = true;
             overlay.retirePersonal(viewerId);

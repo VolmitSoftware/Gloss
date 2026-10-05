@@ -6,10 +6,27 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class EntityOverlayDocTest {
+    @Test
+    void nametagOverrideIsOptInAndSurvivesPresentationSelection() {
+        assertFalse(EntityOverlayDoc.DEFAULTS.overrideNametag());
+        EntityOverlayDoc enabled = EntityOverlayDoc.parse("default.json", """
+            {"schemaVersion":2,"revision":1,"overrideNametag":true,
+             "variants":[{"id":"named","when":"entity.named","presentation":{"verticalOffset":1}}]}
+            """);
+        assertTrue(enabled.overrideNametag());
+        assertTrue(enabled.variants().getFirst().presentation().apply(enabled).overrideNametag());
+        assertFalse(EntityOverlayDoc.parse("default.json", """
+            {"schemaVersion":2,"revision":1,"overrideNametag":false}
+            """).overrideNametag());
+        assertEquals(EntityOverlayDoc.DEFAULT_LINES, enabled.lines());
+    }
+
     @Test
     void omittedOptionsUseCompleteShippedDefaults() throws Exception {
         EntityOverlayDoc minimal = EntityOverlayDoc.parse("default.json", "{\"schemaVersion\":2,\"revision\":1}");

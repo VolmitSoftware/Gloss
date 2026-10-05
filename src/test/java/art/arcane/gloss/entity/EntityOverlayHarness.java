@@ -11,6 +11,7 @@ import art.arcane.gloss.config.GlossConfigFile;
 import art.arcane.gloss.hologram.HologramService;
 import art.arcane.gloss.particle.ParticleService;
 import art.arcane.gloss.text.TextPipeline;
+import art.arcane.gloss.util.common.LayeredTeamAllocator;
 import art.arcane.volmlib.util.scheduling.SchedulerRuntime;
 import org.bukkit.Bukkit;
 import org.bukkit.GameMode;
@@ -115,6 +116,7 @@ final class EntityOverlayHarness implements AutoCloseable {
     final TextPipeline text;
     final AnimationService animations;
     final File dataFolder;
+    final LayeredTeamAllocator teams = new LayeredTeamAllocator();
     volatile GlossConfig config;
 
     private final GlossConfigFile configFile;
@@ -154,6 +156,7 @@ final class EntityOverlayHarness implements AutoCloseable {
             setField(gloss, Gloss.class, "animations", animations);
             setField(gloss, Gloss.class, "animator", null);
             setField(gloss, Gloss.class, "particles", new ParticleService(gloss));
+            setField(gloss, Gloss.class, "teams", teams);
 
             this.holograms = new HologramService(gloss);
             setField(gloss, Gloss.class, "holograms", holograms);
