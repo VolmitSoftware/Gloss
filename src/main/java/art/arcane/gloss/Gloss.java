@@ -1,5 +1,6 @@
 package art.arcane.gloss;
 
+import java.util.concurrent.CompletionStage;
 import art.arcane.volmlib.util.diagnostics.BukkitDebugDump;
 import art.arcane.gloss.animation.AnimationService;
 import art.arcane.gloss.bedrock.BedrockPolicy;
@@ -457,13 +458,14 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
     }
 
     @Override
-    public void onPreUnload(PreUnloadReason reason) {
+    public CompletionStage<Void> commitReload(PreUnloadReason reason) {
         log(Level.INFO, "Pre-unload hook fired (%s). Tearing down Gloss sessions and PacketEvents.", reason);
         shutdownServices();
         SchedulerUtils.cancelPluginTasks(this);
         if (scheduler != null) {
             scheduler.cancelPluginTasks();
         }
+        return CompletableFuture.completedFuture(null);
     }
 
     /**
