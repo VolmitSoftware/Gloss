@@ -10,6 +10,13 @@
   ],
   "additionalProperties": false,
   "properties": {
+    "preset": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1
+    },
     "schemaVersion": {
       "const": 1
     },
@@ -148,6 +155,28 @@
         },
         "healthBar": {
           "$ref": "#/$defs/healthBar"
+        },
+        "healthSegments": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 40,
+          "default": 10
+        },
+        "hideInvisible": {
+          "type": "boolean",
+          "default": true
+        },
+        "hideSpectator": {
+          "type": "boolean",
+          "default": true
+        },
+        "includeNpcs": {
+          "type": "boolean",
+          "default": true
+        },
+        "showSelf": {
+          "type": "boolean",
+          "default": false
         }
       }
     },

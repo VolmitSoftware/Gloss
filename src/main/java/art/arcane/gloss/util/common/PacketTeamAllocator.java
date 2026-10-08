@@ -1,6 +1,12 @@
 package art.arcane.gloss.util.common;
 
+import art.arcane.gloss.service.GlossTelemetry;
 import com.github.retrooper.packetevents.PacketEvents;
+import com.github.retrooper.packetevents.event.PacketListenerAbstract;
+import com.github.retrooper.packetevents.event.PacketListenerCommon;
+import com.github.retrooper.packetevents.event.PacketListenerPriority;
+import com.github.retrooper.packetevents.event.PacketSendEvent;
+import com.github.retrooper.packetevents.protocol.packettype.PacketType;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerTeams;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -9,6 +15,10 @@ import org.bukkit.entity.Player;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.Objects;
 import java.util.Locale;
 import java.util.Map;
 import java.util.TreeMap;
@@ -34,15 +44,34 @@ public final class PacketTeamAllocator implements TeamAllocator {
     private static final int MAX_TEAM_NAME_LENGTH = 16;
     private static final String DEFAULT_COLOR = "white";
 
-    /** Owned by {@code GlowService}, {@code NameplateSuppression} and {@code NametagDriver}. */
-    private static final Map<String, Integer> LAYER_STRENGTH = Map.of(
-        "glow", 3,
-        "nameplate", 2,
-        "nametag", 1);
+    public enum ForeignPolicy { YIELD, OVERRIDE }
+    public enum Composition { INTERSECTION, PRIORITY }
+
+    public record Policy(ForeignPolicy foreignPolicy, Map<String, Integer> layerPriorities,
+                         Composition visibilityPolicy, Composition collisionPolicy, boolean whiteIsUnspecified) {
+        public static final Policy DEFAULTS = new Policy(ForeignPolicy.YIELD,
+            Map.of("glow", 3, "nameplate", 2, "nametag", 1, "entity-overlay", 2),
+            Composition.INTERSECTION, Composition.INTERSECTION, true);
+
+        public Policy {
+            Objects.requireNonNull(foreignPolicy);
+            Objects.requireNonNull(visibilityPolicy);
+            Objects.requireNonNull(collisionPolicy);
+            layerPriorities = Map.copyOf(layerPriorities);
+            for (Map.Entry<String, Integer> layer : layerPriorities.entrySet()) {
+                if (layer.getKey().isBlank() || layer.getValue() < -1000000 || layer.getValue() > 1000000) {
+                    throw new IllegalArgumentException("Team layer priorities require a nonempty purpose and a value in -1000000..1000000");
+                }
+            }
+        }
+    }
 
     private final PacketSink sink;
     private final AtomicLong sequence = new AtomicLong();
     private final Map<UUID, ViewerClaims> claims = new ConcurrentHashMap<>();
+    private final Map<UUID, ForeignTeams> foreign = new ConcurrentHashMap<>();
+    private volatile Policy policy = Policy.DEFAULTS;
+    private PacketListenerCommon listener;
 
     public PacketTeamAllocator() {
         this(PacketTeamAllocator::sendPacket);
@@ -52,13 +81,53 @@ public final class PacketTeamAllocator implements TeamAllocator {
         this.sink = sink;
     }
 
+    public void enable() {
+        if (listener == null && PacketEvents.getAPI() != null) {
+            listener = PacketEvents.getAPI().getEventManager().registerListener(new PacketListenerAbstract(PacketListenerPriority.MONITOR) {
+                @Override
+                public void onPacketSend(PacketSendEvent event) {
+                    observe(event);
+                }
+            });
+        }
+    }
+
+    public void disable() {
+        if (listener != null && PacketEvents.getAPI() != null) {
+            PacketEvents.getAPI().getEventManager().unregisterListener(listener);
+            listener = null;
+        }
+        for (ViewerClaims viewer : claims.values()) {
+            for (Map.Entry<String, Team> entry : viewer.teams().entrySet()) {
+                synchronized (entry.getValue()) {
+                    remove(viewer, entry.getValue(), entry.getKey());
+                }
+            }
+        }
+        claims.clear();
+        foreign.clear();
+    }
+
+    public void configure(Policy replacement) {
+        policy = Objects.requireNonNull(replacement);
+        for (ViewerClaims viewer : claims.values()) {
+            for (Map.Entry<String, Team> entry : viewer.teams().entrySet()) {
+                synchronized (entry.getValue()) {
+                    publish(viewer.viewer(), entry.getValue(), entry.getKey());
+                }
+            }
+        }
+    }
+
     @Override
     public TeamHandle claim(Player viewer, String purpose, String entry, TeamStyle style) {
         ViewerClaims mine = claims.computeIfAbsent(viewer.getUniqueId(), key -> new ViewerClaims(viewer));
         Team team = mine.teams().computeIfAbsent(entry, key -> new Team(teamName()));
         synchronized (team) {
-            team.layers.put(purpose, style);
-            publish(mine.viewer(), team, entry);
+            TeamStyle previous = team.layers.put(purpose, style);
+            if (!Objects.equals(previous, style)) {
+                publish(mine.viewer(), team, entry);
+            }
         }
         return new TeamHandle(viewer.getUniqueId(), purpose, entry, team.name);
     }
@@ -77,8 +146,10 @@ public final class PacketTeamAllocator implements TeamAllocator {
             if (!team.layers.containsKey(handle.purpose())) {
                 return;
             }
-            team.layers.put(handle.purpose(), style);
-            publish(mine.viewer(), team, handle.entry());
+            TeamStyle previous = team.layers.put(handle.purpose(), style);
+            if (!Objects.equals(previous, style)) {
+                publish(mine.viewer(), team, handle.entry());
+            }
         }
     }
 
@@ -114,6 +185,7 @@ public final class PacketTeamAllocator implements TeamAllocator {
     @Override
     public void forget(UUID viewerId) {
         claims.remove(viewerId);
+        foreign.remove(viewerId);
     }
 
     /** Drops one layer: the team is removed when it was the last, and recomposed when it was not. */
@@ -126,22 +198,45 @@ public final class PacketTeamAllocator implements TeamAllocator {
             return;
         }
         mine.teams().remove(entry, team);
-        if (!team.created) {
-            return;
+        remove(mine, team, entry);
+    }
+
+    private void remove(ViewerClaims mine, Team team, String entry) {
+        if (team.created) {
+            sink.send(mine.viewer(), new WrapperPlayServerTeams(team.name, WrapperPlayServerTeams.TeamMode.REMOVE,
+                (WrapperPlayServerTeams.ScoreBoardTeamInfo) null, List.of()));
         }
-        sink.send(mine.viewer(), new WrapperPlayServerTeams(team.name, WrapperPlayServerTeams.TeamMode.REMOVE,
-            (WrapperPlayServerTeams.ScoreBoardTeamInfo) null, List.of()));
+        String previous = foreignTeam(mine.viewer().getUniqueId(), entry);
+        if (team.joined && previous != null) {
+            sink.send(mine.viewer(), membership(previous, WrapperPlayServerTeams.TeamMode.ADD_ENTITIES, entry));
+        }
+        team.created = false;
+        team.joined = false;
     }
 
     /** Sends the composed team, once as a CREATE and afterwards only when the composition moved. */
     private void publish(Player viewer, Team team, String entry) {
-        TeamStyle composed = compose(team.layers);
+        Policy current = policy;
+        String external = foreignTeam(viewer.getUniqueId(), entry);
+        if (current.foreignPolicy() == ForeignPolicy.YIELD && external != null) {
+            if (team.joined) {
+                sink.send(viewer, membership(external, WrapperPlayServerTeams.TeamMode.ADD_ENTITIES, entry));
+                team.joined = false;
+            }
+            return;
+        }
+        TeamStyle composed = compose(team.layers, current);
         if (!team.created) {
             team.created = true;
+            team.joined = true;
             team.style = composed;
             sink.send(viewer, new WrapperPlayServerTeams(team.name, WrapperPlayServerTeams.TeamMode.CREATE,
                 info(composed), List.of(entry)));
             return;
+        }
+        if (!team.joined) {
+            sink.send(viewer, membership(team.name, WrapperPlayServerTeams.TeamMode.ADD_ENTITIES, entry));
+            team.joined = true;
         }
         if (composed.equals(team.style)) {
             return;
@@ -152,14 +247,21 @@ public final class PacketTeamAllocator implements TeamAllocator {
     }
 
     static TeamStyle compose(Map<String, TeamStyle> layers) {
+        return compose(layers, Policy.DEFAULTS);
+    }
+
+    static TeamStyle compose(Map<String, TeamStyle> layers, Policy policy) {
         List<Map.Entry<String, TeamStyle>> ordered = new ArrayList<>(layers.entrySet());
         ordered.sort(Comparator.<Map.Entry<String, TeamStyle>>comparingInt(
-            entry -> -LAYER_STRENGTH.getOrDefault(entry.getKey(), 0)).thenComparing(Map.Entry::getKey));
+            entry -> policy.layerPriorities().getOrDefault(entry.getKey(), 0)).reversed()
+            .thenComparing(Map.Entry::getKey));
         String prefix = "";
         String suffix = "";
         String color = DEFAULT_COLOR;
-        int visibility = 0;
-        int collision = 0;
+        boolean colored = false;
+        NameTagVisibility visibility = NameTagVisibility.ALWAYS;
+        CollisionRule collision = CollisionRule.ALWAYS;
+        boolean first = true;
         for (Map.Entry<String, TeamStyle> entry : ordered) {
             TeamStyle layer = entry.getValue();
             if (prefix.isEmpty()) {
@@ -168,50 +270,146 @@ public final class PacketTeamAllocator implements TeamAllocator {
             if (suffix.isEmpty()) {
                 suffix = layer.suffix();
             }
-            if (DEFAULT_COLOR.equals(color) && !DEFAULT_COLOR.equals(layer.color())) {
+            if (!colored && (!policy.whiteIsUnspecified() || !DEFAULT_COLOR.equals(layer.color()))) {
                 color = layer.color();
+                colored = true;
             }
-            visibility = Math.max(visibility, rank(layer.nameTagVisibility()));
-            collision = Math.max(collision, rank(layer.collisionRule()));
+            if (first || policy.visibilityPolicy() == Composition.INTERSECTION) {
+                visibility = intersect(visibility, layer.nameTagVisibility());
+            }
+            if (first || policy.collisionPolicy() == Composition.INTERSECTION) {
+                collision = intersect(collision, layer.collisionRule());
+            }
+            first = false;
         }
-        return new TeamStyle(prefix, suffix, color, visibilityOf(visibility), collisionOf(collision));
+        return new TeamStyle(prefix, suffix, color, visibility, collision);
     }
 
-    /** Higher is more restrictive, so the strictest layer wins whatever order the claims arrived in. */
-    private static int rank(NameTagVisibility visibility) {
-        return switch (visibility) {
-            case ALWAYS -> 0;
-            case HIDE_FOR_OTHER_TEAMS -> 1;
-            case HIDE_FOR_OWN_TEAM -> 2;
-            case NEVER -> 3;
-        };
+    private static NameTagVisibility intersect(NameTagVisibility left, NameTagVisibility right) {
+        if (left == NameTagVisibility.ALWAYS) {
+            return right;
+        }
+        if (right == NameTagVisibility.ALWAYS || left == right) {
+            return left;
+        }
+        return NameTagVisibility.NEVER;
     }
 
-    private static NameTagVisibility visibilityOf(int rank) {
-        return switch (rank) {
-            case 1 -> NameTagVisibility.HIDE_FOR_OTHER_TEAMS;
-            case 2 -> NameTagVisibility.HIDE_FOR_OWN_TEAM;
-            case 3 -> NameTagVisibility.NEVER;
-            default -> NameTagVisibility.ALWAYS;
-        };
+    private static CollisionRule intersect(CollisionRule left, CollisionRule right) {
+        if (left == CollisionRule.ALWAYS) {
+            return right;
+        }
+        if (right == CollisionRule.ALWAYS || left == right) {
+            return left;
+        }
+        return CollisionRule.NEVER;
     }
 
-    private static int rank(CollisionRule rule) {
-        return switch (rule) {
-            case ALWAYS -> 0;
-            case PUSH_OTHER_TEAMS -> 1;
-            case PUSH_OWN_TEAM -> 2;
-            case NEVER -> 3;
-        };
+    private void observe(PacketSendEvent event) {
+        if (event.isCancelled() || event.getUser() == null || event.getUser().getUUID() == null
+            || event.getPacketType() != PacketType.Play.Server.TEAMS) {
+            return;
+        }
+        UUID viewerId = event.getUser().getUUID();
+        WrapperPlayServerTeams packet = new WrapperPlayServerTeams(event);
+        Set<String> changed = observe(viewerId, packet);
+        if (!changed.isEmpty()) {
+            event.getTasksAfterSend().add(() -> reconcile(viewerId, changed));
+        }
     }
 
-    private static CollisionRule collisionOf(int rank) {
-        return switch (rank) {
-            case 1 -> CollisionRule.PUSH_OTHER_TEAMS;
-            case 2 -> CollisionRule.PUSH_OWN_TEAM;
-            case 3 -> CollisionRule.NEVER;
-            default -> CollisionRule.ALWAYS;
-        };
+    Set<String> observe(UUID viewerId, WrapperPlayServerTeams packet) {
+        ViewerClaims mine = claims.get(viewerId);
+        if (packet.getTeamName().startsWith(PREFIX)) {
+            return Set.of();
+        }
+        ForeignTeams state = foreign.computeIfAbsent(viewerId, ignored -> new ForeignTeams());
+        Set<String> changed = new HashSet<>();
+        synchronized (state) {
+            String team = packet.getTeamName();
+            switch (packet.getTeamMode()) {
+                case CREATE, ADD_ENTITIES -> {
+                    Set<String> members = state.teams.computeIfAbsent(team, ignored -> new HashSet<>());
+                    for (String entry : packet.getPlayers()) {
+                        String previous = state.entries.put(entry, team);
+                        if (previous != null && !previous.equals(team)) {
+                            Set<String> old = state.teams.get(previous);
+                            if (old != null) {
+                                old.remove(entry);
+                            }
+                        }
+                        members.add(entry);
+                        changed.add(entry);
+                    }
+                }
+                case REMOVE -> {
+                    Set<String> members = state.teams.remove(team);
+                    if (members != null) {
+                        for (String entry : members) {
+                            if (state.entries.remove(entry, team)) {
+                                changed.add(entry);
+                            }
+                        }
+                    }
+                }
+                case REMOVE_ENTITIES -> {
+                    Set<String> members = state.teams.get(team);
+                    for (String entry : packet.getPlayers()) {
+                        if (members != null) {
+                            members.remove(entry);
+                        }
+                        if (state.entries.remove(entry, team)) {
+                            changed.add(entry);
+                        }
+                    }
+                }
+                default -> { }
+            }
+        }
+        if (mine == null) {
+            return Set.of();
+        }
+        changed.retainAll(mine.teams().keySet());
+        for (String entry : changed) {
+            Team owned = mine.teams().get(entry);
+            if (owned != null) {
+                synchronized (owned) {
+                    owned.joined = false;
+                }
+            }
+        }
+        return changed;
+    }
+
+    void reconcile(UUID viewerId, Set<String> changed) {
+        ViewerClaims viewer = claims.get(viewerId);
+        if (viewer == null) {
+            return;
+        }
+        for (String entry : changed) {
+            Team team = viewer.teams().get(entry);
+            if (team != null) {
+                synchronized (team) {
+                    if (!team.layers.isEmpty()) {
+                        publish(viewer.viewer(), team, entry);
+                    }
+                }
+            }
+        }
+    }
+
+    private String foreignTeam(UUID viewerId, String entry) {
+        ForeignTeams state = foreign.get(viewerId);
+        if (state == null) {
+            return null;
+        }
+        synchronized (state) {
+            return state.entries.get(entry);
+        }
+    }
+
+    private static WrapperPlayServerTeams membership(String team, WrapperPlayServerTeams.TeamMode mode, String entry) {
+        return new WrapperPlayServerTeams(team, mode, (WrapperPlayServerTeams.ScoreBoardTeamInfo) null, List.of(entry));
     }
 
     /**
@@ -261,7 +459,8 @@ public final class PacketTeamAllocator implements TeamAllocator {
         if (PacketEvents.getAPI() == null) {
             return;
         }
-        PacketUtils.send(viewer, packet);
+        PacketEvents.getAPI().getPlayerManager().sendPacketSilently(viewer, packet);
+        GlossTelemetry.countPackets(1L);
     }
 
     @FunctionalInterface
@@ -274,10 +473,16 @@ public final class PacketTeamAllocator implements TeamAllocator {
         private final Map<String, TeamStyle> layers = new TreeMap<>();
         private TeamStyle style;
         private boolean created;
+        private boolean joined;
 
         private Team(String name) {
             this.name = name;
         }
+    }
+
+    private static final class ForeignTeams {
+        private final Map<String, Set<String>> teams = new HashMap<>();
+        private final Map<String, String> entries = new HashMap<>();
     }
 
     private record ViewerClaims(Player viewer, Map<String, Team> teams) {

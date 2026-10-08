@@ -27,25 +27,40 @@ public final class ProxyTablists implements AutoCloseable {
     private final ProxyServer proxy;
     private final ProxyText text;
     private final Logger logger;
+    private final ProxyTablistGrid grids;
     private final Map<UUID, ViewerState> viewers = new ConcurrentHashMap<>();
     private final Set<UUID> failedPlayers = ConcurrentHashMap.newKeySet();
     private volatile boolean closed;
+    private volatile ProxyTablistVisibility visibility = ProxyTablistVisibility.EMPTY;
 
     public ProxyTablists(ProxyServer proxy, ProxyText text, Logger logger) {
         this.proxy = proxy;
         this.text = text;
         this.logger = logger;
+        this.grids = new ProxyTablistGrid(text);
     }
 
     @Override
     public void close() {
         closed = true;
+        grids.unregister();
         for (ViewerState state : viewers.values()) {
             execute(state.player, state.user, () -> clearNow(state.player, state.user));
         }
     }
 
-    public void render(Player viewer, ProxyDocuments.Snapshot snapshot) {
+    public void visibility(ProxyTablistVisibility visibility) {
+        this.visibility = Objects.requireNonNull(visibility, "visibility");
+        text.visibility(visibility);
+    }
+
+    public ProxyRoster captureRoster() {
+        ProxyRoster roster = ProxyRoster.capture(proxy.getAllPlayers(), visibility);
+        grids.roster(roster);
+        return roster;
+    }
+
+    public void render(Player viewer, ProxyDocuments.Snapshot snapshot, ProxyRoster roster) {
         if (closed) {
             return;
         }
@@ -53,7 +68,7 @@ public final class ProxyTablists implements AutoCloseable {
         if (user != null) {
             execute(viewer, user, () -> {
                 if (!closed && ready(viewer, user)) {
-                    renderNow(viewer, user, snapshot);
+                    renderNow(viewer, user, snapshot, roster);
                 }
             });
         }
@@ -73,19 +88,28 @@ public final class ProxyTablists implements AutoCloseable {
             ? PacketEvents.getAPI().getPlayerManager().getUser(viewer) : state == null ? null : state.user;
         if (user == null || viewer == null) {
             viewers.remove(id);
+            grids.forget(id);
             failedPlayers.remove(id);
             return;
         }
         execute(viewer, user, () -> {
             clearNow(viewer, user);
             viewers.remove(id);
+            grids.forget(id);
             failedPlayers.remove(id);
         });
     }
 
-    private void renderNow(Player viewer, User user, ProxyDocuments.Snapshot snapshot) {
+    private void renderNow(Player viewer, User user, ProxyDocuments.Snapshot snapshot, ProxyRoster roster) {
+        ProxyRoster.Subject reader = roster.subjects().get(viewer.getUniqueId());
+        if (reader == null) {
+            reader = ProxyRoster.capture(viewer);
+        }
+        if (reader == null) {
+            return;
+        }
         ProxyDocuments.Tablist document = snapshot.tablist();
-        ExpressionScope scope = text.scope(viewer, viewer);
+        ExpressionScope scope = roster.scope(text, reader, reader);
         if (!snapshot.settings().tablist() || !text.test(document.show(), scope)) {
             clearNow(viewer, user);
             return;
@@ -109,30 +133,33 @@ public final class ProxyTablists implements AutoCloseable {
         }
         TabList tab = viewer.getTabList();
         Set<UUID> desired = new HashSet<>();
-        for (Player subject : proxy.getAllPlayers()) {
-            if (!subject.isActive() || subject.getCurrentServer().isEmpty()) {
+        for (ProxyRoster.Subject subject : roster.subjects().values()) {
+            boolean local = reader.server().equals(subject.server());
+            if (!snapshot.settings().networkTablist() && !local) {
                 continue;
             }
-            if (!snapshot.settings().networkTablist() && !sameServer(viewer, subject)) {
+            ExpressionScope subjectScope = roster.scope(text, reader, subject);
+            if (!roster.visibility().visible(reader.id(), subject.id())
+                || !text.test(snapshot.settings().networkVisibility(), subjectScope)) {
                 continue;
             }
-            desired.add(subject.getUniqueId());
-            ExpressionScope subjectScope = text.scope(viewer, subject);
+            desired.add(subject.id());
             ProxyDocuments.ListName name = text.select(document.listNames(), subjectScope);
-            TabListEntry entry = tab.getEntry(subject.getUniqueId()).orElse(null);
-            if (entry == null && !snapshot.settings().networkTablist()) {
+            TabListEntry entry = tab.getEntry(subject.id()).orElse(null);
+            Original previous = state.entries.get(subject.id());
+            if (entry == null && (local || !snapshot.settings().networkTablist() || previous != null)) {
                 continue;
             }
             boolean added = entry == null;
             if (added) {
-                entry = TabListEntry.builder().tabList(tab).profile(subject.getGameProfile())
-                    .latency((int) Math.clamp(subject.getPing(), 0, Integer.MAX_VALUE)).gameMode(0).build();
+                entry = TabListEntry.builder().tabList(tab).profile(subject.profile())
+                    .latency(subject.ping()).gameMode(0).build();
                 tab.addEntry(entry);
             }
-            Original original = state.entries.get(subject.getUniqueId());
+            Original original = state.entries.get(subject.id());
             if (original == null || original.entry != entry) {
                 original = new Original(added, entry);
-                state.entries.put(subject.getUniqueId(), original);
+                state.entries.put(subject.id(), original);
             }
             if (name != null) {
                 if (!original.nameOwned) {
@@ -162,7 +189,7 @@ public final class ProxyTablists implements AutoCloseable {
                 original.orderOwned = false;
             }
             if (original.added) {
-                int ping = (int) Math.clamp(subject.getPing(), 0, Integer.MAX_VALUE);
+                int ping = subject.ping();
                 if (entry.getLatency() != ping) {
                     entry.setLatency(ping);
                 }
@@ -178,12 +205,15 @@ public final class ProxyTablists implements AutoCloseable {
         for (UUID id : removed) {
             state.entries.remove(id);
         }
+        grids.render(new ProxyTablistGrid.Render(reader, roster, document, snapshot.settings().networkTablist(),
+            snapshot.settings().networkVisibility()));
     }
 
     private void clearNow(Player viewer, User user) {
         if (viewer.isActive() && user.getEncoderState() != ConnectionState.PLAY) {
             return;
         }
+        grids.clear(viewer);
         ViewerState state = viewers.remove(viewer.getUniqueId());
         if (state == null || !ready(viewer, user)) {
             return;

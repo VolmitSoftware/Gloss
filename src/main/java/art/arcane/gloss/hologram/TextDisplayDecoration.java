@@ -1,6 +1,7 @@
 package art.arcane.gloss.hologram;
 
 import art.arcane.gloss.Gloss;
+import art.arcane.gloss.service.VisibilityGovernor;
 import art.arcane.gloss.api.HologramBox;
 import art.arcane.gloss.api.HologramPresentation;
 import art.arcane.gloss.api.IconDisplayStyle;
@@ -18,21 +19,30 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.function.Supplier;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public final class TextDisplayDecoration {
     private final HologramService service;
     private final Runnable visibilityChanged;
+    private final Supplier<VisibilityGovernor.Surface> surface;
+    private final ViewerDisplayBudget displayBudget;
     private final AtomicBoolean spawning = new AtomicBoolean();
     private final AtomicBoolean destroyed = new AtomicBoolean();
     private final Map<UUID, Player> visibleViewers = new ConcurrentHashMap<>();
     private volatile List<TextDisplay> displays = List.of();
     private volatile State state;
 
-    public TextDisplayDecoration(HologramService service, Runnable visibilityChanged) {
-        this.service = service;
-        this.visibilityChanged = visibilityChanged;
+    public TextDisplayDecoration(Options options) {
+        this.service = options.service();
+        this.visibilityChanged = options.visibilityChanged();
+        this.surface = options.surface();
+        this.displayBudget = new ViewerDisplayBudget(service.plugin(), surface);
+    }
+
+    public record Options(HologramService service, Runnable visibilityChanged,
+                          Supplier<VisibilityGovernor.Surface> surface) {
     }
 
     public List<TextDisplay> displays() {
@@ -109,17 +119,28 @@ public final class TextDisplayDecoration {
             return;
         }
         visibleViewers.clear();
+        displayBudget.close();
         removeDisplays(anchor);
     }
 
+    public void forget(UUID viewerId) {
+        visibleViewers.remove(viewerId);
+        displayBudget.forget(viewerId);
+    }
+
     public void setVisible(Player viewer, boolean visible) {
+        if (!viewer.isOnline()) {
+            forget(viewer.getUniqueId());
+            return;
+        }
         if (destroyed.get()) {
             return;
         }
         UUID viewerId = viewer.getUniqueId();
-        Player previous = visible ? visibleViewers.put(viewerId, viewer) : visibleViewers.remove(viewerId);
-        if (visible && previous == viewer) {
-            return;
+        if (visible) {
+            visibleViewers.put(viewerId, viewer);
+        } else {
+            visibleViewers.remove(viewerId);
         }
         applyVisibility(viewer);
     }
@@ -131,12 +152,15 @@ public final class TextDisplayDecoration {
                 return;
             }
             boolean visible = visibleViewers.get(viewerId) == viewer;
-            for (TextDisplay display : displays) {
-                if (visible) {
-                    viewer.showEntity(service.plugin(), display);
-                } else {
-                    viewer.hideEntity(service.plugin(), display);
-                }
+            State current = state;
+            Location location = viewer.getLocation();
+            boolean detailed = current != null && location.getWorld() == current.anchor().getWorld()
+                && service.plugin().governor().tier(viewer, surface.get(), location.distanceSquared(current.anchor()))
+                == VisibilityGovernor.Tier.FULL;
+            if (visible && detailed) {
+                displayBudget.show(viewer, displays);
+            } else {
+                displayBudget.hide(viewer);
             }
         });
     }
@@ -148,6 +172,7 @@ public final class TextDisplayDecoration {
     }
 
     private void removeDisplays(Location anchor) {
+        displayBudget.clear();
         List<TextDisplay> current;
         synchronized (this) {
             current = displays;
@@ -175,7 +200,7 @@ public final class TextDisplayDecoration {
                         service.configureDisplay(display, false, Display.Billboard.CENTER);
                         display.setText(" ");
                         display.setTextOpacity((byte) 0);
-                        DisplayVisibility.setVisibleByDefault(display, false);
+                        DisplayVisibility.hideByDefault(display);
                         configure(display, next, part);
                     }));
                 }

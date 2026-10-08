@@ -1,6 +1,9 @@
 package art.arcane.gloss.hologram;
 
 import art.arcane.gloss.Gloss;
+import art.arcane.gloss.menu.DisplayEntityGroup;
+import art.arcane.gloss.menu.DisplayEntityManager;
+import art.arcane.gloss.service.VisibilityGovernor;
 import art.arcane.gloss.bedrock.BedrockPolicy;
 import art.arcane.gloss.bedrock.BedrockSurface;
 import art.arcane.gloss.api.AnchoredHologram;
@@ -73,14 +76,14 @@ final class PersistentHologram implements AnchoredHologram {
     private record AppliedAnchor(long generation, Location location) {
     }
 
-    private record SharedText(long generation, long emojiGeneration, long renderGeneration, String text) {
+    private record SharedText(long generation, long emojiGeneration, long renderGeneration, long refreshAfterMs, String text) {
     }
 
     private record StaticSegments(long generation, long emojiGeneration, long renderGeneration, String[] segments) {
     }
 
     private record SharedAnimation(long generation, long emojiGeneration, long renderGeneration,
-                                   long animationGeneration, AnimationTemplate template) {
+                                   long animationGeneration, long refreshAfterMs, AnimationTemplate template) {
     }
 
     private record ViewerAnimation(long lineGeneration, long emojiGeneration, long renderGeneration,
@@ -93,18 +96,20 @@ final class PersistentHologram implements AnchoredHologram {
     }
 
     private record PresentationMemo(long tick, long generation, String page, ResolvedPresentation presentation) {}
+    private record VisibilityMemo(ShowCondition condition, long generation, long nextTick, boolean visible) {}
 
     private record VariantMatch(HologramDoc.Variant variant, ShowCondition condition) {}
 
     private record ResolvedPresentation(String key, LineSet lines, IconDisplayStyle style,
                                         HologramBox box, List<ParticleLayer> particles) {}
 
-    private record SpawnedObjects(Player player, String pageKey, int[] entityIds) {
+    private record SpawnedObjects(Player player, String pageKey, int[] entityIds, DisplayEntityGroup group) {
     }
 
     private final HologramService service;
     private final String id;
     private final String animatorGroup;
+    private final String admissionWorkKey;
     private final String particlesWorkKey;
     private final String boxWorkKey;
     private final Object linesLock;
@@ -112,6 +117,8 @@ final class PersistentHologram implements AnchoredHologram {
     private final Map<UUID, ViewerAnimation> viewerAnimations;
     private final Map<UUID, Player> activeViewers;
     private final Map<UUID, Boolean> shownViewers = new ConcurrentHashMap<>();
+    private final Map<UUID, VisibilityMemo> visibilityMemos = new ConcurrentHashMap<>();
+    private final DisplayRefreshClock motionClock = new DisplayRefreshClock();
     private final Set<UUID> untrackedViewers = ConcurrentHashMap.newKeySet();
     private final Set<UUID> trackingChangedViewers = ConcurrentHashMap.newKeySet();
     private final AtomicBoolean sharedSpawning;
@@ -144,6 +151,7 @@ final class PersistentHologram implements AnchoredHologram {
     private volatile double pitch;
     private volatile double viewDistance = 48.0D;
     private volatile int refreshTicks = 10;
+    private volatile DisplayRefresh refresh = DisplayRefresh.DEFAULTS;
     private volatile long nextRefreshTick;
     private volatile List<ParticleLayer> particleLayers;
     private volatile long revision;
@@ -156,11 +164,14 @@ final class PersistentHologram implements AnchoredHologram {
     private volatile SharedAnimation sharedAnimationCache;
     private volatile DependencyMemo dependencyMemo;
     private volatile ShowCondition show = ShowCondition.ALWAYS;
+    private final ViewerDisplayBudget displayBudget;
 
     PersistentHologram(HologramService service, String id, Location location) {
         this.service = service;
+        this.displayBudget = new ViewerDisplayBudget(service.plugin(), () -> VisibilityGovernor.Surface.HOLOGRAM);
         this.id = id;
         this.animatorGroup = "holo:" + id;
+        this.admissionWorkKey = id + "#admission";
         this.particlesWorkKey = id + "#particles";
         this.boxWorkKey = id + "#box";
         this.linesLock = new Object();
@@ -182,8 +193,10 @@ final class PersistentHologram implements AnchoredHologram {
 
     PersistentHologram(HologramService service, String id, HologramDoc doc) {
         this.service = service;
+        this.displayBudget = new ViewerDisplayBudget(service.plugin(), () -> VisibilityGovernor.Surface.HOLOGRAM);
         this.id = id;
         this.animatorGroup = "holo:" + id;
+        this.admissionWorkKey = id + "#admission";
         this.particlesWorkKey = id + "#particles";
         this.boxWorkKey = id + "#box";
         this.linesLock = new Object();
@@ -331,6 +344,9 @@ final class PersistentHologram implements AnchoredHologram {
         style = doc.style();
         viewDistance = doc.viewDistance();
         refreshTicks = doc.refreshTicks();
+        refresh = doc.refresh();
+        visibilityMemos.clear();
+        motionClock.reset();
         nextRefreshTick = 0L;
         box = doc.box();
         if (!box.enabled()) {
@@ -365,14 +381,16 @@ final class PersistentHologram implements AnchoredHologram {
     }
 
     int refreshTicks() {
-        return refreshTicks;
+        int interval = Math.min(refreshTicks, Math.min(refresh.contentInterval(refreshTicks),
+            refresh.visibilityInterval(refreshTicks)));
+        return refresh.motionTicks() == null ? interval : Math.min(interval, refresh.motionTicks());
     }
 
     boolean refreshDue(long tick) {
         if (tick < nextRefreshTick) {
             return false;
         }
-        nextRefreshTick = tick + refreshTicks;
+        nextRefreshTick = tick + refreshTicks();
         return true;
     }
 
@@ -382,7 +400,7 @@ final class PersistentHologram implements AnchoredHologram {
         return new HologramDoc(HologramDoc.CURRENT_SCHEMA_VERSION, revision,
             new HologramDoc.Anchor(anchor.worldName(), new Vector(anchor.x(), anchor.y(), anchor.z())),
             currentPages.isEmpty() ? lineSet.source() : List.of(), style, box, yaw, pitch, particleLayers, show,
-            currentPages, actions, hitbox, viewDistance, refreshTicks, variants);
+            currentPages, actions, hitbox, viewDistance, refreshTicks, variants, refresh);
     }
 
     List<MenuActionData> actions() {
@@ -457,6 +475,8 @@ final class PersistentHologram implements AnchoredHologram {
         pageSets.clear();
         presentations.clear();
         viewerPresentations.clear();
+        visibilityMemos.clear();
+        motionClock.reset();
         visiblePages.clear();
         viewerStyles.clear();
         staticSegmentsByGeneration.clear();
@@ -575,9 +595,17 @@ final class PersistentHologram implements AnchoredHologram {
         } else {
             updateShared(world, tickAnchor, anchor, snapshot, viewers);
         }
-        updateDecorations(tickAnchor, anchor, snapshot, viewers);
+        if (!personalizedDisplay) {
+            reconcileDisplayBudget(anchor, snapshot, viewers);
+        }
+        boolean motionDue = motionClock.due(System.nanoTime() / 50_000_000L, refresh.motionTicks());
+        if (motionDue) {
+            updateDecorations(tickAnchor, anchor, snapshot, viewers);
+        }
         emitParticles(anchor, snapshot, viewers);
-        updateObjectLines(anchor, snapshot, viewers);
+        if (motionDue) {
+            updateObjectLines(anchor, snapshot, viewers);
+        }
     }
 
     /** Pages and per-line show conditions give every viewer their own line list. */
@@ -630,6 +658,10 @@ final class PersistentHologram implements AnchoredHologram {
         return resolved;
     }
 
+    boolean shownTo(Player viewer) {
+        return displayBudget.isShown(viewer.getUniqueId());
+    }
+
     boolean hasSpawnedDisplay() {
         return sharedDisplay != null;
     }
@@ -653,9 +685,13 @@ final class PersistentHologram implements AnchoredHologram {
     }
 
     void onPlayerQuit(UUID playerId) {
+        displayBudget.forget(playerId);
         untrackedViewers.remove(playerId);
         trackingChangedViewers.remove(playerId);
-        objectViewers.remove(playerId);
+        SpawnedObjects objects = objectViewers.remove(playerId);
+        if (objects != null) {
+            objects.group().disconnected();
+        }
         objectsByPage.keySet().removeIf(key -> key.endsWith("@" + playerId));
         invalidateViewer(playerId, false);
     }
@@ -735,12 +771,14 @@ final class PersistentHologram implements AnchoredHologram {
         SharedText cached = sharedTextCache;
         if (cached != null && cached.generation() == snapshot.generation()
             && cached.emojiGeneration() == emojiGeneration
-            && cached.renderGeneration() == renderGeneration && !hasDynamicText(snapshot)) {
+            && cached.renderGeneration() == renderGeneration
+            && (!hasDynamicText(snapshot) || refresh.contentTicks() != null && System.currentTimeMillis() < cached.refreshAfterMs())) {
             return cached.text();
         }
 
         String rendered = service.renderStaticLines(snapshot.lines());
-        sharedTextCache = new SharedText(snapshot.generation(), emojiGeneration, renderGeneration, rendered);
+        sharedTextCache = new SharedText(snapshot.generation(), emojiGeneration, renderGeneration,
+            System.currentTimeMillis() + refresh.contentInterval(refreshTicks) * 50L, rendered);
         return rendered;
     }
 
@@ -750,17 +788,19 @@ final class PersistentHologram implements AnchoredHologram {
         long animationGeneration = service.animationGeneration();
         boolean dynamic = service.hasDynamicAnimationContent(snapshot.lines());
         SharedAnimation cached = sharedAnimationCache;
-        if (!dynamic && cached != null && cached.generation() == snapshot.generation()
+        if (cached != null && cached.generation() == snapshot.generation()
             && cached.emojiGeneration() == emojiGeneration
             && cached.renderGeneration() == renderGeneration
-            && cached.animationGeneration() == animationGeneration) {
+            && cached.animationGeneration() == animationGeneration
+            && (!dynamic || refresh.contentTicks() != null && System.currentTimeMillis() < cached.refreshAfterMs())) {
             return cached.template();
         }
         AnimationTemplate template = service.animator().compileTemplate(snapshot.lines(),
                 line -> service.plugin().text().renderParticleText(null, line).text());
-        if (template != null && !dynamic) {
+        if (template != null) {
             sharedAnimationCache = new SharedAnimation(snapshot.generation(), emojiGeneration,
-                renderGeneration, animationGeneration, template);
+                renderGeneration, animationGeneration,
+                System.currentTimeMillis() + refresh.contentInterval(refreshTicks) * 50L, template);
         }
         return template;
     }
@@ -825,6 +865,12 @@ final class PersistentHologram implements AnchoredHologram {
             return;
         }
         authored = presentation.lines().lines();
+        Location viewerLocation = viewer.getLocation();
+        if (!displayBudget.isShown(viewer.getUniqueId()) || viewerLocation.getWorld() != anchor.getWorld()
+            || service.plugin().governor().tier(viewer, VisibilityGovernor.Surface.HOLOGRAM, viewerLocation.distanceSquared(anchor))
+                != VisibilityGovernor.Tier.FULL) {
+            return;
+        }
         long tick = System.currentTimeMillis() / 50L;
         List<ParticleLayer> layers = presentation.particles();
         boolean due = false;
@@ -906,9 +952,7 @@ final class PersistentHologram implements AnchoredHologram {
                     service.configureDisplay(spawned, style.seeThrough(), Display.Billboard.valueOf(style.billboard().name()));
                     service.trackDisplay(spawned, (player, tracked) -> trackingChanged(spawned, player, tracked));
                     configureStyle(spawned);
-                    if (!show.isAlwaysVisible()) {
-                        DisplayVisibility.setVisibleByDefault(spawned, false);
-                    }
+                    DisplayVisibility.hideByDefault(spawned);
                     spawned.setText(rendered);
                 };
                 TextDisplay spawned = world.spawn(anchor, TextDisplay.class, configurer);
@@ -927,6 +971,9 @@ final class PersistentHologram implements AnchoredHologram {
                     clearShared(spawned);
                     service.despawnEntity(spawned, anchor);
                     return;
+                }
+                if (!personalized) {
+                    reconcileDisplayBudget(anchor, snapshot, viewers);
                 }
                 if (personalized) {
                     refreshPersonalizedViewers(spawned.getEntityId(), snapshot, viewers, 1L);
@@ -997,6 +1044,7 @@ final class PersistentHologram implements AnchoredHologram {
             refreshViewerText(viewer.id(), viewer.player(), entityId, snapshot,
                 delayTicks);
         }
+        displayBudget.retain(current);
         for (UUID viewerId : activeViewers.keySet()) {
             if (!current.contains(viewerId)) {
                 invalidateViewer(viewerId, true);
@@ -1044,6 +1092,7 @@ final class PersistentHologram implements AnchoredHologram {
 
         int entityId = sharedEntityId;
         shownViewers.remove(viewerId);
+        visibilityMemos.remove(viewerId);
         viewerStyles.remove(viewerId);
         viewerPresentations.remove(viewerId);
         visiblePages.remove(viewerId);
@@ -1132,26 +1181,78 @@ final class PersistentHologram implements AnchoredHologram {
     }
 
     private long viewerRefreshIntervalMs(LineSet snapshot) {
-        return dependencies(snapshot).fastDynamic()
-            ? 50L
-            : refreshTicks * 50L;
+        int fallback = dependencies(snapshot).fastDynamic() ? 1 : refreshTicks;
+        int interval = refresh.contentInterval(fallback);
+        if (snapshot.conditional()) {
+            interval = Math.min(interval, refresh.visibilityInterval(fallback));
+        }
+        return interval * 50L;
+    }
+
+    private void reconcileDisplayBudget(Location anchor, LineSet snapshot, List<HologramTick.Viewer> viewers) {
+        TextDisplay expected = sharedDisplay;
+        if (expected == null) {
+            return;
+        }
+        Set<UUID> current = new HashSet<>(viewers.size());
+        for (HologramTick.Viewer viewer : viewers) {
+            current.add(viewer.id());
+            service.runViewerWork(viewer.player(), viewer.id(), admissionWorkKey, () -> {
+                Player player = viewer.player();
+                if (!player.isOnline() || sharedDisplay != expected || lineSet != snapshot) {
+                    return;
+                }
+                LineSet lines = personalizedDisplay ? selectPresentation(player).lines() : snapshot;
+                boolean visible = updateDisplayBudget(player, expected, anchor,
+                    lines != EMPTY_LINES && show.matches(service.plugin(), player));
+                shownViewers.put(viewer.id(), visible);
+            });
+        }
+        displayBudget.retain(current);
+    }
+
+    private boolean updateDisplayBudget(Player player, TextDisplay display, Location anchor, boolean eligible) {
+        Location viewerLocation = player.getLocation();
+        BedrockPolicy policy = BedrockPolicy.of(service.plugin());
+        boolean visible = eligible && viewerLocation.getWorld() == anchor.getWorld()
+            && viewerLocation.distanceSquared(anchor) <= viewDistance * viewDistance
+            && (policy == null || !policy.hides(BedrockSurface.HOLOGRAM, player))
+            && service.plugin().governor().tier(player, VisibilityGovernor.Surface.HOLOGRAM,
+                viewerLocation.distanceSquared(anchor)) != VisibilityGovernor.Tier.CULLED;
+        if (visible) {
+            return displayBudget.show(player, List.of(display));
+        }
+        displayBudget.hide(player);
+        return false;
     }
 
     private Boolean refreshShow(Player player, UUID viewerId, TextDisplay expectedDisplay, LineSet snapshot) {
         ShowCondition condition = show;
-        boolean visible = snapshot != EMPTY_LINES && condition.matches(service.plugin(), player);
+        boolean visible = snapshot != EMPTY_LINES && conditionVisible(player, snapshot, condition);
         if (sharedDisplay != expectedDisplay || expectedDisplay == null || !isCurrentSet(snapshot)
             || show != condition || !personalizedDisplay || activeViewers.get(viewerId) != player) {
             return null;
         }
-        Boolean previous = shownViewers.put(viewerId, visible);
-        if (previous == null || previous != visible) {
-            if (visible) {
-                player.showEntity(service.plugin(), expectedDisplay);
-            } else {
-                player.hideEntity(service.plugin(), expectedDisplay);
-            }
+        Location anchor = location();
+        visible = anchor != null && updateDisplayBudget(player, expectedDisplay, anchor, visible);
+        shownViewers.put(viewerId, visible);
+        return visible;
+    }
+
+    private boolean conditionVisible(Player viewer, LineSet snapshot, ShowCondition condition) {
+        Integer interval = refresh.visibilityTicks();
+        if (interval == null) {
+            return condition.matches(service.plugin(), viewer);
         }
+        UUID viewerId = viewer.getUniqueId();
+        long tick = System.nanoTime() / 50_000_000L;
+        VisibilityMemo memo = visibilityMemos.get(viewerId);
+        if (memo != null && memo.condition() == condition && memo.generation() == snapshot.generation()
+            && tick < memo.nextTick()) {
+            return memo.visible();
+        }
+        boolean visible = condition.matches(service.plugin(), viewer);
+        visibilityMemos.put(viewerId, new VisibilityMemo(condition, snapshot.generation(), tick + interval, visible));
         return visible;
     }
 
@@ -1268,7 +1369,7 @@ final class PersistentHologram implements AnchoredHologram {
                     return;
                 }
                 if (sharedDecoration == null) {
-                    sharedDecoration = new TextDisplayDecoration(service, () -> {});
+                    sharedDecoration = new TextDisplayDecoration(new TextDisplayDecoration.Options(service, () -> {}, () -> VisibilityGovernor.Surface.HOLOGRAM));
                 }
                 TextFrameSource frames = sharedFrames;
                 String text = frames == null ? sharedRendered : frames.compose(System.currentTimeMillis());
@@ -1276,7 +1377,7 @@ final class PersistentHologram implements AnchoredHologram {
                     style, box, text == null ? "" : text, 0));
                 for (HologramTick.Viewer viewer : viewers) {
                     decorationViewers.put(viewer.id(), viewer.player());
-                    sharedDecoration.setVisible(viewer.player(), true);
+                    sharedDecoration.setVisible(viewer.player(), displayBudget.isShown(viewer.id()));
                 }
                 return;
             }
@@ -1295,7 +1396,7 @@ final class PersistentHologram implements AnchoredHologram {
             return;
         }
         ResolvedPresentation presentation = selectPresentation(player);
-        boolean visible = presentation.lines() != EMPTY_LINES && presentation.box().enabled()
+        boolean visible = displayBudget.isShown(viewerId) && presentation.lines() != EMPTY_LINES && presentation.box().enabled()
             && show.matches(service.plugin(), player);
         synchronized (decorationLock) {
             if (sharedDisplay != expected || !personalizedDisplay || activeViewers.get(viewerId) != player
@@ -1316,7 +1417,7 @@ final class PersistentHologram implements AnchoredHologram {
                 return;
             }
             TextDisplayDecoration decoration = viewerDecorations.computeIfAbsent(viewerId,
-                ignored -> new TextDisplayDecoration(service, () -> {}));
+                ignored -> new TextDisplayDecoration(new TextDisplayDecoration.Options(service, () -> {}, () -> VisibilityGovernor.Surface.HOLOGRAM)));
             decorationViewers.put(viewerId, player);
             decoration.update(new TextDisplayDecoration.Update(anchor, HologramPresentation.identity(),
                 presentation.style(), presentation.box(), text, 0));
@@ -1361,6 +1462,7 @@ final class PersistentHologram implements AnchoredHologram {
 
     private void despawnShared() {
         TextDisplay display = sharedDisplay;
+        displayBudget.clear();
         service.animator().removeGroup(animatorGroup);
         clearPersonalizedState();
         sharedDisplay = null;
@@ -1410,7 +1512,9 @@ final class PersistentHologram implements AnchoredHologram {
             if (policy != null && policy.hides(BedrockSurface.HOLOGRAM, viewer.player())) {
                 continue;
             }
-            captured.add(viewer.player());
+            if (displayBudget.isShown(viewer.id())) {
+                captured.add(viewer.player());
+            }
         }
 
         return List.copyOf(captured);
@@ -1424,6 +1528,7 @@ final class PersistentHologram implements AnchoredHologram {
         if (sharedDisplay != display) {
             return;
         }
+        displayBudget.clear();
         service.animator().removeGroup(animatorGroup);
         clearPersonalizedState();
         sharedDisplay = null;
@@ -1440,6 +1545,7 @@ final class PersistentHologram implements AnchoredHologram {
         Player viewer = activeViewers.remove(viewerId);
         removeViewerDecoration(viewerId);
         shownViewers.remove(viewerId);
+        visibilityMemos.remove(viewerId);
         viewerStyles.remove(viewerId);
         viewerPresentations.remove(viewerId);
         visiblePages.remove(viewerId);
@@ -1456,7 +1562,7 @@ final class PersistentHologram implements AnchoredHologram {
             if (personalizedDisplay && sharedEntityId == entityId && !activeViewers.containsKey(viewerId)) {
                 TextDisplay display = sharedDisplay;
                 if (!show.isAlwaysVisible() && display != null) {
-                    viewer.hideEntity(service.plugin(), display);
+                    displayBudget.hide(viewer);
                 }
                 service.animator().sendText(viewer, viewerId, entityId, "");
             }
@@ -1471,6 +1577,7 @@ final class PersistentHologram implements AnchoredHologram {
         }
         activeViewers.clear();
         shownViewers.clear();
+        visibilityMemos.clear();
         viewerPresentations.clear();
         visiblePages.clear();
         viewerStyles.clear();
@@ -1520,7 +1627,8 @@ final class PersistentHologram implements AnchoredHologram {
         long generation = selected.generation();
         String requested = service.viewerPage(id, viewer.getUniqueId());
         PresentationMemo memo = viewerPresentations.get(viewer.getUniqueId());
-        if (memo != null && memo.tick() == tick && memo.generation() == generation
+        if (memo != null && tick >= memo.tick() && tick < memo.tick() + refresh.visibilityInterval(1)
+            && memo.generation() == generation
             && Objects.equals(memo.page(), requested)) {
             return memo.presentation();
         }
@@ -1662,7 +1770,10 @@ final class PersistentHologram implements AnchoredHologram {
         }
         ResolvedPresentation presentation = selectPresentation(player);
         Location anchor = objectAnchor;
-        if (anchor == null || presentation.lines() == EMPTY_LINES) {
+        if (anchor == null || presentation.lines() == EMPTY_LINES
+            || player.getWorld() != anchor.getWorld()
+            || service.plugin().governor().tier(player, VisibilityGovernor.Surface.HOLOGRAM,
+                player.getLocation().distanceSquared(anchor)) == VisibilityGovernor.Tier.CULLED) {
             despawnObjectLines(viewerId, null);
             return;
         }
@@ -1682,8 +1793,9 @@ final class PersistentHologram implements AnchoredHologram {
         }
         SpawnedObjects current = objectViewers.get(viewerId);
         if (current != null && current.player() == player && Arrays.equals(current.entityIds(), entityIds)) {
+            current.group().refresh();
             if (presentation.lines().rawEntities()) {
-                updateRawObjectPositions(player, anchor, presentation.style(), visible, true);
+                updateRawObjectPositions(player, anchor, presentation.style(), visible, current.group().visible());
             }
             return;
         }
@@ -1694,12 +1806,14 @@ final class PersistentHologram implements AnchoredHologram {
         if (presentation.lines().rawEntities()) {
             updateRawObjectPositions(player, anchor, presentation.style(), visible, false);
         }
-        List<PacketWrapper<?>> packets = new ArrayList<>(visible.size() * 2);
-        for (HologramLineRenderer.ObjectLine line : visible) {
-            packets.addAll(line.display().spawn());
-        }
-        objectViewers.put(viewerId, new SpawnedObjects(player, objectKey, entityIds));
-        PacketUtils.send(player, packets);
+        DisplayEntityGroup group = DisplayEntityManager.group(player, VisibilityGovernor.Surface.HOLOGRAM);
+        objectViewers.put(viewerId, new SpawnedObjects(player, objectKey, entityIds, group));
+        group.batch(() -> {
+            for (HologramLineRenderer.ObjectLine line : visible) {
+                UUID handle = DisplayEntityManager.add(group, line.display());
+                DisplayEntityManager.spawn(handle, player);
+            }
+        });
     }
 
     private void updateRawObjectPositions(Player player, Location anchor, IconDisplayStyle style,
@@ -1729,10 +1843,10 @@ final class PersistentHologram implements AnchoredHologram {
         if (removed != null && !removed.pageKey().equals(retainedKey) && removed.pageKey().endsWith("@" + viewerId)) {
             objectsByPage.remove(removed.pageKey());
         }
-        if (removed == null || !removed.player().isOnline() || removed.entityIds().length == 0) {
+        if (removed == null) {
             return;
         }
-        PacketUtils.send(removed.player(), List.of(DisplayEntity.destroyAll(removed.entityIds())));
+        DisplayEntityManager.retire(service.plugin(), removed.group());
     }
 
     private void clearObjectLines() {

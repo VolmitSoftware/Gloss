@@ -24,6 +24,9 @@ import org.junit.jupiter.api.io.TempDir;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.ArrayDeque;
+import java.util.Queue;
+import java.util.concurrent.CompletableFuture;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -46,6 +49,7 @@ class CameraServiceTest {
     private World world;
     private CameraService camera;
     private PlayerSections sections;
+    private final ControlledTransport transport = new ControlledTransport();
 
     @BeforeEach
     void setUp() throws ReflectiveOperationException {
@@ -54,7 +58,10 @@ class CameraServiceTest {
             (proxy, method, args) -> switch (method.getName()) {
                 case "getName" -> "world";
                 case "getUID" -> worldId;
-                case "spawn" -> carrier();
+                case "spawn" -> {
+                    Assertions.assertSame(rider, transport.owner);
+                    yield carrier();
+                }
                 default -> CharacterizationSupport.identity(proxy, method, args);
             });
         rider = (Player) CharacterizationSupport.proxy(new Class<?>[]{Player.class},
@@ -71,22 +78,27 @@ class CameraServiceTest {
                 case "getVelocity" -> new org.bukkit.util.Vector();
                 case "hasPermission" -> true;
                 case "setGameMode" -> {
+                    Assertions.assertSame(rider, transport.owner);
                     calls.add("setGameMode:" + args[0]);
                     yield null;
                 }
                 case "setSpectatorTarget" -> {
+                    Assertions.assertSame(rider, transport.owner);
                     calls.add("setSpectatorTarget:" + (args[0] == null ? "null" : "carrier"));
                     yield null;
                 }
                 case "setAllowFlight" -> {
+                    Assertions.assertSame(rider, transport.owner);
                     calls.add("setAllowFlight:" + args[0]);
                     yield null;
                 }
                 case "setFlying" -> {
+                    Assertions.assertSame(rider, transport.owner);
                     calls.add("setFlying:" + args[0]);
                     yield null;
                 }
                 case "setVelocity" -> {
+                    Assertions.assertSame(rider, transport.owner);
                     calls.add("setVelocity");
                     yield null;
                 }
@@ -127,7 +139,7 @@ class CameraServiceTest {
         CharacterizationSupport.setField(plugin, "laneServices", List.of());
         previousPlugin = CharacterizationSupport.installGloss(plugin);
         sections = new PlayerSections(dataFolder);
-        camera = new CameraService(plugin, sections);
+        camera = new CameraService(new CameraService.Dependencies(plugin, sections, transport));
     }
 
     @AfterEach
@@ -205,7 +217,7 @@ class CameraServiceTest {
         camera.onQuit(new PlayerQuitEvent(rider, (String) null));
 
         Assertions.assertFalse(camera.riding(RIDER));
-        Assertions.assertTrue(calls.contains("teleportDropped"), calls.toString());
+        Assertions.assertFalse(calls.contains("teleportDropped"), calls.toString());
         CameraJournal.Entry entry = new CameraJournal(sections).read(RIDER).orElseThrow();
         Assertions.assertEquals("world", entry.world());
         Assertions.assertEquals(5.0D, entry.x());
@@ -285,6 +297,203 @@ class CameraServiceTest {
         Assertions.assertEquals(Optional.empty(), new CameraJournal(sections).read(RIDER));
     }
 
+
+    @Test
+    void restorationKeepsTheJournalUntilTheTeleportAndOwnerCallbackFinish() {
+        camera.ride(rider, PATH, options(true));
+        CompletableFuture<Boolean> restored = new CompletableFuture<>();
+        transport.playerTeleport = restored;
+        calls.clear();
+
+        camera.stop(rider, CameraService.EndReason.END);
+
+        Assertions.assertTrue(new CameraJournal(sections).read(RIDER).isPresent());
+        Assertions.assertFalse(calls.contains("setVelocity"));
+        Assertions.assertFalse(camera.ride(rider, PATH, options(true)));
+        transport.queued = true;
+        restored.complete(true);
+        Assertions.assertTrue(new CameraJournal(sections).read(RIDER).isPresent());
+        transport.drain();
+        Assertions.assertTrue(new CameraJournal(sections).read(RIDER).isEmpty());
+        Assertions.assertTrue(calls.contains("setVelocity"));
+    }
+
+    @Test
+    void rejectedRestorationSchedulingRetainsRecoveryWithoutUnsafeFallback() {
+        camera.ride(rider, PATH, options(true));
+        transport.rejectPlayer = true;
+        calls.clear();
+
+        camera.stop(rider, CameraService.EndReason.END);
+
+        Assertions.assertTrue(new CameraJournal(sections).read(RIDER).isPresent());
+        Assertions.assertTrue(calls.isEmpty(), calls.toString());
+        Assertions.assertTrue(carrierRemoved.get());
+    }
+
+    @Test
+    void rejectedCarrierCleanupIsRetriedOnItsOwner() {
+        camera.ride(rider, PATH, options(true));
+        transport.rejectCarrier = true;
+
+        camera.stop(rider, CameraService.EndReason.END);
+
+        Assertions.assertFalse(carrierRemoved.get());
+        transport.rejectCarrier = false;
+        camera.tick();
+        Assertions.assertTrue(carrierRemoved.get());
+    }
+
+    @Test
+    void unfinishedRestorationDoesNotBlockRecoveryAfterRejoining() {
+        camera.ride(rider, PATH, options(true));
+        CompletableFuture<Boolean> previous = new CompletableFuture<>();
+        transport.playerTeleport = previous;
+        camera.stop(rider, CameraService.EndReason.END);
+        quitting.set(true);
+        camera.onQuit(new PlayerQuitEvent(rider, (String) null));
+        quitting.set(false);
+        transport.playerTeleport = null;
+
+        camera.restoreJournalled(rider);
+
+        Assertions.assertTrue(new CameraJournal(sections).read(RIDER).isEmpty());
+        calls.clear();
+        previous.complete(true);
+        Assertions.assertTrue(calls.isEmpty(), calls.toString());
+    }
+
+    @Test
+    void failedRestorationTeleportKeepsRecoveryForRetry() {
+        camera.ride(rider, PATH, options(true));
+        transport.playerTeleport = CompletableFuture.completedFuture(false);
+
+        camera.stop(rider, CameraService.EndReason.END);
+
+        Assertions.assertTrue(new CameraJournal(sections).read(RIDER).isPresent());
+        transport.playerTeleport = null;
+        camera.restoreJournalled(rider);
+        Assertions.assertTrue(new CameraJournal(sections).read(RIDER).isEmpty());
+    }
+
+    @Test
+    void stoppingDuringCarrierTransferWaitsBeforeRemovalAndRestoration() {
+        camera.ride(rider, PATH, options(true));
+        CompletableFuture<Boolean> moved = new CompletableFuture<>();
+        transport.carrierTeleport = moved;
+        camera.tick();
+        int moveCount = transport.carrierMoves;
+        camera.tick();
+        Assertions.assertEquals(moveCount, transport.carrierMoves);
+        calls.clear();
+
+        camera.stop(rider, CameraService.EndReason.END);
+
+        Assertions.assertFalse(carrierRemoved.get());
+        Assertions.assertFalse(calls.contains("teleport"));
+        Assertions.assertTrue(new CameraJournal(sections).read(RIDER).isPresent());
+        moved.complete(true);
+        Assertions.assertTrue(carrierRemoved.get());
+        assertRestored();
+    }
+
+    @Test
+    void stoppingDuringInitialPlayerTransferCannotRestoreBeforeThatTransferCompletes() {
+        CompletableFuture<Boolean> moved = new CompletableFuture<>();
+        transport.playerTeleport = moved;
+        camera.ride(rider, PATH, options(true));
+        calls.clear();
+
+        camera.stop(rider, CameraService.EndReason.END);
+
+        Assertions.assertFalse(calls.contains("setGameMode:SURVIVAL"));
+        transport.playerTeleport = null;
+        moved.complete(true);
+        Assertions.assertFalse(calls.contains("setSpectatorTarget:carrier"));
+        assertRestored();
+    }
+
+    @Test
+    void ownerQueuesSeparateCarrierMovementFromRiderRestoration() {
+        transport.queued = true;
+        camera.ride(rider, PATH, options(true));
+        transport.drain();
+        Assertions.assertTrue(calls.contains("setSpectatorTarget:carrier"));
+        camera.tick();
+        transport.drain();
+        camera.stop(rider, CameraService.EndReason.END);
+        Assertions.assertTrue(new CameraJournal(sections).read(RIDER).isPresent());
+        transport.drain();
+        assertRestored();
+    }
+
+    @Test
+    void failedDurableJournalWriteDoesNotMutateThePlayerOrSpawnACarrier() throws Exception {
+        java.nio.file.Files.createFile(dataFolder.resolve("state"));
+
+        Assertions.assertFalse(camera.ride(rider, PATH, options(true)));
+
+        Assertions.assertTrue(calls.isEmpty(), calls.toString());
+        Assertions.assertFalse(camera.riding(RIDER));
+        Assertions.assertTrue(new CameraJournal(sections).read(RIDER).isEmpty());
+    }
+
+    private final class ControlledTransport implements CameraService.Transport {
+        private final Queue<Runnable> tasks = new ArrayDeque<>();
+        private Entity owner;
+        private boolean queued;
+        private boolean rejectPlayer;
+        private boolean rejectCarrier;
+        private CompletableFuture<Boolean> playerTeleport;
+        private CompletableFuture<Boolean> carrierTeleport;
+        private int carrierMoves;
+
+        @Override
+        public boolean execute(Entity entity, Runnable action, Runnable retired) {
+            if (entity == rider ? rejectPlayer : rejectCarrier) {
+                return false;
+            }
+            Runnable owned = () -> {
+                Entity previous = owner;
+                owner = entity;
+                try {
+                    if (entity.isValid()) {
+                        action.run();
+                    } else {
+                        retired.run();
+                    }
+                } finally {
+                    owner = previous;
+                }
+            };
+            if (queued && owner != entity) {
+                tasks.add(owned);
+            } else {
+                owned.run();
+            }
+            return true;
+        }
+
+        @Override
+        public CompletableFuture<Boolean> teleport(Entity entity, Location destination) {
+            Assertions.assertSame(entity, owner);
+            if (entity == rider) {
+                calls.add("teleport");
+                return playerTeleport == null ? CompletableFuture.completedFuture(true) : playerTeleport;
+            }
+            carrierMoves++;
+            return carrierTeleport == null ? CompletableFuture.completedFuture(true) : carrierTeleport;
+        }
+
+        private void drain() {
+            int remaining = 100;
+            while (!tasks.isEmpty()) {
+                Assertions.assertTrue(remaining-- > 0);
+                tasks.remove().run();
+            }
+        }
+    }
+
     private void assertRestored() {
         Assertions.assertTrue(calls.contains("setSpectatorTarget:null"), calls.toString());
         Assertions.assertTrue(calls.contains("setGameMode:SURVIVAL"), calls.toString());
@@ -302,10 +511,12 @@ class CameraServiceTest {
                 case "getUniqueId" -> UUID.randomUUID();
                 case "isValid" -> !carrierRemoved.get();
                 case "remove" -> {
+                    Assertions.assertSame(proxy, transport.owner);
                     carrierRemoved.set(true);
                     yield null;
                 }
                 case "teleport" -> true;
+                case "teleportAsync" -> java.util.concurrent.CompletableFuture.completedFuture(Boolean.TRUE);
                 case "getLocation" -> new Location(world, 0, 64, 0);
                 case "setGravity", "setInvisible", "setMarker", "setSilent", "setPersistent",
                      "setInvulnerable", "setCollidable", "setVisibleByDefault", "setBasePlate",

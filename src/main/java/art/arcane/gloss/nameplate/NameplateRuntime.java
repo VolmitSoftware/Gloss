@@ -108,6 +108,18 @@ public final class NameplateRuntime {
         return "";
     }
 
+    public boolean includesSelf() {
+        if (doc.presentation().showSelf()) {
+            return true;
+        }
+        for (NameplateDoc.Variant variant : doc.variants()) {
+            if (variant.presentation().showSelf()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private static boolean computeViewerDependent(NameplateDoc doc) {
         if (viewerDependent(doc.presentation())) {
             return true;

@@ -289,6 +289,8 @@ class SceneCueTest {
                 case "getWorld" -> world;
                 case "getLocation" -> new Location(world, 0, 64, 0);
                 case "isValid" -> true;
+                case "teleport" -> true;
+                case "teleportAsync" -> java.util.concurrent.CompletableFuture.completedFuture(Boolean.TRUE);
                 default -> CharacterizationSupport.identity(proxy, method, args);
             });
     }

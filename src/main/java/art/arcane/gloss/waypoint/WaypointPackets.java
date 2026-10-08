@@ -8,6 +8,7 @@ import com.github.retrooper.packetevents.protocol.world.waypoint.Vec3iWaypointIn
 import com.github.retrooper.packetevents.protocol.world.waypoint.WaypointIcon;
 import com.github.retrooper.packetevents.protocol.world.waypoint.WaypointInfo;
 import com.github.retrooper.packetevents.util.Either;
+import com.github.retrooper.packetevents.resources.ResourceLocation;
 import com.github.retrooper.packetevents.util.Vector3i;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerWaypoint;
 
@@ -37,7 +38,7 @@ public final class WaypointPackets {
 
     private static WaypointIcon icon(WaypointTarget target) {
         return new WaypointIcon(
-            target.style() == WaypointStyle.BOWTIE ? WaypointIcon.ICON_STYLE_BOWTIE : WaypointIcon.ICON_STYLE_DEFAULT,
+            new ResourceLocation(target.styleKey()),
             new Color(target.color()));
     }
 

@@ -1,27 +1,34 @@
 package art.arcane.gloss.integrate;
 
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.HashSet;
-import java.util.List;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 
 public final class MetricReferences {
-    private final int capacity;
-    private final long windowMs;
-    private final Map<String, Long> lastRequested;
+    private int capacity;
+    private long windowMs;
+    private long evictions;
+    private final Map<String, Long> lastRequested = new LinkedHashMap<>(16, 0.75F, true);
 
     public MetricReferences(int capacity, long windowMs) {
-        this.capacity = Math.max(1, capacity);
-        this.windowMs = Math.max(1L, windowMs);
-        this.lastRequested = new ConcurrentHashMap<>();
+        configure(capacity, windowMs);
     }
 
-    public void reference(String key, long nowMs) {
+    public synchronized void configure(int capacity, long windowMs) {
+        this.capacity = Math.max(1, capacity);
+        this.windowMs = Math.max(1L, windowMs);
+        while (lastRequested.size() > this.capacity) {
+            evictOldest();
+        }
+    }
+
+    public synchronized void reference(String key, long nowMs) {
         if (key == null || key.isBlank()) {
             return;
+        }
+        if (!lastRequested.containsKey(key) && lastRequested.size() >= capacity) {
+            evictOldest();
         }
         lastRequested.put(key, nowMs);
     }
@@ -35,37 +42,28 @@ public final class MetricReferences {
         }
     }
 
-    public Set<String> active(long nowMs) {
-        List<Map.Entry<String, Long>> live = new ArrayList<>(lastRequested.size());
-        for (Map.Entry<String, Long> entry : lastRequested.entrySet()) {
-            if (nowMs - entry.getValue() > windowMs) {
-                lastRequested.remove(entry.getKey(), entry.getValue());
-                continue;
-            }
-            live.add(entry);
-        }
-
-        if (live.size() > capacity) {
-            live.sort(Comparator.comparingLong((Map.Entry<String, Long> entry) -> entry.getValue()).reversed());
-            for (int index = capacity; index < live.size(); index++) {
-                Map.Entry<String, Long> expired = live.get(index);
-                lastRequested.remove(expired.getKey(), expired.getValue());
-            }
-            live = live.subList(0, capacity);
-        }
-
-        Set<String> keys = new HashSet<>(live.size());
-        for (Map.Entry<String, Long> entry : live) {
-            keys.add(entry.getKey());
-        }
-        return Set.copyOf(keys);
+    public synchronized Set<String> active(long nowMs) {
+        lastRequested.entrySet().removeIf(entry -> nowMs - entry.getValue() > windowMs);
+        return Set.copyOf(lastRequested.keySet());
     }
 
-    public int tracked() {
+    public synchronized int tracked() {
         return lastRequested.size();
     }
 
-    public void clear() {
+    public synchronized long evictions() {
+        return evictions;
+    }
+
+    public synchronized void clear() {
         lastRequested.clear();
+        evictions = 0;
+    }
+
+    private void evictOldest() {
+        Iterator<String> oldest = lastRequested.keySet().iterator();
+        oldest.next();
+        oldest.remove();
+        evictions++;
     }
 }

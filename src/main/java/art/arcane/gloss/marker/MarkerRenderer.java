@@ -1,6 +1,7 @@
 package art.arcane.gloss.marker;
 
 import art.arcane.gloss.Gloss;
+import art.arcane.gloss.service.VisibilityGovernor;
 import art.arcane.gloss.api.HologramPresentation;
 import art.arcane.gloss.api.TemporaryHologram;
 import art.arcane.gloss.config.MenuComponentData;
@@ -8,13 +9,13 @@ import art.arcane.gloss.config.MenuDefinitionData;
 import art.arcane.gloss.config.components.DecoComponentData;
 import art.arcane.gloss.config.icon.MenuIconData;
 import art.arcane.gloss.menu.MenuSession;
+import art.arcane.gloss.menu.DisplayEntityGroup;
+import art.arcane.gloss.menu.DisplayEntityManager;
 import art.arcane.gloss.menu.MenuSessionOptions;
 import art.arcane.gloss.menu.MenuTransform;
 import art.arcane.gloss.menu.action.NavigationResult;
 import art.arcane.gloss.util.common.DisplayEntity;
-import art.arcane.gloss.util.common.PacketUtils;
 import com.github.retrooper.packetevents.util.Vector3f;
-import com.github.retrooper.packetevents.wrapper.PacketWrapper;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.block.data.BlockData;
@@ -39,7 +40,8 @@ public final class MarkerRenderer {
     static final class Render {
         private TemporaryHologram label;
         private TemporaryHologram edge;
-        private DisplayEntity beam;
+        private UUID beam;
+        private DisplayEntityGroup beamGroup;
         private MenuSession icon;
         private MenuIconData iconData;
         private String labelText = "";
@@ -60,13 +62,19 @@ public final class MarkerRenderer {
                 icon = null;
             }
             if (beam != null) {
-                PacketUtils.send(viewer, beam.remove());
+                try {
+                    beamGroup.close();
+                } catch (RuntimeException failure) {
+                    DisplayEntityManager.retire(Gloss.instance, beamGroup);
+                    throw failure;
+                }
                 beam = null;
             }
         }
 
         int entityCount() {
-            return (label == null ? 0 : 1) + (edge == null ? 0 : 1) + (beam == null ? 0 : 1) + (icon == null ? 0 : 1);
+            return (label == null ? 0 : 1) + (edge == null ? 0 : 1) + (beamGroup == null ? 0 : beamGroup.visibleCount())
+                + (icon == null ? 0 : icon.displayGroup().visibleCount());
         }
     }
 
@@ -120,10 +128,23 @@ public final class MarkerRenderer {
             render.destroy(viewer);
         }
         render.spec = spec;
+        VisibilityGovernor.Tier tier = plugin.governor().tier(viewer, VisibilityGovernor.Surface.MARKER,
+            candidate.distance() * candidate.distance());
+        if (tier == VisibilityGovernor.Tier.CULLED) {
+            render.destroy(viewer);
+            return;
+        }
         applyLabel(render, candidate, anchor, labelText, scale);
-        applyIcon(render, candidate, anchor, scale);
-        applyBeam(render, candidate, anchor);
-        applyEdge(render, candidate, indicator);
+        if (tier == VisibilityGovernor.Tier.MINIMAL) {
+            if (render.icon != null) {
+                render.icon.close();
+                render.icon = null;
+            }
+        } else {
+            applyIcon(render, candidate, anchor, scale);
+        }
+        applyBeam(render, candidate, anchor, tier == VisibilityGovernor.Tier.FULL);
+        applyEdge(render, candidate, tier == VisibilityGovernor.Tier.FULL ? indicator : null);
     }
 
     Render render(String markerId) {
@@ -182,6 +203,7 @@ public final class MarkerRenderer {
                 0F, 0F, (float) scale);
             render.icon = new MenuSession(definition, viewer,
                 MenuSessionOptions.positioned(transform, request -> NavigationResult.DENIED, (float) scale));
+            render.icon.setVisibilitySurface(VisibilityGovernor.Surface.MARKER);
             render.icon.open();
         } else {
             render.icon.applyTransform(new MenuTransform(position, new Vector(), position.getYaw(),
@@ -190,16 +212,17 @@ public final class MarkerRenderer {
         }
     }
 
-    private void applyBeam(Render render, MarkerCandidate candidate, Location anchor) {
+    private void applyBeam(Render render, MarkerCandidate candidate, Location anchor, boolean detailed) {
         MarkerSpec.Beam beam = candidate.spec().beam();
-        if (!beam.enabled()) {
+        if (!beam.enabled() || !detailed) {
             if (render.beam != null) {
-                PacketUtils.send(viewer, render.beam.remove());
+                DisplayEntityManager.delete(render.beam, viewer);
                 render.beam = null;
             }
             return;
         }
         if (render.beam != null) {
+            render.beamGroup.refresh();
             return;
         }
         BlockData data = blockData(beam.material(), candidate.id());
@@ -215,9 +238,9 @@ public final class MarkerRenderer {
             display.entityFlags((byte) (display.entityFlags() | 0x40));
             display.glowColorOverride(MarkerColors.parse(beam.glowColor(), "beam glowColor"));
         }
-        List<PacketWrapper<?>> packets = new ArrayList<>(display.spawn());
-        PacketUtils.send(viewer, packets);
-        render.beam = display;
+        render.beamGroup = DisplayEntityManager.group(viewer, VisibilityGovernor.Surface.MARKER);
+        render.beam = DisplayEntityManager.add(render.beamGroup, display);
+        DisplayEntityManager.spawn(render.beam, viewer);
     }
 
     private void applyEdge(Render render, MarkerCandidate candidate, EdgeIndicatorMath.Indicator indicator) {
@@ -261,6 +284,7 @@ public final class MarkerRenderer {
 
     private TemporaryHologram create(String id, Location location) {
         TemporaryHologram hologram = plugin.holograms().createTemporary(id, location, FOREVER_MS);
+        plugin.holograms().setVisibilitySurface(hologram, VisibilityGovernor.Surface.MARKER);
         hologram.viewers().whitelist();
         hologram.viewers().add(viewer.getUniqueId());
         return hologram;

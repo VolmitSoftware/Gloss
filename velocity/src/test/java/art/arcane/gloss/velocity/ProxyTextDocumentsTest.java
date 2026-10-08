@@ -1,5 +1,7 @@
 package art.arcane.gloss.velocity;
 
+import art.arcane.gloss.doc.DocumentPresetCatalog;
+
 import art.arcane.gloss.animation.AnimationMode;
 import art.arcane.gloss.expr.ExpressionScope;
 import com.velocitypowered.api.proxy.ProxyServer;
@@ -26,7 +28,7 @@ final class ProxyTextDocumentsTest {
     void decodesEmojiValuesAndAppliesDocumentDefaults() throws IOException {
         write("emoji/heart.json", "{\"schemaVersion\":1,\"revision\":1,\"trigger\":\"<3\",\"emoji\":\"U+2764;\"}");
         write("emoji/alpha.json", "{\"schemaVersion\":1,\"revision\":1,\"emoji\":\"U+0041;U+0042;\",\"enabled\":false}");
-        ProxyTextDocuments.Content content = ProxyTextDocuments.load(directory, settings(true, true));
+        ProxyTextDocuments.Content content = ProxyTextDocuments.load(directory, settings(true, true), DocumentPresetCatalog.empty());
         assertEquals(List.of("alpha", "heart"), content.emoji().stream().map(ProxyTextDocuments.Emoji::id).toList());
         ProxyTextDocuments.Emoji alpha = content.emoji().getFirst();
         assertEquals("AB", alpha.emoji());
@@ -45,7 +47,7 @@ final class ProxyTextDocumentsTest {
             + "\"frameIntervalMs\":0,\"frames\":[\"a\",null]}");
         write("animations/slow.json", "{\"schemaVersion\":1,\"revision\":1,\"mode\":\"descend\","
             + "\"frameIntervalMs\":999999,\"frames\":[\"a\"],\"show\":\"viewer.present\"}");
-        ProxyTextDocuments.Content content = ProxyTextDocuments.load(directory, settings(true, true));
+        ProxyTextDocuments.Content content = ProxyTextDocuments.load(directory, settings(true, true), DocumentPresetCatalog.empty());
         ProxyTextDocuments.Animation fast = content.animations().get("fast");
         assertEquals(AnimationMode.ASCEND_DESCEND, fast.clip().mode());
         assertEquals(1000.0D, fast.clip().targetFramerate());
@@ -63,7 +65,7 @@ final class ProxyTextDocumentsTest {
         write("emoji/notes.txt", "not a document");
         write("animations/marquee.json", "{\"schemaVersion\":9,\"revision\":1,\"mode\":\"ascend\","
             + "\"frameIntervalMs\":50,\"frames\":[\"a\"]}");
-        ProxyTextDocuments.Content content = ProxyTextDocuments.load(directory, settings(true, true));
+        ProxyTextDocuments.Content content = ProxyTextDocuments.load(directory, settings(true, true), DocumentPresetCatalog.empty());
         assertTrue(content.emoji().isEmpty());
         assertTrue(content.animations().isEmpty());
     }
@@ -71,38 +73,38 @@ final class ProxyTextDocumentsTest {
     @Test
     void rejectsEmojiAndAnimationDocumentsThatCannotRender() throws IOException {
         write("emoji/broken.json", "{\"schemaVersion\":1,\"revision\":1,\"emoji\":\"   \"}");
-        assertThrows(IllegalArgumentException.class, () -> ProxyTextDocuments.load(directory, settings(true, true)));
+        assertThrows(IllegalArgumentException.class, () -> ProxyTextDocuments.load(directory, settings(true, true), DocumentPresetCatalog.empty()));
         write("emoji/broken.json", "{\"schemaVersion\":1,\"revision\":1}");
-        assertThrows(IllegalArgumentException.class, () -> ProxyTextDocuments.load(directory, settings(true, true)));
+        assertThrows(IllegalArgumentException.class, () -> ProxyTextDocuments.load(directory, settings(true, true), DocumentPresetCatalog.empty()));
         write("emoji/broken.json", "{\"schemaVersion\":1,\"revision\":1,\"emoji\":\"x\",\"show\":\"viewer.world\"}");
-        assertThrows(IllegalArgumentException.class, () -> ProxyTextDocuments.load(directory, settings(true, true)));
+        assertThrows(IllegalArgumentException.class, () -> ProxyTextDocuments.load(directory, settings(true, true), DocumentPresetCatalog.empty()));
         Files.delete(directory.resolve("emoji/broken.json"));
         write("animations/broken.json", "{\"schemaVersion\":1,\"revision\":1,\"frameIntervalMs\":50,\"frames\":[\"a\"]}");
         assertTrue(assertThrows(IllegalArgumentException.class,
-            () -> ProxyTextDocuments.load(directory, settings(true, true))).getMessage().contains("requires a mode"));
+            () -> ProxyTextDocuments.load(directory, settings(true, true), DocumentPresetCatalog.empty())).getMessage().contains("requires a mode"));
         write("animations/broken.json", "{\"schemaVersion\":1,\"revision\":1,\"mode\":\"spin\","
             + "\"frameIntervalMs\":50,\"frames\":[\"a\"]}");
         assertTrue(assertThrows(IllegalArgumentException.class,
-            () -> ProxyTextDocuments.load(directory, settings(true, true))).getMessage().contains("unknown animation mode"));
+            () -> ProxyTextDocuments.load(directory, settings(true, true), DocumentPresetCatalog.empty())).getMessage().contains("unknown animation mode"));
         write("animations/broken.json", "{\"schemaVersion\":1,\"revision\":1,\"mode\":\"ascend\","
             + "\"frameIntervalMs\":50,\"frames\":[]}");
         assertTrue(assertThrows(IllegalArgumentException.class,
-            () -> ProxyTextDocuments.load(directory, settings(true, true))).getMessage().contains("at least one frame"));
+            () -> ProxyTextDocuments.load(directory, settings(true, true), DocumentPresetCatalog.empty())).getMessage().contains("at least one frame"));
         write("animations/broken.json", "{\"schemaVersion\":1,\"revision\":1,\"mode\":\"ascend\","
             + "\"frameIntervalMs\":50,\"frames\":[\"{{ server.online\"]}");
-        assertThrows(IllegalArgumentException.class, () -> ProxyTextDocuments.load(directory, settings(true, true)));
+        assertThrows(IllegalArgumentException.class, () -> ProxyTextDocuments.load(directory, settings(true, true), DocumentPresetCatalog.empty()));
         write("animations/broken.json", "{\"schemaVersion\":1,\"revision\":1,\"mode\":\"ascend\","
             + "\"frameIntervalMs\":50,\"frames\":[\"{{ nothing.here }}\"]}");
-        assertThrows(IllegalArgumentException.class, () -> ProxyTextDocuments.load(directory, settings(true, true)));
+        assertThrows(IllegalArgumentException.class, () -> ProxyTextDocuments.load(directory, settings(true, true), DocumentPresetCatalog.empty()));
     }
 
     @Test
     void carriesTheEnabledSwitchesFromProxySettings() throws IOException {
         write("emoji/heart.json", "{\"schemaVersion\":1,\"revision\":1,\"emoji\":\"U+2764;\"}");
-        ProxyTextDocuments.Content on = ProxyTextDocuments.load(directory, settings(true, true));
+        ProxyTextDocuments.Content on = ProxyTextDocuments.load(directory, settings(true, true), DocumentPresetCatalog.empty());
         assertTrue(on.emojiEnabled());
         assertTrue(on.animationsEnabled());
-        ProxyTextDocuments.Content off = ProxyTextDocuments.load(directory, settings(false, false));
+        ProxyTextDocuments.Content off = ProxyTextDocuments.load(directory, settings(false, false), DocumentPresetCatalog.empty());
         assertFalse(off.emojiEnabled());
         assertFalse(off.animationsEnabled());
         assertEquals(1, off.emoji().size());
@@ -111,7 +113,7 @@ final class ProxyTextDocumentsTest {
     @Test
     void loadsEverySeededServerEditionDefault() throws IOException {
         ProxyDocuments.seed(directory);
-        ProxyTextDocuments.Content content = ProxyTextDocuments.load(directory, settings(true, true));
+        ProxyTextDocuments.Content content = ProxyTextDocuments.load(directory, settings(true, true), DocumentPresetCatalog.empty());
         assertEquals(count("emoji"), content.emoji().size());
         assertEquals(count("animations"), content.animations().size());
         assertTrue(content.emoji().stream().anyMatch(entry -> entry.id().equals("heart")));

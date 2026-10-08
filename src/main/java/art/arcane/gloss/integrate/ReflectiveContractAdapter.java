@@ -5,10 +5,11 @@ import art.arcane.volmlib.integration.IntegrationHandshakeResponse;
 import art.arcane.volmlib.integration.IntegrationHeartbeat;
 import art.arcane.volmlib.integration.IntegrationMetricDescriptor;
 import art.arcane.volmlib.integration.IntegrationMetricSample;
+import art.arcane.volmlib.integration.IntegrationMetricSnapshot;
+import art.arcane.volmlib.integration.IntegrationSnapshotProvider;
 import art.arcane.volmlib.integration.IntegrationMetricSchema;
 import art.arcane.volmlib.integration.IntegrationMetricType;
 import art.arcane.volmlib.integration.IntegrationProtocolVersion;
-import art.arcane.volmlib.integration.IntegrationServiceContract;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
@@ -17,10 +18,11 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
-public final class ReflectiveContractAdapter implements IntegrationServiceContract {
+public final class ReflectiveContractAdapter implements IntegrationSnapshotProvider {
     public static final String CONTRACT_SUFFIX = ".integration.IntegrationServiceContract";
 
     private static final MethodEntry MISSING_METHOD = new MethodEntry(null);
@@ -41,6 +43,7 @@ public final class ReflectiveContractAdapter implements IntegrationServiceContra
     private final Method handshakeMethod;
     private final Method heartbeatMethod;
     private final Method sampleMetricsMethod;
+    private final Method snapshotMetricsMethod;
     private final String pluginId;
     private final String pluginVersion;
 
@@ -56,12 +59,14 @@ public final class ReflectiveContractAdapter implements IntegrationServiceContra
         this.handshakeMethod = requireSingleArgumentMethod(providerClass, "handshake");
         this.heartbeatMethod = requireMethod(providerClass, "heartbeat");
         this.sampleMetricsMethod = requireMethod(providerClass, "sampleMetrics", Set.class);
+        this.snapshotMetricsMethod = optionalMethod(providerClass, "snapshotMetrics", Set.class);
         this.pluginId = normalize(text(invoke(pluginIdMethod), ""));
         this.pluginVersion = text(invoke(pluginVersionMethod), "");
     }
 
     public static boolean supports(String serviceClassName) {
-        return serviceClassName != null && serviceClassName.endsWith(CONTRACT_SUFFIX);
+        return serviceClassName != null && (serviceClassName.endsWith(CONTRACT_SUFFIX)
+            || serviceClassName.endsWith(".integration.IntegrationSnapshotProvider"));
     }
 
     public static ReflectiveContractAdapter create(Object provider, String serviceClassName) {
@@ -154,21 +159,52 @@ public final class ReflectiveContractAdapter implements IntegrationServiceContra
         );
     }
 
+    boolean sameProvider(ReflectiveContractAdapter other) {
+        return provider == other.provider;
+    }
+
+    public boolean supportsSnapshotMetrics() {
+        return snapshotMetricsMethod != null;
+    }
+
+    @Override
+    public IntegrationMetricSnapshot snapshotMetrics(Set<String> metricKeys) {
+        if (snapshotMetricsMethod == null) {
+            throw new IllegalStateException("Provider does not support metric snapshots");
+        }
+        Objects.requireNonNull(metricKeys, "metricKeys");
+        Object raw = invoke(snapshotMetricsMethod, metricKeys);
+        if (raw == null) {
+            return null;
+        }
+        long capturedAtMs = number(read(raw, "capturedAtMs"), -1);
+        return new IntegrationMetricSnapshot(number(read(raw, "generation"), -1), capturedAtMs,
+            metricKeys.isEmpty() ? Map.of() : selectedSamples(read(raw, "samples"), metricKeys, capturedAtMs));
+    }
+
     @Override
     public Map<String, IntegrationMetricSample> sampleMetrics(Set<String> metricKeys) {
-        Object raw = invoke(sampleMetricsMethod, metricKeys);
+        return selectedSamples(invoke(sampleMetricsMethod, metricKeys), metricKeys, System.currentTimeMillis());
+    }
+
+    private Map<String, IntegrationMetricSample> selectedSamples(Object raw, Set<String> metricKeys, long now) {
         if (!(raw instanceof Map<?, ?> values)) {
             return Map.of();
         }
-
         Map<String, IntegrationMetricSample> out = new LinkedHashMap<>();
-        long now = System.currentTimeMillis();
-        for (Map.Entry<?, ?> entry : values.entrySet()) {
-            String key = text(entry.getKey(), "");
-            if (key.isBlank()) {
-                continue;
+        if (metricKeys != null && !metricKeys.isEmpty()) {
+            for (String key : metricKeys) {
+                if (values.containsKey(key)) {
+                    out.put(key, toSample(values.get(key), key, now));
+                }
             }
-            out.put(key, toSample(entry.getValue(), key, now));
+        } else {
+            for (Map.Entry<?, ?> entry : values.entrySet()) {
+                String key = text(entry.getKey(), "");
+                if (!key.isBlank()) {
+                    out.put(key, toSample(entry.getValue(), key, now));
+                }
+            }
         }
         return out;
     }
@@ -347,6 +383,16 @@ public final class ReflectiveContractAdapter implements IntegrationServiceContra
 
     private static String normalize(String value) {
         return value == null ? "" : value.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private static Method optionalMethod(Class<?> source, String name, Class<?>... parameters) {
+        try {
+            Method method = source.getMethod(name, parameters);
+            method.setAccessible(true);
+            return method;
+        } catch (NoSuchMethodException missing) {
+            return null;
+        }
     }
 
     private static Method requireMethod(Class<?> source, String name, Class<?>... parameters) {

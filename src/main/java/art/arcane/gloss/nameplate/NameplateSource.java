@@ -1,13 +1,10 @@
 package art.arcane.gloss.nameplate;
 
 import art.arcane.gloss.Gloss;
-import art.arcane.gloss.condition.GlossConditionContext;
-import art.arcane.gloss.condition.GlossConditionScope;
+import art.arcane.gloss.condition.EntityRelationshipSnapshot;
 import art.arcane.gloss.entity.EntityOverlaySource;
 import art.arcane.gloss.entity.EntityOverlayText;
 import art.arcane.gloss.expr.ExprScope;
-import org.bukkit.GameMode;
-import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 
 import java.util.List;
@@ -22,9 +19,6 @@ import java.util.function.Supplier;
  * still leave mobs alone.
  */
 public final class NameplateSource implements EntityOverlaySource {
-    /** Health segments a nameplate's {@code {bar}} token draws with. */
-    public static final int HEALTH_SEGMENTS = 10;
-
     private final BooleanSupplier active;
     private final Supplier<List<NameplateRuntime>> documents;
     private final NameplateSuppression suppression;
@@ -41,8 +35,8 @@ public final class NameplateSource implements EntityOverlaySource {
     }
 
     @Override
-    public boolean wants(LivingEntity target) {
-        return active.getAsBoolean() && target instanceof Player;
+    public boolean wants(EntityRelationshipSnapshot target) {
+        return active.getAsBoolean() && target.player();
     }
 
     /**
@@ -50,56 +44,72 @@ public final class NameplateSource implements EntityOverlaySource {
      * invisible or spectating, from the subject's own client, and from a sneaking subject when the
      * document asks for that.
      */
-    public boolean visible(Player viewer, Player subject, boolean hideSneaking) {
-        if (viewer.getUniqueId().equals(subject.getUniqueId())) {
-            return false;
-        }
-        if (subject.isInvisible() || subject.getGameMode() == GameMode.SPECTATOR) {
-            return false;
-        }
-        if (hideSneaking && subject.isSneaking()) {
-            return false;
-        }
-        return viewer.canSee(subject);
+    public boolean visible(UUID viewer, EntityRelationshipSnapshot subject, NameplateDoc.Presentation presentation) {
+        return (presentation.showSelf() || !viewer.equals(subject.id()))
+            && (!presentation.hideInvisible() || !subject.invisible())
+            && (!presentation.hideSpectator() || !subject.spectator())
+            && (!presentation.hideSneaking() || !subject.sneaking())
+            && (presentation.includeNpcs() || !subject.npc());
     }
 
     @Override
-    public Pane prepare(Player viewer, LivingEntity target, EntityOverlayText.Snapshot snapshot) {
-        if (!(target instanceof Player subject)) {
+    public ScanPolicy scanPolicy() {
+        return Gloss.instance == null ? ScanPolicy.INHERIT : new ScanPolicy(
+            Gloss.instance.cfg().modules().nameplates().viewerRange(),
+            Gloss.instance.cfg().modules().nameplates().maxSubjectsPerViewer(),
+            Gloss.instance.cfg().modules().nameplates().refreshIntervalTicks());
+    }
+
+    @Override
+    public boolean includesSelf() {
+        for (NameplateRuntime runtime : documents.get()) {
+            if (runtime.includesSelf()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @Override
+    public Pane prepare(Context context) {
+        Player viewer = context.viewer();
+        EntityRelationshipSnapshot subject = context.relationship();
+        if (!subject.player()) {
             return null;
         }
-        ExprScope scope = new GlossConditionScope(Gloss.instance,
-            GlossConditionContext.subject(viewer, subject, null, java.util.Map.of()));
+        EntityOverlayText.Snapshot snapshot = context.snapshot();
+        ExprScope scope = context.scope();
         NameplateRuntime runtime = NameplateRuntime.select(documents.get(), scope);
         if (runtime == null) {
-            retire(viewer, subject);
+            retired(viewer.getUniqueId(), subject.id());
             return null;
         }
         NameplateDoc.Presentation presentation = runtime.presentation(scope);
-        if (!visible(viewer, subject, presentation.hideSneaking())) {
-            retire(viewer, subject);
+        if (!visible(viewer.getUniqueId(), subject, presentation)) {
+            retired(viewer.getUniqueId(), subject.id());
             return null;
         }
         List<String> lines = runtime.visibleLines(scope, scope);
         if (lines.isEmpty()) {
-            retire(viewer, subject);
+            retired(viewer.getUniqueId(), subject.id());
             return null;
         }
         String relation = runtime.relationColor(presentation, scope);
         List<String> colored = relation.isEmpty() ? lines : prefix(lines, relation);
-        admit(viewer, subject);
         return new Pane(EntityOverlayText.prepareLines(Gloss.instance, viewer, colored,
-            HEALTH_SEGMENTS, presentation.healthBar(), snapshot, scope), presentation.style(), presentation.box(), presentation.offset());
+            presentation.healthSegments(), presentation.healthBar(), snapshot, scope), presentation.style(), presentation.box(), presentation.offset());
+    }
+
+    @Override
+    public void displayed(Player viewer, EntityRelationshipSnapshot subject) {
+        if (suppression != null) {
+            suppression.admit(viewer, subject.id(), subject.teamEntry(),
+                Gloss.instance.bedrock() != null && Gloss.instance.bedrock().isBedrock(viewer.getUniqueId()));
+        }
     }
 
     private static List<String> prefix(List<String> lines, String color) {
         return lines.stream().map(line -> color + line).toList();
-    }
-
-    private void admit(Player viewer, Player subject) {
-        if (suppression != null) {
-            suppression.admit(viewer, subject, Gloss.instance.bedrock().isBedrock(viewer));
-        }
     }
 
     @Override
@@ -109,7 +119,4 @@ public final class NameplateSource implements EntityOverlaySource {
         }
     }
 
-    private void retire(Player viewer, Player subject) {
-        retired(viewer.getUniqueId(), subject.getUniqueId());
-    }
 }

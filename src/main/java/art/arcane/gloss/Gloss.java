@@ -2,6 +2,8 @@ package art.arcane.gloss;
 
 import java.util.concurrent.CompletionStage;
 import art.arcane.volmlib.util.diagnostics.BukkitDebugDump;
+import art.arcane.volmlib.util.diagnostics.DebugDumpContributor;
+import art.arcane.gloss.marker.AnchorSnapshots;
 import art.arcane.gloss.animation.AnimationService;
 import art.arcane.gloss.bedrock.BedrockPolicy;
 import art.arcane.gloss.bedrock.BedrockService;
@@ -50,6 +52,7 @@ import art.arcane.gloss.service.GlossIntegrationService;
 import art.arcane.gloss.service.GlossLaneServices;
 import art.arcane.gloss.service.GlossService;
 import art.arcane.gloss.service.VisibilityGovernor;
+import art.arcane.gloss.service.BudgetedVisibilityGovernor;
 import art.arcane.gloss.util.common.PacketTeamAllocator;
 import art.arcane.gloss.util.common.TeamAllocator;
 import art.arcane.gloss.service.MetricsRuntime;
@@ -79,6 +82,7 @@ import com.github.retrooper.packetevents.protocol.player.UserProfile;
 import com.github.retrooper.packetevents.settings.PacketEventsSettings;
 import io.github.retrooper.packetevents.factory.spigot.SpigotPacketEventsBuilder;
 import io.github.slimjar.app.builder.SpigotApplicationBuilder;
+import com.google.gson.GsonBuilder;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.event.server.PluginEnableEvent;
@@ -91,6 +95,8 @@ import java.util.ArrayDeque;
 import java.util.Collection;
 import java.util.Deque;
 import java.util.List;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -170,6 +176,7 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
     private BedrockPolicy bedrockPolicy;
     private TeamAllocator teams;
     private VisibilityGovernor governor;
+    private AnchorSnapshots anchorSnapshots;
 
     public Gloss() {
         getLogger().info("Loading dependencies...");
@@ -287,16 +294,37 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
             scheduler = installSchedulerBridge();
             ImageIO.scanForPlugins();
             enableService("packetevents", this::initPacketEvents, this::terminatePacketEvents);
+            persistenceCoordinator = new GlossPersistenceCoordinator();
+            projectTransaction = new GlossProjectTransaction(getDataFolder().toPath());
+            try {
+                persistenceCoordinator.write(() -> {
+                    projectTransaction.recover();
+                    return null;
+                });
+            } catch (Exception failure) {
+                throw new IllegalStateException("Unable to recover Gloss persistence", failure);
+            }
             configLoader = new GlossConfigLoader(getDataFolder());
             GlossConfigFile bootConfigFile = loadBootConfig();
-            runDataImporters(bootConfigFile);
+            if (runDataImporters()) {
+                bootConfigFile = loadBootConfig();
+            }
+            if (persistenceCoordinator.recoveryRequired()) {
+                throw new IllegalStateException("Gloss import requires persistence recovery before startup");
+            }
             config = GlossConfig.from(bootConfigFile);
+            configureTransactionRetention(config);
             watchdog = new DataWatchdog(this);
             enableService("data-watchdog", this::startDataWatchdog, this::stopDataWatchdog);
             bedrock = new BedrockService(BedrockService.Detection.parse(config.modules().bedrock().detection()));
             bedrockPolicy = new BedrockPolicy(bedrock, () -> cfg().modules().bedrock());
-            teams = new PacketTeamAllocator();
-            governor = VisibilityGovernor.passthrough();
+            PacketTeamAllocator allocator = new PacketTeamAllocator();
+            allocator.configure(config.teams());
+            teams = allocator;
+            enableService("scoreboard-teams", allocator::enable, allocator::disable);
+            governor = new BudgetedVisibilityGovernor(() -> cfg().visibility());
+            anchorSnapshots = new AnchorSnapshots(this);
+            enableService("anchor-snapshots", () -> { }, anchorSnapshots::close);
             names = new NamesService(this);
             enableService("names", names::enable, names::disable);
             laneServices = GlossLaneServices.create(this);
@@ -344,7 +372,8 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
             enableService("hud", () -> {
             }, hudBar::shutdown);
             localization = new GlossLocalization(getDataFolder(), getLogger(), config.language());
-            enableService("diagnostic-reports", () -> debugDump = BukkitDebugDump.create(this), () -> {
+            enableService("diagnostic-reports", () -> debugDump = BukkitDebugDump.create(this,
+                new BukkitDebugDump.Options(() -> true, this::captureDiagnostics)), () -> {
                 if (debugDump != null) {
                     debugDump.close();
                     debugDump = null;
@@ -356,18 +385,8 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
             if (!config.language().equals(localization.activeLocale())) {
                 localization.reloadConfigured(config.language());
             }
-            persistenceCoordinator = new GlossPersistenceCoordinator();
-            projectTransaction = new GlossProjectTransaction(getDataFolder().toPath());
-            try {
-                persistenceCoordinator.write(() -> {
-                    projectTransaction.recover();
-                    return null;
-                });
-            } catch (Exception failure) {
-                throw new IllegalStateException("Unable to recover Gloss editor sync persistence", failure);
-            }
             menuCatalog = new MenuCatalog(getDataFolder());
-            imageAssets = new ImageAssets(getDataFolder());
+            imageAssets = new ImageAssets(getDataFolder(), () -> cfg().images());
             panelService = new PanelService(this);
             enableService("panels", this::startPanelService, this::stopPanelService);
             startPreviewRegistry();
@@ -537,6 +556,7 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
         GlossConfig previous = config;
         GlossConfig next = GlossConfig.from(reloaded);
         config = next;
+        configureTransactionRetention(next);
         reloadServices(previous, next, cycleEveryService);
         applyMergedConfigHooks(previous, next, cycleEveryService);
         info("Reloaded in-place from disk.");
@@ -551,6 +571,9 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
      * Documents themselves keep hot-reloading through their own watchdog entries either way.
      */
     private void reloadServices(GlossConfig previous, GlossConfig next, boolean cycleEveryService) {
+        if (teams instanceof PacketTeamAllocator allocator && (previous == null || !previous.teams().equals(next.teams()))) {
+            allocator.configure(next.teams());
+        }
         if (bedrock != null) {
             bedrock.detection(BedrockService.Detection.parse(next.modules().bedrock().detection()));
         }
@@ -626,21 +649,41 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
     }
 
     /**
-     * The data importers run in exactly this slot: after gloss.toml is loaded (so the HoloUi
-     * settings overlay lands in the in-memory boot config before {@link GlossConfig#from}
-     * snapshots it) and before the DataWatchdog and every service constructs — MenuCatalog
+     * The data importers run before the boot configuration is snapshotted and before the
+     * DataWatchdog and every service constructs — MenuCatalog
      * scans menus/ in its constructor and PanelService/registries scan on start, so imported files
      * must already be in place. Importer failures never abort enable.
      */
-    private void runDataImporters(GlossConfigFile bootConfigFile) {
+    private boolean runDataImporters() {
         try {
-            HoloUiDataImporter holoUiImporter = new HoloUiDataImporter(getDataFolder(), configLoader);
+            HoloUiDataImporter holoUiImporter = new HoloUiDataImporter(getDataFolder(),
+                new HoloUiDataImporter.Services(configLoader, projectTransaction, persistenceCoordinator));
             if (holoUiImporter.shouldRun()) {
-                holoUiImporter.run(bootConfigFile, false);
+                return holoUiImporter.run(false).applied();
             }
         } catch (RuntimeException failure) {
             logExceptionStack(false, failure, "HoloUi data import failed; continuing enable.");
         }
+        return false;
+    }
+
+    private void configureTransactionRetention(GlossConfig current) {
+        GlossConfig.History history = current.modules().history();
+        projectTransaction.configureRetention(new GlossProjectTransaction.RetentionPolicy(
+            history.maxTransactionBackups(), history.maxTransactionBackupBytes()));
+    }
+
+    private void pruneTransactionRetention() {
+        if (!projectTransaction.retentionPending()) {
+            return;
+        }
+        persistenceCoordinator.tryRead(() -> {
+            try {
+                projectTransaction.pruneRetainedBackups();
+            } catch (IOException failure) {
+                logExceptionStack(false, failure, "Transaction backup retention could not finish.");
+            }
+        });
     }
 
     private void startDataWatchdog() {
@@ -651,12 +694,14 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
             previous.close();
         }
         watchdog.register("config", this::configWatchTick);
+        watchdog.register("transaction-retention", this::pruneTransactionRetention);
         watchdog.start(config.hotload().watchIntervalTicks());
     }
 
     private void stopDataWatchdog() {
         watchdog.stop();
         watchdog.unregister("config");
+        watchdog.unregister("transaction-retention");
         FileWatcher previous = configWatcher;
         configWatcher = null;
         if (previous != null) {
@@ -678,6 +723,31 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
 
     public BukkitDebugDump debugDump() {
         return debugDump;
+    }
+
+    private DebugDumpContributor.Report captureDiagnostics() {
+        GlossConfig current = cfg();
+        Map<String, Object> values = new LinkedHashMap<>();
+        values.put("cadenceUnits", "server ticks; configured schedules, not measured wall-clock latency");
+        if (boards != null) {
+            values.put("boards", boards.cadenceSnapshot());
+        }
+        if (tablist != null) {
+            values.put("tablist", tablist.cadenceSnapshot());
+        }
+        values.put("panels", current.panels());
+        values.put("temporaryDisplays", Map.of(
+            "updateIntervalTicks", current.holograms().temporaryUpdateIntervalTicks(),
+            "maxActiveBubbles", current.bubbles().maxActive(),
+            "maxActiveIndicators", current.indicators().maxActive()));
+        if (integrationBridge != null) {
+            values.put("integration", integrationBridge.bridge().diagnosticSnapshot());
+        }
+        if (projectTransaction != null) {
+            values.put("transactionRetention", projectTransaction.retentionStatus());
+        }
+        Map<String, Object> captured = Map.copyOf(values);
+        return () -> new GsonBuilder().setPrettyPrinting().create().toJson(captured);
     }
 
     public BukkitLanguageSwitcher languageSwitcher() {
@@ -820,7 +890,7 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
             watchdog.restart(next.hotload().watchIntervalTicks());
         }
         if (integrationBridge != null
-            && previous.integration().sampleIntervalTicks() != next.integration().sampleIntervalTicks()) {
+            && !previous.integration().equals(next.integration())) {
             integrationBridge.restart(next.integration().sampleIntervalTicks());
         }
     }
@@ -923,6 +993,10 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
 
     public TeamAllocator teams() {
         return teams;
+    }
+
+    public AnchorSnapshots anchorSnapshots() {
+        return anchorSnapshots;
     }
 
     public VisibilityGovernor governor() {

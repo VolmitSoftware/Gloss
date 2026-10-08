@@ -9,8 +9,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
 /**
- * One governor lease per viewer for a surface that redraws its whole set every pass, like markers. The old lease is released before the new request because the viewer is asking for
- * their whole allotment again, not for more on top of what they hold.
+ * One governor lease per viewer for a surface that redraws its whole set every pass, like markers.
+ * Renewal adjusts the existing reservation; refused changes retain it until teardown succeeds.
  *
  * <p>A refusal has to tear the render down. Entities left drawn that the governor no longer counts
  * make the budget under-count permanently: the next pass asks again, is refused again, and the
@@ -31,10 +31,13 @@ public final class ViewerLeases {
      */
     public boolean admit(VisibilityGovernor governor, Player viewer, int entities, Runnable onRefused) {
         UUID viewerId = viewer.getUniqueId();
-        release(viewerId);
-        AdmissionBudget.Lease lease = governor.admit(viewer, surface, entities);
+        AdmissionBudget.Lease previous = leases.get(viewerId);
+        AdmissionBudget.Lease lease = governor.renew(previous, viewer, surface, entities);
         if (lease == null) {
             onRefused.run();
+            if (previous != null && leases.remove(viewerId, previous)) {
+                previous.close();
+            }
             return false;
         }
         leases.put(viewerId, lease);

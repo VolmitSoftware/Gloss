@@ -35,13 +35,13 @@ class TablistSortServiceTest {
     });
 
     @Test
-    void aViewerIndependentWeightIsComputedOncePerSubjectAndBroadcast() {
+    void aViewerIndependentWeightIsCapturedOnceAndDeliveredToEachViewer() {
         Player admin = player("admin");
         Player member = player("member");
 
-        sorts.pass(compile("subject.op ? 1000 : 0"), List.of(admin, member), this::scope, silent());
+        pass(compile("subject.op ? 1000 : 0"), List.of(admin, member), this::scope, silent());
 
-        assertEquals(List.of("[admin, member] {admin=1000, member=0}"), sends);
+        assertEquals(List.of("[admin] {admin=1000, member=0}", "[member] {admin=1000, member=0}"), sends);
     }
 
     @Test
@@ -49,7 +49,7 @@ class TablistSortServiceTest {
         Player admin = player("admin");
         Player member = player("member");
         assertEquals(0, sorts.publishedOrder(member.getUniqueId(), admin.getUniqueId(), false));
-        sorts.pass(compile("subject.op ? 1000 : 0"), List.of(admin, member), this::scope, silent());
+        pass(compile("subject.op ? 1000 : 0"), List.of(admin, member), this::scope, silent());
         assertEquals(1000, sorts.publishedOrder(member.getUniqueId(), admin.getUniqueId(), false));
         sorts.clear();
         assertEquals(0, sorts.publishedOrder(member.getUniqueId(), admin.getUniqueId(), false));
@@ -59,7 +59,7 @@ class TablistSortServiceTest {
     void layoutsReadTheObserversPublishedOrder() {
         Player admin = player("admin");
         Player member = player("member");
-        sorts.pass(compile("viewer.op ? 1000 : 0"), List.of(admin, member),
+        pass(compile("viewer.op ? 1000 : 0"), List.of(admin, member),
             this::scope, silent());
         assertEquals(1000, sorts.publishedOrder(admin.getUniqueId(), admin.getUniqueId(), true));
         assertEquals(0, sorts.publishedOrder(member.getUniqueId(), admin.getUniqueId(), true));
@@ -71,9 +71,9 @@ class TablistSortServiceTest {
         Player member = player("member");
         TablistRuntime runtime = compile("subject.op ? 1000 : 0");
 
-        sorts.pass(runtime, List.of(admin, member), this::scope, silent());
+        pass(runtime, List.of(admin, member), this::scope, silent());
         sends.clear();
-        sorts.pass(runtime, List.of(admin, member), this::scope, silent());
+        pass(runtime, List.of(admin, member), this::scope, silent());
 
         assertEquals(List.of(), sends, "an unchanged order must not be re-sent");
     }
@@ -86,12 +86,12 @@ class TablistSortServiceTest {
         levels.put("admin", 1.0D);
         levels.put("member", 2.0D);
 
-        sorts.pass(runtime, List.of(admin, member), this::scope, silent());
+        pass(runtime, List.of(admin, member), this::scope, silent());
         sends.clear();
         levels.put("member", 5.0D);
-        sorts.pass(runtime, List.of(admin, member), this::scope, silent());
+        pass(runtime, List.of(admin, member), this::scope, silent());
 
-        assertEquals(List.of("[admin, member] {member=50}"), sends);
+        assertEquals(List.of("[admin] {member=50}", "[member] {member=50}"), sends);
     }
 
     @Test
@@ -100,7 +100,7 @@ class TablistSortServiceTest {
         Player member = player("member");
         TablistRuntime runtime = compile("viewer.op ? 100 : 1");
 
-        sorts.pass(runtime, List.of(admin, member), this::scope, silent());
+        pass(runtime, List.of(admin, member), this::scope, silent());
 
         assertEquals(List.of("[admin] {admin=100, member=100}", "[member] {admin=1, member=1}"), sends);
     }
@@ -116,7 +116,7 @@ class TablistSortServiceTest {
     void sortingIsSkippedWhenTheBlockIsAbsentOrDisabled() {
         Player admin = player("admin");
 
-        sorts.pass(TablistRuntime.compile(TablistDoc.DEFAULTS), List.of(admin), this::scope, silent());
+        pass(TablistRuntime.compile(TablistDoc.DEFAULTS), List.of(admin), this::scope, silent());
 
         assertEquals(List.of(), sends);
     }
@@ -126,10 +126,10 @@ class TablistSortServiceTest {
         Player admin = player("admin");
         TablistRuntime runtime = compile("subject.op ? 1000 : 0");
 
-        sorts.pass(runtime, List.of(admin), this::scope, silent());
+        pass(runtime, List.of(admin), this::scope, silent());
         sends.clear();
         sorts.forget(admin.getUniqueId());
-        sorts.pass(runtime, List.of(admin), this::scope, silent());
+        pass(runtime, List.of(admin), this::scope, silent());
 
         assertEquals(List.of("[admin] {admin=1000}"), sends);
     }
@@ -141,6 +141,40 @@ class TablistSortServiceTest {
         assertEquals(Integer.MAX_VALUE, TablistSortService.listOrder(1.0E30D));
         assertEquals(Integer.MIN_VALUE, TablistSortService.listOrder(-1.0E30D));
         assertEquals(0, TablistSortService.listOrder(Double.NaN));
+    }
+
+    @Test
+    void newlyArrivingViewerReceivesExistingSharedOrdersWithoutSubjectReevaluation() {
+        Player admin = player("admin");
+        Player reader = player("reader");
+        TablistRuntime runtime = compile("subject.op ? 1000 : 0");
+        sorts.captureSubject(runtime, admin, scope(admin, admin), silent());
+        sorts.applyViewer(runtime, admin, List.of(admin), (viewer, subject) -> {
+            throw new AssertionError("Shared weight must use the captured subject result");
+        }, silent());
+        sends.clear();
+        sorts.applyViewer(runtime, reader, List.of(admin), (viewer, subject) -> {
+            throw new AssertionError("New viewer must not recapture shared subject weight");
+        }, silent());
+        assertEquals(List.of("[reader] {admin=1000}"), sends);
+        sends.clear();
+        sorts.applyViewer(runtime, reader, List.of(admin), this::scope, silent());
+        assertTrue(sends.isEmpty());
+    }
+
+    @Test
+    void providerCallsRemainViewerSpecificEvenWithoutExplicitViewerVariables() {
+        assertTrue(compile("hasPermission('subject', 'rank.staff') ? 1 : 0").sortViewerDependent());
+    }
+
+    private void pass(TablistRuntime runtime, List<Player> players, TablistSortService.ScopeFactory scopes,
+                      BoundedConditionErrorCallback errors) {
+        for (Player subject : players) {
+            sorts.captureSubject(runtime, subject, scopes.scope(subject, subject), errors);
+        }
+        for (Player viewer : players) {
+            sorts.applyViewer(runtime, viewer, players, scopes, errors);
+        }
     }
 
     private final Map<String, Double> levels = new LinkedHashMap<>();

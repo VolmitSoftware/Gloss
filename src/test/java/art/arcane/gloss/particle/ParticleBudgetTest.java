@@ -66,4 +66,12 @@ class ParticleBudgetTest {
         assertEquals(0, ParticleService.admit(global, viewer, 1L, 0, 4096, 128));
         assertEquals(4096, ParticleService.admit(global, viewer, 1L, 5000, 4096, 10000));
     }
+    @Test
+    void anOlderRegionPassCannotResetTheNewerTickBudget() {
+        Budget global = new Budget();
+        assertEquals(10, ParticleService.admit(global, new Budget(), 2L, 10, 10, 10));
+        assertEquals(0, ParticleService.admit(global, new Budget(), 1L, 10, 10, 10));
+        assertEquals(0, ParticleService.admit(global, new Budget(), 2L, 10, 10, 10));
+    }
+
 }

@@ -11,6 +11,14 @@
   ],
   "additionalProperties": false,
   "properties": {
+    "preset": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1,
+      "description": "Named preset from this collection in presets.json; document fields override inherited values."
+    },
     "schemaVersion": {
       "const": 1
     },
@@ -33,10 +41,9 @@
     },
     "style": {
       "type": "string",
-      "enum": [
-        "default",
-        "bowtie"
-      ]
+      "default": "default",
+      "pattern": "^(default|bowtie|[a-z0-9_.-]+:[a-z0-9_./-]+)$",
+      "description": "Vanilla default/bowtie or a namespaced style declared in glyphs waypointStyles. Custom styles require the current Gloss pack."
     },
     "range": {
       "description": "Blocks beyond which the client is given a bearing instead of the exact position. Zero always sends the position.",
@@ -45,6 +52,15 @@
     },
     "audience": {
       "$ref": "gloss-markers.schema.json#/$defs/audience"
+    },
+    "fallbackStyle": {
+      "type": "string",
+      "enum": [
+        "default",
+        "bowtie"
+      ],
+      "default": "default",
+      "description": "Vanilla style shown while the custom style or current pack is unavailable."
     }
   }
 }

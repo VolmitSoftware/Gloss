@@ -2,16 +2,15 @@ package art.arcane.gloss.motd;
 
 import art.arcane.gloss.Gloss;
 import art.arcane.gloss.condition.GlossConditionScope;
-import art.arcane.gloss.expr.ExprScope;
-import java.util.random.RandomGenerator;
 import art.arcane.gloss.doc.DocumentDelta;
 import art.arcane.gloss.doc.DocumentRegistry;
 import art.arcane.gloss.doc.GlossDocument;
 import art.arcane.gloss.doc.RegistryOwner;
 import art.arcane.gloss.doc.ShippedDefaults;
 import art.arcane.gloss.doc.ShippedDocumentCatalog;
+import art.arcane.gloss.expr.ExprScope;
 import art.arcane.gloss.service.PaperBridges;
-import art.arcane.gloss.text.TextPipeline;
+import art.arcane.volmlib.util.scheduling.FoliaScheduler;
 import org.bukkit.Bukkit;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -22,73 +21,87 @@ import org.bukkit.util.CachedServerIcon;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.random.RandomGenerator;
 
 public final class MotdService implements RegistryOwner {
     private final Gloss plugin;
     private final ShippedDefaults defaults;
     private final DocumentRegistry<MotdDoc> registry;
-    private final AtomicLong docGeneration;
+    private final AtomicLong lifecycle = new AtomicLong();
+    private final AtomicLong sequence = new AtomicLong();
+    private final AtomicReference<Prepared> pending = new AtomicReference<>();
     private final FaviconCache favicons;
-    private PingDecorator pingDecorator;
+    private volatile PingDecorator pingDecorator;
     private ServerLinksPublisher serverLinks;
     private PingListener listener;
+    private int refreshTask = -1;
     private volatile boolean failureLogged;
-    private volatile MotdMemo memo;
+    private volatile boolean linksDirty;
+    private volatile Prepared prepared;
+    private volatile Snapshot snapshot;
 
     public MotdService(Gloss plugin) {
         this.plugin = plugin;
-        this.docGeneration = new AtomicLong();
-        this.defaults = new ShippedDefaults(MotdDoc.KIND, plugin.getDataFolder(),
-            ShippedDocumentCatalog.MOTD.names());
+        this.defaults = new ShippedDefaults(MotdDoc.KIND, plugin.getDataFolder(), ShippedDocumentCatalog.MOTD.names());
         this.registry = DocumentRegistry.singleFile(MotdDoc.KIND,
             new File(plugin.getDataFolder(), MotdDoc.KIND + ".json"), MotdDoc::parse, MotdDoc::revision);
         this.favicons = new FaviconCache(plugin.getImageAssets());
     }
 
-    /**
-     * MOTD ships off, so the shipped {@code motd.json} is only written once the feature is turned
-     * on. Until then {@link #doc()} falls back to {@link MotdDoc#DEFAULTS} and nothing lands on disk.
-     */
     public void enable() {
-        boolean enabled = plugin.cfg().motd().enabled();
-        if (enabled) {
+        long generation = lifecycle.incrementAndGet();
+        if (plugin.cfg().motd().enabled()) {
             defaults.extractMissing();
         }
         registry.reload();
-        docGeneration.incrementAndGet();
-        plugin.watchdog().register(MotdDoc.KIND, this::pollRegistry);
-        if (!enabled) {
-            return;
-        }
-
-        pingDecorator = PaperBridges.load("com.destroystokyo.paper.event.server.PaperServerListPingEvent",
-            "art.arcane.gloss.paper.PaperServerListPingBridge", PingDecorator.class).orElse(null);
+        prepared = prepare(doc());
+        plugin.watchdog().register(MotdDoc.KIND, () -> pollRegistry(generation));
         serverLinks = PaperBridges.load("org.bukkit.ServerLinks",
             "art.arcane.gloss.paper.PaperServerLinksBridge", ServerLinksPublisher.class).orElse(null);
         publishLinks();
+        if (!plugin.cfg().motd().enabled()) {
+            return;
+        }
+        pingDecorator = PaperBridges.load("com.destroystokyo.paper.event.server.PaperServerListPingEvent",
+            "art.arcane.gloss.paper.PaperServerListPingBridge", PingDecorator.class).orElse(null);
+        refreshSnapshot();
+        refreshTask = plugin.scheduler().sr(this::refreshSnapshot, plugin.cfg().motd().snapshotRefreshTicks());
         listener = new PingListener();
         Bukkit.getPluginManager().registerEvents(listener, plugin);
     }
 
     public void disable() {
+        lifecycle.incrementAndGet();
         plugin.watchdog().unregister(MotdDoc.KIND);
+        if (refreshTask != -1) {
+            plugin.scheduler().csr(refreshTask);
+            refreshTask = -1;
+        }
         registry.close();
         favicons.clear();
+        pending.set(null);
+        linksDirty = false;
+        prepared = null;
+        snapshot = null;
         if (serverLinks != null) {
-            serverLinks.clear();
+            if (plugin.proxyOwnership() == null || !plugin.proxyOwnership().ownsServerLinks()) {
+                serverLinks.publish(List.of());
+            } else {
+                serverLinks.clear();
+            }
             serverLinks = null;
         }
         pingDecorator = null;
-        if (listener == null) {
-            return;
+        if (listener != null) {
+            HandlerList.unregisterAll(listener);
+            listener = null;
         }
-
-        HandlerList.unregisterAll(listener);
-        listener = null;
     }
 
     public void reload() {
@@ -101,134 +114,162 @@ public final class MotdService implements RegistryOwner {
         return defaults.resetToDefault(nameOrStar);
     }
 
+    public void refreshProxyOwnership() {
+        if (!FoliaScheduler.isFoliaThreading(plugin.getServer()) && Bukkit.isPrimaryThread()) {
+            publishLinks();
+            return;
+        }
+        long generation = lifecycle.get();
+        if (!FoliaScheduler.runGlobal(plugin, () -> {
+            if (lifecycle.get() == generation) {
+                publishLinks();
+            }
+        })) {
+            linksDirty = true;
+            logFailure(new IllegalStateException("Cannot schedule server-link ownership publication"));
+        }
+    }
+
+    @Override
+    public Map<String, DocumentRegistry<?>> registries() {
+        return Map.of("motd", registry);
+    }
+
     private MotdDoc doc() {
         GlossDocument<MotdDoc> document = registry.get(MotdDoc.KIND);
         return document == null ? MotdDoc.DEFAULTS : document.value();
     }
 
-    private void pollRegistry() {
+    private void pollRegistry(long generation) {
         DocumentDelta delta = registry.poll();
-        if (delta.isEmpty() || !registry.acknowledge(delta)) {
+        if (!delta.isEmpty() && registry.acknowledge(delta)) {
+            Prepared next = prepare(doc());
+            if (lifecycle.get() == generation) {
+                pending.set(next);
+            }
+        }
+        if (pending.get() == null && !linksDirty || lifecycle.get() != generation) {
             return;
         }
-        docGeneration.incrementAndGet();
-        publishLinks();
+        if (!FoliaScheduler.runGlobal(plugin, () -> {
+            if (lifecycle.get() != generation) {
+                return;
+            }
+            Prepared next = pending.getAndSet(null);
+            if (next != null) {
+                prepared = next;
+                refreshSnapshot();
+            }
+            publishLinks();
+        })) {
+            logFailure(new IllegalStateException("Cannot schedule MOTD document publication; retrying on the next scan"));
+        }
     }
 
-    /** Re-evaluates the published server links after the proxy claims or releases the MOTD. */
-    public void refreshProxyOwnership() {
-        publishLinks();
+    private Prepared prepare(MotdDoc document) {
+        Map<String, CachedServerIcon> icons = new HashMap<>();
+        for (MotdDoc.MotdEntry entry : document.entries()) {
+            for (String path : document.iconsFor(entry)) {
+                if (!icons.containsKey(path)) {
+                    CachedServerIcon icon = favicons.iconFor(path, document.revision());
+                    if (icon != null) {
+                        icons.put(path, icon);
+                    }
+                }
+            }
+        }
+        return new Prepared(document, Map.copyOf(icons));
     }
 
     private void publishLinks() {
+        linksDirty = false;
         ServerLinksPublisher publisher = serverLinks;
         if (publisher == null) {
             return;
         }
-        if (plugin.proxyOwnership() != null && plugin.proxyOwnership().ownsMotd()) {
+        if (plugin.proxyOwnership() != null && plugin.proxyOwnership().ownsServerLinks()) {
             publisher.clear();
             return;
         }
-        publisher.publish(doc().links());
+        publisher.publish(doc().enabledLinks(plugin.cfg().motd().enabled()));
+    }
+
+    private void refreshSnapshot() {
+        Prepared source = prepared;
+        if (source == null) {
+            return;
+        }
+        try {
+            long now = System.currentTimeMillis();
+            MotdDoc document = source.document();
+            source = prepare(document);
+            prepared = source;
+            ExprScope scope = GlossConditionScope.viewer(plugin, null);
+            List<Response> responses = new ArrayList<>(document.entries().size());
+            List<MotdPolicy.Candidate> candidates = new ArrayList<>(document.entries().size());
+            if (document.show().matches(scope)) {
+                int online = Bukkit.getOnlinePlayers().size();
+                for (MotdDoc.MotdEntry entry : document.entries()) {
+                    if (!entry.show().matches(scope) || !entry.select().matchesSnapshot(now, document.state(), online)) {
+                        continue;
+                    }
+                    int index = responses.size();
+                    candidates.add(new MotdPolicy.Candidate(index, entry.weight(), entry.select()));
+                    List<String> sample = new ArrayList<>(entry.sample().size());
+                    for (String line : entry.sample()) {
+                        sample.add(plugin.text().renderStatic(line));
+                    }
+                    responses.add(new Response(plugin.text().renderStatic(entry.joined()), document.iconsFor(entry),
+                        new PingDecorator.RenderedPing(List.copyOf(sample), number(entry.online()), number(entry.max()),
+                            renderStatic(entry.version()), entry.sampleMode(), entry.counts())));
+                }
+            }
+            snapshot = new Snapshot(document.rotation(), List.copyOf(candidates), List.copyOf(responses), source.icons());
+        } catch (RuntimeException failure) {
+            logFailure(failure);
+        }
     }
 
     private void handlePing(ServerListPingEvent event) {
         if (plugin.proxyOwnership() != null && plugin.proxyOwnership().ownsMotd()) {
             return;
         }
+        Snapshot current = snapshot;
+        if (current == null) {
+            return;
+        }
         try {
-            MotdDoc document = doc();
-            if (!document.show().matches(plugin, null)) {
-                return;
-            }
-            MotdMemo current = memo(document);
-            int index = selectEntry(current.entries(), GlossConditionScope.viewer(plugin, null),
-                ThreadLocalRandom.current());
+            PingDecorator decorator = pingDecorator;
+            MotdPolicy.Request request = decorator == null
+                ? new MotdPolicy.Request(event.getHostname(), null) : decorator.request(event);
+            RandomGenerator random = ThreadLocalRandom.current();
+            long position = current.rotation().position(sequence, System.currentTimeMillis());
+            int index = current.rotation().choose(current.candidates(), request, position, random);
             if (index < 0) {
                 return;
             }
-            String cached = current.rendered()[index];
-            MotdDoc.MotdEntry entry = current.entries().get(index);
-            event.setMotd(cached == null
-                ? plugin.text().renderStatic(entry.joined())
-                : cached);
-            applyExtras(event, entry, current, index);
-        } catch (Throwable failure) {
-            if (!failureLogged) {
-                failureLogged = true;
-                Gloss.logExceptionStack(false, failure, "MOTD render failed; keeping the server default.");
+            Response response = current.responses().get(index);
+            event.setMotd(response.text());
+            int iconIndex = current.rotation().icon(response.icons().size(), position, random);
+            if (iconIndex >= 0) {
+                CachedServerIcon icon = current.icons().get(response.icons().get(iconIndex));
+                if (icon != null) {
+                    event.setServerIcon(icon);
+                }
             }
-        }
-    }
-
-    static int selectEntry(List<MotdDoc.MotdEntry> entries, ExprScope scope, RandomGenerator random) {
-        long total = 0L;
-        int selected = -1;
-        for (int index = 0; index < entries.size(); index++) {
-            MotdDoc.MotdEntry entry = entries.get(index);
-            if (!entry.show().matches(scope)) {
-                continue;
+            PingDecorator.RenderedPing extras = response.extras();
+            MotdPolicy.Counts counts = extras.counts();
+            if (!counts.maximumMode().equals("inherit")) {
+                event.setMaxPlayers(MotdPolicy.count(counts.maximumMode(), counts.maximumValue(), event.getMaxPlayers()));
+            } else if (extras.max() != null) {
+                event.setMaxPlayers(extras.max());
             }
-            total += entry.weight();
-            if (random.nextLong(total) < entry.weight()) {
-                selected = index;
+            if (decorator != null) {
+                decorator.decorate(event, extras);
             }
+        } catch (RuntimeException failure) {
+            logFailure(failure);
         }
-        return selected;
-    }
-
-    private void applyExtras(ServerListPingEvent event, MotdDoc.MotdEntry entry, MotdMemo memo, int index) {
-        CachedServerIcon icon = memo.icons()[index];
-        if (icon != null) {
-            event.setServerIcon(icon);
-        }
-        Extras extras = memo.extras()[index] == null ? render(entry) : memo.extras()[index];
-        if (extras.max() != null) {
-            event.setMaxPlayers(extras.max());
-        }
-        PingDecorator decorator = pingDecorator;
-        if (decorator == null) {
-            return;
-        }
-        decorator.decorate(event,
-            new PingDecorator.RenderedPing(extras.sample(), extras.online(), extras.max(), extras.version()));
-    }
-
-    /** Everything a ping needs besides the MOTD line itself; memoised unless something varies. */
-    private Extras render(MotdDoc.MotdEntry entry) {
-        return new Extras(renderSample(entry), number(entry.online()), number(entry.max()),
-            renderStatic(entry.version()));
-    }
-
-    /**
-     * Whether an entry's sample, counts or version carry a text function, which is the one thing
-     * that can produce different output on the next ping and so must not be memoised.
-     */
-    static boolean extrasVary(MotdDoc.MotdEntry entry) {
-        if (varies(entry.online()) || varies(entry.max()) || varies(entry.version())) {
-            return true;
-        }
-        for (String line : entry.sample()) {
-            if (varies(line)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private static boolean varies(String raw) {
-        return raw != null && (TextPipeline.classify(raw) & TextPipeline.HAS_FUNCTION) != 0;
-    }
-
-    private List<String> renderSample(MotdDoc.MotdEntry entry) {
-        if (entry.sample().isEmpty()) {
-            return List.of();
-        }
-        List<String> rendered = new ArrayList<>(entry.sample().size());
-        for (String line : entry.sample()) {
-            rendered.add(plugin.text().renderStatic(line));
-        }
-        return rendered;
     }
 
     private String renderStatic(String raw) {
@@ -241,52 +282,31 @@ public final class MotdService implements RegistryOwner {
             return null;
         }
         try {
-            return Integer.valueOf((int) Double.parseDouble(rendered.trim()));
-        } catch (NumberFormatException notANumber) {
-            Gloss.warnThrottled("motd-count-" + raw, "MOTD count \"%s\" did not render to a number.", raw);
-            return null;
-        }
-    }
-
-    /**
-     * Entries are rendered once per document revision and emoji table. An entry carrying a text
-     * function ({@code |name|}) is left out of the memo and re-rendered on every ping, so a
-     * time-varying function still produces fresh output.
-     */
-    private MotdMemo memo(MotdDoc document) {
-        long generation = docGeneration.get();
-        long emojiGeneration = TextPipeline.emojiGeneration();
-        MotdMemo current = memo;
-        if (current != null && current.docGeneration() == generation && current.emojiGeneration() == emojiGeneration) {
-            return current;
-        }
-
-        List<MotdDoc.MotdEntry> entries = document.entries();
-        String[] rendered = new String[entries.size()];
-        for (int index = 0; index < rendered.length; index++) {
-            String joined = entries.get(index).joined();
-            if ((TextPipeline.classify(joined) & TextPipeline.HAS_FUNCTION) == 0) {
-                rendered[index] = plugin.text().renderStatic(joined);
+            double value = Double.parseDouble(rendered.trim());
+            if (Double.isFinite(value)) {
+                return (int) Math.clamp(value, 0D, Integer.MAX_VALUE);
             }
+        } catch (NumberFormatException ignored) {
         }
-        CachedServerIcon[] icons = new CachedServerIcon[entries.size()];
-        Extras[] extras = new Extras[entries.size()];
-        for (int index = 0; index < icons.length; index++) {
-            MotdDoc.MotdEntry entry = entries.get(index);
-            icons[index] = favicons.iconFor(document.faviconFor(entry), generation);
-            extras[index] = extrasVary(entry) ? null : render(entry);
-        }
-        MotdMemo built = new MotdMemo(generation, emojiGeneration, entries, rendered, icons, extras);
-        memo = built;
-        return built;
+        Gloss.warnThrottled("motd-count-" + raw, "MOTD count \"%s\" did not render to a finite number.", raw);
+        return null;
     }
 
-    private record MotdMemo(long docGeneration, long emojiGeneration, List<MotdDoc.MotdEntry> entries,
-                            String[] rendered, CachedServerIcon[] icons, Extras[] extras) {
+    private void logFailure(RuntimeException failure) {
+        if (!failureLogged) {
+            failureLogged = true;
+            Gloss.logExceptionStack(false, failure, "MOTD update failed; retaining the previous response snapshot.");
+        }
     }
 
-    /** A ping's sample, counts and version, rendered once per document revision and emoji table. */
-    private record Extras(List<String> sample, Integer online, Integer max, String version) {
+    private record Prepared(MotdDoc document, Map<String, CachedServerIcon> icons) {
+    }
+
+    private record Snapshot(MotdPolicy.Rotation rotation, List<MotdPolicy.Candidate> candidates,
+                            List<Response> responses, Map<String, CachedServerIcon> icons) {
+    }
+
+    private record Response(String text, List<String> icons, PingDecorator.RenderedPing extras) {
     }
 
     private final class PingListener implements Listener {
@@ -294,10 +314,5 @@ public final class MotdService implements RegistryOwner {
         public void on(ServerListPingEvent event) {
             handlePing(event);
         }
-    }
-
-    @Override
-    public Map<String, DocumentRegistry<?>> registries() {
-        return Map.of("motd", registry);
     }
 }

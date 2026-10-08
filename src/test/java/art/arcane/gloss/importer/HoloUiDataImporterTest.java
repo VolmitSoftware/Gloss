@@ -1,14 +1,23 @@
 package art.arcane.gloss.importer;
 
 import art.arcane.gloss.config.GlossConfigFile;
+import art.arcane.gloss.GlossConfig;
 import art.arcane.gloss.config.GlossConfigLoader;
-import com.google.gson.JsonArray;
+import art.arcane.gloss.doc.DocumentParsers;
+import art.arcane.gloss.panel.PanelDefinition;
+import art.arcane.gloss.panel.PanelTransform;
+import art.arcane.gloss.persistence.GlossPersistenceCoordinator;
+import art.arcane.gloss.persistence.GlossProjectTransaction;
+import art.arcane.gloss.persistence.FailingImportTransaction;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -19,32 +28,26 @@ import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.TreeMap;
+import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class HoloUiDataImporterTest {
-    private static final String PANEL_JSON = """
-        {
-          "id": "spawn",
-          "uuid": "00000000-0000-0000-0000-000000000901",
-          "revision": 3,
-          "rootMenuId": "main"
-        }
-        """;
-    private static final String SETTINGS_JSON = """
+    private static final String SETTINGS = """
         {
           "debugHitbox": true,
           "debugPosition": true,
           "builderUrl": "https://editor.example.com",
           "editorSyncEnabled": false,
-          "editorSyncCreateToken": "abcdefghijklmnopqrstuv",
+          "editorSyncCreateToken": "synthetic-private-credential",
           "editorSyncSessionMinutes": 120,
           "editorSyncPollSeconds": 7,
           "editorSyncMaxProjectMiB": 16,
@@ -59,234 +62,377 @@ class HoloUiDataImporterTest {
 
     @TempDir
     Path plugins;
-
     private Path source;
-    private Path dataFolder;
+    private Path root;
     private GlossConfigLoader loader;
 
     @BeforeEach
     void seed() throws IOException {
         source = plugins.resolve("holoui");
-        dataFolder = plugins.resolve("Gloss");
-        Files.createDirectories(dataFolder);
-        loader = new GlossConfigLoader(dataFolder.toFile());
-
-        write(source.resolve("menus/main.json"), resourceBytes("/defaults/menus/default.json"));
-        write(source.resolve("menus/shop/weapons.json"), resourceBytes("/defaults/menus/default.json"));
-        write(source.resolve("menus/readme.txt"), "not a menu".getBytes(StandardCharsets.UTF_8));
-        write(source.resolve("menus/.hidden/secret.json"), "{}".getBytes(StandardCharsets.UTF_8));
-        write(source.resolve("images/logo.png"), new byte[]{(byte) 0x89, 'P', 'N', 'G'});
-        write(source.resolve("boards/spawn.json"), PANEL_JSON.getBytes(StandardCharsets.UTF_8));
-        write(source.resolve("boards/hub/lobby.json"), PANEL_JSON.getBytes(StandardCharsets.UTF_8));
-        write(source.resolve("previews/chest.json"), resourceBytes("/previews/chest.json"));
-        write(source.resolve("previews/custom.json"), "{\"match\": {\"blocks\": [\"LECTERN\"]}}".getBytes(StandardCharsets.UTF_8));
-        write(source.resolve("preview-scales.json"), "{\"scales\": {}}".getBytes(StandardCharsets.UTF_8));
-        write(source.resolve("settings.json"), SETTINGS_JSON.getBytes(StandardCharsets.UTF_8));
-        write(source.resolve("editor-sync-sessions.json"), "{\"sessions\": \"secret\"}".getBytes(StandardCharsets.UTF_8));
-        write(source.resolve("editor-sync-transactions/txn.json"), "{}".getBytes(StandardCharsets.UTF_8));
-        write(source.resolve("editor-sync-backups/backup.json"), "{}".getBytes(StandardCharsets.UTF_8));
-        write(source.resolve("custom-items.json"), "{\"items\": []}".getBytes(StandardCharsets.UTF_8));
+        root = plugins.resolve("Gloss");
+        Files.createDirectories(root);
+        loader = new GlossConfigLoader(root.toFile());
+        loader.loadForBoot();
+        write(source.resolve("menus/main.json"), menuFixture());
+        write(source.resolve("menus/shop/weapons.json"), menuFixture());
+        write(source.resolve("menus/readme.txt"), "not a menu");
+        write(source.resolve("menus/.hidden/secret.json"), "{}");
+        ByteArrayOutputStream image = new ByteArrayOutputStream();
+        ImageIO.write(new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB), "png", image);
+        write(source.resolve("images/logo.png"), image.toByteArray());
+        write(source.resolve("boards/spawn.json"), panel("spawn"));
+        write(source.resolve("boards/hub/lobby.json"), panel("hub/lobby"));
+        write(source.resolve("previews/chest.json"), new String(resource("/previews/chest.json"),
+            StandardCharsets.UTF_8).replace("gloss.preview.", "holoui.preview."));
+        write(source.resolve("preview-scales.json"), "{\"00000000-0000-0000-0000-000000000001\":1.2}");
+        write(source.resolve("settings.json"), SETTINGS);
+        write(source.resolve("editor-sync-sessions.json"), "{\"sessions\":\"secret\"}");
+        write(source.resolve("editor-sync-transactions/txn.json"), "{}");
+        write(source.resolve("editor-sync-backups/backup.json"), "{}");
+        write(source.resolve("custom-items.json"), "{\"items\":[]}");
     }
 
     private HoloUiDataImporter importer() {
-        return new HoloUiDataImporter(dataFolder.toFile(), loader);
+        return importer(new GlossProjectTransaction(root));
     }
 
     @Test
-    void mappingsCopyEverySurfaceAndNeverTouchTheSource() throws IOException {
+    void sourceScanLimitsRejectIgnoredDeepDirectoriesBeforeStaging() throws IOException {
+        Files.createDirectories(source.resolve("menus/.ignored/one/two"));
+        GlossConfig.Imports limits = new GlossConfig.Imports(16777216, 134217728, 4096,
+            600, 8, 268435456, 65536, 1);
+        HoloUiDataImporter.Plan plan = importer().preview(false, limits);
+        assertFalse(plan.ready());
+        assertTrue(plan.entries().stream().anyMatch(entry -> entry.detail().contains("directory-depth")));
+        assertTrue(plan.targets().isEmpty());
+        assertFalse(Files.exists(root.resolve("menus")));
+    }
+
+    private HoloUiDataImporter importer(GlossProjectTransaction transaction) {
+        return new HoloUiDataImporter(root.toFile(), new HoloUiDataImporter.Services(
+            loader, transaction, new GlossPersistenceCoordinator()));
+    }
+
+    @Test
+    void previewDoesNotWriteEitherDirectoryAndPublishesAnImmutablePlan() throws IOException {
+        Map<String, String> beforeSource = snapshot(source);
+        Map<String, String> beforeTarget = snapshot(root);
+
+        HoloUiDataImporter.Plan plan = importer().preview(false);
+
+        assertTrue(plan.ready(), plan.entries().toString());
+        assertEquals(beforeSource, snapshot(source));
+        assertEquals(beforeTarget, snapshot(root));
+        assertThrows(UnsupportedOperationException.class, () -> plan.entries().clear());
+        assertThrows(UnsupportedOperationException.class, () -> plan.targets().clear());
+    }
+
+    @Test
+    void importsEverySupportedSurfaceAndPreservesSourceAndPanelIdentities() throws IOException {
         Map<String, String> before = snapshot(source);
-        GlossConfigFile config = loader.loadForBoot();
 
-        HoloUiDataImporter.Result result = importer().run(config, false);
+        HoloUiDataImporter.Result result = importer().run(false);
 
+        assertTrue(result.applied(), result.entries().toString());
         assertTrue(result.sourcePresent());
-        assertArrayEquals(resourceBytes("/defaults/menus/default.json"), Files.readAllBytes(dataFolder.resolve("menus/main.json")));
-        assertTrue(Files.isRegularFile(dataFolder.resolve("menus/shop/weapons.json")));
-        assertFalse(Files.exists(dataFolder.resolve("menus/readme.txt")));
-        assertFalse(Files.exists(dataFolder.resolve("menus/.hidden")));
-        assertTrue(Files.isRegularFile(dataFolder.resolve("images/logo.png")));
-        assertEquals(PANEL_JSON, Files.readString(dataFolder.resolve("panels/spawn.json"), StandardCharsets.UTF_8));
-        assertTrue(Files.isRegularFile(dataFolder.resolve("panels/hub/lobby.json")));
-        assertFalse(Files.exists(dataFolder.resolve("boards")));
-        assertTrue(Files.isRegularFile(dataFolder.resolve("previews/custom.json")));
-        assertTrue(Files.isRegularFile(dataFolder.resolve("preview-scales.json")));
-        assertTrue(Files.isRegularFile(dataFolder.resolve(HoloUiDataImporter.RECEIPT_FILE_NAME)));
+        assertArrayEquals(menuFixture(), Files.readAllBytes(root.resolve("menus/main.json")));
+        assertTrue(Files.isRegularFile(root.resolve("menus/shop/weapons.json")));
+        assertFalse(Files.exists(root.resolve("menus/readme.txt")));
+        assertFalse(Files.exists(root.resolve("menus/.hidden")));
+        assertTrue(Files.isRegularFile(root.resolve("images/logo.png")));
+        assertArrayEquals(Files.readAllBytes(source.resolve("boards/spawn.json")), Files.readAllBytes(root.resolve("panels/spawn.json")));
+        assertTrue(Files.isRegularFile(root.resolve("panels/hub/lobby.json")));
+        assertFalse(Files.exists(root.resolve("boards")));
+        assertTrue(Files.isRegularFile(root.resolve("preview-scales.json")));
+        assertTrue(Files.isRegularFile(root.resolve(HoloUiDataImporter.RECEIPT_FILE_NAME)));
+        assertNotNull(result.backupPath());
         assertEquals(before, snapshot(source));
     }
 
     @Test
-    void shippedIdenticalPreviewSkipsWhileModifiedPreviewCopies() throws IOException {
-        GlossConfigFile config = loader.loadForBoot();
+    void translatesHistoricalPreviewGlobalsAndLanguageKeys() throws IOException {
+        HoloUiDataImporter.Result result = importer().run(false);
 
-        HoloUiDataImporter.Result result = importer().run(config, false);
-
-        assertFalse(Files.exists(dataFolder.resolve("previews/chest.json")));
-        assertEquals(HoloUiImportDisposition.SKIPPED_SHIPPED_IDENTICAL,
-            disposition(result, "previews/chest.json"));
-        assertEquals(HoloUiImportDisposition.COPIED, disposition(result, "previews/custom.json"));
+        assertTrue(result.applied(), result.entries().toString());
+        String raw = Files.readString(root.resolve("previews/chest.json"));
+        JsonObject preview = JsonParser.parseString(raw).getAsJsonObject();
+        assertEquals(1.25D, preview.get("scale").getAsDouble());
+        assertEquals(14.5D, preview.get("viewDistance").getAsDouble());
+        assertFalse(raw.contains("holoui.preview."));
+        assertTrue(raw.contains("gloss.preview."));
     }
 
     @Test
-    void secretsAndRegenerableFilesNeverCopy() throws IOException {
-        GlossConfigFile config = loader.loadForBoot();
+    void credentialsAndEditorStateNeverCopy() throws IOException {
+        HoloUiDataImporter.Result result = importer().run(false);
 
-        HoloUiDataImporter.Result result = importer().run(config, false);
-
-        assertFalse(Files.exists(dataFolder.resolve("editor-sync-sessions.json")));
-        assertFalse(Files.exists(dataFolder.resolve("editor-sync-transactions")));
-        assertFalse(Files.exists(dataFolder.resolve("editor-sync-backups")));
-        assertFalse(Files.exists(dataFolder.resolve("custom-items.json")));
-        assertEquals(HoloUiImportDisposition.SKIPPED_SECRET, disposition(result, "editor-sync-sessions.json"));
-        assertEquals(HoloUiImportDisposition.SKIPPED_SECRET, disposition(result, "editor-sync-transactions"));
-        assertEquals(HoloUiImportDisposition.SKIPPED_SECRET, disposition(result, "editor-sync-backups"));
-        assertEquals(HoloUiImportDisposition.SKIPPED_SECRET, disposition(result, "custom-items.json"));
+        assertTrue(result.applied(), result.entries().toString());
+        assertFalse(Files.exists(root.resolve("editor-sync-sessions.json")));
+        assertFalse(Files.exists(root.resolve("editor-sync-transactions/txn.json")));
+        assertFalse(Files.exists(root.resolve("custom-items.json")));
+        assertEquals(HoloUiImportDisposition.SKIPPED_SECRET, disposition(result, "settings.json:editorSyncCreateToken"));
+        assertEquals("", loader.loadForReload().editor.sync.createToken);
+        assertFalse(Files.readString(root.resolve(GlossConfigLoader.FILE_NAME)).contains("synthetic-private-credential"));
+        assertFalse(Files.readString(root.resolve(HoloUiDataImporter.RECEIPT_FILE_NAME)).contains("synthetic-private-credential"));
     }
 
     @Test
-    void settingsOverlayLandsInConfig() throws IOException {
-        GlossConfigFile config = loader.loadForBoot();
+    void importsTypedSettingsWithoutMutatingPreviouslyLoadedConfiguration() throws IOException {
+        GlossConfigFile prior = loader.loadForReload();
 
-        HoloUiDataImporter.Result result = importer().run(config, false);
+        HoloUiDataImporter.Result result = importer().run(false);
 
-        assertTrue(config.debug.hitbox);
-        assertTrue(config.debug.position);
-        assertEquals("https://editor.example.com", config.editor.builderUrl);
-        assertFalse(config.editor.sync.enabled);
-        assertEquals(GlossConfigFile.EDITOR_SYNC_ENDPOINT_DEFAULT, config.editor.sync.endpoint);
-        assertEquals("abcdefghijklmnopqrstuv", config.editor.sync.createToken);
-        assertEquals(120, config.editor.sync.sessionMinutes);
-        assertEquals(7, config.editor.sync.pollSeconds);
-        assertEquals(16, config.editor.sync.maxProjectMiB);
-        assertFalse(config.features.previews);
-        assertEquals(2.0D, config.menus.uiScale);
-        assertFalse(config.items.customItems);
-        assertEquals(List.of("oraxen", "mmoitems", "nexo"), config.items.customItemProviders);
-        String toml = Files.readString(dataFolder.resolve(GlossConfigLoader.FILE_NAME), StandardCharsets.UTF_8);
-        assertTrue(toml.contains(GlossConfigFile.EDITOR_SYNC_ENDPOINT_DEFAULT));
-        assertTrue(toml.contains("#"), "comments must regenerate on overlay save");
-        assertTrue(loader.isSelfWrite(), "overlay save must register as a self write");
+        assertTrue(result.applied(), result.entries().toString());
+        GlossConfigFile updated = loader.loadForReload();
+        assertFalse(prior.debug.hitbox);
+        assertTrue(updated.debug.hitbox);
+        assertTrue(updated.debug.position);
+        assertEquals("https://editor.example.com", updated.editor.builderUrl);
+        assertFalse(updated.editor.sync.enabled);
+        assertEquals(120, updated.editor.sync.sessionMinutes);
+        assertEquals(7, updated.editor.sync.pollSeconds);
+        assertEquals(16, updated.editor.sync.maxProjectMiB);
+        assertFalse(updated.features.previews);
+        assertEquals(2.0D, updated.menus.uiScale);
+        assertFalse(updated.items.customItems);
+        assertEquals(List.of("oraxen", "mmoitems", "nexo"), updated.items.customItemProviders);
+        assertTrue(Files.readString(root.resolve(GlossConfigLoader.FILE_NAME)).contains("#"));
     }
 
     @Test
-    void receiptRecordsEveryDisposition() throws IOException {
-        GlossConfigFile config = loader.loadForBoot();
-        importer().run(config, false);
-
-        JsonObject receipt = JsonParser.parseString(
-            Files.readString(dataFolder.resolve(HoloUiDataImporter.RECEIPT_FILE_NAME), StandardCharsets.UTF_8)).getAsJsonObject();
-        assertEquals(HoloUiDataImporter.RECEIPT_SCHEMA_VERSION, receipt.get("schemaVersion").getAsInt());
-        assertEquals(source.toFile().getAbsolutePath(), receipt.get("source").getAsString());
-        assertFalse(receipt.get("force").getAsBoolean());
-        assertTrue(receipt.get("importedAtMs").getAsLong() > 0L);
-
-        JsonArray entries = receipt.getAsJsonArray("entries");
-        assertEquals("copied", receiptDisposition(entries, "menus/main.json"));
-        assertEquals("skipped-shipped-identical", receiptDisposition(entries, "previews/chest.json"));
-        assertEquals("skipped-secret", receiptDisposition(entries, "editor-sync-sessions.json"));
-        assertEquals("overlaid-config-key", receiptDisposition(entries, "settings.json:uiScale"));
-    }
-
-    @Test
-    void receiptPresenceMakesTheBootRunANoOp() throws IOException {
-        GlossConfigFile config = loader.loadForBoot();
+    void unchangedRepeatedImportDoesNotRewriteReceiptOrConfiguration() throws IOException {
         HoloUiDataImporter importer = importer();
-
         assertTrue(importer.shouldRun());
-        importer.run(config, false);
+        assertTrue(importer.run(false).applied());
+        Map<String, String> before = snapshot(root);
+
+        HoloUiDataImporter.Result result = importer.run(false);
+
+        assertTrue(result.applied(), result.entries().toString());
+        assertEquals(before, snapshot(root));
+        assertEquals(null, result.backupPath());
         assertFalse(importer.shouldRun());
     }
 
     @Test
-    void nonForceRerunNeverOverwritesExistingFiles() throws IOException {
-        GlossConfigFile config = loader.loadForBoot();
-        HoloUiDataImporter importer = importer();
-        importer.run(config, false);
-        Files.writeString(dataFolder.resolve("menus/main.json"), "operator edit", StandardCharsets.UTF_8);
+    void destinationConflictPreventsEveryWriteIncludingReceipt() throws IOException {
+        write(root.resolve("menus/main.json"), "{\"components\":[]}");
+        Map<String, String> before = snapshot(root);
 
-        HoloUiDataImporter.Result rerun = importer.run(config, false);
+        HoloUiDataImporter.Result result = importer().run(false);
 
-        assertEquals("operator edit", Files.readString(dataFolder.resolve("menus/main.json"), StandardCharsets.UTF_8));
-        assertEquals(HoloUiImportDisposition.SKIPPED_EXISTING, disposition(rerun, "menus/main.json"));
+        assertFalse(result.applied());
+        assertEquals(HoloUiImportDisposition.CONFLICT, disposition(result, "menus/main.json"));
+        assertEquals(before, snapshot(root));
+        assertFalse(Files.exists(root.resolve(HoloUiDataImporter.RECEIPT_FILE_NAME)));
     }
 
     @Test
-    void forceRerunOverwritesImportedFilesAndUpdatesTheReceipt() throws IOException {
-        GlossConfigFile config = loader.loadForBoot();
-        HoloUiDataImporter importer = importer();
-        importer.run(config, false);
-        Files.writeString(dataFolder.resolve("menus/main.json"), "operator edit", StandardCharsets.UTF_8);
-        Map<String, String> before = snapshot(source);
+    void explicitOverwriteArchivesTheOldDestination() throws IOException {
+        write(root.resolve("menus/main.json"), "{\"components\":[]}");
 
-        HoloUiDataImporter.Result rerun = importer.run(config, true);
+        HoloUiDataImporter.Result result = importer().run(true);
 
-        assertArrayEquals(resourceBytes("/defaults/menus/default.json"),
-            Files.readAllBytes(dataFolder.resolve("menus/main.json")));
-        assertEquals(HoloUiImportDisposition.COPIED, disposition(rerun, "menus/main.json"));
-        assertEquals(before, snapshot(source));
-        JsonObject receipt = JsonParser.parseString(
-            Files.readString(dataFolder.resolve(HoloUiDataImporter.RECEIPT_FILE_NAME), StandardCharsets.UTF_8)).getAsJsonObject();
-        assertTrue(receipt.get("force").getAsBoolean());
+        assertTrue(result.applied(), result.entries().toString());
+        assertArrayEquals(menuFixture(), Files.readAllBytes(root.resolve("menus/main.json")));
+        assertEquals("{\"components\":[]}", Files.readString(Path.of(result.backupPath()).resolve("menus/main.json")));
     }
 
     @Test
-    void brokenSettingsJsonRecordsAnErrorWhileCopiesProceed() throws IOException {
-        Files.writeString(source.resolve("settings.json"), "{broken", StandardCharsets.UTF_8);
-        GlossConfigFile config = loader.loadForBoot();
+    void changedSourceBytesAfterPreviewRejectTheWholeApply() throws IOException {
+        HoloUiDataImporter importer = importer();
+        HoloUiDataImporter.Plan plan = importer.preview(false);
+        write(source.resolve("menus/main.json"), "{\"components\":[]}");
+        Map<String, String> before = snapshot(root);
 
-        HoloUiDataImporter.Result result = importer().run(config, false);
+        HoloUiDataImporter.Result result = importer.apply(plan);
 
-        assertEquals(HoloUiImportDisposition.ERROR, disposition(result, "settings.json"));
-        assertEquals(HoloUiImportDisposition.COPIED, disposition(result, "menus/main.json"));
-        assertEquals("{broken", Files.readString(source.resolve("settings.json"), StandardCharsets.UTF_8));
-        assertEquals(GlossConfigFile.EDITOR_SYNC_ENDPOINT_DEFAULT, config.editor.sync.endpoint);
+        assertFalse(result.applied());
+        assertEquals(before, snapshot(root));
+        assertTrue(result.count(HoloUiImportDisposition.ERROR) > 0);
     }
 
     @Test
-    void missingSourceDirectoryMeansNothingToRun() throws IOException {
-        deleteRecursively(source);
-        GlossConfigFile config = loader.loadForBoot();
+    void addedSourceFileAfterPreviewRejectsApply() throws IOException {
+        HoloUiDataImporter importer = importer();
+        HoloUiDataImporter.Plan plan = importer.preview(false);
+        write(source.resolve("menus/new.json"), menuFixture());
+
+        assertFalse(importer.apply(plan).applied());
+        assertFalse(Files.exists(root.resolve("menus/main.json")));
+    }
+
+    @Test
+    void changedDestinationAfterPreviewRejectsApply() throws IOException {
+        HoloUiDataImporter importer = importer();
+        HoloUiDataImporter.Plan plan = importer.preview(false);
+        write(root.resolve("menus/main.json"), "{\"components\":[]}");
+
+        assertFalse(importer.apply(plan).applied());
+        assertEquals("{\"components\":[]}", Files.readString(root.resolve("menus/main.json")));
+        assertFalse(Files.exists(root.resolve("images/logo.png")));
+    }
+
+    @Test
+    void malformedSettingsPreventsTheImport() throws IOException {
+        write(source.resolve("settings.json"), "{broken");
+        Map<String, String> before = snapshot(root);
+
+        HoloUiDataImporter.Result result = importer().run(false);
+
+        assertFalse(result.applied());
+        assertTrue(result.count(HoloUiImportDisposition.ERROR) > 0);
+        assertEquals(before, snapshot(root));
+    }
+
+    @Test
+    void invalidSourceDocumentPreventsEveryCopy() throws IOException {
+        write(source.resolve("boards/spawn.json"), "{\"schemaVersion\":999}");
+
+        HoloUiDataImporter.Result result = importer().run(false);
+
+        assertFalse(result.applied());
+        assertEquals(HoloUiImportDisposition.ERROR, disposition(result, "boards/spawn.json"));
+        assertFalse(Files.exists(root.resolve("menus/main.json")));
+    }
+
+    @Test
+    void invalidMenuActionsCannotBeSilentlyDroppedByAnExactImport() throws IOException {
+        JsonObject menu = JsonParser.parseString(Files.readString(source.resolve("menus/main.json"))).getAsJsonObject();
+        JsonObject button = menu.getAsJsonArray("components").get(2).getAsJsonObject().getAsJsonObject("data");
+        button.add("actions", JsonParser.parseString("[{\"type\":\"command\",\"command\":\"\"}]"));
+        write(source.resolve("menus/main.json"), menu.toString());
+
+        HoloUiDataImporter.Result result = importer().run(false);
+
+        assertFalse(result.applied());
+        assertTrue(result.count(HoloUiImportDisposition.ERROR) > 0);
+        assertFalse(Files.exists(root.resolve("menus/main.json")));
+    }
+
+    @Test
+    void invalidExistingCurrentDocumentBlocksActivation() throws IOException {
+        write(root.resolve("emoji/broken.json"), "{\"schemaVersion\":999}");
+
+        assertFalse(importer().run(false).applied());
+        assertFalse(Files.exists(root.resolve("menus/main.json")));
+    }
+
+    @Test
+    void missingPanelMenuReferenceBlocksActivation() throws IOException {
+        Files.delete(source.resolve("menus/main.json"));
+
+        HoloUiDataImporter.Result result = importer().run(false);
+
+        assertFalse(result.applied());
+        assertTrue(result.entries().stream().anyMatch(entry -> entry.detail() != null
+            && entry.detail().contains("root menu does not exist")), result.entries().toString());
+    }
+
+    @Test
+    void duplicatePanelIdentityBlocksActivation() throws IOException {
+        JsonObject panel = JsonParser.parseString(Files.readString(source.resolve("boards/spawn.json"))).getAsJsonObject();
+        panel.addProperty("id", "hub/lobby");
+        write(source.resolve("boards/hub/lobby.json"), panel.toString());
+
+        assertFalse(importer().run(false).applied());
+        assertFalse(Files.exists(root.resolve("panels/spawn.json")));
+    }
+
+    @Test
+    void unknownSettingsAreReportedAsUnsupportedRatherThanSilentlyDiscarded() throws IOException {
+        JsonObject settings = JsonParser.parseString(SETTINGS).getAsJsonObject();
+        settings.addProperty("unrecognizedFeature", true);
+        write(source.resolve("settings.json"), settings.toString());
+
+        HoloUiDataImporter.Result result = importer().run(false);
+
+        assertFalse(result.applied());
+        assertEquals(HoloUiImportDisposition.UNSUPPORTED, disposition(result, "settings.json:unrecognizedFeature"));
+    }
+
+    @Test
+    void customizedDestinationSettingsRequireExplicitOverwrite() throws IOException {
+        GlossConfigFile customized = loader.loadForReload();
+        customized.menus.uiScale = 3D;
+        loader.save(customized);
+
+        HoloUiDataImporter.Result result = importer().run(false);
+
+        assertFalse(result.applied());
+        assertEquals(HoloUiImportDisposition.CONFLICT, disposition(result, GlossConfigLoader.FILE_NAME));
+        assertEquals(3D, loader.loadForReload().menus.uiScale);
+    }
+
+    @Test
+    void aMidCommitFailureRollsBackDocumentsConfigurationAndReceipt() throws IOException {
+        Map<String, String> before = snapshot(root);
+        AtomicBoolean injected = new AtomicBoolean();
+        GlossProjectTransaction transaction = FailingImportTransaction.afterMenuWrite(root, injected);
+
+        HoloUiDataImporter.Result result = importer(transaction).run(false);
+
+        assertFalse(result.applied());
+        assertTrue(injected.get());
+        Map<String, String> live = snapshot(root);
+        live.keySet().removeIf(path -> path.startsWith("editor-sync-backups/") || path.startsWith("editor-sync-transactions/"));
+        assertEquals(before, live);
+        assertFalse(Files.exists(root.resolve(HoloUiDataImporter.RECEIPT_FILE_NAME)));
+    }
+
+    @Test
+    void planCannotBeAppliedByAnotherImporter() {
+        HoloUiDataImporter.Plan plan = importer().preview(false);
+        assertThrows(IllegalArgumentException.class, () -> importer().apply(plan));
+    }
+
+    @Test
+    void noSourceProducesNoReceipt() throws IOException {
+        delete(source);
         HoloUiDataImporter importer = importer();
 
-        assertFalse(importer.shouldRun());
-        HoloUiDataImporter.Result result = importer.run(config, false);
+        HoloUiDataImporter.Result result = importer.run(false);
+
         assertFalse(result.sourcePresent());
+        assertFalse(result.applied());
         assertTrue(result.entries().isEmpty());
-        assertFalse(Files.exists(dataFolder.resolve(HoloUiDataImporter.RECEIPT_FILE_NAME)));
+        assertFalse(importer.shouldRun());
+        assertFalse(Files.exists(root.resolve(HoloUiDataImporter.RECEIPT_FILE_NAME)));
     }
 
     private static HoloUiImportDisposition disposition(HoloUiDataImporter.Result result, String path) {
-        Optional<HoloUiImportEntry> entry = result.entries().stream()
-            .filter(candidate -> candidate.path().equals(path))
-            .findFirst();
-        assertTrue(entry.isPresent(), "missing receipt entry for " + path);
-        return entry.get().disposition();
+        return result.entries().stream().filter(entry -> entry.path().equals(path)).findFirst().orElseThrow().disposition();
     }
 
-    private static String receiptDisposition(JsonArray entries, String path) {
-        for (int index = 0; index < entries.size(); index++) {
-            JsonObject entry = entries.get(index).getAsJsonObject();
-            if (entry.get("path").getAsString().equals(path)) {
-                return entry.get("disposition").getAsString();
-            }
-        }
-        return null;
+    private static String panel(String id) {
+        return DocumentParsers.GSON.toJson(PanelDefinition.create(id, "main",
+            PanelTransform.at("minecraft:overworld", UUID.fromString("00000000-0000-0000-0000-000000000010"),
+                0, 64, 0, 0)));
     }
 
-    private static byte[] resourceBytes(String path) throws IOException {
+    private static byte[] resource(String path) throws IOException {
         try (InputStream stream = HoloUiDataImporterTest.class.getResourceAsStream(path)) {
-            assertNotNull(stream, "missing classpath resource " + path);
+            assertNotNull(stream);
             return stream.readAllBytes();
         }
     }
 
-    private static Map<String, String> snapshot(Path root) throws IOException {
+    private static Map<String, String> snapshot(Path directory) throws IOException {
         Map<String, String> hashes = new TreeMap<>();
-        try (Stream<Path> stream = Files.walk(root)) {
+        try (Stream<Path> stream = Files.walk(directory)) {
             for (Path path : stream.filter(Files::isRegularFile).toList()) {
-                hashes.put(root.relativize(path).toString(), sha256(Files.readAllBytes(path)));
+                hashes.put(directory.relativize(path).toString(), sha256(Files.readAllBytes(path)));
             }
         }
         return hashes;
+    }
+
+    private static byte[] menuFixture() throws IOException {
+        JsonObject menu = JsonParser.parseString(new String(resource("/defaults/menus/default.json"),
+            StandardCharsets.UTF_8)).getAsJsonObject();
+        menu.getAsJsonArray("components").get(2).getAsJsonObject().getAsJsonObject("data")
+            .getAsJsonArray("actions").remove(0);
+        return menu.toString().getBytes(StandardCharsets.UTF_8);
     }
 
     private static String sha256(byte[] content) {
@@ -297,18 +443,19 @@ class HoloUiDataImporterTest {
         }
     }
 
-    private static void write(Path path, byte[] content) throws IOException {
-        Files.createDirectories(path.getParent());
-        Files.write(path, content);
+    private static void write(Path file, String content) throws IOException {
+        write(file, content.getBytes(StandardCharsets.UTF_8));
     }
 
-    private static void deleteRecursively(Path root) throws IOException {
-        if (!Files.exists(root)) {
-            return;
-        }
-        try (Stream<Path> stream = Files.walk(root)) {
-            for (Path path : stream.sorted((left, right) -> right.compareTo(left)).toList()) {
-                Files.delete(path);
+    private static void write(Path file, byte[] content) throws IOException {
+        Files.createDirectories(file.getParent());
+        Files.write(file, content);
+    }
+
+    private static void delete(Path directory) throws IOException {
+        try (Stream<Path> stream = Files.walk(directory)) {
+            for (Path file : stream.sorted((left, right) -> right.compareTo(left)).toList()) {
+                Files.delete(file);
             }
         }
     }

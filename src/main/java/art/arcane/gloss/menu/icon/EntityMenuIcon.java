@@ -43,7 +43,7 @@ public final class EntityMenuIcon extends MenuIcon<EntityIconData> {
   @Override
   protected List<UUID> createDisplayEntities(Location loc) {
     DisplayEntity displayEntity = DisplayEntity.Builder.entity(entityType, position);
-    return List.of(DisplayEntityManager.add(displayEntity));
+    return List.of(DisplayEntityManager.add(session.displayGroup(), displayEntity));
   }
 
   @Override

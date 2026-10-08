@@ -59,6 +59,10 @@ public final class ShowCondition {
         return constant == null;
     }
 
+    public boolean requiresScope() {
+        return condition.requiresScope();
+    }
+
     public boolean matches(ExprScope scope) {
         return matches(scope, errors);
     }

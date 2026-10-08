@@ -9,6 +9,8 @@ import org.bukkit.entity.Player;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.UUID;
+import art.arcane.gloss.expr.ExprRoleSnapshot;
 
 /**
  * {@code stateOf(role, key)}: the state value of the viewer, subject or source instead of the
@@ -35,7 +37,18 @@ public final class StateOfFunction {
         if (schema == null) {
             throw new ExprException(NAME + " does not know the state key " + key, -1);
         }
-        Entity entity = roleEntity(scope.variableContext(), role);
+        ExprVariableContext context = scope.variableContext();
+        ExprRoleSnapshot snapshot = context.snapshots().get(role);
+        if (snapshot != null) {
+            return switch (schema.scope()) {
+                case GLOBAL -> store.get(StateScope.GLOBAL, null, key);
+                case PLAYER -> "player".equals(snapshot.variable("subject.type"))
+                    ? store.get(StateScope.PLAYER, UUID.fromString(String.valueOf(snapshot.variable("subject.uuid"))), key)
+                    : schema.defaultValue();
+                case WORLD -> store.get(StateScope.WORLD, UUID.fromString(String.valueOf(snapshot.variable("world.uuid"))), key);
+            };
+        }
+        Entity entity = roleEntity(context, role);
         return switch (schema.scope()) {
             case GLOBAL -> store.get(StateScope.GLOBAL, null, key);
             case PLAYER -> entity instanceof Player player

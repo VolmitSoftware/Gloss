@@ -10,14 +10,20 @@ import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Stream;
 
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThrows;
@@ -26,6 +32,79 @@ import static org.junit.Assert.assertTrue;
 public class HoloUiProjectTransactionTest {
   @Rule
   public final TemporaryFolder temp = new TemporaryFolder();
+
+  @Test
+  public void preparationBytesIncludeOriginalsAndReplacementsBeforeStaging() throws Exception {
+    Path data = temp.newFolder("byte-budget").toPath();
+    Path target = data.resolve("menus/main.json");
+    Files.createDirectories(target.getParent());
+    Files.writeString(target, "original");
+    GlossProjectTransaction transaction = new GlossProjectTransaction(data);
+    TransactionPreparation preparation = new TransactionPreparation(
+        new TransactionPreparation.Limits(10, 1000));
+
+    assertThrows(IOException.class, () -> transaction.apply("bounded", write(target, "replacement"),
+        Map.of(target, Files.readAllBytes(target)), preparation));
+
+    assertEquals("original", Files.readString(target));
+    try (Stream<Path> files = Files.list(data.resolve("editor-sync-transactions"))) {
+      assertEquals(0, files.count());
+    }
+  }
+
+  @Test
+  public void expirationDuringStagingCleansPartialFilesWithoutPublishing() throws Exception {
+    Path data = temp.newFolder("time-budget-stage").toPath();
+    Path target = data.resolve("menus/main.json");
+    Files.createDirectories(target.getParent());
+    Files.writeString(target, "original");
+    AtomicLong clock = new AtomicLong();
+    GlossProjectTransaction transaction = new GlossProjectTransaction(data, directory -> {
+      if (directory.startsWith(data.resolve("editor-sync-transactions"))
+          && directory.getFileName().toString().equals("menus")) {
+        clock.set(1000000L);
+      }
+    });
+    TransactionPreparation preparation = new TransactionPreparation(
+        new TransactionPreparation.Limits(1024, 1), clock::get);
+
+    assertThrows(IOException.class, () -> transaction.apply("bounded", write(target, "replacement"),
+        Map.of(target, Files.readAllBytes(target)), preparation));
+
+    assertEquals("original", Files.readString(target));
+    try (Stream<Path> files = Files.list(data.resolve("editor-sync-transactions"))) {
+      assertEquals(0, files.count());
+    }
+  }
+
+  @Test
+  public void expirationAfterPreparedJournalStillAllowsRollbackAndRecovery() throws Exception {
+    Path data = temp.newFolder("time-budget-journal").toPath();
+    Path target = data.resolve("menus/main.json");
+    Files.createDirectories(target.getParent());
+    Files.writeString(target, "original");
+    AtomicLong clock = new AtomicLong();
+    GlossProjectTransaction transaction = new GlossProjectTransaction(data, directory -> {
+      if (directory.startsWith(data.resolve("editor-sync-transactions"))
+          && Files.exists(directory.resolve("journal.json"))) {
+        clock.set(1000000L);
+      }
+    });
+    TransactionPreparation preparation = new TransactionPreparation(
+        new TransactionPreparation.Limits(1024, 1), clock::get);
+
+    assertThrows(IOException.class, () -> transaction.apply("bounded", write(target, "replacement"),
+        Map.of(target, Files.readAllBytes(target)), preparation));
+    transaction.recover();
+
+    assertEquals("original", Files.readString(target));
+    try (Stream<Path> files = Files.list(data.resolve("editor-sync-transactions"))) {
+      assertEquals(0, files.count());
+    }
+    try (Stream<Path> files = Files.list(data.resolve("editor-sync-backups"))) {
+      assertEquals(1, files.count());
+    }
+  }
 
   @Test
   public void uncommittedPublishedTransactionRollsBackOnStartupRecovery() throws Exception {
@@ -259,6 +338,142 @@ public class HoloUiProjectTransactionTest {
     assertEquals(new String(original, StandardCharsets.UTF_8), Files.readString(menu));
     assertTrue(Files.list(data.resolve("editor-sync-transactions")).findAny().isEmpty());
     assertEquals(1L, Files.list(data.resolve("editor-sync-backups")).count());
+  }
+
+  @Test
+  public void recoveryRestoresEveryByteAcrossMultipleCopyBuffers() throws Exception {
+    Path data = temp.newFolder("streaming-recovery").toPath();
+    Path menu = data.resolve("menus/shop.json");
+    Files.createDirectories(menu.getParent());
+    byte[] original = new byte[65539];
+    for (int index = 0; index < original.length; index++) {
+      original[index] = (byte) (index * 31);
+    }
+    Files.write(menu, original);
+    GlossProjectTransaction transaction = new GlossProjectTransaction(data);
+    GlossProjectTransaction.Pending pending = transaction.apply("session",
+        write(menu, "replacement"), Map.of(menu, original));
+
+    assertArrayEquals(original,
+        Files.readAllBytes(pending.transactionDirectory().resolve("backup/menus/shop.json")));
+    transaction.recover();
+
+    assertArrayEquals(original, Files.readAllBytes(menu));
+  }
+
+  @Test
+  public void destinationGrowthBeforeBackupRejectsTheReviewAndArchivesCurrentBytes() throws Exception {
+    Path data = temp.newFolder("growth-before-backup").toPath();
+    Path menu = data.resolve("menus/shop.json");
+    Files.createDirectories(menu.getParent());
+    byte[] original = "reviewed".getBytes(StandardCharsets.UTF_8);
+    byte[] grown = "external-change".repeat(5000).getBytes(StandardCharsets.UTF_8);
+    Files.write(menu, original);
+    AtomicBoolean injected = new AtomicBoolean();
+    GlossProjectTransaction transaction = new GlossProjectTransaction(data, directory -> {
+      if (directory.endsWith("stage/menus") && Files.exists(directory.resolve("shop.json"))
+          && injected.compareAndSet(false, true)) {
+        Files.write(menu, grown);
+      }
+    });
+
+    IOException failure = assertThrows(IOException.class, () -> transaction.apply("session",
+        write(menu, "replacement"), Map.of(menu, original)));
+
+    assertTrue(injected.get());
+    assertTrue(failure.getMessage().contains("changed after the session snapshot"));
+    assertArrayEquals(grown, Files.readAllBytes(menu));
+    try (Stream<Path> archives = Files.list(data.resolve("editor-sync-backups"))) {
+      Path archived = archives.findFirst().orElseThrow();
+      assertArrayEquals(grown, Files.readAllBytes(archived.resolve("backup/menus/shop.json")));
+    }
+    try (Stream<Path> transactions = Files.list(data.resolve("editor-sync-transactions"))) {
+      assertTrue(transactions.findAny().isEmpty());
+    }
+  }
+
+  @Test
+  public void destinationGrowthAfterBackupPreservesTheExternalEditAndRecoveryEvidence() throws Exception {
+    Path data = temp.newFolder("growth-after-backup").toPath();
+    Path menu = data.resolve("menus/shop.json");
+    Files.createDirectories(menu.getParent());
+    byte[] original = "reviewed".getBytes(StandardCharsets.UTF_8);
+    byte[] grown = "external-change".repeat(5000).getBytes(StandardCharsets.UTF_8);
+    Files.write(menu, original);
+    AtomicBoolean injected = new AtomicBoolean();
+    GlossProjectTransaction transaction = new GlossProjectTransaction(data, directory -> {
+      if (directory.endsWith("backup/menus") && Files.exists(directory.resolve("shop.json"))
+          && injected.compareAndSet(false, true)) {
+        Files.write(menu, grown);
+      }
+    });
+
+    IOException failure = assertThrows(IOException.class, () -> transaction.apply("session",
+        write(menu, "replacement"), Map.of(menu, original)));
+
+    assertTrue(injected.get());
+    assertTrue(failure.getMessage().contains("changed after the session snapshot"));
+    assertTrue(failure.getSuppressed().length > 0);
+    assertArrayEquals(grown, Files.readAllBytes(menu));
+    assertThrows(IOException.class, transaction::recover);
+    assertArrayEquals(grown, Files.readAllBytes(menu));
+    try (Stream<Path> transactions = Files.list(data.resolve("editor-sync-transactions"))) {
+      Path pending = transactions.findFirst().orElseThrow();
+      assertArrayEquals(original, Files.readAllBytes(pending.resolve("backup/menus/shop.json")));
+      assertTrue(Files.isRegularFile(pending.resolve("journal.json")));
+    }
+  }
+
+  @Test
+  public void oversizedSparseJournalIsRejectedBeforeAllocatingItsContents() throws Exception {
+    Path data = temp.newFolder("oversized-journal").toPath();
+    Path menu = data.resolve("menus/shop.json");
+    Files.createDirectories(menu.getParent());
+    byte[] original = "reviewed".getBytes(StandardCharsets.UTF_8);
+    Files.write(menu, original);
+    GlossProjectTransaction transaction = new GlossProjectTransaction(data);
+    GlossProjectTransaction.Pending pending = transaction.apply("session",
+        write(menu, "replacement"), Map.of(menu, original));
+    Path journal = pending.transactionDirectory().resolve("journal.json");
+    long oversizedLength = (long) Integer.MAX_VALUE + 1;
+    try (FileChannel channel = FileChannel.open(journal, StandardOpenOption.WRITE)) {
+      channel.position(oversizedLength - 1);
+      channel.write(ByteBuffer.wrap(new byte[]{0}));
+    }
+
+    IOException failure = assertThrows(IOException.class, transaction::recover);
+
+    assertTrue(failure.getMessage().contains("journal exceeds the size limit"));
+    assertEquals("replacement", Files.readString(menu));
+    assertEquals(oversizedLength, Files.size(journal));
+    assertArrayEquals(original,
+        Files.readAllBytes(pending.transactionDirectory().resolve("backup/menus/shop.json")));
+  }
+
+  @Test
+  public void oversizedPublicationIsRejectedBeforeStagingOrChangingTargets() throws Exception {
+    Path data = temp.newFolder("oversized-publication").toPath();
+    Path untouched = data.resolve("menus/existing.json");
+    Files.createDirectories(untouched.getParent());
+    Files.writeString(untouched, "original");
+    Map<Path, GlossProjectTransaction.Mutation> mutations = new HashMap<>();
+    for (int index = 0; index < 4000; index++) {
+      mutations.put(data.resolve("menus/" + "x".repeat(160) + index + ".json"),
+          GlossProjectTransaction.Mutation.write("{}".getBytes(StandardCharsets.UTF_8)));
+    }
+    mutations.put(untouched, GlossProjectTransaction.Mutation.write("replacement".getBytes(StandardCharsets.UTF_8)));
+
+    IOException failure = assertThrows(IOException.class,
+        () -> new GlossProjectTransaction(data).apply("large", mutations, Map.of()));
+
+    assertTrue(failure.getMessage().contains("journal exceeds the size limit"));
+    assertEquals("original", Files.readString(untouched));
+    try (Stream<Path> transactions = Files.list(data.resolve("editor-sync-transactions"))) {
+      assertTrue(transactions.findAny().isEmpty());
+    }
+    try (Stream<Path> targets = Files.list(untouched.getParent())) {
+      assertEquals(1, targets.count());
+    }
   }
 
   @Test

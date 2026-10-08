@@ -4,12 +4,15 @@ import art.arcane.gloss.Gloss;
 import art.arcane.gloss.condition.BoundedConditionErrorCallback;
 import art.arcane.gloss.expr.ExprScope;
 import org.bukkit.boss.BarColor;
+import org.bukkit.boss.BarFlag;
 import org.bukkit.boss.BarStyle;
 import org.bukkit.entity.Player;
 
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.HashSet;
+import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -68,6 +71,19 @@ public final class SurfaceDriver {
     public void apply(Player viewer, ExprScope scope, Map<SurfaceKind, List<SurfaceRuntime>> byKind,
                       int defaultTtlTicks, long nowTicks, BoundedConditionErrorCallback errors) {
         ViewerState state = states.computeIfAbsent(viewer.getUniqueId(), key -> new ViewerState());
+        if (state.catalog != byKind) {
+            Set<String> ids = new HashSet<>();
+            for (List<SurfaceRuntime> runtimes : byKind.values()) {
+                for (SurfaceRuntime runtime : runtimes) {
+                    ids.add(runtime.id());
+                }
+            }
+            for (SurfaceQueue<Emission> queue : state.queues.values()) {
+                queue.remove(request -> !ids.contains(request.value().id()));
+            }
+            state.catalog = byKind;
+        }
+        advance(viewer, state, nowTicks);
         applyActionBar(viewer, scope, byKind.get(SurfaceKind.ACTIONBAR), state, defaultTtlTicks, errors);
         applyBossBar(viewer, scope, byKind.get(SurfaceKind.BOSSBAR), state, defaultTtlTicks, errors);
         applyTitle(viewer, scope, byKind.get(SurfaceKind.TITLE), state, nowTicks, errors);
@@ -88,9 +104,11 @@ public final class SurfaceDriver {
         if (actionBar != null) {
             delivery.clearActionBar(viewer, PURPOSE_PREFIX + actionBar);
         }
-        String bossBar = state.selected.get(SurfaceKind.BOSSBAR);
-        if (bossBar != null) {
+        for (String bossBar : state.bossBars.values()) {
             delivery.hideBossBar(viewer, PURPOSE_PREFIX + bossBar);
+        }
+        for (Emission emission : state.delivered.values()) {
+            clearEmission(viewer, emission);
         }
         String title = state.selected.get(SurfaceKind.TITLE);
         if (title != null) {
@@ -104,6 +122,13 @@ public final class SurfaceDriver {
 
     private void applyActionBar(Player viewer, ExprScope scope, List<SurfaceRuntime> candidates, ViewerState state,
                                 int defaultTtlTicks, BoundedConditionErrorCallback errors) {
+        if (state.delivered.containsKey("actionbar")) {
+            String previous = state.selected.remove(SurfaceKind.ACTIONBAR);
+            if (previous != null) {
+                delivery.clearActionBar(viewer, PURPOSE_PREFIX + previous);
+            }
+            return;
+        }
         Optional<SurfaceRuntime> picked = SurfaceRuntime.pick(candidates, scope, errors);
         String previous = state.selected.get(SurfaceKind.ACTIONBAR);
         if (picked.isEmpty()) {
@@ -129,33 +154,45 @@ public final class SurfaceDriver {
 
     private void applyBossBar(Player viewer, ExprScope scope, List<SurfaceRuntime> candidates, ViewerState state,
                               int defaultTtlTicks, BoundedConditionErrorCallback errors) {
-        Optional<SurfaceRuntime> picked = SurfaceRuntime.pick(candidates, scope, errors);
-        String previous = state.selected.get(SurfaceKind.BOSSBAR);
-        if (picked.isEmpty()) {
-            if (previous != null) {
-                state.selected.remove(SurfaceKind.BOSSBAR);
-                delivery.hideBossBar(viewer, PURPOSE_PREFIX + previous);
+        Map<String, SurfaceRuntime> selected = new HashMap<>();
+        for (SurfaceRuntime candidate : candidates) {
+            if (!candidate.doc().automatic() || !candidate.selected(scope, errors)) {
+                continue;
             }
-            return;
+            String group = candidate.doc().group();
+            if (state.delivered.containsKey("bossbar:" + group)) {
+                continue;
+            }
+            SurfaceRuntime previous = selected.get(group);
+            if (previous == null || candidate.selectionPriority() > previous.selectionPriority()
+                || candidate.selectionPriority() == previous.selectionPriority() && candidate.id().compareTo(previous.id()) < 0) {
+                selected.put(group, candidate);
+            }
         }
-        SurfaceRuntime runtime = picked.get();
-        if (previous != null && !previous.equals(runtime.id())) {
-            delivery.hideBossBar(viewer, PURPOSE_PREFIX + previous);
+        Iterator<Map.Entry<String, String>> old = state.bossBars.entrySet().iterator();
+        while (old.hasNext()) {
+            Map.Entry<String, String> entry = old.next();
+            SurfaceRuntime next = selected.get(entry.getKey());
+            if (next == null || !next.id().equals(entry.getValue())) {
+                delivery.hideBossBar(viewer, PURPOSE_PREFIX + entry.getValue());
+                old.remove();
+            }
         }
-        state.selected.put(SurfaceKind.BOSSBAR, runtime.id());
-        ExprScope surfaceScope = new SurfaceScope(scope, runtime);
-        SurfaceRuntime.SurfaceProfile profile = runtime.profile(surfaceScope, errors);
-        int ttlTicks = profile.presentation().ttlTicks() == null
-            ? Math.max(1, defaultTtlTicks * 2) : profile.presentation().ttlTicks();
-        boolean shown = delivery.bossBar(viewer, PURPOSE_PREFIX + runtime.id(), profile.priorityValue(),
-            renderer.render(viewer, profile.presentation().title(), surfaceScope), profile.progress(surfaceScope),
-            barColor(profile.presentation().color()), barStyle(profile.presentation().style()),
-            ttlTicks * TICK_MILLIS);
-        if (!shown) {
-            Gloss.warnThrottled("surface-bossbar-denied:" + runtime.id(),
-                "Boss bar surface \"%s\" did not get a slot for %s: the shared boss bar stack is full at "
-                    + "[surfaces] maxBossBarsPerViewer, and every plugin's bars count against it.",
-                runtime.id(), viewer.getName());
+        for (Map.Entry<String, SurfaceRuntime> entry : selected.entrySet()) {
+            SurfaceRuntime runtime = entry.getValue();
+            state.bossBars.put(entry.getKey(), runtime.id());
+            ExprScope surfaceScope = new SurfaceScope(scope, runtime);
+            SurfaceRuntime.SurfaceProfile profile = runtime.profile(surfaceScope, errors);
+            int ttlTicks = profile.presentation().ttlTicks() == null
+                ? Math.max(1, defaultTtlTicks * 2) : profile.presentation().ttlTicks();
+            boolean shown = delivery.bossBar(viewer, PURPOSE_PREFIX + runtime.id(), new SurfaceDelivery.BossBarOptions(
+                profile.priorityValue(), renderer.render(viewer, profile.presentation().title(), surfaceScope),
+                profile.progress(surfaceScope), barColor(profile.presentation().color()), barStyle(profile.presentation().style()),
+                ttlTicks * TICK_MILLIS, flags(profile.presentation().flags())));
+            if (!shown) {
+                Gloss.warnThrottled("surface-bossbar-denied:" + runtime.id(),
+                    "Boss bar surface \"%s\" did not get a shared bossbar slot for %s.", runtime.id(), viewer.getName());
+            }
         }
     }
 
@@ -168,6 +205,10 @@ public final class SurfaceDriver {
             return;
         }
         SurfaceRuntime runtime = picked.get();
+        Emission active = state.delivered.get("title");
+        if (active != null && !active.id().equals(runtime.id())) {
+            return;
+        }
         state.selected.put(SurfaceKind.TITLE, runtime.id());
         ExprScope surfaceScope = new SurfaceScope(scope, runtime);
         SurfaceRuntime.SurfaceProfile profile = runtime.profile(surfaceScope, errors);
@@ -178,12 +219,100 @@ public final class SurfaceDriver {
         if (!state.armTitle(runtime.id(), profile.id(), presentation.trigger(), repeatTicks, nowTicks)) {
             return;
         }
-        delivery.title(viewer, PURPOSE_PREFIX + runtime.id(), profile.priorityValue(),
-            renderer.render(viewer, presentation.title(), surfaceScope),
-            renderer.render(viewer, presentation.subtitle(), surfaceScope),
-            presentation.fadeInTicks() == null ? SurfaceDoc.DEFAULT_FADE_IN_TICKS : presentation.fadeInTicks(),
-            stayTicks,
-            presentation.fadeOutTicks() == null ? SurfaceDoc.DEFAULT_FADE_OUT_TICKS : presentation.fadeOutTicks());
+        submit(viewer, runtime, scope, nowTicks, errors);
+        advance(viewer, state, nowTicks);
+    }
+
+    public SurfaceQueue.Outcome submit(Player viewer, SurfaceRuntime runtime, ExprScope scope, long tick,
+                                       BoundedConditionErrorCallback errors) {
+        if (!runtime.doc().show().matches(scope, errors)) {
+            return SurfaceQueue.Outcome.REJECTED;
+        }
+        ViewerState state = states.computeIfAbsent(viewer.getUniqueId(), ignored -> new ViewerState());
+        ExprScope surfaceScope = new SurfaceScope(scope, runtime);
+        SurfaceRuntime.SurfaceProfile profile = runtime.profile(surfaceScope, errors);
+        SurfaceDoc.Presentation presentation = profile.presentation();
+        int duration = runtime.kind() == SurfaceKind.TITLE
+            ? Math.max(1, presentation.fadeInTicks() + presentation.stayTicks() + presentation.fadeOutTicks())
+            : presentation.ttlTicks() == null ? 100 : presentation.ttlTicks();
+        Emission emission = new Emission(runtime.id(), runtime.kind(), runtime.doc().group(), profile.priorityValue(),
+            render(viewer, presentation.text(), surfaceScope), render(viewer, presentation.title(), surfaceScope),
+            render(viewer, presentation.subtitle(), surfaceScope), profile.progress(surfaceScope), presentation);
+        String lane = lane(runtime.kind(), runtime.doc().group());
+        SurfaceQueue<Emission> queue = state.queues.computeIfAbsent(lane, ignored -> new SurfaceQueue<>());
+        return queue.offer(new SurfaceQueue.Request<>(runtime.id(), emission.content(), profile.priorityValue(),
+            duration, runtime.doc().delivery(), emission), tick);
+    }
+
+    private String render(Player viewer, String raw, ExprScope scope) {
+        return raw == null ? "" : renderer.render(viewer, raw, scope);
+    }
+
+    private void advance(Player viewer, ViewerState state, long tick) {
+        for (Map.Entry<String, SurfaceQueue<Emission>> entry : state.queues.entrySet()) {
+            SurfaceQueue.Active<Emission> active = entry.getValue().advance(tick);
+            Emission previous = state.delivered.get(entry.getKey());
+            Emission next = active == null ? null : active.request().value();
+            if (previous != null && previous != next) {
+                clearEmission(viewer, previous);
+                state.delivered.remove(entry.getKey());
+            }
+            if (next == null) {
+                continue;
+            }
+            state.delivered.put(entry.getKey(), next);
+            if (next.kind() == SurfaceKind.TITLE && previous != next
+                && !next.id().equals(state.selected.get(SurfaceKind.TITLE))) {
+                state.lastTitleKey = null;
+            }
+            String purpose = "gloss:surface-event:" + next.id();
+            SurfaceDoc.Presentation presentation = next.presentation();
+            long remaining = Math.max(1, active.endsAt() - tick) * TICK_MILLIS;
+            switch (next.kind()) {
+                case ACTIONBAR -> delivery.actionBar(viewer, purpose, next.priority(), remaining,
+                    presentation.hudSlots(), next.text());
+                case BOSSBAR -> delivery.bossBar(viewer, purpose, new SurfaceDelivery.BossBarOptions(next.priority(),
+                    next.title(), next.progress(), barColor(presentation.color()), barStyle(presentation.style()),
+                    remaining, flags(presentation.flags())));
+                case TITLE -> {
+                    if (previous != next) {
+                        delivery.title(viewer, purpose, next.priority(), next.title(), next.subtitle(),
+                            presentation.fadeInTicks(), presentation.stayTicks(), presentation.fadeOutTicks());
+                    }
+                }
+            }
+        }
+    }
+
+    private void clearEmission(Player viewer, Emission emission) {
+        String purpose = "gloss:surface-event:" + emission.id();
+        switch (emission.kind()) {
+            case ACTIONBAR -> delivery.clearActionBar(viewer, purpose);
+            case BOSSBAR -> delivery.hideBossBar(viewer, purpose);
+            case TITLE -> delivery.clearTitle(viewer, purpose);
+        }
+    }
+
+    private static String lane(SurfaceKind kind, String group) {
+        return kind == SurfaceKind.BOSSBAR ? "bossbar:" + group : kind.wireName();
+    }
+
+    private static Set<BarFlag> flags(List<String> names) {
+        if (names.isEmpty()) {
+            return Set.of();
+        }
+        Set<BarFlag> flags = new HashSet<>();
+        for (String name : names) {
+            flags.add(BarFlag.valueOf(name.toUpperCase(Locale.ROOT)));
+        }
+        return Set.copyOf(flags);
+    }
+
+    private record Emission(String id, SurfaceKind kind, String group, int priority, String text, String title,
+                             String subtitle, double progress, SurfaceDoc.Presentation presentation) {
+        private String content() {
+            return text + "\u0000" + title + "\u0000" + subtitle;
+        }
     }
 
     private static BarColor barColor(String name) {
@@ -218,6 +347,10 @@ public final class SurfaceDriver {
 
     private static final class ViewerState {
         private final Map<SurfaceKind, String> selected = new EnumMap<>(SurfaceKind.class);
+        private final Map<String, String> bossBars = new HashMap<>();
+        private final Map<String, SurfaceQueue<Emission>> queues = new HashMap<>();
+        private final Map<String, Emission> delivered = new HashMap<>();
+        private Map<SurfaceKind, List<SurfaceRuntime>> catalog;
         private final Set<String> firedOnce = new HashSet<>();
         private String lastTitleKey;
         private long lastTitleTick;

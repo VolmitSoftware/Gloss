@@ -34,6 +34,25 @@ public final class PacketUtils {
     send(Collections.singletonList(player), packets);
   }
 
+  public static boolean sendChecked(Player player, Collection<PacketWrapper<?>> packets) {
+    PacketEventsAPI<?> api = PacketEvents.getAPI();
+    Object channel = api.getPlayerManager().getChannel(player);
+    if (channel == null) {
+      return false;
+    }
+    long written = 0L;
+    try {
+      for (PacketWrapper<?> packet : packets) {
+        api.getProtocolManager().writePacket(channel, packet);
+        written++;
+      }
+      ChannelHelper.flush(channel);
+      return true;
+    } finally {
+      GlossTelemetry.countPackets(written);
+    }
+  }
+
   /**
    * Writes every packet to each recipient's channel and flushes that channel once, instead of one
    * write-and-flush per packet. Each packet is still encoded per recipient; use

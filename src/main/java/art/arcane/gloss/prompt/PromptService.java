@@ -6,6 +6,7 @@ import art.arcane.gloss.expr.ExprVariableNamespaces;
 import art.arcane.gloss.locale.GlossMessages;
 import art.arcane.gloss.menu.SessionVariables;
 import art.arcane.gloss.menu.action.MenuAction;
+import art.arcane.gloss.menu.action.ActionContext;
 import art.arcane.gloss.service.GlossService;
 import art.arcane.gloss.text.TextPipeline;
 import art.arcane.gloss.util.common.TextUtils;
@@ -38,6 +39,7 @@ public final class PromptService implements GlossService, Listener {
     private final SignPrompt sign;
     private final AnvilPrompt anvil;
     private final ChatPrompt chat;
+    private final NativeDialogService dialogs;
     private final ConcurrentMap<UUID, PromptRequest> pending = new ConcurrentHashMap<>();
 
     public PromptService(Gloss plugin) {
@@ -45,6 +47,7 @@ public final class PromptService implements GlossService, Listener {
         this.sign = new SignPrompt(plugin, this);
         this.anvil = new AnvilPrompt(plugin, this);
         this.chat = new ChatPrompt(this);
+        this.dialogs = new NativeDialogService(plugin);
         active = this;
     }
 
@@ -64,8 +67,10 @@ public final class PromptService implements GlossService, Listener {
 
     @Override
     public void enable() {
+        active = this;
         sign.enable();
         anvil.enable();
+        dialogs.enable();
         if (plugin != null && plugin.getServer() != null) {
             plugin.getServer().getPluginManager().registerEvents(this, plugin);
         }
@@ -76,6 +81,7 @@ public final class PromptService implements GlossService, Listener {
         ExprVariableNamespaces.global().unregister(InputNamespace.PREFIX);
         sign.disable();
         anvil.disable();
+        dialogs.disable();
         HandlerList.unregisterAll(this);
         pending.clear();
         if (active == this) {
@@ -88,6 +94,7 @@ public final class PromptService implements GlossService, Listener {
         if (viewer == null || request == null) {
             return false;
         }
+        dialogs.clear(viewer);
         if (pending.putIfAbsent(viewer.getUniqueId(), request) != null) {
             send(viewer, GlossMessages.FORMS_PROMPT_BUSY);
             return false;
@@ -110,6 +117,18 @@ public final class PromptService implements GlossService, Listener {
     /** The request this player is answering, or null when they are not answering one. */
     public PromptRequest pending(UUID viewer) {
         return pending.get(viewer);
+    }
+
+    public NativeDialogService dialogs() {
+        return dialogs;
+    }
+
+    public boolean dialog(ActionContext context, DialogDefinition definition) {
+        if (!dialogs.available(context.player()) || !context.current()) {
+            return false;
+        }
+        cancel(context.player().getUniqueId());
+        return dialogs.open(context, definition);
     }
 
     /** Delivers a completed answer: the session variable is written, then {@code then} runs. */
@@ -151,6 +170,7 @@ public final class PromptService implements GlossService, Listener {
      */
     @EventHandler(priority = EventPriority.MONITOR)
     public void onQuit(PlayerQuitEvent event) {
+        dialogs.cancel(event.getPlayer());
         cancel(event.getPlayer().getUniqueId());
     }
 

@@ -13,6 +13,15 @@
 #
 # === Переменные ===
 # Не меняйте имена переменных и используйте только переменные исходного сообщения.
+#   {viewers}  Наблюдатели
+#   {entries}  Записи в кэше
+#   {admissions}  Допуски
+#   {refusals}  Отказы
+#   {waiting}  Ожидающие
+#   {expired}  Истёкшие очереди
+#   {retiring}  Ожидающая очистка
+#   {bytes}  Сохранённые данные (байт)
+#   {completed}  Завершено
 #   {absorbed}  Число импортированных записей, объединённых с существующими
 #   {active}  Число активных поставщиков
 #   {actual}  Текущая редакция
@@ -225,8 +234,8 @@ indicators = "Инструменты индикаторов урона и леч
 status = "Показать краткую сводку счётчиков"
 import = "Перенести устаревшие голограммы без изменения исходных файлов"
 "import.apply" = "Применить перенос устаревших голограмм без перезаписи"
-"import.holoui" = "Скопировать данные HoloUi из plugins/holoui, перезаписав предыдущие импорты"
-"import.legacy" = "Перенести файлы данных Gloss, созданные до объединения, в конверты v2"
+"import.holoui" = "Предпросмотр или применение транзакционного импорта HoloUi"
+"import.legacy" = "Предпросмотр или применение транзакционного обновления данных Gloss"
 "import.preview" = "Предпросмотр неразрушающего переноса устаревших голограмм"
 item = "Инструменты провайдеров пользовательских предметов"
 "item.export" = "Экспортировать каталог пользовательских предметов для веб-редактора"
@@ -294,6 +303,9 @@ web = "Открыть веб-редактор Gloss и управлять им"
 "web.sessions.revoke" = "Отозвать право доступа к веб-редактору"
 "web.sessions.status" = "Показать один сеанс веб-редактора"
 language = "Выберите свой язык или язык сервера по умолчанию"
+
+"import.mode" = "preview или apply"
+"import.overwrite" = "Предпросмотр замены существующих файлов"
 
 [command.help.arg]
 reset_name = "Имя для сброса или * для всех стандартных значений"
@@ -421,6 +433,9 @@ emoji = "&7Эмодзи: &f{enabled}&8/&f{total}"
 animations = "&7Анимации: &f{count}"
 effects = "&7Облачка: &f{bubbles} &8| &7Индикаторы: &f{indicators} &8| &7Дропы: &f{drops}"
 
+visibility = "&7Видимые копии сущностей: &f{entities} &8| &7Наблюдатели: &f{viewers} &8| &7Допуски: &f{admissions} &8| &7Отказы: &f{refusals} &8| &7Ожидающие: &f{waiting} &8| &7Истёкшие очереди: &f{expired} &8| &7Ожидающая очистка: &f{retiring}"
+images = "&7Кэш изображений: &f{entries} &8| &7Ожидающие: &f{pending} &8| &7Сохранённые данные: &f{bytes} &7байт &8| &7Завершено: &f{completed} &8| &7Отказы: &f{refusals}"
+
 [command.reset]
 done = "&8[&dGloss&8] &aВосстановлено &f{count}&a стандартных значений {kind}."
 none = "&8[&dGloss&8] &cНет стандартных значений {kind}, соответствующих '&f{name}&c'."
@@ -433,12 +448,19 @@ style_unknown = "&8[&dGloss&8] &cНет стиля облачков с имен�
 [command.import]
 config_unreadable = "&8[&dGloss&8] &cНе удалось загрузить gloss.toml: &f{reason}"
 
+mode_invalid = "&8[&dGloss&8] &cИспользуйте preview или apply в качестве режима импорта."
+preview_capacity = "&8[&dGloss&8] &cКэш проверенных импортов заполнен. Примените существующий предпросмотр или дождитесь истечения его срока, затем создайте новый."
+
 [command.import.holoui]
 missing = "&8[&dGloss&8] &cРядом с папкой данных Gloss не найдена папка данных holoui."
 done = "&8[&dGloss&8] &aИмпорт HoloUi завершён: скопировано &f{copied}&a, пропущено &f{skipped}&a, ключей конфигурации &f{overlaid}&a, ошибок &f{errors}&a."
 
+preview_required = "&8[&dGloss&8] &cСначала выполните /gloss import holoui mode=preview. Предпросмотр действует в течение настроенного срока. Добавьте overwrite=true для предпросмотра замены существующих файлов."
+
 [command.import.legacy]
 done = "&8[&dGloss&8] &aПеренос устаревших данных завершён: перенесено &f{migrated}&a, поглощено &f{absorbed}&a, ключей конфигурации &f{overlaid}&a, ошибок &f{errors}&a."
+
+preview_required = "&8[&dGloss&8] &cСначала выполните /gloss import legacy mode=preview. Предпросмотр действует в течение настроенного срока."
 
 [director.help]
 no_subcommands = "На этой странице нет подкоманд."
@@ -829,6 +851,7 @@ empty = "(пусто)"
 # Lane message tables. Each lane appends its [gloss.message.<lane>] and [command.help.<group>]
 # tables inside its own anchor so parallel branches never share a line.
 # --- lane:screen ---
+
 [gloss.message.screen]
 "surfaces.empty" = "&8[&dGloss&8] &7Поверхности не загружены."
 "surfaces.unknown" = "&8[&dGloss&8]: &cПоверхности &f{id}&c не существует."
@@ -865,6 +888,7 @@ who = "Показывает, какой плагин занимает кажды
 "who.player" = "Игрок для просмотра; по умолчанию вы"
 
 # --- lane:chat ---
+
 [gloss.message.chat]
 filtered = "&8[&dGloss&8]: &cФильтр чата заблокировал ваше сообщение."
 too_fast = "&8[&dGloss&8]: &eПодождите немного перед следующим сообщением."
@@ -915,6 +939,7 @@ sample = "Собрать таблицу лидеров сейчас по все�
 "sample.id" = "Идентификатор документа"
 
 # --- lane:forms ---
+
 [gloss.message.forms]
 icon_unsupported = "&7Нельзя отобразить в ячейке сундука ({kind})"
 no_inventories = "&8[&dGloss&8]: &7Меню-сундуки не настроены."
@@ -964,6 +989,7 @@ hologram_actions_header = "&8[&dGloss&8] &7Действия голограммы
 hologram_actions_entry = "&8[&dGloss&8] &7  &f{kind}&7 на &f{value}"
 
 # --- lane:world ---
+
 [gloss.message.world]
 players_only = "&cЭту команду должен выполнить игрок."
 disabled = "&cЭта функция отключена в gloss.toml."
@@ -1055,6 +1081,7 @@ color = "Именованный цвет текста"
 ticks = "Тики длительности свечения или 0, чтобы сохранить"
 
 # --- lane:behaviors ---
+
 [command.help.behavior]
 root = "Просмотр и запуск документов поведения"
 list = "Показать загруженные документы поведения"
@@ -1119,6 +1146,7 @@ fired = "&8[&dGloss&8]: &aЗапись &f{line}&a из &f{id}&a выполнен
 "explain.missing" = "&8[&dGloss&8]: &cНет {kind} с именем \"{id}\"."
 
 # --- lane:authoring ---
+
 [command.help.pack]
 root = "Установка и управление пакетами Gloss"
 install = "Установить пакет из файла или по адресу HTTPS"
@@ -1188,8 +1216,10 @@ preview = "&8[&dGloss&8] &f{source}&7 запишет &f{count}&7 докумен�
 entry = "&8[&dGloss&8] &7{state} &f{path}&7 {reason}"
 applied = "&8[&dGloss&8] &f{count}&7 документ(ов) импортировано из &f{source}&7."
 absent = "&8[&dGloss&8] &7По пути &f{path}&7 нет данных &f{source}&7."
+preview_required = "&8[&dGloss&8] &cСначала выполните /gloss import preview {source}. Предпросмотр действует в течение настроенного срока."
 
 # --- lane:forge ---
+
 [gloss.message.forge]
 disabled = "&8[&dGloss&8] &cКузница глифов выключена. Установите features.forge в true в gloss.toml."
 built = "&8[&dGloss&8] &aПакет &f{value}&a собран, глифов: {count}."
@@ -1211,6 +1241,7 @@ serve = "Запустить или остановить встроенную р�
 reset = "Восстановить поставляемые документы глифов"
 
 # --- lane:fixes ---
+
 [gloss.message.fixes]
 status_bedrock = "&7bedrock: &f{name}&7, &f{count}&7 в сети"
 status_textimage_oversize = "&7textimage-слишком-большой: &f{count}"

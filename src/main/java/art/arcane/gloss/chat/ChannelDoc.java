@@ -12,7 +12,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.regex.Pattern;
-import java.util.regex.PatternSyntaxException;
 
 /**
  * One chat channel: who hears it, how it renders per viewer, and what the engine does to the text
@@ -21,11 +20,11 @@ import java.util.regex.PatternSyntaxException;
  */
 public record ChannelDoc(int schemaVersion, long revision, ShowCondition show, Channel channel,
                          String format, List<String> card, Mentions mentions, Items items, Links links,
-                         List<Filter> filters, Throttle throttle, List<Variant> variants) {
+                         List<Filter> filters, Filtering filtering, Throttle throttle, List<Variant> variants) {
     public static final String KIND = "channels";
-    public static final int CURRENT_SCHEMA_VERSION = 1;
+    public static final int CURRENT_SCHEMA_VERSION = 2;
     public static final int MAX_CARD_LINES = 16;
-    public static final int MAX_FILTERS = 64;
+    public static final int MAX_FILTERS = 256;
     public static final int MAX_VARIANTS = 32;
     public static final int MAX_TEXT_LENGTH = 4096;
 
@@ -41,9 +40,15 @@ public record ChannelDoc(int schemaVersion, long revision, ShowCondition show, C
         mentions = mentions == null ? Mentions.DEFAULTS : mentions;
         items = items == null ? Items.DEFAULTS : items;
         links = links == null ? Links.DEFAULTS : links;
+        filtering = filtering == null ? Filtering.DEFAULTS : filtering;
         filters = copyFilters(filters);
+        ChatFilterCompiler.validate(filters, filtering);
         throttle = throttle == null ? Throttle.DEFAULTS : throttle;
         variants = copyVariants(variants);
+        for (Variant variant : variants) {
+            ChatFilterCompiler.validate(variant.filters() == null ? filters : variant.filters(),
+                variant.filtering() == null ? filtering : variant.filtering());
+        }
     }
 
     public static ChannelDoc parse(String fileName, String raw) {
@@ -75,13 +80,6 @@ public record ChannelDoc(int schemaVersion, long revision, ShowCondition show, C
             Filter filter = filters.get(index);
             if (filter == null) {
                 throw new IllegalArgumentException("channel filter " + index + " is null");
-            }
-            try {
-                Pattern.compile(filter.match());
-            } catch (PatternSyntaxException invalid) {
-                // No cause: DocumentParsers reports the deepest message, which would drop the index.
-                throw new IllegalArgumentException("channel filter " + index + " is not a valid pattern: "
-                    + invalid.getDescription() + " near index " + invalid.getIndex());
             }
         }
         return List.copyOf(filters);
@@ -247,6 +245,48 @@ public record ChannelDoc(int schemaVersion, long revision, ShowCondition show, C
         }
     }
 
+    public enum FilterLimitPolicy {
+        @SerializedName("drop")
+        DROP,
+        @SerializedName("keep-completed")
+        KEEP_COMPLETED
+    }
+
+    public record Filtering(String syntax, Integer maxInputCharacters, Integer maxOutputCharacters,
+                            Integer maxPatternCharacters, Integer maxReplacementCharacters,
+                            Integer maxFilters, Integer maxMatches, Integer maxProgramSize,
+                            Integer maxNestingDepth, Integer maxWorkUnits, Integer budgetMicros,
+                            FilterLimitPolicy onLimit) {
+        public static final Filtering DEFAULTS = new Filtering(null, null, null, null, null, null,
+            null, null, null, null, null, null);
+
+        public Filtering {
+            syntax = syntax == null ? "re2" : syntax;
+            if (!syntax.equals("re2")) {
+                throw new IllegalArgumentException("channel filtering.syntax must be re2");
+            }
+            maxInputCharacters = limit(maxInputCharacters, 1, 32768, 4096, "maxInputCharacters");
+            maxOutputCharacters = limit(maxOutputCharacters, 1, 262144, 16384, "maxOutputCharacters");
+            maxPatternCharacters = limit(maxPatternCharacters, 1, 4096, 1024, "maxPatternCharacters");
+            maxReplacementCharacters = limit(maxReplacementCharacters, 0, 16384, 4096, "maxReplacementCharacters");
+            maxFilters = limit(maxFilters, 0, MAX_FILTERS, 64, "maxFilters");
+            maxMatches = limit(maxMatches, 1, 65536, 4096, "maxMatches");
+            maxProgramSize = limit(maxProgramSize, 16, 1000000, 16384, "maxProgramSize");
+            maxNestingDepth = limit(maxNestingDepth, 1, 128, 32, "maxNestingDepth");
+            maxWorkUnits = limit(maxWorkUnits, 1, 100000000, 2000000, "maxWorkUnits");
+            budgetMicros = limit(budgetMicros, 1, 100000, 2000, "budgetMicros");
+            onLimit = onLimit == null ? FilterLimitPolicy.DROP : onLimit;
+        }
+
+        private static int limit(Integer value, int minimum, int maximum, int fallback, String name) {
+            int resolved = value == null ? fallback : value;
+            if (resolved < minimum || resolved > maximum) {
+                throw new IllegalArgumentException("channel filtering." + name + " must be within " + minimum + ".." + maximum);
+            }
+            return resolved;
+        }
+    }
+
     public record Throttle(Integer repeatWindowTicks, Integer maxRepeats, Integer minIntervalTicks) {
         public static final Throttle DEFAULTS = new Throttle(null, null, null);
 
@@ -258,7 +298,7 @@ public record ChannelDoc(int schemaVersion, long revision, ShowCondition show, C
     }
 
     public record Variant(String id, Integer priority, String when, String format, List<String> card,
-                          Mentions mentions, Items items, Links links, List<Filter> filters, Throttle throttle) {
+                          Mentions mentions, Items items, Links links, List<Filter> filters, Filtering filtering, Throttle throttle) {
         public Variant {
             id = normalizeId(id);
             when = normalizeCondition(when, "channel variant " + id);
@@ -274,6 +314,7 @@ public record ChannelDoc(int schemaVersion, long revision, ShowCondition show, C
                 format == null ? base.format() : format, card == null ? base.card() : card,
                 mentions == null ? base.mentions() : mentions, items == null ? base.items() : items,
                 links == null ? base.links() : links, filters == null ? base.filters() : filters,
+                filtering == null ? base.filtering() : filtering,
                 throttle == null ? base.throttle() : throttle, List.of());
         }
 

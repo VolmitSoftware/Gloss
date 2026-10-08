@@ -1,6 +1,7 @@
 package art.arcane.gloss.menu.icon;
 
 import art.arcane.gloss.Gloss;
+import art.arcane.gloss.image.ImageAssets;
 import art.arcane.gloss.config.icon.AnimatedImageData;
 import art.arcane.gloss.exceptions.MenuIconException;
 import art.arcane.gloss.menu.DisplayEntityManager;
@@ -13,15 +14,15 @@ import net.kyori.adventure.text.Component;
 import org.bukkit.Location;
 import org.bukkit.util.Vector;
 
-import java.awt.image.BufferedImage;
 import java.io.IOException;
-import java.util.LinkedList;
+import java.util.ArrayList;
+import java.util.Optional;
 import java.util.List;
 import java.util.UUID;
 
 public class AnimatedTextImageMenuIcon extends MenuIcon<AnimatedImageData> {
 
-  private final LinkedList<List<Component>> frameComponents = Lists.newLinkedList();
+  private final List<List<Component>> frameComponents = new ArrayList<>();
 
   private int currentFrame;
   private int passedTicks;
@@ -50,7 +51,7 @@ public class AnimatedTextImageMenuIcon extends MenuIcon<AnimatedImageData> {
         new Vector(0F, ((frameComponents.getFirst().size() - 1) / 2F * localLineHeight()) - localLineHeight(), 0F)
     );
     frameComponents.getFirst().forEach(c -> {
-      uuids.add(DisplayEntityManager.add(textDisplay(c, lineLocation)));
+      uuids.add(DisplayEntityManager.add(session.displayGroup(), textDisplay(c, lineLocation)));
       lineLocation.add(session.getTransform().localVector(new Vector(0F, -localLineHeight(), 0F)));
     });
     return uuids;
@@ -66,40 +67,46 @@ public class AnimatedTextImageMenuIcon extends MenuIcon<AnimatedImageData> {
     return session.getTransform().createPlane(textBoundingBoxCenter(anchor), width, frameComponents.getFirst().size() * lineHeight);
   }
 
-  private List<BufferedImage> getImages() throws IOException, MenuIconException {
-    List<BufferedImage> images = Lists.newArrayList();
-    for (String s : data.requireSource())
-      images.add(Gloss.instance.getImageAssets().get(s).getRight());
-    return images;
-  }
-
   private void createComponents() throws MenuIconException {
     try {
-      List<BufferedImage> images = getImages();
-      int height = images
-          .stream()
-          .mapToInt(BufferedImage::getHeight)
-          .max()
-          .orElse(0);
-      images.forEach(i -> {
-        List<Component> raster = TextImageRasterCache.lines(i, false);
-        int padding = height - i.getHeight();
-        if (padding <= 0) {
-          frameComponents.add(raster);
-          return;
+      List<ImageAssets.PreparedImage> frames = new ArrayList<>();
+      boolean pending = false;
+      int height = 0;
+      for (String path : data.requireSource()) {
+        Optional<ImageAssets.PreparedImage> prepared = Gloss.instance.getImageAssets().prepared(path);
+        if (prepared.isEmpty()) {
+          pending = true;
+          continue;
         }
-
-        List<Component> lines = Lists.newArrayList(raster);
-        Component empty = TextImageRasterCache.blankRow(i.getWidth());
-        for (int y = 0; y < padding; y++) {
+        ImageAssets.PreparedImage image = prepared.get();
+        if (image.rows().isEmpty()) {
+          TextImageRasterCache.reportOversize(path, image.width(), image.height());
+          pending = true;
+          continue;
+        }
+        frames.add(image);
+        height = Math.max(height, image.height());
+      }
+      if (pending || frames.isEmpty()) {
+        frameComponents.add(TextImageMenuIcon.MISSING);
+        return;
+      }
+      for (ImageAssets.PreparedImage frame : frames) {
+        if (frame.height() == height) {
+          frameComponents.add(frame.rows());
+          continue;
+        }
+        List<Component> lines = new ArrayList<>(frame.rows());
+        Component empty = TextImageRasterCache.blankRow(frame.width());
+        for (int row = frame.height(); row < height; row++) {
           lines.add(empty);
         }
-        frameComponents.add(lines);
-      });
-    } catch (IOException | RuntimeException e) {
-      MenuIconException ex = new MenuIconException("Failed to construct animated icon!");
-      ex.initCause(e);
-      throw ex;
+        frameComponents.add(List.copyOf(lines));
+      }
+    } catch (IOException | RuntimeException failure) {
+      MenuIconException rejected = new MenuIconException("Failed to construct animated icon!");
+      rejected.initCause(failure);
+      throw rejected;
     }
   }
 

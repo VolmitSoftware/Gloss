@@ -85,8 +85,9 @@ public record NameplateDoc(int schemaVersion, long revision, ShowCondition show,
     }
 
     public record Presentation(List<Line> lines, IconDisplayStyle style, HologramBox box, Double offset,
-                               Boolean hideSneaking, List<Relation> relations, HealthBarStyle healthBar) {
-        public static final Presentation EMPTY = new Presentation(null, null, null, null, null, null, null);
+                               Boolean hideSneaking, List<Relation> relations, HealthBarStyle healthBar,
+                               Integer healthSegments, Boolean hideInvisible, Boolean hideSpectator, Boolean includeNpcs, Boolean showSelf) {
+        public static final Presentation EMPTY = new Presentation(null, null, null, null, null, null, null, null, null, null, null, null);
 
         public Presentation {
             lines = copyLines(lines);
@@ -96,6 +97,11 @@ public record NameplateDoc(int schemaVersion, long revision, ShowCondition show,
             hideSneaking = hideSneaking == null || hideSneaking;
             relations = relations == null ? List.of() : List.copyOf(relations);
             healthBar = healthBar == null ? HealthBarStyle.DEFAULTS : healthBar;
+            healthSegments = healthSegments == null ? 10 : Math.clamp(healthSegments, 1, 40);
+            hideInvisible = hideInvisible == null || hideInvisible;
+            hideSpectator = hideSpectator == null || hideSpectator;
+            includeNpcs = includeNpcs == null || includeNpcs;
+            showSelf = Boolean.TRUE.equals(showSelf);
         }
 
         private static List<Line> copyLines(List<Line> lines) {

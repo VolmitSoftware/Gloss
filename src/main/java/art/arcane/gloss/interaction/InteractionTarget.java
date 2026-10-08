@@ -1,6 +1,7 @@
 package art.arcane.gloss.interaction;
 
 import art.arcane.gloss.api.HoloClickTrigger;
+import art.arcane.gloss.service.VisibilityGovernor;
 import art.arcane.gloss.menu.action.ActionContext;
 import art.arcane.gloss.menu.action.MenuAction;
 import org.bukkit.Location;
@@ -11,6 +12,7 @@ import java.util.Objects;
 import java.util.function.BiFunction;
 import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
+import java.util.function.Predicate;
 
 public record InteractionTarget(
     String owner,
@@ -20,7 +22,8 @@ public record InteractionTarget(
     float height,
     List<MenuAction<?>> actions,
     BiFunction<Player, HoloClickTrigger, ActionContext> context,
-    BooleanSupplier live
+    BooleanSupplier live,
+    Visibility visibility
 ) {
     public static final float MAX_SIZE = 64.0F;
 
@@ -35,5 +38,12 @@ public record InteractionTarget(
         actions = List.copyOf(actions);
         context = Objects.requireNonNull(context, "context");
         live = Objects.requireNonNull(live, "live");
+        visibility = Objects.requireNonNull(visibility, "visibility");
+    }    public record Visibility(VisibilityGovernor.Surface surface, Predicate<Player> shown) {
+        public Visibility {
+            surface = Objects.requireNonNull(surface);
+            shown = Objects.requireNonNull(shown);
+        }
     }
+
 }

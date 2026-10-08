@@ -4,7 +4,10 @@ import art.arcane.gloss.state.PlayerSections;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
+import org.bukkit.util.Vector;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -28,7 +31,7 @@ public final class CameraJournal {
     private static final String GAME_MODE = "gameMode";
 
     public record Entry(String world, double x, double y, double z, float yaw, float pitch,
-                        String gameMode) {
+                        String gameMode, Boolean allowFlight, Boolean flying, Vector velocity) {
     }
 
     private final PlayerSections sections;
@@ -38,13 +41,25 @@ public final class CameraJournal {
     }
 
     public void write(Player player, Location at, GameMode gameMode) {
-        write(player.getUniqueId(), at.getWorld().getName(), at.getX(), at.getY(), at.getZ(),
+        Map<String, Object> values = values(at.getWorld().getName(), at.getX(), at.getY(), at.getZ(),
             at.getYaw(), at.getPitch(), gameMode.name());
+        values.put("allowFlight", player.getAllowFlight());
+        values.put("flying", player.isFlying());
+        Vector velocity = player.getVelocity();
+        values.put("velocityX", velocity.getX());
+        values.put("velocityY", velocity.getY());
+        values.put("velocityZ", velocity.getZ());
+        persist(player.getUniqueId(), values);
     }
 
     public void write(UUID player, String world, double x, double y, double z, float yaw, float pitch,
                       String gameMode) {
-        Map<String, Object> values = new LinkedHashMap<>(7);
+        persist(player, values(world, x, y, z, yaw, pitch, gameMode));
+    }
+
+    private static Map<String, Object> values(String world, double x, double y, double z, float yaw,
+                                             float pitch, String gameMode) {
+        Map<String, Object> values = new LinkedHashMap<>(12);
         values.put(WORLD, world);
         values.put(X, x);
         values.put(Y, y);
@@ -52,7 +67,7 @@ public final class CameraJournal {
         values.put(YAW, (double) yaw);
         values.put(PITCH, (double) pitch);
         values.put(GAME_MODE, gameMode);
-        sections.write(player, SECTION, values);
+        return values;
     }
 
     public Optional<Entry> read(UUID player) {
@@ -63,11 +78,23 @@ public final class CameraJournal {
         }
         return Optional.of(new Entry(world, x.doubleValue(), y.doubleValue(), z.doubleValue(),
             number(values.get(YAW)), number(values.get(PITCH)),
-            values.get(GAME_MODE) instanceof String mode ? mode : GameMode.SURVIVAL.name()));
+            values.get(GAME_MODE) instanceof String mode ? mode : GameMode.SURVIVAL.name(),
+            values.get("allowFlight") instanceof Boolean flight ? flight : null,
+            values.get("flying") instanceof Boolean flying ? flying : null,
+            new Vector(number(values.get("velocityX")), number(values.get("velocityY")),
+                number(values.get("velocityZ")))));
     }
 
     public void clear(UUID player) {
-        sections.write(player, SECTION, Map.of());
+        persist(player, Map.of());
+    }
+
+    private void persist(UUID player, Map<String, Object> values) {
+        try {
+            sections.writeChecked(player, SECTION, values);
+        } catch (IOException failure) {
+            throw new UncheckedIOException("Camera recovery state could not be saved for " + player, failure);
+        }
     }
 
     private static float number(Object value) {

@@ -14,6 +14,7 @@ import java.lang.reflect.Proxy;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -202,6 +203,76 @@ class PacketTeamAllocatorTest {
         assertEquals(WrapperPlayServerTeams.NameTagVisibility.HIDE_FOR_OTHER_TEAMS, info.getTagVisibility());
         assertEquals(WrapperPlayServerTeams.CollisionRule.NEVER, info.getCollisionRule());
         assertEquals("red", info.getColor().toString());
+    }
+
+    @Test
+    void oppositeRestrictionsIntersectToNever() {
+        TeamStyle composed = PacketTeamAllocator.compose(Map.of(
+            "first", new TeamStyle("", "", "red", NameTagVisibility.HIDE_FOR_OWN_TEAM, CollisionRule.PUSH_OWN_TEAM),
+            "second", new TeamStyle("", "", "white", NameTagVisibility.HIDE_FOR_OTHER_TEAMS, CollisionRule.PUSH_OTHER_TEAMS)));
+        assertEquals(NameTagVisibility.NEVER, composed.nameTagVisibility());
+        assertEquals(CollisionRule.NEVER, composed.collisionRule());
+    }
+
+    @Test
+    void prioritiesAndExplicitWhiteAreConfigurable() {
+        PacketTeamAllocator.Policy policy = new PacketTeamAllocator.Policy(PacketTeamAllocator.ForeignPolicy.YIELD,
+            Map.of("nametag", 100, "glow", 1), PacketTeamAllocator.Composition.PRIORITY,
+            PacketTeamAllocator.Composition.PRIORITY, false);
+        TeamStyle composed = PacketTeamAllocator.compose(Map.of("nametag", TeamStyle.PLAIN,
+            "glow", new TeamStyle("", "", "red", NameTagVisibility.NEVER, CollisionRule.NEVER)), policy);
+        assertEquals("white", composed.color());
+        assertEquals(NameTagVisibility.ALWAYS, composed.nameTagVisibility());
+        assertEquals(CollisionRule.ALWAYS, composed.collisionRule());
+    }
+
+    @Test
+    void foreignMembershipYieldsThenRestoresGlossWhenReleased() {
+        Player viewer = player("viewer");
+        WrapperPlayServerTeams foreign = new WrapperPlayServerTeams("foreign", WrapperPlayServerTeams.TeamMode.ADD_ENTITIES,
+            (WrapperPlayServerTeams.ScoreBoardTeamInfo) null, List.of("Notch"));
+        teams.observe(viewer.getUniqueId(), foreign);
+        TeamHandle handle = teams.claim(viewer, "nametag", "Notch", style("prefix", "red"));
+        assertTrue(sends.isEmpty());
+        Set<String> changed = teams.observe(viewer.getUniqueId(), new WrapperPlayServerTeams("foreign",
+            WrapperPlayServerTeams.TeamMode.REMOVE, (WrapperPlayServerTeams.ScoreBoardTeamInfo) null, List.of()));
+        teams.reconcile(viewer.getUniqueId(), changed);
+        assertEquals(List.of("viewer CREATE " + handle.teamName() + " [Notch]"), sends);
+    }
+
+    @Test
+    void overridingRestoresObservedForeignMembershipAndSameUpdatesAreSilent() {
+        Player viewer = player("viewer");
+        teams.configure(new PacketTeamAllocator.Policy(PacketTeamAllocator.ForeignPolicy.OVERRIDE,
+            PacketTeamAllocator.Policy.DEFAULTS.layerPriorities(), PacketTeamAllocator.Composition.INTERSECTION,
+            PacketTeamAllocator.Composition.INTERSECTION, true));
+        teams.observe(viewer.getUniqueId(), new WrapperPlayServerTeams("foreign", WrapperPlayServerTeams.TeamMode.ADD_ENTITIES,
+            (WrapperPlayServerTeams.ScoreBoardTeamInfo) null, List.of("Notch")));
+        TeamStyle style = style("prefix", "red");
+        TeamHandle handle = teams.claim(viewer, "nametag", "Notch", style);
+        sends.clear();
+        teams.update(handle, style);
+        assertTrue(sends.isEmpty());
+        teams.release(handle);
+        assertEquals(List.of("viewer REMOVE " + handle.teamName() + " []", "viewer ADD_ENTITIES foreign [Notch]"), sends);
+    }
+
+    @Test
+    void liveForeignAssignmentAndPolicyChangesReconcileMembership() {
+        Player viewer = player("viewer");
+        TeamHandle handle = teams.claim(viewer, "nametag", "Notch", style("prefix", "red"));
+        sends.clear();
+        Set<String> changed = teams.observe(viewer.getUniqueId(), new WrapperPlayServerTeams("foreign",
+            WrapperPlayServerTeams.TeamMode.ADD_ENTITIES, (WrapperPlayServerTeams.ScoreBoardTeamInfo) null, List.of("Notch")));
+        teams.reconcile(viewer.getUniqueId(), changed);
+        assertTrue(sends.isEmpty());
+        teams.configure(new PacketTeamAllocator.Policy(PacketTeamAllocator.ForeignPolicy.OVERRIDE,
+            PacketTeamAllocator.Policy.DEFAULTS.layerPriorities(), PacketTeamAllocator.Composition.INTERSECTION,
+            PacketTeamAllocator.Composition.INTERSECTION, true));
+        assertEquals(List.of("viewer ADD_ENTITIES " + handle.teamName() + " [Notch]"), sends);
+        sends.clear();
+        teams.configure(PacketTeamAllocator.Policy.DEFAULTS);
+        assertEquals(List.of("viewer ADD_ENTITIES foreign [Notch]"), sends);
     }
 
     private static TeamStyle suppression() {

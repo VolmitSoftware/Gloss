@@ -9,6 +9,13 @@
     "revision"
   ],
   "properties": {
+    "preset": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1
+    },
     "schemaVersion": {
       "type": "integer",
       "const": 2
@@ -122,6 +129,13 @@
       },
       "default": [],
       "description": "First matching presentation by descending priority, then id. Omitted fields inherit the base presentation."
+    },
+    "snapshotReadLimit": {
+      "type": "integer",
+      "minimum": 16,
+      "maximum": 65536,
+      "default": 4096,
+      "description": "Maximum distinct captured role fields and provider calls per sampled entity."
     }
   },
   "$defs": {

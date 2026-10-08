@@ -68,7 +68,7 @@ class ExplainTest {
     @Test
     void tablistExplainCoversHeaderFooterAndListNameVariants() {
         TablistDoc doc = TablistDoc.parse("tablist.json", """
-            {"schemaVersion":2,"revision":1,
+            {"schemaVersion":3,"revision":1,
              "headerFooter":{"enabled":true,"variants":[
                {"id":"vip","priority":10,"when":"level > 9","presentation":{"header":"a","footer":"b"}},
                {"id":"regular","priority":1,"when":"level > 2","presentation":{"header":"c","footer":"d"}}]},
@@ -89,7 +89,7 @@ class ExplainTest {
     @Test
     void behaviorExplainReportsEachEntryGateAndWhichOnesWouldRun() {
         BehaviorDoc doc = BehaviorDoc.parse("quests.json", """
-            {"schemaVersion":1,"revision":1,"on":[
+            {"schemaVersion":2,"revision":1,"on":[
               {"trigger":"join","when":"level > 9","do":[]},
               {"trigger":"join","when":"level > 2","do":[]},
               {"trigger":"interval","everyTicks":20,"do":[]}]}

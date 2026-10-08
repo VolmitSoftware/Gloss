@@ -203,7 +203,7 @@ class ChannelServiceTest {
     @Test
     void aRadiusChannelOnlyReachesPlayersInsideIt() throws Exception {
         ChannelService service = service("""
-            {"schemaVersion":1,"revision":1,
+            {"schemaVersion":2,"revision":1,
              "channel":{"name":"local","default":true,"scope":"radius","radius":10},
              "format":"&f{{ sender.name }}&8: &f{{ message }}"}
             """);
@@ -220,7 +220,7 @@ class ChannelServiceTest {
     @Test
     void aPermissionChannelOnlyReachesHolders() throws Exception {
         ChannelService service = service("""
-            {"schemaVersion":1,"revision":1,
+            {"schemaVersion":2,"revision":1,
              "channel":{"name":"staff","default":true,"scope":"permission","permission":"server.staff"},
              "format":"&f{{ sender.name }}&8: &f{{ message }}"}
             """);
@@ -238,7 +238,7 @@ class ChannelServiceTest {
     void theDefaultChannelIsTheMarkedOneAndAliasesResolve() throws Exception {
         write("global", global(""));
         write("staff", """
-            {"schemaVersion":1,"revision":1,
+            {"schemaVersion":2,"revision":1,
              "channel":{"name":"staff","aliases":["s"],"scope":"global","priority":-50},
              "format":"&c{{ message }}"}
             """);
@@ -253,11 +253,11 @@ class ChannelServiceTest {
     @Test
     void aDuplicateAliasRefusesTheLaterDocumentById() throws Exception {
         write("alpha", """
-            {"schemaVersion":1,"revision":1,"channel":{"name":"alpha","aliases":["g"],"default":true},
+            {"schemaVersion":2,"revision":1,"channel":{"name":"alpha","aliases":["g"],"default":true},
              "format":"&f{{ message }}"}
             """);
         write("beta", """
-            {"schemaVersion":1,"revision":1,"channel":{"name":"beta","aliases":["g"]},
+            {"schemaVersion":2,"revision":1,"channel":{"name":"beta","aliases":["g"]},
              "format":"&f{{ message }}"}
             """);
         ChannelService service = load();
@@ -271,7 +271,7 @@ class ChannelServiceTest {
     void aPlayerChoiceOverridesTheDefaultUntilTheChannelDisappears() throws Exception {
         write("global", global(""));
         write("staff", """
-            {"schemaVersion":1,"revision":1,"channel":{"name":"staff","scope":"global"},
+            {"schemaVersion":2,"revision":1,"channel":{"name":"staff","scope":"global"},
              "format":"&c{{ message }}"}
             """);
         ChannelService service = load();
@@ -336,7 +336,7 @@ class ChannelServiceTest {
     }
 
     private static String global(String extra) {
-        return "{\"schemaVersion\":1,\"revision\":1,"
+        return "{\"schemaVersion\":2,\"revision\":1,"
             + "\"channel\":{\"name\":\"global\",\"aliases\":[\"g\"],\"default\":true,\"scope\":\"global\"},"
             + extra
             + "\"format\":\"&f{{ sender.name }}&8: &f{{ message }}\"}";

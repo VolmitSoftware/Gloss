@@ -1,0 +1,375 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://volmit.com/gloss/presets.schema.json",
+  "title": "Gloss document presets",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "revision"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1,
+      "type": "integer"
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991
+    },
+    "defaults": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "animations": {
+          "$ref": "#/$defs/values"
+        },
+        "bubbles": {
+          "$ref": "#/$defs/values"
+        },
+        "previews": {
+          "$ref": "#/$defs/values"
+        },
+        "damage-indicators": {
+          "$ref": "#/$defs/values"
+        },
+        "emoji": {
+          "$ref": "#/$defs/values"
+        },
+        "entity-overlays": {
+          "$ref": "#/$defs/values"
+        },
+        "holograms": {
+          "$ref": "#/$defs/values"
+        },
+        "menus": {
+          "$ref": "#/$defs/values"
+        },
+        "names": {
+          "$ref": "#/$defs/values"
+        },
+        "motd": {
+          "$ref": "#/$defs/values"
+        },
+        "panels": {
+          "$ref": "#/$defs/values"
+        },
+        "real-drops": {
+          "$ref": "#/$defs/values"
+        },
+        "boards": {
+          "$ref": "#/$defs/values"
+        },
+        "tablist": {
+          "$ref": "#/$defs/values"
+        },
+        "surfaces": {
+          "$ref": "#/$defs/values"
+        },
+        "nametags": {
+          "$ref": "#/$defs/values"
+        },
+        "channels": {
+          "$ref": "#/$defs/values"
+        },
+        "strings": {
+          "$ref": "#/$defs/values"
+        },
+        "leaderboards": {
+          "$ref": "#/$defs/values"
+        },
+        "inventories": {
+          "$ref": "#/$defs/values"
+        },
+        "markers": {
+          "$ref": "#/$defs/values"
+        },
+        "nameplates": {
+          "$ref": "#/$defs/values"
+        },
+        "waypoints": {
+          "$ref": "#/$defs/values"
+        },
+        "behaviors": {
+          "$ref": "#/$defs/values"
+        },
+        "glyphs": {
+          "$ref": "#/$defs/values"
+        },
+        "connections": {
+          "$ref": "#/$defs/values"
+        }
+      }
+    },
+    "presets": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "animations": {
+          "type": "object",
+          "propertyNames": {
+            "pattern": "^(?!.*\\.\\.)(?!.*[/\\\\])\\S.*$"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/preset"
+          }
+        },
+        "bubbles": {
+          "type": "object",
+          "propertyNames": {
+            "pattern": "^(?!.*\\.\\.)(?!.*[/\\\\])\\S.*$"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/preset"
+          }
+        },
+        "previews": {
+          "type": "object",
+          "propertyNames": {
+            "pattern": "^(?!.*\\.\\.)(?!.*[/\\\\])\\S.*$"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/preset"
+          }
+        },
+        "damage-indicators": {
+          "type": "object",
+          "propertyNames": {
+            "pattern": "^(?!.*\\.\\.)(?!.*[/\\\\])\\S.*$"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/preset"
+          }
+        },
+        "emoji": {
+          "type": "object",
+          "propertyNames": {
+            "pattern": "^(?!.*\\.\\.)(?!.*[/\\\\])\\S.*$"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/preset"
+          }
+        },
+        "entity-overlays": {
+          "type": "object",
+          "propertyNames": {
+            "pattern": "^(?!.*\\.\\.)(?!.*[/\\\\])\\S.*$"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/preset"
+          }
+        },
+        "holograms": {
+          "type": "object",
+          "propertyNames": {
+            "pattern": "^(?!.*\\.\\.)(?!.*[/\\\\])\\S.*$"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/preset"
+          }
+        },
+        "menus": {
+          "type": "object",
+          "propertyNames": {
+            "pattern": "^(?!.*\\.\\.)(?!.*[/\\\\])\\S.*$"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/preset"
+          }
+        },
+        "names": {
+          "type": "object",
+          "propertyNames": {
+            "pattern": "^(?!.*\\.\\.)(?!.*[/\\\\])\\S.*$"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/preset"
+          }
+        },
+        "motd": {
+          "type": "object",
+          "propertyNames": {
+            "pattern": "^(?!.*\\.\\.)(?!.*[/\\\\])\\S.*$"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/preset"
+          }
+        },
+        "panels": {
+          "type": "object",
+          "propertyNames": {
+            "pattern": "^(?!.*\\.\\.)(?!.*[/\\\\])\\S.*$"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/preset"
+          }
+        },
+        "real-drops": {
+          "type": "object",
+          "propertyNames": {
+            "pattern": "^(?!.*\\.\\.)(?!.*[/\\\\])\\S.*$"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/preset"
+          }
+        },
+        "boards": {
+          "type": "object",
+          "propertyNames": {
+            "pattern": "^(?!.*\\.\\.)(?!.*[/\\\\])\\S.*$"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/preset"
+          }
+        },
+        "tablist": {
+          "type": "object",
+          "propertyNames": {
+            "pattern": "^(?!.*\\.\\.)(?!.*[/\\\\])\\S.*$"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/preset"
+          }
+        },
+        "surfaces": {
+          "type": "object",
+          "propertyNames": {
+            "pattern": "^(?!.*\\.\\.)(?!.*[/\\\\])\\S.*$"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/preset"
+          }
+        },
+        "nametags": {
+          "type": "object",
+          "propertyNames": {
+            "pattern": "^(?!.*\\.\\.)(?!.*[/\\\\])\\S.*$"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/preset"
+          }
+        },
+        "channels": {
+          "type": "object",
+          "propertyNames": {
+            "pattern": "^(?!.*\\.\\.)(?!.*[/\\\\])\\S.*$"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/preset"
+          }
+        },
+        "strings": {
+          "type": "object",
+          "propertyNames": {
+            "pattern": "^(?!.*\\.\\.)(?!.*[/\\\\])\\S.*$"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/preset"
+          }
+        },
+        "leaderboards": {
+          "type": "object",
+          "propertyNames": {
+            "pattern": "^(?!.*\\.\\.)(?!.*[/\\\\])\\S.*$"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/preset"
+          }
+        },
+        "inventories": {
+          "type": "object",
+          "propertyNames": {
+            "pattern": "^(?!.*\\.\\.)(?!.*[/\\\\])\\S.*$"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/preset"
+          }
+        },
+        "markers": {
+          "type": "object",
+          "propertyNames": {
+            "pattern": "^(?!.*\\.\\.)(?!.*[/\\\\])\\S.*$"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/preset"
+          }
+        },
+        "nameplates": {
+          "type": "object",
+          "propertyNames": {
+            "pattern": "^(?!.*\\.\\.)(?!.*[/\\\\])\\S.*$"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/preset"
+          }
+        },
+        "waypoints": {
+          "type": "object",
+          "propertyNames": {
+            "pattern": "^(?!.*\\.\\.)(?!.*[/\\\\])\\S.*$"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/preset"
+          }
+        },
+        "behaviors": {
+          "type": "object",
+          "propertyNames": {
+            "pattern": "^(?!.*\\.\\.)(?!.*[/\\\\])\\S.*$"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/preset"
+          }
+        },
+        "glyphs": {
+          "type": "object",
+          "propertyNames": {
+            "pattern": "^(?!.*\\.\\.)(?!.*[/\\\\])\\S.*$"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/preset"
+          }
+        },
+        "connections": {
+          "type": "object",
+          "propertyNames": {
+            "pattern": "^(?!.*\\.\\.)(?!.*[/\\\\])\\S.*$"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/preset"
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "values": {
+      "type": "object",
+      "propertyNames": {
+        "not": {
+          "enum": [
+            "schemaVersion",
+            "revision",
+            "id",
+            "uuid",
+            "preset"
+          ]
+        }
+      }
+    },
+    "preset": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "extends": {
+          "type": ["string", "null"],
+          "minLength": 1
+        },
+        "values": {
+          "$ref": "#/$defs/values"
+        }
+      }
+    }
+  }
+}

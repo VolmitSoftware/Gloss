@@ -9,6 +9,8 @@ import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import art.arcane.gloss.GlossConfig;
 import art.arcane.gloss.api.ParticleLayer;
 import art.arcane.gloss.menu.DisplayEntityManager;
+import art.arcane.gloss.menu.DisplayEntityGroup;
+import art.arcane.gloss.service.VisibilityGovernor;
 import art.arcane.gloss.particle.ParticleFrame;
 import art.arcane.gloss.particle.ParticleRect;
 import art.arcane.gloss.particle.ParticleText;
@@ -71,8 +73,6 @@ public final class ContainerPreview {
   private static final double MIN_DISTANCE = 0.12;
   private static final double MIN_SCALE_FACTOR = 0.08;
   private static final double SCALE_EPSILON = 0.02;
-  private static final int REFRESH_INTERVAL = 4;
-  private static final int ACCESS_RECHECK_INTERVAL = 10;
 
   /**
    * How far the eye may drift from the pose the card was placed at before it is placed again. A
@@ -93,6 +93,7 @@ public final class ContainerPreview {
   private static final int TELEPORT_INTERPOLATION_TICKS = 1;
 
   private final Player player;
+  private final DisplayEntityGroup displayGroup;
   private final Block block;
   private final Entity entity;
   private final Vector targetCenter;
@@ -103,6 +104,8 @@ public final class ContainerPreview {
   private volatile List<Rendered> rendered = List.of();
   private double documentScale = 0.65D;
   private double viewDistance = 10.0D;
+  private int contentRefreshTicks = 4;
+  private int accessCheckTicks = 10;
   private CompiledPreviewDocument document;
   private PreviewStateContext context;
   private CompiledPreviewDocument.Visibility visibility;
@@ -139,6 +142,7 @@ public final class ContainerPreview {
                            List<PreviewElement> elements, List<ParticleLayer> particleLayers,
                            boolean showsContents) {
     this.player = player;
+    this.displayGroup = DisplayEntityManager.group(player, VisibilityGovernor.Surface.PREVIEW);
     this.block = block;
     this.entity = entity;
     this.targetCenter = targetCenter;
@@ -161,6 +165,8 @@ public final class ContainerPreview {
   private void trackVisibility(CompiledPreviewDocument document, PreviewStateContext context) {
     documentScale = document.scale();
     viewDistance = document.viewDistance();
+    contentRefreshTicks = document.contentRefreshTicks();
+    accessCheckTicks = document.accessCheckTicks();
     if (document.hasDynamicVisibility()) {
       this.document = document;
       this.context = context;
@@ -283,6 +289,10 @@ public final class ContainerPreview {
   }
 
   public void open() {
+    displayGroup.batch(this::openDisplays);
+  }
+
+  private void openDisplays() {
     refreshViewerScale();
     recomputeAnchor();
     appliedScale = scaleTarget;
@@ -297,17 +307,31 @@ public final class ContainerPreview {
   }
 
   public boolean tick() {
+    displayGroup.begin();
+    try {
+      return tickDisplays();
+    } finally {
+      displayGroup.end();
+    }
+  }
+
+  private boolean tickDisplays() {
     if (!open || !canView()) {
       return false;
     }
-    boolean checkAccess = ticks % ACCESS_RECHECK_INTERVAL == 0;
-    boolean refreshContents = (showsContents || document != null) && ticks % REFRESH_INTERVAL == 0;
+    boolean checkAccess = ticks % accessCheckTicks == 0;
+    boolean refreshContents = (showsContents || document != null) && ticks % contentRefreshTicks == 0;
     ticks++;
     if (checkAccess || refreshContents) {
       scheduleRefresh(checkAccess);
     }
     refreshViewerScale();
     recomputeAnchor();
+    VisibilityGovernor governor = Gloss.instance == null ? null : Gloss.instance.governor();
+    VisibilityGovernor.Tier tier = governor == null ? VisibilityGovernor.Tier.FULL
+        : governor.tier(player, VisibilityGovernor.Surface.PREVIEW,
+            player.getEyeLocation().toVector().distanceSquared(targetCenter));
+    displayGroup.culled(tier == VisibilityGovernor.Tier.CULLED);
     applyPendingLayout();
     boolean shouldShow = !viewerHidden && !rendered.isEmpty();
     if (shouldShow != visualsShown) {
@@ -325,7 +349,9 @@ public final class ContainerPreview {
     if (!visualsShown) {
       return true;
     }
-    emitParticles();
+    if (tier == VisibilityGovernor.Tier.FULL && displayGroup.visible()) {
+      emitParticles();
+    }
     boolean scaleDirty = Math.abs(scaleTarget - appliedScale) > appliedScale * SCALE_EPSILON;
     if (scaleDirty) {
       appliedScale = scaleTarget;
@@ -480,7 +506,13 @@ public final class ContainerPreview {
   public void close() {
     open = false;
     visualsShown = false;
-    despawnVisuals();
+    try {
+      displayGroup.batch(this::despawnVisuals);
+      displayGroup.close();
+    } catch (RuntimeException failure) {
+      DisplayEntityManager.retire(Gloss.instance, displayGroup);
+      throw failure;
+    }
   }
 
   private void despawnVisuals() {
@@ -871,7 +903,7 @@ public final class ContainerPreview {
     displayEntity.backgroundColor(color);
     displayEntity.teleportDuration(TELEPORT_INTERPOLATION_TICKS);
     displayEntity.translation(backgroundCenteringTranslation(scaleX, scaleY));
-    UUID uuid = DisplayEntityManager.add(displayEntity);
+    UUID uuid = DisplayEntityManager.add(displayGroup, displayEntity);
     DisplayEntityManager.spawn(uuid, player);
     return uuid;
   }
@@ -943,7 +975,7 @@ public final class ContainerPreview {
     displayEntity.backgroundColor(backgroundColor);
     displayEntity.teleportDuration(TELEPORT_INTERPOLATION_TICKS);
     displayEntity.translation(textCenteringTranslation(scale * style.scaleX(), scale * style.scaleY()));
-    UUID uuid = DisplayEntityManager.add(displayEntity);
+    UUID uuid = DisplayEntityManager.add(displayGroup, displayEntity);
     DisplayEntityManager.spawn(uuid, player);
     return uuid;
   }
@@ -954,7 +986,7 @@ public final class ContainerPreview {
     TextDisplayStyle.apply(displayEntity, style);
     displayEntity.teleportDuration(TELEPORT_INTERPOLATION_TICKS);
     displayEntity.scale(new Vector3f(scale * style.scaleX(), scale * style.scaleY(), scale * style.scaleZ()));
-    UUID uuid = DisplayEntityManager.add(displayEntity);
+    UUID uuid = DisplayEntityManager.add(displayGroup, displayEntity);
     DisplayEntityManager.spawn(uuid, player);
     return uuid;
   }
@@ -983,7 +1015,7 @@ public final class ContainerPreview {
       displayEntity.teleportDuration(TELEPORT_INTERPOLATION_TICKS);
       displayEntity.scale(new Vector3f(scale * style.scaleX(), scale * style.scaleY(), style.scaleZ()));
       displayEntity.translation(textCenteringTranslation(scale * style.scaleX(), scale * style.scaleY()));
-      r.count = DisplayEntityManager.add(displayEntity);
+      r.count = DisplayEntityManager.add(displayGroup, displayEntity);
       DisplayEntityManager.spawn(r.count, player);
     } else {
       DisplayEntityManager.changeName(r.count, text);
@@ -995,7 +1027,7 @@ public final class ContainerPreview {
       return;
     }
     if (rendered.decoration == null) {
-      rendered.decoration = new PacketTextDecoration(player);
+      rendered.decoration = new PacketTextDecoration(player, displayGroup);
     }
     float scale = baseTextScale() * (float) depthShrink(rendered.backgroundPx[2]);
     IconDisplayStyle style = label.style();

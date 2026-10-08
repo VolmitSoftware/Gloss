@@ -107,8 +107,8 @@ class SurfaceDeliveryTest {
         apply(runtimes, scope(), 20L);
         apply(runtimes, scope(), 400L);
 
-        assertEquals(List.of("title gloss:surface:hello " + HudPriority.STATUS + " hello-title hello-sub 10 40 10"),
-            delivery.calls);
+        assertEquals(List.of("title gloss:surface-event:hello " + HudPriority.STATUS + " hello-title hello-sub 10 40 10",
+            "clearTitle gloss:surface-event:hello"), delivery.calls);
     }
 
     @Test
@@ -118,9 +118,8 @@ class SurfaceDeliveryTest {
         apply(runtimes, scope("gate", Boolean.FALSE), 20L);
         apply(runtimes, scope("gate", Boolean.TRUE), 40L);
 
-        assertEquals(2, delivery.calls.size());
-        assertTrue(delivery.calls.get(0).startsWith("title gloss:surface:hello"));
-        assertTrue(delivery.calls.get(1).startsWith("title gloss:surface:hello"));
+        assertEquals(2, delivery.calls.stream().filter(call -> call.startsWith("title gloss:surface-event:hello")).count());
+        assertEquals("clearTitle gloss:surface-event:hello", delivery.calls.get(1));
     }
 
     @Test
@@ -142,7 +141,9 @@ class SurfaceDeliveryTest {
         apply(runtimes, scope(), 39L);
         apply(runtimes, scope(), 40L);
 
-        assertEquals(2, delivery.calls.size(), "repeatTicks below stayTicks is clamped to stayTicks");
+        assertEquals(2, delivery.calls.stream().filter(call -> call.startsWith("title ")).count(),
+            "repeatTicks below stayTicks is clamped to stayTicks");
+        assertEquals("clearTitle gloss:surface-event:hello", delivery.calls.get(1));
     }
 
     @Test

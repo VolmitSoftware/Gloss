@@ -53,6 +53,34 @@ public final class SkyOwnershipStack {
         }
     }
 
+    public Optional<SkyOverride> effective(UUID player) {
+        LinkedHashMap<String, SkyOverride> stack = owners.get(player);
+        if (stack == null) {
+            return Optional.empty();
+        }
+        synchronized (stack) {
+            String purpose = null;
+            Long time = null;
+            String weather = null;
+            SkyOverride.Border border = null;
+            int fade = 0;
+            for (SkyOverride override : stack.values()) {
+                purpose = override.purpose();
+                if (override.time() != null) {
+                    time = override.time();
+                    fade = override.fadeTicks();
+                }
+                if (override.weather() != null) {
+                    weather = override.weather();
+                }
+                if (override.border() != null) {
+                    border = override.border();
+                }
+            }
+            return purpose == null ? Optional.empty() : Optional.of(new SkyOverride(purpose, time, weather, border, fade));
+        }
+    }
+
     public boolean owns(UUID player) {
         return top(player).isPresent();
     }

@@ -84,6 +84,11 @@ public final class BehaviorActionContext implements ActionContext, ArgsView.Sour
         return event.args();
     }
 
+    public boolean currentDefinition() {
+        BehaviorService service = plugin.service(BehaviorService.class);
+        return service != null && service.subscriptions().runtime(runtime.id()) == runtime;
+    }
+
     public TriggerEvent event() {
         return event;
     }

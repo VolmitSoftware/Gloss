@@ -16,6 +16,7 @@ import art.arcane.gloss.inventory.InventoryMenuService;
 import art.arcane.gloss.config.menu.MenuIds;
 import art.arcane.gloss.doc.DocumentIds;
 import art.arcane.gloss.doc.DocumentParsers;
+import art.arcane.gloss.doc.DocumentPresetCatalog;
 import art.arcane.gloss.drop.RealDropSettingsDoc;
 import art.arcane.gloss.emoji.EmojiDoc;
 import art.arcane.gloss.entity.EntityOverlayDoc;
@@ -70,6 +71,11 @@ import java.util.function.UnaryOperator;
  * {@link Gloss} needs a matching edit.
  */
 public enum EditorSyncDocumentKind {
+  PRESETS("presets", "presets.json", Layout.SINGLE, true, "presets",
+      value -> requireSingleton(value, "presets"),
+      (id, source) -> DocumentPresetCatalog.parse(DocumentPresetCatalog.FILE_NAME, source),
+      gloss -> {
+      }),
   ANIMATION("animation", "animations", Layout.FOLDER, true, null,
       EditorSyncDocumentKind::requireFlatId,
       (id, source) -> AnimationDoc.parse(id + ".json", source),
@@ -315,11 +321,27 @@ public enum EditorSyncDocumentKind {
     return new ParsedDocument(value, revision);
   }
 
+  public ParsedDocument parse(String id, String source, DocumentPresetCatalog presets) {
+    String collection = layout == Layout.SINGLE
+        ? storageName.substring(0, storageName.length() - ".json".length()) : storageName;
+    return parse(id, presets.resolve(collection, source));
+  }
+
   String wireSource(String id, String source, ParsedDocument parsed) {
     if (this != PANEL) {
       return source;
     }
     return EditorSyncJson.canonical(DocumentParsers.GSON.toJsonTree(parsed.value()));
+  }
+
+  String wireSource(String id, String source, ParsedDocument parsed, DocumentPresetCatalog presets) {
+    return this == PANEL && !presets.resolve("panels", source).equals(source)
+        ? source : wireSource(id, source, parsed);
+  }
+
+  byte[] persistedBytes(String id, String wireSource, DocumentPresetCatalog presets) {
+    return this == PANEL && !presets.resolve("panels", wireSource).equals(wireSource)
+        ? wireSource.getBytes(StandardCharsets.UTF_8) : persistedBytes(id, wireSource);
   }
 
   byte[] persistedBytes(String id, String wireSource) {

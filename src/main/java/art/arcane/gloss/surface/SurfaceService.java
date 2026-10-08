@@ -3,6 +3,13 @@ package art.arcane.gloss.surface;
 import art.arcane.gloss.Gloss;
 import art.arcane.gloss.GlossConfig;
 import art.arcane.gloss.bedrock.BedrockService;
+import art.arcane.gloss.behavior.BehaviorDoc;
+import art.arcane.gloss.behavior.BehaviorEntry;
+import art.arcane.gloss.behavior.BehaviorService;
+import art.arcane.gloss.behavior.BehaviorTrigger;
+import art.arcane.gloss.config.action.DelayActionData;
+import art.arcane.gloss.config.action.MenuActionData;
+import art.arcane.gloss.config.action.SurfaceActionData;
 import art.arcane.gloss.camera.TitleProvider;
 import art.arcane.gloss.condition.BoundedConditionErrorCallback;
 import art.arcane.gloss.condition.GlossConditionScope;
@@ -16,6 +23,7 @@ import art.arcane.gloss.service.GlossService;
 import art.arcane.volmlib.util.scheduling.FoliaScheduler;
 import art.arcane.volmlib.util.scheduling.SchedulerUtils;
 import org.bukkit.Bukkit;
+import org.bukkit.Location;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -27,6 +35,7 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
 import java.util.function.UnaryOperator;
@@ -51,7 +60,8 @@ public final class SurfaceService implements GlossService, Listener, TitleProvid
     private volatile Map<SurfaceKind, List<SurfaceRuntime>> byKind = SurfaceDriver.byKind(List.of());
     private int stripeIndex;
     private int sweepCursor;
-    private long tick;
+    private volatile long tick;
+    private volatile boolean enabled;
     private int taskId = -1;
 
     public SurfaceService(Gloss plugin) {
@@ -82,6 +92,7 @@ public final class SurfaceService implements GlossService, Listener, TitleProvid
         if (!enabled) {
             return;
         }
+        this.enabled = true;
         Bukkit.getPluginManager().registerEvents(this, plugin);
         delivery.start(BOSS_BAR_SWEEP_TICKS);
         taskId = plugin.scheduler().sr(this::sweepStripe, STRIPE_PERIOD_TICKS);
@@ -89,6 +100,11 @@ public final class SurfaceService implements GlossService, Listener, TitleProvid
 
     @Override
     public void disable() {
+        enabled = false;
+        BehaviorService behaviors = plugin.service(BehaviorService.class);
+        if (behaviors != null) {
+            behaviors.derivedDocuments("surface", Map.of());
+        }
         HandlerList.unregisterAll(this);
         plugin.watchdog().unregister(SurfaceDoc.KIND);
         if (taskId != -1) {
@@ -198,6 +214,85 @@ public final class SurfaceService implements GlossService, Listener, TitleProvid
         compiled.sort(Comparator.comparing(SurfaceRuntime::id));
         runtimes = List.copyOf(compiled);
         byKind = SurfaceDriver.byKind(runtimes);
+        syncBehaviors();
+    }
+
+    public void submit(SurfaceActionData action, Player source) {
+        SurfaceRuntime runtime = runtime(action.surface());
+        if (!enabled || runtime == null) {
+            if (runtime == null) {
+                Gloss.warnThrottled("surface-action-missing:" + action.surface(), "Surface action references missing document %s.", action.surface());
+            }
+            return;
+        }
+        SurfaceActionData.Audience audience = action.audience();
+        Location origin = source == null ? null : source.getLocation().clone();
+        if (audience.scope().equals("viewer")) {
+            if (source != null) {
+                submitTo(source, runtime, audience, origin);
+            }
+            return;
+        }
+        for (Player viewer : Bukkit.getOnlinePlayers()) {
+            submitTo(viewer, runtime, audience, origin);
+        }
+    }
+
+    private void submitTo(Player viewer, SurfaceRuntime runtime, SurfaceActionData.Audience audience, Location origin) {
+        plugin.scheduler().runEntity(viewer, () -> {
+            if (!enabled || !viewer.isOnline() || runtime(runtime.id()) != runtime || suppressForProxy(viewer)) {
+                return;
+            }
+            if (audience.scope().equals("world") || audience.scope().equals("radius")) {
+                Location target = viewer.getLocation();
+                if (origin == null || !target.getWorld().equals(origin.getWorld())
+                    || audience.scope().equals("radius") && target.distanceSquared(origin) > audience.radius() * audience.radius()) {
+                    return;
+                }
+            }
+            GlossConditionScope scope = GlossConditionScope.viewer(plugin, viewer);
+            if (!audience.when().matches(scope, conditionErrors)) {
+                return;
+            }
+            SurfaceQueue.Outcome outcome = driver.submit(viewer, runtime, scope, tick, conditionErrors);
+            if (outcome == SurfaceQueue.Outcome.REJECTED) {
+                Gloss.warnThrottled("surface-queue-rejected:" + runtime.id(), "Surface %s delivery was rejected by its queue policy.", runtime.id());
+            }
+            apply(viewer);
+        });
+    }
+
+    private void syncBehaviors() {
+        BehaviorService behaviors = plugin.service(BehaviorService.class);
+        if (behaviors == null) {
+            return;
+        }
+        Map<String, BehaviorDoc> documents = new LinkedHashMap<>();
+        if (plugin.cfg().modules().surfaces().enabled()) {
+            for (SurfaceRuntime runtime : runtimes) {
+                if (runtime.doc().on().isEmpty()) {
+                    continue;
+                }
+                List<BehaviorEntry> entries = new ArrayList<>();
+                for (SurfaceTrigger trigger : runtime.doc().on()) {
+                    List<MenuActionData> actions = new ArrayList<>();
+                    if (trigger.delayTicks() > 0) {
+                        actions.add(new DelayActionData(trigger.delayTicks(), null, null, null));
+                    }
+                    actions.add(new SurfaceActionData(runtime.id(), null, null, null, null));
+                    Map<String, Object> options = trigger.trigger().equals("interval")
+                        ? Map.of("everyTicks", trigger.everyTicks(), "scope", "player") : Map.of();
+                    entries.add(new BehaviorEntry(BehaviorTrigger.parse(trigger.trigger()), options,
+                        "(" + runtime.doc().select().when() + ") && (" + trigger.when() + ")", null, actions));
+                }
+                documents.put(runtime.id(), new BehaviorDoc(BehaviorDoc.CURRENT_SCHEMA_VERSION, runtime.doc().revision(),
+                    true, false, Map.of(), entries, null));
+            }
+        }
+        behaviors.derivedDocuments("surface", documents);
+        if (!documents.isEmpty() && !behaviors.enabled()) {
+            Gloss.warnThrottled("surface-behaviors-disabled", "Surface event and interval triggers require the behaviors module to be enabled.");
+        }
     }
 
     private void pollRegistry() {
@@ -266,6 +361,7 @@ public final class SurfaceService implements GlossService, Listener, TitleProvid
         if (suppressForProxy(viewer)) {
             return;
         }
+        delivery.tick(viewer);
         driver.apply(viewer, GlossConditionScope.viewer(plugin, viewer), byKind,
             plugin.cfg().modules().surfaces().refreshIntervalTicks(), tick, conditionErrors);
     }

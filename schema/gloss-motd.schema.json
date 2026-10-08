@@ -4,6 +4,7 @@
   "title": "Gloss MOTD Document",
   "type": "object",
   "properties": {
+    "preset": {"type": ["string", "null"], "minLength": 1, "description": "Named preset from this collection in presets.json; document fields override inherited values."},
     "schemaVersion": {
       "const": 1
     },
@@ -35,6 +36,53 @@
         "$ref": "#/$defs/link"
       },
       "maxItems": 16
+    },
+    "icons": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "maxItems": 64
+    },
+    "state": {
+      "type": "string",
+      "minLength": 1,
+      "default": "normal"
+    },
+    "rotation": {
+      "type": "object",
+      "properties": {
+        "mode": {
+          "enum": [
+            "weighted",
+            "sequence",
+            "time",
+            "first"
+          ],
+          "default": "weighted"
+        },
+        "intervalSeconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 86400,
+          "default": 60
+        }
+      },
+      "additionalProperties": false
+    },
+    "serverLinks": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": true
+        },
+        "links": {
+          "$ref": "#/properties/links"
+        }
+      },
+      "additionalProperties": false
     }
   },
   "required": [
@@ -86,6 +134,100 @@
           "minimum": 1,
           "maximum": 1000000,
           "default": 1
+        },
+        "icons": {
+          "$ref": "#/properties/icons"
+        },
+        "select": {
+          "type": "object",
+          "properties": {
+            "hostnames": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 253
+              }
+            },
+            "minProtocol": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "maxProtocol": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "zone": {
+              "type": "string",
+              "default": "UTC"
+            },
+            "startTime": {
+              "type": "string"
+            },
+            "endTime": {
+              "type": "string"
+            },
+            "days": {
+              "type": "array",
+              "items": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 7
+              }
+            },
+            "states": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "minOnline": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "maxOnline": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "additionalProperties": false
+        },
+        "counts": {
+          "type": "object",
+          "properties": {
+            "onlineMode": {
+              "enum": [
+                "inherit",
+                "fixed",
+                "offset"
+              ]
+            },
+            "onlineValue": {
+              "type": "integer"
+            },
+            "maximumMode": {
+              "enum": [
+                "inherit",
+                "fixed",
+                "offset"
+              ]
+            },
+            "maximumValue": {
+              "type": "integer"
+            },
+            "hide": {
+              "type": "boolean",
+              "default": false
+            }
+          },
+          "additionalProperties": false
+        },
+        "sampleMode": {
+          "enum": [
+            "inherit",
+            "replace",
+            "hide"
+          ]
         }
       },
       "required": [

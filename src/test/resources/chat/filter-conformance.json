@@ -1,0 +1,251 @@
+[
+  {
+    "name": "literal replacement",
+    "filters": [
+      {
+        "match": "(a)",
+        "replace": "$1\\path"
+      }
+    ],
+    "input": "a",
+    "expected": "$1\\path"
+  },
+  {
+    "name": "case insensitive words",
+    "filters": [
+      {
+        "match": "(?i)\\bbadword\\b",
+        "replace": "***"
+      }
+    ],
+    "input": "BadWord other",
+    "expected": "*** other"
+  },
+  {
+    "name": "unicode letters",
+    "filters": [
+      {
+        "match": "\\p{L}+",
+        "replace": "word"
+      }
+    ],
+    "input": "café 日本語 123",
+    "expected": "word word 123"
+  },
+  {
+    "name": "empty matches",
+    "filters": [
+      {
+        "match": "(?:)",
+        "replace": "_"
+      }
+    ],
+    "input": "ab",
+    "expected": "_a_b_"
+  },
+  {
+    "name": "supplementary literal",
+    "filters": [
+      {
+        "match": "😀",
+        "replace": "ok"
+      }
+    ],
+    "input": "a😀b",
+    "expected": "aokb"
+  },
+  {
+    "name": "quoted syntax",
+    "filters": [
+      {
+        "match": "\\Q({x})\\E",
+        "replace": "ok"
+      }
+    ],
+    "input": "({x})",
+    "expected": "ok"
+  },
+  {
+    "name": "drop output overflow",
+    "filters": [
+      {
+        "match": "a",
+        "replace": "long"
+      }
+    ],
+    "filtering": {
+      "maxOutputCharacters": 4
+    },
+    "input": "aa",
+    "expected": null
+  },
+  {
+    "name": "retain completed only",
+    "filters": [
+      {
+        "match": "x",
+        "replace": "a"
+      },
+      {
+        "match": "a",
+        "replace": "long"
+      }
+    ],
+    "filtering": {
+      "maxOutputCharacters": 4,
+      "onLimit": "keep-completed"
+    },
+    "input": "xx",
+    "expected": "aa"
+  },
+  {
+    "name": "match cap",
+    "filters": [
+      {
+        "match": "a",
+        "replace": "b"
+      }
+    ],
+    "filtering": {
+      "maxMatches": 1
+    },
+    "input": "aa",
+    "expected": null
+  },
+  {
+    "name": "work cap",
+    "filters": [
+      {
+        "match": "a",
+        "replace": "b"
+      }
+    ],
+    "filtering": {
+      "maxWorkUnits": 1,
+      "onLimit": "keep-completed"
+    },
+    "input": "aa",
+    "expected": "aa"
+  },
+  {
+    "name": "nested repetition nonmatch",
+    "filters": [
+      {
+        "match": "(a+)+$",
+        "replace": "b"
+      }
+    ],
+    "input": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa!",
+    "expected": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa!"
+  },
+  {
+    "name": "unsupported (?<=a)b",
+    "filters": [
+      {
+        "match": "(?<=a)b",
+        "replace": ""
+      }
+    ],
+    "input": "a",
+    "invalid": true
+  },
+  {
+    "name": "unsupported (a)\\1",
+    "filters": [
+      {
+        "match": "(a)\\1",
+        "replace": ""
+      }
+    ],
+    "input": "a",
+    "invalid": true
+  },
+  {
+    "name": "unsupported (?>a)",
+    "filters": [
+      {
+        "match": "(?>a)",
+        "replace": ""
+      }
+    ],
+    "input": "a",
+    "invalid": true
+  },
+  {
+    "name": "unsupported a++",
+    "filters": [
+      {
+        "match": "a++",
+        "replace": ""
+      }
+    ],
+    "input": "a",
+    "invalid": true
+  },
+  {
+    "name": "unsupported (?x)a",
+    "filters": [
+      {
+        "match": "(?x)a",
+        "replace": ""
+      }
+    ],
+    "input": "a",
+    "invalid": true
+  },
+  {
+    "name": "unsupported ((a{1000}){1000}){1000}",
+    "filters": [
+      {
+        "match": "((a{1000}){1000}){1000}",
+        "replace": ""
+      }
+    ],
+    "input": "a",
+    "invalid": true
+  },
+  {
+    "name": "empty matches around supplementary character",
+    "filters": [
+      {
+        "match": "(?:)",
+        "replace": "_"
+      }
+    ],
+    "input": "a😀é",
+    "expected": "_a_😀_é_"
+  },
+  {
+    "name": "named group literal replacement",
+    "filters": [
+      {
+        "match": "(?P<name>a)",
+        "replace": "${name}"
+      }
+    ],
+    "input": "a",
+    "expected": "${name}"
+  },
+  {
+    "name": "ungreedy flag",
+    "filters": [
+      {
+        "match": "(?U)a+",
+        "replace": "_"
+      }
+    ],
+    "input": "aaa",
+    "expected": "___"
+  },
+  {
+    "name": "POSIX alphabetic class",
+    "filters": [
+      {
+        "match": "[[:alpha:]]+",
+        "replace": "_"
+      }
+    ],
+    "input": "ab 12",
+    "expected": "_ 12"
+  }
+]

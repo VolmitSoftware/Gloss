@@ -1,0 +1,107 @@
+[
+  {
+    "kind": "holograms",
+    "schemaVersion": 1,
+    "file": "holograms-v1.json",
+    "commit": "4140c7f",
+    "path": "src/test/java/art/arcane/gloss/hologram/HologramDocTest.java"
+  },
+  {
+    "kind": "holograms",
+    "schemaVersion": 2,
+    "file": "holograms-v2.json",
+    "commit": "f4b4903",
+    "path": "src/test/java/art/arcane/gloss/hologram/HologramDocTest.java"
+  },
+  {
+    "kind": "bubbles",
+    "schemaVersion": 1,
+    "file": "bubbles-v1.json",
+    "commit": "4a0895f",
+    "path": "src/main/resources/defaults/bubbles/default.json"
+  },
+  {
+    "kind": "bubbles",
+    "schemaVersion": 2,
+    "file": "bubbles-v2.json",
+    "commit": "6831db6",
+    "path": "src/main/resources/defaults/bubbles/default.json"
+  },
+  {
+    "kind": "bubbles",
+    "schemaVersion": 3,
+    "file": "bubbles-v3.json",
+    "commit": "f045270",
+    "path": "src/main/resources/defaults/bubbles/default.json"
+  },
+  {
+    "kind": "bubbles",
+    "schemaVersion": 4,
+    "file": "bubbles-v4.json",
+    "commit": "f4b4903",
+    "path": "src/main/resources/defaults/bubbles/default.json"
+  },
+  {
+    "kind": "damage-indicators",
+    "schemaVersion": 1,
+    "file": "damage-indicators-v1.json",
+    "commit": "74d1234",
+    "path": "src/main/resources/defaults/damage-indicators/default.json"
+  },
+  {
+    "kind": "damage-indicators",
+    "schemaVersion": 2,
+    "file": "damage-indicators-v2.json",
+    "commit": "f045270",
+    "path": "src/main/resources/defaults/damage-indicators/default.json"
+  },
+  {
+    "kind": "damage-indicators",
+    "schemaVersion": 3,
+    "file": "damage-indicators-v3.json",
+    "commit": "f4b4903",
+    "path": "src/main/resources/defaults/damage-indicators/default.json"
+  },
+  {
+    "kind": "real-drops",
+    "schemaVersion": 1,
+    "file": "real-drops-v1.json",
+    "commit": "c73c93b",
+    "path": "src/main/resources/defaults/real-drops/default.json"
+  },
+  {
+    "kind": "real-drops",
+    "schemaVersion": 2,
+    "file": "real-drops-v2.json",
+    "commit": "f045270",
+    "path": "src/main/resources/defaults/real-drops/default.json"
+  },
+  {
+    "kind": "real-drops",
+    "schemaVersion": 3,
+    "file": "real-drops-v3.json",
+    "commit": "f4b4903",
+    "path": "src/main/resources/defaults/real-drops/default.json"
+  },
+  {
+    "kind": "boards",
+    "schemaVersion": 1,
+    "file": "boards-v1.json",
+    "commit": "0fa9b8d",
+    "path": "src/main/resources/defaults/boards/default.json"
+  },
+  {
+    "kind": "tablist",
+    "schemaVersion": 1,
+    "file": "tablist-v1.json",
+    "commit": "4a0895f",
+    "path": "src/main/resources/defaults/tablist/tablist.json"
+  },
+  {
+    "kind": "entity-overlays",
+    "schemaVersion": 1,
+    "file": "entity-overlays-v1.json",
+    "commit": "45b4cd3",
+    "path": "src/main/resources/defaults/entity-overlays/default.json"
+  }
+]

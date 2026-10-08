@@ -8,6 +8,7 @@ import art.arcane.gloss.condition.ConditionSource;
 import art.arcane.gloss.condition.ShowCondition;
 import art.arcane.gloss.doc.DocumentEnvelope;
 import art.arcane.gloss.doc.DocumentParsers;
+import art.arcane.gloss.hologram.DisplayRefresh;
 import org.bukkit.util.Vector;
 
 import java.util.Locale;
@@ -17,7 +18,7 @@ public record BubbleStyleDoc(int schemaVersion, long revision, String prefix, Ve
                              long maxAliveMs, boolean followPlayer, boolean hideOwn, Motion motion,
                              Shimmer shimmer, Select select, List<ParticleLayer> particleLayers, ShowCondition show,
                              IconDisplayStyle style, HologramBox box, Double stackDistance, List<String> blacklistWorlds,
-                             Integer maxPerSender, String format) {
+                             Integer maxPerSender, String format, String overflow, DisplayRefresh refresh) {
     public static final String KIND = "bubbles";
     public static final int CURRENT_SCHEMA_VERSION = 5;
     public static final String DEFAULT_TRANSLATION_Y =
@@ -36,12 +37,17 @@ public record BubbleStyleDoc(int schemaVersion, long revision, String prefix, Ve
         true, true, DEFAULT_MOTION, DEFAULT_SHIMMER, null, List.of(), ShowCondition.ALWAYS, null, null, null, null, null, null);
 
     public BubbleStyleDoc {
+        refresh = DisplayRefresh.resolve(refresh);
         DocumentEnvelope.requireSchemaVersion(KIND, schemaVersion, CURRENT_SCHEMA_VERSION);
         DocumentEnvelope.requireRevision(KIND, revision);
         stackDistance = stackDistance == null || !Double.isFinite(stackDistance) ? 0.26D
             : Math.clamp(stackDistance, 0.05D, 2.0D);
         blacklistWorlds = blacklistWorlds == null ? List.of() : List.copyOf(blacklistWorlds);
         maxPerSender = maxPerSender == null ? 4 : Math.clamp(maxPerSender, 1, 64);
+        overflow = overflow == null ? "replace-oldest" : overflow.trim().toLowerCase(Locale.ROOT);
+        if (!overflow.equals("replace-oldest") && !overflow.equals("reject-new")) {
+            throw new IllegalArgumentException("bubble overflow must be replace-oldest or reject-new");
+        }
         format = format == null ? "{message}" : format;
         prefix = prefix == null ? "&7" : prefix;
         offset = offset == null ? new Vector(0.0D, 0.3D, 0.0D) : offset.clone();
@@ -53,6 +59,16 @@ public record BubbleStyleDoc(int schemaVersion, long revision, String prefix, Ve
         show = show == null ? ShowCondition.ALWAYS : show;
         style = style == null ? IconDisplayStyle.hologramDefaults() : style;
         box = box == null ? HologramBox.defaults() : box;
+    }
+
+    public BubbleStyleDoc(int schemaVersion, long revision, String prefix, Vector offset, int wordWrapChars,
+                          long maxAliveMs, boolean followPlayer, boolean hideOwn, Motion motion,
+                          Shimmer shimmer, Select select, List<ParticleLayer> particleLayers, ShowCondition show,
+                          IconDisplayStyle style, HologramBox box, Double stackDistance, List<String> blacklistWorlds,
+                          Integer maxPerSender, String format) {
+        this(schemaVersion, revision, prefix, offset, wordWrapChars, maxAliveMs, followPlayer, hideOwn,
+            motion, shimmer, select, particleLayers, show, style, box, stackDistance, blacklistWorlds,
+            maxPerSender, format, null, null);
     }
 
     public static BubbleStyleDoc parse(String fileName, String raw) {

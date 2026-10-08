@@ -16,6 +16,9 @@ import art.arcane.gloss.api.HologramBox;
 import art.arcane.gloss.condition.ShowCondition;
 import art.arcane.gloss.config.GlossConfigFile;
 import art.arcane.gloss.drop.RealDropSettingsDoc;
+import art.arcane.gloss.hologram.DisplayRefresh;
+import art.arcane.gloss.service.BudgetedVisibilityGovernor;
+import art.arcane.gloss.util.common.PacketTeamAllocator;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -53,7 +56,11 @@ public record GlossConfig(
     CustomItems customItems,
     PlayerHeads playerHeads,
     Integration integration,
-    Modules modules
+    Modules modules,
+    BudgetedVisibilityGovernor.Limits visibility,
+    Images images,
+    PacketTeamAllocator.Policy teams,
+    Imports imports
 ) {
     private static final GlossConfig DEFAULTS = defaults();
 
@@ -61,13 +68,44 @@ public record GlossConfig(
         return new GlossConfig(locale, metrics, splashScreen, holograms, particles, boards, tablist,
             emoji, animations, chat, text, bubbles, indicators, drops, realDrops, motd, groups,
             hotload, commands, menus, panels, previews, editorSync, debug, customItems, playerHeads, integration,
-            modules);
+            modules, visibility, images, teams, imports);
     }
 
     /**
      * Headline module snapshots. Each lane owns one nested record here plus its block in
      * {@link #from}; the master switch is the record's {@code enabled}, sourced from {@code features.*}.
      */
+    public record Imports(int maxFileBytes, int maxPreviewBytes, int maxFiles, int previewLifetimeSeconds,
+                          int maxPreparedPreviews, int maxCachedBytes, int maxVisitedEntries,
+                          int maxDirectoryDepth, long maxPreparationBytes, long maxPreparationMillis) {
+        public Imports(int maxFileBytes, int maxPreviewBytes, int maxFiles, int previewLifetimeSeconds,
+                       int maxPreparedPreviews, int maxCachedBytes) {
+            this(maxFileBytes, maxPreviewBytes, maxFiles, previewLifetimeSeconds, maxPreparedPreviews,
+                maxCachedBytes, 65536, 16);
+        }
+
+        public Imports(int maxFileBytes, int maxPreviewBytes, int maxFiles, int previewLifetimeSeconds,
+                       int maxPreparedPreviews, int maxCachedBytes, int maxVisitedEntries, int maxDirectoryDepth) {
+            this(maxFileBytes, maxPreviewBytes, maxFiles, previewLifetimeSeconds, maxPreparedPreviews,
+                maxCachedBytes, maxVisitedEntries, maxDirectoryDepth, 1073741824L, 30000L);
+        }
+
+        public Imports {
+            if (maxPreparationBytes < 1024L || maxPreparationBytes > 17179869184L
+                || maxPreparationMillis < 1L || maxPreparationMillis > 600000L
+                || maxFileBytes < 1 || maxPreviewBytes < maxFileBytes || maxFiles < 1
+                || previewLifetimeSeconds < 1 || previewLifetimeSeconds > 86400 || maxPreparedPreviews < 1
+                || maxCachedBytes < maxPreviewBytes || maxVisitedEntries < 1 || maxVisitedEntries > 1048576
+                || maxDirectoryDepth < 1 || maxDirectoryDepth > 128) {
+                throw new IllegalArgumentException("Import limits must be positive and fit the preview capacity");
+            }
+        }
+    }
+
+    public record Images(int maxFileBytes, int maxPixels, int maxDimension, int rasterMaxDimension,
+                         int cacheBytes, int maxEntries, int maxPending, int workerThreads) {
+    }
+
     public record Modules(
         // --- lane:screen ---
         Surfaces surfaces,
@@ -102,7 +140,8 @@ public record GlossConfig(
     public record Surfaces(boolean enabled, int refreshIntervalTicks, int maxBossBarsPerViewer, int titleQueueLimit) {
     }
 
-    public record Nametags(boolean enabled, int refreshIntervalTicks) {
+    public record Nametags(boolean enabled, int refreshIntervalTicks, int snapshotReadLimit,
+                           double viewerRange, int maxSubjectsPerViewer) {
     }
 
     public record Leaderboards(boolean enabled, int sampleIntervalTicks, int maxEntries) {
@@ -117,35 +156,71 @@ public record GlossConfig(
     public record Inventories(boolean enabled, boolean closeOnTeleport, String unsupportedIconItem) {
     }
 
-    public record Markers(boolean enabled, int maxPerViewer, double viewRange) {
+    public record Markers(boolean enabled, int maxPerViewer, double viewRange,
+                          int anchorSnapshotTicks, int anchorMaxAgeTicks, int anchorCacheEntries) {
+        public Markers(boolean enabled, int maxPerViewer, double viewRange) {
+            this(enabled, maxPerViewer, viewRange, 2, 100, 4096);
+        }
     }
 
-    public record Waypoints(boolean enabled, int maxPerViewer) {
+    public record Waypoints(boolean enabled, int maxPerViewer, int refreshTicks,
+                            double positionThreshold, double azimuthThreshold) {
+        public Waypoints(boolean enabled, int maxPerViewer) {
+            this(enabled, maxPerViewer, 20, 1.0D, 0.017D);
+        }
     }
 
     public record Camera(boolean enabled, int maxRideSeconds) {
     }
 
-    public record Sky(boolean enabled) {
+    public record Sky(boolean enabled, int fadeIntervalTicks, int maxPendingPerViewer, int maxPendingOperations) {
     }
 
-    public record Nameplates(boolean enabled) {
+    public record Nameplates(boolean enabled, double viewerRange, int maxSubjectsPerViewer, int refreshIntervalTicks) {
     }
 
-    public record Glow(boolean enabled) {
+    public record Glow(boolean enabled, int sweepIntervalTicks, double viewerRange, int maxTargetsPerViewer) {
     }
 
-    public record Behaviors(boolean enabled, int maxActionsPerTick, int maxTimersPerPlayer, int stateFlushSeconds) {
+    public record Behaviors(boolean enabled, int maxActionsPerTick, int maxTimersPerPlayer, int stateFlushSeconds,
+                            int chatMaxWorkUnits, int maxTimersGlobal, int maxTimersWithoutPlayer) {
+        public Behaviors(boolean enabled, int maxActionsPerTick, int maxTimersPerPlayer, int stateFlushSeconds,
+                         int chatMaxWorkUnits) {
+            this(enabled, maxActionsPerTick, maxTimersPerPlayer, stateFlushSeconds, chatMaxWorkUnits, 8192, 256);
+        }
     }
 
     public record GlossPacks(boolean enabled, boolean allowServerCommands) {
     }
 
-    public record History(boolean enabled, int maxVersions, int maxAgeDays) {
+    public record History(boolean enabled, int maxVersions, int maxAgeDays,
+                          int maxTransactionBackups, long maxTransactionBackupBytes) {
+        public History(boolean enabled, int maxVersions, int maxAgeDays) {
+            this(enabled, maxVersions, maxAgeDays, 20, 1073741824L);
+        }
     }
 
     public record Forge(boolean enabled, String url, boolean serve, String serveBind, int servePort, boolean required,
-                        String prompt, int packFormat, int codepointBase) {
+                        String prompt, int packFormat, int codepointBase, int listenerThreads, int listenerBacklog,
+                        int buildDebounceTicks, int buildQueueCapacity, PackLimits limits) {
+        public Forge(boolean enabled, String url, boolean serve, String serveBind, int servePort, boolean required,
+                     String prompt, int packFormat, int codepointBase, int listenerThreads, int listenerBacklog,
+                     int buildDebounceTicks, int buildQueueCapacity) {
+            this(enabled, url, serve, serveBind, servePort, required, prompt, packFormat, codepointBase,
+                listenerThreads, listenerBacklog, buildDebounceTicks, buildQueueCapacity, PackLimits.DEFAULT);
+        }
+    }
+
+    public record PackLimits(int maxBuildFiles, long maxBuildBytes, long maxBuildPixels,
+                             int maxRetainedArtifacts, long maxRetainedBytes, long artifactRetentionSeconds) {
+        public static final PackLimits DEFAULT = new PackLimits(8192, 67108864L, 67108864L, 8, 536870912L, 600);
+
+        public PackLimits {
+            if (maxBuildFiles < 1 || maxBuildBytes < 1 || maxBuildPixels < 1 || maxRetainedArtifacts < 1
+                || maxRetainedBytes < 1 || artifactRetentionSeconds < 0 || artifactRetentionSeconds > 2592000) {
+                throw new IllegalArgumentException("Invalid resource pack limits");
+            }
+        }
     }
 
     public record Connections(boolean enabled) {
@@ -184,7 +259,8 @@ public record GlossConfig(
 
     public record Tablist(
         boolean enabled,
-        int updateIntervalTicks
+        int updateIntervalTicks,
+        int snapshotReadLimit
     ) {
     }
 
@@ -211,12 +287,16 @@ public record GlossConfig(
     ) {
     }
 
-    public record Bubbles(
-        boolean enabled
-    ) {
+    public record Bubbles(boolean enabled, int maxActive) {
+        public Bubbles(boolean enabled) {
+            this(enabled, 2048);
+        }
     }
 
-    public record Indicators(boolean enabled) {
+    public record Indicators(boolean enabled, int maxActive) {
+        public Indicators(boolean enabled) {
+            this(enabled, 2048);
+        }
     }
 
     public record Drops(boolean enabled) {
@@ -284,8 +364,15 @@ public record GlossConfig(
             IconDisplayStyle style,
             HologramBox box,
             ShowCondition show,
-            boolean preserveCustomNames
+            boolean preserveCustomNames,
+            DisplayRefresh refresh
         ) {
+            public Labels(boolean enabled, float yOffset, String format, boolean useItemDisplayNames,
+                          Map<String, String> names, LabelBundle bundle, IconDisplayStyle style,
+                          HologramBox box, ShowCondition show, boolean preserveCustomNames) {
+                this(enabled, yOffset, format, useItemDisplayNames, names, bundle, style, box, show,
+                    preserveCustomNames, DisplayRefresh.DEFAULTS);
+            }
         }
 
         public record LabelBundle(
@@ -492,7 +579,8 @@ public record GlossConfig(
     }
 
     public record Motd(
-        boolean enabled
+        boolean enabled,
+        int snapshotRefreshTicks
     ) {
     }
 
@@ -518,9 +606,11 @@ public record GlossConfig(
     ) {
     }
 
-    public record Panels(
-        boolean enabled
-    ) {
+    public record Panels(boolean enabled, int visibilityIntervalTicks, int followIntervalTicks,
+                         int permissionCacheTicks) {
+        public Panels(boolean enabled) {
+            this(enabled, 1, 1, 20);
+        }
     }
 
     public record Previews(boolean enabled) {
@@ -565,8 +655,18 @@ public record GlossConfig(
     }
 
     public record Integration(
-        int sampleIntervalTicks
+        int sampleIntervalTicks,
+        int maxSampleAgeMs,
+        int retainUnavailableMs,
+        int errorRetryTicks,
+        String unavailableText,
+        int maxReferencedMetrics,
+        long referenceWindowMs
     ) {
+        public Integration(int sampleIntervalTicks, int maxSampleAgeMs, int retainUnavailableMs,
+                           int errorRetryTicks, String unavailableText) {
+            this(sampleIntervalTicks, maxSampleAgeMs, retainUnavailableMs, errorRetryTicks, unavailableText, 256, 60000L);
+        }
     }
 
     public static GlossConfig from(GlossConfigFile file) {
@@ -597,7 +697,8 @@ public record GlossConfig(
             ),
             new Tablist(
                 source.features.tablist,
-                source.tablist.updateIntervalTicks
+                source.tablist.updateIntervalTicks,
+                source.tablist.snapshotReadLimit
             ),
             new Emoji(
                 source.features.emoji,
@@ -615,17 +716,18 @@ public record GlossConfig(
                 source.text.functions
             ),
             new Bubbles(
-                source.features.chatBubbles
+                source.features.chatBubbles, source.temporaryDisplays.maxActiveBubbles
             ),
             new Indicators(
-                source.features.damageIndicators
+                source.features.damageIndicators, source.temporaryDisplays.maxActiveIndicators
             ),
             new Drops(
                 source.features.drops
             ),
             RealDropSettingsDoc.DEFAULTS.toConfig(source.features.realDrops),
             new Motd(
-                source.features.motd
+                source.features.motd,
+                source.motd.snapshotRefreshTicks
             ),
             new Groups(
                 source.groups.useVault
@@ -642,7 +744,8 @@ public record GlossConfig(
                 source.menus.maxListEntries
             ),
             new Panels(
-                source.features.panels
+                source.features.panels, source.panels.visibilityIntervalTicks, source.panels.followIntervalTicks,
+                source.panels.permissionCacheTicks
             ),
             new Previews(
                 source.features.previews
@@ -673,13 +776,21 @@ public record GlossConfig(
                 source.playerHeads.unknownFallbackItem
             ),
             new Integration(
-                source.integration.sampleIntervalTicks
+                source.integration.sampleIntervalTicks,
+                source.integration.maxSampleAgeMs,
+                source.integration.retainUnavailableMs,
+                source.integration.errorRetryTicks,
+                source.integration.unavailableText,
+                source.integration.maxReferencedMetrics,
+                source.integration.referenceWindowMs
             ),
             new Modules(
                 // --- lane:screen ---
                 new Surfaces(source.features.surfaces, source.surfaces.refreshIntervalTicks,
                     source.surfaces.maxBossBarsPerViewer, source.surfaces.titleQueueLimit),
-                new Nametags(source.features.nametags, source.nametags.refreshIntervalTicks),
+                new Nametags(source.features.nametags, source.nametags.refreshIntervalTicks,
+                    source.nametags.snapshotReadLimit, source.nametags.viewerRange,
+                    source.nametags.maxSubjectsPerViewer),
                 // --- lane:chat ---
                 new Leaderboards(source.features.leaderboards, source.leaderboards.sampleIntervalTicks,
                     source.leaderboards.maxEntries),
@@ -689,29 +800,50 @@ public record GlossConfig(
                 new Inventories(source.features.inventories, source.inventories.closeOnTeleport,
                     source.inventories.unsupportedIconItem),
                 // --- lane:world ---
-                new Markers(source.features.markers, source.markers.maxPerViewer, source.markers.viewRange),
-                new Waypoints(source.features.waypoints, source.waypoints.maxPerViewer),
+                new Markers(source.features.markers, source.markers.maxPerViewer, source.markers.viewRange,
+                    source.markers.anchorSnapshotTicks, source.markers.anchorMaxAgeTicks,
+                    source.markers.anchorCacheEntries),
+                new Waypoints(source.features.waypoints, source.waypoints.maxPerViewer,
+                    source.waypoints.refreshTicks, source.waypoints.positionThreshold,
+                    source.waypoints.azimuthThreshold),
                 new Camera(source.features.camera, source.camera.maxRideSeconds),
-                new Sky(source.features.sky),
-                new Nameplates(source.features.nameplates),
-                new Glow(source.features.glow),
+                new Sky(source.features.sky, source.sky.fadeIntervalTicks, source.sky.maxPendingPerViewer, source.sky.maxPendingOperations),
+                new Nameplates(source.features.nameplates, source.nameplates.viewerRange, source.nameplates.maxSubjectsPerViewer,
+                    source.nameplates.refreshIntervalTicks),
+                new Glow(source.features.glow, source.glow.sweepIntervalTicks, source.glow.viewerRange, source.glow.maxTargetsPerViewer),
                 // --- lane:behaviors ---
                 new Behaviors(source.features.behaviors, source.behaviors.maxActionsPerTick,
-                    source.behaviors.maxTimersPerPlayer, source.behaviors.stateFlushSeconds),
+                    source.behaviors.maxTimersPerPlayer, source.behaviors.stateFlushSeconds,
+                    source.behaviors.chatMaxWorkUnits, source.behaviors.maxTimersGlobal,
+                    source.behaviors.maxTimersWithoutPlayer),
                 // --- lane:authoring ---
                 new GlossPacks(source.features.glosspacks, source.glosspacks.allowServerCommands),
-                new History(source.features.history, source.history.maxVersions, source.history.maxAgeDays),
+                new History(source.features.history, source.history.maxVersions, source.history.maxAgeDays,
+                    source.history.maxTransactionBackups, source.history.maxTransactionBackupBytes),
                 // --- lane:forge ---
                 new Forge(source.features.forge, source.forge.url, source.forge.serve, source.forge.serveBind,
                     source.forge.servePort, source.forge.required, source.forge.prompt, source.forge.packFormat,
-                    source.forge.codepointBase),
+                    source.forge.codepointBase, source.forge.listenerThreads, source.forge.listenerBacklog,
+                    source.forge.buildDebounceTicks, source.forge.buildQueueCapacity,
+                    new PackLimits(source.forge.maxBuildFiles, source.forge.maxBuildBytes, source.forge.maxBuildPixels,
+                        source.forge.maxRetainedArtifacts, source.forge.maxRetainedBytes,
+                        source.forge.artifactRetentionSeconds)),
                 // --- lane:connections ---
                 new Connections(source.features.connections),
                 // --- lane:fixes ---
                 new Bedrock(source.bedrock.detection, source.bedrock.hideHolograms, source.bedrock.hidePanels,
                     source.bedrock.hideBubbles, source.bedrock.hideIndicators, source.bedrock.hideDrops,
                     source.bedrock.hideOverlays)
-            )
+            ),
+            source.visibility.snapshot(),
+            new Images(source.images.maxFileBytes, source.images.maxPixels, source.images.maxDimension,
+                source.images.rasterMaxDimension, source.images.cacheBytes, source.images.maxEntries,
+                source.images.maxPending, source.images.workerThreads),
+            source.teams.snapshot(),
+            new Imports(source.imports.maxFileBytes, source.imports.maxPreviewBytes, source.imports.maxFiles,
+                source.imports.previewLifetimeSeconds, source.imports.maxPreparedPreviews, source.imports.maxCachedBytes,
+                source.imports.maxVisitedEntries, source.imports.maxDirectoryDepth,
+                source.imports.maxPreparationBytes, source.imports.maxPreparationMillis)
         );
     }
 

@@ -1,6 +1,7 @@
 package art.arcane.gloss.menu.icon;
 
 import art.arcane.gloss.Gloss;
+import art.arcane.gloss.GlossConfig;
 import art.arcane.gloss.util.common.TextUtils;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.TextComponent;
@@ -10,9 +11,10 @@ import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 
@@ -22,9 +24,7 @@ import java.util.logging.Level;
  * redo it; because Components are immutable the finished lines can simply be shared.
  *
  * <p>The cache key is the image's own pixels, so it needs no hot-reload hook: an edited file decodes
- * to different pixels and therefore misses. It is bounded and cleared whole when it overflows —
- * menus reference a handful of images, and a runaway key set is a bug, not a working set worth
- * keeping.
+ * to different pixels and therefore misses. Least-recently-used entries are evicted when the bounded cache is full.
  */
 public final class TextImageRasterCache {
 
@@ -32,9 +32,9 @@ public final class TextImageRasterCache {
 
   private static final int MAX_ENTRIES = 256;
 
-  private static final Map<Raster, List<Component>> LINES = new ConcurrentHashMap<>();
-  private static final Map<Integer, Component> BLANK_ROWS = new ConcurrentHashMap<>();
-  private static final Set<String> OVERSIZE_REPORTED = ConcurrentHashMap.newKeySet();
+  private static final Map<Raster, List<Component>> LINES = new LinkedHashMap<>(16, 0.75F, true);
+  private static final Map<Integer, Component> BLANK_ROWS = new LinkedHashMap<>(16, 0.75F, true);
+  private static final Set<String> OVERSIZE_REPORTED = new LinkedHashSet<>();
   private static final AtomicInteger OVERSIZE = new AtomicInteger();
 
   private TextImageRasterCache() {
@@ -44,13 +44,17 @@ public final class TextImageRasterCache {
    * Names a file the raster cannot draw. Menus re-render constantly, so each path is logged once
    * and the running total is what /gloss status prints.
    */
-  static void reportOversize(String path, int width, int height) {
+  static synchronized void reportOversize(String path, int width, int height) {
     if (OVERSIZE_REPORTED.add(path)) {
+      if (OVERSIZE_REPORTED.size() > MAX_ENTRIES) {
+        OVERSIZE_REPORTED.remove(OVERSIZE_REPORTED.iterator().next());
+      }
       OVERSIZE.incrementAndGet();
       Gloss.log(Level.WARNING,
           "textImage %s is %dx%d; the text raster renders at most %dx%d, so it shows the missing-icon checkerboard."
               + " Declare it in a glyphs/ document to render it as one glyph for players with the Gloss pack.",
-          path, width, height, MAX_DIMENSION, MAX_DIMENSION);
+          path, width, height, GlossConfig.current().images().rasterMaxDimension(),
+          GlossConfig.current().images().rasterMaxDimension());
     }
   }
 
@@ -62,7 +66,7 @@ public final class TextImageRasterCache {
    * The image as one text line per pixel row. {@code forceOpaque} drops the alpha test — JPEG has
    * no alpha channel, so its 0 bytes must not read as transparent.
    */
-  static List<Component> lines(BufferedImage image, boolean forceOpaque) {
+  static synchronized List<Component> lines(BufferedImage image, boolean forceOpaque) {
     int width = image.getWidth();
     int height = image.getHeight();
     if (width > MAX_DIMENSION || height > MAX_DIMENSION) {
@@ -78,14 +82,26 @@ public final class TextImageRasterCache {
 
     List<Component> built = build(pixels, width, height, forceOpaque);
     if (LINES.size() >= MAX_ENTRIES) {
-      LINES.clear();
+      LINES.remove(LINES.keySet().iterator().next());
     }
     LINES.put(key, built);
     return built;
   }
 
+  public static List<Component> prepare(BufferedImage image, boolean forceOpaque, int maximumDimension) {
+    int width = image.getWidth();
+    int height = image.getHeight();
+    if (width < 1 || height < 1 || width > maximumDimension || height > maximumDimension) {
+      throw new IllegalArgumentException("Image exceeds text raster dimension " + maximumDimension);
+    }
+    return build(image.getRGB(0, 0, width, height, null, 0, width), width, height, forceOpaque);
+  }
+
   /** A fully transparent row of {@code width} pixels, used to pad short animation frames. */
-  static Component blankRow(int width) {
+  static synchronized Component blankRow(int width) {
+    if (width < 1 || width > 128) {
+      throw new IllegalArgumentException("Raster row width must be between 1 and 128");
+    }
     return BLANK_ROWS.computeIfAbsent(width, pixels -> transparentRun(pixels));
   }
 

@@ -17,6 +17,8 @@ import art.arcane.gloss.menu.ArgsNamespace;
 import art.arcane.gloss.menu.SessionNamespace;
 import art.arcane.gloss.menu.SessionVariables;
 import art.arcane.gloss.menu.action.MenuAction;
+import art.arcane.gloss.menu.action.ActionOutcome;
+import art.arcane.gloss.config.icon.MenuIconData;
 import art.arcane.gloss.menu.action.NavigationRequest;
 import art.arcane.gloss.menu.action.NavigationResult;
 import art.arcane.gloss.service.GlossService;
@@ -40,6 +42,8 @@ import java.io.File;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.function.UnaryOperator;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -60,7 +64,10 @@ public final class InventoryMenuService implements GlossService, Listener {
     private final DocumentRegistry<InventoryDoc> registry;
     private final InventoryNavigationHistory history = new InventoryNavigationHistory();
     private final ConcurrentMap<UUID, OpenWindow> windows = new ConcurrentHashMap<>();
+    private final ConcurrentMap<UUID, OpenWindow> origins = new ConcurrentHashMap<>();
+    private final ConcurrentMap<UUID, OpenWindow> refreshing = new ConcurrentHashMap<>();
     private volatile Map<String, InventoryRuntime> runtimes = Map.of();
+    private volatile boolean running;
     private int refreshTaskId = -1;
 
     public InventoryMenuService(Gloss plugin) {
@@ -90,14 +97,17 @@ public final class InventoryMenuService implements GlossService, Listener {
 
     @Override
     public void enable() {
+        running = true;
+        active = this;
         reload();
         plugin.getServer().getPluginManager().registerEvents(this, plugin);
         plugin.watchdog().register(InventoryDoc.KIND, this::poll);
-        refreshTaskId = plugin.scheduler().sr(this::refreshOpenWindows, 20);
     }
 
     @Override
     public void disable() {
+        running = false;
+        refreshing.clear();
         plugin.watchdog().unregister(InventoryDoc.KIND);
         HandlerList.unregisterAll(this);
         if (refreshTaskId != -1) {
@@ -114,9 +124,18 @@ public final class InventoryMenuService implements GlossService, Listener {
 
     @Override
     public void reload() {
+        if (!enabled()) {
+            closeAll();
+        }
         defaults.extractMissing();
         registry.reload();
         rebuild();
+        reconcileRefreshTask();
+    }
+
+    @Override
+    public boolean reloadOnConfigChange(GlossConfig previous, GlossConfig next) {
+        return !previous.modules().inventories().equals(next.modules().inventories());
     }
 
     public List<String> resetToDefault(String name) {
@@ -177,15 +196,22 @@ public final class InventoryMenuService implements GlossService, Listener {
     /** @return true when the viewer now has this window open */
     public boolean open(Player viewer, String id, Map<String, Object> args) {
         InventoryRuntime runtime = runtimes.get(id);
-        if (viewer == null || runtime == null || !runtime.shown(viewer)) {
+        if (!enabled() || viewer == null || runtime == null || !runtime.shown(viewer)) {
             return false;
         }
         OpenWindow previous = windows.get(viewer.getUniqueId());
-        UIWindow window = previous != null && previous.runtime().id().equals(id)
+        UIWindow window = previous != null && previous.window().isVisible() && previous.runtime().id().equals(id)
+            && previous.runtime().doc().resolution().equals(runtime.doc().resolution())
             ? previous.window()
             : newWindow(viewer, runtime);
         OpenWindow open = new OpenWindow(runtime, window, args == null ? Map.of() : Map.copyOf(args));
         windows.put(viewer.getUniqueId(), open);
+        origins.put(viewer.getUniqueId(), open);
+        if (runtime.refresh().active()) {
+            refreshing.put(viewer.getUniqueId(), open);
+        } else {
+            refreshing.remove(viewer.getUniqueId());
+        }
         history.record(viewer.getUniqueId(), id);
         render(viewer, open);
         window.open();
@@ -202,6 +228,7 @@ public final class InventoryMenuService implements GlossService, Listener {
             return;
         }
         OpenWindow open = windows.remove(viewer.getUniqueId());
+        refreshing.remove(viewer.getUniqueId());
         history.forget(viewer.getUniqueId());
         if (open != null) {
             open.window().close();
@@ -210,11 +237,20 @@ public final class InventoryMenuService implements GlossService, Listener {
     }
 
     public void closeAll() {
+        origins.clear();
+        refreshing.clear();
         for (UUID viewer : List.copyOf(windows.keySet())) {
             OpenWindow open = windows.remove(viewer);
             if (open != null) {
-                open.window().close();
-                publishClose(open.window().getViewer(), open);
+                Player player = open.window().getViewer();
+                Runnable retired = () -> open.window().close();
+                boolean scheduled = FoliaScheduler.runEntity(plugin, player, () -> {
+                    open.window().close();
+                    publishClose(player, open);
+                }, 0L, retired);
+                if (!scheduled) {
+                    retired.run();
+                }
             }
         }
         history.clear();
@@ -237,6 +273,7 @@ public final class InventoryMenuService implements GlossService, Listener {
                 return;
             }
             windows.remove(viewer.getUniqueId(), open);
+            refreshing.remove(viewer.getUniqueId(), open);
             publishClose(viewer, open);
         });
         return window;
@@ -251,22 +288,63 @@ public final class InventoryMenuService implements GlossService, Listener {
     }
 
     private void render(Player viewer, OpenWindow open) {
+        render(viewer, open, InventoryRefreshPlan.ALL);
+    }
+
+    private void render(Player viewer, OpenWindow open, int mask) {
         InventoryRuntime runtime = open.runtime();
         ExprScope scope = new InventoryActionContext(viewer, runtime.id(), -1, HoloClickTrigger.ANY,
             open.args(), null).conditionScope();
-        InventoryRuntime.Presentation presentation = runtime.present(scope);
-        UIWindow window = open.window();
-        window.batch(() -> {
-            window.clearElements();
-            window.setTitle(TextPipeline.menuText(viewer, presentation.title()));
-            for (Map.Entry<Integer, InventoryRuntime.Slot> entry : presentation.slots().entrySet()) {
-                place(viewer, open, window, entry.getKey(), entry.getValue(), scope);
+        if ((mask & InventoryRefreshPlan.CONDITIONS) != 0 && !runtime.doc().show().matches(scope)) {
+            close(viewer);
+            return;
+        }
+        InventoryRuntime.Presentation presentation = open.presentation;
+        if (presentation == null || (mask & InventoryRefreshPlan.CONDITIONS) != 0) {
+            presentation = runtime.present(scope);
+            if (open.presentation != presentation) {
+                open.presentation = presentation;
+                open.toggleStates.clear();
+                open.baseCells.clear();
+                mask = InventoryRefreshPlan.ALL;
             }
-            renderList(viewer, open, window, scope);
-        });
+        }
+        UIWindow window = open.window();
+        if ((mask & InventoryRefreshPlan.TITLE) != 0) {
+            String title = renderText(viewer, presentation.title(), scope);
+            if (!Objects.equals(window.getTitle(), title)) {
+                window.setTitle(title);
+            }
+        }
+        if ((mask & InventoryRefreshPlan.SLOTS) != 0) {
+            open.baseCells.keySet().retainAll(presentation.slots().keySet());
+            boolean force = runtime.doc().refresh().mode().equals("always");
+            for (Map.Entry<Integer, InventoryRuntime.Slot> entry : presentation.slots().entrySet()) {
+                InventoryRuntime.Slot cell = entry.getValue();
+                if (force || cell.toggle() != null || InventoryRefreshPlan.dynamic(cell) || !open.baseCells.containsKey(entry.getKey())) {
+                    open.baseCells.put(entry.getKey(), element(viewer, open, entry.getKey(), cell, scope, cell, false));
+                }
+            }
+        }
+        if ((mask & InventoryRefreshPlan.LIST) != 0) {
+            renderList(viewer, open, scope);
+        }
+        if ((mask & (InventoryRefreshPlan.SLOTS | InventoryRefreshPlan.LIST)) != 0) {
+            window.batch(() -> {
+                window.clearElements();
+                for (Map.Entry<Integer, UIElement> cell : open.baseCells.entrySet()) {
+                    window.setElement(window.getPosition(cell.getKey()), window.getRow(cell.getKey()), cell.getValue());
+                }
+                for (Map.Entry<Integer, UIElement> cell : open.listCells.entrySet()) {
+                    window.setElement(window.getPosition(cell.getKey()), window.getRow(cell.getKey()), cell.getValue());
+                }
+            });
+        }
+        open.refresh.rendered(mask, ticks());
     }
 
-    private void renderList(Player viewer, OpenWindow open, UIWindow window, ExprScope scope) {
+    private void renderList(Player viewer, OpenWindow open, ExprScope scope) {
+        open.listCells.clear();
         InventoryRuntime.ListSection list = open.runtime().list();
         if (list == null) {
             return;
@@ -276,32 +354,52 @@ public final class InventoryMenuService implements GlossService, Listener {
         List<Object> page = InventoryPager.page(entries,
             InventoryPager.clamp(open.page(), entries.size(), list.pageSize()), list.pageSize());
         List<Integer> slots = list.slots();
-        for (int index = 0; index < slots.size(); index++) {
-            if (index >= page.size()) {
-                continue;
-            }
+        for (int index = 0; index < slots.size() && index < page.size(); index++) {
             ExprScope entryScope = new RepeatScope(scope, list.var(), page.get(index));
-            place(viewer, open, window, slots.get(index), list.template(), entryScope);
+            open.listCells.put(slots.get(index), element(viewer, open, slots.get(index), list.template(), entryScope, page.get(index), true));
         }
     }
 
-    private void place(Player viewer, OpenWindow open, UIWindow window, int slot,
-                       InventoryRuntime.Slot cell, ExprScope scope) {
+    private UIElement element(Player viewer, OpenWindow open, int slot, InventoryRuntime.Slot cell, ExprScope scope, Object binding, boolean listCell) {
         UIElement element = new UIElement("slot-" + slot);
-        ItemStack stack = SlotItemRenderer.render(viewer, cell.icon(), scope);
-        element.setBaseItemStack(stack);
-        element.setName(stack.getItemMeta() == null ? "" : stack.getItemMeta().getDisplayName());
-        if (cell.clickable()) {
-            InventoryClicks.bind(element, trigger -> click(viewer, open, slot, cell, trigger));
+        InventoryRuntime.Toggle toggle = cell.toggle();
+        boolean state = true;
+        if (toggle != null) {
+            state = open.toggleStates.resolve(listCell, slot, binding,
+                TextPipeline.viewerDependent(toggle.condition()) || TextPipeline.viewerDependent(toggle.expectedValue()),
+                () -> renderText(viewer, toggle.condition(), scope).equalsIgnoreCase(renderText(viewer, toggle.expectedValue(), scope)));
         }
-        window.setElement(window.getPosition(slot), window.getRow(slot), element);
+        MenuIconData icon = toggle == null || state ? cell.icon() : toggle.falseIcon();
+        ItemStack stack = SlotItemRenderer.render(viewer, icon, scope);
+        element.setBaseItemStack(stack);
+        if (cell.clickable()) {
+            InventoryClicks.bind(element, trigger -> click(viewer, open, slot, cell, trigger, scope, listCell));
+        }
+        return element;
+    }
+
+    private static String renderText(Player viewer, String text, ExprScope scope) {
+        Gloss plugin = Gloss.instance;
+        return plugin == null || plugin.text() == null ? text
+            : plugin.text().renderScoped(viewer, text, scope, UnaryOperator.identity());
     }
 
     private void click(Player viewer, OpenWindow open, int slot, InventoryRuntime.Slot cell,
-                       HoloClickTrigger trigger) {
-        InventoryActionContext context = new InventoryActionContext(viewer, open.runtime().id(), slot, trigger,
-            open.args(), request -> navigate(viewer, open, request));
-        MenuAction.execute(cell.actions(), context);
+                       HoloClickTrigger trigger, ExprScope scope, boolean listCell) {
+        if (windows.get(viewer.getUniqueId()) != open || !open.window().isVisible()) {
+            return;
+        }
+        InventoryActionContext context = new InventoryActionContext(viewer,
+            new InventoryActionContext.Options(open.runtime().id(), slot, trigger, open.args(),
+                request -> navigate(viewer, open, request), scope, open.variables(),
+                () -> running && origins.get(viewer.getUniqueId()) == open && viewer.isOnline()));
+        boolean state = open.toggleStates.current(listCell, slot);
+        List<MenuAction<?>> actions = cell.toggle() != null && state ? cell.toggle().falseActions() : cell.actions();
+        ActionOutcome outcome = MenuAction.execute(actions, context);
+        if (cell.toggle() != null && outcome == ActionOutcome.CONTINUE && windows.get(viewer.getUniqueId()) == open) {
+            open.toggleStates.flip(listCell, slot);
+            render(viewer, open, InventoryRefreshPlan.SLOTS | InventoryRefreshPlan.LIST);
+        }
         ApiEvents.fireInventoryClick(viewer, open.runtime().id(), slot);
     }
 
@@ -333,25 +431,49 @@ public final class InventoryMenuService implements GlossService, Listener {
         return NavigationResult.APPLIED;
     }
 
-    private void refreshOpenWindows() {
-        for (Map.Entry<UUID, OpenWindow> entry : windows.entrySet()) {
-            OpenWindow open = entry.getValue();
-            InventoryRuntime.ListSection list = open.runtime().list();
-            if (list == null || !list.viewerDependent() || list.refreshTicks() <= 0) {
-                continue;
+    private void reconcileRefreshTask() {
+        if (running && enabled()) {
+            if (refreshTaskId == -1) {
+                refreshTaskId = plugin.scheduler().sr(this::refreshOpenWindows, 1);
             }
-            if (!open.dueForRefresh(list.refreshTicks())) {
+        } else if (refreshTaskId != -1) {
+            plugin.scheduler().csr(refreshTaskId);
+            refreshTaskId = -1;
+        }
+    }
+
+    private void refreshOpenWindows() {
+        long now = ticks();
+        for (Map.Entry<UUID, OpenWindow> entry : refreshing.entrySet()) {
+            OpenWindow open = entry.getValue();
+            if (open.refresh.due(now) == 0 || !open.refreshPending.compareAndSet(false, true)) {
                 continue;
             }
             Player viewer = open.window().getViewer();
-            if (viewer == null || !viewer.isOnline()) {
-                continue;
-            }
-            FoliaScheduler.runEntity(plugin, viewer, () -> {
-                render(viewer, open);
-                open.window().updateInventory();
+            boolean scheduled = FoliaScheduler.runEntity(plugin, viewer, () -> {
+                try {
+                    if (!running || windows.get(entry.getKey()) != open || !viewer.isOnline() || !open.window().isVisible()) {
+                        return;
+                    }
+                    int mask = open.refresh.due(ticks());
+                    if (mask != 0) {
+                        render(viewer, open, mask);
+                    }
+                } finally {
+                    open.refreshPending.set(false);
+                }
+            }, 0L, () -> {
+                refreshing.remove(entry.getKey(), open);
+                open.refreshPending.set(false);
             });
+            if (!scheduled) {
+                open.refreshPending.set(false);
+            }
         }
+    }
+
+    private static long ticks() {
+        return System.nanoTime() / 50_000_000L;
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
@@ -367,7 +489,9 @@ public final class InventoryMenuService implements GlossService, Listener {
 
     @EventHandler(priority = EventPriority.MONITOR)
     public void onQuit(PlayerQuitEvent event) {
+        origins.remove(event.getPlayer().getUniqueId());
         windows.remove(event.getPlayer().getUniqueId());
+        refreshing.remove(event.getPlayer().getUniqueId());
         history.forget(event.getPlayer().getUniqueId());
     }
 
@@ -380,13 +504,19 @@ public final class InventoryMenuService implements GlossService, Listener {
         private final AtomicBoolean closed = new AtomicBoolean();
         private volatile int page;
         private volatile int entryCount;
-        private volatile long refreshedAtTicks;
+        private final InventoryRefreshClock refresh;
+        private final AtomicBoolean refreshPending = new AtomicBoolean();
+        private final Map<Integer, UIElement> baseCells = new LinkedHashMap<>();
+        private final Map<Integer, UIElement> listCells = new LinkedHashMap<>();
+        private final InventoryToggleState toggleStates = new InventoryToggleState();
+        private InventoryRuntime.Presentation presentation;
 
         private OpenWindow(InventoryRuntime runtime, UIWindow window, Map<String, Object> args) {
             this.runtime = runtime;
             this.window = window;
             this.args = args;
             this.variables = SessionVariables.of(Map.of(), args);
+            this.refresh = new InventoryRefreshClock(runtime.refresh(), ticks());
         }
 
         /** @return true for the one caller that closed this window; every later one gets false */
@@ -426,13 +556,6 @@ public final class InventoryMenuService implements GlossService, Listener {
             this.entryCount = entryCount;
         }
 
-        private boolean dueForRefresh(int refreshTicks) {
-            long now = System.currentTimeMillis() / 50L;
-            if (now - refreshedAtTicks < refreshTicks) {
-                return false;
-            }
-            refreshedAtTicks = now;
-            return true;
-        }
+
     }
 }

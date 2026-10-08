@@ -98,7 +98,7 @@ class TablistSweepStripeTest {
 
     @Test
     void variantsCarryTheirOwnTraits() {
-        TablistDoc doc = new TablistDoc(2, 1L, ShowCondition.ALWAYS,
+        TablistDoc doc = new TablistDoc(TablistDoc.CURRENT_SCHEMA_VERSION, 1L, ShowCondition.ALWAYS,
             new TablistDoc.HeaderFooter(false, ShowCondition.ALWAYS,
                 new TablistDoc.HeaderFooterPresentation("", ""), List.of()),
             new TablistDoc.ListNames(true, ShowCondition.ALWAYS,
@@ -119,7 +119,7 @@ class TablistSweepStripeTest {
     }
 
     private static TablistDoc doc(String format) {
-        return new TablistDoc(2, 1L, ShowCondition.ALWAYS,
+        return new TablistDoc(TablistDoc.CURRENT_SCHEMA_VERSION, 1L, ShowCondition.ALWAYS,
             new TablistDoc.HeaderFooter(false, ShowCondition.ALWAYS,
                 new TablistDoc.HeaderFooterPresentation("", ""), List.of()),
             new TablistDoc.ListNames(true, ShowCondition.ALWAYS,

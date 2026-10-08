@@ -10,7 +10,7 @@ import art.arcane.gloss.menu.action.MenuAction;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
-import java.util.regex.Pattern;
+import com.google.re2j.Pattern;
 
 /** One document compiled once per revision: entry conditions, chat patterns and resolved action lists. */
 public record BehaviorRuntime(String id, BehaviorDoc doc, List<CompiledEntry> entries) {
@@ -27,7 +27,7 @@ public record BehaviorRuntime(String id, BehaviorDoc doc, List<CompiledEntry> en
             String path = "behaviors/" + id + ".on[" + index + "]";
             CompiledCondition when = entry.when() == null ? null
                 : ConditionCompiler.compile(new ConditionSource(path + ".when", entry.when()));
-            Pattern pattern = entry.pattern() == null ? null : Pattern.compile(entry.pattern());
+            Pattern pattern = entry.pattern() == null ? null : doc.matching().compile(entry.pattern(), path + ".pattern");
             List<MenuAction<?>> actions = MenuAction.resolve(entry.actions(), "behavior:" + id, "on:" + index);
             BoundedConditionErrorCallback errors = BoundedConditionErrorCallback.bounded(1, error ->
                 Gloss.logExceptionStack(false, error.cause(), "Behavior condition %s failed and was treated as false.",

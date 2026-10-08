@@ -9,9 +9,11 @@ import java.util.List;
  * Spigot server simply has no decorator and keeps the MOTD, favicon and max-player count.
  */
 public interface PingDecorator {
+    MotdPolicy.Request request(ServerListPingEvent event);
+
     void decorate(ServerListPingEvent event, RenderedPing rendered);
 
-    record RenderedPing(List<String> sample, Integer online, Integer max, String version) {
+    record RenderedPing(List<String> sample, Integer online, Integer max, String version, String sampleMode, MotdPolicy.Counts counts) {
         public RenderedPing {
             sample = sample == null ? List.of() : List.copyOf(sample);
         }

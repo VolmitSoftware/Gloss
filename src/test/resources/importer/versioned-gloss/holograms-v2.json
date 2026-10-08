@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 2,
+  "revision": 6,
+  "anchor": {
+    "world": "world_nether",
+    "position": [12.5, 64.0, -7.25]
+  },
+  "lines": ["&dWelcome", "&7Line two"],
+  "scale": 2.5
+}

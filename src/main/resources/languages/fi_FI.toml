@@ -13,6 +13,15 @@
 #
 # === Muuttujat ===
 # Säilytä muuttujien nimet ja käytä vain kunkin viestin omia muuttujia.
+#   {viewers}  Katsojat
+#   {entries}  Välimuistin merkinnät
+#   {admissions}  Hyväksynnät
+#   {refusals}  Hylkäykset
+#   {waiting}  Odottaa
+#   {expired}  Vanhentuneet vuorot
+#   {retiring}  Siivous odottaa
+#   {bytes}  Säilytetyt tiedot (tavua)
+#   {completed}  Valmistuneet
 #   {absorbed}  Olemassa oleviin tietoihin yhdistetyt tuontimerkinnät
 #   {active}  Aktiivisten tarjoajien määrä
 #   {actual}  Nykyinen versio
@@ -225,8 +234,8 @@ indicators = "Vahinko- ja parannusilmaisimien työkalut"
 status = "Näytä tiiviit ajonaikaiset lukumäärät"
 import = "Siirrä vanhat hologrammit muokkaamatta lähdetiedostoja"
 "import.apply" = "Suorita vanhojen hologrammien siirto ilman ylikirjoitusta"
-"import.holoui" = "Kopioi HoloUi-tiedot kansiosta plugins/holoui ja ylikirjoita aiemmat tuonnit"
-"import.legacy" = "Siirrä yhdistymistä edeltävät Gloss-datatiedostot v2-kuoriin"
+"import.holoui" = "Esikatsele tai suorita HoloUi-tuonti yhtenä tapahtumana"
+"import.legacy" = "Esikatsele tai suorita Gloss-tietojen päivitys yhtenä tapahtumana"
 "import.preview" = "Esikatsele vanhojen hologrammien siirtoa muuttamatta mitään"
 item = "Mukautettujen esineiden tarjoajien työkalut"
 "item.export" = "Vie mukautettujen esineiden katalogi verkkoeditoria varten"
@@ -294,6 +303,9 @@ web = "Avaa ja hallitse Glossin verkkoeditoria"
 "web.sessions.revoke" = "Peru verkkoeditorin käyttölinkki"
 "web.sessions.status" = "Näytä yksi verkkoeditorin istunto"
 language = "Valitse oma kielesi tai palvelimen oletuskieli"
+
+"import.mode" = "preview tai apply"
+"import.overwrite" = "Esikatsele olemassa olevien tiedostojen korvaamista"
 
 [command.help.arg]
 reset_name = "Palautettava nimi, tai * kaikille mukana toimitetuille oletuksille"
@@ -421,6 +433,9 @@ emoji = "&7Emojit: &f{enabled}&8/&f{total}"
 animations = "&7Animaatiot: &f{count}"
 effects = "&7Kuplat: &f{bubbles} &8| &7Ilmaisimet: &f{indicators} &8| &7Pudotukset: &f{drops}"
 
+visibility = "&7Näkyvät entiteettikopiot: &f{entities} &8| &7Katsojat: &f{viewers} &8| &7Hyväksynnät: &f{admissions} &8| &7Hylkäykset: &f{refusals} &8| &7Odottaa: &f{waiting} &8| &7Vanhentuneet vuorot: &f{expired} &8| &7Siivous odottaa: &f{retiring}"
+images = "&7Kuvavälimuisti: &f{entries} &8| &7Odottaa: &f{pending} &8| &7Säilytetyt tiedot: &f{bytes} &7tavua &8| &7Valmistuneet: &f{completed} &8| &7Hylkäykset: &f{refusals}"
+
 [command.reset]
 done = "&8[&dGloss&8] &aPalautettu &f{count}&a mukana toimitettua {kind}-oletusta."
 none = "&8[&dGloss&8] &cYksikään mukana toimitettu {kind}-oletus ei vastaa nimeä '&f{name}&c'."
@@ -433,12 +448,19 @@ style_unknown = "&8[&dGloss&8] &cPuhekuplatyyliä nimeltä '&f{style}&c' ei ole.
 [command.import]
 config_unreadable = "&8[&dGloss&8] &cTiedostoa gloss.toml ei voitu ladata: &f{reason}"
 
+mode_invalid = "&8[&dGloss&8] &cKäytä tuontitilana arvoa preview tai apply."
+preview_capacity = "&8[&dGloss&8] &cTarkistettujen tuontien välimuisti on täynnä. Suorita olemassa oleva esikatselu tai odota sen vanhenemista ja esikatsele sitten uudelleen."
+
 [command.import.holoui]
 missing = "&8[&dGloss&8] &cGlossin datakansion vierestä ei löytynyt holoui-datakansiota."
 done = "&8[&dGloss&8] &aHoloUi-tuonti valmis: &f{copied}&a kopioitu, &f{skipped}&a ohitettu, &f{overlaid}&a asetusavainta, &f{errors}&a virhettä."
 
+preview_required = "&8[&dGloss&8] &cSuorita ensin /gloss import holoui mode=preview. Esikatselut käyttävät määritettyä voimassaoloaikaa. Lisää overwrite=true esikatsellaksesi olemassa olevien tiedostojen korvaamista."
+
 [command.import.legacy]
 done = "&8[&dGloss&8] &aVanhan datan siirto valmis: &f{migrated}&a siirretty, &f{absorbed}&a sulautettu, &f{overlaid}&a asetusavainta, &f{errors}&a virhettä."
+
+preview_required = "&8[&dGloss&8] &cSuorita ensin /gloss import legacy mode=preview. Esikatselut käyttävät määritettyä voimassaoloaikaa."
 
 [director.help]
 no_subcommands = "Tällä sivulla ei ole alikomentoja."
@@ -829,6 +851,7 @@ empty = "(tyhjä)"
 # Lane message tables. Each lane appends its [gloss.message.<lane>] and [command.help.<group>]
 # tables inside its own anchor so parallel branches never share a line.
 # --- lane:screen ---
+
 [gloss.message.screen]
 "surfaces.empty" = "&8[&dGloss&8] &7Pintoja ei ole ladattu."
 "surfaces.unknown" = "&8[&dGloss&8]: &cPintaa &f{id}&c ei ole."
@@ -865,6 +888,7 @@ who = "Näyttää, mikä lisäosa varaa kunkin HUD-paikan"
 "who.player" = "Tarkasteltava pelaaja; oletuksena sinä"
 
 # --- lane:chat ---
+
 [gloss.message.chat]
 filtered = "&8[&dGloss&8]: &cChat-suodatin esti viestisi."
 too_fast = "&8[&dGloss&8]: &eOdota hetki ennen seuraavaa viestiä."
@@ -915,6 +939,7 @@ sample = "Näytteistä tulostaulu heti kaikille paikalla oleville"
 "sample.id" = "Tulostaulun tunnus"
 
 # --- lane:forms ---
+
 [gloss.message.forms]
 icon_unsupported = "&7Ei piirrettävissä arkun ruutuun ({kind})"
 no_inventories = "&8[&dGloss&8]: &7Arkkuvalikkoja ei ole määritetty."
@@ -964,6 +989,7 @@ hologram_actions_header = "&8[&dGloss&8] &7Hologrammin &f{id}&7 toiminnot (&f{co
 hologram_actions_entry = "&8[&dGloss&8] &7  &f{kind}&7 kohteessa &f{value}"
 
 # --- lane:world ---
+
 [gloss.message.world]
 players_only = "&cTämän komennon täytyy suorittaa pelaaja."
 disabled = "&cTämä ominaisuus on pois päältä gloss.toml-tiedostossa."
@@ -1055,6 +1081,7 @@ color = "Nimetty tekstiväri"
 ticks = "Tikit, jotka hehku kestää, tai 0 pitämiseen"
 
 # --- lane:behaviors ---
+
 [command.help.behavior]
 root = "Tarkastele ja laukaise kayttaytymisdokumentteja"
 list = "Listaa ladatut kayttaytymisdokumentit"
@@ -1119,6 +1146,7 @@ fired = "&8[&dGloss&8]: &aSuoritettiin merkinta &f{line}&a dokumentista &f{id}&a
 "explain.missing" = "&8[&dGloss&8]: &cKohdetta {kind} nimella \"{id}\" ei ole."
 
 # --- lane:authoring ---
+
 [command.help.pack]
 root = "Asenna ja hallitse Gloss-paketteja"
 install = "Asenna paketti tiedostosta tai HTTPS-osoitteesta"
@@ -1188,8 +1216,10 @@ preview = "&8[&dGloss&8] &f{source}&7 kirjoittaisi &f{count}&7 asiakirjaa."
 entry = "&8[&dGloss&8] &7{state} &f{path}&7 {reason}"
 applied = "&8[&dGloss&8] &f{count}&7 asiakirjaa tuotu lähteestä &f{source}&7."
 absent = "&8[&dGloss&8] &7Polussa &f{path}&7 ei ole &f{source}&7-tietoja."
+preview_required = "&8[&dGloss&8] &cSuorita ensin /gloss import preview {source}. Esikatselut käyttävät määritettyä voimassaoloaikaa."
 
 # --- lane:forge ---
+
 [gloss.message.forge]
 disabled = "&8[&dGloss&8] &cKirjasinpaja on pois päältä. Aseta features.forge arvoon true tiedostossa gloss.toml."
 built = "&8[&dGloss&8] &aPaketti &f{value}&a koottu, {count} kuvaketta."
@@ -1211,6 +1241,7 @@ serve = "Käynnistä tai pysäytä sisäänrakennettu pakettipalvelin"
 reset = "Palauta mukana toimitetut kuvakedokumentit"
 
 # --- lane:fixes ---
+
 [gloss.message.fixes]
 status_bedrock = "&7bedrock: &f{name}&7, &f{count}&7 paikalla"
 status_textimage_oversize = "&7textimage-ylisuuri: &f{count}"

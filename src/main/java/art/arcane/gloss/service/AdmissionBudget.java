@@ -41,17 +41,36 @@ public final class AdmissionBudget {
 
     public static final class Lease implements AutoCloseable {
         private final AdmissionBudget owner;
+        private final Reservation reservation;
         private final AtomicBoolean released = new AtomicBoolean();
 
         private Lease(AdmissionBudget owner) {
             this.owner = owner;
+            this.reservation = null;
+        }
+
+        Lease(Reservation reservation) {
+            this.owner = null;
+            this.reservation = reservation;
+        }
+
+        Reservation reservation() {
+            return released.get() ? null : reservation;
         }
 
         @Override
         public void close() {
             if (released.compareAndSet(false, true)) {
-                owner.release();
+                if (owner != null) {
+                    owner.release();
+                } else {
+                    reservation.release();
+                }
             }
         }
     }
+    interface Reservation {
+        void release();
+    }
+
 }

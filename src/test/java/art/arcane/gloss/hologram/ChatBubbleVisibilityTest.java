@@ -46,8 +46,8 @@ class ChatBubbleVisibilityTest {
             DisplayHandle display = harness.onlySpawned(world);
             assertEquals(Boolean.FALSE, display.visibleByDefault);
             assertEquals(0, hidden.showCallsFor(display));
-            assertEquals(Boolean.FALSE, hidden.perceivedVisibility(display));
-            assertEquals(Boolean.FALSE, sender.perceivedVisibility(display));
+            assertFalse(hidden.effectivelyVisible(display));
+            assertFalse(sender.effectivelyVisible(display));
             assertEquals(Boolean.TRUE, staff.perceivedVisibility(display));
             assertEquals(1, harness.animator.pass(System.currentTimeMillis()));
             assertEquals(List.of(staff.proxy), harness.sender.sent.getLast().viewers());
@@ -72,7 +72,7 @@ class ChatBubbleVisibilityTest {
             viewer.playerVisibility.put(sender.uuid, false);
             bubble.drive(true);
 
-            assertEquals(Boolean.FALSE, viewer.perceivedVisibility(display));
+            assertFalse(viewer.effectivelyVisible(display));
             assertEquals(0, harness.animator.pass(System.currentTimeMillis()));
             int hiddenCalls = viewer.hideCallsFor(display);
             bubble.drive(true);
@@ -101,12 +101,12 @@ class ChatBubbleVisibilityTest {
             bubble.drive(true);
             DisplayHandle display = harness.onlySpawned(world);
             assertEquals(Boolean.TRUE, sender.perceivedVisibility(display));
-            assertEquals(Boolean.FALSE, viewer.perceivedVisibility(display));
+            assertFalse(viewer.effectivelyVisible(display));
 
             harness.moveTo(viewer, world, 2.0D, 64.0D, 0.0D);
             viewer.playerVisibility.put(sender.uuid, false);
             bubble.drive(true);
-            assertEquals(Boolean.FALSE, viewer.perceivedVisibility(display));
+            assertFalse(viewer.effectivelyVisible(display));
 
             viewer.playerVisibility.put(sender.uuid, true);
             bubble.drive(true);
@@ -114,7 +114,7 @@ class ChatBubbleVisibilityTest {
 
             harness.moveTo(viewer, world, 0.0D, 64.0D, 0.0D);
             bubble.drive(true);
-            assertEquals(Boolean.FALSE, viewer.perceivedVisibility(display));
+            assertFalse(viewer.effectivelyVisible(display));
             assertTrue(harness.schedulerErrors.isEmpty());
         }
     }

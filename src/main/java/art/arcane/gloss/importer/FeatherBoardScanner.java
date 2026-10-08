@@ -1,5 +1,7 @@
 package art.arcane.gloss.importer;
 
+import art.arcane.gloss.GlossConfig;
+
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
 
@@ -9,9 +11,7 @@ import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
-import java.util.stream.Stream;
 
 /**
  * Reads {@code plugins/FeatherBoard/boards/*.yml}.
@@ -33,17 +33,15 @@ public final class FeatherBoardScanner {
         if (!Files.isDirectory(root, LinkOption.NOFOLLOW_LINKS)) {
             return List.of();
         }
+        ImportSourceFiles sources = new ImportSourceFiles(GlossConfig.current().imports());
         List<LegacyBoardDraft> drafts = new ArrayList<>();
-        try (Stream<Path> files = Files.list(root)) {
-            for (Path file : files.sorted(Comparator.comparing(Path::getFileName)).toList()) {
-                String name = file.getFileName().toString();
-                if (!Files.isRegularFile(file, LinkOption.NOFOLLOW_LINKS)
-                        || !(name.endsWith(".yml") || name.endsWith(".yaml"))) {
-                    continue;
-                }
-                drafts.add(read(name.substring(0, name.lastIndexOf('.')),
-                        Files.readString(file, StandardCharsets.UTF_8)));
-            }
+        for (Path file : sources.collect(root, false, path -> {
+            String name = path.getFileName().toString();
+            return name.endsWith(".yml") || name.endsWith(".yaml");
+        })) {
+            String name = file.getFileName().toString();
+            drafts.add(read(name.substring(0, name.lastIndexOf('.')),
+                new String(sources.read(file), StandardCharsets.UTF_8)));
         }
         return List.copyOf(drafts);
     }

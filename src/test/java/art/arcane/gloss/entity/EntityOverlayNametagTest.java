@@ -131,12 +131,14 @@ class EntityOverlayNametagTest {
             EntityOverlayService service = harness.service(OVERRIDE);
             harness.drive(service);
             EntityOverlayTarget retired = harness.overlays(service).remove(mob.uuid);
+            assertEquals(1, harness.teams.calls.size(), "Initial admission: " + harness.teams.calls);
             harness.drive(service);
+            assertEquals(1, harness.teams.calls.size(), "Replacement admission: " + harness.teams.calls);
             Method destroy = EntityOverlayService.class.getDeclaredMethod("destroy", EntityOverlayTarget.class);
             destroy.setAccessible(true);
             destroy.invoke(service, retired);
             assertEquals(1, harness.teams.layersFor(viewer.uuid, mob.uuid.toString()).size());
-            assertEquals(1, harness.teams.calls.size());
+            assertEquals(1, harness.teams.calls.size(), "Retired display: " + harness.teams.calls);
         }
     }
 }

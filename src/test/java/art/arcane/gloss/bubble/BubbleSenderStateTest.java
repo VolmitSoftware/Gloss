@@ -20,9 +20,28 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class BubbleSenderStateTest {
+    @Test
+    void overflowRejectsNewOrRetiresEnoughForTheCurrentLimit() {
+        ConcurrentMap<UUID, SenderState> states = new ConcurrentHashMap<>();
+        UUID sender = UUID.randomUUID();
+        BubbleRecord first = record(false, 1000L);
+        BubbleRecord second = record(false, 2000L);
+        BubbleRecord third = record(false, 3000L);
+        ChatBubblesService.publishBubble(states, sender, null, first, 4, "replace-oldest");
+        ChatBubblesService.publishBubble(states, sender, null, second, 4, "replace-oldest");
+        assertNull(ChatBubblesService.publishBubble(states, sender, null, third, 2, "reject-new"));
+        assertEquals(List.of(first, second), states.get(sender).live);
+        ChatBubblesService.SenderPublication publication =
+            ChatBubblesService.publishBubble(states, sender, null, third, 1, "replace-oldest");
+        assertEquals(List.of(first, second), publication.retired());
+        assertEquals(List.of(third), publication.state().live);
+        assertEquals(0, third.lineIndex);
+    }
+
     private static BubbleRecord record(boolean followPlayer, long expiresAtMs) {
         return record(followPlayer, expiresAtMs, 1);
     }
@@ -172,7 +191,7 @@ class BubbleSenderStateTest {
         state.add(second);
         state.add(third);
 
-        assertEquals(first, state.addAtLimit(fourth, 3, null));
+        assertEquals(List.of(first), state.addAtLimit(fourth, 3, null));
         assertEquals(List.of(second, third, fourth), state.live);
         assertEquals(0, second.lineIndex);
         assertEquals(1, third.lineIndex);
@@ -188,7 +207,7 @@ class BubbleSenderStateTest {
                 ConcurrentMap<UUID, SenderState> states = new ConcurrentHashMap<>();
                 BubbleRecord expired = record(false, 0L);
                 BubbleRecord replacement = record(false, 1000L);
-                ChatBubblesService.publishBubble(states, senderId, null, expired, 4);
+                ChatBubblesService.publishBubble(states, senderId, null, expired, 4, "replace-oldest");
                 CountDownLatch ready = new CountDownLatch(2);
                 CountDownLatch start = new CountDownLatch(1);
                 Future<?> expiry = executor.submit(() -> {
@@ -199,7 +218,7 @@ class BubbleSenderStateTest {
                 Future<?> publication = executor.submit(() -> {
                     ready.countDown();
                     await(start);
-                    ChatBubblesService.publishBubble(states, senderId, null, replacement, 4);
+                    ChatBubblesService.publishBubble(states, senderId, null, replacement, 4, "replace-oldest");
                 });
 
                 assertTrue(ready.await(5L, TimeUnit.SECONDS));

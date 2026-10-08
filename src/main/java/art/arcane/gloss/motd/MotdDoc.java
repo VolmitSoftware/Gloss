@@ -13,7 +13,8 @@ import java.util.Locale;
 import java.util.Set;
 
 public record MotdDoc(int schemaVersion, long revision, ShowCondition show, String favicon,
-                      List<MotdEntry> entries, List<MotdLink> links) {
+                      List<MotdEntry> entries, List<MotdLink> links, MotdPolicy.Rotation rotation,
+                      List<String> icons, String state, ServerLinks serverLinks) {
     public static final String KIND = "motd";
     public static final int CURRENT_SCHEMA_VERSION = 1;
     public static final int MAX_LINES_PER_ENTRY = 2;
@@ -23,7 +24,7 @@ public record MotdDoc(int schemaVersion, long revision, ShowCondition show, Stri
         "status", "feedback", "community", "website", "forums", "news", "announcements");
 
     public static final MotdDoc DEFAULTS = new MotdDoc(CURRENT_SCHEMA_VERSION, DocumentEnvelope.INITIAL_REVISION,
-        ShowCondition.ALWAYS, null, List.of(MotdEntry.ofLines(List.of("&dA glossy server"))), List.of());
+        ShowCondition.ALWAYS, null, List.of(MotdEntry.ofLines(List.of("&dA glossy server"))), List.of(), null, null, null, null);
 
     public MotdDoc {
         show = show == null ? ShowCondition.ALWAYS : show;
@@ -35,6 +36,12 @@ public record MotdDoc(int schemaVersion, long revision, ShowCondition show, Stri
         }
         entries = List.copyOf(entries);
         links = copyLinks(links);
+        rotation = rotation == null ? MotdPolicy.Rotation.DEFAULT : rotation;
+        icons = MotdPolicy.icons(icons);
+        state = state == null ? "normal" : state;
+        if (state.isBlank()) {
+            throw new IllegalArgumentException("MOTD state must not be blank");
+        }
     }
 
     public static MotdDoc parse(String fileName, String raw) {
@@ -43,6 +50,31 @@ public record MotdDoc(int schemaVersion, long revision, ShowCondition show, Stri
 
     public String faviconFor(MotdEntry entry) {
         return entry.favicon() == null ? favicon : entry.favicon();
+    }
+
+    public List<String> iconsFor(MotdEntry entry) {
+        if (!entry.icons().isEmpty()) {
+            return entry.icons();
+        }
+        if (entry.favicon() != null) {
+            return List.of(entry.favicon());
+        }
+        if (!icons.isEmpty()) {
+            return icons;
+        }
+        return favicon == null ? List.of() : List.of(favicon);
+    }
+
+    public List<MotdLink> enabledLinks(boolean motdEnabled) {
+        return serverLinks == null ? (motdEnabled ? links : List.of())
+            : serverLinks.enabled() ? serverLinks.links() : List.of();
+    }
+
+    public record ServerLinks(Boolean enabled, List<MotdLink> links) {
+        public ServerLinks {
+            enabled = enabled == null || enabled;
+            links = copyLinks(links);
+        }
     }
 
     private static List<MotdLink> copyLinks(List<MotdLink> links) {
@@ -63,7 +95,8 @@ public record MotdDoc(int schemaVersion, long revision, ShowCondition show, Stri
     }
 
     public record MotdEntry(List<String> lines, String favicon, List<String> sample, String online, String max,
-                            String version, ShowCondition show, Integer weight) {
+                            String version, ShowCondition show, Integer weight, MotdPolicy.Selector select,
+                            List<String> icons, MotdPolicy.Counts counts, String sampleMode) {
         public MotdEntry {
             show = show == null ? ShowCondition.ALWAYS : show;
             weight = weight == null ? 1 : weight;
@@ -80,10 +113,14 @@ public record MotdDoc(int schemaVersion, long revision, ShowCondition show, Stri
             lines = List.copyOf(copied);
             favicon = trimToNull(favicon);
             sample = copySample(sample);
+            select = select == null ? MotdPolicy.Selector.ANY : select;
+            icons = MotdPolicy.icons(icons);
+            counts = counts == null ? MotdPolicy.Counts.DEFAULT : counts;
+            sampleMode = MotdPolicy.sampleMode(sampleMode, sample);
         }
 
         public static MotdEntry ofLines(List<String> lines) {
-            return new MotdEntry(lines, null, null, null, null, null, ShowCondition.ALWAYS, 1);
+            return new MotdEntry(lines, null, null, null, null, null, ShowCondition.ALWAYS, 1, null, null, null, null);
         }
 
         public String joined() {

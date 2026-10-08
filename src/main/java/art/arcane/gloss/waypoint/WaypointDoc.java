@@ -11,9 +11,14 @@ import art.arcane.gloss.marker.MarkerColors;
 import java.util.Objects;
 
 public record WaypointDoc(int schemaVersion, long revision, ShowCondition show, MarkerAnchor anchor,
-                          String color, String style, Double range, Audience audience) {
+                          String color, String style, Double range, Audience audience, String fallbackStyle) {
     public static final String KIND = "waypoints";
     public static final int CURRENT_SCHEMA_VERSION = 1;
+
+    public WaypointDoc(int schemaVersion, long revision, ShowCondition show, MarkerAnchor anchor,
+                       String color, String style, Double range, Audience audience) {
+        this(schemaVersion, revision, show, anchor, color, style, range, audience, "default");
+    }
 
     public WaypointDoc {
         DocumentEnvelope.requireSchemaVersion(KIND, schemaVersion, CURRENT_SCHEMA_VERSION);
@@ -21,7 +26,8 @@ public record WaypointDoc(int schemaVersion, long revision, ShowCondition show, 
         show = show == null ? ShowCondition.ALWAYS : show;
         anchor = Objects.requireNonNull(anchor, "a waypoint requires an anchor");
         MarkerColors.parse(color, "waypoint color");
-        WaypointStyle.parse(style);
+        style = new WaypointStyleKey(style).value();
+        fallbackStyle = WaypointStyle.parse(fallbackStyle).serializedName();
         range = range == null ? 0.0D : range;
         audience = audience == null ? Audience.ALWAYS : audience;
     }
@@ -35,10 +41,10 @@ public record WaypointDoc(int schemaVersion, long revision, ShowCondition show, 
     }
 
     public WaypointStyle waypointStyle() {
-        return WaypointStyle.parse(style);
+        return WaypointStyle.parse(new WaypointStyleKey(style).builtIn() ? style : fallbackStyle);
     }
 
     public WaypointSpec toSpec(String id) {
-        return new WaypointSpec(id, anchor, rgb(), waypointStyle().serializedName(), range);
+        return new WaypointSpec(id, anchor, rgb(), style, range);
     }
 }

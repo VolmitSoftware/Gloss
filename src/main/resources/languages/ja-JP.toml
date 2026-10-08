@@ -13,6 +13,15 @@
 #
 # === 変数 ===
 # 変数名を変更せず、各メッセージに元からある変数だけを使用してください。
+#   {viewers}  閲覧者
+#   {entries}  キャッシュ内の項目数
+#   {admissions}  許可数
+#   {refusals}  拒否数
+#   {waiting}  待機中
+#   {expired}  期限切れの順番
+#   {retiring}  クリーンアップ待ち
+#   {bytes}  保持データ (バイト)
+#   {completed}  完了数
 #   {absorbed}  既存データに統合したインポート項目数
 #   {active}  有効なプロバイダー数
 #   {actual}  現在のリビジョン
@@ -225,8 +234,8 @@ indicators = "ダメージ・回復インジケーターのツール"
 status = "実行時のカウントを簡潔に表示する"
 import = "ソースファイルを変更せずにレガシーホログラムを移行する"
 "import.apply" = "上書きなしのレガシーホログラム移行を適用する"
-"import.holoui" = "plugins/holouiからHoloUiデータをコピーする。以前のインポートは上書き"
-"import.legacy" = "統合前のGlossデータファイルをv2エンベロープに移行する"
+"import.holoui" = "HoloUiのトランザクション型インポートをプレビューまたは適用する"
+"import.legacy" = "Glossデータのトランザクション型更新をプレビューまたは適用する"
 "import.preview" = "非破壊のレガシーホログラム移行をプレビューする"
 item = "カスタムアイテムプロバイダーツール"
 "item.export" = "Webエディター用にカスタムアイテムカタログをエクスポートする"
@@ -294,6 +303,9 @@ web = "Gloss の Web エディターを開いて管理する"
 "web.sessions.revoke" = "Web エディターの編集権限を失効させる"
 "web.sessions.status" = "Web エディターのセッションを1つ表示する"
 language = "自分の言語またはサーバーの既定言語を選択"
+
+"import.mode" = "preview または apply"
+"import.overwrite" = "既存ファイルの置き換えをプレビューする"
 
 [command.help.arg]
 reset_name = "リセットする名前。*で同梱デフォルトすべて"
@@ -421,6 +433,9 @@ emoji = "&7絵文字: &f{enabled}&8/&f{total}"
 animations = "&7アニメーション: &f{count}"
 effects = "&7吹き出し: &f{bubbles} &8| &7インジケーター: &f{indicators} &8| &7ドロップ: &f{drops}"
 
+visibility = "&7表示中のエンティティコピー: &f{entities} &8| &7閲覧者: &f{viewers} &8| &7許可数: &f{admissions} &8| &7拒否数: &f{refusals} &8| &7待機中: &f{waiting} &8| &7期限切れの順番: &f{expired} &8| &7クリーンアップ待ち: &f{retiring}"
+images = "&7画像キャッシュ: &f{entries} &8| &7処理待ち: &f{pending} &8| &7保持データ: &f{bytes} &7バイト &8| &7完了数: &f{completed} &8| &7拒否数: &f{refusals}"
+
 [command.reset]
 done = "&8[&dGloss&8] &a同梱の {kind} デフォルト &f{count}&a 件を復元しました。"
 none = "&8[&dGloss&8] &c'&f{name}&c' に一致する同梱の {kind} デフォルトはありません。"
@@ -433,12 +448,19 @@ style_unknown = "&8[&dGloss&8] &c'&f{style}&c' という名前の吹き出しス
 [command.import]
 config_unreadable = "&8[&dGloss&8] &cgloss.toml を読み込めませんでした: &f{reason}"
 
+mode_invalid = "&8[&dGloss&8] &cインポートモードには preview または apply を指定してください。"
+preview_capacity = "&8[&dGloss&8] &c確認済みインポートのキャッシュが満杯です。既存のプレビューを適用するか、有効期限が切れるまで待ってから再度プレビューしてください。"
+
 [command.import.holoui]
 missing = "&8[&dGloss&8] &cGlossデータフォルダの隣に holoui データフォルダが見つかりません。"
 done = "&8[&dGloss&8] &aHoloUiインポートが完了しました: コピー &f{copied}&a 件、スキップ &f{skipped}&a 件、設定キー &f{overlaid}&a 件、エラー &f{errors}&a 件。"
 
+preview_required = "&8[&dGloss&8] &c先に /gloss import holoui mode=preview を実行してください。 プレビューには設定済みの有効期間が適用されます。 既存ファイルの置き換えを確認するには overwrite=true を追加してください。"
+
 [command.import.legacy]
 done = "&8[&dGloss&8] &aレガシー移行が完了しました: 移行 &f{migrated}&a 件、吸収 &f{absorbed}&a 件、設定キー &f{overlaid}&a 件、エラー &f{errors}&a 件。"
+
+preview_required = "&8[&dGloss&8] &c先に /gloss import legacy mode=preview を実行してください。 プレビューには設定済みの有効期間が適用されます。"
 
 [director.help]
 no_subcommands = "このページにサブコマンドはありません。"
@@ -829,6 +851,7 @@ empty = "(空)"
 # Lane message tables. Each lane appends its [gloss.message.<lane>] and [command.help.<group>]
 # tables inside its own anchor so parallel branches never share a line.
 # --- lane:screen ---
+
 [gloss.message.screen]
 "surfaces.empty" = "&8[&dGloss&8] &7読み込まれたサーフェスはありません。"
 "surfaces.unknown" = "&8[&dGloss&8]: &c&f{id}&c というサーフェスはありません。"
@@ -865,6 +888,7 @@ who = "各 HUD 枠をどのプラグインが占有しているか表示"
 "who.player" = "確認するプレイヤー。既定は自分"
 
 # --- lane:chat ---
+
 [gloss.message.chat]
 filtered = "&8[&dGloss&8]: &cチャットフィルターによりメッセージがブロックされました。"
 too_fast = "&8[&dGloss&8]: &e次のメッセージを送るまで少し待ってください。"
@@ -915,6 +939,7 @@ sample = "オンラインの全プレイヤーについて今すぐ取得"
 "sample.id" = "リーダーボード文書のID"
 
 # --- lane:forms ---
+
 [gloss.message.forms]
 icon_unsupported = "&7チェストのスロットには描画できません ({kind})"
 no_inventories = "&8[&dGloss&8]: &7チェストメニューが設定されていません。"
@@ -964,6 +989,7 @@ hologram_actions_header = "&8[&dGloss&8] &7ホログラム &f{id}&7 のアクシ
 hologram_actions_entry = "&8[&dGloss&8] &7  &f{kind}&7 / &f{value}"
 
 # --- lane:world ---
+
 [gloss.message.world]
 players_only = "&cこのコマンドはプレイヤーが実行する必要があります。"
 disabled = "&cこの機能は gloss.toml で無効になっています。"
@@ -1055,6 +1081,7 @@ color = "名前付きテキスト色"
 ticks = "発光が続くティック数、0 で維持"
 
 # --- lane:behaviors ---
+
 [command.help.behavior]
 root = "ビヘイビア文書を確認して実行する"
 list = "読み込まれたビヘイビア文書を一覧表示する"
@@ -1119,6 +1146,7 @@ fired = "&8[&dGloss&8]: &a{id}&a の項目 &f{line}&a を実行しました。"
 "explain.missing" = "&8[&dGloss&8]: &c\"{id}\" という {kind} はありません。"
 
 # --- lane:authoring ---
+
 [command.help.pack]
 root = "Gloss パックのインストールと管理"
 install = "ファイルまたは HTTPS URL からパックをインストールします"
@@ -1188,8 +1216,10 @@ preview = "&8[&dGloss&8] &f{source}&7 は &f{count}&7 個のドキュメント�
 entry = "&8[&dGloss&8] &7{state} &f{path}&7 {reason}"
 applied = "&8[&dGloss&8] &f{source}&7 から &f{count}&7 個のドキュメントを取り込みました。"
 absent = "&8[&dGloss&8] &7&f{path}&7 に &f{source}&7 のデータはありません。"
+preview_required = "&8[&dGloss&8] &c先に /gloss import preview {source} を実行してください。 プレビューには設定済みの有効期間が適用されます。"
 
 # --- lane:forge ---
+
 [gloss.message.forge]
 disabled = "&8[&dGloss&8] &cグリフフォージは無効です。gloss.toml の features.forge を true にしてください。"
 built = "&8[&dGloss&8] &aパック &f{value}&a を {count} 個のグリフでビルドしました。"
@@ -1211,6 +1241,7 @@ serve = "内蔵パックリスナーを開始または停止"
 reset = "同梱のグリフ文書を復元"
 
 # --- lane:fixes ---
+
 [gloss.message.fixes]
 status_bedrock = "&7bedrock: &f{name}&7、&f{count}&7 人接続中"
 status_textimage_oversize = "&7textimage-サイズ超過: &f{count}"

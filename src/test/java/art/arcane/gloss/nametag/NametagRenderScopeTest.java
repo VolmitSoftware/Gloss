@@ -15,6 +15,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
+import art.arcane.gloss.condition.RoleSnapshotPendingException;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -54,6 +56,57 @@ class NametagRenderScopeTest {
             (pairViewer, subject) -> scope(Map.of()), BoundedConditionErrorCallback.silent());
 
         assertEquals(List.of("Viewer"), viewers);
+    }
+
+    @Test
+    void subjectOnlyPrefixesRenderOncePerSubjectForAllViewers() {
+        RecordingTeams teams = new RecordingTeams();
+        AtomicInteger renders = new AtomicInteger();
+        NametagDriver driver = new NametagDriver(teams, (viewer, raw, scope) -> {
+            renders.incrementAndGet();
+            return render(viewer, raw, scope);
+        }, (viewer, subject) -> 0.0D);
+        List<Player> players = new ArrayList<>();
+        for (int index = 0; index < 64; index++) {
+            players.add(player("p" + index));
+        }
+        driver.apply(players, players, List.of(runtime("{{ subject.group }}")),
+            (viewer, subject) -> scope(Map.of("subject.group", subject.getName())),
+            BoundedConditionErrorCallback.silent());
+        assertEquals(64, renders.get());
+        assertEquals(64 * 64, teams.claimed.size());
+    }
+
+    @Test
+    void unknownNamespacePrefixesRemainViewerSpecific() {
+        RecordingTeams teams = new RecordingTeams();
+        AtomicInteger renders = new AtomicInteger();
+        NametagDriver driver = new NametagDriver(teams, (viewer, raw, scope) -> {
+            renders.incrementAndGet();
+            return viewer.getName();
+        }, (viewer, subject) -> 0.0D);
+        List<Player> players = List.of(player("a"), player("b"));
+        driver.apply(players, players, List.of(runtime("{{ custom.rank }}")),
+            (viewer, subject) -> scope(Map.of()), BoundedConditionErrorCallback.silent());
+        assertEquals(4, renders.get());
+    }
+
+    @Test
+    void awaitingAnOwnerSampleKeepsTheExistingPresentation() {
+        RecordingTeams teams = new RecordingTeams();
+        NametagDriver driver = new NametagDriver(teams, (viewer, raw, scope) -> {
+            if (raw.contains("viewer.name")) {
+                throw new RoleSnapshotPendingException();
+            }
+            return raw;
+        }, (viewer, subject) -> 0.0D);
+        Player player = player("viewer");
+        driver.apply(List.of(player), List.of(player), List.of(runtime("known")),
+            (viewer, subject) -> scope(Map.of()), BoundedConditionErrorCallback.silent());
+        teams.claimed.clear();
+        driver.apply(List.of(player), List.of(player), List.of(runtime("{{ viewer.name }}")),
+            (viewer, subject) -> scope(Map.of()), BoundedConditionErrorCallback.silent());
+        assertEquals(List.of(), teams.claimed);
     }
 
     private static String render(Player viewer, String raw, ExprScope scope) {
@@ -109,6 +162,7 @@ class NametagRenderScopeTest {
 
         @Override
         public void release(TeamHandle handle) {
+            claimed.add("release " + handle.entry());
         }
 
         @Override

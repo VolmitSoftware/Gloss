@@ -33,7 +33,7 @@ class OwnershipProtocolTest {
     @Test
     void verifiesEveryFeatureCombinationIncludingRelease() {
         OwnershipProtocol.Request request = OwnershipProtocol.createRequest(UUID.randomUUID());
-        for (int mask = 0; mask <= 7; mask++) {
+        for (int mask = 0; mask <= 63; mask++) {
             byte[] response = OwnershipProtocol.reply(request, mask, NOW + 30_000L, KEY);
             assertEquals(OptionalInt.of(mask), OwnershipProtocol.verifyReply(response, request, KEY, NOW));
         }

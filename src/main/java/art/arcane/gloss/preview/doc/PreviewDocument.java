@@ -21,6 +21,8 @@ import java.util.Map;
 final class PreviewDocument {
   Double scale;
   Double viewDistance;
+  JsonElement contentRefreshTicks;
+  JsonElement accessCheckTicks;
   ShowCondition show = ShowCondition.ALWAYS;
   MatchDef match;
   List<VariantDef> variants;

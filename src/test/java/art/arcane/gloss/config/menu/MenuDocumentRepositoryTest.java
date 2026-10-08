@@ -28,6 +28,28 @@ public class MenuDocumentRepositoryTest {
   public final TemporaryFolder temp = new TemporaryFolder();
 
   @Test
+  public void mutationsResolveInheritedRowsWithoutFlatteningOtherDefaults() throws IOException {
+    File pluginData = temp.newFolder("preset-menu");
+    JsonObject defaults = JsonParser.parseString(source("Inherited")).getAsJsonObject();
+    JsonObject kinds = new JsonObject();
+    kinds.add("menus", defaults);
+    JsonObject catalog = new JsonObject();
+    catalog.addProperty("schemaVersion", 1);
+    catalog.addProperty("revision", 1);
+    catalog.add("defaults", kinds);
+    Files.writeString(pluginData.toPath().resolve("presets.json"), catalog.toString());
+    writeMenu(pluginData, "shop", "{}");
+    MenuDocumentRepository repository = new MenuDocumentRepository(pluginData);
+    MenuDocument changed = repository.mutate("shop", MenuDocument.revisionOf("{}"),
+        document -> MenuRowMutations.setTextRow(document, 1, "Edited"));
+    JsonObject authored = JsonParser.parseString(changed.source()).getAsJsonObject();
+    assertEquals(1, authored.size());
+    assertTrue(authored.has("components"));
+    assertEquals("Edited", authored.getAsJsonArray("components").get(0).getAsJsonObject()
+        .getAsJsonObject("data").getAsJsonObject("icon").get("text").getAsString());
+  }
+
+  @Test
   public void nestedMutationIsAtomicAndPreservesUnknownFields() throws IOException {
     File pluginData = temp.newFolder("plugin");
     Path menu = writeMenu(pluginData, "folders/shop", source("Original"));

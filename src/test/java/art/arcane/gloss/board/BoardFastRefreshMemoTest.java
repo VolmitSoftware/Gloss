@@ -54,6 +54,21 @@ class BoardFastRefreshMemoTest {
     }
 
     @Test
+    void disabledFunctionsOnlySuppressTextDrivenCadence() {
+        GlossBoardMeta meta = board("Static", "|animation.rainbow|");
+        assertTrue(meta.usesFastRefresh(true));
+        assertFalse(meta.usesFastRefresh(false));
+        meta.setVariants(List.of(new BoardDoc.Variant("timed", 1, "true",
+            BoardDoc.parse("timed", """
+                {"schemaVersion":2,"revision":1,"presentation":{"lines":["plain"],
+                 "layout":{"refresh":{"textTicks":2}}}}
+                """).presentation())));
+        assertTrue(meta.usesFastRefresh(false));
+        meta.setVariants(List.of());
+        assertFalse(meta.usesFastRefresh(false));
+    }
+
+    @Test
     void replacingTheVariantsMovesTheAnswer() {
         GlossBoardMeta meta = board("Static", "%vault_prefix%");
         assertFalse(meta.usesFastRefreshText());

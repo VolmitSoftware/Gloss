@@ -96,15 +96,21 @@ class GlyphRegistryTest {
     }
 
     @Test
-    void refusesTwoDocumentsThatTargetDifferentFonts() {
-        GlyphDoc first = GlyphDoc.parse("a.json",
-            "{\"schemaVersion\":1,\"revision\":1,\"font\":\"glyphs\",\"glyphs\":[]}");
-        GlyphDoc second = GlyphDoc.parse("b.json",
-            "{\"schemaVersion\":1,\"revision\":1,\"font\":\"other\",\"glyphs\":[]}");
+    void differentFontsPreserveTheirOwnGlyphIdentityAndStableLedgerCodepoints() {
+        GlyphDoc first = GlyphDoc.parse("a.json", """
+            {"schemaVersion":1,"revision":1,"font":"glyphs","glyphs":[{"id":"one","image":"a.png"}]}
+            """);
+        GlyphDoc second = GlyphDoc.parse("b.json", """
+            {"schemaVersion":1,"revision":1,"namespace":"hud","font":"other","glyphs":[{"id":"two","image":"b.png"}]}
+            """);
         GlyphLedger ledger = ledger();
-
-        assertThrows(IllegalArgumentException.class,
-            () -> GlyphRegistry.build(Map.of("a", first, "b", second), ledger, SQUARE_16));
+        GlyphRegistry registry = GlyphRegistry.build(Map.of("a", first, "b", second), ledger, SQUARE_16);
+        GlyphRegistry reordered = GlyphRegistry.build(Map.of("b", second, "a", first), ledger, SQUARE_16);
+        assertEquals("gloss", registry.glyph("one").orElseThrow().namespace());
+        assertEquals("hud", registry.glyph("two").orElseThrow().namespace());
+        assertEquals("other", registry.glyph("two").orElseThrow().font());
+        assertEquals(registry.glyph("two").orElseThrow().codepoints(),
+            reordered.glyph("two").orElseThrow().codepoints());
     }
 
     @Test

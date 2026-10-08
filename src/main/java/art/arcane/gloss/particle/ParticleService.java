@@ -19,8 +19,6 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.WeakHashMap;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
 
 public final class ParticleService {
     private static final long TICK_MILLIS = 50L;
@@ -33,42 +31,31 @@ public final class ParticleService {
     }
 
     static final class Budget {
-        private final AtomicLong tick = new AtomicLong(Long.MIN_VALUE);
-        private final AtomicInteger used = new AtomicInteger();
+        private long tick = Long.MIN_VALUE;
+        private int used;
 
-        private int reserve(long currentTick, int requested, int limit) {
-            long observed = tick.get();
-            if (observed != currentTick && tick.compareAndSet(observed, currentTick)) {
-                used.set(0);
+        private synchronized int reserve(long currentTick, int requested, int limit) {
+            if (currentTick < tick || requested <= 0) {
+                return 0;
             }
-            while (true) {
-                int current = used.get();
-                int admitted = Math.min(requested, Math.max(0, limit - current));
-                if (admitted == 0) {
-                    return 0;
-                }
-                if (used.compareAndSet(current, current + admitted)) {
-                    return admitted;
-                }
+            if (currentTick > tick) {
+                tick = currentTick;
+                used = 0;
             }
+            int admitted = Math.min(requested, Math.max(0, limit - used));
+            used += admitted;
+            return admitted;
         }
 
-        private void release(long currentTick, int amount) {
-            if (amount <= 0) {
-                return;
-            }
-            while (tick.get() == currentTick) {
-                int current = used.get();
-                int returned = Math.max(0, current - amount);
-                if (used.compareAndSet(current, returned)) {
-                    return;
-                }
+        private synchronized void release(long currentTick, int amount) {
+            if (currentTick == tick && amount > 0) {
+                used = Math.max(0, used - amount);
             }
         }
     }
 
     private final Gloss plugin;
-    private final Map<ParticleLayer.ParticleSpec, ResolvedParticle> particles;
+    private final BoundedCache<ParticleLayer.ParticleSpec, ResolvedParticle> particles;
     private final BoundedCache<SampleKey, List<Vector>> samples;
     private final BoundedCache<String, ShowCondition> conditions;
     private final Map<UUID, Budget> viewerBudgets;
@@ -77,7 +64,7 @@ public final class ParticleService {
 
     public ParticleService(Gloss plugin) {
         this.plugin = plugin;
-        this.particles = new ConcurrentHashMap<>();
+        this.particles = new BoundedCache<>(MAX_SAMPLE_CACHE_ENTRIES);
         this.samples = new BoundedCache<>(MAX_SAMPLE_CACHE_ENTRIES);
         this.conditions = new BoundedCache<>(MAX_SAMPLE_CACHE_ENTRIES);
         this.viewerBudgets = new ConcurrentHashMap<>();
@@ -114,7 +101,7 @@ public final class ParticleService {
         if (admitted == 0) {
             return;
         }
-        ResolvedParticle resolved = particles.computeIfAbsent(layer.particle(), this::resolve);
+        ResolvedParticle resolved = particles.get(layer.particle(), this::resolve);
         Vector spread = layer.particle().spread();
         for (int index = 0; index * count < admitted; index++) {
             Location point = frame.world(selected.get(index), layer.placement());
@@ -145,7 +132,7 @@ public final class ParticleService {
         if (admitted == 0) {
             return;
         }
-        ResolvedParticle resolved = particles.computeIfAbsent(layer.particle(), this::resolve);
+        ResolvedParticle resolved = particles.get(layer.particle(), this::resolve);
         Location viewerLocation = viewer.getLocation();
         double rangeSquared = square(layer.viewDistance());
         Vector spread = layer.particle().spread();

@@ -30,6 +30,33 @@ public class ConditionCompilerTest {
   }
 
   @Test
+  public void literalBooleansPreserveScopeAndErrorCallbackContracts() {
+    TestScope scope = new TestScope(Map.of());
+    List<ConditionEvaluationError> reported = new ArrayList<>();
+    BoundedConditionErrorCallback errors = BoundedConditionErrorCallback.bounded(1, reported::add);
+    for (String expression : List.of("true", "(true)", "false", "(false)")) {
+      CompiledCondition condition = ConditionCompiler.compile(expression);
+      Assert.assertFalse(condition.requiresScope());
+      Assert.assertEquals(expression.contains("true"), condition.matches(scope, errors));
+      Assert.assertThrows(NullPointerException.class, () -> condition.matches(null, errors));
+      Assert.assertThrows(NullPointerException.class, () -> condition.matches(scope, null));
+    }
+    Assert.assertTrue(reported.isEmpty());
+  }
+
+  @Test
+  public void nonliteralBooleansObserveEachCurrentScope() {
+    CompiledCondition condition = ConditionCompiler.compile("true && viewer.op");
+    Assert.assertTrue(condition.requiresScope());
+    Assert.assertTrue(ConditionCompiler.compile("contains('literal', 'lit')").requiresScope());
+    TestScope allowed = new TestScope(Map.of("viewer.op", true));
+    TestScope denied = new TestScope(Map.of("viewer.op", false));
+    Assert.assertTrue(condition.matches(allowed));
+    Assert.assertFalse(condition.matches(denied));
+    Assert.assertTrue(condition.matches(allowed));
+  }
+
+  @Test
   public void collectsSortedReferencesAndLiteralMetricKeys() {
     CompiledCondition condition = ConditionCompiler.compile(
         "metric('react.tick-ms', 0) > server.limit && hasPermission('viewer', 'gloss.staff')"

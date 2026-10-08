@@ -59,6 +59,10 @@ public final class DocumentRegistry<T> implements AutoCloseable {
     private final File target;
     private final Layout layout;
     private final DocumentParser<T> parser;
+    private final DocumentPresetSource presetSource;
+    private final Map<String, String> compiledFingerprints;
+    private volatile DocumentPresetSource.Snapshot presetSnapshot;
+    private boolean closed;
     private final ToLongFunction<T> revisionOf;
     private final Predicate<File> ownWrite;
     private final LongSupplier clock;
@@ -75,6 +79,7 @@ public final class DocumentRegistry<T> implements AutoCloseable {
     private final Set<String> ownerWrites;
     private final long reconciliationInitialOffsetNanos;
     private volatile Map<String, GlossDocument<T>> snapshot;
+    private volatile Map<String, String> publishedFingerprints = Map.of();
     private volatile FolderWatcher folderWatcher;
     private volatile FileWatcher fileWatcher;
     private List<File> reconciliationFiles;
@@ -100,6 +105,9 @@ public final class DocumentRegistry<T> implements AutoCloseable {
         this.target = Objects.requireNonNull(target, "target");
         this.layout = Objects.requireNonNull(layout, "layout");
         this.parser = Objects.requireNonNull(parser, "parser");
+        this.presetSource = DocumentPresetCatalog.supports(kind)
+            ? DocumentPresetSource.acquire(target.getAbsoluteFile().getParentFile().toPath()) : null;
+        this.compiledFingerprints = new ConcurrentHashMap<>();
         this.revisionOf = Objects.requireNonNull(revisionOf, "revisionOf");
         this.ownWrite = Objects.requireNonNull(ownWrite, "ownWrite");
         this.clock = Objects.requireNonNull(clock, "clock");
@@ -178,6 +186,10 @@ public final class DocumentRegistry<T> implements AutoCloseable {
         return id == null ? null : snapshot.get(id);
     }
 
+    public String preparedFingerprint(String id) {
+        return id == null ? null : publishedFingerprints.get(id);
+    }
+
     public synchronized GlossDocument<T> get(DocumentDelta delta, String id) {
         if (id == null) {
             return null;
@@ -197,13 +209,17 @@ public final class DocumentRegistry<T> implements AutoCloseable {
         Objects.requireNonNull(id, "id");
         Objects.requireNonNull(raw, "raw");
         Objects.requireNonNull(value, "value");
+        refreshPresets(true);
         invalidatePending(id);
         recordOwnerWrite(id);
         clearFailure(id);
         ignoredSchemaFingerprints.remove(id);
         ignoredSchemaReasons.remove(id);
         reconciliationLoaded.remove(id);
-        GlossDocument<T> document = GlossDocument.of(id, raw, value, revisionOf.applyAsLong(value));
+        String resolved = presetSnapshot == null ? raw : presetSnapshot.resolve(kind, raw);
+        T prepared = resolved.equals(raw) ? value : parser.parse(id + EXTENSION, resolved);
+        GlossDocument<T> document = GlossDocument.of(id, raw, prepared, revisionOf.applyAsLong(prepared));
+        compiledFingerprints.put(id, DocumentHashes.sha256(resolved));
         documents.put(id, document);
         pendingDeletions.remove(id);
         commit(id, document);
@@ -216,6 +232,7 @@ public final class DocumentRegistry<T> implements AutoCloseable {
             return false;
         }
         invalidatePending(id);
+        compiledFingerprints.remove(id);
         recordOwnerWrite(id);
         clearFailure(id);
         ignoredSchemaFingerprints.remove(id);
@@ -236,6 +253,7 @@ public final class DocumentRegistry<T> implements AutoCloseable {
      * reports its contents as creations on the poll after that.
      */
     public synchronized void reload() {
+        refreshPresets(true);
         pollInvalidated = polling;
         clearPending();
         retryIds.clear();
@@ -271,7 +289,23 @@ public final class DocumentRegistry<T> implements AutoCloseable {
      * exactly the ids the owner just settled.
      */
     public DocumentDelta poll() {
+        refreshPresets(false);
         return layout == Layout.FILE ? pollSingle() : pollFolder();
+    }
+
+    private void refreshPresets(boolean force) {
+        if (presetSource == null) {
+            return;
+        }
+        DocumentPresetSource.Snapshot refreshed = presetSource.refresh(force);
+        synchronized (this) {
+            DocumentPresetSource.Snapshot previous = presetSnapshot;
+            presetSnapshot = refreshed;
+            if (previous != null && !previous.fingerprint().equals(refreshed.fingerprint())) {
+                failureRetryIds.addAll(documents.keySet());
+                failureRetryIds.addAll(ignoredSchemaReasons.keySet());
+            }
+        }
     }
 
     private DocumentDelta pollFolder() {
@@ -668,6 +702,11 @@ public final class DocumentRegistry<T> implements AutoCloseable {
 
     @Override
     public synchronized void close() {
+        if (!closed && presetSource != null) {
+            DocumentPresetSource.release(presetSource);
+        }
+        closed = true;
+        compiledFingerprints.clear();
         LIVE.remove(this);
         pollInvalidated = polling;
         replaceFolderWatcher(null);
@@ -831,6 +870,7 @@ public final class DocumentRegistry<T> implements AutoCloseable {
             committed.remove(id);
         }
         snapshot = Map.copyOf(committed);
+        publishFingerprints();
         recordHotload(delta.loaded().size() + delta.removed().size());
         clearPending();
     }
@@ -876,6 +916,17 @@ public final class DocumentRegistry<T> implements AutoCloseable {
             committed.put(id, document);
         }
         snapshot = Map.copyOf(committed);
+        publishFingerprints();
+    }
+
+    private void publishFingerprints() {
+        compiledFingerprints.keySet().retainAll(documents.keySet());
+        Map<String, String> fingerprints = new HashMap<>();
+        for (Map.Entry<String, GlossDocument<T>> entry : snapshot.entrySet()) {
+            fingerprints.put(entry.getKey(), compiledFingerprints.getOrDefault(entry.getKey(),
+                entry.getValue().contentHash()));
+        }
+        publishedFingerprints = Map.copyOf(fingerprints);
     }
 
     /**
@@ -890,7 +941,12 @@ public final class DocumentRegistry<T> implements AutoCloseable {
 
     /** A watcher-reported candidate: an own write is adopted as-is and never read back. */
     private PreparedLoad<T> readCandidate(String id, File file) {
-        return ownWrite.test(file) ? PreparedLoad.ownWrite(id, file) : read(id, file);
+        return ownWrite.test(file) && !needsPresetRefresh(id)
+            ? PreparedLoad.ownWrite(id, file) : read(id, file);
+    }
+
+    private synchronized boolean needsPresetRefresh(String id) {
+        return failureRetryIds.contains(id);
     }
 
     /**
@@ -908,20 +964,24 @@ public final class DocumentRegistry<T> implements AutoCloseable {
                 throw new IllegalArgumentException("document exceeds " + MAX_DOCUMENT_BYTES + " bytes");
             }
             raw = Files.readString(file.toPath(), StandardCharsets.UTF_8);
+            DocumentPresetSource.Snapshot catalog = presetSnapshot;
+            String resolved = catalog == null ? raw : catalog.resolve(kind, raw);
+            String fingerprint = DocumentHashes.sha256(resolved);
             GlossDocument<T> current = documents.get(id);
-            if (current != null && current.raw().equals(raw)) {
-                return PreparedLoad.unchanged(id, file, raw);
+            if (current != null && current.raw().equals(raw)
+                && fingerprint.equals(compiledFingerprints.get(id))) {
+                return PreparedLoad.unchanged(id, file, raw, fingerprint);
             }
             String ignoredSchemaFingerprint = ignoredSchemaFingerprints.get(id);
             if (ignoredSchemaFingerprint != null
                 && ignoredSchemaFingerprint.equals(DocumentHashes.sha256(raw))) {
-                return PreparedLoad.unchanged(id, file, raw);
+                return PreparedLoad.unchanged(id, file, raw, fingerprint);
             }
-            T value = parser.parse(id + EXTENSION, raw);
+            T value = parser.parse(id + EXTENSION, resolved);
             if (value == null) {
                 throw new IllegalArgumentException("document must not be null");
             }
-            return PreparedLoad.parsed(id, file, raw, value);
+            return PreparedLoad.parsed(id, file, raw, fingerprint, value);
         } catch (ThreadDeath fatal) {
             throw fatal;
         } catch (Throwable failure) {
@@ -936,7 +996,8 @@ public final class DocumentRegistry<T> implements AutoCloseable {
         Throwable failure = prepared.failure();
         if (failure == null) {
             GlossDocument<T> current = documents.get(id);
-            if (current != null && current.raw().equals(raw)) {
+            if (current != null && current.raw().equals(raw)
+                && Objects.equals(prepared.fingerprint(), compiledFingerprints.get(id))) {
                 clearFailure(id);
                 ignoredSchemaFingerprints.remove(id);
                 ignoredSchemaReasons.remove(id);
@@ -947,6 +1008,7 @@ public final class DocumentRegistry<T> implements AutoCloseable {
                 return false;
             }
             documents.put(id, GlossDocument.of(id, raw, value, revisionOf.applyAsLong(value)));
+            compiledFingerprints.put(id, prepared.fingerprint());
             clearFailure(id);
             ignoredSchemaFingerprints.remove(id);
             ignoredSchemaReasons.remove(id);
@@ -1059,6 +1121,7 @@ public final class DocumentRegistry<T> implements AutoCloseable {
 
     private void publish() {
         snapshot = Map.copyOf(documents);
+        publishFingerprints();
     }
 
     private String idOf(File file) {
@@ -1160,25 +1223,25 @@ public final class DocumentRegistry<T> implements AutoCloseable {
 
     /** One candidate document read and parsed off the monitor, ready to be applied under it. */
     private record PreparedLoad<V>(String id, File file, boolean missing, boolean ownWrite,
-                                   String raw, V value, Throwable failure) {
+                                   String raw, String fingerprint, V value, Throwable failure) {
         private static <V> PreparedLoad<V> missing(String id, File file) {
-            return new PreparedLoad<>(id, file, true, false, null, null, null);
+            return new PreparedLoad<>(id, file, true, false, null, null, null, null);
         }
 
         private static <V> PreparedLoad<V> ownWrite(String id, File file) {
-            return new PreparedLoad<>(id, file, false, true, null, null, null);
+            return new PreparedLoad<>(id, file, false, true, null, null, null, null);
         }
 
-        private static <V> PreparedLoad<V> unchanged(String id, File file, String raw) {
-            return new PreparedLoad<>(id, file, false, false, raw, null, null);
+        private static <V> PreparedLoad<V> unchanged(String id, File file, String raw, String fingerprint) {
+            return new PreparedLoad<>(id, file, false, false, raw, fingerprint, null, null);
         }
 
-        private static <V> PreparedLoad<V> parsed(String id, File file, String raw, V value) {
-            return new PreparedLoad<>(id, file, false, false, raw, value, null);
+        private static <V> PreparedLoad<V> parsed(String id, File file, String raw, String fingerprint, V value) {
+            return new PreparedLoad<>(id, file, false, false, raw, fingerprint, value, null);
         }
 
         private static <V> PreparedLoad<V> failed(String id, File file, String raw, Throwable failure) {
-            return new PreparedLoad<>(id, file, false, false, raw, null, failure);
+            return new PreparedLoad<>(id, file, false, false, raw, null, null, failure);
         }
     }
 

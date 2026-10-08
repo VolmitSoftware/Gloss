@@ -43,8 +43,8 @@ public final class EntityOverlayText {
             settings, entity, insight);
     }
 
-    static ExprScope variantScope(Gloss plugin, Player viewer, Snapshot entity, boolean insight) {
-        return new EntityScope(GlossConditionScope.viewer(plugin, viewer), entity, insight);
+    static ExprScope variantScope(ExprScope parent, Snapshot entity, boolean insight) {
+        return new EntityScope(parent, entity, insight);
     }
 
     static Prepared prepare(TextPipeline pipeline, HologramAnimator animator, Player viewer, ExprScope parent,

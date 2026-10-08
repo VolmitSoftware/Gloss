@@ -1,6 +1,7 @@
 package art.arcane.gloss.editor.sync;
 
 import art.arcane.gloss.Gloss;
+import art.arcane.gloss.doc.DocumentPresetCatalog;
 import art.arcane.gloss.panel.PanelDefinition;
 import art.arcane.gloss.config.GlossConfigFile;
 import art.arcane.gloss.editor.EditorUrl;
@@ -887,6 +888,7 @@ public final class EditorSyncService {
 
   private Map<Path, GlossProjectTransaction.Mutation> mutations(
       EditorSyncPublicationValidator.ValidatedProject publication) {
+    DocumentPresetCatalog presets = EditorSyncPublicationValidator.presets(publication.project().json());
     Path data = plugin.getDataFolder().toPath().toAbsolutePath().normalize();
     Map<Path, GlossProjectTransaction.Mutation> mutations = new LinkedHashMap<>();
     Set<EditorSyncPublicationValidator.DocumentKey> documentKeys = new java.util.HashSet<>(
@@ -902,7 +904,7 @@ public final class EditorSyncService {
       mutations.put(path, applied == null
           ? GlossProjectTransaction.Mutation.delete()
           : GlossProjectTransaction.Mutation.write(
-              key.kind().persistedBytes(key.id(), applied.entry().json())));
+              key.kind().persistedBytes(key.id(), applied.entry().json(), presets)));
     }
     Set<String> imagePaths = new java.util.HashSet<>(publication.baseImages().keySet());
     imagePaths.addAll(publication.appliedImages().keySet());

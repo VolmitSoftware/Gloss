@@ -13,6 +13,15 @@
 #
 # === Variáveis ===
 # Mantenha os nomes das variáveis e use apenas as que pertencem a cada mensagem.
+#   {viewers}  Observadores
+#   {entries}  Entradas na cache
+#   {admissions}  Admissões
+#   {refusals}  Recusas
+#   {waiting}  Em espera
+#   {expired}  Turnos expirados
+#   {retiring}  Limpeza pendente
+#   {bytes}  Dados retidos (bytes)
+#   {completed}  Concluídas
 #   {absorbed}  Entradas importadas fundidas com os dados existentes
 #   {active}  Número de fornecedores ativos
 #   {actual}  Revisão atual
@@ -225,8 +234,8 @@ indicators = "Ferramentas de indicadores de dano e cura"
 status = "Mostrar contagens de execução resumidas"
 import = "Migrar hologramas legados sem modificar os ficheiros de origem"
 "import.apply" = "Aplicar uma migração de hologramas legados sem substituição"
-"import.holoui" = "Copiar os dados do HoloUi de plugins/holoui, substituindo importações anteriores"
-"import.legacy" = "Migrar os ficheiros de dados do Gloss anteriores à fusão para os envelopes v2"
+"import.holoui" = "Pré-visualizar ou aplicar uma importação transacional do HoloUi"
+"import.legacy" = "Pré-visualizar ou aplicar uma atualização transacional dos dados do Gloss"
 "import.preview" = "Pré-visualizar uma migração não destrutiva de hologramas legados"
 item = "Ferramentas de fornecedores de itens personalizados"
 "item.export" = "Exportar o catálogo de itens personalizados para o editor web"
@@ -294,6 +303,9 @@ web = "Abrir e gerir o editor web do Gloss"
 "web.sessions.revoke" = "Revogar uma ligação de acesso ao editor web"
 "web.sessions.status" = "Mostrar uma sessão do editor web"
 language = "Escolhe o teu idioma ou o idioma predefinido do servidor"
+
+"import.mode" = "preview ou apply"
+"import.overwrite" = "Pré-visualizar a substituição dos ficheiros existentes"
 
 [command.help.arg]
 reset_name = "Nome a repor, ou * para todas as predefinições incluídas"
@@ -421,6 +433,9 @@ emoji = "&7Emojis: &f{enabled}&8/&f{total}"
 animations = "&7Animações: &f{count}"
 effects = "&7Balões: &f{bubbles} &8| &7Indicadores: &f{indicators} &8| &7Drops: &f{drops}"
 
+visibility = "&7Cópias de entidades visíveis: &f{entities} &8| &7Observadores: &f{viewers} &8| &7Admissões: &f{admissions} &8| &7Recusas: &f{refusals} &8| &7Em espera: &f{waiting} &8| &7Turnos expirados: &f{expired} &8| &7Limpeza pendente: &f{retiring}"
+images = "&7Cache de imagens: &f{entries} &8| &7Pendentes: &f{pending} &8| &7Dados retidos: &f{bytes} &7bytes &8| &7Concluídas: &f{completed} &8| &7Recusas: &f{refusals}"
+
 [command.reset]
 done = "&8[&dGloss&8] &aForam repostas &f{count}&a predefinições de {kind} incluídas."
 none = "&8[&dGloss&8] &cNenhuma predefinição de {kind} incluída corresponde a '&f{name}&c'."
@@ -433,12 +448,19 @@ style_unknown = "&8[&dGloss&8] &cNão existe nenhum estilo de balão chamado '&f
 [command.import]
 config_unreadable = "&8[&dGloss&8] &cNão foi possível carregar o gloss.toml: &f{reason}"
 
+mode_invalid = "&8[&dGloss&8] &cUsa preview ou apply como modo de importação."
+preview_capacity = "&8[&dGloss&8] &cA cache de importações revistas está cheia. Aplica uma pré-visualização existente ou espera que expire e cria outra."
+
 [command.import.holoui]
 missing = "&8[&dGloss&8] &cNão foi encontrada nenhuma pasta de dados holoui ao lado da pasta de dados do Gloss."
 done = "&8[&dGloss&8] &aImportação do HoloUi concluída: &f{copied}&a copiados, &f{skipped}&a ignorados, &f{overlaid}&a chaves de configuração, &f{errors}&a erros."
 
+preview_required = "&8[&dGloss&8] &cExecuta primeiro /gloss import holoui mode=preview. As pré-visualizações usam o prazo de validade configurado. Adiciona overwrite=true para pré-visualizar a substituição dos ficheiros existentes."
+
 [command.import.legacy]
 done = "&8[&dGloss&8] &aMigração legada concluída: &f{migrated}&a migrados, &f{absorbed}&a absorvidos, &f{overlaid}&a chaves de configuração, &f{errors}&a erros."
+
+preview_required = "&8[&dGloss&8] &cExecuta primeiro /gloss import legacy mode=preview. As pré-visualizações usam o prazo de validade configurado."
 
 [director.help]
 no_subcommands = "Não existem subcomandos nesta página."
@@ -829,6 +851,7 @@ empty = "(vazio)"
 # Lane message tables. Each lane appends its [gloss.message.<lane>] and [command.help.<group>]
 # tables inside its own anchor so parallel branches never share a line.
 # --- lane:screen ---
+
 [gloss.message.screen]
 "surfaces.empty" = "&8[&dGloss&8] &7Nenhuma superfície carregada."
 "surfaces.unknown" = "&8[&dGloss&8]: &cNão existe a superfície &f{id}&c."
@@ -865,6 +888,7 @@ who = "Mostra que plugin ocupa cada espaço do HUD"
 "who.player" = "Jogador a inspecionar; por omissão tu"
 
 # --- lane:chat ---
+
 [gloss.message.chat]
 filtered = "&8[&dGloss&8]: &cUm filtro de chat bloqueou a tua mensagem."
 too_fast = "&8[&dGloss&8]: &eEspera um momento antes de enviares outra mensagem."
@@ -915,6 +939,7 @@ sample = "Amostrar uma classificação agora para todos os jogadores online"
 "sample.id" = "Id do documento"
 
 # --- lane:forms ---
+
 [gloss.message.forms]
 icon_unsupported = "&7Não é desenhável num slot de baú ({kind})"
 no_inventories = "&8[&dGloss&8]: &7Não há menus de baú configurados."
@@ -964,6 +989,7 @@ hologram_actions_header = "&8[&dGloss&8] &7Acoes do holograma &f{id}&7 (&f{count
 hologram_actions_entry = "&8[&dGloss&8] &7  &f{kind}&7 em &f{value}"
 
 # --- lane:world ---
+
 [gloss.message.world]
 players_only = "&cEsse comando tem de ser executado por um jogador."
 disabled = "&cEssa funcionalidade está desativada em gloss.toml."
@@ -1055,6 +1081,7 @@ color = "Cor de texto com nome"
 ticks = "Ticks que o brilho dura, ou 0 para o manter"
 
 # --- lane:behaviors ---
+
 [command.help.behavior]
 root = "Inspecionar e disparar documentos de comportamento"
 list = "Listar os documentos de comportamento carregados"
@@ -1119,6 +1146,7 @@ fired = "&8[&dGloss&8]: &aEntrada &f{line}&a de &f{id}&a executada."
 "explain.missing" = "&8[&dGloss&8]: &cNao existe o {kind} \"{id}\"."
 
 # --- lane:authoring ---
+
 [command.help.pack]
 root = "Instalar e gerir pacotes Gloss"
 install = "Instalar um pacote a partir de um ficheiro ou de um URL HTTPS"
@@ -1188,8 +1216,10 @@ preview = "&8[&dGloss&8] &f{source}&7 escreveria &f{count}&7 documento(s)."
 entry = "&8[&dGloss&8] &7{state} &f{path}&7 {reason}"
 applied = "&8[&dGloss&8] &f{count}&7 documento(s) importado(s) de &f{source}&7."
 absent = "&8[&dGloss&8] &7Não há dados &f{source}&7 em &f{path}&7."
+preview_required = "&8[&dGloss&8] &cExecuta primeiro /gloss import preview {source}. As pré-visualizações usam o prazo de validade configurado."
 
 # --- lane:forge ---
+
 [gloss.message.forge]
 disabled = "&8[&dGloss&8] &cA forja de glifos está desligada. Define features.forge como true em gloss.toml."
 built = "&8[&dGloss&8] &aPacote &f{value}&a criado com {count} glifos."
@@ -1211,6 +1241,7 @@ serve = "Iniciar ou parar o servidor de pacote integrado"
 reset = "Restaurar os documentos de glifos incluídos"
 
 # --- lane:fixes ---
+
 [gloss.message.fixes]
 status_bedrock = "&7bedrock: &f{name}&7, &f{count}&7 online"
 status_textimage_oversize = "&7textimage-demasiado-grande: &f{count}"

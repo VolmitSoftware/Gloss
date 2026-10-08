@@ -1,6 +1,7 @@
 package art.arcane.gloss.panel;
 
 import art.arcane.gloss.Gloss;
+import art.arcane.gloss.service.VisibilityGovernor;
 import art.arcane.gloss.api.HoloClickTrigger;
 import art.arcane.gloss.api.internal.ApiEvents;
 import art.arcane.gloss.config.MenuDefinitionData;
@@ -155,7 +156,7 @@ public final class PanelViewSession implements MenuNavigator {
   }
 
   public void dispatchClick(ClickableComponent<?> component, HoloClickTrigger trigger) {
-    if (closed || session == null || component == null || !component.isInteractable()) {
+    if (closed || session == null || component == null || !session.isRendered() || !component.isInteractable()) {
       return;
     }
     if (ApiEvents.fireClick(viewer, currentMenuId, component.getId(), null, trigger)) {
@@ -217,6 +218,7 @@ public final class PanelViewSession implements MenuNavigator {
         viewer,
         MenuSessionOptions.positioned(transform, this, (float) effectiveTransform.scale())
     );
+    replacement.setVisibilitySurface(VisibilityGovernor.Surface.PANEL);
     replacement.setParentShow(definition.show());
     try {
       replacement.open();

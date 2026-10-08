@@ -36,6 +36,7 @@ public final class InventoryRuntime {
     private final Presentation base;
     private final List<Variant> variants;
     private final ListSection list;
+    private final InventoryRefreshPlan refresh;
 
     private InventoryRuntime(String id, InventoryDoc doc, CompiledCondition selection, Presentation base,
                              List<Variant> variants, ListSection list) {
@@ -45,6 +46,12 @@ public final class InventoryRuntime {
         this.base = base;
         this.variants = variants;
         this.list = list;
+        List<Presentation> presentations = new ArrayList<>(variants.size());
+        for (Variant variant : variants) {
+            presentations.add(variant.presentation());
+        }
+        this.refresh = InventoryRefreshPlan.compile(doc, base, presentations,
+            list != null && (list.viewerDependent() || InventoryRefreshPlan.dynamic(list.template())));
     }
 
     public static InventoryRuntime compile(String id, InventoryDoc doc) {
@@ -89,6 +96,10 @@ public final class InventoryRuntime {
         return doc.show().matches(Gloss.instance, viewer);
     }
 
+    public InventoryRefreshPlan refresh() {
+        return refresh;
+    }
+
     public ListSection list() {
         return list;
     }
@@ -128,9 +139,13 @@ public final class InventoryRuntime {
     }
 
     private static Slot slot(String id, String owner, int index, ComponentData component) {
+        Toggle toggle = component instanceof ToggleComponentData data
+            ? new Toggle(data.condition(), data.expectedValue(), data.falseIcon(),
+                MenuAction.resolve(data.falseActions(), "inventory:" + id, owner + "/slot:" + index + "/false"))
+            : null;
         return new Slot(index, icon(component), MenuAction.resolve(actions(component),
             "inventory:" + id, owner + "/slot:" + index), component instanceof ButtonComponentData
-            || component instanceof ToggleComponentData);
+            || component instanceof ToggleComponentData, toggle);
     }
 
     private static ListSection listSection(String id, InventoryDoc doc) {
@@ -161,7 +176,15 @@ public final class InventoryRuntime {
     }
 
     /** One drawable, possibly clickable, cell. */
-    public record Slot(int index, MenuIconData icon, List<MenuAction<?>> actions, boolean clickable) {
+    public record Slot(int index, MenuIconData icon, List<MenuAction<?>> actions, boolean clickable, Toggle toggle) {
+    }
+
+    public record Toggle(String condition, String expectedValue, MenuIconData falseIcon,
+                         List<MenuAction<?>> falseActions) {
+        public Toggle {
+            condition = condition == null ? "" : condition;
+            expectedValue = expectedValue == null ? "" : expectedValue;
+        }
     }
 
     /** A window as one viewer sees it, before the list fills its area. */

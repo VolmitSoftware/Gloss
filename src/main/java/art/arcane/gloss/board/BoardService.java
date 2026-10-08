@@ -23,6 +23,7 @@ import art.arcane.volmlib.util.scheduling.FoliaScheduler;
 import art.arcane.volmlib.util.board.BoardManager;
 import art.arcane.volmlib.util.board.BoardProvider;
 import art.arcane.volmlib.util.board.BoardSettings;
+import art.arcane.volmlib.util.board.BoardTextFormat;
 import art.arcane.volmlib.util.board.ScoreDirection;
 import com.github.retrooper.packetevents.PacketEvents;
 import com.github.retrooper.packetevents.event.PacketListenerCommon;
@@ -57,6 +58,17 @@ public final class BoardService implements Listener, Explainable, RegistryOwner 
     private static final int ANIMATION_REFRESH_INTERVAL_TICKS = 1;
     private static final int SELECTION_STRIPE_PERIOD_TICKS = 1;
     private static final long TICK_NANOS = 50_000_000L;
+    private static final ExprScope LITERAL_SCOPE = new ExprScope() {
+        @Override
+        public Object variable(String name) {
+            throw new IllegalStateException("Literal board conditions cannot resolve variables");
+        }
+
+        @Override
+        public Object call(String name, List<Object> arguments) {
+            throw new IllegalStateException("Literal board conditions cannot invoke functions");
+        }
+    };
 
     private static final DocumentReviser<BoardDoc> REVISER = new DocumentReviser<>() {
         @Override
@@ -77,11 +89,13 @@ public final class BoardService implements Listener, Explainable, RegistryOwner 
     private final BoardStorageQueue storage;
     private final Map<String, GlossBoardMeta> metas;
     private final Map<UUID, String> selections;
-    private final Map<UUID, GlossBoardMeta.ActiveProfile> profiles;
+    private final Map<UUID, SelectedProfile> profiles;
     private final Set<UUID> sticky;
     private final UnaryOperator<String> staticRender;
     private final BoundedConditionErrorCallback conditionErrors;
     private final BoardRenderCache renderCache;
+    private final BoardNativeObjectives nativeObjectives;
+    private PacketListenerCommon nativeObjectiveListener;
     private final List<UUID> selectionOrder;
     private int selectionStripeIndex;
     private int selectionCursor;
@@ -90,7 +104,7 @@ public final class BoardService implements Listener, Explainable, RegistryOwner 
     private volatile int ordinaryManagerIntervalTicks;
     private volatile int selectionTaskId;
     private volatile List<GlossBoardMeta> boardSnapshot;
-    private final Map<UUID, BoardFormatIndex> formatIndex;
+    private final ScoreFormatDecorator scoreFormats;
     private volatile PacketListenerCommon scoreFormatListener;
     private volatile boolean loggedSidebarObjective;
 
@@ -113,7 +127,8 @@ public final class BoardService implements Listener, Explainable, RegistryOwner 
             Gloss.logExceptionStackThrottled(false, "board-condition-" + error.path(), error.cause(),
                 "Board condition %s failed and was treated as false.", error.path()));
         this.renderCache = new BoardRenderCache();
-        this.formatIndex = new ConcurrentHashMap<>();
+        this.scoreFormats = new ScoreFormatDecorator();
+        this.nativeObjectives = new BoardNativeObjectives(plugin, conditionErrors);
         this.selectionOrder = new ArrayList<>();
         this.selectionStripeIndex = 0;
         this.selectionCursor = 0;
@@ -125,6 +140,15 @@ public final class BoardService implements Listener, Explainable, RegistryOwner 
     public ExplainReport explain(String id, Player viewer) {
         GlossBoardMeta meta = board(id);
         return meta == null ? null : ExplainReports.board(meta, GlossConditionScope.viewer(plugin, viewer));
+    }
+
+    public Map<String, Object> cadenceSnapshot() {
+        return Map.of(
+            "configuredIntervalTicks", plugin.cfg().boards().updateIntervalTicks(),
+            "ordinaryDriverRunning", ordinaryManager != null,
+            "ordinaryDriverIntervalTicks", ordinaryManager == null ? 0 : ordinaryManagerIntervalTicks,
+            "fastDriverRunning", animationManager != null,
+            "fastDriverIntervalTicks", animationManager == null ? 0 : ANIMATION_REFRESH_INTERVAL_TICKS);
     }
 
     public static String selectBoardId(List<GlossBoardMeta> boards, ExprScope scope) {
@@ -162,21 +186,15 @@ public final class BoardService implements Listener, Explainable, RegistryOwner 
             createManagers();
         }
         plugin.watchdog().register("boards", this::pollRegistry);
-        if (plugin.cfg().boards().enabled()) {
-            scoreFormatListener = PacketEvents.getAPI().getEventManager()
-                .registerListener(new ScoreFormatDecorator(formatIndex::get));
-        }
+        syncPacketListeners(plugin.cfg().boards().enabled());
         plugin.scheduler().s(this::selectAllAutomatically, 1);
     }
 
     public void disable() {
         HandlerList.unregisterAll(this);
         plugin.watchdog().unregister("boards");
-        if (scoreFormatListener != null) {
-            PacketEvents.getAPI().getEventManager().unregisterListener(scoreFormatListener);
-            scoreFormatListener = null;
-        }
-        formatIndex.clear();
+        syncPacketListeners(false);
+        scoreFormats.clear();
         loggedSidebarObjective = false;
         registry.close();
         stopManagers();
@@ -192,6 +210,7 @@ public final class BoardService implements Listener, Explainable, RegistryOwner 
 
     public void reload() {
         boolean enabled = plugin.cfg().boards().enabled();
+        syncPacketListeners(enabled);
         if (enabled) {
             defaults.extractMissing();
         }
@@ -347,9 +366,24 @@ public final class BoardService implements Listener, Explainable, RegistryOwner 
         selections.remove(uuid);
         profiles.remove(uuid);
         sticky.remove(uuid);
-        formatIndex.remove(uuid);
+        scoreFormats.forget(uuid);
+        nativeObjectives.forget(uuid);
         renderCache.forget(uuid);
         removeFromManagers(event.getPlayer());
+    }
+
+    private void syncPacketListeners(boolean enabled) {
+        if (enabled && scoreFormatListener == null) {
+            scoreFormatListener = PacketEvents.getAPI().getEventManager().registerListener(scoreFormats);
+            nativeObjectives.enable();
+            nativeObjectiveListener = PacketEvents.getAPI().getEventManager().registerListener(nativeObjectives);
+        } else if (!enabled && scoreFormatListener != null) {
+            nativeObjectives.disable();
+            PacketEvents.getAPI().getEventManager().unregisterListener(scoreFormatListener);
+            PacketEvents.getAPI().getEventManager().unregisterListener(nativeObjectiveListener);
+            scoreFormatListener = null;
+            nativeObjectiveListener = null;
+        }
     }
 
     private void createManagers() {
@@ -367,8 +401,7 @@ public final class BoardService implements Listener, Explainable, RegistryOwner 
     }
 
     private BoardManager<Board> createManager(int intervalTicks, String cadenceName) {
-        boolean fastCadence = intervalTicks <= ANIMATION_REFRESH_INTERVAL_TICKS;
-        BoardSettings settings = new BoardSettings(new SelectionBoardProvider(fastCadence),
+        BoardSettings settings = new BoardSettings(new SelectionBoardProvider(),
             ScoreDirection.DOWN, intervalTicks);
         try {
             return new BoardManager<>(plugin, settings, Board::new);
@@ -413,7 +446,7 @@ public final class BoardService implements Listener, Explainable, RegistryOwner 
             profiles.remove(uuid);
         } else {
             selections.put(uuid, chosen);
-            profiles.put(uuid, meta.activeProfile(scope, conditionErrors));
+            profiles.put(uuid, new SelectedProfile(meta, meta.activeProfile(scope, conditionErrors)));
         }
         applyManager(player, meta, meta != null);
     }
@@ -524,14 +557,13 @@ public final class BoardService implements Listener, Explainable, RegistryOwner 
             if (other != null) {
                 other.remove(player);
             }
-            if (target != activeAnimationManager) {
-                renderCache.forget(player.getUniqueId());
-            }
             if (!target.hasBoard(player)) {
+                renderCache.forget(player.getUniqueId());
                 target.setup(player);
             }
             return;
         }
+        nativeObjectives.release(player);
         activeOrdinaryManager.remove(player);
         if (activeAnimationManager != null) {
             activeAnimationManager.remove(player);
@@ -544,9 +576,10 @@ public final class BoardService implements Listener, Explainable, RegistryOwner 
         if (plugin.proxyOwnership() == null || !plugin.proxyOwnership().ownsScoreboard(uuid)) {
             return false;
         }
+        nativeObjectives.release(player);
         removeFromManagers(player);
         profiles.remove(uuid);
-        formatIndex.remove(uuid);
+        scoreFormats.forget(uuid);
         renderCache.forget(uuid);
         return true;
     }
@@ -563,7 +596,7 @@ public final class BoardService implements Listener, Explainable, RegistryOwner 
     }
 
     private boolean usesFastRefresh(GlossBoardMeta meta) {
-        return plugin.cfg().text().functions() && meta != null && meta.usesFastRefreshText();
+        return meta != null && meta.usesFastRefresh(plugin.cfg().text().functions());
     }
 
     static int refreshIntervalTicks(GlossBoardMeta meta, int configuredIntervalTicks) {
@@ -586,16 +619,19 @@ public final class BoardService implements Listener, Explainable, RegistryOwner 
             profiles.remove(player.getUniqueId());
             return;
         }
-        profiles.put(player.getUniqueId(), meta.activeProfile(scope, conditionErrors));
+        profiles.put(player.getUniqueId(), new SelectedProfile(meta, meta.activeProfile(scope, conditionErrors)));
     }
 
     private GlossBoardMeta.ActiveProfile selectedProfile(Player player, GlossBoardMeta meta) {
-        GlossBoardMeta.ActiveProfile profile = profiles.get(player.getUniqueId());
-        if (profile != null) {
-            return profile;
+        SelectedProfile profile = profiles.get(player.getUniqueId());
+        if (profile != null && profile.meta() == meta) {
+            return profile.profile();
         }
         refreshProfile(player, meta);
-        return profiles.get(player.getUniqueId());
+        return profiles.get(player.getUniqueId()).profile();
+    }
+
+    private record SelectedProfile(GlossBoardMeta meta, GlossBoardMeta.ActiveProfile profile) {
     }
 
     private void loadAllBoards() {
@@ -606,6 +642,7 @@ public final class BoardService implements Listener, Explainable, RegistryOwner 
             metas.put(document.id(), GlossBoardMeta.fromDoc(document.id(), document.value()));
         }
         metas.keySet().retainAll(present);
+        nativeObjectives.retain(metas.values());
         boardSnapshot = null;
     }
 
@@ -636,6 +673,7 @@ public final class BoardService implements Listener, Explainable, RegistryOwner 
             dirty = metas.remove(id) != null || dirty;
         }
         if (dirty) {
+            nativeObjectives.retain(metas.values());
             boardSnapshot = null;
             reselectAll();
         }
@@ -656,10 +694,9 @@ public final class BoardService implements Listener, Explainable, RegistryOwner 
     }
 
     private final class SelectionBoardProvider implements BoardProvider {
-        private final boolean fastCadence;
-
-        private SelectionBoardProvider(boolean fastCadence) {
-            this.fastCadence = fastCadence;
+        @Override
+        public BoardTextFormat getTextFormat() {
+            return BoardTextFormat.MINI_MESSAGE;
         }
 
         @Override
@@ -668,17 +705,11 @@ public final class BoardService implements Listener, Explainable, RegistryOwner 
             if (meta == null) {
                 return "";
             }
-            GlossBoardMeta.ActiveProfile profile = selectedProfile(player, meta);
-            GlossBoardMeta.RenderPlan plan = plan(meta, profile);
-            if (fastCadence) {
-                return renderCache.entry(player.getUniqueId()).title(plan, System.nanoTime(),
-                    slowIntervalNanos(), player.getUniqueId().hashCode(), raw -> render(player, raw));
-            }
-            String cached = plan.staticTitle();
-            if (cached != null) {
-                return cached;
-            }
-            return render(player, plan.rawTitle());
+            BoardRenderCache.Entry cache = renderCache.entry(player.getUniqueId());
+            BoardRenderCache.Frame frame = cache.frame();
+            GlossBoardMeta.RenderPlan plan = frame == null ? plan(player, meta, selectedProfile(player, meta)) : frame.plan();
+            return cache.title(plan, System.nanoTime(), slowIntervalNanos(),
+                player.getUniqueId().hashCode(), raw -> render(player, raw));
         }
 
         @Override
@@ -687,47 +718,44 @@ public final class BoardService implements Listener, Explainable, RegistryOwner 
             if (meta == null) {
                 return List.of();
             }
+            nativeObjectives.publish(player, meta.objectives());
             GlossBoardMeta.ActiveProfile profile = selectedProfile(player, meta);
-            GlossBoardMeta.RenderPlan plan = plan(meta, profile);
-            publishFormats(player, plan);
-            if (fastCadence) {
-                return Arrays.asList(renderCache.entry(player.getUniqueId()).lines(plan, System.nanoTime(),
-                    slowIntervalNanos(), player.getUniqueId().hashCode(), raw -> render(player, raw)));
-            }
-            int count = plan.lineCount();
-            List<String> rendered = new ArrayList<>(count);
-            for (int index = 0; index < count; index++) {
-                String cached = plan.staticLine(index);
-                if (cached != null) {
-                    rendered.add(cached);
-                    continue;
-                }
-                rendered.add(render(player, plan.rawLine(index)));
-            }
-            return rendered;
+            ExprScope scope = profile.renderRequiresScope() ? GlossConditionScope.viewer(plugin, player) : LITERAL_SCOPE;
+            BoardLayout.Page page = profile.presentation().layout().page(scope, conditionErrors, System.nanoTime() / TICK_NANOS);
+            GlossBoardMeta.RenderPlan plan = meta.renderPlan(profile.id(), profile.presentation(), TextPipeline.emojiGeneration(),
+                BoardLayout.MAX_AUTHORED_ROWS, staticRender, page);
+            BoardRenderCache.Entry cache = renderCache.entry(player.getUniqueId());
+            BoardRenderCache.Frame frame = cache.frame(plan, plan.visibleRows(scope, conditionErrors, MAX_LINES));
+            publishFormats(player, frame, profile.presentation().hideNumbers());
+            return Arrays.asList(cache.lines(plan, frame.rows(), System.nanoTime(), slowIntervalNanos(),
+                player.getUniqueId().hashCode(), raw -> render(player, raw)));
+        }
+
+        @Override
+        public int[] getLineSlots(Player player) {
+            BoardRenderCache.Frame frame = renderCache.entry(player.getUniqueId()).frame();
+            return frame == null ? null : frame.slots();
         }
 
         /**
          * The value column is published here, beside the line render that produced it: the packet
          * thread reads one immutable snapshot per viewer and never touches document state.
          */
-        private void publishFormats(Player player, GlossBoardMeta.RenderPlan plan) {
-            if (!plan.hasValueColumn()) {
-                formatIndex.remove(player.getUniqueId());
-                return;
-            }
+        private void publishFormats(Player player, BoardRenderCache.Frame frame, boolean hideNumbers) {
+            GlossBoardMeta.RenderPlan plan = frame.plan();
             String objectiveName = objectiveNameFor(player);
             if (objectiveName == null) {
-                formatIndex.remove(player.getUniqueId());
+                scoreFormats.forget(player.getUniqueId());
                 return;
             }
             Map<String, ScoreFormat> formats = new HashMap<>();
-            for (int index = 0; index < plan.lineCount(); index++) {
+            for (int position = 0; position < frame.rows().length; position++) {
+                int index = frame.rows()[position];
                 BoardLineFormat format = plan.format(index);
                 if (format == null) {
                     continue;
                 }
-                String entry = Board.entryForLine(index);
+                String entry = Board.entryForLine(frame.slots()[position]);
                 if (entry == null) {
                     continue;
                 }
@@ -736,12 +764,12 @@ public final class BoardService implements Listener, Explainable, RegistryOwner 
                     formats.put(entry, resolved);
                 }
             }
-            BoardFormatIndex published = BoardFormatIndex.of(objectiveName, formats);
+            BoardFormatIndex published = BoardFormatIndex.of(objectiveName, formats, hideNumbers);
             if (published == null) {
-                formatIndex.remove(player.getUniqueId());
+                scoreFormats.forget(player.getUniqueId());
                 return;
             }
-            formatIndex.put(player.getUniqueId(), published);
+            scoreFormats.publish(player, published);
         }
 
         private ScoreFormat scoreFormat(Player player, BoardLineFormat format, GlossBoardMeta.RenderPlan plan,
@@ -749,8 +777,8 @@ public final class BoardService implements Listener, Explainable, RegistryOwner 
             if (format == BoardLineFormat.BLANK || format == BoardLineFormat.NUMBER) {
                 return format.scoreFormat(null);
             }
-            String cached = plan.staticValue(index);
-            String value = cached != null ? cached : render(player, plan.rawValue(index));
+            String value = renderCache.entry(player.getUniqueId()).value(plan, index, System.nanoTime(),
+                slowIntervalNanos(), player.getUniqueId().hashCode(), raw -> render(player, raw));
             return format.scoreFormat(value);
         }
 
@@ -766,9 +794,12 @@ public final class BoardService implements Listener, Explainable, RegistryOwner 
             return rendered == null ? "" : rendered;
         }
 
-        private GlossBoardMeta.RenderPlan plan(GlossBoardMeta meta, GlossBoardMeta.ActiveProfile profile) {
+        private GlossBoardMeta.RenderPlan plan(Player player, GlossBoardMeta meta, GlossBoardMeta.ActiveProfile profile) {
+            ExprScope scope = profile.renderRequiresScope() ? GlossConditionScope.viewer(plugin, player) : LITERAL_SCOPE;
+            BoardLayout.Page page = profile.presentation().layout().page(scope,
+                conditionErrors, System.nanoTime() / TICK_NANOS);
             return meta.renderPlan(profile.id(), profile.presentation(), TextPipeline.emojiGeneration(),
-                MAX_LINES, staticRender);
+                BoardLayout.MAX_AUTHORED_ROWS, staticRender, page);
         }
     }
 

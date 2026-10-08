@@ -18,7 +18,7 @@ import java.util.concurrent.ConcurrentMap;
  * turns it into packets, so a caller never touches the protocol itself.
  */
 public final class Waypoints {
-    private record Owned(Plugin owner, WaypointSpec spec) {
+    private record Owned(Plugin owner, WaypointSpec spec, WaypointOptions options) {
     }
 
     private static final ConcurrentMap<UUID, Map<String, Owned>> TRACKED = new ConcurrentHashMap<>();
@@ -27,13 +27,18 @@ public final class Waypoints {
     }
 
     public static void track(Plugin owner, Player viewer, WaypointSpec spec) {
+        track(owner, viewer, spec, WaypointOptions.DEFAULT);
+    }
+
+    public static void track(Plugin owner, Player viewer, WaypointSpec spec, WaypointOptions options) {
+        Objects.requireNonNull(options, "options");
         Objects.requireNonNull(owner, "owner");
         Objects.requireNonNull(viewer, "viewer");
         Objects.requireNonNull(spec, "spec");
         Map<String, Owned> owned = TRACKED.computeIfAbsent(viewer.getUniqueId(),
             ignored -> new LinkedHashMap<>());
         synchronized (owned) {
-            owned.put(spec.id(), new Owned(owner, spec));
+            owned.put(spec.id(), new Owned(owner, spec, options));
         }
     }
 
@@ -64,6 +69,23 @@ public final class Waypoints {
             }
             return List.copyOf(specs);
         }
+    }
+
+    public static List<Registration> registered(UUID viewerId) {
+        Map<String, Owned> owned = TRACKED.get(viewerId);
+        if (owned == null) {
+            return List.of();
+        }
+        synchronized (owned) {
+            List<Registration> result = new ArrayList<>(owned.size());
+            for (Owned entry : owned.values()) {
+                result.add(new Registration(entry.spec(), entry.options()));
+            }
+            return List.copyOf(result);
+        }
+    }
+
+    public record Registration(WaypointSpec spec, WaypointOptions options) {
     }
 
     public static void forget(UUID viewerId) {

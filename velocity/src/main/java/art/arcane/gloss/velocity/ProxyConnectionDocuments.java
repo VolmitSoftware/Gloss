@@ -1,5 +1,7 @@
 package art.arcane.gloss.velocity;
 
+import art.arcane.gloss.doc.DocumentPresetCatalog;
+
 import art.arcane.gloss.expr.Expr;
 import com.google.gson.JsonObject;
 
@@ -24,8 +26,9 @@ public final class ProxyConnectionDocuments {
     private ProxyConnectionDocuments() {
     }
 
-    public static Document load(Path directory) throws IOException {
-        JsonObject document = ProxyDocuments.read(directory.resolve("connections.json"), SCHEMA_VERSION);
+    public static Document load(Path directory, DocumentPresetCatalog presets) throws IOException {
+        JsonObject document = ProxyDocuments.resolve(presets, "connections",
+            ProxyDocuments.read(directory.resolve("connections.json"), SCHEMA_VERSION));
         if (document.isEmpty()) {
             return DISABLED;
         }

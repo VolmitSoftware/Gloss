@@ -11,6 +11,7 @@ import com.github.retrooper.packetevents.protocol.entity.data.EntityData;
 import com.github.retrooper.packetevents.protocol.entity.data.EntityDataTypes;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityMetadata;
 import org.bukkit.Server;
+import java.util.concurrent.atomic.AtomicReference;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.junit.jupiter.api.AfterEach;
@@ -58,7 +59,7 @@ class GlowServiceTest {
             (proxy, method, args) -> switch (method.getName()) {
                 case "getUniqueId" -> viewerId;
                 case "getName" -> "viewer";
-                case "isOnline" -> true;
+                case "isOnline", "canSee" -> true;
                 default -> CharacterizationSupport.identity(proxy, method, args);
             });
         Server server = (Server) CharacterizationSupport.proxy(new Class<?>[]{Server.class},
@@ -77,6 +78,69 @@ class GlowServiceTest {
         CharacterizationSupport.setField(plugin, "teams", teams);
         previousPlugin = CharacterizationSupport.installGloss(plugin);
         glow = new GlowService(plugin);
+    }
+
+    @Test
+    void flagsAreCapturedOnTargetOwnerBeforeViewerApplyAndExpiry() {
+        AtomicReference<Entity> owner = new AtomicReference<>();
+        List<Runnable> pending = new ArrayList<>();
+        UUID sampledId = UUID.randomUUID();
+        target = (Entity) CharacterizationSupport.proxy(new Class<?>[]{Entity.class},
+            (proxy, method, args) -> switch (method.getName()) {
+                case "getUniqueId" -> sampledId;
+                case "getEntityId" -> TARGET_ENTITY_ID;
+                case "isValid" -> true;
+                case "getFireTicks" -> {
+                    Assertions.assertSame(proxy, owner.get(), "flags require target ownership");
+                    yield 0;
+                }
+                case "isGlowing", "isSneaking", "isInvisible", "isSprinting", "isSwimming",
+                     "isGliding", "isVisualFire" -> false;
+                default -> CharacterizationSupport.identity(proxy, method, args);
+            });
+        glow = new GlowService(plugin, (entity, task, retired) -> pending.add(() -> {
+            owner.set(entity);
+            try { task.run(); } finally { owner.set(null); }
+        }));
+        glow.tag(viewer, target, "red", "quest", 1, 1);
+        Assertions.assertTrue(packets.sentTo(viewer, WrapperPlayServerEntityMetadata.class).isEmpty());
+        pending.removeFirst().run();
+        Assertions.assertTrue(packets.sentTo(viewer, WrapperPlayServerEntityMetadata.class).isEmpty());
+        pending.removeFirst().run();
+        Assertions.assertEquals(1, packets.sentTo(viewer, WrapperPlayServerEntityMetadata.class).size());
+        packets.clear();
+        glow.sweep(System.currentTimeMillis() + 1000);
+        Assertions.assertTrue(packets.sentTo(viewer, WrapperPlayServerEntityMetadata.class).isEmpty());
+        pending.removeFirst().run();
+        pending.removeFirst().run();
+        Assertions.assertEquals(1, packets.sentTo(viewer, WrapperPlayServerEntityMetadata.class).size());
+        Assertions.assertTrue(pending.isEmpty());
+    }
+
+    @Test
+    void staleOwnerCaptureCannotRetireAReplacementTag() {
+        List<Runnable> pending = new ArrayList<>();
+        glow = new GlowService(plugin, (entity, task, retired) -> pending.add(task));
+        glow.tag(viewer, target, "red", "quest", 1, 0);
+        glow.untag(viewer, target, "quest");
+        glow.tag(viewer, target, "blue", "quest", 1, 0);
+
+        while (!pending.isEmpty()) {
+            pending.removeFirst().run();
+        }
+
+        Assertions.assertEquals("blue", glow.top(viewer.getUniqueId(), target.getUniqueId()).color());
+        Assertions.assertTrue(glow.tagged(viewer.getUniqueId(), TARGET_ENTITY_ID));
+        Assertions.assertEquals(List.of("claim:viewer/glow/target"), teams.calls);
+    }
+
+    @Test
+    void equivalentLowerPriorityClaimDoesNotResendEntityMetadata() {
+        glow.tag(viewer, target, "red", "high", 10, 0);
+        packets.clear();
+        glow.tag(viewer, target, "blue", "low", 1, 0);
+        Assertions.assertTrue(packets.sentTo(viewer, WrapperPlayServerEntityMetadata.class).isEmpty());
+        Assertions.assertEquals("red", glow.top(viewer.getUniqueId(), target.getUniqueId()).color());
     }
 
     @AfterEach

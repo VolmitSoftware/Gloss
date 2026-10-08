@@ -3,8 +3,11 @@ package art.arcane.gloss.command;
 import art.arcane.gloss.Gloss;
 import art.arcane.gloss.bedrock.BedrockService;
 import art.arcane.gloss.doc.DocumentRegistry;
+import art.arcane.gloss.image.ImageAssets;
 import art.arcane.gloss.locale.GlossMessages;
 import art.arcane.gloss.menu.icon.TextImageRasterCache;
+import art.arcane.gloss.menu.DisplayEntityManager;
+import art.arcane.gloss.service.BudgetedVisibilityGovernor;
 import art.arcane.volmlib.util.director.annotations.Director;
 import art.arcane.volmlib.util.director.annotations.Param;
 import art.arcane.volmlib.util.localization.MessageArgument;
@@ -118,7 +121,7 @@ public class CommandGloss {
         this.preview = new CommandGlossPreview();
         this.item = new CommandGlossItem();
         this.web = new CommandGlossWeb(plugin);
-        this.legacyImport = new CommandGlossImport();
+        this.legacyImport = new CommandGlossImport(plugin);
         this.debug = new CommandGlossDebug(plugin);
         // --- lane:screen ---
         this.surface = new CommandGlossSurface(plugin);
@@ -169,6 +172,9 @@ public class CommandGloss {
     }
 
     public void shutdown() {
+        if (legacyImport != null) {
+            legacyImport.shutdown();
+        }
         if (panel != null) {
             panel.shutdown();
         }
@@ -205,6 +211,27 @@ public class CommandGloss {
                 MessageArgument.trusted("bubbles", plugin.bubbles().activeCount()),
                 MessageArgument.trusted("indicators", plugin.indicators().activeCount()),
                 MessageArgument.trusted("drops", plugin.drops().activeCount()));
+        if (plugin.governor() instanceof BudgetedVisibilityGovernor governor) {
+            BudgetedVisibilityGovernor.Snapshot budgets = governor.snapshot();
+            GlossCommandMessages.send(sender, GlossMessages.STATUS_VISIBILITY,
+                MessageArgument.trusted("entities", budgets.visibleEntities()),
+                MessageArgument.trusted("viewers", budgets.viewers()),
+                MessageArgument.trusted("admissions", budgets.admissions()),
+                MessageArgument.trusted("refusals", budgets.refusals()),
+                MessageArgument.trusted("waiting", budgets.pending()),
+                MessageArgument.trusted("expired", budgets.expired()),
+                MessageArgument.trusted("retiring", DisplayEntityManager.pendingRetirements()));
+        }
+        ImageAssets images = plugin.getImageAssets();
+        if (images != null) {
+            ImageAssets.Snapshot assets = images.snapshot();
+            GlossCommandMessages.send(sender, GlossMessages.STATUS_IMAGES,
+                MessageArgument.trusted("entries", assets.cachedEntries()),
+                MessageArgument.trusted("pending", assets.pending()),
+                MessageArgument.trusted("bytes", assets.retainedWeight()),
+                MessageArgument.trusted("completed", assets.completed()),
+                MessageArgument.trusted("refusals", assets.refused()));
+        }
         // --- lane:fixes ---
         GlossCommandMessages.send(sender, GlossMessages.STATUS_SCHEMA_SKIPPED,
                 MessageArgument.trusted("count", DocumentRegistry.unsupportedSchemaTotal()));

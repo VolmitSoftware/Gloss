@@ -1,6 +1,7 @@
 package art.arcane.gloss.velocity;
 
 import art.arcane.gloss.expr.ExprEvaluator;
+import art.arcane.gloss.doc.DocumentPresetCatalog;
 import art.arcane.gloss.expr.ExprException;
 import art.arcane.gloss.expr.ExpressionScope;
 import org.junit.jupiter.api.Test;
@@ -26,7 +27,7 @@ final class ProxySurfaceDocumentsTest {
     @Test
     void theSeededWelcomeDocumentParsesAndStaysUnselected() throws IOException {
         ProxyDocuments.seed(directory);
-        List<ProxySurfaceDocuments.Document> documents = ProxySurfaceDocuments.load(directory);
+        List<ProxySurfaceDocuments.Document> documents = ProxySurfaceDocuments.load(directory, DocumentPresetCatalog.empty());
         assertEquals(1, documents.size());
         ProxySurfaceDocuments.Document welcome = documents.getFirst();
         assertEquals("welcome", welcome.id());
@@ -41,13 +42,27 @@ final class ProxySurfaceDocumentsTest {
 
     @Test
     void missingDirectoriesAndOtherSchemasLoadNothing() throws IOException {
-        assertTrue(ProxySurfaceDocuments.load(directory).isEmpty());
+        assertTrue(ProxySurfaceDocuments.load(directory, DocumentPresetCatalog.empty()).isEmpty());
         write("retired.json", """
             {"schemaVersion":2,"surface":"actionbar","presentation":{"text":"Retired"}}
             """);
-        assertTrue(ProxySurfaceDocuments.load(directory).isEmpty());
+        assertTrue(ProxySurfaceDocuments.load(directory, DocumentPresetCatalog.empty()).isEmpty());
         Files.writeString(directory.resolve("surfaces/notes.txt"), "ignored");
-        assertTrue(ProxySurfaceDocuments.load(directory).isEmpty());
+        assertTrue(ProxySurfaceDocuments.load(directory, DocumentPresetCatalog.empty()).isEmpty());
+    }
+
+    @Test
+    void actionbarRejectsUnavailableCompositorSlotsButAcceptsCenter() throws IOException {
+        write("center.json", """
+            {"schemaVersion":1,"surface":"actionbar","presentation":{"text":"Center","slots":["center"]}}
+            """);
+        assertEquals(1, ProxySurfaceDocuments.load(directory, DocumentPresetCatalog.empty()).size());
+        write("left.json", """
+            {"schemaVersion":1,"surface":"actionbar","presentation":{"text":"Left","slots":["left"]}}
+            """);
+        IllegalArgumentException failure = assertThrows(IllegalArgumentException.class,
+            () -> ProxySurfaceDocuments.load(directory, DocumentPresetCatalog.empty()));
+        assertTrue(failure.getMessage().contains("only center on Velocity"));
     }
 
     @Test
@@ -94,7 +109,7 @@ final class ProxySurfaceDocumentsTest {
         write("bar.json", """
             {"schemaVersion":1,"surface":"actionbar","presentation":{"text":"Hello"}}
             """);
-        ProxySurfaceDocuments.Document document = ProxySurfaceDocuments.load(directory).getFirst();
+        ProxySurfaceDocuments.Document document = ProxySurfaceDocuments.load(directory, DocumentPresetCatalog.empty()).getFirst();
         assertTrue(ExprEvaluator.bool(document.show(), scope(Map.of())));
         assertFalse(ExprEvaluator.bool(document.when(), scope(Map.of())));
         assertEquals(0, document.priority());
@@ -150,7 +165,7 @@ final class ProxySurfaceDocumentsTest {
     }
 
     @Test
-    void progressReadsWrappedAndBareExpressionsWhileSlotsAndHudPriorityAreIgnored() throws IOException {
+    void progressReadsWrappedAndBareExpressionsWithHudPriority() throws IOException {
         write("wrapped.json", """
             {"schemaVersion":1,"surface":"bossbar","presentation":{"title":"Ping","slots":["left"],
              "priority":"ambient","progress":"{{ viewer.ping / 100 }}","color":"red","style":"segmented_20"}}
@@ -184,7 +199,7 @@ final class ProxySurfaceDocumentsTest {
             {"schemaVersion":1,"surface":"actionbar","select":{"priority":80,"when":"true"},
              "presentation":{"text":"Bravo"}}
             """);
-        List<ProxySurfaceDocuments.Document> documents = ProxySurfaceDocuments.load(directory);
+        List<ProxySurfaceDocuments.Document> documents = ProxySurfaceDocuments.load(directory, DocumentPresetCatalog.empty());
         assertEquals(List.of("bravo", "alpha", "zulu"), documents.stream()
             .map(ProxySurfaceDocuments.Document::id).toList());
         assertEquals(List.of("beta", "zeta", "low"), documents.get(1).variants().stream()
@@ -198,11 +213,11 @@ final class ProxySurfaceDocumentsTest {
         write("none.json", """
             {"schemaVersion":1,"presentation":{"text":"Hello"}}
             """);
-        assertThrows(IllegalArgumentException.class, () -> ProxySurfaceDocuments.load(directory));
+        assertThrows(IllegalArgumentException.class, () -> ProxySurfaceDocuments.load(directory, DocumentPresetCatalog.empty()));
         write("none.json", """
             {"schemaVersion":1,"surface":"hologram","presentation":{"text":"Hello"}}
             """);
-        assertThrows(IllegalArgumentException.class, () -> ProxySurfaceDocuments.load(directory));
+        assertThrows(IllegalArgumentException.class, () -> ProxySurfaceDocuments.load(directory, DocumentPresetCatalog.empty()));
     }
 
     @Test
@@ -210,19 +225,19 @@ final class ProxySurfaceDocumentsTest {
         write("bar.json", """
             {"schemaVersion":1,"surface":"actionbar","presentation":{"ttlTicks":20}}
             """);
-        assertThrows(IllegalArgumentException.class, () -> ProxySurfaceDocuments.load(directory));
+        assertThrows(IllegalArgumentException.class, () -> ProxySurfaceDocuments.load(directory, DocumentPresetCatalog.empty()));
         write("bar.json", """
             {"schemaVersion":1,"surface":"actionbar"}
             """);
-        assertThrows(IllegalArgumentException.class, () -> ProxySurfaceDocuments.load(directory));
+        assertThrows(IllegalArgumentException.class, () -> ProxySurfaceDocuments.load(directory, DocumentPresetCatalog.empty()));
         write("bar.json", """
             {"schemaVersion":1,"surface":"bossbar","presentation":{"text":"Hello"}}
             """);
-        assertThrows(IllegalArgumentException.class, () -> ProxySurfaceDocuments.load(directory));
+        assertThrows(IllegalArgumentException.class, () -> ProxySurfaceDocuments.load(directory, DocumentPresetCatalog.empty()));
         write("bar.json", """
             {"schemaVersion":1,"surface":"title","presentation":{"subtitle":"Only"}}
             """);
-        assertThrows(IllegalArgumentException.class, () -> ProxySurfaceDocuments.load(directory));
+        assertThrows(IllegalArgumentException.class, () -> ProxySurfaceDocuments.load(directory, DocumentPresetCatalog.empty()));
     }
 
     @Test
@@ -230,23 +245,23 @@ final class ProxySurfaceDocumentsTest {
         write("boss.json", """
             {"schemaVersion":1,"surface":"bossbar","presentation":{"title":"Event","color":"orange"}}
             """);
-        assertThrows(IllegalArgumentException.class, () -> ProxySurfaceDocuments.load(directory));
+        assertThrows(IllegalArgumentException.class, () -> ProxySurfaceDocuments.load(directory, DocumentPresetCatalog.empty()));
         write("boss.json", """
             {"schemaVersion":1,"surface":"bossbar","presentation":{"title":"Event","style":"segmented_7"}}
             """);
-        assertThrows(IllegalArgumentException.class, () -> ProxySurfaceDocuments.load(directory));
+        assertThrows(IllegalArgumentException.class, () -> ProxySurfaceDocuments.load(directory, DocumentPresetCatalog.empty()));
         write("boss.json", """
             {"schemaVersion":1,"surface":"bossbar","presentation":{"title":"Event","progress":"viewer.mood"}}
             """);
-        assertThrows(IllegalArgumentException.class, () -> ProxySurfaceDocuments.load(directory));
+        assertThrows(IllegalArgumentException.class, () -> ProxySurfaceDocuments.load(directory, DocumentPresetCatalog.empty()));
         write("boss.json", """
             {"schemaVersion":1,"surface":"bossbar","presentation":{"title":"Event","progress":"{{ }}"}}
             """);
-        assertThrows(ExprException.class, () -> ProxySurfaceDocuments.load(directory));
+        assertThrows(ExprException.class, () -> ProxySurfaceDocuments.load(directory, DocumentPresetCatalog.empty()));
         write("boss.json", """
             {"schemaVersion":1,"surface":"title","presentation":{"title":"Event","trigger":"pulse"}}
             """);
-        assertThrows(IllegalArgumentException.class, () -> ProxySurfaceDocuments.load(directory));
+        assertThrows(IllegalArgumentException.class, () -> ProxySurfaceDocuments.load(directory, DocumentPresetCatalog.empty()));
     }
 
     @Test
@@ -255,28 +270,28 @@ final class ProxySurfaceDocumentsTest {
             {"schemaVersion":1,"surface":"actionbar","presentation":{"text":"Hello"},
              "variants":[{"id":" ","when":"true","presentation":{"text":"Blank"}}]}
             """);
-        assertThrows(IllegalArgumentException.class, () -> ProxySurfaceDocuments.load(directory));
+        assertThrows(IllegalArgumentException.class, () -> ProxySurfaceDocuments.load(directory, DocumentPresetCatalog.empty()));
         write("bar.json", """
             {"schemaVersion":1,"surface":"actionbar","presentation":{"text":"Hello"},
              "variants":[{"id":"one two","when":"true","presentation":{"text":"Spaced"}}]}
             """);
-        assertThrows(IllegalArgumentException.class, () -> ProxySurfaceDocuments.load(directory));
+        assertThrows(IllegalArgumentException.class, () -> ProxySurfaceDocuments.load(directory, DocumentPresetCatalog.empty()));
         write("bar.json", """
             {"schemaVersion":1,"surface":"actionbar","presentation":{"text":"Hello"},
              "variants":[{"id":"same","when":"true","presentation":{"text":"First"}},
                          {"id":"same","when":"true","presentation":{"text":"Second"}}]}
             """);
-        assertThrows(IllegalArgumentException.class, () -> ProxySurfaceDocuments.load(directory));
+        assertThrows(IllegalArgumentException.class, () -> ProxySurfaceDocuments.load(directory, DocumentPresetCatalog.empty()));
         write("bar.json", """
             {"schemaVersion":1,"surface":"actionbar","presentation":{"text":"Hello"},
              "variants":[{"id":"empty","when":"true"}]}
             """);
-        assertThrows(IllegalArgumentException.class, () -> ProxySurfaceDocuments.load(directory));
+        assertThrows(IllegalArgumentException.class, () -> ProxySurfaceDocuments.load(directory, DocumentPresetCatalog.empty()));
         write("bar.json", """
             {"schemaVersion":1,"surface":"bossbar","presentation":{"title":"Hello"},
              "variants":[{"id":"wrong","when":"true","presentation":{"text":"Action bar only"}}]}
             """);
-        assertThrows(IllegalArgumentException.class, () -> ProxySurfaceDocuments.load(directory));
+        assertThrows(IllegalArgumentException.class, () -> ProxySurfaceDocuments.load(directory, DocumentPresetCatalog.empty()));
     }
 
     @Test
@@ -285,31 +300,31 @@ final class ProxySurfaceDocumentsTest {
             {"schemaVersion":1,"surface":"actionbar","select":{"when":"viewer.world == 'lobby'"},
              "presentation":{"text":"Hello"}}
             """);
-        assertThrows(IllegalArgumentException.class, () -> ProxySurfaceDocuments.load(directory));
+        assertThrows(IllegalArgumentException.class, () -> ProxySurfaceDocuments.load(directory, DocumentPresetCatalog.empty()));
         write("bar.json", """
             {"schemaVersion":1,"surface":"actionbar","show":"unknownFunction('x')",
              "presentation":{"text":"Hello"}}
             """);
-        assertThrows(IllegalArgumentException.class, () -> ProxySurfaceDocuments.load(directory));
+        assertThrows(IllegalArgumentException.class, () -> ProxySurfaceDocuments.load(directory, DocumentPresetCatalog.empty()));
         write("bar.json", """
             {"schemaVersion":1,"surface":"actionbar","presentation":{"text":"{{ missing"}}
             """);
-        assertThrows(IllegalArgumentException.class, () -> ProxySurfaceDocuments.load(directory));
+        assertThrows(IllegalArgumentException.class, () -> ProxySurfaceDocuments.load(directory, DocumentPresetCatalog.empty()));
         write("bar.json", """
             {"schemaVersion":1,"surface":"actionbar","presentation":{"text":"{{ server.online + }}"}}
             """);
-        assertThrows(ExprException.class, () -> ProxySurfaceDocuments.load(directory));
+        assertThrows(ExprException.class, () -> ProxySurfaceDocuments.load(directory, DocumentPresetCatalog.empty()));
     }
 
     @Test
     void malformedJsonFailsTheWholeLoad() throws IOException {
         write("bar.json", "{ malformed");
-        assertThrows(IOException.class, () -> ProxySurfaceDocuments.load(directory));
+        assertThrows(IOException.class, () -> ProxySurfaceDocuments.load(directory, DocumentPresetCatalog.empty()));
     }
 
     private Map<String, ProxySurfaceDocuments.Document> byId() throws IOException {
         Map<String, ProxySurfaceDocuments.Document> documents = new HashMap<>();
-        for (ProxySurfaceDocuments.Document document : ProxySurfaceDocuments.load(directory)) {
+        for (ProxySurfaceDocuments.Document document : ProxySurfaceDocuments.load(directory, DocumentPresetCatalog.empty())) {
             documents.put(document.id(), document);
         }
         return documents;

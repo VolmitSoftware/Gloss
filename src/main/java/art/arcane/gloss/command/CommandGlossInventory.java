@@ -119,7 +119,8 @@ public class CommandGlossInventory {
       return;
     }
     if (!service.open(target, id, arguments)) {
-      plugin.getLocalization().send(sender, GlossMessages.FORMS_UNKNOWN_INVENTORY);
+      plugin.getLocalization().send(sender, GlossMessages.FORMS_UNKNOWN_INVENTORY,
+          MessageArgs.builder().untrusted("id", id).build());
       return;
     }
     plugin.getLocalization().send(sender, GlossMessages.FORMS_INVENTORY_OPENED, MessageArgs.builder()

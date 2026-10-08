@@ -4,8 +4,9 @@
   "title": "Gloss Tablist Document",
   "type": "object",
   "properties": {
+    "preset": {"type": ["string", "null"], "minLength": 1, "description": "Named preset from this collection in presets.json; document fields override inherited values."},
     "schemaVersion": {
-      "const": 2
+      "const": 3
     },
     "revision": {
       "type": "integer",
@@ -151,25 +152,10 @@
     "layout": {
       "type": "object",
       "properties": {
-        "enabled": {
-          "type": "boolean"
-        },
-        "show": {
-          "type": [
-            "string",
-            "boolean"
-          ],
-          "description": "Boolean or Gloss condition expression."
-        },
-        "columns": {
+        "entries": {
           "type": "integer",
-          "minimum": 0,
-          "maximum": 4
-        },
-        "rows": {
-          "type": "integer",
-          "minimum": 0,
-          "maximum": 20
+          "minimum": 1,
+          "maximum": 80
         },
         "slots": {
           "type": "array",
@@ -177,40 +163,38 @@
             "$ref": "#/$defs/slot"
           }
         },
-        "players": {
-          "$ref": "#/$defs/players"
-        }
-      },
-      "required": [],
-      "additionalProperties": false,
-      "allOf": [
-        {
-          "if": {
-            "properties": {
-              "enabled": {
-                "const": true
-              }
-            },
-            "required": [
-              "enabled"
-            ]
-          },
-          "then": {
-            "properties": {
-              "columns": {
-                "minimum": 1
-              },
-              "rows": {
-                "minimum": 1
-              }
-            },
-            "required": [
-              "columns",
-              "rows"
-            ]
+        "sections": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/section"
+          }
+        },
+        "skins": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/skin"
+          }
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "show": {
+          "type": [
+            "string",
+            "boolean"
+          ]
+        },
+        "variants": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/layoutVariant"
           }
         }
-      ]
+      },
+      "required": [
+        "entries"
+      ],
+      "additionalProperties": false
     }
   },
   "required": [
@@ -265,6 +249,10 @@
           "type": "integer",
           "minimum": -1,
           "maximum": 10000
+        },
+        "hat": {
+          "type": "boolean",
+          "default": true
         }
       },
       "required": [
@@ -273,13 +261,65 @@
       ],
       "additionalProperties": false
     },
-    "players": {
+    "skin": {
       "type": "object",
       "properties": {
+        "value": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 16384
+        },
+        "signature": {
+          "type": "string",
+          "maxLength": 16384
+        }
+      },
+      "required": [
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "sortKey": {
+      "type": "object",
+      "properties": {
+        "expression": {
+          "type": "string",
+          "minLength": 1
+        },
+        "type": {
+          "enum": [
+            "number",
+            "text"
+          ]
+        },
+        "direction": {
+          "enum": [
+            "ascending",
+            "descending"
+          ]
+        }
+      },
+      "required": [
+        "expression"
+      ],
+      "additionalProperties": false
+    },
+    "section": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
         "column": {
           "type": "integer",
           "minimum": 0,
           "maximum": 3
+        },
+        "row": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 19
         },
         "columns": {
           "type": "integer",
@@ -292,8 +332,17 @@
           "maximum": 20
         },
         "filter": {
-          "type": "string",
-          "minLength": 1
+          "type": "string"
+        },
+        "format": {
+          "type": "string"
+        },
+        "sort": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/sortKey"
+          },
+          "maxItems": 16
         },
         "overflow": {
           "enum": [
@@ -302,13 +351,83 @@
           ]
         },
         "overflowFormat": {
-          "type": "string",
-          "default": "+{count}",
-          "description": "Text for overflow=count; {count} is the number of unlisted players."
+          "type": "string"
+        },
+        "includeNpcs": {
+          "type": "boolean",
+          "default": false
+        },
+        "skin": {
+          "type": "string"
+        },
+        "hat": {
+          "type": "boolean",
+          "default": true
         }
       },
       "required": [
-        "column"
+        "id",
+        "column",
+        "row",
+        "columns",
+        "rows"
+      ],
+      "additionalProperties": false
+    },
+    "layoutPresentation": {
+      "type": "object",
+      "properties": {
+        "entries": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 80
+        },
+        "slots": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/slot"
+          }
+        },
+        "sections": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/section"
+          }
+        },
+        "skins": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/skin"
+          }
+        }
+      },
+      "required": [
+        "entries"
+      ],
+      "additionalProperties": false
+    },
+    "layoutVariant": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "priority": {
+          "type": "integer"
+        },
+        "when": {
+          "type": "string",
+          "minLength": 1
+        },
+        "presentation": {
+          "$ref": "#/$defs/layoutPresentation"
+        }
+      },
+      "required": [
+        "id",
+        "when",
+        "presentation"
       ],
       "additionalProperties": false
     }

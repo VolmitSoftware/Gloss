@@ -17,6 +17,10 @@ public interface ActionContext {
 
   HoloClickTrigger trigger();
 
+  default boolean current() {
+    return true;
+  }
+
   NavigationResult navigate(NavigationRequest request);
 
   /** The scope a per-action {@code when} gate evaluates in; defaults to the clicking player's condition scope. */

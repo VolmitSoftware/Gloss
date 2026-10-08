@@ -95,7 +95,7 @@ class BackendProxyOwnershipTest {
         manager = allocate(RecordingManager.class);
         set(boards, BoardService.class, "ordinaryManager", manager);
         TablistDoc document = TablistDoc.parse("tablist.json", """
-            {"schemaVersion":2,"revision":1,
+            {"schemaVersion":3,"revision":1,
              "headerFooter":{"enabled":true,"presentation":{"header":"Backend","footer":"Footer"}},
              "listNames":{"enabled":true,"presentation":{"format":"Local $player"}}}
             """);

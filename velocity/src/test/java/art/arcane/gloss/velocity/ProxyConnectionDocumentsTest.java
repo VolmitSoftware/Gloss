@@ -1,5 +1,7 @@
 package art.arcane.gloss.velocity;
 
+import art.arcane.gloss.doc.DocumentPresetCatalog;
+
 import art.arcane.gloss.expr.ExprEvaluator;
 import art.arcane.gloss.expr.ExpressionScope;
 import org.junit.jupiter.api.Test;
@@ -24,7 +26,7 @@ final class ProxyConnectionDocumentsTest {
     @Test
     void bundledDefaultEnablesEverySectionOnTheNetworkAudience() throws IOException {
         ProxyDocuments.seed(directory);
-        ProxyConnectionDocuments.Document document = ProxyConnectionDocuments.load(directory);
+        ProxyConnectionDocuments.Document document = ProxyConnectionDocuments.load(directory, DocumentPresetCatalog.empty());
 
         assertTrue(document.join().enabled());
         assertTrue(document.switched().enabled());
@@ -40,13 +42,13 @@ final class ProxyConnectionDocumentsTest {
 
     @Test
     void missingFileAndRetiredSchemaBothLoadDisabled() throws IOException {
-        assertSame(ProxyConnectionDocuments.DISABLED, ProxyConnectionDocuments.load(directory));
+        assertSame(ProxyConnectionDocuments.DISABLED, ProxyConnectionDocuments.load(directory, DocumentPresetCatalog.empty()));
 
         Files.writeString(directory.resolve("connections.json"), """
             {"schemaVersion":2,"join":{"presentation":{"text":"&aignored"}}}
             """);
 
-        assertSame(ProxyConnectionDocuments.DISABLED, ProxyConnectionDocuments.load(directory));
+        assertSame(ProxyConnectionDocuments.DISABLED, ProxyConnectionDocuments.load(directory, DocumentPresetCatalog.empty()));
     }
 
     @Test
@@ -54,7 +56,7 @@ final class ProxyConnectionDocumentsTest {
         Files.writeString(directory.resolve("connections.json"), """
             {"schemaVersion":1,"join":{"presentation":{"text":"&a$player"}}}
             """);
-        ProxyConnectionDocuments.Document document = ProxyConnectionDocuments.load(directory);
+        ProxyConnectionDocuments.Document document = ProxyConnectionDocuments.load(directory, DocumentPresetCatalog.empty());
 
         assertTrue(document.join().enabled());
         assertEquals("network", document.join().audience());
@@ -70,7 +72,7 @@ final class ProxyConnectionDocumentsTest {
              "join":{"enabled":false,"presentation":{"text":"&aoff"}},
              "leave":{"show":"subject.present","audience":"server","presentation":{"text":"&c$player"}}}
             """);
-        ProxyConnectionDocuments.Document document = ProxyConnectionDocuments.load(directory);
+        ProxyConnectionDocuments.Document document = ProxyConnectionDocuments.load(directory, DocumentPresetCatalog.empty());
 
         assertFalse(document.join().enabled());
         assertTrue(document.leave().enabled());
@@ -89,7 +91,7 @@ final class ProxyConnectionDocumentsTest {
               "variants":[{"priority":5,"when":"subject.present","presentation":{"text":"&7low"}},
                           {"priority":50,"when":"subject.present","presentation":{"text":"&6high"}}]}}
             """);
-        ProxyConnectionDocuments.Document document = ProxyConnectionDocuments.load(directory);
+        ProxyConnectionDocuments.Document document = ProxyConnectionDocuments.load(directory, DocumentPresetCatalog.empty());
 
         assertEquals(2, document.join().variants().size());
         assertEquals(50, document.join().variants().getFirst().priority());
@@ -103,7 +105,7 @@ final class ProxyConnectionDocumentsTest {
             {"schemaVersion":1,
              "switch":{"presentation":{"text":"$player: $from -> $to ({{ connection.to }})"}}}
             """);
-        ProxyConnectionDocuments.Document document = ProxyConnectionDocuments.load(directory);
+        ProxyConnectionDocuments.Document document = ProxyConnectionDocuments.load(directory, DocumentPresetCatalog.empty());
 
         assertEquals("$player: $from -> $to ({{ connection.to }})", document.switched().presentation().text());
     }
@@ -113,17 +115,17 @@ final class ProxyConnectionDocumentsTest {
         Files.writeString(directory.resolve("connections.json"), """
             {"schemaVersion":1,"join":{"audience":"everyone","presentation":{"text":"&ahi"}}}
             """);
-        assertThrows(IllegalArgumentException.class, () -> ProxyConnectionDocuments.load(directory));
+        assertThrows(IllegalArgumentException.class, () -> ProxyConnectionDocuments.load(directory, DocumentPresetCatalog.empty()));
 
         Files.writeString(directory.resolve("connections.json"), """
             {"schemaVersion":1,"join":{"presentation":{"text":"{{ nonsense.variable }}"}}}
             """);
-        assertThrows(IllegalArgumentException.class, () -> ProxyConnectionDocuments.load(directory));
+        assertThrows(IllegalArgumentException.class, () -> ProxyConnectionDocuments.load(directory, DocumentPresetCatalog.empty()));
 
         Files.writeString(directory.resolve("connections.json"), """
             {"schemaVersion":1,"join":{"show":"nonsense.variable","presentation":{"text":"&ahi"}}}
             """);
-        assertThrows(IllegalArgumentException.class, () -> ProxyConnectionDocuments.load(directory));
+        assertThrows(IllegalArgumentException.class, () -> ProxyConnectionDocuments.load(directory, DocumentPresetCatalog.empty()));
     }
 
     private static ExpressionScope variables(Map<String, Object> values) {

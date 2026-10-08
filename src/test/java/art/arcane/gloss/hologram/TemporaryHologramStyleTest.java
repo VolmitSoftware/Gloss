@@ -1,5 +1,7 @@
 package art.arcane.gloss.hologram;
 
+import art.arcane.gloss.service.VisibilityGovernor;
+
 import art.arcane.gloss.api.HologramBox;
 import art.arcane.gloss.api.HologramPresentation;
 import art.arcane.gloss.api.IconArgbColor;
@@ -329,7 +331,7 @@ class TemporaryHologramStyleTest {
 
     @Test
     void destroyedBoxCannotPublishChildrenFromAQueuedSpawn() {
-        TextDisplayDecoration box = new TextDisplayDecoration(harness.service, () -> {});
+        TextDisplayDecoration box = new TextDisplayDecoration(new TextDisplayDecoration.Options(harness.service, () -> {}, () -> VisibilityGovernor.Surface.HOLOGRAM));
         harness.ownsThread = false;
         harness.deferImmediateTasks = true;
         box.update(new TextDisplayDecoration.Update(harness.at(world, 0, 64, 0), HologramPresentation.identity(), null,
@@ -345,7 +347,7 @@ class TemporaryHologramStyleTest {
 
     @Test
     void movingDuringQueuedDecorationSpawnUpdatesAllChildrenOnTheNextDrive() {
-        TextDisplayDecoration box = new TextDisplayDecoration(harness.service, () -> {});
+        TextDisplayDecoration box = new TextDisplayDecoration(new TextDisplayDecoration.Options(harness.service, () -> {}, () -> VisibilityGovernor.Surface.HOLOGRAM));
         HologramBox settings = new HologramBox(true, null, null, null, null);
         harness.ownsThread = false;
         harness.deferImmediateTasks = true;

@@ -23,7 +23,7 @@ public record EntityOverlayDoc(
     Integer maxEntitiesPerViewer, Integer maxActiveOverlays, Boolean includePlayers, Boolean overrideNametag, Double verticalOffset,
     Integer healthSegments, Long hitHighlightMs, List<String> blacklistWorlds,
     List<String> excludedEntityTypes, ShowCondition show, List<Line> lines,
-    IconDisplayStyle style, HologramBox box, List<ParticleLayer> particleLayers, HealthBarStyle healthBar, List<Variant> variants
+    IconDisplayStyle style, HologramBox box, List<ParticleLayer> particleLayers, HealthBarStyle healthBar, List<Variant> variants, Integer snapshotReadLimit
 ) {
     public static final String KIND = "entity-overlays";
     public static final String DEFAULT_ID = "default";
@@ -41,7 +41,7 @@ public record EntityOverlayDoc(
         new Line("stats", "text", "&7ATK &f{attack} &8| &7ARM &f{armor}", null));
     public static final EntityOverlayDoc DEFAULTS = new EntityOverlayDoc(
         CURRENT_SCHEMA_VERSION, DocumentEnvelope.INITIAL_REVISION, null, null, null, null,
-        null, null, null, null, null, null, null, null, null, null, null, null, null, null, null);
+        null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null);
 
     public EntityOverlayDoc {
         DocumentEnvelope.requireSchemaVersion(KIND, schemaVersion, CURRENT_SCHEMA_VERSION);
@@ -66,6 +66,7 @@ public record EntityOverlayDoc(
         particleLayers = ParticleLayer.copyLayers(particleLayers, KIND);
         healthBar = healthBar == null ? HealthBarStyle.DEFAULTS : healthBar;
         variants = copyVariants(variants);
+        snapshotReadLimit = integer(snapshotReadLimit, 16, 65536, 4096);
     }
 
     public static EntityOverlayDoc parse(String fileName, String raw) {
@@ -99,7 +100,7 @@ public record EntityOverlayDoc(
                 base.blacklistWorlds(), base.excludedEntityTypes(), base.show(), lines == null ? base.lines() : lines,
                 style == null ? base.style() : style, box == null ? base.box() : box,
                 particleLayers == null ? base.particleLayers() : particleLayers,
-                healthBar == null ? base.healthBar() : healthBar, List.of());
+                healthBar == null ? base.healthBar() : healthBar, List.of(), base.snapshotReadLimit());
         }
     }
 

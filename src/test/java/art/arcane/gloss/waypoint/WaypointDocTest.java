@@ -42,6 +42,20 @@ class WaypointDocTest {
     }
 
     @Test
+    void customStylesKeepTheirNativeKeyAndUseABuiltInFallback() {
+        WaypointDoc doc = WaypointDoc.parse("quest.json", """
+            {"schemaVersion":1,"revision":1,"style":"trails:quest","fallbackStyle":"bowtie",
+             "anchor":{"world":"world","x":1,"y":2,"z":3}}
+            """);
+        Assertions.assertEquals("trails:quest", doc.toSpec("quest").style());
+        Assertions.assertEquals(WaypointStyle.BOWTIE, doc.waypointStyle());
+        Assertions.assertEquals("minecraft:bowtie", new WaypointStyleKey(doc.style()).select(doc.fallbackStyle(), false));
+        Assertions.assertEquals("trails:quest", new WaypointStyleKey(doc.style()).select(doc.fallbackStyle(), true));
+        Assertions.assertThrows(IllegalArgumentException.class, () -> new WaypointStyleKey("trails:../outside"));
+        Assertions.assertThrows(IllegalArgumentException.class, () -> new WaypointStyleKey("trails:/absolute"));
+    }
+
+    @Test
     void refusesAnUnknownStyle() {
         Assertions.assertThrows(IllegalArgumentException.class, () -> WaypointDoc.parse("bad.json", """
             { "schemaVersion": 1, "revision": 1, "style": "spiral",

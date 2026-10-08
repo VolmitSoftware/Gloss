@@ -13,6 +13,15 @@
 #
 # === Kintamieji ===
 # Nekeiskite kintamųjų pavadinimų ir naudokite tik konkrečiame pranešime esančius kintamuosius.
+#   {viewers}  Stebėtojai
+#   {entries}  Podėlio įrašai
+#   {admissions}  Priėmimai
+#   {refusals}  Atmetimai
+#   {waiting}  Laukia
+#   {expired}  Pasibaigę ėjimai
+#   {retiring}  Laukiantis valymas
+#   {bytes}  Saugomi duomenys (baitų)
+#   {completed}  Baigta
 #   {absorbed}  Importuoti įrašai, sujungti su esamais duomenimis
 #   {active}  Aktyvių teikėjų skaičius
 #   {actual}  Dabartinė versija
@@ -225,8 +234,8 @@ indicators = "Žalos ir gydymo indikatorių įrankiai"
 status = "Rodyti glaustą vykdymo statistiką"
 import = "Perkelti senas hologramas nekeičiant šaltinio failų"
 "import.apply" = "Vykdyti senų hologramų perkėlimą be perrašymo"
-"import.holoui" = "Kopijuoti HoloUi duomenis iš plugins/holoui, perrašant ankstesnius importus"
-"import.legacy" = "Perkelti iki sujungimo sukurtus Gloss duomenų failus į v2 formatą"
+"import.holoui" = "Peržiūrėti arba pritaikyti transakcinį HoloUi importą"
+"import.legacy" = "Peržiūrėti arba pritaikyti transakcinį Gloss duomenų atnaujinimą"
 "import.preview" = "Peržiūrėti nedestruktyvų senų hologramų perkėlimą"
 item = "Pasirinktinių daiktų teikėjų įrankiai"
 "item.export" = "Eksportuoti pasirinktinių daiktų katalogą žiniatinklio redaktoriui"
@@ -294,6 +303,9 @@ web = "Atidaryti ir valdyti Gloss žiniatinklio redaktorių"
 "web.sessions.revoke" = "Atšaukti žiniatinklio redaktoriaus prieigos nuorodą"
 "web.sessions.status" = "Rodyti vieną žiniatinklio redaktoriaus sesiją"
 language = "Pasirinkite savo arba numatytąją serverio kalbą"
+
+"import.mode" = "preview arba apply"
+"import.overwrite" = "Peržiūrėti esamų failų pakeitimą"
 
 [command.help.arg]
 reset_name = "Atkuriamas pavadinimas arba * visoms numatytosioms reikšmėms"
@@ -421,6 +433,9 @@ emoji = "&7Jaustukai: &f{enabled}&8/&f{total}"
 animations = "&7Animacijos: &f{count}"
 effects = "&7Burbulai: &f{bubbles} &8| &7Indikatoriai: &f{indicators} &8| &7Iškritimai: &f{drops}"
 
+visibility = "&7Matomos objektų kopijos: &f{entities} &8| &7Stebėtojai: &f{viewers} &8| &7Priėmimai: &f{admissions} &8| &7Atmetimai: &f{refusals} &8| &7Laukia: &f{waiting} &8| &7Pasibaigę ėjimai: &f{expired} &8| &7Laukiantis valymas: &f{retiring}"
+images = "&7Vaizdų podėlis: &f{entries} &8| &7Laukia: &f{pending} &8| &7Saugomi duomenys: &f{bytes} &7baitų &8| &7Baigta: &f{completed} &8| &7Atmetimai: &f{refusals}"
+
 [command.reset]
 done = "&8[&dGloss&8] &aAtkurta &f{count}&a numatytųjų {kind} įrašų."
 none = "&8[&dGloss&8] &cJokie numatytieji {kind} įrašai neatitinka '&f{name}&c'."
@@ -433,12 +448,19 @@ style_unknown = "&8[&dGloss&8] &cNėra burbulo stiliaus pavadinimu '&f{style}&c'
 [command.import]
 config_unreadable = "&8[&dGloss&8] &cNepavyko įkelti gloss.toml: &f{reason}"
 
+mode_invalid = "&8[&dGloss&8] &cKaip importo režimą naudokite preview arba apply."
+preview_capacity = "&8[&dGloss&8] &cPeržiūrėtų importų podėlis pilnas. Pritaikykite esamą peržiūrą arba palaukite, kol ji nustos galioti, tada sukurkite naują."
+
 [command.import.holoui]
 missing = "&8[&dGloss&8] &cŠalia Gloss duomenų aplanko nerastas holoui duomenų aplankas."
 done = "&8[&dGloss&8] &aHoloUi importas baigtas: nukopijuota &f{copied}&a, praleista &f{skipped}&a, konfigūracijos raktų &f{overlaid}&a, klaidų &f{errors}&a."
 
+preview_required = "&8[&dGloss&8] &cPirmiausia vykdykite /gloss import holoui mode=preview. Peržiūros galioja nustatytą laiką. Pridėkite overwrite=true, kad peržiūrėtumėte esamų failų pakeitimą."
+
 [command.import.legacy]
 done = "&8[&dGloss&8] &aSenų duomenų perkėlimas baigtas: perkelta &f{migrated}&a, įtraukta &f{absorbed}&a, konfigūracijos raktų &f{overlaid}&a, klaidų &f{errors}&a."
+
+preview_required = "&8[&dGloss&8] &cPirmiausia vykdykite /gloss import legacy mode=preview. Peržiūros galioja nustatytą laiką."
 
 [director.help]
 no_subcommands = "Šiame puslapyje nėra antrinių komandų."
@@ -829,6 +851,7 @@ empty = "(tuščia)"
 # Lane message tables. Each lane appends its [gloss.message.<lane>] and [command.help.<group>]
 # tables inside its own anchor so parallel branches never share a line.
 # --- lane:screen ---
+
 [gloss.message.screen]
 "surfaces.empty" = "&8[&dGloss&8] &7Nėra įkeltų paviršių."
 "surfaces.unknown" = "&8[&dGloss&8]: &cNėra paviršiaus pavadinimu &f{id}&c."
@@ -865,6 +888,7 @@ who = "Rodo, kuris papildinys užima kiekvieną HUD vietą"
 "who.player" = "Tikrinamas žaidėjas; numatytai tu"
 
 # --- lane:chat ---
+
 [gloss.message.chat]
 filtered = "&8[&dGloss&8]: &cPokalbių filtras užblokavo tavo žinutę."
 too_fast = "&8[&dGloss&8]: &ePalauk akimirką prieš siųsdamas kitą žinutę."
@@ -915,6 +939,7 @@ sample = "Nuskaityti lyderių lentelę dabar visiems prisijungusiems"
 "sample.id" = "Dokumento ID"
 
 # --- lane:forms ---
+
 [gloss.message.forms]
 icon_unsupported = "&7Negalima pavaizduoti skrynios langelyje ({kind})"
 no_inventories = "&8[&dGloss&8]: &7Nesukonfigūruota jokių skrynios meniu."
@@ -964,6 +989,7 @@ hologram_actions_header = "&8[&dGloss&8] &7Hologramos &f{id}&7 veiksmai (&f{coun
 hologram_actions_entry = "&8[&dGloss&8] &7  &f{kind}&7 ties &f{value}"
 
 # --- lane:world ---
+
 [gloss.message.world]
 players_only = "&cŠią komandą turi vykdyti žaidėjas."
 disabled = "&cŠi funkcija išjungta gloss.toml faile."
@@ -1055,6 +1081,7 @@ color = "Pavadinta teksto spalva"
 ticks = "Tiktai, kiek trunka švytėjimas, arba 0, kad liktų"
 
 # --- lane:behaviors ---
+
 [command.help.behavior]
 root = "Perziureti ir paleisti elgsenos dokumentus"
 list = "Isvardyti ikeltus elgsenos dokumentus"
@@ -1119,6 +1146,7 @@ fired = "&8[&dGloss&8]: &aIvykdytas &f{id}&a irasas &f{line}&a."
 "explain.missing" = "&8[&dGloss&8]: &cNera {kind} pavadinimu \"{id}\"."
 
 # --- lane:authoring ---
+
 [command.help.pack]
 root = "Diegti ir tvarkyti Gloss paketus"
 install = "Įdiegti paketą iš failo arba HTTPS adreso"
@@ -1188,8 +1216,10 @@ preview = "&8[&dGloss&8] &f{source}&7 įrašytų &f{count}&7 dokumentą (-us)."
 entry = "&8[&dGloss&8] &7{state} &f{path}&7 {reason}"
 applied = "&8[&dGloss&8] &f{count}&7 dokumentas (-ai) importuotas iš &f{source}&7."
 absent = "&8[&dGloss&8] &7Kelyje &f{path}&7 nėra &f{source}&7 duomenų."
+preview_required = "&8[&dGloss&8] &cPirmiausia vykdykite /gloss import preview {source}. Peržiūros galioja nustatytą laiką."
 
 # --- lane:forge ---
+
 [gloss.message.forge]
 disabled = "&8[&dGloss&8] &cGlifų kalvė išjungta. Faile gloss.toml nustatykite features.forge į true."
 built = "&8[&dGloss&8] &aPaketas &f{value}&a sukurtas su {count} glifų."
@@ -1211,6 +1241,7 @@ serve = "Paleisti arba sustabdyti įtaisytą paketo klausytuvą"
 reset = "Atkurti pateiktus glifų dokumentus"
 
 # --- lane:fixes ---
+
 [gloss.message.fixes]
 status_bedrock = "&7bedrock: &f{name}&7, &f{count}&7 prisijungę"
 status_textimage_oversize = "&7textimage-per-didelis: &f{count}"

@@ -135,23 +135,50 @@ export default {
       await context.step('Mixed hologram object rows preserve order and viewer visibility', async () => {
         const position = bot.entity.position
         const anchor = [position.x + 4, position.y + 3, position.z]
-        const entitiesNear = viewer => Object.values(viewer.entities).filter(entity =>
-          Math.abs(entity.position.x - anchor[0]) < 0.3 && Math.abs(entity.position.z - anchor[2]) < 0.3)
         bot.chat('/gamemode creative @s')
         await until(() => bot.game.gameMode === 'creative', 'creative object viewer')
+        const existing = new Map([bot, peer].map(viewer => [viewer,
+          new Set(Object.values(viewer.entities).map(entity => entity.id))]))
+        const objects = viewer => Object.values(viewer.entities).filter(entity =>
+          !existing.get(viewer).has(entity.id) && ['cow', 'pig'].includes(entity.name) &&
+          Math.abs(entity.position.x - anchor[0]) < 1.25 &&
+          Math.abs(entity.position.z - anchor[2]) < 1.25 &&
+          entity.position.y >= anchor[1] - 0.05 && entity.position.y < anchor[1] + 5)
+        const describe = entity => ({ id: entity.id, name: entity.name,
+          position: { x: entity.position.x, y: entity.position.y, z: entity.position.z } })
+        context.report.objectOrder = { anchor, primary: [], peer: [] }
         await save('holograms/audit-order.json', { schemaVersion: 3, revision: 1,
           anchor: { world: 'world', position: anchor }, refreshTicks: 1,
+          style: { billboard: 'fixed', scaleX: 1, scaleY: 1, scaleZ: 1 },
           lines: [{ entity: 'minecraft:cow', scale: 1, show: "viewer.gameMode == 'creative'" },
             'AUDIT_ORDER_MIDDLE', { entity: 'minecraft:pig', scale: 1 }] })
-        await until(() => entitiesNear(bot).some(entity => entity.name === 'cow') && entitiesNear(bot).some(entity => entity.name === 'pig'), 'ordered object spawns')
-        const cow = entitiesNear(bot).find(entity => entity.name === 'cow')
-        const pig = entitiesNear(bot).find(entity => entity.name === 'pig')
-        context.expect(cow.position.y > anchor[1] && pig.position.y < anchor[1], 'Object rows were not placed around their middle text row')
-        await until(() => entitiesNear(peer).some(entity => entity.name === 'pig'), 'peer object visibility')
-        context.expect(!entitiesNear(peer).some(entity => entity.name === 'cow'), 'Conditional cow row leaked to survival viewer')
-        context.report.objectOrder = { topY: cow.position.y, textY: anchor[1], bottomY: pig.position.y }
+        await until(() => {
+          context.report.objectOrder.primary = objects(bot).map(describe)
+          context.report.objectOrder.peer = objects(peer).map(describe)
+          return objects(bot).some(entity => entity.name === 'cow') &&
+            objects(bot).some(entity => entity.name === 'pig') && find('AUDIT_ORDER_MIDDLE')
+        }, 'ordered object spawns')
+        context.expect(objects(bot).length === 2, 'Mixed hologram spawned duplicate object rows')
+        const cow = objects(bot).find(entity => entity.name === 'cow')
+        const pig = objects(bot).find(entity => entity.name === 'pig')
+        const renderedRows = text(find('AUDIT_ORDER_MIDDLE')).split('\n')
+        const middleIndex = renderedRows.findIndex(row => row.includes('AUDIT_ORDER_MIDDLE'))
+        const middleBottom = anchor[1] + (renderedRows.length - middleIndex - 1) * 0.25
+        const middleTop = middleBottom + 0.25
+        const textTop = anchor[1] + renderedRows.length * 0.25
+        context.expect(cow.position.y >= middleTop - 0.05 && cow.position.y + 1.4 <= textTop + 0.05 &&
+          pig.position.y >= anchor[1] - 0.05 && pig.position.y + 0.9 <= middleBottom + 0.05,
+          'Native cow and pig bounds did not occupy their authored rows above and below the middle text')
+        await until(() => objects(peer).some(entity => entity.name === 'pig'), 'peer object visibility')
+        context.expect(objects(peer).length === 1 && objects(peer)[0].name === 'pig',
+          'Conditional cow row leaked to survival viewer or object rows duplicated')
+        const peerPigId = objects(peer)[0].id
+        Object.assign(context.report.objectOrder, { primary: objects(bot).map(describe),
+          peer: objects(peer).map(describe), textRows: renderedRows.length, middleBottom, middleTop })
         bot.chat('/gamemode survival @s')
-        await until(() => !entitiesNear(bot).some(entity => entity.name === 'cow') && entitiesNear(bot).some(entity => entity.name === 'pig'), 'object show updates')
+        await until(() => !bot.entities[cow.id] && bot.entities[pig.id] &&
+          !objects(bot).some(entity => entity.name === 'cow'), 'object show updates')
+        context.expect(Boolean(peer.entities[peerPigId]), 'Other viewer lost its unchanged pig row')
       })
       await context.step('Entity overlay variants use each viewer state', async () => {
         const position = bot.entity.position

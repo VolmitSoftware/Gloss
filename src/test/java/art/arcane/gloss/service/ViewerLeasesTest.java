@@ -5,14 +5,33 @@ import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Proxy;
 import java.util.UUID;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class ViewerLeasesTest {
     private final ViewerLeases leases = new ViewerLeases(VisibilityGovernor.Surface.MARKER);
+
+    @Test
+    void failedTeardownRetainsItsWeightedReservationForRetry() {
+        Player viewer = player();
+        BudgetedVisibilityGovernor.Policy policy = new BudgetedVisibilityGovernor.Policy(10, 10, 0, 0, 10, 20, 30);
+        BudgetedVisibilityGovernor governor = new BudgetedVisibilityGovernor(() ->
+            new BudgetedVisibilityGovernor.Limits(10, 10, policy, Map.of(), new BudgetedVisibilityGovernor.AdmissionPolicy(BudgetedVisibilityGovernor.AdmissionMode.REJECT, 4096, 100)));
+        assertTrue(leases.admit(governor, viewer, 8, failOnTeardown()));
+        assertThrows(IllegalStateException.class, () -> leases.admit(governor, viewer, 11, () -> {
+            throw new IllegalStateException("removal failed");
+        }));
+        assertEquals(8, governor.snapshot().visibleEntities());
+        assertTrue(leases.holds(viewer.getUniqueId()));
+        assertFalse(leases.admit(governor, viewer, 11, () -> { }));
+        assertEquals(0, governor.snapshot().visibleEntities());
+        assertFalse(leases.holds(viewer.getUniqueId()));
+    }
 
     @Test
     void aRefusedViewerTearsDownWhatTheyAlreadyHadDrawn() {

@@ -1,13 +1,14 @@
 package art.arcane.gloss.command;
 
 import art.arcane.gloss.Gloss;
-import art.arcane.gloss.config.GlossConfigFile;
+import art.arcane.gloss.GlossConfig;
 import art.arcane.gloss.importer.DocumentImportEntry;
 import art.arcane.gloss.importer.DocumentImportPlan;
 import art.arcane.gloss.importer.DocumentImportService;
 import art.arcane.gloss.importer.HoloUiDataImporter;
 import art.arcane.gloss.history.HistoryService;
 import art.arcane.gloss.importer.HoloUiImportDisposition;
+import art.arcane.gloss.importer.HoloUiImportEntry;
 import art.arcane.gloss.importer.LegacyGlossDataImporter;
 import art.arcane.gloss.importer.LegacyHologramImportService;
 import art.arcane.gloss.importer.LegacyImportApplyEntry;
@@ -35,6 +36,10 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.LinkedHashMap;
+import java.util.Iterator;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
@@ -46,6 +51,23 @@ public final class CommandGlossImport {
   public static final String APPLY_PERMISSION = "gloss.import.apply";
 
   private static final int MAX_DETAIL_LINES = 12;
+  private final Gloss plugin;
+  private final PreviewCache previews = new PreviewCache();
+  private int expiryTask = -1;
+  private boolean closed;
+
+  public CommandGlossImport(Gloss plugin) {
+    this.plugin = plugin;
+  }
+
+  public synchronized void shutdown() {
+    closed = true;
+    previews.clear();
+    if (expiryTask != -1) {
+      plugin.scheduler().car(expiryTask);
+      expiryTask = -1;
+    }
+  }
 
   @Director(name = "preview", aliases = {"dry-run", "dryrun"},
       description = "Preview a non-destructive legacy hologram migration",
@@ -112,70 +134,268 @@ public final class CommandGlossImport {
     });
   }
 
-  @Director(name = "holoui", sync = true,
-      description = "Copy HoloUi data from plugins/holoui, overwriting earlier imports",
+  @Director(name = "holoui",
+      description = "Preview or apply a transactional HoloUi import",
       descriptionKey = "command.help.import.holoui")
   public void holoui(
+      @Param(name = "mode", defaultValue = "preview", description = "preview or apply",
+          descriptionKey = "command.help.import.mode")
+      String mode,
+      @Param(name = "overwrite", defaultValue = "false", description = "Preview replacement of existing files",
+          descriptionKey = "command.help.import.overwrite")
+      boolean overwrite,
       @Param(name = "sender", contextual = true)
       CommandSender sender
   ) {
-    if (!checkPermission(sender, PERMISSION)) {
+    boolean apply = "apply".equalsIgnoreCase(mode);
+    if (!checkPermission(sender, apply ? APPLY_PERMISSION : PERMISSION)) {
+      return;
+    }
+    if (!apply && !"preview".equalsIgnoreCase(mode)) {
+      sendLater(sender, () -> GlossCommandMessages.send(sender, GlossMessages.IMPORT_MODE_INVALID));
       return;
     }
     Gloss plugin = Gloss.instance;
-    HoloUiDataImporter importer = new HoloUiDataImporter(plugin.getDataFolder(), plugin.configLoader());
-    if (importer.sourceDirectory() == null) {
-      GlossCommandMessages.send(sender, GlossMessages.IMPORT_HOLOUI_MISSING);
+    String identity = sender instanceof Player player ? player.getUniqueId().toString() : sender.getName();
+    if (!apply) {
+      HoloUiDataImporter importer = new HoloUiDataImporter(plugin.getDataFolder(),
+          new HoloUiDataImporter.Services(plugin.configLoader(), plugin.getProjectTransaction(),
+              plugin.getPersistenceCoordinator()));
+      HoloUiDataImporter.Plan plan = importer.preview(overwrite);
+      if (!plan.sourcePresent()) {
+        sendLater(sender, () -> GlossCommandMessages.send(sender, GlossMessages.IMPORT_HOLOUI_MISSING));
+        return;
+      }
+      if (!rememberPreview("holoui", identity, new HoloUiPreview(importer, plan))) {
+        sendLater(sender, () -> GlossCommandMessages.send(sender, GlossMessages.IMPORT_PREVIEW_CAPACITY));
+        return;
+      }
+      sendLater(sender, () -> {
+        GlossCommandMessages.send(sender, GlossMessages.IMPORT_DOCUMENT_PREVIEW,
+            MessageArgument.untrusted("source", "holoui"), MessageArgument.trusted("count", plan.targets().size()));
+        reportHoloUiEntries(sender, plan.entries());
+      });
       return;
     }
-    GlossConfigFile configFile;
-    try {
-      configFile = plugin.configLoader().loadForReload();
-    } catch (IOException failure) {
-      GlossCommandMessages.send(sender, GlossMessages.IMPORT_CONFIG_UNREADABLE,
-          MessageArgument.untrusted("reason", safeReason(failure)));
+    Preview cached = previews.take(new PreviewKey("holoui", identity), System.nanoTime());
+    if (!(cached instanceof HoloUiPreview preview)) {
+      sendLater(sender, () -> GlossCommandMessages.send(sender, GlossMessages.IMPORT_HOLOUI_PREVIEW_REQUIRED));
       return;
     }
-    HoloUiDataImporter.Result result = importer.run(configFile, true);
-    plugin.reloadAll();
-    long copied = result.count(HoloUiImportDisposition.COPIED);
+    HoloUiDataImporter.Result result = preview.importer().apply(preview.plan());
+    if (result.applied() && result.backupPath() != null) {
+      SchedulerUtils.runGlobal(plugin, plugin::reloadAll);
+    }
+    long copied = result.count(HoloUiImportDisposition.COPIED) + result.count(HoloUiImportDisposition.APPROXIMATED);
     long overlaid = result.count(HoloUiImportDisposition.OVERLAID_CONFIG_KEY);
-    long errors = result.count(HoloUiImportDisposition.ERROR);
+    long errors = result.count(HoloUiImportDisposition.ERROR) + result.count(HoloUiImportDisposition.CONFLICT)
+        + result.count(HoloUiImportDisposition.UNSUPPORTED);
     long skipped = result.entries().size() - copied - overlaid - errors;
-    GlossCommandMessages.send(sender, GlossMessages.IMPORT_HOLOUI_DONE,
+    sendLater(sender, () -> {
+      GlossCommandMessages.send(sender, GlossMessages.IMPORT_HOLOUI_DONE,
         MessageArgument.trusted("copied", copied),
         MessageArgument.trusted("skipped", skipped),
         MessageArgument.trusted("overlaid", overlaid),
         MessageArgument.trusted("errors", errors));
+      reportHoloUiEntries(sender, result.entries());
+    });
   }
 
-  @Director(name = "legacy", sync = true,
-      description = "Migrate pre-merger Gloss data files to the v2 envelopes",
+  private void reportHoloUiEntries(CommandSender sender, List<HoloUiImportEntry> entries) {
+    int reported = 0;
+    for (HoloUiImportEntry entry : entries) {
+      if (entry.disposition() == HoloUiImportDisposition.UNCHANGED) {
+        continue;
+      }
+      if (reported++ >= MAX_DETAIL_LINES) {
+        return;
+      }
+      GlossCommandMessages.send(sender, GlossMessages.IMPORT_DOCUMENT_ENTRY,
+          MessageArgument.untrusted("state", entry.disposition().id()),
+          MessageArgument.untrusted("path", entry.path()),
+          MessageArgument.untrusted("reason", entry.detail() == null ? "" : entry.detail()));
+    }
+  }
+
+  private synchronized boolean rememberPreview(String format, String sender, Preview preview) {
+    if (closed || !previews.remember(new PreviewKey(format, sender), preview, plugin.cfg().imports(), System.nanoTime())) {
+      return false;
+    }
+    if (expiryTask == -1) {
+      expiryTask = plugin.scheduler().ar(this::expirePreviews, 20);
+      if (expiryTask == -1) {
+        previews.clear();
+        return false;
+      }
+    }
+    return true;
+  }
+
+  private synchronized void expirePreviews() {
+    previews.expire(System.nanoTime());
+    if (previews.isEmpty() && expiryTask != -1) {
+      plugin.scheduler().car(expiryTask);
+      expiryTask = -1;
+    }
+  }
+
+  interface Preview {
+    long retainedBytes();
+  }
+
+  record PreviewKey(String format, String sender) {
+  }
+
+  static final class PreviewCache {
+    private final Map<PreviewKey, CachedPreview> entries = new LinkedHashMap<>();
+    private long retainedBytes;
+
+    synchronized boolean remember(PreviewKey key, Preview preview, GlossConfig.Imports limits, long now) {
+      expire(now);
+      CachedPreview previous = entries.get(key);
+      long previousBytes = previous == null ? 0 : previous.preview().retainedBytes();
+      if (preview.retainedBytes() < 0 || entries.size() + (previous == null ? 1 : 0) > limits.maxPreparedPreviews()
+          || preview.retainedBytes() > limits.maxCachedBytes() - retainedBytes + previousBytes) {
+        return false;
+      }
+      entries.put(key, new CachedPreview(preview, now, TimeUnit.SECONDS.toNanos(limits.previewLifetimeSeconds())));
+      retainedBytes += preview.retainedBytes() - previousBytes;
+      return true;
+    }
+
+    synchronized Preview take(PreviewKey key, long now) {
+      expire(now);
+      CachedPreview found = entries.remove(key);
+      if (found == null) {
+        return null;
+      }
+      retainedBytes -= found.preview().retainedBytes();
+      return found.preview();
+    }
+
+    synchronized void expire(long now) {
+      Iterator<CachedPreview> iterator = entries.values().iterator();
+      while (iterator.hasNext()) {
+        CachedPreview entry = iterator.next();
+        if (now - entry.createdAt() >= entry.lifetime()) {
+          retainedBytes -= entry.preview().retainedBytes();
+          iterator.remove();
+        }
+      }
+    }
+
+    synchronized boolean isEmpty() {
+      return entries.isEmpty();
+    }
+
+    synchronized void clear() {
+      entries.clear();
+      retainedBytes = 0;
+    }
+
+    private record CachedPreview(Preview preview, long createdAt, long lifetime) {
+    }
+  }
+
+  private record HoloUiPreview(HoloUiDataImporter importer, HoloUiDataImporter.Plan plan) implements Preview {
+    @Override
+    public long retainedBytes() {
+      return plan.retainedBytes();
+    }
+  }
+
+  private record LegacyPreview(LegacyGlossDataImporter importer, LegacyGlossDataImporter.Plan plan) implements Preview {
+    @Override
+    public long retainedBytes() {
+      return plan.retainedBytes();
+    }
+  }
+
+  private record DocumentPreview(DocumentImportService importer, DocumentImportPlan plan) implements Preview {
+    @Override
+    public long retainedBytes() {
+      return plan.retainedBytes();
+    }
+  }
+
+  @Director(name = "legacy", description = "Preview or apply a transactional Gloss data upgrade",
       descriptionKey = "command.help.import.legacy")
   public void legacy(
+      @Param(name = "mode", defaultValue = "preview", description = "preview or apply",
+          descriptionKey = "command.help.import.mode")
+      String mode,
       @Param(name = "sender", contextual = true)
       CommandSender sender
   ) {
-    if (!checkPermission(sender, PERMISSION)) {
+    boolean apply = "apply".equalsIgnoreCase(mode);
+    if (!checkPermission(sender, apply ? APPLY_PERMISSION : PERMISSION)) {
+      return;
+    }
+    if (!apply && !"preview".equalsIgnoreCase(mode)) {
+      sendLater(sender, () -> GlossCommandMessages.send(sender, GlossMessages.IMPORT_MODE_INVALID));
       return;
     }
     Gloss plugin = Gloss.instance;
-    GlossConfigFile configFile;
+    String identity = sender instanceof Player player ? player.getUniqueId().toString() : sender.getName();
     try {
-      configFile = plugin.configLoader().loadForReload();
-    } catch (IOException failure) {
-      GlossCommandMessages.send(sender, GlossMessages.IMPORT_CONFIG_UNREADABLE,
-          MessageArgument.untrusted("reason", safeReason(failure)));
-      return;
+      if (!apply) {
+        LegacyGlossDataImporter importer = new LegacyGlossDataImporter(plugin.getDataFolder(),
+            new LegacyGlossDataImporter.Services(plugin.configLoader(), plugin.getProjectTransaction(),
+                plugin.getPersistenceCoordinator()));
+        LegacyGlossDataImporter.Plan plan = importer.preview();
+        if (!rememberPreview("legacy", identity, new LegacyPreview(importer, plan))) {
+          sendLater(sender, () -> GlossCommandMessages.send(sender, GlossMessages.IMPORT_PREVIEW_CAPACITY));
+          return;
+        }
+        sendLater(sender, () -> {
+          GlossCommandMessages.send(sender, GlossMessages.IMPORT_DOCUMENT_PREVIEW,
+              MessageArgument.untrusted("source", "legacy"),
+              MessageArgument.trusted("count", plan.targets().size()));
+          reportLegacyEntries(sender, plan.entries());
+        });
+        return;
+      }
+      Preview cached = previews.take(new PreviewKey("legacy", identity), System.nanoTime());
+      if (!(cached instanceof LegacyPreview preview)) {
+        sendLater(sender, () -> GlossCommandMessages.send(sender, GlossMessages.IMPORT_LEGACY_PREVIEW_REQUIRED));
+        return;
+      }
+      LegacyGlossDataImporter.Result result = preview.importer().apply(preview.plan());
+      if (result.backupPath() != null) {
+        SchedulerUtils.runGlobal(plugin, plugin::reloadAll);
+      }
+      sendLater(sender, () -> {
+        GlossCommandMessages.send(sender, GlossMessages.IMPORT_LEGACY_DONE,
+            MessageArgument.trusted("migrated", result.count(LegacyGlossDataImporter.Status.MIGRATED)
+                + result.count(LegacyGlossDataImporter.Status.APPROXIMATED)),
+            MessageArgument.trusted("absorbed", result.count(LegacyGlossDataImporter.Status.ABSORBED)),
+            MessageArgument.trusted("overlaid", result.count(LegacyGlossDataImporter.Status.OVERLAID)),
+            MessageArgument.trusted("errors", result.count(LegacyGlossDataImporter.Status.ERROR)
+                + result.count(LegacyGlossDataImporter.Status.CONFLICT)
+                + result.count(LegacyGlossDataImporter.Status.UNSUPPORTED)));
+        reportLegacyEntries(sender, result.entries());
+      });
+    } catch (RuntimeException failure) {
+      Gloss.logExceptionStack(false, failure, "Legacy Gloss import could not be prepared.");
+      sendLater(sender, () -> GlossCommandMessages.send(sender, GlossMessages.IMPORT_CONFIG_UNREADABLE,
+          MessageArgument.untrusted("reason", safeReason(failure))));
     }
-    LegacyGlossDataImporter.Result result =
-        new LegacyGlossDataImporter(plugin.getDataFolder(), plugin.configLoader()).run(configFile);
-    plugin.reloadAll();
-    GlossCommandMessages.send(sender, GlossMessages.IMPORT_LEGACY_DONE,
-        MessageArgument.trusted("migrated", result.count(LegacyGlossDataImporter.Status.MIGRATED)),
-        MessageArgument.trusted("absorbed", result.count(LegacyGlossDataImporter.Status.ABSORBED)),
-        MessageArgument.trusted("overlaid", result.count(LegacyGlossDataImporter.Status.OVERLAID)),
-        MessageArgument.trusted("errors", result.count(LegacyGlossDataImporter.Status.ERROR)));
+  }
+
+  private void reportLegacyEntries(CommandSender sender, List<LegacyGlossDataImporter.Entry> entries) {
+    int reported = 0;
+    for (LegacyGlossDataImporter.Entry entry : entries) {
+      if (entry.status() == LegacyGlossDataImporter.Status.SKIPPED_ENVELOPE) {
+        continue;
+      }
+      if (reported++ >= MAX_DETAIL_LINES) {
+        return;
+      }
+      GlossCommandMessages.send(sender, GlossMessages.IMPORT_DOCUMENT_ENTRY,
+          MessageArgument.untrusted("state", entry.status().name().toLowerCase(Locale.ROOT)),
+          MessageArgument.untrusted("path", entry.path()),
+          MessageArgument.untrusted("reason", entry.detail() == null ? "" : entry.detail()));
+    }
   }
 
   private void reportPreview(CommandSender sender, LegacyImportPlan plan) {
@@ -306,9 +526,10 @@ public final class CommandGlossImport {
    * a conflict and skipped.
    */
   private void previewDocuments(CommandSender sender, LegacyImportSource source) {
+    DocumentImportService importer = documentImporter();
     DocumentImportPlan plan;
     try {
-      plan = documentImporter().preview(source);
+      plan = importer.preview(source);
     } catch (IOException | RuntimeException failure) {
       reportDocumentFailure(sender, source, failure);
       return;
@@ -319,6 +540,11 @@ public final class CommandGlossImport {
           MessageArgument.untrusted("path", plan.sourcePath()));
       return;
     }
+    String identity = sender instanceof Player player ? player.getUniqueId().toString() : sender.getName();
+    if (!rememberPreview(source.id(), identity, new DocumentPreview(importer, plan))) {
+      GlossCommandMessages.send(sender, GlossMessages.IMPORT_PREVIEW_CAPACITY);
+      return;
+    }
     GlossCommandMessages.send(sender, GlossMessages.IMPORT_DOCUMENT_PREVIEW,
         MessageArgument.untrusted("source", source.id()),
         MessageArgument.trusted("count", plan.entries().size()));
@@ -326,12 +552,17 @@ public final class CommandGlossImport {
   }
 
   private void applyDocuments(CommandSender sender, LegacyImportSource source) {
-    DocumentImportService importer = documentImporter();
+    String identity = sender instanceof Player player ? player.getUniqueId().toString() : sender.getName();
+    Preview cached = previews.take(new PreviewKey(source.id(), identity), System.nanoTime());
+    if (!(cached instanceof DocumentPreview preview)) {
+      GlossCommandMessages.send(sender, GlossMessages.IMPORT_DOCUMENT_PREVIEW_REQUIRED,
+          MessageArgument.untrusted("source", source.id()));
+      return;
+    }
     List<DocumentImportEntry> applied;
-    DocumentImportPlan plan;
+    DocumentImportPlan plan = preview.plan();
     try {
-      plan = importer.preview(source);
-      applied = importer.apply(plan, false);
+      applied = preview.importer().apply(plan, false);
     } catch (IOException | RuntimeException failure) {
       reportDocumentFailure(sender, source, failure);
       return;

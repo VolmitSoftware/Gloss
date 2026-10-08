@@ -24,7 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class BehaviorDocTest {
-    private static final String HEAD = "{\"schemaVersion\":1,\"revision\":1,";
+    private static final String HEAD = "{\"schemaVersion\":2,\"revision\":1,";
 
     private static BehaviorDoc parse(String body) {
         return BehaviorDoc.parse("test.json", HEAD + body + "}");
@@ -44,7 +44,7 @@ class BehaviorDocTest {
         assertTrue(doc.on().isEmpty());
         assertTrue(doc.stateSchemas().isEmpty());
         assertEquals("behaviors", BehaviorDoc.KIND);
-        assertThrows(IllegalArgumentException.class, () -> BehaviorDoc.parse("test.json", "{\"schemaVersion\":2,\"revision\":1}"));
+        assertThrows(IllegalArgumentException.class, () -> BehaviorDoc.parse("test.json", "{\"schemaVersion\":3,\"revision\":1}"));
     }
 
     @Test
@@ -171,6 +171,18 @@ class BehaviorDocTest {
         assertEquals(1, chat.actions().size());
         assertNull(runtime.entries().get(1).when());
         assertNull(runtime.entries().get(1).pattern());
+    }
+
+    @Test
+    void chatPatternsRequireBoundedRe2Syntax() {
+        assertTrue(refused("\"on\":[{\"trigger\":\"chat\",\"pattern\":\"(?=a)a\",\"do\":[]}]")
+            .contains("RE2"));
+        assertTrue(refused("\"matching\":{\"maxPatternCharacters\":2},\"on\":["
+            + "{\"trigger\":\"chat\",\"pattern\":\"long\",\"do\":[]}]").contains("maxPatternCharacters"));
+        assertTrue(refused("\"matching\":{\"maxProgramSize\":16},\"on\":["
+            + "{\"trigger\":\"chat\",\"pattern\":\"(a{100}){100}\",\"do\":[]}]").contains("maxProgramSize"));
+        assertTrue(refused("\"matching\":{\"syntax\":\"java\"},\"on\":[]").contains("syntax"));
+        assertTrue(refused("\"matching\":{\"maxInputCharacters\":0},\"on\":[]").contains("maxInputCharacters"));
     }
 
     @Test

@@ -3,6 +3,9 @@ package art.arcane.gloss.text;
 import art.arcane.gloss.Gloss;
 import art.arcane.gloss.GlossConfig;
 import art.arcane.gloss.expr.ExprScope;
+import art.arcane.gloss.expr.ExprRoleSnapshot;
+import art.arcane.gloss.expr.ExprVariableContext;
+import art.arcane.gloss.condition.RoleSnapshotScope;
 import art.arcane.gloss.nametag.NametagService;
 import art.arcane.gloss.particle.ParticleText;
 import art.arcane.gloss.util.common.TextUtils;
@@ -102,7 +105,8 @@ public final class TextPipeline implements TextRenderer {
         }
         if (functionsEnabled() && out.indexOf("{{") >= 0) {
             ExprScope activeScope = scope == null ? expressions.scope(viewer) : scope;
-            out = expressions.render(new PlayerTextScope(activeScope, viewer, this::playerName), out, resolvedText);
+            out = expressions.render(new PlayerTextScope(activeScope, viewer, this::playerName,
+                (role, captured) -> capturedName(viewer, role, captured)), out, resolvedText);
         }
         if (viewer != null && placeholdersEnabled() && out.indexOf('%') >= 0) {
             if (out.contains("%player_name%") || out.contains("%player_displayname%")) {
@@ -152,6 +156,18 @@ public final class TextPipeline implements TextRenderer {
         }
         NametagService nametags = plugin == null ? null : plugin.service(NametagService.class);
         return nametags == null ? subject.getName() : nametags.displayName(viewer, subject);
+    }
+
+    private String capturedName(Player viewer, String role, ExprScope scope) {
+        ExprRoleSnapshot subject = scope.variableContext().snapshots().get(role);
+        String name = String.valueOf(subject.variable("subject.name"));
+        NametagService nametags = plugin == null ? null : plugin.service(NametagService.class);
+        if (nametags == null || !"player".equals(subject.variable("subject.type"))) {
+            return name;
+        }
+        ExprScope pair = new RoleSnapshotScope(scope,
+            new ExprVariableContext(viewer, null, null, null, Map.of("subject", subject)));
+        return nametags.displayNameFromScope(viewer, pair);
     }
 
     public static boolean viewerDependent(String raw) {

@@ -1,6 +1,7 @@
 package art.arcane.gloss.bubble;
 
 import art.arcane.gloss.Gloss;
+import art.arcane.gloss.service.VisibilityGovernor;
 import art.arcane.gloss.bedrock.BedrockPolicy;
 import art.arcane.gloss.bedrock.BedrockSurface;
 import art.arcane.gloss.api.HologramPresentation;
@@ -57,7 +58,6 @@ public final class ChatBubblesService implements Listener, RegistryOwner {
     private static final String STATE_FILE_NAME = "bubble-styles.json";
     private static final int STYLE_PERSIST_DELAY_TICKS = 40;
     static final int EXPIRY_SWEEP_INTERVAL_TICKS = 20;
-    private static final int MAX_ACTIVE_BUBBLES = 2048;
     private final Gloss plugin;
     private final ShippedDefaults defaults;
     private final DocumentRegistry<BubbleStyleDoc> registry;
@@ -296,6 +296,10 @@ public final class ChatBubblesService implements Listener, RegistryOwner {
         Vector offset = style.offset();
         Location captured = eye.clone().add(offset.getX(), offset.getY(), offset.getZ());
         UUID senderId = sender.getUniqueId();
+        SenderState current = bubbles.get(senderId);
+        if (current != null && current.rejects(style.maxPerSender(), style.overflow())) {
+            return;
+        }
         synchronized (bubbleLifecycleLock) {
             if (!acceptingBubbles) {
                 return;
@@ -315,6 +319,8 @@ public final class ChatBubblesService implements Listener, RegistryOwner {
                 viewer -> !hiddenOnBedrock(viewer)
                     && (!style.hideOwn() || !senderId.equals(viewer.getUniqueId()))
                     && viewer.canSee(sender) && style.show().matches(plugin, viewer));
+        plugin.holograms().setVisibilitySurface(hologram, VisibilityGovernor.Surface.BUBBLE);
+            plugin.holograms().setRefresh(hologram, style.refresh());
             hologram.setStyle(style.style());
             hologram.setBox(style.box());
             hologram.setParticleLayers(style.particleLayers());
@@ -327,15 +333,15 @@ public final class ChatBubblesService implements Listener, RegistryOwner {
             SenderPublication publication;
             synchronized (bubbleLifecycleLock) {
                 publication = acceptingBubbles
-                    ? publishBubble(bubbles, senderId, eyePoint, record, style.maxPerSender())
+                    ? publishBubble(bubbles, senderId, eyePoint, record, style.maxPerSender(), style.overflow())
                     : null;
             }
             if (publication == null) {
                 retire(record);
                 return;
             }
-            if (publication.retired() != null) {
-                retire(publication.retired());
+            for (BubbleRecord retired : publication.retired()) {
+                retire(retired);
             }
             SenderState state = publication.state();
             BubbleRecord boundRecord = record;
@@ -489,8 +495,9 @@ public final class ChatBubblesService implements Listener, RegistryOwner {
     }
 
     private boolean reserveBubble() {
+        int limit = plugin.cfg().bubbles().maxActive();
         int active = activeBubbles.get();
-        while (active < MAX_ACTIVE_BUBBLES) {
+        while (active < limit) {
             if (activeBubbles.compareAndSet(active, active + 1)) {
                 return true;
             }
@@ -538,11 +545,14 @@ public final class ChatBubblesService implements Listener, RegistryOwner {
     }
 
     static SenderPublication publishBubble(ConcurrentMap<UUID, SenderState> states, UUID senderId,
-                                             EyePoint eyePoint, BubbleRecord record, int limit) {
+                                             EyePoint eyePoint, BubbleRecord record, int limit, String overflow) {
         AtomicReference<SenderPublication> result = new AtomicReference<>();
         states.compute(senderId, (ignored, existing) -> {
             SenderState state = existing == null ? new SenderState() : existing;
-            BubbleRecord retired = state.addAtLimit(record, limit, eyePoint);
+            if (state.rejects(limit, overflow)) {
+                return state;
+            }
+            List<BubbleRecord> retired = state.addAtLimit(record, limit, eyePoint);
             result.set(new SenderPublication(state, retired));
             return state;
         });
@@ -639,6 +649,10 @@ public final class ChatBubblesService implements Listener, RegistryOwner {
         final List<BubbleRecord> live = new CopyOnWriteArrayList<>();
         volatile EyePoint lastEye;
 
+        synchronized boolean rejects(int limit, String overflow) {
+            return overflow.equals("reject-new") && live.size() >= limit;
+        }
+
         synchronized void add(BubbleRecord record) {
             record.lineIndex = live.size();
             live.add(record);
@@ -657,8 +671,12 @@ public final class ChatBubblesService implements Listener, RegistryOwner {
             return true;
         }
 
-        synchronized BubbleRecord addAtLimit(BubbleRecord record, int limit, EyePoint eyePoint) {
-            BubbleRecord retired = removeOldestAtLimit(limit);
+        synchronized List<BubbleRecord> addAtLimit(BubbleRecord record, int limit, EyePoint eyePoint) {
+            List<BubbleRecord> retired = new ArrayList<>();
+            BubbleRecord oldest;
+            while ((oldest = removeOldestAtLimit(limit)) != null) {
+                retired.add(oldest);
+            }
             lastEye = eyePoint;
             add(record);
             return retired;
@@ -783,7 +801,7 @@ public final class ChatBubblesService implements Listener, RegistryOwner {
     record ShimmerFrame(long bandIndex, List<String> base, List<String> lines) {
     }
 
-    record SenderPublication(SenderState state, BubbleRecord retired) {
+    record SenderPublication(SenderState state, List<BubbleRecord> retired) {
     }
 
     private record StyleSnapshot(Map<String, ResolvedStyle> resolved,

@@ -16,7 +16,7 @@ import java.util.TreeMap;
  */
 public final class GlyphRegistry {
     public static final GlyphRegistry EMPTY = new GlyphRegistry(GlyphDoc.DEFAULT_NAMESPACE, GlyphDoc.DEFAULT_FONT,
-        Map.of(), Map.of(), Map.of(), new Spaces(false, 0, 0, Map.of()));
+        Map.of(), Map.of(), Map.of(), new Spaces(false, 0, 0, Map.of()), Map.of());
 
     private final String namespace;
     private final String font;
@@ -24,16 +24,19 @@ public final class GlyphRegistry {
     private final Map<String, ResolvedGlyph> overlays;
     private final Map<String, String> emoji;
     private final Spaces spaces;
+    private final Map<String, WaypointAsset> waypointStyles;
     private final Map<String, ResolvedGlyph> byImage;
 
     private GlyphRegistry(String namespace, String font, Map<String, ResolvedGlyph> glyphs,
-                          Map<String, ResolvedGlyph> overlays, Map<String, String> emoji, Spaces spaces) {
+                          Map<String, ResolvedGlyph> overlays, Map<String, String> emoji, Spaces spaces,
+                          Map<String, WaypointAsset> waypointStyles) {
         this.namespace = namespace;
         this.font = font;
         this.glyphs = Map.copyOf(glyphs);
         this.overlays = Map.copyOf(overlays);
         this.emoji = Map.copyOf(emoji);
         this.spaces = spaces;
+        this.waypointStyles = Map.copyOf(waypointStyles);
         Map<String, ResolvedGlyph> images = new LinkedHashMap<>();
         for (ResolvedGlyph glyph : glyphs.values()) {
             images.putIfAbsent(glyph.image(), glyph);
@@ -70,7 +73,7 @@ public final class GlyphRegistry {
      */
     public record ResolvedGlyph(String id, String image, int height, int ascent, String fallback,
                                 int widthPx, int frames, List<Integer> codepoints, boolean overlay,
-                                String anchor) {
+                                String anchor, String namespace, String font) {
         public ResolvedGlyph {
             codepoints = List.copyOf(codepoints);
         }
@@ -96,10 +99,11 @@ public final class GlyphRegistry {
         Map<String, ResolvedGlyph> overlays = new LinkedHashMap<>();
         Map<String, String> emoji = new LinkedHashMap<>();
         Map<String, String> owners = new LinkedHashMap<>();
+        Map<String, WaypointAsset> waypointStyles = new TreeMap<>();
+        Map<String, String> waypointImages = new TreeMap<>();
         Map<String, GlyphDoc> ordered = new TreeMap<>(documents);
         String namespace = null;
         String font = null;
-        String source = null;
         boolean spacesEnabled = false;
         int minimum = 0;
         int maximum = 0;
@@ -110,11 +114,19 @@ public final class GlyphRegistry {
             if (namespace == null) {
                 namespace = doc.namespace();
                 font = doc.font();
-                source = documentId;
-            } else if (!namespace.equals(doc.namespace()) || !font.equals(doc.font())) {
-                throw new IllegalArgumentException("glyphs/" + documentId + " targets " + doc.namespace() + ":"
-                    + doc.font() + " but glyphs/" + source + " targets " + namespace + ":" + font
-                    + "; one pack carries one font");
+            }
+            for (GlyphDoc.WaypointStyleAsset style : doc.waypointStyles()) {
+                String key = doc.namespace() + ":" + style.id();
+                if (waypointStyles.putIfAbsent(key, new WaypointAsset(doc.namespace(), style)) != null) {
+                    throw new IllegalArgumentException("Duplicate waypoint style: " + key);
+                }
+                for (GlyphDoc.WaypointSprite sprite : style.sprites()) {
+                    String spriteKey = doc.namespace() + ":" + sprite.id();
+                    String previous = waypointImages.putIfAbsent(spriteKey, sprite.image());
+                    if (previous != null && !previous.equals(sprite.image())) {
+                        throw new IllegalArgumentException("Waypoint sprite " + spriteKey + " names different images");
+                    }
+                }
             }
             for (String id : doc.declaredIds()) {
                 String previous = owners.putIfAbsent(id, documentId);
@@ -139,7 +151,7 @@ public final class GlyphRegistry {
                 GlyphDoc doc = entry.getValue();
                 for (GlyphDoc.Glyph glyph : doc.glyphs()) {
                     ResolvedGlyph resolved = resolve(glyph.id(), glyph.image(), glyph.height(), glyph.ascent(),
-                        glyph.fallback(), glyph.width(), glyph.frames(), false, null, ledger, sizes);
+                        glyph.fallback(), glyph.width(), glyph.frames(), false, null, ledger, sizes, doc);
                     glyphs.put(resolved.id(), resolved);
                     if (glyph.emoji() != null) {
                         emoji.put(glyph.emoji(), resolved.id());
@@ -147,7 +159,7 @@ public final class GlyphRegistry {
                 }
                 for (GlyphDoc.Overlay overlay : doc.overlays()) {
                     ResolvedGlyph resolved = resolve(overlay.id(), overlay.image(), overlay.height(),
-                        overlay.ascent(), "", null, 1, true, overlay.anchor(), ledger, sizes);
+                        overlay.ascent(), "", null, 1, true, overlay.anchor(), ledger, sizes, doc);
                     overlays.put(resolved.id(), resolved);
                 }
             }
@@ -159,7 +171,14 @@ public final class GlyphRegistry {
         });
 
         return new GlyphRegistry(namespace, font, glyphs, overlays, emoji,
-            new Spaces(allocateSpaces, spaceMinimum, spaceMaximum, spaceCodepoints));
+            new Spaces(allocateSpaces, spaceMinimum, spaceMaximum, spaceCodepoints), waypointStyles);
+    }
+
+    public Map<String, WaypointAsset> waypointStyles() {
+        return waypointStyles;
+    }
+
+    public record WaypointAsset(String namespace, GlyphDoc.WaypointStyleAsset style) {
     }
 
     public String namespace() {
@@ -225,13 +244,13 @@ public final class GlyphRegistry {
 
     private static ResolvedGlyph resolve(String id, String image, int height, int ascent, String fallback,
                                          Integer declaredWidth, int frames, boolean overlay, String anchor,
-                                         GlyphLedger ledger, ImageProbe probe) {
+                                         GlyphLedger ledger, ImageProbe probe, GlyphDoc doc) {
         List<Integer> codepoints = new ArrayList<>(frames);
         for (int frame = 0; frame < frames; frame++) {
             codepoints.add(ledger.codepointFor(frame == 0 ? id : id + "#" + frame));
         }
         return new ResolvedGlyph(id, image, height, ascent, fallback,
-            advance(image, height, frames, declaredWidth, probe), frames, codepoints, overlay, anchor);
+            advance(image, height, frames, declaredWidth, probe), frames, codepoints, overlay, anchor, doc.namespace(), doc.font());
     }
 
     /**

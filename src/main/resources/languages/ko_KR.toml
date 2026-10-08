@@ -13,6 +13,15 @@
 #
 # === 변수 ===
 # 변수 이름을 변경하지 말고 각 메시지에 원래 있는 변수만 사용하세요.
+#   {viewers}  관전자
+#   {entries}  캐시 항목 수
+#   {admissions}  허용
+#   {refusals}  거부
+#   {waiting}  대기 중
+#   {expired}  만료된 차례
+#   {retiring}  정리 대기
+#   {bytes}  보관 데이터 (바이트)
+#   {completed}  완료
 #   {absorbed}  기존 데이터에 병합한 가져오기 항목 수
 #   {active}  활성 공급자 수
 #   {actual}  현재 리비전
@@ -225,8 +234,8 @@ indicators = "피해 및 회복 표시 도구"
 status = "런타임 개수를 간단히 표시"
 import = "원본 파일을 수정하지 않고 레거시 홀로그램 마이그레이션"
 "import.apply" = "덮어쓰기 없는 레거시 홀로그램 마이그레이션 적용"
-"import.holoui" = "plugins/holoui에서 HoloUi 데이터 복사, 기존 가져오기 덮어쓰기"
-"import.legacy" = "병합 이전의 Gloss 데이터 파일을 v2 엔벨로프로 마이그레이션"
+"import.holoui" = "HoloUi 트랜잭션 가져오기를 미리 보거나 적용"
+"import.legacy" = "Gloss 데이터 트랜잭션 업그레이드를 미리 보거나 적용"
 "import.preview" = "비파괴 레거시 홀로그램 마이그레이션 미리보기"
 item = "커스텀 아이템 제공자 도구"
 "item.export" = "웹 에디터용 커스텀 아이템 카탈로그 내보내기"
@@ -294,6 +303,9 @@ web = "Gloss 웹 편집기 열기 및 관리"
 "web.sessions.revoke" = "웹 편집 권한 취소"
 "web.sessions.status" = "웹 편집기 세션 하나 표시"
 language = "개인 언어 또는 서버 기본 언어 선택"
+
+"import.mode" = "preview 또는 apply"
+"import.overwrite" = "기존 파일 교체 미리 보기"
 
 [command.help.arg]
 reset_name = "초기화할 이름, 모든 기본 제공 기본값은 *"
@@ -421,6 +433,9 @@ emoji = "&7이모지: &f{enabled}&8/&f{total}"
 animations = "&7애니메이션: &f{count}"
 effects = "&7말풍선: &f{bubbles} &8| &7표시기: &f{indicators} &8| &7드롭: &f{drops}"
 
+visibility = "&7표시 중인 엔티티 복사본: &f{entities} &8| &7관전자: &f{viewers} &8| &7허용: &f{admissions} &8| &7거부: &f{refusals} &8| &7대기 중: &f{waiting} &8| &7만료된 차례: &f{expired} &8| &7정리 대기: &f{retiring}"
+images = "&7이미지 캐시: &f{entries} &8| &7대기 중: &f{pending} &8| &7보관 데이터: &f{bytes} &7바이트 &8| &7완료: &f{completed} &8| &7거부: &f{refusals}"
+
 [command.reset]
 done = "&8[&dGloss&8] &a기본 제공 {kind} 기본값 &f{count}&a개를 복원했습니다."
 none = "&8[&dGloss&8] &c'&f{name}&c'와(과) 일치하는 기본 제공 {kind} 기본값이 없습니다."
@@ -433,12 +448,19 @@ style_unknown = "&8[&dGloss&8] &c이름이 '&f{style}&c'인 말풍선 스타일�
 [command.import]
 config_unreadable = "&8[&dGloss&8] &cgloss.toml을 불러올 수 없습니다: &f{reason}"
 
+mode_invalid = "&8[&dGloss&8] &c가져오기 모드로 preview 또는 apply를 사용하세요."
+preview_capacity = "&8[&dGloss&8] &c검토한 가져오기 캐시가 가득 찼습니다. 기존 미리 보기를 적용하거나 만료될 때까지 기다린 후 다시 미리 보세요."
+
 [command.import.holoui]
 missing = "&8[&dGloss&8] &cGloss 데이터 폴더 옆에 holoui 데이터 폴더가 없습니다."
 done = "&8[&dGloss&8] &aHoloUi 가져오기 완료: 복사 &f{copied}&a개, 건너뜀 &f{skipped}&a개, 설정 키 &f{overlaid}&a개, 오류 &f{errors}&a개."
 
+preview_required = "&8[&dGloss&8] &c먼저 /gloss import holoui mode=preview 명령을 실행하세요. 미리 보기에는 설정된 유효 기간이 적용됩니다. 기존 파일 교체를 미리 보려면 overwrite=true를 추가하세요."
+
 [command.import.legacy]
 done = "&8[&dGloss&8] &a레거시 마이그레이션 완료: 마이그레이션 &f{migrated}&a개, 흡수 &f{absorbed}&a개, 설정 키 &f{overlaid}&a개, 오류 &f{errors}&a개."
+
+preview_required = "&8[&dGloss&8] &c먼저 /gloss import legacy mode=preview 명령을 실행하세요. 미리 보기에는 설정된 유효 기간이 적용됩니다."
 
 [director.help]
 no_subcommands = "이 페이지에는 하위 명령어가 없습니다."
@@ -829,6 +851,7 @@ empty = "(비어 있음)"
 # Lane message tables. Each lane appends its [gloss.message.<lane>] and [command.help.<group>]
 # tables inside its own anchor so parallel branches never share a line.
 # --- lane:screen ---
+
 [gloss.message.screen]
 "surfaces.empty" = "&8[&dGloss&8] &7불러온 서피스가 없습니다."
 "surfaces.unknown" = "&8[&dGloss&8]: &c&f{id}&c 서피스가 없습니다."
@@ -865,6 +888,7 @@ who = "각 HUD 칸을 어떤 플러그인이 점유하는지 표시"
 "who.player" = "확인할 플레이어. 기본값은 자신"
 
 # --- lane:chat ---
+
 [gloss.message.chat]
 filtered = "&8[&dGloss&8]: &c채팅 필터가 메시지를 차단했습니다."
 too_fast = "&8[&dGloss&8]: &e다음 메시지를 보내기 전에 잠시 기다리세요."
@@ -915,6 +939,7 @@ sample = "접속 중인 모든 플레이어에 대해 지금 수집"
 "sample.id" = "리더보드 문서 ID"
 
 # --- lane:forms ---
+
 [gloss.message.forms]
 icon_unsupported = "&7상자 칸에는 표시할 수 없습니다 ({kind})"
 no_inventories = "&8[&dGloss&8]: &7설정된 상자 메뉴가 없습니다."
@@ -964,6 +989,7 @@ hologram_actions_header = "&8[&dGloss&8] &7홀로그램 &f{id}&7 동작 (&f{coun
 hologram_actions_entry = "&8[&dGloss&8] &7  &f{kind}&7 / &f{value}"
 
 # --- lane:world ---
+
 [gloss.message.world]
 players_only = "&c이 명령은 플레이어만 실행할 수 있습니다."
 disabled = "&c이 기능은 gloss.toml에서 꺼져 있습니다."
@@ -1055,6 +1081,7 @@ color = "이름이 있는 텍스트 색상"
 ticks = "발광이 지속되는 틱, 0이면 유지"
 
 # --- lane:behaviors ---
+
 [command.help.behavior]
 root = "동작 문서를 살펴보고 실행합니다"
 list = "불러온 동작 문서를 나열합니다"
@@ -1119,6 +1146,7 @@ fired = "&8[&dGloss&8]: &a{id}&a 의 항목 &f{line}&a 을(를) 실행했습니�
 "explain.missing" = "&8[&dGloss&8]: &c\"{id}\" 라는 {kind} 이(가) 없습니다."
 
 # --- lane:authoring ---
+
 [command.help.pack]
 root = "Gloss 팩 설치 및 관리"
 install = "파일이나 HTTPS 주소에서 팩을 설치합니다"
@@ -1188,8 +1216,10 @@ preview = "&8[&dGloss&8] &f{source}&7 이(가) 문서 &f{count}&7 개를 씁니�
 entry = "&8[&dGloss&8] &7{state} &f{path}&7 {reason}"
 applied = "&8[&dGloss&8] &f{source}&7 에서 문서 &f{count}&7 개를 가져왔습니다."
 absent = "&8[&dGloss&8] &7&f{path}&7 에 &f{source}&7 데이터가 없습니다."
+preview_required = "&8[&dGloss&8] &c먼저 /gloss import preview {source} 명령을 실행하세요. 미리 보기에는 설정된 유효 기간이 적용됩니다."
 
 # --- lane:forge ---
+
 [gloss.message.forge]
 disabled = "&8[&dGloss&8] &c글리프 포지가 꺼져 있습니다. gloss.toml에서 features.forge를 true로 설정하세요."
 built = "&8[&dGloss&8] &a팩 &f{value}&a을(를) 글리프 {count}개로 빌드했습니다."
@@ -1211,6 +1241,7 @@ serve = "내장 팩 리스너를 시작하거나 중지"
 reset = "기본 제공 글리프 문서를 복원"
 
 # --- lane:fixes ---
+
 [gloss.message.fixes]
 status_bedrock = "&7bedrock: &f{name}&7, &f{count}&7명 접속 중"
 status_textimage_oversize = "&7textimage-크기초과: &f{count}"

@@ -13,6 +13,7 @@ import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -76,7 +77,7 @@ final class ProxyServerLinksTest {
     }
 
     @Test
-    void disabledOrHiddenMotdPublishesNoLinks() throws IOException {
+    void legacyLinksFollowFeatureToggleAndStatusVisibility() throws IOException {
         Files.writeString(seeded(), """
             {"schemaVersion":1,"show":false,"entries":[{"lines":["Network"]}],
              "links":[{"type":"website","url":"https://example.org"}]}
@@ -100,6 +101,27 @@ final class ProxyServerLinksTest {
         verify(disabled, never()).setServerLinks(anyList());
     }
 
+    @Test
+    void explicitLinksWorkWithStatusDisabledAndAnEmptyListClearsClientLinks() throws IOException {
+        Files.writeString(seeded(), """
+            {"schemaVersion":1,"show":false,"entries":[{"lines":["Hidden"]}],
+             "serverLinks":{"enabled":true,"links":[{"type":"website","url":"https://example.org"}]}}
+            """);
+        Files.writeString(directory.resolve("proxy.json"), """
+            {"schemaVersion":1,"motd":{"enabled":false}}
+            """);
+        Player player = player(ProtocolVersion.MINECRAFT_1_21);
+        new ProxyServerLinks(text()).send(player, ProxyDocuments.load(directory));
+        assertEquals(1, capture(player).size());
+        Files.writeString(directory.resolve("motd.json"), """
+            {"schemaVersion":1,"show":false,"entries":[{"lines":["Hidden"]}],
+             "serverLinks":{"enabled":true,"links":[]}}
+            """);
+        Player cleared = player(ProtocolVersion.MINECRAFT_1_21);
+        new ProxyServerLinks(text()).send(cleared, ProxyDocuments.load(directory));
+        assertTrue(capture(cleared).isEmpty());
+    }
+
     private Path seeded() throws IOException {
         ProxyDocuments.seed(directory);
         return directory.resolve("motd.json");
@@ -112,6 +134,7 @@ final class ProxyServerLinksTest {
     private static Player player(ProtocolVersion version) {
         Player player = mock(Player.class);
         when(player.getProtocolVersion()).thenReturn(version);
+        when(player.getUniqueId()).thenReturn(UUID.randomUUID());
         return player;
     }
 

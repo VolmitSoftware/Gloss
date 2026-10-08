@@ -11,6 +11,13 @@
     "presentation"
   ],
   "properties": {
+    "preset": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1
+    },
     "schemaVersion": {
       "description": "Document format version. Files on any other version are ignored.",
       "type": "integer",
@@ -177,6 +184,19 @@
           "type": "integer",
           "minimum": 1,
           "maximum": 72000
+        },
+        "flags": {
+          "type": "array",
+          "uniqueItems": true,
+          "maxItems": 3,
+          "items": {
+            "enum": [
+              "darken_sky",
+              "play_boss_music",
+              "create_fog"
+            ]
+          },
+          "default": []
         }
       }
     },
@@ -327,10 +347,148 @@
                 "type": "integer",
                 "minimum": 1,
                 "maximum": 72000
+              },
+              "flags": {
+                "type": "array",
+                "uniqueItems": true,
+                "maxItems": 3,
+                "items": {
+                  "enum": [
+                    "darken_sky",
+                    "play_boss_music",
+                    "create_fog"
+                  ]
+                },
+                "default": []
               }
             }
           }
         }
+      }
+    },
+    "group": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}$",
+      "default": "main",
+      "description": "Bossbar selection group. Each group selects independently."
+    },
+    "automatic": {
+      "type": "boolean",
+      "default": true,
+      "description": "Include in persistent selection; false makes the surface available only to events and surface actions."
+    },
+    "delivery": {
+      "type": "object",
+      "properties": {
+        "mode": {
+          "enum": [
+            "queue",
+            "replace",
+            "drop"
+          ],
+          "default": "replace"
+        },
+        "preempt": {
+          "enum": [
+            "higher",
+            "always",
+            "never"
+          ],
+          "default": "always"
+        },
+        "maxPending": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 256,
+          "default": 32
+        },
+        "overflow": {
+          "enum": [
+            "drop-oldest",
+            "reject"
+          ],
+          "default": "reject"
+        },
+        "cooldownTicks": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 72000,
+          "default": 0
+        },
+        "deduplicate": {
+          "enum": [
+            "none",
+            "purpose",
+            "content"
+          ],
+          "default": "none"
+        },
+        "expireTicks": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 72000,
+          "default": 1200
+        }
+      },
+      "additionalProperties": false
+    },
+    "on": {
+      "type": "array",
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "required": [
+          "trigger"
+        ],
+        "properties": {
+          "trigger": {
+            "enum": [
+              "join",
+              "world_change",
+              "server_change",
+              "interval"
+            ]
+          },
+          "everyTicks": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1728000
+          },
+          "delayTicks": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 72000,
+            "default": 0
+          },
+          "when": {
+            "type": "string",
+            "default": "true"
+          }
+        },
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "trigger": {
+                  "const": "interval"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "everyTicks"
+              ]
+            },
+            "else": {
+              "not": {
+                "required": [
+                  "everyTicks"
+                ]
+              }
+            }
+          }
+        ]
       }
     }
   }

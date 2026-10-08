@@ -54,19 +54,19 @@ class PacketLayoutSinkTest {
             PacketEvents.setAPI(new ProfileApi(source, player));
             TablistLayoutService.SlotEntry cell = new TablistLayoutService.SlotEntry(
                 TablistLayoutRuntime.slotId(0), TablistLayoutRuntime.slotName(0), 100_000,
-                "[Staff] ListedPlayer", "ListedPlayer", 73);
+                "[Staff] ListedPlayer", "ListedPlayer", 73, true, new TablistLayoutDefinition.Skin(texture.getValue(), texture.getSignature()));
             Method infoMethod = PacketLayoutSink.class.getDeclaredMethod("info", TablistLayoutService.SlotEntry.class);
             infoMethod.setAccessible(true);
 
             WrapperPlayServerPlayerInfoUpdate.PlayerInfo info =
-                (WrapperPlayServerPlayerInfoUpdate.PlayerInfo) infoMethod.invoke(null, cell);
+                (WrapperPlayServerPlayerInfoUpdate.PlayerInfo) infoMethod.invoke(new PacketLayoutSink(), cell);
 
             assertEquals(cell.id(), info.getProfileId());
             assertEquals(cell.name(), info.getGameProfile().getName());
             assertEquals(73, info.getLatency());
             assertEquals(100_000, info.getListOrder());
             assertEquals(1, info.getGameProfile().getTextureProperties().size());
-            assertSame(texture, info.getGameProfile().getTextureProperties().getFirst());
+            assertEquals(texture.getValue(), info.getGameProfile().getTextureProperties().getFirst().getValue());
             assertEquals("texture-signature", info.getGameProfile().getTextureProperties().getFirst().getSignature());
         } finally {
             PacketEvents.setAPI(previousApi);

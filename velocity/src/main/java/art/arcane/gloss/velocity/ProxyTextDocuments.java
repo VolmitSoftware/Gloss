@@ -1,5 +1,7 @@
 package art.arcane.gloss.velocity;
 
+import art.arcane.gloss.doc.DocumentPresetCatalog;
+
 import art.arcane.gloss.animation.AnimationClip;
 import art.arcane.gloss.animation.AnimationMode;
 import art.arcane.gloss.emoji.UnicodeText;
@@ -33,10 +35,10 @@ public final class ProxyTextDocuments {
     private ProxyTextDocuments() {
     }
 
-    public static Content load(Path directory, ProxyDocuments.Settings settings) throws IOException {
+    public static Content load(Path directory, ProxyDocuments.Settings settings, DocumentPresetCatalog presets) throws IOException {
         List<Emoji> emoji = new ArrayList<>();
         for (Path path : documents(directory.resolve("emoji"))) {
-            JsonObject document = ProxyDocuments.read(path, SCHEMA_VERSION);
+            JsonObject document = ProxyDocuments.resolve(presets, "emoji", ProxyDocuments.read(path, SCHEMA_VERSION));
             if (document.isEmpty()) {
                 continue;
             }
@@ -46,7 +48,7 @@ public final class ProxyTextDocuments {
         List<Path> paths = documents(directory.resolve("animations"));
         Map<String, Animation> animations = new HashMap<>(Math.max(4, paths.size() * 2));
         for (Path path : paths) {
-            JsonObject document = ProxyDocuments.read(path, SCHEMA_VERSION);
+            JsonObject document = ProxyDocuments.resolve(presets, "animations", ProxyDocuments.read(path, SCHEMA_VERSION));
             if (document.isEmpty()) {
                 continue;
             }

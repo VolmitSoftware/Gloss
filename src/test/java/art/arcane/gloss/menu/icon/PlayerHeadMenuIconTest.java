@@ -234,7 +234,7 @@ public class PlayerHeadMenuIconTest {
         defaults.editorSync(), defaults.debug(), defaults.customItems(),
         new GlossConfig.PlayerHeads(enabled, heads.cacheMinutes(), heads.unknownCacheMinutes(),
             heads.maxCachedProfiles(), heads.unknownFallbackItem()),
-        defaults.integration(), defaults.modules());
+        defaults.integration(), defaults.modules(), defaults.visibility(), defaults.images(), defaults.teams(), defaults.imports());
   }
 
   private static Player player(String name) {

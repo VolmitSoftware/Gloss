@@ -4,6 +4,7 @@ import art.arcane.gloss.Gloss;
 import art.arcane.gloss.config.MenuDefinitionData;
 import art.arcane.gloss.doc.DocumentDelta;
 import art.arcane.gloss.doc.DocumentRegistry;
+import art.arcane.gloss.doc.DocumentPresetCatalog;
 import art.arcane.gloss.doc.DocumentRevisionConflictException;
 import art.arcane.gloss.doc.DocumentTree;
 import art.arcane.gloss.doc.GlossDocument;
@@ -199,13 +200,14 @@ public final class MenuCatalog implements RegistryOwner {
     if (registry.get(id) != null) {
       throw new FileAlreadyExistsException(id);
     }
-    MenuDocument expected = MenuDocumentParser.parse(id, source);
+    DocumentPresetCatalog presets = DocumentPresetCatalog.read(menuDir.toPath().toAbsolutePath().getParent());
+    MenuDocument expected = MenuDocumentParser.parse(id, source, presets);
     File target = new File(menuDir, id + MENU_EXTENSION);
     if (!DocumentTree.isDocument(menuDir, target)) {
       throw new IOException("external menu creation is not a regular menu file: " + target);
     }
     String persistedSource = Files.readString(target.toPath(), StandardCharsets.UTF_8);
-    MenuDocument persisted = MenuDocumentParser.parse(id, persistedSource);
+    MenuDocument persisted = MenuDocumentParser.parse(id, persistedSource, presets);
     if (!persisted.revision().equals(expected.revision())) {
       throw new IOException("external menu creation does not match the persisted document");
     }
@@ -250,10 +252,11 @@ public final class MenuCatalog implements RegistryOwner {
     List<MenuDocument> documents;
     try {
       documents = new ArrayList<>(requiredSources.size());
+      DocumentPresetCatalog presets = DocumentPresetCatalog.read(menuDir.toPath().toAbsolutePath().getParent());
       for (Map.Entry<String, String> entry : requiredSources.entrySet()) {
-        documents.add(MenuDocumentParser.parse(entry.getKey(), entry.getValue()));
+        documents.add(MenuDocumentParser.parse(entry.getKey(), entry.getValue(), presets));
       }
-    } catch (RuntimeException failure) {
+    } catch (IOException | RuntimeException failure) {
       return CompletableFuture.failedFuture(failure);
     }
     List<MenuDocument> parsed = List.copyOf(documents);

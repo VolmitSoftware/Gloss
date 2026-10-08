@@ -3,15 +3,20 @@ package art.arcane.gloss.importer;
 
 import art.arcane.gloss.condition.ShowCondition;
 import art.arcane.gloss.Gloss;
+import art.arcane.volmlib.util.config.TomlCodec;
 import art.arcane.gloss.animation.AnimationDoc;
 import art.arcane.gloss.bubble.BubbleStyleDoc;
 import art.arcane.gloss.config.GlossConfigFile;
 import art.arcane.gloss.config.GlossConfigLoader;
-import art.arcane.gloss.doc.AtomicFiles;
+import art.arcane.gloss.doc.DocumentHashes;
+import art.arcane.gloss.persistence.GlossPersistenceCoordinator;
+import art.arcane.gloss.persistence.GlossProjectTransaction;
 import art.arcane.gloss.doc.DocumentEnvelope;
 import art.arcane.gloss.drop.RealDropSettingsDoc;
 import art.arcane.gloss.emoji.EmojiDoc;
 import art.arcane.gloss.hologram.HologramDoc;
+import art.arcane.gloss.history.HistoryKinds;
+import art.arcane.gloss.editor.sync.EditorSyncDocumentKind;
 import art.arcane.gloss.motd.MotdDoc;
 import art.arcane.gloss.doc.DocumentParsers;
 import com.google.gson.JsonArray;
@@ -28,9 +33,6 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -41,33 +43,26 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.function.Function;
 import java.util.logging.Level;
-import java.util.stream.Stream;
 
 /**
- * In-place migration of supported pre-merger Gloss data inside the current data folder to current
- * document envelopes. A file without {@code schemaVersion} is legacy; its original bytes are
- * backed up to {@code import-backups/<timestamp>/<kind>/<file>} before the rewrite, which makes
- * the run idempotent by construction — files that already carry the envelope are skipped.
- *
- * <p>Kinds: {@code holograms/} ({id,world,x,y,z,lines} → anchor envelope, embedded id dropped),
- * {@code emoji/} ({trigger,emoji,enabled} → envelope, the {@code <uses :id:>} sentinel becomes an
- * empty trigger), {@code animations/} ({target-framerate,animation-type,frames} → lowercased
- * mode + frameIntervalMs), and a legacy {@code config.yml} (mechanics overlay onto gloss.toml,
- * then renamed {@code config.yml.imported}).
+ * Prepares supported older Gloss content before publishing a validated transaction. Original
+ * documents are archived by the transaction; config.yml remains unchanged and a source-hash
+ * receipt prevents applying the same configuration overlay twice.
  */
 public final class LegacyGlossDataImporter {
-    public static final String BACKUP_DIRECTORY_NAME = "import-backups";
+    public static final String RECEIPT_FILE_NAME = "legacy-import.json";
     public static final String LEGACY_CONFIG_FILE_NAME = "config.yml";
-    public static final String IMPORTED_CONFIG_FILE_NAME = "config.yml.imported";
 
-    private static final DateTimeFormatter BACKUP_TIMESTAMP = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss");
     private static final String JSON_EXTENSION = ".json";
     private static final String LEGACY_NO_TRIGGER = "<uses :id:>";
 
     public enum Status {
         MIGRATED,
+        APPROXIMATED,
+        UNSUPPORTED,
         SKIPPED_ENVELOPE,
         SKIPPED_NOTE,
+        CONFLICT,
         ABSORBED,
         OVERLAID,
         ERROR
@@ -96,28 +91,131 @@ public final class LegacyGlossDataImporter {
     }
 
     private final File dataFolder;
-    private final GlossConfigLoader configLoader;
+    private final Services services;
+    private PreparedImport preparation;
 
-    private Path backupRoot;
-
-    public LegacyGlossDataImporter(File dataFolder, GlossConfigLoader configLoader) {
-        this.dataFolder = Objects.requireNonNull(dataFolder, "dataFolder").getAbsoluteFile();
-        this.configLoader = Objects.requireNonNull(configLoader, "configLoader");
+    public record Services(GlossConfigLoader configLoader, GlossProjectTransaction transaction,
+                           GlossPersistenceCoordinator coordinator) {
+        public Services {
+            Objects.requireNonNull(configLoader, "configLoader");
+            Objects.requireNonNull(transaction, "transaction");
+            Objects.requireNonNull(coordinator, "coordinator");
+        }
     }
 
-    public Result run(GlossConfigFile config) {
-        Objects.requireNonNull(config, "config");
-        backupRoot = null;
+    public static final class Plan {
+        private final LegacyGlossDataImporter owner;
+        private final List<Entry> entries;
+        private final PreparedImport preparation;
+
+        private Plan(LegacyGlossDataImporter owner, List<Entry> entries, PreparedImport preparation) {
+            this.owner = owner;
+            this.entries = List.copyOf(entries);
+            this.preparation = preparation;
+        }
+
+        public List<Entry> entries() {
+            return entries;
+        }
+
+        public long retainedBytes() {
+            return preparation.retainedBytes();
+        }
+
+        public List<String> targets() {
+            return preparation.targets();
+        }
+
+        public boolean ready() {
+            return entries.stream().noneMatch(entry -> entry.status() == Status.ERROR
+                || entry.status() == Status.CONFLICT || entry.status() == Status.UNSUPPORTED);
+        }
+    }
+
+    public LegacyGlossDataImporter(File dataFolder, Services services) {
+        this.dataFolder = Objects.requireNonNull(dataFolder, "dataFolder").getAbsoluteFile();
+        this.services = Objects.requireNonNull(services, "services");
+    }
+
+    public synchronized Plan preview() {
+        preparation = new PreparedImport(dataFolder.toPath());
         List<Entry> entries = new ArrayList<>();
+        GlossConfigFile candidate;
+        try {
+            byte[] current = preparation.read(services.configLoader().file().toPath());
+            candidate = current == null ? new GlossConfigFile() : TomlCodec.fromToml(
+                new String(current, StandardCharsets.UTF_8), GlossConfigFile.class);
+            Objects.requireNonNull(candidate, "configuration").normalize();
+        } catch (IOException | RuntimeException failure) {
+            entries.add(new Entry("config", GlossConfigLoader.FILE_NAME, Status.ERROR, detail(failure)));
+            Gloss.logExceptionStack(false, failure, "Unable to prepare Gloss configuration.");
+            return new Plan(this, entries, preparation);
+        }
         migrateKind(HologramDoc.KIND, LegacyGlossDataImporter::convertHologram, entries);
         migrateKind(EmojiDoc.KIND, LegacyGlossDataImporter::convertEmoji, entries);
         migrateKind(AnimationDoc.KIND, LegacyGlossDataImporter::convertAnimation, entries);
-        overlayLegacyConfig(config, entries);
+        for (String kind : List.of("boards", "bubbles", "damage-indicators", "real-drops", "entity-overlays", "tablist", "channels", "behaviors")) {
+            migrateKind(kind, null, entries);
+        }
+        overlayLegacyConfig(candidate, entries);
+        if (entries.stream().noneMatch(entry -> entry.status() == Status.ERROR
+            || entry.status() == Status.UNSUPPORTED || entry.status() == Status.CONFLICT)) {
+            try {
+                preparation.validateDocuments();
+            } catch (IOException | RuntimeException failure) {
+                entries.add(new Entry("project", "documents", Status.ERROR, detail(failure)));
+                Gloss.logExceptionStack(false, failure, "Unable to validate imported Gloss project.");
+            }
+        }
+        return new Plan(this, entries, preparation);
+    }
+
+    public Result run() {
+        return apply(preview());
+    }
+
+    public Result apply(Plan plan) {
+        Objects.requireNonNull(plan, "plan");
+        if (plan.owner != this) {
+            throw new IllegalArgumentException("Import plan belongs to another importer");
+        }
+        if (!plan.ready()) {
+            return unapplied(plan, null);
+        }
+        try {
+            String backupPath = plan.preparation.apply("import-legacy", services.transaction(), services.coordinator());
+            logReport(plan.entries());
+            return new Result(plan.entries(), backupPath);
+        } catch (IOException | RuntimeException failure) {
+            Gloss.logExceptionStack(false, failure, "Legacy Gloss import did not complete.");
+            return unapplied(plan, failure);
+        }
+    }
+
+    private Result unapplied(Plan plan, Throwable failure) {
+        List<Entry> entries = new ArrayList<>();
+        for (Entry entry : plan.entries()) {
+            boolean changed = entry.status() == Status.MIGRATED || entry.status() == Status.APPROXIMATED || entry.status() == Status.OVERLAID
+                || entry.status() == Status.ABSORBED;
+            entries.add(changed ? new Entry(entry.kind(), entry.path(), Status.SKIPPED_NOTE,
+                "not applied: the import did not commit") : entry);
+        }
+        if (failure != null) {
+            entries.add(new Entry("transaction", "legacy", Status.ERROR, detail(failure)));
+        }
         logReport(entries);
-        return new Result(entries, backupRoot == null ? null : backupRoot.toString());
+        return new Result(entries, null);
     }
 
     private void migrateKind(String kind, Function<JsonObject, Object> converter, List<Entry> entries) {
+        EditorSyncDocumentKind documentKind = HistoryKinds.requireCollection(kind);
+        if (documentKind.layout() == EditorSyncDocumentKind.Layout.SINGLE) {
+            File file = documentKind.path(dataFolder.toPath(), documentKind.singletonId()).toFile();
+            if (file.exists()) {
+                migrateFile(kind, file, converter, entries);
+            }
+            return;
+        }
         File folder = new File(dataFolder, kind);
         File[] files = folder.listFiles(file -> file.isFile()
             && file.getName().toLowerCase(Locale.ROOT).endsWith(JSON_EXTENSION)
@@ -127,27 +225,62 @@ public final class LegacyGlossDataImporter {
         }
         Arrays.sort(files, Comparator.comparing(File::getName));
         for (File file : files) {
-            String path = kind + "/" + file.getName();
-            try {
-                String raw = Files.readString(file.toPath(), StandardCharsets.UTF_8);
-                JsonElement parsed = JsonParser.parseString(raw);
-                if (!parsed.isJsonObject()) {
-                    throw new IllegalArgumentException("document is not a JSON object");
-                }
-                JsonObject legacy = parsed.getAsJsonObject();
-                if (legacy.has("schemaVersion")) {
-                    entries.add(Entry.of(kind, path, Status.SKIPPED_ENVELOPE));
-                    continue;
-                }
-                legacy.addProperty("_fileName", baseName(file));
-                Object converted = converter.apply(legacy);
-                backup(kind, file);
-                writeDocument(file.toPath(), converted);
-                entries.add(Entry.of(kind, path, Status.MIGRATED));
-            } catch (IOException | RuntimeException failure) {
-                entries.add(new Entry(kind, path, Status.ERROR, detail(failure)));
-            }
+            migrateFile(kind, file, converter, entries);
         }
+    }
+
+    private void migrateFile(String kind, File file, Function<JsonObject, Object> converter, List<Entry> entries) {
+        String path = dataFolder.toPath().relativize(file.toPath()).toString();
+        try {
+            String raw = new String(preparation.read(file.toPath()), StandardCharsets.UTF_8);
+            JsonElement parsed = JsonParser.parseString(raw);
+            if (!parsed.isJsonObject()) {
+                throw new IllegalArgumentException("document is not a JSON object");
+            }
+            JsonObject legacy = parsed.getAsJsonObject();
+            if (legacy.has("schemaVersion")) {
+                migrateEnvelope(kind, file, legacy, entries);
+                return;
+            }
+            if (converter == null) {
+                entries.add(new Entry(kind, path, Status.UNSUPPORTED, "No supported unversioned format for " + kind));
+                return;
+            }
+            legacy.addProperty("_fileName", baseName(file));
+            Object converted = converter.apply(legacy);
+            writeDocument(file.toPath(), converted);
+            entries.add(Entry.of(kind, path, Status.MIGRATED));
+        } catch (IOException | RuntimeException failure) {
+            Status status = failure instanceof VersionedGlossConverter.UnsupportedFormatException
+                || DocumentEnvelope.isUnsupportedSchemaVersion(failure) ? Status.UNSUPPORTED : Status.ERROR;
+            entries.add(new Entry(kind, path, status, detail(failure)));
+            Gloss.logExceptionStack(false, failure, "Unable to prepare legacy document %s.", path);
+        }
+    }
+
+    private void migrateEnvelope(String kind, File file, JsonObject source, List<Entry> entries) throws IOException {
+        String path = dataFolder.toPath().relativize(file.toPath()).toString();
+        if (kind.equals(EmojiDoc.KIND) || kind.equals(AnimationDoc.KIND)) {
+            HistoryKinds.requireCollection(kind).parse(baseName(file), source.toString());
+            entries.add(Entry.of(kind, path, Status.SKIPPED_ENVELOPE));
+            return;
+        }
+        VersionedGlossConverter.Conversion conversion;
+        if (kind.equals("channels")) {
+            ChannelSchemaConverter.Conversion channel = ChannelSchemaConverter.convert(baseName(file), source);
+            conversion = new VersionedGlossConverter.Conversion(channel.document(), channel.warnings());
+        } else {
+            conversion = VersionedGlossConverter.convert(kind, baseName(file), source);
+        }
+        if (source.equals(conversion.document())) {
+            entries.add(Entry.of(kind, path, Status.SKIPPED_ENVELOPE));
+            return;
+        }
+        JsonObject converted = conversion.document();
+        converted.addProperty("revision", DocumentEnvelope.requireRevision(kind, converted.get("revision").getAsLong() + 1L));
+        writeDocument(file.toPath(), converted);
+        entries.add(new Entry(kind, path, conversion.warnings().isEmpty() ? Status.MIGRATED : Status.APPROXIMATED,
+            conversion.warnings().isEmpty() ? "Exact schema conversion" : String.join(" ", conversion.warnings())));
     }
 
     private static HologramDoc convertHologram(JsonObject legacy) {
@@ -183,29 +316,34 @@ public final class LegacyGlossDataImporter {
         if (!legacyConfig.isFile()) {
             return;
         }
-        YamlConfiguration yaml = new YamlConfiguration();
         try {
-            yaml.load(legacyConfig);
+            byte[] source = preparation.read(legacyConfig.toPath());
+            String sourceHash = DocumentHashes.sha256(source);
+            Path receiptPath = dataFolder.toPath().resolve(RECEIPT_FILE_NAME);
+            byte[] receiptBytes = preparation.read(receiptPath);
+            if (receiptBytes != null) {
+                JsonObject receipt = JsonParser.parseString(new String(receiptBytes, StandardCharsets.UTF_8)).getAsJsonObject();
+                if (sourceHash.equals(optString(receipt, "configSha256", ""))) {
+                    return;
+                }
+            }
+            YamlConfiguration yaml = new YamlConfiguration();
+            yaml.loadFromString(new String(source, StandardCharsets.UTF_8));
+            overlayMechanics(yaml, config, entries);
+            overlayTablistContent(yaml, entries);
+            overlayBubbleContent(yaml, entries);
+            overlayIndicatorContent(yaml, entries);
+            overlayMotdContent(yaml, entries);
+            overlayDropLabelContent(yaml, entries);
+            preparation.stage(services.configLoader().file().toPath(), services.configLoader().encode(config));
+            JsonObject receipt = new JsonObject();
+            receipt.addProperty("schemaVersion", 1);
+            receipt.addProperty("configSha256", sourceHash);
+            preparation.stage(receiptPath, (DocumentParsers.GSON.toJson(receipt)
+                + System.lineSeparator()).getBytes(StandardCharsets.UTF_8));
         } catch (IOException | InvalidConfigurationException | RuntimeException failure) {
             entries.add(new Entry("config", LEGACY_CONFIG_FILE_NAME, Status.ERROR, detail(failure)));
-            return;
-        }
-        overlayMechanics(yaml, config, entries);
-        overlayBubbleContent(yaml, entries);
-        overlayMotdContent(yaml, entries);
-        overlayDropLabelContent(yaml, entries);
-        try {
-            configLoader.save(config);
-        } catch (IOException failure) {
-            entries.add(new Entry("config", GlossConfigLoader.FILE_NAME, Status.ERROR, detail(failure)));
-        }
-        try {
-            Files.move(legacyConfig.toPath(), new File(dataFolder, IMPORTED_CONFIG_FILE_NAME).toPath(),
-                StandardCopyOption.REPLACE_EXISTING);
-            entries.add(new Entry("config", LEGACY_CONFIG_FILE_NAME, Status.OVERLAID,
-                "renamed to " + IMPORTED_CONFIG_FILE_NAME));
-        } catch (IOException failure) {
-            entries.add(new Entry("config", LEGACY_CONFIG_FILE_NAME, Status.ERROR, detail(failure)));
+            Gloss.logExceptionStack(false, failure, "Unable to prepare legacy configuration.");
         }
     }
 
@@ -244,6 +382,94 @@ public final class LegacyGlossDataImporter {
         entries.add(Entry.of("config", LEGACY_CONFIG_FILE_NAME + ":" + key, Status.OVERLAID));
     }
 
+    private void overlayTablistContent(YamlConfiguration yaml, List<Entry> entries) {
+        if (!yaml.contains("tablist.header") && !yaml.contains("tablist.footer")
+            && !yaml.contains("tablist.use-header-footers") && !yaml.contains("tablist.group-list-names")) {
+            return;
+        }
+        try {
+            String path = "tablist.json";
+            JsonObject document = shippedDestination(path, "/defaults/tablist/tablist.json", entries);
+            if (document == null) {
+                return;
+            }
+            JsonObject header = document.getAsJsonObject("headerFooter");
+            JsonObject presentation = header.getAsJsonObject("presentation");
+            header.addProperty("enabled", yaml.getBoolean("tablist.use-header-footers", header.get("enabled").getAsBoolean()));
+            presentation.addProperty("header", yaml.getString("tablist.header", presentation.get("header").getAsString()));
+            presentation.addProperty("footer", yaml.getString("tablist.footer", presentation.get("footer").getAsString()));
+            JsonObject names = document.getAsJsonObject("listNames");
+            names.addProperty("enabled", yaml.getBoolean("tablist.group-list-names", names.get("enabled").getAsBoolean()));
+            writeDocument(dataFolder.toPath().resolve(path), document);
+            entries.add(Entry.of("config", LEGACY_CONFIG_FILE_NAME + ":tablist", Status.OVERLAID));
+        } catch (IOException | RuntimeException failure) {
+            entries.add(new Entry("config", "tablist.json", Status.ERROR, detail(failure)));
+            Gloss.logExceptionStack(false, failure, "Unable to prepare imported tablist settings.");
+        }
+    }
+
+    private void overlayIndicatorContent(YamlConfiguration yaml, List<Entry> entries) {
+        if (!yaml.contains("damage-indicators")) {
+            return;
+        }
+        String path = "damage-indicators/default.json";
+        try {
+            JsonObject document = shippedDestination(path, "/defaults/" + path, entries);
+            if (document == null) {
+                return;
+            }
+            JsonObject limits = document.getAsJsonObject("limits");
+            limits.addProperty("maxPerSecond", yaml.getInt("damage-indicators.max-indicators-per-second", 40));
+            limits.addProperty("lifetimeMs", yaml.getLong("damage-indicators.max-ms-alive", 3000));
+            limits.addProperty("decimals", yaml.getInt("damage-indicators.decimals", 0));
+            double ticks = yaml.getInt("holograms.temporary-update-interval-ticks", 2);
+            if (ticks <= 0) {
+                throw new IllegalArgumentException("holograms.temporary-update-interval-ticks must be positive");
+            }
+            double stepsPerSecond = 20.0D / ticks;
+            double horizontal = yaml.getDouble("damage-indicators.motion.random-throw-force", 0.08D) * stepsPerSecond;
+            double vertical = yaml.getDouble("damage-indicators.motion.initial-up-force", 0.13D) * stepsPerSecond;
+            double acceleration = yaml.getDouble("damage-indicators.motion.gravity-factor", 0.0093D)
+                * stepsPerSecond * stepsPerSecond;
+            for (String kind : List.of("damage", "healing")) {
+                boolean damage = kind.equals("damage");
+                JsonObject style = document.getAsJsonObject(kind);
+                style.addProperty("when", damage || yaml.getBoolean("damage-indicators.show-heals", true) ? "true" : "false");
+                JsonObject presentation = style.getAsJsonObject("presentation");
+                presentation.addProperty("format", yaml.getString(damage ? "damage-indicators.damage-indicator-prefix"
+                    : "damage-indicators.heal-indicator-prefix", damage ? "&c&l" : "&a&l") + "{amount}");
+                JsonObject motion = presentation.getAsJsonObject("motion");
+                motion.addProperty("horizontalSpeed", horizontal);
+                motion.addProperty("verticalSpeed", vertical);
+                motion.addProperty("verticalAcceleration", damage ? -acceleration : acceleration / 19.5D);
+                JsonObject transform = presentation.getAsJsonObject("transform");
+                transform.addProperty("startScale", 1);
+                transform.addProperty("endScale", 1);
+                transform.addProperty("fadeStartFraction", 1);
+            }
+            writeDocument(dataFolder.toPath().resolve(path), document);
+            entries.add(new Entry("config", LEGACY_CONFIG_FILE_NAME + ":damage-indicators", Status.APPROXIMATED,
+                "Lifetime, rate, text, healing visibility and motion rates are retained; continuous motion uses the current scatter distribution."));
+        } catch (IOException | RuntimeException failure) {
+            entries.add(new Entry("config", path, Status.ERROR, detail(failure)));
+            Gloss.logExceptionStack(false, failure, "Unable to prepare imported damage-indicator settings.");
+        }
+    }
+
+    private JsonObject shippedDestination(String path, String resource, List<Entry> entries) throws IOException {
+        byte[] shipped = readResource(resource);
+        Path target = dataFolder.toPath().resolve(path);
+        byte[] existing = preparation.read(target);
+        if (existing != null && !Arrays.equals(shipped, existing)) {
+            entries.add(new Entry("config", path, Status.CONFLICT,
+                path + " was already customized; config.yml content not applied"));
+            return null;
+        }
+        JsonObject document = JsonParser.parseString(new String(shipped, StandardCharsets.UTF_8)).getAsJsonObject();
+        document.addProperty("revision", document.get("revision").getAsLong() + 1L);
+        return document;
+    }
+
     private void overlayBubbleContent(YamlConfiguration yaml, List<Entry> entries) {
         if (!yaml.contains("chat-bubbles")) {
             return;
@@ -251,15 +477,16 @@ public final class LegacyGlossDataImporter {
         boolean present = yaml.contains("chat-bubbles.message.prefix") || yaml.contains("chat-bubbles.message.offset")
             || yaml.contains("chat-bubbles.word-wrap-break-chars") || yaml.contains("chat-bubbles.max-time-alive")
             || yaml.contains("chat-bubbles.line-stagger-ticks") || yaml.contains("chat-bubbles.fly-away")
-            || yaml.contains("chat-bubbles.follow-players") || yaml.contains("chat-bubbles.hide-own-messages");
+            || yaml.contains("chat-bubbles.follow-players") || yaml.contains("chat-bubbles.hide-own-messages")
+            || yaml.contains("chat-bubbles.blacklist-worlds");
         if (!present) {
             return;
         }
         File styleFile = new File(new File(dataFolder, BubbleStyleDoc.KIND), "default" + JSON_EXTENSION);
         try {
             byte[] shipped = readResource("/defaults/" + BubbleStyleDoc.KIND + "/default" + JSON_EXTENSION);
-            if (styleFile.isFile() && !Arrays.equals(shipped, Files.readAllBytes(styleFile.toPath()))) {
-                entries.add(new Entry("config", "bubbles/default" + JSON_EXTENSION, Status.SKIPPED_NOTE,
+            if (styleFile.isFile() && !Arrays.equals(shipped, preparation.read(styleFile.toPath()))) {
+                entries.add(new Entry("config", "bubbles/default" + JSON_EXTENSION, Status.CONFLICT,
                     "bubbles/default.json was already customized; config.yml bubble content not applied"));
                 return;
             }
@@ -280,13 +507,17 @@ public final class LegacyGlossDataImporter {
                 yaml.getBoolean("chat-bubbles.follow-players", base.followPlayer()),
                 yaml.getBoolean("chat-bubbles.hide-own-messages", base.hideOwn()),
                 motion,
-                base.shimmer(),
+                new BubbleStyleDoc.Shimmer(false, false, null, null, null, null, null),
                 base.select(),
-                base.particleLayers(), base.show(), null, null, null, null, null, null);
+                base.particleLayers(), base.show(), null, null,
+                yaml.getDouble("holograms.stack-distance", base.stackDistance()),
+                yaml.getStringList("chat-bubbles.blacklist-worlds"), null, null);
             writeDocument(styleFile.toPath(), updated);
-            entries.add(Entry.of("config", LEGACY_CONFIG_FILE_NAME + ":chat-bubbles", Status.OVERLAID));
+            entries.add(new Entry("config", LEGACY_CONFIG_FILE_NAME + ":chat-bubbles", Status.APPROXIMATED,
+                "Wrapped messages use one display block; per-line spawning and line-stagger-ticks are not retained."));
         } catch (IOException | RuntimeException failure) {
             entries.add(new Entry("config", "bubbles/default" + JSON_EXTENSION, Status.ERROR, detail(failure)));
+            Gloss.logExceptionStack(false, failure, "Unable to prepare imported bubble settings.");
         }
     }
 
@@ -298,8 +529,8 @@ public final class LegacyGlossDataImporter {
         File motdFile = new File(dataFolder, MotdDoc.KIND + JSON_EXTENSION);
         try {
             byte[] shipped = readResource("/defaults/" + MotdDoc.KIND + "/" + MotdDoc.KIND + JSON_EXTENSION);
-            if (motdFile.isFile() && !Arrays.equals(shipped, Files.readAllBytes(motdFile.toPath()))) {
-                entries.add(new Entry("config", MotdDoc.KIND + JSON_EXTENSION, Status.SKIPPED_NOTE,
+            if (motdFile.isFile() && !Arrays.equals(shipped, preparation.read(motdFile.toPath()))) {
+                entries.add(new Entry("config", MotdDoc.KIND + JSON_EXTENSION, Status.CONFLICT,
                     "motd.json was already customized; config.yml motd texts not applied"));
                 return;
             }
@@ -318,11 +549,12 @@ public final class LegacyGlossDataImporter {
                 return;
             }
             MotdDoc updated = new MotdDoc(MotdDoc.CURRENT_SCHEMA_VERSION, DocumentEnvelope.INITIAL_REVISION, ShowCondition.ALWAYS,
-                null, motdEntries, List.of());
+                null, motdEntries, List.of(), null, null, null, null);
             writeDocument(motdFile.toPath(), updated);
             entries.add(Entry.of("config", LEGACY_CONFIG_FILE_NAME + ":motd.texts", Status.OVERLAID));
         } catch (IOException | RuntimeException failure) {
             entries.add(new Entry("config", MotdDoc.KIND + JSON_EXTENSION, Status.ERROR, detail(failure)));
+            Gloss.logExceptionStack(false, failure, "Unable to prepare imported MOTD settings.");
         }
     }
 
@@ -336,8 +568,8 @@ public final class LegacyGlossDataImporter {
             RealDropSettingsDoc.DEFAULT_ID + JSON_EXTENSION);
         try {
             byte[] shipped = readResource("/defaults/" + documentName);
-            if (documentFile.isFile() && !Arrays.equals(shipped, Files.readAllBytes(documentFile.toPath()))) {
-                entries.add(new Entry("config", documentName, Status.SKIPPED_NOTE,
+            if (documentFile.isFile() && !Arrays.equals(shipped, preparation.read(documentFile.toPath()))) {
+                entries.add(new Entry("config", documentName, Status.CONFLICT,
                     documentName + " was already customized; config.yml drops.name-format not applied"));
                 return;
             }
@@ -346,84 +578,17 @@ public final class LegacyGlossDataImporter {
             document.getAsJsonObject("presentation").getAsJsonObject("labels").addProperty("format", format);
             String updated = DocumentParsers.GSON.toJson(document);
             RealDropSettingsDoc.parse(documentName, updated);
-            AtomicFiles.replace(documentFile.toPath(),
+            preparation.document(documentFile.toPath(),
                 (updated + System.lineSeparator()).getBytes(StandardCharsets.UTF_8));
             entries.add(Entry.of("config", LEGACY_CONFIG_FILE_NAME + ":drops.name-format", Status.OVERLAID));
         } catch (IOException | RuntimeException failure) {
             entries.add(new Entry("config", documentName, Status.ERROR, detail(failure)));
+            Gloss.logExceptionStack(false, failure, "Unable to prepare imported drop settings.");
         }
     }
 
-    private void backup(String kind, File file) throws IOException {
-        Path target = backupDirectory().resolve(kind).resolve(file.getName());
-        Files.createDirectories(target.getParent());
-        try {
-            Files.copy(file.toPath(), target, StandardCopyOption.REPLACE_EXISTING);
-        } catch (IOException failure) {
-            discardEmptyDirectory(target.getParent());
-            discardEmptyBackupDirectory();
-            throw failure;
-        }
-    }
-
-    private Path backupDirectory() throws IOException {
-        if (backupRoot == null) {
-            Path root = dataFolder.toPath().resolve(BACKUP_DIRECTORY_NAME)
-                .resolve(LocalDateTime.now().format(BACKUP_TIMESTAMP));
-            Files.createDirectories(root);
-            backupRoot = root;
-        }
-        return backupRoot;
-    }
-
-    /**
-     * Removes the timestamp folder — and {@code import-backups/} above it — when the write that
-     * created it failed and left nothing inside. A failed backup must not be reported as one either,
-     * so the memoized root is dropped along with the directory.
-     */
-    private void discardEmptyBackupDirectory() {
-        Path root = backupRoot;
-        if (root == null) {
-            return;
-        }
-        try {
-            if (!isEmptyDirectory(root)) {
-                return;
-            }
-            Files.delete(root);
-            backupRoot = null;
-            Path parent = root.getParent();
-            if (parent != null && isEmptyDirectory(parent)) {
-                Files.delete(parent);
-            }
-        } catch (IOException failure) {
-            Gloss.logExceptionStack(false, failure,
-                "Unable to remove the empty import backup directory %s.", root);
-        }
-    }
-
-    private static void discardEmptyDirectory(Path directory) {
-        try {
-            if (directory != null && isEmptyDirectory(directory)) {
-                Files.delete(directory);
-            }
-        } catch (IOException failure) {
-            Gloss.logExceptionStack(false, failure,
-                "Unable to remove the empty import backup directory %s.", directory);
-        }
-    }
-
-    private static boolean isEmptyDirectory(Path directory) throws IOException {
-        if (!Files.isDirectory(directory)) {
-            return false;
-        }
-        try (Stream<Path> children = Files.list(directory)) {
-            return children.findAny().isEmpty();
-        }
-    }
-
-    private static void writeDocument(Path file, Object document) throws IOException {
-        AtomicFiles.replace(file,
+    private void writeDocument(Path file, Object document) throws IOException {
+        preparation.document(file,
             (DocumentParsers.GSON.toJson(document) + System.lineSeparator()).getBytes(StandardCharsets.UTF_8));
     }
 
@@ -468,7 +633,8 @@ public final class LegacyGlossDataImporter {
             int[] counts = kind.getValue();
             int active = counts[Status.MIGRATED.ordinal()] + counts[Status.ABSORBED.ordinal()]
                 + counts[Status.OVERLAID.ordinal()] + counts[Status.ERROR.ordinal()]
-                + counts[Status.SKIPPED_NOTE.ordinal()];
+                + counts[Status.SKIPPED_NOTE.ordinal()] + counts[Status.CONFLICT.ordinal()]
+                + counts[Status.APPROXIMATED.ordinal()] + counts[Status.UNSUPPORTED.ordinal()];
             if (active == 0) {
                 continue;
             }

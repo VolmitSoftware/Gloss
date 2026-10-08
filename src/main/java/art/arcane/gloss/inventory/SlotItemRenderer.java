@@ -16,6 +16,7 @@ import art.arcane.gloss.menu.icon.IconItems;
 import art.arcane.gloss.text.TextPipeline;
 import art.arcane.volmlib.util.localization.MessageArgs;
 import art.arcane.volmlib.util.bukkit.registry.RegistryUtil;
+import io.github.retrooper.packetevents.util.SpigotConversionUtil;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.entity.Player;
@@ -57,6 +58,10 @@ public final class SlotItemRenderer {
         if (name == null && lore.isEmpty()) {
             return stack;
         }
+        if (hasMarkup(name, lore)) {
+            return SpigotConversionUtil.toBukkitItemStack(InventoryItemText.apply(
+                    SpigotConversionUtil.fromBukkitItemStack(stack), name, lore));
+        }
         ItemMeta meta = stack.getItemMeta();
         if (meta == null) {
             return stack;
@@ -69,6 +74,18 @@ public final class SlotItemRenderer {
         }
         stack.setItemMeta(meta);
         return stack;
+    }
+
+    private static boolean hasMarkup(String name, List<String> lore) {
+        if (name != null && name.indexOf('<') >= 0) {
+            return true;
+        }
+        for (String line : lore) {
+            if (line.indexOf('<') >= 0) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

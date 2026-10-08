@@ -29,28 +29,29 @@ final class BoundedCache<K, V> {
         if (value == null) {
             value = factory.apply(key);
         }
-        if (current.size() >= generationSize) {
-            rotate(current);
+        synchronized (this) {
             current = hot;
+            V raced = current.get(key);
+            if (raced != null) {
+                return raced;
+            }
+            if (current.size() >= generationSize) {
+                cold = current;
+                hot = new ConcurrentHashMap<>();
+                current = hot;
+            }
+            current.put(key, value);
+            return value;
         }
-        V raced = current.putIfAbsent(key, value);
-        return raced == null ? value : raced;
     }
 
     int size() {
         return hot.size() + cold.size();
     }
 
-    void clear() {
+    synchronized void clear() {
         hot = new ConcurrentHashMap<>();
         cold = Map.of();
     }
 
-    private synchronized void rotate(Map<K, V> full) {
-        if (hot != full) {
-            return;
-        }
-        cold = full;
-        hot = new ConcurrentHashMap<>();
-    }
 }

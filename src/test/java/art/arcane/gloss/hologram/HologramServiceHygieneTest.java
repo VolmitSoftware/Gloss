@@ -1,14 +1,18 @@
 package art.arcane.gloss.hologram;
 
 import art.arcane.gloss.hologram.CharacterizationHarness.DisplayHandle;
+import art.arcane.gloss.hologram.CharacterizationHarness.PlayerHandle;
 import art.arcane.gloss.hologram.CharacterizationHarness.WorldState;
+import art.arcane.volmlib.util.localization.LanguageAudience;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -21,12 +25,13 @@ class HologramServiceHygieneTest {
 
     private CharacterizationHarness harness;
     private WorldState world;
+    private PlayerHandle alice;
 
     @BeforeEach
     void setUp() {
         harness = new CharacterizationHarness(dataFolder);
         world = harness.world("overworld");
-        harness.join("Alice", world, 1.0D, 64.0D, 1.0D);
+        alice = harness.join("Alice", world, 1.0D, 64.0D, 1.0D);
     }
 
     @AfterEach
@@ -124,7 +129,7 @@ class HologramServiceHygieneTest {
 
     @Test
     void viewerWorkQueueRetainsOnlyTheLatestRefreshPerHologram() {
-        HologramService.ViewerWorkQueue queue = new HologramService.ViewerWorkQueue();
+        HologramService.ViewerWorkQueue queue = new HologramService.ViewerWorkQueue(harness.service, alice.uuid);
         AtomicInteger rendered = new AtomicInteger();
 
         for (int refresh = 1; refresh <= 1_000; refresh++) {
@@ -136,5 +141,93 @@ class HologramServiceHygieneTest {
             "a lagging player region must retain one latest refresh per hologram");
         queue.remove("same-hologram").run();
         assertEquals(1_000, rendered.get());
+    }
+
+    @Test
+    void ownerDrainPreservesAudienceAndProcessesWorkEnqueuedDuringTheDrain() {
+        List<String> rendered = new ArrayList<>();
+        UUID outerAudience = UUID.randomUUID();
+        long before = harness.service.viewerWorkDispatchCount();
+        try (LanguageAudience.Scope audience = LanguageAudience.open(outerAudience)) {
+            harness.service.runViewerWork(alice.proxy, alice.uuid, "first", () -> {
+                assertEquals(alice.uuid, LanguageAudience.current());
+                rendered.add("first");
+                harness.service.runViewerWork(alice.proxy, alice.uuid, "next", () -> rendered.add("next"));
+            });
+            assertEquals(outerAudience, LanguageAudience.current());
+        }
+        assertEquals(List.of("first", "next"), rendered);
+        assertEquals(before + 1, harness.service.viewerWorkDispatchCount());
+        assertTrue(harness.immediateTasks.isEmpty());
+    }
+
+    @Test
+    void foreignOwnerDrainCoalescesPendingKeysAndRestoresAudience() {
+        harness.ownsThread = false;
+        harness.deferImmediateTasks = true;
+        List<Integer> rendered = new ArrayList<>();
+        harness.service.runViewerWork(alice.proxy, alice.uuid, "same", () -> rendered.add(1));
+        harness.service.runViewerWork(alice.proxy, alice.uuid, "same", () -> {
+            assertEquals(alice.uuid, LanguageAudience.current());
+            rendered.add(2);
+        });
+        assertTrue(rendered.isEmpty());
+        assertEquals(1, harness.immediateTasks.size());
+        harness.ownsThread = true;
+        UUID outerAudience = UUID.randomUUID();
+        try (LanguageAudience.Scope audience = LanguageAudience.open(outerAudience)) {
+            harness.drainImmediate();
+            assertEquals(outerAudience, LanguageAudience.current());
+        }
+        assertEquals(List.of(2), rendered);
+    }
+
+    @Test
+    void retiredOwnerAndInactivePluginDiscardWorkWithoutBlockingLaterRefresh() {
+        AtomicInteger rendered = new AtomicInteger();
+        alice.online = false;
+        harness.service.runViewerWork(alice.proxy, alice.uuid, "same", rendered::incrementAndGet);
+        alice.online = true;
+        harness.enabled(false);
+        harness.service.runViewerWork(alice.proxy, alice.uuid, "same", rendered::incrementAndGet);
+        assertEquals(0, rendered.get());
+        harness.enabled(true);
+        harness.service.runViewerWork(alice.proxy, alice.uuid, "same", rendered::incrementAndGet);
+        assertEquals(1, rendered.get());
+    }
+
+    @Test
+    void staleForeignOwnerRetirementDoesNotRemoveAReconnectedViewersQueue() {
+        harness.ownsThread = false;
+        harness.deferImmediateTasks = true;
+        AtomicInteger oldRefreshes = new AtomicInteger();
+        AtomicInteger newRefreshes = new AtomicInteger();
+        harness.service.runViewerWork(alice.proxy, alice.uuid, "same", oldRefreshes::incrementAndGet);
+        harness.quit(alice);
+        PlayerHandle returning = harness.join("Alice", alice.uuid, world, 1.0D, 64.0D, 1.0D);
+        harness.service.runViewerWork(returning.proxy, returning.uuid, "same", newRefreshes::incrementAndGet);
+        assertEquals(2, harness.immediateTasks.size());
+        harness.ownsThread = true;
+        harness.drainImmediate();
+        assertEquals(0, oldRefreshes.get());
+        assertEquals(1, newRefreshes.get());
+        harness.service.runViewerWork(returning.proxy, returning.uuid, "same", newRefreshes::incrementAndGet);
+        assertEquals(2, newRefreshes.get());
+    }
+
+    @Test
+    void failedOwnerWorkRestoresAudienceAndAllowsAnotherRefresh() {
+        UUID outerAudience = UUID.randomUUID();
+        AtomicInteger rendered = new AtomicInteger();
+        try (LanguageAudience.Scope audience = LanguageAudience.open(outerAudience)) {
+            harness.service.runViewerWork(alice.proxy, alice.uuid, "failure", () -> {
+                harness.service.runViewerWork(alice.proxy, alice.uuid, "next", rendered::incrementAndGet);
+                throw new IllegalStateException("Expected viewer work failure");
+            });
+            assertEquals(outerAudience, LanguageAudience.current());
+        }
+        assertEquals(1, rendered.get());
+        harness.service.runViewerWork(alice.proxy, alice.uuid, "later", rendered::incrementAndGet);
+        assertEquals(2, rendered.get());
     }
 }

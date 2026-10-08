@@ -2,6 +2,9 @@ package art.arcane.gloss.forge;
 
 import art.arcane.gloss.expr.ExprFunctionRegistry;
 import art.arcane.gloss.expr.ExprScope;
+import art.arcane.gloss.util.common.TextUtils;
+import net.kyori.adventure.key.Key;
+import net.kyori.adventure.text.Component;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -51,6 +54,29 @@ class LayoutFunctionsTest {
             imagePath -> new int[]{8, 8});
         functions = new LayoutFunctions(() -> glyphs, FontMetrics.load());
         functions.register(registry);
+    }
+
+    @Test
+    void generatedFontTagsParseIntoNamespacedComponents() {
+        install();
+        String raw = functions.fontTag("coin").orElseThrow();
+        Component component = TextUtils.parse(raw);
+        assertEquals(glyphs.glyph("coin").orElseThrow().character(), TextUtils.content(component));
+        assertEquals(Key.key("gloss:glyphs"), component.font());
+    }
+
+    @Test
+    void glyphTagsSelectTheFontDeclaredByEachDocument() {
+        GlyphDoc first = GlyphDoc.parse("base.json", DOC);
+        GlyphDoc second = GlyphDoc.parse("hud.json", """
+            {"schemaVersion":1,"revision":1,"namespace":"hud","font":"labels","glyphs":[
+              {"id":"badge","image":"badge.png","height":8}],"space":{"enabled":false}}
+            """);
+        GlyphRegistry resolved = GlyphRegistry.build(Map.of("base", first, "hud", second),
+            GlyphLedger.load(folder.resolve("ledger.json"), GlyphLedger.DEFAULT_BASE), path -> new int[]{8, 8});
+        LayoutFunctions layout = new LayoutFunctions(() -> resolved, FontMetrics.load());
+        assertTrue(layout.fontTag("coin").orElseThrow().startsWith("<font:gloss:glyphs>"));
+        assertTrue(layout.fontTag("badge").orElseThrow().startsWith("<font:hud:labels>"));
     }
 
     @AfterEach

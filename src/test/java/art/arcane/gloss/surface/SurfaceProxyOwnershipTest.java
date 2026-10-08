@@ -80,6 +80,7 @@ class SurfaceProxyOwnershipTest {
         set(plugin, Gloss.class, "proxyOwnership", ownership);
         surfaces = allocate(SurfaceService.class);
         set(surfaces, SurfaceService.class, "plugin", plugin);
+        set(surfaces, SurfaceService.class, "delivery", new CompositorDelivery(plugin));
         set(surfaces, SurfaceService.class, "driver",
             new SurfaceDriver(new RecordingDelivery(), (viewer, raw, scope) -> raw));
         set(surfaces, SurfaceService.class, "conditionErrors", BoundedConditionErrorCallback.silent());

@@ -8,11 +8,18 @@ import java.util.Objects;
  * only learns a bearing.
  */
 public record WaypointTarget(String id, int color, WaypointStyle style, double x, double y, double z,
-                             Float azimuthRadians) {
+                             Float azimuthRadians, String styleKey) {
+    public WaypointTarget(String id, int color, WaypointStyle style, double x, double y, double z,
+                          Float azimuthRadians) {
+        this(id, color, style, x, y, z, azimuthRadians,
+            (style == null ? WaypointStyle.DEFAULT : style).serializedName());
+    }
+
     public WaypointTarget {
         id = Objects.requireNonNull(id, "waypoint id");
         color = color & 0xFFFFFF;
         style = style == null ? WaypointStyle.DEFAULT : style;
+        styleKey = new WaypointStyleKey(styleKey).resourceKey();
     }
 
     public boolean azimuth() {

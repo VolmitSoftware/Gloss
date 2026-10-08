@@ -15,14 +15,12 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * The grid is the only thing a viewer with a layout sees, so every other entry in an add-player
- * packet is unlisted on the way out. Anything taken away has to be remembered, or a second plugin's
- * fake entries stay gone after the layout does.
+ * Real players are unlisted while a layout is active. Entries owned by other plugins are preserved.
  */
 class PlayerInfoRewriteTest {
 
     @Test
-    void ourOwnSlotsSurviveAndEverythingElseIsUnlistedAndRecorded() {
+    void ourSlotsAndForeignNpcEntriesSurviveWhileKnownPlayersAreUnlisted() {
         UUID real = UUID.randomUUID();
         UUID npc = UUID.randomUUID();
         List<WrapperPlayServerPlayerInfoUpdate.PlayerInfo> entries = new ArrayList<>(List.of(
@@ -31,12 +29,12 @@ class PlayerInfoRewriteTest {
             entry(npc, "Shopkeeper")));
         Set<UUID> recorded = new LinkedHashSet<>();
 
-        assertTrue(PlayerInfoRewriteListener.unlistRealEntries(entries, recorded::add));
+        assertTrue(PlayerInfoRewriteListener.unlistRealEntries(entries, id -> id.equals(real), recorded::add));
 
-        assertEquals(Set.of(real, npc), recorded);
+        assertEquals(Set.of(real), recorded);
         assertFalse(entries.get(0).isListed());
         assertTrue(entries.get(1).isListed());
-        assertFalse(entries.get(2).isListed());
+        assertTrue(entries.get(2).isListed());
     }
 
     @Test
@@ -45,7 +43,7 @@ class PlayerInfoRewriteTest {
             entry(UUID.randomUUID(), TablistLayoutRuntime.SLOT_NAME_PREFIX + "00")));
         Set<UUID> recorded = new LinkedHashSet<>();
 
-        assertFalse(PlayerInfoRewriteListener.unlistRealEntries(entries, recorded::add));
+        assertFalse(PlayerInfoRewriteListener.unlistRealEntries(entries, id -> true, recorded::add));
 
         assertEquals(Set.of(), recorded);
     }

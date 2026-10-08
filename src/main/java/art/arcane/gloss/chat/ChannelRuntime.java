@@ -50,7 +50,7 @@ public final class ChannelRuntime {
         Objects.requireNonNull(doc, "doc");
         List<CompiledFilter> filters = new ArrayList<>(doc.filters().size());
         for (ChannelDoc.Filter filter : doc.filters()) {
-            filters.add(new CompiledFilter(Pattern.compile(filter.match()), filter.replace()));
+            filters.add(ChatFilterCompiler.compile(filter, doc.filtering(), filters.size()));
         }
         List<ChannelDoc.Variant> ordered = new ArrayList<>(doc.variants());
         ordered.sort(BY_PRIORITY_THEN_ID);
@@ -142,7 +142,7 @@ public final class ChannelRuntime {
             + "(?![A-Za-z0-9_])";
     }
 
-    public record CompiledFilter(Pattern pattern, String replace) {
+    public record CompiledFilter(com.google.re2j.Pattern pattern, String replace) {
     }
 
     private record CompiledVariant(ChannelDoc.Variant variant, CompiledCondition condition, ChannelRuntime runtime) {

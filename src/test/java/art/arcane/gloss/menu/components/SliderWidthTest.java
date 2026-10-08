@@ -12,6 +12,8 @@ import art.arcane.gloss.menu.action.NavigationResult;
 import art.arcane.gloss.menu.icon.MenuIcon;
 import art.arcane.gloss.util.common.math.CollisionPlane;
 import org.bukkit.Location;
+import org.bukkit.entity.Player;
+import java.lang.reflect.Proxy;
 import org.bukkit.util.Vector;
 import org.junit.jupiter.api.Test;
 
@@ -30,7 +32,7 @@ class SliderWidthTest {
         MenuTransform transform = new MenuTransform(anchor, new Vector(), 0F, 0F, 0F, 2F);
         MenuDefinitionData definition = new MenuDefinitionData(new Vector(), false, false, null,
             false, false, List.of(), List.of(), null, Map.of(), List.of());
-        MenuSession session = new MenuSession(definition, null,
+        MenuSession session = new MenuSession(definition, viewer(),
             MenuSessionOptions.positioned(transform, request -> NavigationResult.DENIED, 2F));
         SliderComponentData data = new SliderComponentData("volume", 0F, 100F, 1F, 3F, "Volume", null);
         SliderComponent slider = new SliderComponent(session,
@@ -59,5 +61,11 @@ class SliderWidthTest {
         public CollisionPlane createBoundingBox(Location anchor) {
             return new CollisionPlane(anchor.toVector(), 0.5F, 0.5F);
         }
+    }    private static Player viewer() {
+        return (Player) Proxy.newProxyInstance(Player.class.getClassLoader(), new Class<?>[]{Player.class},
+            (proxy, method, arguments) -> {
+                throw new UnsupportedOperationException(method.getName());
+            });
     }
+
 }

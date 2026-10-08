@@ -1,6 +1,8 @@
 package art.arcane.gloss.drop;
 
 import art.arcane.gloss.Gloss;
+import art.arcane.gloss.hologram.ViewerDisplayBudget;
+import art.arcane.gloss.service.VisibilityGovernor;
 import art.arcane.gloss.GlossConfig;
 import art.arcane.gloss.bedrock.BedrockPolicy;
 import art.arcane.gloss.bedrock.BedrockSurface;
@@ -40,11 +42,13 @@ import org.bukkit.util.Vector;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
 
+import java.util.HashSet;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -245,6 +249,7 @@ final class RealDropService {
             state = new State(
                 item, createGeneration, reservedChunk, reserved, restoreVisibility, restoreName,
                 item.hasGravity(), admission, selection);
+            state.displayBudget = new ViewerDisplayBudget(plugin, () -> VisibilityGovernor.Surface.DROP);
             state.modelKind = RealDropModel.modelKind(stack.getType());
             state.lastPollDelayTicks = config.limits().updateIntervalTicks();
             Quaternionf initialRotation = RealDropModel.baseRotation(state.modelKind);
@@ -287,7 +292,7 @@ final class RealDropService {
             item.getPersistentDataContainer().set(restoreNameKey, PersistentDataType.BOOLEAN, restoreName);
             item.getPersistentDataContainer().set(restoreVisibilityKey, PersistentDataType.BOOLEAN, restoreVisibility);
             DisplayVisibility.setVisibleByDefault(item,
-                selection.universalAudience() ? false : restoreVisibility);
+                restoreVisibility);
             if (createLabel && restoreName) {
                 item.setCustomNameVisible(false);
             }
@@ -338,12 +343,14 @@ final class RealDropService {
         World world = state.item.getWorld();
         Display display;
         if (state.modelKind == RealDropModel.ModelKind.FLAT) {
-            ItemDisplay itemDisplay = world.spawn(state.item.getLocation(), ItemDisplay.class);
+            ItemDisplay itemDisplay = world.spawn(state.item.getLocation(), ItemDisplay.class,
+                spawned -> DisplayVisibility.hideByDefault(spawned));
             itemDisplay.setItemDisplayTransform(ItemDisplay.ItemDisplayTransform.FIXED);
             setDisplayContent(itemDisplay, stack);
             display = itemDisplay;
         } else {
-            BlockDisplay blockDisplay = world.spawn(state.item.getLocation(), BlockDisplay.class);
+            BlockDisplay blockDisplay = world.spawn(state.item.getLocation(), BlockDisplay.class,
+                spawned -> DisplayVisibility.hideByDefault(spawned));
             setDisplayContent(blockDisplay, stack);
             display = blockDisplay;
         }
@@ -353,9 +360,7 @@ final class RealDropService {
         display.setInterpolationDuration(config.limits().updateIntervalTicks());
         display.getPersistentDataContainer().set(ownerKey, PersistentDataType.STRING,
             state.item.getUniqueId().toString());
-        if (!state.selection.universalAudience()) {
-            DisplayVisibility.setVisibleByDefault(display, false);
-        }
+
         if (index > 0 && usesPassengerCarrier(detachedRegionizedDisplays)
             && !carrier(state).addPassenger(display)) {
             display.remove();
@@ -370,6 +375,8 @@ final class RealDropService {
         TemporaryHologram hologram = plugin.holograms().createTemporary(
             "real-drop-label-" + state.itemId,
             state.item.getLocation().add(0, config.labels().yOffset(), 0), Long.MAX_VALUE);
+        plugin.holograms().setVisibilitySurface(hologram, VisibilityGovernor.Surface.DROP);
+        plugin.holograms().setRefresh(hologram, config.labels().refresh());
         try {
             hologram.setStyle(config.labels().style());
             hologram.setBox(config.labels().box());
@@ -1335,6 +1342,12 @@ final class RealDropService {
             || !audienceVisible(emission.state(), viewer)) {
             return;
         }
+        Location location = viewer.getLocation();
+        Location anchor = emission.itemOrigin();
+        if (location.getWorld() != anchor.getWorld() || plugin.governor().tier(viewer,
+            VisibilityGovernor.Surface.DROP, location.distanceSquared(anchor)) != VisibilityGovernor.Tier.FULL) {
+            return;
+        }
         GlossConfig.RealDrops config = emission.config();
         List<ParticleLayer> layers = config.particleLayers();
         boolean due = false;
@@ -1440,7 +1453,7 @@ final class RealDropService {
 
     private void reconcileAudience(State state) {
         RealDropConditionPlan.Selection selection = state.selection;
-        if (state.closed || (selection.universalAudience() && !bedrockDropsHidden())) {
+        if (state.closed) {
             return;
         }
         GlossConfig.RealDrops config = selection.style().config();
@@ -1448,12 +1461,31 @@ final class RealDropService {
         List<Display> displays = visibleDisplays(state);
         int revision = state.visualsRevision;
         long tick = System.currentTimeMillis() / 50L;
-        plugin.holograms().forEachViewerWithinBox(state.item.getLocation(), range, viewer -> {
+        Location anchor = state.item.getLocation();
+        Set<UUID> current = new HashSet<>();
+        plugin.holograms().forEachViewerWithinBox(anchor, range, viewer -> {
+            current.add(viewer.getUniqueId());
             if (!state.audience.refreshRequired(viewer.getUniqueId(), revision, tick)) {
                 return;
             }
-            dispatchAudience(state, selection, viewer, displays, revision, tick);
+            dispatchAudience(state, selection, viewer, displays, revision, tick, anchor);
         });
+        for (UUID viewerId : state.audience.viewers()) {
+            if (current.contains(viewerId)) {
+                continue;
+            }
+            Player viewer = plugin.getServer().getPlayer(viewerId);
+            if (viewer == null) {
+                state.displayBudget.forget(viewerId);
+                state.audience.forget(viewerId);
+                continue;
+            }
+            plugin.scheduler().runEntity(viewer, () -> {
+                state.displayBudget.hide(viewer);
+                restoreItemForViewer(state, viewer);
+                state.audience.forget(viewerId);
+            });
+        }
     }
 
     /**
@@ -1461,21 +1493,32 @@ final class RealDropService {
      * server without regionised threading the drop poll already runs on that same thread.
      */
     private void dispatchAudience(State state, RealDropConditionPlan.Selection selection, Player viewer,
-                                  List<Display> displays, int revision, long tick) {
+                                  List<Display> displays, int revision, long tick, Location anchor) {
         if (!detachedRegionizedDisplays) {
-            applyAudience(state, selection, viewer, displays, revision, tick);
+            applyAudience(state, selection, viewer, displays, revision, tick, anchor);
             return;
         }
         plugin.scheduler().runEntity(viewer,
-            () -> applyAudience(state, selection, viewer, displays, revision, tick));
+            () -> applyAudience(state, selection, viewer, displays, revision, tick, anchor));
     }
 
     private void applyAudience(State state, RealDropConditionPlan.Selection selection, Player viewer,
-                               List<Display> displays, int revision, long tick) {
+                               List<Display> displays, int revision, long tick, Location anchor) {
         if (state.closed || !viewer.isOnline()) {
             return;
         }
-        boolean visible = !hiddenOnBedrock(viewer) && selection.visibleTo(plugin, viewer);
+        Location location = viewer.getLocation();
+        boolean eligible = !hiddenOnBedrock(viewer) && selection.visibleTo(plugin, viewer)
+            && location.getWorld() == anchor.getWorld()
+            && plugin.governor().tier(viewer, VisibilityGovernor.Surface.DROP, location.distanceSquared(anchor))
+                != VisibilityGovernor.Tier.CULLED;
+        boolean visible;
+        if (eligible) {
+            visible = state.displayBudget.show(viewer, displays);
+        } else {
+            state.displayBudget.hide(viewer);
+            visible = false;
+        }
         if (state.audience.changed(viewer.getUniqueId(), visible, revision)) {
             if (visible) {
                 viewer.hideEntity(plugin, state.item);
@@ -1484,13 +1527,7 @@ final class RealDropService {
             } else {
                 viewer.hideEntity(plugin, state.item);
             }
-            for (Display display : displays) {
-                if (visible) {
-                    viewer.showEntity(plugin, display);
-                } else {
-                    viewer.hideEntity(plugin, display);
-                }
-            }
+
         }
         state.audience.applied(viewer.getUniqueId(), visible, revision, tick);
     }
@@ -1500,12 +1537,7 @@ final class RealDropService {
         if (hiddenOnBedrock(viewer)) {
             return false;
         }
-        RealDropConditionPlan.Selection selection = state.selection;
-        if (selection.universalAudience()) {
-            return true;
-        }
-        Boolean applied = state.audience.visibility(viewer.getUniqueId());
-        return applied == null ? selection.visibleTo(plugin, viewer) : applied;
+        return Boolean.TRUE.equals(state.audience.visibility(viewer.getUniqueId()));
     }
 
     /**
@@ -1517,18 +1549,10 @@ final class RealDropService {
         return policy != null && policy.hides(BedrockSurface.DROP, viewer);
     }
 
-    /**
-     * True while a Bedrock detector is loaded and drops are withheld from it. Universal-audience
-     * drops otherwise never walk their viewers, and that walk is what restores the vanilla item.
-     */
-    private boolean bedrockDropsHidden() {
-        BedrockPolicy policy = BedrockPolicy.of(plugin);
-        return policy != null && policy.mayHide(BedrockSurface.DROP);
-    }
-
     /** A viewer that quit or changed world keeps none of this drop's applied state. */
     void forgetViewer(UUID viewerId) {
         for (State state : states.values()) {
+            state.displayBudget.forget(viewerId);
             state.audience.forget(viewerId);
         }
     }
@@ -1540,6 +1564,14 @@ final class RealDropService {
             state.visualsView = view;
         }
         return view;
+    }
+
+    private void restoreItemForViewer(State state, Player viewer) {
+        if (state.restoreVisibleByDefault) {
+            viewer.showEntity(plugin, state.item);
+        } else {
+            viewer.hideEntity(plugin, state.item);
+        }
     }
 
     private void restoreAudience(State state) {
@@ -1579,6 +1611,7 @@ final class RealDropService {
         }
         boolean current = states.remove(state.item.getUniqueId(), state);
         state.closed = true;
+        state.displayBudget.close();
         restoreAudience(state);
         release(state.chunkKey, state.reserved);
         state.reserved = 0;
@@ -1607,6 +1640,7 @@ final class RealDropService {
         }
         states.remove(state.itemId, state);
         state.closed = true;
+        state.displayBudget.close();
         restoreAudience(state);
         release(state.chunkKey, state.reserved);
         state.reserved = 0;
@@ -1959,6 +1993,7 @@ final class RealDropService {
         private volatile boolean retryPending;
         private volatile RealDropConditionPlan.Selection selection;
         private volatile boolean closed;
+        private ViewerDisplayBudget displayBudget;
 
         private State(Item item, long generation, ChunkKey chunkKey, int reserved,
                       boolean restoreVisibleByDefault, boolean restoreNameVisible, boolean restoreGravity,

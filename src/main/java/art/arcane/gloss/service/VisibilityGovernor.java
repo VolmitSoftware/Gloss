@@ -5,8 +5,8 @@ import org.bukkit.entity.Player;
 /**
  * Cross-surface admission and level-of-detail arbitration per viewer. New surfaces ask for a lease
  * before spending entities on a viewer and ask for a tier before choosing how much to draw; the
- * seam ships {@link #passthrough()}, which admits everything at full detail and exists so the
- * call sites are in place when the real arbiter lands.
+ * runtime uses configured viewer, surface and aggregate budgets. {@link #passthrough()} provides
+ * an explicit unrestricted implementation for callers without resource constraints.
  */
 public interface VisibilityGovernor {
     enum Surface {
@@ -35,6 +35,13 @@ public interface VisibilityGovernor {
     /** @return a lease to release when the entities are gone, or {@code null} when refused */
     AdmissionBudget.Lease admit(Player viewer, Surface surface, int entities);
 
+    default AdmissionBudget.Lease renew(AdmissionBudget.Lease previous, Player viewer, Surface surface, int entities) {
+        if (previous != null) {
+            previous.close();
+        }
+        return admit(viewer, surface, entities);
+    }
+
     Tier tier(Player viewer, Surface surface, double distanceSquared);
 
     static VisibilityGovernor passthrough() {
@@ -42,10 +49,7 @@ public interface VisibilityGovernor {
     }
 
     /**
-     * Enforces nothing. {@code entities} is ignored and no request is ever refused, so the only
-     * limits in the build are each surface's own: the marker cap per viewer, the interaction hitbox cap, and the
-     * entity-overlay caps. Nothing arbitrates across surfaces. Read a call to {@link #admit} as a
-     * seam waiting for an arbiter, never as a bound on the worst case.
+     * Enforces nothing. Requests receive full detail and a releasable lease.
      */
     final class Passthrough implements VisibilityGovernor {
         private static final Passthrough INSTANCE = new Passthrough();

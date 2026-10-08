@@ -82,6 +82,24 @@ class NametagServiceModeTest {
     }
 
     @Test
+    void rangeAndSubjectLimitUseConfiguredValues() {
+        Player viewer = player("viewer");
+        Player near = player("near");
+        Player far = player("far");
+        distances.put("viewer>near", 25.0D);
+        distances.put("viewer>far", 100.0D);
+        driver.configure(20.0D, 1);
+        driver.apply(List.of(viewer), List.of(near, far), List.of(runtime("viewer.op")),
+            this::scope, silent());
+        assertEquals(List.of("claim viewer nametag near"), teams.calls);
+        teams.calls.clear();
+        driver.configure(3.0D, 10);
+        driver.apply(List.of(viewer), List.of(near, far), List.of(runtime("viewer.op")),
+            this::scope, silent());
+        assertEquals(List.of("release viewer nametag near"), teams.calls);
+    }
+
+    @Test
     void aSubjectThatStopsMatchingIsReleased() {
         Player viewer = player("viewer");
         Player subject = player("subject");
@@ -117,6 +135,16 @@ class NametagServiceModeTest {
         driver.forget(viewer.getUniqueId());
 
         assertEquals(List.of("forget " + viewer.getUniqueId()), teams.calls);
+    }
+
+    @Test
+    void forgettingASubjectReleasesItsClaimsForOtherViewers() {
+        Player viewer = player("viewer");
+        Player subject = player("subject");
+        driver.apply(List.of(viewer), List.of(subject), List.of(runtime("subject.op")), this::scope, silent());
+        teams.calls.clear();
+        driver.forget(subject.getUniqueId());
+        assertEquals(List.of("release viewer nametag subject", "forget " + subject.getUniqueId()), teams.calls);
     }
 
     private ExprScope scope(Player viewer, Player subject) {

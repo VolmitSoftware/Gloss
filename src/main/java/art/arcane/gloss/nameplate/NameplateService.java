@@ -148,6 +148,10 @@ public final class NameplateService implements GlossService, Listener {
             unregisterSource();
             suppression.clear();
         }
+        EntityOverlayService overlays = plugin.entityOverlays();
+        if (overlays != null) {
+            overlays.refreshSources();
+        }
     }
 
     private void registerSource() {

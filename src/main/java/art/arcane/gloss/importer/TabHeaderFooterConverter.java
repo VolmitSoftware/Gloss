@@ -12,7 +12,7 @@ import java.util.Map;
  * per permission group gated on {@code inGroup('viewer', '<group>')}.
  */
 public final class TabHeaderFooterConverter {
-    private static final int SCHEMA_VERSION = 2;
+    private static final int SCHEMA_VERSION = 3;
     private static final long INITIAL_REVISION = 1L;
     private static final int FIRST_PRIORITY = 100;
 

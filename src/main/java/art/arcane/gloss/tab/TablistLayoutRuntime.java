@@ -1,65 +1,94 @@
 package art.arcane.gloss.tab;
 
+import art.arcane.gloss.condition.BoundedConditionErrorCallback;
 import art.arcane.gloss.condition.CompiledCondition;
 import art.arcane.gloss.condition.ConditionCompiler;
 import art.arcane.gloss.condition.ConditionSource;
 import art.arcane.gloss.condition.ShowCondition;
+import art.arcane.gloss.expr.Expr;
+import art.arcane.gloss.expr.ExprParser;
+import art.arcane.gloss.expr.ExprScope;
 
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 
-/**
- * The compiled grid behind a tablist layout: one cell per slot, each with the deterministic
- * identity the client sorts and renders it by. The template is shared by every viewer; only the
- * rendered text differs.
- */
 public final class TablistLayoutRuntime {
     public static final String SLOT_NAME_PREFIX = " gloss_slot_";
     public static final String SLOT_ID_PREFIX = "gloss:tab:";
     public static final int BASE_LIST_ORDER = 100_000;
 
-    private final TablistDoc.Layout layout;
+    private final TablistLayoutDefinition.LayoutPresentation presentation;
+    private final ShowCondition show;
     private final List<Cell> cells;
-    private final List<Cell> playerCells;
-    private final CompiledCondition playerFilter;
+    private final List<Section> sections;
+    private final List<Variant> variants;
 
-    private TablistLayoutRuntime(TablistDoc.Layout layout, List<Cell> cells, List<Cell> playerCells,
-                                 CompiledCondition playerFilter) {
-        this.layout = layout;
-        this.cells = cells;
-        this.playerCells = playerCells;
-        this.playerFilter = playerFilter;
+    private TablistLayoutRuntime(Compilation compilation) {
+        this.presentation = compilation.presentation();
+        this.show = compilation.show();
+        this.cells = compilation.cells();
+        this.sections = compilation.sections();
+        this.variants = compilation.variants();
     }
 
     public static TablistLayoutRuntime compile(TablistDoc.Layout layout) {
         if (layout == null || !layout.active()) {
             return null;
         }
-        int rows = layout.rows();
-        List<Cell> cells = new ArrayList<>(layout.size());
-        for (int index = 0; index < layout.size(); index++) {
-            cells.add(new Cell(index, slotId(index), slotName(index), listOrderFor(index), "", null, null));
+        List<Variant> variants = new ArrayList<>(layout.variants().size());
+        for (TablistLayoutDefinition.LayoutVariant variant : layout.variants()) {
+            variants.add(new Variant(variant.id(), variant.priority(), ConditionCompiler.compile(
+                new ConditionSource("tablist.layout.variants." + variant.id() + ".when", variant.when())),
+                compilePresentation(variant.presentation(), ShowCondition.ALWAYS, List.of())));
         }
-        for (TablistDoc.Slot slot : layout.slots()) {
-            int index = indexOf(slot.column(), slot.row(), rows);
-            Cell base = cells.get(index);
-            cells.set(index, new Cell(base.index(), base.id(), base.name(), base.listOrder(), slot.text(),
-                slot.skin(), slot.ping()));
+        variants.sort(Comparator.comparingInt(Variant::priority).reversed().thenComparing(Variant::id));
+        return compilePresentation(layout.presentation(), layout.show(), List.copyOf(variants));
+    }
+
+    private static TablistLayoutRuntime compilePresentation(TablistLayoutDefinition.LayoutPresentation presentation,
+                                                            ShowCondition show, List<Variant> variants) {
+        List<Cell> cells = new ArrayList<>(presentation.entries());
+        for (int index = 0; index < presentation.entries(); index++) {
+            cells.add(new Cell(index, slotId(index), slotName(index), listOrderFor(index), "", null, null, true));
         }
-        List<Cell> players = new ArrayList<>();
-        TablistDoc.Players block = layout.players();
-        if (block != null) {
-            for (int column = block.column(); column < block.column() + block.columns(); column++) {
-                for (int row = 0; row < block.rows(); row++) {
-                    players.add(cells.get(indexOf(column, row, rows)));
+        for (TablistLayoutDefinition.Slot slot : presentation.slots()) {
+            int index = indexOf(slot.column(), slot.row(), presentation.rows());
+            cells.set(index, new Cell(index, slotId(index), slotName(index), listOrderFor(index), slot.text(),
+                slot.skin(), slot.ping(), slot.hat()));
+        }
+        List<Section> sections = new ArrayList<>(presentation.sections().size());
+        for (TablistLayoutDefinition.Section section : presentation.sections()) {
+            List<Cell> playerCells = new ArrayList<>(section.columns() * section.rows());
+            for (int column = section.column(); column < section.column() + section.columns(); column++) {
+                for (int row = section.row(); row < section.row() + section.rows(); row++) {
+                    playerCells.add(cells.get(indexOf(column, row, presentation.rows())));
                 }
             }
+            List<SortKey> keys = new ArrayList<>(section.sort().size());
+            for (TablistLayoutDefinition.SortKey key : section.sort()) {
+                keys.add(new SortKey(ExprParser.parse(key.expression()), key.type().equals("number"),
+                    key.direction().equals("descending")));
+            }
+            sections.add(new Section(section, List.copyOf(playerCells), ConditionCompiler.compile(
+                new ConditionSource("tablist.layout.sections." + section.id() + ".filter", section.filter())), List.copyOf(keys)));
         }
-        CompiledCondition filter = block == null ? null : ConditionCompiler.compile(
-            new ConditionSource("tablist.layout.players.filter", block.filter()));
-        return new TablistLayoutRuntime(layout, List.copyOf(cells), List.copyOf(players), filter);
+        return new TablistLayoutRuntime(new Compilation(presentation, show, List.copyOf(cells),
+            List.copyOf(sections), variants));
+    }
+
+    public TablistLayoutRuntime select(ExprScope scope, BoundedConditionErrorCallback errors) {
+        if (!show.matches(scope, errors)) {
+            return null;
+        }
+        for (Variant variant : variants) {
+            if (variant.condition().matches(scope, errors)) {
+                return variant.runtime();
+            }
+        }
+        return this;
     }
 
     public static int indexOf(int column, int row, int rows) {
@@ -74,48 +103,40 @@ public final class TablistLayoutRuntime {
         return SLOT_NAME_PREFIX + index;
     }
 
-    /** Descending, so the client keeps the authored reading order rather than sorting by name. */
     public static int listOrderFor(int index) {
         return BASE_LIST_ORDER - index;
-    }
-
-    public TablistDoc.Layout layout() {
-        return layout;
-    }
-
-    public ShowCondition show() {
-        return layout.show();
     }
 
     public int size() {
         return cells.size();
     }
 
-    public List<Cell> cells() {
-        return cells;
-    }
-
     public Cell cell(int index) {
         return cells.get(index);
     }
 
-    public List<Cell> playerCells() {
-        return playerCells;
+    public List<Section> sections() {
+        return sections;
     }
 
-    public CompiledCondition playerFilter() {
-        return playerFilter;
+    public TablistLayoutDefinition.Skin skin(String name) {
+        return name == null ? null : presentation.skins().get(name);
     }
 
-    public boolean isPlayerCell(int index) {
-        for (Cell cell : playerCells) {
-            if (cell.index() == index) {
-                return true;
-            }
-        }
-        return false;
+    public record Cell(int index, UUID id, String name, int listOrder, String text, String skin, Integer ping,
+                       boolean hat) {
     }
 
-    public record Cell(int index, UUID id, String name, int listOrder, String text, String skin, Integer ping) {
+    public record Section(TablistLayoutDefinition.Section source, List<Cell> cells, CompiledCondition filter, List<SortKey> sort) {
+    }
+
+    public record SortKey(Expr expression, boolean number, boolean descending) {
+    }
+
+    private record Variant(String id, int priority, CompiledCondition condition, TablistLayoutRuntime runtime) {
+    }
+
+    private record Compilation(TablistLayoutDefinition.LayoutPresentation presentation, ShowCondition show, List<Cell> cells,
+                                List<Section> sections, List<Variant> variants) {
     }
 }

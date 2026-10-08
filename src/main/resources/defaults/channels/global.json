@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "revision": 1,
   "show": "true",
   "channel": {
@@ -35,6 +35,7 @@
     "render": "&9&n{{ link.host }}"
   },
   "filters": [],
+  "filtering": { "syntax": "re2" },
   "throttle": {
     "repeatWindowTicks": 100,
     "maxRepeats": 1,

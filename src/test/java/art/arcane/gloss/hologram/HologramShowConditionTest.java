@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -33,7 +34,7 @@ class HologramShowConditionTest {
             harness.drainDelayed();
             DisplayHandle display = harness.onlySpawned(world);
             assertEquals(Boolean.FALSE, display.visibleByDefault);
-            assertEquals(Boolean.FALSE, alice.perceivedVisibility(display));
+            assertFalse(alice.effectivelyVisible(display));
             assertEquals(Boolean.TRUE, bob.perceivedVisibility(display));
 
             alice.location.setX(3.0D);
@@ -41,7 +42,7 @@ class HologramShowConditionTest {
             hologram.update();
             harness.drainDelayed();
             assertEquals(Boolean.TRUE, alice.perceivedVisibility(display));
-            assertEquals(Boolean.FALSE, bob.perceivedVisibility(display));
+            assertFalse(bob.effectivelyVisible(display));
             assertEquals(1, harness.liveSpawned(world).size());
             assertTrue(harness.schedulerErrors.isEmpty());
         }
@@ -101,14 +102,14 @@ class HologramShowConditionTest {
             hologram.setLines(List.of("text"));
             hologram.drive(true);
             DisplayHandle display = harness.onlySpawned(world);
-            assertEquals(Boolean.FALSE, alice.perceivedVisibility(display));
+            assertFalse(alice.effectivelyVisible(display));
             visible.set(true);
             hologram.drive(true);
             assertEquals(Boolean.TRUE, alice.perceivedVisibility(display));
-            assertEquals(Boolean.FALSE, bob.perceivedVisibility(display));
+            assertFalse(bob.effectivelyVisible(display));
             visible.set(false);
             hologram.drive(true);
-            assertEquals(Boolean.FALSE, alice.perceivedVisibility(display));
+            assertFalse(alice.effectivelyVisible(display));
             assertTrue(harness.schedulerErrors.isEmpty());
         }
     }
@@ -167,7 +168,7 @@ class HologramShowConditionTest {
             assertEquals(2, world.spawned.size());
             assertEquals(0, alice.showCallsFor(replacement));
             harness.drainDelayed();
-            assertEquals(Boolean.FALSE, alice.perceivedVisibility(replacement));
+            assertFalse(alice.effectivelyVisible(replacement));
             assertTrue(harness.schedulerErrors.isEmpty());
         }
     }

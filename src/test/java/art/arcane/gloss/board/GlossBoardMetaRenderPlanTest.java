@@ -1,18 +1,21 @@
 package art.arcane.gloss.board;
 
 import art.arcane.gloss.text.TextPipeline;
+import art.arcane.gloss.doc.DocumentPresetCatalog;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.UUID;
 import java.util.function.UnaryOperator;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 
 class GlossBoardMetaRenderPlanTest {
     private static final int MAX_LINES = 15;
@@ -26,6 +29,39 @@ class GlossBoardMetaRenderPlanTest {
     @AfterEach
     void clearPublishedTriggers() {
         TextPipeline.publishEmojiTriggers(List.of());
+    }
+
+    @Test
+    void presetReloadCannotKeepAnOlderPresentationCachedUnderTheSameProfileId() {
+        GlossBoardMeta original = presetBoard("PRESET_INITIAL");
+        GlossBoardMeta replacement = presetBoard("PRESET_RELOADED");
+        assertEquals(original.revision(), replacement.revision());
+        GlossBoardMeta.RenderPlan initial = plan(original);
+        BoardRenderCache.Entry cache = new BoardRenderCache().entry(UUID.randomUUID());
+        int[] slots = cache.frame(initial, new int[]{0}).slots();
+
+        GlossBoardMeta.RenderPlan stale = replacement.renderPlan("base", original.presentation(),
+            0, MAX_LINES, staticRender);
+        assertEquals("PRESET_INITIAL", stale.staticTitle());
+        GlossBoardMeta.RenderPlan refreshed = plan(replacement);
+
+        assertNotSame(stale, refreshed);
+        assertEquals("PRESET_RELOADED", refreshed.staticTitle());
+        assertEquals("stable-row", refreshed.rowId(0));
+        assertArrayEquals(slots, cache.frame(refreshed, new int[]{0}).slots());
+        assertSame(refreshed, plan(replacement));
+    }
+
+    private static GlossBoardMeta presetBoard(String title) {
+        DocumentPresetCatalog presets = DocumentPresetCatalog.parse("presets.json", """
+            {"schemaVersion":1,"revision":1,"presets":{"boards":{"base":{"values":{
+              "presentation":{"title":"%s","lines":[{"id":"stable-row","text":"Label","value":"1"}]}
+            }}}}}
+            """.formatted(title));
+        BoardDoc document = BoardDoc.parse("sidebar.json", presets.resolve("boards", """
+            {"schemaVersion":2,"revision":1,"preset":"base"}
+            """));
+        return GlossBoardMeta.fromDoc("sidebar", document);
     }
 
     @Test

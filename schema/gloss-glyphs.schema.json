@@ -8,6 +8,14 @@
     "revision"
   ],
   "properties": {
+    "preset": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1,
+      "description": "Named preset from this collection in presets.json; document fields override inherited values."
+    },
     "schemaVersion": {
       "type": "integer",
       "const": 1
@@ -27,7 +35,7 @@
       "type": "string",
       "pattern": "^[a-z0-9_.-]+$",
       "default": "glyphs",
-      "description": "Font name inside the namespace. Every glyph document in the workspace must agree on namespace and font."
+      "description": "Font name inside the namespace. Documents may target different fonts; glyph and overlay IDs remain globally unique."
     },
     "glyphs": {
       "type": "array",
@@ -45,6 +53,14 @@
     },
     "space": {
       "$ref": "#/$defs/space"
+    },
+    "waypointStyles": {
+      "type": "array",
+      "maxItems": 128,
+      "description": "Native locator-bar styles. Refer to each as namespace:id from a waypoint.",
+      "items": {
+        "$ref": "#/$defs/waypointStyle"
+      }
     }
   },
   "additionalProperties": false,
@@ -169,6 +185,51 @@
         }
       },
       "additionalProperties": false
+    },
+    "waypointStyle": {
+      "type": "object",
+      "required": [
+        "id",
+        "sprites"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "nearDistance": {
+          "type": "number",
+          "minimum": 0,
+          "default": 128
+        },
+        "farDistance": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "default": 332,
+          "description": "Must exceed nearDistance."
+        },
+        "sprites": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 64,
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "image"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "$ref": "#/$defs/id"
+              },
+              "image": {
+                "$ref": "#/$defs/image"
+              }
+            }
+          }
+        }
+      }
     }
   }
 }

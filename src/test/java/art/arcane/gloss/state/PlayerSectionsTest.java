@@ -45,6 +45,34 @@ class PlayerSectionsTest {
     }
 
     @Test
+    void failedCheckedWriteLeavesThePreviouslyPublishedSectionIntact() throws IOException {
+        UUID player = UUID.randomUUID();
+        PlayerSections sections = new PlayerSections(dataFolder);
+        sections.writeChecked(player, "camera", Map.of("world", "world"));
+        Path file = dataFolder.resolve("state").resolve("players").resolve(player + ".json");
+        Files.delete(file);
+        Files.createDirectory(file);
+        Files.writeString(file.resolve("occupied"), "occupied");
+
+        Assertions.assertThrows(IOException.class,
+            () -> sections.writeChecked(player, "camera", Map.of()));
+
+        Assertions.assertEquals(Map.of("world", "world"), sections.read(player, "camera"));
+    }
+
+    @Test
+    void failedFirstCheckedWriteDoesNotPublishUndurableValues() throws IOException {
+        UUID player = UUID.randomUUID();
+        PlayerSections sections = new PlayerSections(dataFolder);
+        Files.createFile(dataFolder.resolve("state"));
+
+        Assertions.assertThrows(IOException.class,
+            () -> sections.writeChecked(player, "camera", Map.of("world", "world")));
+
+        Assertions.assertEquals(Map.of(), sections.read(player, "camera"));
+    }
+
+    @Test
     void overwritingASectionReplacesItAndLeavesOthersAlone() {
         PlayerSections sections = new PlayerSections(dataFolder);
         UUID player = UUID.randomUUID();

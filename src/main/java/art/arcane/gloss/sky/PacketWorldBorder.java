@@ -37,6 +37,8 @@ public final class PacketWorldBorder implements BorderApplier {
     private static void send(Player viewer, double centerX, double centerZ, double size, int warningBlocks) {
         PacketWrapper<?> packet = new WrapperPlayServerInitializeWorldBorder(centerX, centerZ,
             size, size, INSTANT, PORTAL_BOUNDARY, WARNING_TIME_SECONDS, warningBlocks);
-        PacketUtils.send(viewer, List.of(packet));
+        if (!PacketUtils.sendChecked(viewer, List.of(packet))) {
+            throw new IllegalStateException("Player connection refused world-border update");
+        }
     }
 }

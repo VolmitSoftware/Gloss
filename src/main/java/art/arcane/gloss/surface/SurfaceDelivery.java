@@ -2,10 +2,12 @@ package art.arcane.gloss.surface;
 
 import art.arcane.volmlib.util.hud.HudSlot;
 import org.bukkit.boss.BarColor;
+import org.bukkit.boss.BarFlag;
 import org.bukkit.boss.BarStyle;
 import org.bukkit.entity.Player;
 
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -20,6 +22,21 @@ public interface SurfaceDelivery {
 
     boolean bossBar(Player viewer, String laneId, int priority, String title, double progress, BarColor color,
                     BarStyle style, long staleMillis);
+
+    default boolean bossBar(Player viewer, String laneId, BossBarOptions options) {
+        if (!options.flags().isEmpty()) {
+            throw new UnsupportedOperationException("This surface delivery does not support bossbar flags");
+        }
+        return bossBar(viewer, laneId, options.priority(), options.title(), options.progress(), options.color(),
+            options.style(), options.staleMillis());
+    }
+
+    record BossBarOptions(int priority, String title, double progress, BarColor color, BarStyle style,
+                         long staleMillis, Set<BarFlag> flags) {
+        public BossBarOptions {
+            flags = flags == null ? Set.of() : Set.copyOf(flags);
+        }
+    }
 
     void hideBossBar(Player viewer, String laneId);
 

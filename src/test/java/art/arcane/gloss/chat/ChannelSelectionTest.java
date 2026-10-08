@@ -75,7 +75,7 @@ class ChannelSelectionTest {
     @Test
     void selectedVariantOverridesWholeBlocksAndKeepsUnspecifiedBaseValues() {
         ChannelDoc document = ChannelDoc.parse("global.json", """
-            {"schemaVersion":1,"revision":1,"channel":{"name":"global"},
+            {"schemaVersion":2,"revision":1,"channel":{"name":"global"},
              "format":"base-format","card":["base-card"],
              "filters":[{"match":"bad","replace":"base"}],
              "variants":[{"id":"special","priority":1,"when":"viewer.name == 'Alex'",
@@ -107,12 +107,12 @@ class ChannelSelectionTest {
         ChannelDoc doc = new ChannelDoc(ChannelDoc.CURRENT_SCHEMA_VERSION, 1L, null,
             new ChannelDoc.Channel("global", List.of("g"), null, null, null, null, null, null),
             "base-format", List.of(), null, null, null,
-            List.of(new ChannelDoc.Filter("(?i)\\bbadword\\b", "***")), null, List.of(variants));
+            List.of(new ChannelDoc.Filter("(?i)\\bbadword\\b", "***")), null, null, List.of(variants));
         return ChannelRuntime.of("global", doc);
     }
 
     private static ChannelDoc.Variant variant(String id, int priority, String when, String format) {
-        return new ChannelDoc.Variant(id, priority, when, format, null, null, null, null, null, null);
+        return new ChannelDoc.Variant(id, priority, when, format, null, null, null, null, null, null, null);
     }
 
     private record TestScope(Map<String, Object> variables, Set<String> permissions) implements ExprScope {

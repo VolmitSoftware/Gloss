@@ -14,11 +14,14 @@ final class PlayerTextScope implements ExprScope {
     private final ExprScope delegate;
     private final Player viewer;
     private final BiFunction<Player, Player, String> names;
+    private final BiFunction<String, ExprScope, String> capturedNames;
 
-    PlayerTextScope(ExprScope delegate, Player viewer, BiFunction<Player, Player, String> names) {
+    PlayerTextScope(ExprScope delegate, Player viewer, BiFunction<Player, Player, String> names,
+                    BiFunction<String, ExprScope, String> capturedNames) {
         this.delegate = delegate;
         this.viewer = viewer;
         this.names = names;
+        this.capturedNames = capturedNames;
     }
 
     @Override
@@ -27,6 +30,11 @@ final class PlayerTextScope implements ExprScope {
         if (separator >= 0) {
             String property = name.substring(separator + 1);
             if (property.equals("name") || property.equals("displayName") || property.equals("username")) {
+                String roleName = name.substring(0, separator);
+                if (delegate.variableContext().snapshots().containsKey(roleName)) {
+                    return property.equals("username") ? delegate.variableContext().roleValue(roleName, "name")
+                        : capturedNames.apply(roleName, delegate);
+                }
                 Entity entity = role(name.substring(0, separator));
                 if (entity == null && (name.startsWith("leaderboard.") || name.startsWith("source.")
                     || name.startsWith("subject."))) {
@@ -50,6 +58,10 @@ final class PlayerTextScope implements ExprScope {
             if (args.get(keyIndex) instanceof String key
                 && (key.equals("player_name") || key.equals("%player_name%")
                 || key.equals("player_displayname") || key.equals("%player_displayname%"))) {
+                String roleName = keyIndex == 0 ? "viewer" : String.valueOf(args.getFirst());
+                if (delegate.variableContext().snapshots().containsKey(roleName)) {
+                    return capturedNames.apply(roleName, delegate);
+                }
                 Entity entity = role(keyIndex == 0 ? "viewer" : String.valueOf(args.getFirst()));
                 if (entity instanceof Player player) {
                     return names.apply(viewer, player);

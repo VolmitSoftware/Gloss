@@ -1,6 +1,7 @@
 package art.arcane.gloss.drop;
 
 import art.arcane.gloss.Gloss;
+import art.arcane.gloss.service.VisibilityGovernor;
 import art.arcane.gloss.GlossConfig;
 import art.arcane.gloss.api.ParticleLayer;
 import art.arcane.gloss.api.ParticleTextSpan;
@@ -378,6 +379,7 @@ public final class DropNameService implements Listener, RegistryOwner {
         if (current == null) {
             TemporaryHologram hologram = plugin.holograms().createTemporary(
                 "drop-label-" + itemId, item.getLocation(), Long.MAX_VALUE);
+        plugin.holograms().setVisibilitySurface(hologram, VisibilityGovernor.Surface.DROP);
             current = new ConditionalLabel(hologram, selection);
             conditionalLabels.put(itemId, current);
             ConditionalLabel bound = current;

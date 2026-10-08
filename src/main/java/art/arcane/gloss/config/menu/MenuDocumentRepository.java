@@ -4,12 +4,14 @@ import art.arcane.gloss.doc.DocumentParsers;
 
 import art.arcane.gloss.doc.AtomicFiles;
 import art.arcane.gloss.doc.DocumentRevisionConflictException;
+import art.arcane.gloss.doc.DocumentPresetCatalog;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
@@ -24,6 +26,7 @@ import java.util.function.UnaryOperator;
 final class MenuDocumentRepository {
   private static final String JSON_EXTENSION = ".json";
   private static final String NOUN = "menu";
+  private static final int MAX_DOCUMENT_BYTES = 2 * 1024 * 1024;
 
   private final Path directory;
 
@@ -56,13 +59,16 @@ final class MenuDocumentRepository {
     if (!parsed.isJsonObject()) {
       throw new IllegalArgumentException("menu document must be a JSON object");
     }
-    JsonObject changed = Objects.requireNonNull(
-        requiredMutation.apply(parsed.getAsJsonObject().deepCopy()), "menu mutation result");
+    DocumentPresetCatalog presets = DocumentPresetCatalog.read(directory.getParent());
+    JsonObject effective = JsonParser.parseString(presets.resolve("menus", originalSource)).getAsJsonObject();
+    JsonObject mutationResult = Objects.requireNonNull(requiredMutation.apply(effective.deepCopy()), "menu mutation result");
+    JsonObject changed = presets.applies("menus", originalSource)
+        ? DocumentPresetCatalog.applyEdits(parsed.getAsJsonObject(), effective, mutationResult) : mutationResult;
     String changedSource = DocumentParsers.GSON.toJson(changed) + System.lineSeparator();
-    MenuDocument validated = MenuDocumentParser.parse(menuId, changedSource);
+    MenuDocument validated = MenuDocumentParser.parse(menuId, changedSource, presets);
 
     if (changed.equals(parsed)) {
-      return MenuDocumentParser.parse(menuId, originalSource);
+      return MenuDocumentParser.parse(menuId, originalSource, presets);
     }
 
     prepareParent(target);
@@ -88,7 +94,7 @@ final class MenuDocumentRepository {
       throw new IllegalArgumentException("menu document must be a JSON object");
     }
     String copiedSource = DocumentParsers.GSON.toJson(parsed) + System.lineSeparator();
-    MenuDocument validated = MenuDocumentParser.parse(targetMenuId, copiedSource);
+    MenuDocument validated = parse(targetMenuId, copiedSource);
 
     prepareParent(target);
     if (Files.exists(target, LinkOption.NOFOLLOW_LINKS)) {
@@ -116,7 +122,7 @@ final class MenuDocumentRepository {
     String normalizedSource = source.endsWith(System.lineSeparator())
         ? source
         : source + System.lineSeparator();
-    MenuDocument validated = MenuDocumentParser.parse(menuId, normalizedSource);
+    MenuDocument validated = parse(menuId, normalizedSource);
     Path target = path(menuId);
 
     prepareParent(target);
@@ -169,7 +175,11 @@ final class MenuDocumentRepository {
     if (!persistedRevision.equals(writtenRevision)) {
       throw new DocumentRevisionConflictException(NOUN, menuId, writtenRevision, persistedRevision);
     }
-    return MenuDocumentParser.parse(menuId, persistedSource);
+    return parse(menuId, persistedSource);
+  }
+
+  private MenuDocument parse(String id, String source) throws IOException {
+    return MenuDocumentParser.parse(id, source, DocumentPresetCatalog.read(directory.getParent()));
   }
 
   private void publishNewFile(Path temporary, Path target) throws IOException {
@@ -202,7 +212,13 @@ final class MenuDocumentRepository {
     if (Files.isSymbolicLink(path) || !Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS)) {
       throw new IOException("menu path must be a regular non-symbolic file: " + path);
     }
-    return Files.readAllBytes(path);
+    try (InputStream input = Files.newInputStream(path)) {
+      byte[] content = input.readNBytes(MAX_DOCUMENT_BYTES + 1);
+      if (content.length > MAX_DOCUMENT_BYTES) {
+        throw new IOException("Menu exceeds " + MAX_DOCUMENT_BYTES + " bytes: " + path);
+      }
+      return content;
+    }
   }
 
   private void prepareParent(Path target) throws IOException {

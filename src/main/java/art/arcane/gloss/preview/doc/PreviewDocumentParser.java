@@ -149,7 +149,23 @@ public final class PreviewDocumentParser {
     int priority = doc.match != null && doc.match.priority != null ? doc.match.priority : 0;
     return new CompiledPreviewDocument(documentName, priority, match, variants, vars, show, card, elements,
         particleLayers, viewingNumber(doc.scale, 0.65D, 0.25D, 4.0D, "scale"),
-        viewingNumber(doc.viewDistance, 10.0D, 1.0D, 24.0D, "viewDistance"));
+        viewingNumber(doc.viewDistance, 10.0D, 1.0D, 24.0D, "viewDistance"),
+        refreshTicks(doc.contentRefreshTicks, 4, "contentRefreshTicks"),
+        refreshTicks(doc.accessCheckTicks, 10, "accessCheckTicks"));
+  }
+
+  private int refreshTicks(JsonElement value, int fallback, String path) {
+    if (value == null || value.isJsonNull()) {
+      return fallback;
+    }
+    if (!value.isJsonPrimitive() || !value.getAsJsonPrimitive().isNumber()) {
+      throw fail(path, "must be an integer within 1..1200", null);
+    }
+    double ticks = value.getAsDouble();
+    if (!Double.isFinite(ticks) || ticks != Math.rint(ticks) || ticks < 1 || ticks > 1200) {
+      throw fail(path, "must be an integer within 1..1200", null);
+    }
+    return (int) ticks;
   }
 
   // ---------------------------------------------------------------------

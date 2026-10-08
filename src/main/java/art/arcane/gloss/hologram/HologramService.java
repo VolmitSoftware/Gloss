@@ -1,6 +1,8 @@
 package art.arcane.gloss.hologram;
 
 import art.arcane.gloss.Gloss;
+import art.arcane.gloss.menu.DisplayEntityManager;
+import art.arcane.gloss.service.VisibilityGovernor;
 import art.arcane.gloss.animation.AnimationService;
 import art.arcane.gloss.api.AnchoredHologram;
 import art.arcane.gloss.api.TemporaryHologram;
@@ -19,6 +21,7 @@ import art.arcane.gloss.text.TextDisplayLayout;
 import art.arcane.gloss.text.TextPipeline;
 import art.arcane.gloss.util.common.TextUtils;
 import art.arcane.volmlib.util.entity.StackExclusion;
+import art.arcane.volmlib.util.localization.LanguageAudience;
 import art.arcane.volmlib.util.scheduling.FoliaScheduler;
 import art.arcane.volmlib.util.scheduling.SchedulerUtils;
 import com.github.retrooper.packetevents.PacketEvents;
@@ -75,6 +78,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.UnaryOperator;
 import java.util.function.Consumer;
+import java.util.function.BiConsumer;
 import java.util.function.Predicate;
 import java.util.logging.Level;
 
@@ -292,6 +296,20 @@ public final class HologramService implements RegistryOwner {
         return temporary;
     }
 
+    public void setVisibilityObserver(TemporaryHologram hologram, BiConsumer<UUID, Boolean> observer) {
+        if (!(hologram instanceof TemporaryHologramDisplay display) || !temporaries.contains(display)) {
+            throw new IllegalArgumentException("Temporary hologram does not belong to this service.");
+        }
+        display.setVisibilityObserver(observer);
+    }
+
+    public void setVisibilitySurface(TemporaryHologram hologram, VisibilityGovernor.Surface surface) {
+        if (!(hologram instanceof TemporaryHologramDisplay display) || !temporaries.contains(display)) {
+            throw new IllegalArgumentException("Temporary hologram does not belong to this service.");
+        }
+        display.setVisibilitySurface(surface);
+    }
+
     public void setTextTransform(TemporaryHologram hologram, UnaryOperator<String> transform) {
         if (!(hologram instanceof TemporaryHologramDisplay display) || !temporaries.contains(display)) {
             throw new IllegalArgumentException("Temporary hologram does not belong to this service.");
@@ -304,6 +322,12 @@ public final class HologramService implements RegistryOwner {
             throw new IllegalArgumentException("Temporary hologram does not belong to this service.");
         }
         display.setViewDistance(viewDistance);
+    }
+
+    public void setRefresh(TemporaryHologram hologram, DisplayRefresh refresh) {
+        if (hologram instanceof TemporaryHologramDisplay display) {
+            display.setRefresh(refresh);
+        }
     }
 
     public void setViewerCondition(TemporaryHologram hologram, Predicate<Player> condition) {
@@ -553,16 +577,30 @@ public final class HologramService implements RegistryOwner {
                 () -> prunePlayer(playerId));
             return;
         }
-        ViewerWorkQueue queue = viewerWorkQueues.computeIfAbsent(playerId,
-            ignored -> new ViewerWorkQueue());
+        ViewerWorkQueue existing = viewerWorkQueues.get(playerId);
+        ViewerWorkQueue queue = existing == null
+            ? viewerWorkQueues.computeIfAbsent(playerId, ignored -> new ViewerWorkQueue(this, playerId)) : existing;
         queue.tasks.put(key, work);
         if (!queue.scheduled.compareAndSet(false, true)) {
             return;
         }
         viewerWorkDispatches.incrementAndGet();
-        Runnable drain = () -> drainViewerWork(playerId, queue);
+        if (FoliaScheduler.isOwnedByCurrentRegion(player)) {
+            try {
+                if (!plugin.isEnabled() || !player.isOnline() || !player.isValid()) {
+                    retireViewerWork(playerId, queue);
+                    return;
+                }
+                LanguageAudience.run(playerId, queue.drain);
+            } catch (Throwable failure) {
+                retireViewerWork(playerId, queue);
+                Gloss.logExceptionStackThrottled(false, "hologram-viewer-refresh",
+                    failure, "Hologram viewer refresh failed for %s.", playerId);
+            }
+            return;
+        }
         Runnable retirement = once(() -> retireViewerWork(playerId, queue));
-        if (!FoliaScheduler.runEntity(plugin, player, drain, 0L, retirement)) {
+        if (!FoliaScheduler.runEntity(plugin, player, queue.drain, 0L, retirement)) {
             retirement.run();
         }
     }
@@ -938,6 +976,7 @@ public final class HologramService implements RegistryOwner {
     }
 
     private void driveTemporaries() {
+        DisplayEntityManager.pumpRetirements();
         boolean enabled = plugin.cfg().holograms().enabled();
         HologramTick tick = new HologramTick(viewerIndex);
         for (TemporaryHologramDisplay temporary : temporaries) {
@@ -1047,7 +1086,8 @@ public final class HologramService implements RegistryOwner {
         return new InteractionTarget("hologram:" + hologramId, hologramId + "/" + componentId,
             () -> hitboxOrigin(hologram, offset, height), box.width().floatValue(), (float) height, actions,
             (player, trigger) -> new HologramActionContext(hologramId, pages, row, player, trigger),
-            () -> holograms.get(hologramId) == hologram);
+            () -> holograms.get(hologramId) == hologram,
+            new InteractionTarget.Visibility(VisibilityGovernor.Surface.HOLOGRAM, hologram::shownTo));
     }
 
     private Location hitboxOrigin(PersistentHologram hologram, double offset, double height) {
@@ -1340,6 +1380,11 @@ public final class HologramService implements RegistryOwner {
     static final class ViewerWorkQueue {
         private final Map<String, Runnable> tasks = new ConcurrentHashMap<>();
         private final AtomicBoolean scheduled = new AtomicBoolean();
+        private final Runnable drain;
+
+        ViewerWorkQueue(HologramService service, UUID playerId) {
+            drain = () -> service.drainViewerWork(playerId, this);
+        }
 
         void put(String key, Runnable work) {
             tasks.put(key, work);

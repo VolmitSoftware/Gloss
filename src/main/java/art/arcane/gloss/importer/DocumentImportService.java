@@ -1,10 +1,14 @@
 package art.arcane.gloss.importer;
 
-import art.arcane.gloss.doc.DocumentHashes;
+import art.arcane.gloss.GlossConfig;
+import art.arcane.gloss.doc.DocumentEnvelope;
+import art.arcane.gloss.doc.DocumentPresetCatalog;
 import art.arcane.gloss.editor.sync.EditorSyncDocumentKind;
 import art.arcane.gloss.history.HistoryKinds;
 import art.arcane.gloss.persistence.GlossPersistenceCoordinator;
 import art.arcane.gloss.persistence.GlossProjectTransaction;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -12,6 +16,8 @@ import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.function.BiFunction;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -52,6 +58,11 @@ public final class DocumentImportService {
     }
 
     public DocumentImportPlan preview(LegacyImportSource source) throws IOException {
+        return preview(source, GlossConfig.current().imports());
+    }
+
+    DocumentImportPlan preview(LegacyImportSource source, GlossConfig.Imports limits) throws IOException {
+        PreparedImport preparation = new PreparedImport(dataDirectory, limits);
         List<DocumentImportEntry> entries = new ArrayList<>();
         List<LegacyImportIssue> issues = new ArrayList<>();
         Path sourcePath;
@@ -62,7 +73,7 @@ public final class DocumentImportService {
                 sourcePath = scanner.root(serverDirectory);
                 present = Files.isDirectory(sourcePath, LinkOption.NOFOLLOW_LINKS);
                 FeatherBoardConverter converter = new FeatherBoardConverter();
-                for (LegacyBoardDraft draft : scanner.scan(sourcePath)) {
+                for (LegacyBoardDraft draft : scanBoards(sourcePath, preparation, scanner::read, limits)) {
                     entries.addAll(converter.convert(draft));
                 }
             }
@@ -71,7 +82,7 @@ public final class DocumentImportService {
                 sourcePath = scanner.root(serverDirectory);
                 present = Files.isDirectory(sourcePath, LinkOption.NOFOLLOW_LINKS);
                 AnimatedScoreboardConverter converter = new AnimatedScoreboardConverter();
-                for (LegacyBoardDraft draft : scanner.scan(sourcePath)) {
+                for (LegacyBoardDraft draft : scanBoards(sourcePath, preparation, scanner::read, limits)) {
                     entries.addAll(converter.convert(draft));
                 }
             }
@@ -79,7 +90,9 @@ public final class DocumentImportService {
                 TabHeaderFooterScanner scanner = new TabHeaderFooterScanner();
                 sourcePath = scanner.file(serverDirectory);
                 present = Files.isRegularFile(sourcePath, LinkOption.NOFOLLOW_LINKS);
-                TabHeaderFooterScanner.Draft draft = scanner.scan(sourcePath);
+                byte[] bytes = preparation.read(sourcePath);
+                TabHeaderFooterScanner.Draft draft = bytes == null ? null
+                    : scanner.read(new String(bytes, StandardCharsets.UTF_8));
                 if (draft == null) {
                     if (present) {
                         issues.add(new LegacyImportIssue(LegacyImportIssue.Severity.WARNING, "-",
@@ -92,8 +105,19 @@ public final class DocumentImportService {
             default -> throw new IllegalArgumentException(
                     "source is not a document import: " + source.id());
         }
+        List<DocumentImportEntry> resolved = withDispositions(entries, preparation);
+        Set<Path> targets = new LinkedHashSet<>();
+        for (DocumentImportEntry entry : resolved) {
+            Path target = target(entry);
+            if (!targets.add(target)) {
+                throw new IOException("Multiple import entries use the same destination: " + entry.path());
+            }
+            preparation.document(target, entry.json().getBytes(StandardCharsets.UTF_8));
+            preparation.retainBytes(entry.json().length() * 2L);
+        }
+        preparation.validateDocuments();
         return new DocumentImportPlan(source, sourcePath.toString(), present,
-                withDispositions(entries), List.copyOf(issues));
+                resolved, List.copyOf(issues), this, preparation);
     }
 
     /**
@@ -103,42 +127,36 @@ public final class DocumentImportService {
      */
     public List<DocumentImportEntry> apply(DocumentImportPlan plan, boolean overwrite)
             throws IOException {
-        Map<Path, GlossProjectTransaction.Mutation> mutations = new LinkedHashMap<>();
-        Map<Path, byte[]> expected = new LinkedHashMap<>();
+        PreparedImport preparation = plan.preparation(this);
+        Set<Path> excluded = new LinkedHashSet<>();
+        Map<Path, byte[]> replaced = new LinkedHashMap<>();
         Map<Path, DocumentImportEntry> written = new LinkedHashMap<>();
         List<DocumentImportEntry> applied = new ArrayList<>();
         for (DocumentImportEntry entry : plan.entries()) {
-            if (entry.disposition() == LegacyImportDisposition.CONFLICT && !overwrite) {
-                continue;
-            }
             Path target = target(entry);
-            byte[] content = entry.json().getBytes(StandardCharsets.UTF_8);
-            byte[] current = currentBytes(target);
-            if (current != null && DocumentHashes.sha256(current)
-                    .equals(DocumentHashes.sha256(content))) {
+            if (entry.disposition() == LegacyImportDisposition.CONFLICT && !overwrite) {
+                excluded.add(target);
                 continue;
             }
-            mutations.put(target, GlossProjectTransaction.Mutation.write(content));
+            byte[] current = preparation.read(target);
+            if (Arrays.equals(current, entry.json().getBytes(StandardCharsets.UTF_8))) {
+                continue;
+            }
             if (current != null) {
-                expected.put(target, current);
+                replaced.put(target, current);
             }
             written.put(target, entry);
             applied.add(entry);
         }
-        if (mutations.isEmpty()) {
-            return List.of();
-        }
-        return coordinator.writeExternally(() -> {
-            for (Map.Entry<Path, byte[]> replaced : expected.entrySet()) {
-                DocumentImportEntry entry = written.get(replaced.getKey());
-                history.record(entry.kind(), entry.id(), replaced.getValue(),
-                        "import:" + plan.source().id());
+        PreparedImport selected = preparation.excluding(excluded);
+        selected.validateDocuments();
+        selected.apply("import-" + plan.source().id(), transaction, coordinator, () -> {
+            for (Map.Entry<Path, byte[]> previous : replaced.entrySet()) {
+                DocumentImportEntry entry = written.get(previous.getKey());
+                history.record(entry.kind(), entry.id(), previous.getValue(), "import:" + plan.source().id());
             }
-            GlossProjectTransaction.Pending pending = transaction.apply(
-                    "import-" + plan.source().id(), mutations, expected);
-            transaction.commit(pending);
-            return List.copyOf(applied);
         });
+        return List.copyOf(applied);
     }
 
     /** The kinds an applied plan touched, so the caller can reload exactly those runtimes. */
@@ -153,16 +171,46 @@ public final class DocumentImportService {
         return Set.copyOf(kinds);
     }
 
-    private List<DocumentImportEntry> withDispositions(List<DocumentImportEntry> entries) {
+    private List<DocumentImportEntry> withDispositions(List<DocumentImportEntry> entries,
+                                                       PreparedImport preparation) throws IOException {
         List<DocumentImportEntry> resolved = new ArrayList<>(entries.size());
+        byte[] presetBytes = preparation.read(dataDirectory.resolve(DocumentPresetCatalog.FILE_NAME));
+        DocumentPresetCatalog presets = presetBytes == null ? DocumentPresetCatalog.empty()
+            : DocumentPresetCatalog.parse(DocumentPresetCatalog.FILE_NAME,
+                new String(presetBytes, StandardCharsets.UTF_8));
         for (DocumentImportEntry entry : entries) {
             Path target = target(entry);
-            resolved.add(Files.exists(target, LinkOption.NOFOLLOW_LINKS)
-                    ? entry.withDisposition(LegacyImportDisposition.CONFLICT,
-                    "a document already exists at " + entry.path())
-                    : entry);
+            byte[] existing = preparation.read(target);
+            if (existing == null) {
+                resolved.add(entry);
+                continue;
+            }
+            DocumentImportEntry replacement = revisionAfter(entry, existing, presets);
+            resolved.add(replacement.withDisposition(LegacyImportDisposition.CONFLICT,
+                "a document already exists at " + entry.path()));
         }
         return List.copyOf(resolved);
+    }
+
+    private DocumentImportEntry revisionAfter(DocumentImportEntry entry, byte[] existing,
+                                               DocumentPresetCatalog presets) throws IOException {
+        EditorSyncDocumentKind.ParsedDocument parsed;
+        try {
+            parsed = HistoryKinds.requireCollection(entry.kind()).parse(entry.id(),
+                new String(existing, StandardCharsets.UTF_8), presets);
+        } catch (IllegalArgumentException invalid) {
+            return entry;
+        }
+        if (parsed.revision() == null) {
+            return entry;
+        }
+        if (parsed.revision() == DocumentEnvelope.MAX_SAFE_REVISION) {
+            throw new IOException("Import destination has exhausted its document revisions: " + entry.path());
+        }
+        JsonObject document = JsonParser.parseString(entry.json()).getAsJsonObject();
+        document.addProperty("revision", parsed.revision() + 1);
+        return new DocumentImportEntry(entry.kind(), entry.id(), LegacyBoardConverter.pretty(document),
+            entry.disposition(), entry.dispositionReason(), entry.warnings());
     }
 
     private Path target(DocumentImportEntry entry) {
@@ -170,10 +218,36 @@ public final class DocumentImportService {
         return kind.path(dataDirectory, entry.id());
     }
 
-    private static byte[] currentBytes(Path target) throws IOException {
-        return Files.isRegularFile(target, LinkOption.NOFOLLOW_LINKS)
-                ? Files.readAllBytes(target)
-                : null;
+    private List<LegacyBoardDraft> scanBoards(Path root, PreparedImport preparation,
+                                             BiFunction<String, String, LegacyBoardDraft> reader,
+                                             GlossConfig.Imports limits) throws IOException {
+        List<Path> sources = boardFiles(root, limits);
+        preparation.checkBeforeApply(() -> {
+            if (!sources.equals(boardFiles(root, limits))) {
+                throw new IOException("Import source files changed after preview: " + root);
+            }
+        });
+        List<LegacyBoardDraft> drafts = new ArrayList<>(sources.size());
+        for (Path source : sources) {
+            byte[] content = preparation.read(source);
+            if (content == null) {
+                throw new IOException("Import source disappeared while preparing: " + source);
+            }
+            String name = source.getFileName().toString();
+            drafts.add(reader.apply(name.substring(0, name.lastIndexOf('.')),
+                new String(content, StandardCharsets.UTF_8)));
+        }
+        return List.copyOf(drafts);
+    }
+
+    private List<Path> boardFiles(Path root, GlossConfig.Imports limits) throws IOException {
+        if (!Files.exists(root, LinkOption.NOFOLLOW_LINKS)) {
+            return List.of();
+        }
+        return new ImportSourceFiles(limits).collect(root, false, file -> {
+            String name = file.getFileName().toString();
+            return name.endsWith(".yml") || name.endsWith(".yaml");
+        });
     }
 
     /** Where a replaced document's previous bytes go. */

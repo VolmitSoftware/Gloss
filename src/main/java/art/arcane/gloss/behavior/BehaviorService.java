@@ -40,6 +40,7 @@ public final class BehaviorService implements GlossService, Explainable {
     private final IntervalScheduler intervals;
     private final RegionTracker regions;
     private final BehaviorTriggers triggers;
+    private final Map<String, Map<String, BehaviorDoc>> derivedDocuments = new LinkedHashMap<>();
     private volatile BehaviorSubscriptions subscriptions = BehaviorSubscriptions.empty();
     private boolean active;
     private int budgetTaskId = -1;
@@ -101,10 +102,12 @@ public final class BehaviorService implements GlossService, Explainable {
 
     @Override
     public void disable() {
-        if (!active) {
+        boolean wasActive = active;
+        active = false;
+        PendingTimers.global().clear();
+        if (!wasActive) {
             return;
         }
-        active = false;
         plugin.watchdog().unregister(BehaviorDoc.KIND);
         EmitBus.install(null);
         triggers.unregister();
@@ -118,7 +121,6 @@ public final class BehaviorService implements GlossService, Explainable {
             budgetTaskId = -1;
         }
         ActionBudget.global().configure(0);
-        PendingTimers.global().clear();
         regions.clear();
         registry.close();
         subscriptions = BehaviorSubscriptions.empty();
@@ -151,6 +153,17 @@ public final class BehaviorService implements GlossService, Explainable {
 
     public boolean enabled() {
         return config().enabled();
+    }
+
+    public void derivedDocuments(String owner, Map<String, BehaviorDoc> documents) {
+        if (documents.isEmpty()) {
+            derivedDocuments.remove(owner);
+        } else {
+            derivedDocuments.put(owner, Map.copyOf(documents));
+        }
+        if (active) {
+            rebuild();
+        }
     }
 
     public BehaviorSubscriptions subscriptions() {
@@ -222,6 +235,11 @@ public final class BehaviorService implements GlossService, Explainable {
         Map<String, BehaviorDoc> documents = new LinkedHashMap<>();
         for (Map.Entry<String, GlossDocument<BehaviorDoc>> document : registry.snapshot().entrySet()) {
             documents.put(document.getKey(), document.getValue().value());
+        }
+        for (Map.Entry<String, Map<String, BehaviorDoc>> owner : derivedDocuments.entrySet()) {
+            for (Map.Entry<String, BehaviorDoc> entry : owner.getValue().entrySet()) {
+                documents.put(owner.getKey() + ":" + entry.getKey(), entry.getValue());
+            }
         }
         BehaviorSubscriptions compiled = BehaviorSubscriptions.compile(documents, plugin.service(StateStore.class));
         for (Map.Entry<String, String> refusal : compiled.refused().entrySet()) {

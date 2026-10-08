@@ -1,0 +1,12 @@
+name: GlossLifecycleProbe
+version: 1.0.0
+main: art.arcane.gloss.acceptance.GlossLifecycleProbe
+api-version: '26.1'
+folia-supported: true
+depend: [Gloss]
+commands:
+  glosslifecycle:
+    permission: glosslifecycle.run
+permissions:
+  glosslifecycle.run:
+    default: op

@@ -9,6 +9,8 @@ import art.arcane.gloss.animation.AnimationService;
 import art.arcane.gloss.condition.ShowCondition;
 import art.arcane.gloss.config.GlossConfigFile;
 import art.arcane.gloss.hologram.HologramService;
+import art.arcane.gloss.hologram.ViewerDisplayBudget;
+import art.arcane.gloss.service.VisibilityGovernor;
 import art.arcane.gloss.particle.ParticleService;
 import art.arcane.gloss.text.TextPipeline;
 import art.arcane.gloss.util.common.LayeredTeamAllocator;
@@ -157,6 +159,7 @@ final class EntityOverlayHarness implements AutoCloseable {
             setField(gloss, Gloss.class, "animator", null);
             setField(gloss, Gloss.class, "particles", new ParticleService(gloss));
             setField(gloss, Gloss.class, "teams", teams);
+            setField(gloss, Gloss.class, "governor", VisibilityGovernor.passthrough());
 
             this.holograms = new HologramService(gloss);
             setField(gloss, Gloss.class, "holograms", holograms);
@@ -224,8 +227,30 @@ final class EntityOverlayHarness implements AutoCloseable {
             Method drive = EntityOverlayService.class.getDeclaredMethod("drive");
             drive.setAccessible(true);
             drive.invoke(service);
+            for (EntityOverlayTarget overlay : overlays(service).values()) {
+                publishVisibility(overlay.shared);
+                for (EntityOverlayTarget.Render render : overlay.personal.values()) {
+                    publishVisibility(render);
+                }
+            }
         } catch (ReflectiveOperationException failure) {
             throw new IllegalStateException(failure);
+        }
+    }
+
+    private void publishVisibility(EntityOverlayTarget.Render render) throws ReflectiveOperationException {
+        if (render.display == null) {
+            return;
+        }
+        ViewerDisplayBudget budget = (ViewerDisplayBudget) field(render.display, render.display.getClass(), "displayBudget");
+        TextDisplay display = (TextDisplay) Proxy.newProxyInstance(getClass().getClassLoader(),
+            new Class<?>[]{TextDisplay.class}, displayHandler(entityIds.getAndIncrement()));
+        for (PlayerHandle viewer : online) {
+            if (render.whitelist.contains(viewer.uuid)) {
+                budget.show(viewer.proxy, List.of(display));
+            } else {
+                budget.hide(viewer.proxy);
+            }
         }
     }
 
@@ -445,9 +470,10 @@ final class EntityOverlayHarness implements AutoCloseable {
     }
 
     private InvocationHandler displayHandler(int entityId) {
+        UUID uuid = UUID.randomUUID();
         return (proxy, method, args) -> switch (method.getName()) {
             case "getEntityId" -> entityId;
-            case "getUniqueId" -> UUID.randomUUID();
+            case "getUniqueId" -> uuid;
             case "isValid" -> true;
             case "equals" -> proxy == args[0];
             case "hashCode" -> System.identityHashCode(proxy);
@@ -462,7 +488,7 @@ final class EntityOverlayHarness implements AutoCloseable {
             case "getName" -> handle.name;
             case "isOnline", "isValid" -> handle.online;
             case "isDead" -> false;
-            case "isInvisible" -> false;
+            case "isInvisible", "isSneaking", "hasMetadata" -> false;
             case "getGameMode" -> handle.gameMode;
             case "getLocation" -> handle.location.clone();
             case "getEyeLocation" -> handle.location.clone().add(0, 1.62D, 0);
@@ -501,6 +527,7 @@ final class EntityOverlayHarness implements AutoCloseable {
             case "isValid" -> handle.valid;
             case "isDead" -> !handle.valid;
             case "isInvisible" -> handle.invisible;
+            case "hasMetadata" -> false;
             case "getAttribute" -> args[0] == Attribute.MAX_HEALTH ? attributeProxy(handle.maxHealth)
                 : attributeProxy(0.0D);
             case "getPersistentDataContainer" -> dataContainer;

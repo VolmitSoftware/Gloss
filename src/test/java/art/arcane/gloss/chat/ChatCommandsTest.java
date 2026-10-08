@@ -181,7 +181,7 @@ class ChatCommandsTest {
     @Test
     void senderVariantsFilterOnceWhileRecipientVariantsChooseTheirOwnPresentation() throws Exception {
         write("private", """
-            {"schemaVersion":1,"revision":1,"channel":{"name":"private","scope":"direct"},
+            {"schemaVersion":2,"revision":1,"channel":{"name":"private","scope":"direct"},
              "format":"BASE {{ message }}","throttle":{"minIntervalTicks":0},
              "variants":[
                {"id":"sender","when":"viewer.name == 'Steve'","filters":[{"match":"raw","replace":"filtered"}]},
@@ -199,17 +199,17 @@ class ChatCommandsTest {
     }
 
     private void writePrivate(String permission, String throttle) throws IOException {
-        write("private", "{\"schemaVersion\":1,\"revision\":1,"
+        write("private", "{\"schemaVersion\":2,\"revision\":1,"
             + "\"channel\":{\"name\":\"private\",\"scope\":\"direct\"," + permission + "},"
             + "\"format\":\"&7[{{ sender.name }} -> {{ recipient.name }}] &f{{ message }}\","
             + "\"throttle\":" + throttle + "}");
     }
 
     private void boot() throws Exception {
-        write("global", "{\"schemaVersion\":1,\"revision\":1,"
+        write("global", "{\"schemaVersion\":2,\"revision\":1,"
             + "\"channel\":{\"name\":\"global\",\"default\":true,\"scope\":\"global\"},"
             + "\"format\":\"&f{{ sender.name }}&8: &f{{ message }}\"}");
-        write("staff", "{\"schemaVersion\":1,\"revision\":1,"
+        write("staff", "{\"schemaVersion\":2,\"revision\":1,"
             + "\"channel\":{\"name\":\"staff\",\"scope\":\"global\"},"
             + "\"format\":\"&c{{ message }}\"}");
         Gloss gloss = ChatTestHarness.gloss(dataFolder.toFile(), online);

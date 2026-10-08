@@ -120,10 +120,10 @@ public class ItemMenuIcon extends MenuIcon<MenuIconData> {
     } else {
       location = transform.localPosition(loc, new Vector(0F, -(ITEM_OFFSET + countOffset), 0F));
     }
-    uuids.add(DisplayEntityManager.add(itemDisplay(item, location)));
+    uuids.add(DisplayEntityManager.add(session.displayGroup(), itemDisplay(item, location)));
     if (item.getAmount() > 1) {
       Component count = countText(item.getAmount());
-      uuids.add(DisplayEntityManager.add(textDisplay(count, countLocation())));
+      uuids.add(DisplayEntityManager.add(session.displayGroup(), textDisplay(count, countLocation())));
     }
     return uuids;
   }
@@ -166,7 +166,7 @@ public class ItemMenuIcon extends MenuIcon<MenuIconData> {
     appliedBlockTransform = null;
     if (displayEntities.size() == 1 && count > 1) {
       DisplayEntityManager.move(displayEntities.get(0), session.getTransform().localVector(new Vector(0F, .09F, 0F)));
-      UUID displayEntity = DisplayEntityManager.add(textDisplay(countText(count), countLocation()));
+      UUID displayEntity = DisplayEntityManager.add(session.displayGroup(), textDisplay(countText(count), countLocation()));
       displayEntities.add(displayEntity);
       applyOrientation();
       DisplayEntityManager.spawn(displayEntity, session.getPlayer());

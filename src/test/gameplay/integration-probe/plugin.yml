@@ -1,0 +1,12 @@
+name: GlossIntegrationProbe
+version: 1.0.0
+main: art.arcane.gloss.acceptance.GlossIntegrationProbe
+api-version: '26.1'
+folia-supported: true
+depend: [Gloss, Adapt, React, Iris]
+commands:
+  glossintegration:
+    permission: glossintegration.run
+permissions:
+  glossintegration.run:
+    default: op

@@ -74,6 +74,8 @@ public final class CompiledPreviewDocument {
 
   private final double scale;
   private final double viewDistance;
+  private final int contentRefreshTicks;
+  private final int accessCheckTicks;
   private final String name;
   private final int priority;
   private final CompiledMatch match;
@@ -95,11 +97,15 @@ public final class CompiledPreviewDocument {
       List<ElementTemplate> elements,
       List<ParticleLayer> particleLayers,
       double scale,
-      double viewDistance
+      double viewDistance,
+      int contentRefreshTicks,
+      int accessCheckTicks
   ) {
     this.name = name;
     this.scale = scale;
     this.viewDistance = viewDistance;
+    this.contentRefreshTicks = contentRefreshTicks;
+    this.accessCheckTicks = accessCheckTicks;
     this.priority = priority;
     this.match = match;
     this.variants = variants;
@@ -117,6 +123,14 @@ public final class CompiledPreviewDocument {
 
   public double viewDistance() {
     return viewDistance;
+  }
+
+  public int contentRefreshTicks() {
+    return contentRefreshTicks;
+  }
+
+  public int accessCheckTicks() {
+    return accessCheckTicks;
   }
 
   public String name() {

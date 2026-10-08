@@ -1,6 +1,10 @@
 package art.arcane.gloss.beam;
 
 import art.arcane.gloss.Gloss;
+import art.arcane.gloss.menu.DisplayEntityGroup;
+import art.arcane.gloss.menu.DisplayEntityManager;
+import art.arcane.gloss.service.VisibilityGovernor;
+import art.arcane.volmlib.util.scheduling.FoliaScheduler;
 import art.arcane.gloss.api.BeamHandle;
 import art.arcane.gloss.api.BeamSpec;
 import art.arcane.gloss.service.GlossService;
@@ -22,7 +26,6 @@ import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.util.Vector;
 
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -46,7 +49,8 @@ public final class BeamService implements GlossService, Listener {
         private final Supplier<Location> from;
         private final Supplier<Location> to;
         private final BeamSpec spec;
-        private final Map<UUID, DisplayEntity> displays = new LinkedHashMap<>();
+        private final Map<UUID, BeamVisual> displays = new ConcurrentHashMap<>();
+        private final Set<UUID> audience;
         private Location sampledFrom;
         private Location sampledTo;
         private long remainingTicks;
@@ -58,9 +62,7 @@ public final class BeamService implements GlossService, Listener {
             this.to = to;
             this.spec = spec;
             this.remainingTicks = lifetimeTicks;
-            for (UUID viewerId : viewers) {
-                displays.put(viewerId, null);
-            }
+            this.audience = Set.copyOf(viewers);
         }
 
         @Override
@@ -79,14 +81,10 @@ public final class BeamService implements GlossService, Listener {
         }
 
         private void destroy() {
-            for (Map.Entry<UUID, DisplayEntity> entry : displays.entrySet()) {
-                DisplayEntity display = entry.getValue();
-                Player viewer = Bukkit.getPlayer(entry.getKey());
-                if (display != null && viewer != null) {
-                    PacketUtils.send(viewer, display.remove());
-                }
+            for (BeamVisual visual : displays.values()) {
+                DisplayEntityManager.retire(plugin, visual.group());
             }
-            displays.replaceAll((viewerId, display) -> null);
+            displays.clear();
         }
 
         private void update() {
@@ -103,48 +101,74 @@ public final class BeamService implements GlossService, Listener {
                 currentTo.toVector(), spec.width());
             Location midpoint = new Location(currentFrom.getWorld(), transform.midpoint().getX(),
                 transform.midpoint().getY(), transform.midpoint().getZ());
-            for (Map.Entry<UUID, DisplayEntity> entry : displays.entrySet()) {
-                Player viewer = Bukkit.getPlayer(entry.getKey());
+            for (UUID viewerId : audience) {
+                Player viewer = Bukkit.getPlayer(viewerId);
                 if (viewer == null || !viewer.isOnline()) {
-                    // A relogged client knows nothing about the old display, so drop it and respawn.
-                    entry.setValue(null);
+                    BeamVisual removed = displays.remove(viewerId);
+                    if (removed != null) {
+                        removed.group().disconnected();
+                    }
                     continue;
                 }
-                if (viewer.getWorld() != currentFrom.getWorld()) {
-                    continue;
-                }
-                DisplayEntity display = entry.getValue();
-                if (display == null) {
-                    entry.setValue(spawn(viewer, midpoint, transform));
-                } else if (moved) {
-                    reshape(viewer, display, midpoint, transform);
-                }
+                FoliaScheduler.runEntity(plugin, viewer, () -> updateViewer(viewer, midpoint, transform, moved));
             }
             sampledFrom = currentFrom.clone();
             sampledTo = currentTo.clone();
         }
 
-        private DisplayEntity spawn(Player viewer, Location midpoint, BeamMath.Transform transform) {
-            DisplayEntity display = new DisplayEntity(EntityIdAllocator.global().next(),
-                UUID.randomUUID(), EntityTypes.BLOCK_DISPLAY)
-                .displayKind(DisplayEntity.DisplayKind.BLOCK)
-                .blockState(spec.blockState())
-                .noGravity(true);
-            display.location(PacketUtils.vector3d(midpoint.toVector()));
-            apply(display, transform);
-            PacketUtils.send(viewer, new ArrayList<PacketWrapper<?>>(display.spawn()));
-            return display;
+        private void updateViewer(Player viewer, Location midpoint, BeamMath.Transform transform, boolean moved) {
+            if (!live || !viewer.isOnline()) {
+                BeamVisual removed = displays.remove(viewer.getUniqueId());
+                if (removed != null && !viewer.isOnline()) {
+                    removed.group().disconnected();
+                }
+                return;
+            }
+            UUID viewerId = viewer.getUniqueId();
+            Location location = viewer.getLocation();
+            boolean culled = location.getWorld() != midpoint.getWorld()
+                || plugin.governor().tier(viewer, VisibilityGovernor.Surface.SURFACE,
+                    location.distanceSquared(midpoint)) == VisibilityGovernor.Tier.CULLED;
+            BeamVisual visual = displays.get(viewerId);
+            if (visual == null && !culled) {
+                DisplayEntity display = new DisplayEntity(EntityIdAllocator.global().next(),
+                    UUID.randomUUID(), EntityTypes.BLOCK_DISPLAY)
+                    .displayKind(DisplayEntity.DisplayKind.BLOCK).blockState(spec.blockState()).noGravity(true);
+                display.location(PacketUtils.vector3d(midpoint.toVector()));
+                apply(display, transform);
+                DisplayEntityGroup group = DisplayEntityManager.group(viewer, VisibilityGovernor.Surface.SURFACE);
+                UUID handle = DisplayEntityManager.add(group, display);
+                visual = new BeamVisual(display, group, handle);
+                displays.put(viewerId, visual);
+                if (!live) {
+                    displays.remove(viewerId, visual);
+                    DisplayEntityManager.retire(plugin, group);
+                    return;
+                }
+                DisplayEntityManager.spawn(handle, viewer);
+                return;
+            }
+            if (visual == null) {
+                return;
+            }
+            visual.group().culled(culled);
+            if (moved) {
+                reshape(viewer, visual.display(), midpoint, transform, visual.group().visible() && !culled);
+            }
+            visual.group().refresh();
         }
 
         private void reshape(Player viewer, DisplayEntity display, Location midpoint,
-                             BeamMath.Transform transform) {
+                             BeamMath.Transform transform, boolean send) {
             List<PacketWrapper<?>> packets = new ArrayList<>(2);
             packets.add(display.goTo(midpoint));
             apply(display, transform);
             packets.add(DisplayEntity.transformUpdate(display.id(), display.translation(),
                 display.scale(), display.leftRotation(), display.rightRotation(),
                 0, DRIVE_INTERVAL_TICKS));
-            PacketUtils.send(viewer, packets);
+            if (send) {
+                PacketUtils.send(viewer, packets);
+            }
         }
 
         private void apply(DisplayEntity display, BeamMath.Transform transform) {
@@ -162,6 +186,9 @@ public final class BeamService implements GlossService, Listener {
             remainingTicks -= DRIVE_INTERVAL_TICKS;
             return remainingTicks <= 0;
         }
+    }
+
+    private record BeamVisual(DisplayEntity display, DisplayEntityGroup group, UUID handle) {
     }
 
     private final Gloss plugin;
@@ -267,7 +294,14 @@ public final class BeamService implements GlossService, Listener {
 
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
-        forget(event.getPlayer().getUniqueId());
+        UUID viewerId = event.getPlayer().getUniqueId();
+        for (Link link : links) {
+            BeamVisual visual = link.displays.remove(viewerId);
+            if (visual != null) {
+                visual.group().disconnected();
+            }
+        }
+        forget(viewerId);
     }
 
     /** A caller without an id of its own gets one per destination block, which is the next best key. */

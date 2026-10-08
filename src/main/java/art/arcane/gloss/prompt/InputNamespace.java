@@ -1,5 +1,6 @@
 package art.arcane.gloss.prompt;
 
+import art.arcane.gloss.behavior.ActionProgram;
 import art.arcane.gloss.expr.ExprVariableContext;
 import art.arcane.gloss.expr.ExprVariableNamespace;
 
@@ -32,6 +33,14 @@ public final class InputNamespace implements ExprVariableNamespace {
     @Override
     public Object resolve(String suffix, ExprVariableContext context) {
         Map<String, Object> inputs = ACTIVE.get();
+        ActionProgram.Frame frame = ActionProgram.current();
+        if (inputs == null && frame != null && frame.context() instanceof Source source) {
+            inputs = source.inputs();
+        }
         return inputs == null ? null : inputs.get(suffix);
+    }
+
+    public interface Source {
+        Map<String, Object> inputs();
     }
 }

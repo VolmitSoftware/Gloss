@@ -24,6 +24,13 @@ class IndicatorAdmissionTest {
         new DamageIndicatorEventSnapshot.EntityState(Map.of()));
 
     @Test
+    void configuredCeilingCanGrowAndShrinkWithoutArithmeticOverflow() {
+        assertEquals(30000, DamageIndicatorsService.liveLimit(1000, 30000, 40000));
+        assertEquals(10, DamageIndicatorsService.liveLimit(1000, 30000, 10));
+        assertEquals(1048576, DamageIndicatorsService.liveLimit(Integer.MAX_VALUE, Long.MAX_VALUE, 1048576));
+    }
+
+    @Test
     void motionOffsetsNeverMutateTheCapturedOrigin() {
         Location origin = new Location(null, 10.0D, 20.0D, 30.0D);
 
@@ -43,8 +50,8 @@ class IndicatorAdmissionTest {
         return Stream.of(
             Arguments.of("defaultRateAndLifetimeAllowOneExpectedLifetimeWindow", 40, 3000L, 120),
             Arguments.of("partialSecondsRoundUp", 41, 3001L, 124),
-            Arguments.of("configuredExtremesCannotExceedTheHardCeiling", 1000, 30000L,
-                DamageIndicatorsService.MAX_LIVE_INDICATORS),
+            Arguments.of("configuredExtremesRespectTheDefaultCeiling", 1000, 30000L,
+                2048),
             Arguments.of("invalidInputsStillProduceAPositiveLimit", 0, 0L, 1)
         );
     }
@@ -52,7 +59,7 @@ class IndicatorAdmissionTest {
     @ParameterizedTest(name = "{0}")
     @MethodSource("limits")
     void liveLimitBoundsTheFleet(String label, int rate, long lifetime, int expected) {
-        assertEquals(expected, DamageIndicatorsService.liveLimit(rate, lifetime), label);
+        assertEquals(expected, DamageIndicatorsService.liveLimit(rate, lifetime, 2048), label);
     }
 
     @Test

@@ -6,6 +6,7 @@ import art.arcane.gloss.menu.action.ActionContext;
 import art.arcane.gloss.menu.action.ActionOutcome;
 import art.arcane.gloss.menu.action.MenuAction;
 import art.arcane.volmlib.util.scheduling.FoliaScheduler;
+import art.arcane.volmlib.util.scheduling.SchedulerUtils;
 import org.bukkit.entity.Player;
 
 import java.util.List;
@@ -136,21 +137,32 @@ public final class ActionProgram {
          * applied: an exhausted bucket pushes the task one tick, a cancelled run drops it.
          */
         public boolean defer(int delayTicks, Runnable task) {
-            boolean scheduled = continuation.later(delayTicks, () -> {
-                if (isCancelled()) {
+            try {
+                boolean scheduled = continuation.later(delayTicks, () -> {
+                    if (isCancelled()) {
+                        die();
+                        return;
+                    }
+                    if (!ActionBudget.global().take()) {
+                        defer(1, task);
+                        return;
+                    }
+                    task.run();
+                }, this::die);
+                if (!scheduled) {
                     die();
-                    return;
                 }
-                if (!ActionBudget.global().take()) {
-                    defer(1, task);
-                    return;
+                return scheduled;
+            } catch (RuntimeException | Error failure) {
+                try {
+                    die();
+                } catch (RuntimeException | Error cleanupFailure) {
+                    if (cleanupFailure != failure) {
+                        failure.addSuppressed(cleanupFailure);
+                    }
                 }
-                task.run();
-            }, this::die);
-            if (!scheduled) {
-                die();
+                throw failure;
             }
-            return scheduled;
         }
 
         /** A nested list under the current action; {@code afterAsyncComplete} runs when it completes after a suspension. */
@@ -216,7 +228,7 @@ public final class ActionProgram {
     /**
      * The production continuation: a player's run rides {@code FoliaScheduler.runEntity} and dies
      * with the entity; a run without a player rides the global region. Player runs count against
-     * {@code maxTimersPerPlayer}.
+     * the per-player, playerless, and shared timer limits.
      */
     private static final class DefaultContinuation implements Continuation {
         private final ActionContext context;
@@ -239,33 +251,49 @@ public final class ActionProgram {
             }
             int delay = Math.max(1, delayTicks);
             Player player = context.player();
-            if (player == null) {
-                plugin.scheduler().s(task, delay);
-                return true;
-            }
-            UUID id = player.getUniqueId();
-            if (!PendingTimers.global().acquire(id, timerCap(plugin))) {
+            UUID id = player == null ? null : player.getUniqueId();
+            PendingTimers.Lease lease = PendingTimers.global().acquire(id, timerLimits(plugin));
+            if (lease == null) {
                 Gloss.warnThrottled("behavior-timer-cap",
-                    "%s has too many pending behavior timers; a delayed run in %s was dropped.",
-                    player.getName(), context.menuId());
+                    "Behavior timer capacity reached for %s; a delayed run in %s was dropped.",
+                    id == null ? "playerless actions" : id.toString(), context.menuId());
                 return false;
             }
-            boolean scheduled = FoliaScheduler.runEntity(plugin, player, () -> {
-                PendingTimers.global().release(id);
-                task.run();
-            }, delay, () -> {
-                PendingTimers.global().release(id);
-                onDropped.run();
-            });
-            if (!scheduled) {
-                PendingTimers.global().release(id);
+            boolean scheduled = false;
+            try {
+                Runnable resume = () -> {
+                    if (lease.resume()) {
+                        task.run();
+                    } else {
+                        onDropped.run();
+                    }
+                };
+                FoliaScheduler.DelayedTask request = new FoliaScheduler.DelayedTask(delay, resume, () -> {
+                    lease.close();
+                    onDropped.run();
+                });
+                SchedulerUtils.TaskHandle handle = player == null ? FoliaScheduler.scheduleGlobal(plugin, request)
+                    : FoliaScheduler.scheduleEntity(plugin, player, request);
+                scheduled = handle != null;
+                if (scheduled) {
+                    lease.attach(handle);
+                }
+                return scheduled;
+            } finally {
+                if (!scheduled) {
+                    lease.close();
+                }
             }
-            return scheduled;
         }
 
-        private static int timerCap(Gloss plugin) {
+        private static PendingTimers.Limits timerLimits(Gloss plugin) {
             GlossConfig config = plugin.cfg();
-            return config == null ? 0 : config.modules().behaviors().maxTimersPerPlayer();
+            if (config == null) {
+                return PendingTimers.Limits.DEFAULT;
+            }
+            GlossConfig.Behaviors behaviors = config.modules().behaviors();
+            return new PendingTimers.Limits(behaviors.maxTimersPerPlayer(), behaviors.maxTimersGlobal(),
+                behaviors.maxTimersWithoutPlayer());
         }
     }
 }

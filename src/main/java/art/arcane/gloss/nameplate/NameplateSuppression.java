@@ -30,14 +30,17 @@ public final class NameplateSuppression {
     }
 
     public void admit(Player viewer, Entity target, boolean bedrockViewer) {
+        admit(viewer, target.getUniqueId(), target instanceof Player player ? player.getName() : target.getUniqueId().toString(), bedrockViewer);
+    }
+
+    public void admit(Player viewer, UUID target, String teamEntry, boolean bedrockViewer) {
         if (bedrockViewer) {
             return;
         }
         claimed.compute(viewer.getUniqueId(), (viewerId, existing) -> {
             ConcurrentMap<UUID, TeamAllocator.TeamHandle> handles = existing == null
                 ? new ConcurrentHashMap<>() : existing;
-            handles.computeIfAbsent(target.getUniqueId(), ignored -> teams.claim(viewer, purpose,
-                target instanceof Player player ? player.getName() : target.getUniqueId().toString(),
+            handles.computeIfAbsent(target, ignored -> teams.claim(viewer, purpose, teamEntry,
                 new TeamAllocator.TeamStyle("", "", "white",
                     TeamAllocator.NameTagVisibility.NEVER, TeamAllocator.CollisionRule.ALWAYS)));
             return handles;

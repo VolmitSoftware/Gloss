@@ -15,6 +15,22 @@ public final class DisplayVisibility {
         return SET_VISIBLE_BY_DEFAULT != null;
     }
 
+    public static void hideByDefault(Entity entity) {
+        try {
+            if (SET_VISIBLE_BY_DEFAULT == null) {
+                throw new UnsupportedOperationException("This server cannot hide display entities before viewer admission");
+            }
+            SET_VISIBLE_BY_DEFAULT.invoke(entity, false);
+        } catch (ReflectiveOperationException | RuntimeException failure) {
+            try {
+                entity.remove();
+            } catch (RuntimeException removalFailure) {
+                failure.addSuppressed(removalFailure);
+            }
+            throw new IllegalStateException("Cannot establish private display visibility", failure);
+        }
+    }
+
     public static boolean setVisibleByDefault(Entity entity, boolean visible) {
         if (entity == null || SET_VISIBLE_BY_DEFAULT == null) {
             return false;

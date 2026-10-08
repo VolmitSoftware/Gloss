@@ -1,5 +1,8 @@
 package art.arcane.gloss.behavior;
 
+import art.arcane.gloss.Gloss;
+import art.arcane.gloss.GlossConfig;
+import art.arcane.gloss.config.GlossConfigFile;
 import art.arcane.gloss.api.HoloClickTrigger;
 import art.arcane.gloss.config.action.ActionEnvelope;
 import art.arcane.gloss.config.action.DelayActionData;
@@ -13,11 +16,15 @@ import art.arcane.gloss.enums.MenuActionType;
 import art.arcane.gloss.expr.ExprFunctions;
 import art.arcane.gloss.expr.ExprScope;
 import art.arcane.gloss.menu.action.ActionContext;
+import art.arcane.gloss.menu.CharacterizationSupport;
 import art.arcane.gloss.menu.action.ActionOutcome;
 import art.arcane.gloss.menu.action.MenuAction;
 import art.arcane.gloss.menu.action.NavigationRequest;
 import art.arcane.gloss.menu.action.NavigationResult;
 import org.bukkit.entity.Player;
+import org.bukkit.Server;
+import org.bukkit.scheduler.BukkitScheduler;
+import org.bukkit.scheduler.BukkitTask;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
@@ -32,6 +39,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class ActionProgramTest {
     private static final UUID VIEWER = UUID.nameUUIDFromBytes("program-viewer".getBytes());
@@ -42,7 +51,7 @@ class ActionProgramTest {
     @AfterEach
     void cleanUp() {
         ActionBudget.global().configure(0);
-        PendingTimers.global().clear();
+        PendingTimers.global().resetAfterShutdown();
     }
 
     @Test
@@ -211,6 +220,136 @@ class ActionProgramTest {
     }
 
     @Test
+    void schedulerRefusalReleasesTheProductionTimerReservation() throws ReflectiveOperationException {
+        Gloss previous = CharacterizationSupport.installGloss(
+            CharacterizationSupport.bareGloss(CharacterizationSupport.server(Map.of())));
+        try {
+            AtomicBoolean died = new AtomicBoolean();
+            assertEquals(ActionOutcome.STOP,
+                ActionProgram.run(resolve(hook(died), delay(5)), 0, context()));
+            assertTrue(died.get());
+            assertEquals(0, PendingTimers.global().pending(VIEWER));
+        } finally {
+            CharacterizationSupport.restoreGloss(previous);
+        }
+    }
+
+    @Test
+    void schedulingExceptionReleasesTheProductionLeaseAndRunsTheDeathHook() throws ReflectiveOperationException {
+        Gloss previous = CharacterizationSupport.installGloss(
+            CharacterizationSupport.bareGloss(CharacterizationSupport.server(Map.of())));
+        IllegalStateException failure = new IllegalStateException("entity scheduling failed");
+        Player player = (Player) CharacterizationSupport.proxy(new Class<?>[]{Player.class},
+            (proxy, method, arguments) -> {
+                if (method.getName().equals("getUniqueId")) {
+                    if (PendingTimers.global().pending(VIEWER) > 0) {
+                        throw failure;
+                    }
+                    return VIEWER;
+                }
+                return CharacterizationSupport.identity(proxy, method, arguments);
+            });
+        try {
+            AtomicBoolean died = new AtomicBoolean();
+            assertSame(failure, assertThrows(IllegalStateException.class,
+                () -> ActionProgram.run(resolve(hook(died), delay(5)), 0,
+                    context(new AtomicInteger(), player))));
+            assertTrue(died.get());
+            assertEquals(0, PendingTimers.global().pending(VIEWER));
+        } finally {
+            CharacterizationSupport.restoreGloss(previous);
+        }
+    }
+
+    @Test
+    void retiringAnOldContinuationDoesNotReleaseARejoinedPlayersTimer() {
+        FakeContinuation old = new FakeContinuation(VIEWER, 1);
+        FakeContinuation replacement = new FakeContinuation(VIEWER, 1);
+        ActionProgram.run(resolve(delay(5), record("old")), 0, context(), old);
+        PendingTimers.global().forget(VIEWER);
+        ActionProgram.run(resolve(delay(5), record("new")), 0, context(), replacement);
+
+        old.retire();
+
+        assertEquals(1, PendingTimers.global().pending(VIEWER));
+        assertEquals(ActionOutcome.STOP,
+            ActionProgram.run(resolve(delay(5), record("overflow")), 0, context(), replacement));
+        replacement.advance(5);
+        assertEquals(List.of("new"), log);
+        assertEquals(0, PendingTimers.global().pending(VIEWER));
+    }
+
+    @Test
+    void playerlessProductionTimersRefuseBeforeSchedulingAndReadmitAfterCompletion() throws Exception {
+        try (GlobalScheduler scheduler = new GlobalScheduler()) {
+            ActionContext playerless = context(new AtomicInteger(), null);
+            assertEquals(ActionOutcome.SUSPENDED,
+                ActionProgram.run(resolve(delay(5), record("first")), 0, playerless));
+            AtomicBoolean rejected = new AtomicBoolean();
+            assertEquals(ActionOutcome.STOP,
+                ActionProgram.run(resolve(hook(rejected), delay(5), record("refused")), 0, playerless));
+            assertTrue(rejected.get());
+            assertEquals(1, scheduler.tasks.size());
+            assertEquals(1, PendingTimers.global().pending(null));
+            assertEquals(1, PendingTimers.global().total());
+
+            scheduler.tasks.removeFirst().run();
+
+            assertEquals(List.of("first"), log);
+            assertEquals(0, PendingTimers.global().total());
+            assertEquals(ActionOutcome.SUSPENDED,
+                ActionProgram.run(resolve(delay(5), record("next")), 0, playerless));
+            scheduler.tasks.removeFirst().run();
+            assertEquals(List.of("first", "next"), log);
+            assertEquals(0, PendingTimers.global().total());
+        }
+    }
+
+    @Test
+    void playerlessSchedulingFailuresReleaseAllAdmissionCounters() throws Exception {
+        try (GlobalScheduler scheduler = new GlobalScheduler()) {
+            scheduler.failure = new IllegalStateException("global scheduler failed");
+            AtomicBoolean died = new AtomicBoolean();
+            assertSame(scheduler.failure, assertThrows(IllegalStateException.class, () ->
+                ActionProgram.run(resolve(hook(died), delay(5)), 0, context(new AtomicInteger(), null))));
+            assertTrue(died.get());
+            assertEquals(0, PendingTimers.global().total());
+            assertEquals(0, PendingTimers.global().pending(null));
+            scheduler.failure = null;
+            scheduler.refuse = true;
+            assertEquals(ActionOutcome.STOP,
+                ActionProgram.run(resolve(delay(5)), 0, context(new AtomicInteger(), null)));
+            assertEquals(0, PendingTimers.global().total());
+            assertTrue(scheduler.tasks.isEmpty());
+        }
+    }
+
+    @Test
+    void clearingPlayerlessTimersDropsOldActionsWithoutReleasingANewReservation() throws Exception {
+        try (GlobalScheduler scheduler = new GlobalScheduler()) {
+            ActionContext playerless = context(new AtomicInteger(), null);
+            AtomicBoolean retired = new AtomicBoolean();
+            ActionProgram.run(resolve(hook(retired), delay(5), record("old")), 0, playerless);
+            Runnable oldCallback = scheduler.tasks.getFirst();
+            PendingTimers.global().clear();
+
+            assertTrue(retired.get());
+            assertTrue(log.isEmpty());
+            assertTrue(scheduler.tasks.isEmpty());
+            assertEquals(0, PendingTimers.global().total());
+            assertEquals(ActionOutcome.SUSPENDED,
+                ActionProgram.run(resolve(delay(5), record("new")), 0, playerless));
+            oldCallback.run();
+            assertEquals(1, PendingTimers.global().total());
+            assertEquals(ActionOutcome.STOP, ActionProgram.run(resolve(delay(5)), 0, playerless));
+            assertEquals(1, scheduler.tasks.size());
+            scheduler.tasks.removeFirst().run();
+            assertEquals(List.of("new"), log);
+            assertEquals(0, PendingTimers.global().total());
+        }
+    }
+
+    @Test
     void budgetTakesUntilEmptyAndRefillsToCapacity() {
         ActionBudget budget = new ActionBudget();
         assertTrue(budget.take());
@@ -253,6 +392,10 @@ class ActionProgramTest {
                 case "equals" -> proxy == args[0];
                 default -> throw new UnsupportedOperationException(method.getName());
             });
+        return context(counter, player);
+    }
+
+    private static ActionContext context(AtomicInteger counter, Player player) {
         ExprScope scope = new ExprScope() {
             @Override
             public Object variable(String dottedName) {
@@ -327,11 +470,21 @@ class ActionProgramTest {
             if (retired || refusing) {
                 return false;
             }
-            if (player != null && !PendingTimers.global().acquire(player, cap)) {
+            PendingTimers.Lease lease = PendingTimers.global().acquire(player, new PendingTimers.Limits(cap, 0, 0));
+            if (lease == null) {
                 return false;
             }
-            tasks.add(Map.entry(now + Math.max(1, delayTicks), task));
-            dropHooks.add(onDropped);
+            tasks.add(Map.entry(now + Math.max(1, delayTicks), () -> {
+                if (lease.resume()) {
+                    task.run();
+                } else {
+                    onDropped.run();
+                }
+            }));
+            dropHooks.add(() -> {
+                lease.close();
+                onDropped.run();
+            });
             return true;
         }
 
@@ -342,11 +495,6 @@ class ActionProgramTest {
 
         void retire() {
             retired = true;
-            if (player != null) {
-                for (Map.Entry<Long, Runnable> ignored : tasks) {
-                    PendingTimers.global().release(player);
-                }
-            }
             tasks.clear();
             List<Runnable> dropped = new ArrayList<>(dropHooks);
             dropHooks.clear();
@@ -373,12 +521,68 @@ class ActionProgramTest {
                     tasks.remove(task);
                 }
                 for (Map.Entry<Long, Runnable> task : due) {
-                    if (player != null) {
-                        PendingTimers.global().release(player);
-                    }
                     task.getValue().run();
                 }
             }
+        }
+    }
+
+    private static final class GlobalScheduler implements AutoCloseable {
+        private final List<Runnable> tasks = new ArrayList<>();
+        private final Object previousServer;
+        private final Gloss previousPlugin;
+        private RuntimeException failure;
+        private boolean refuse;
+
+        private GlobalScheduler() throws ReflectiveOperationException {
+            BukkitScheduler scheduler = (BukkitScheduler) CharacterizationSupport.proxy(
+                new Class<?>[]{BukkitScheduler.class}, (proxy, method, args) -> {
+                    if (method.getName().equals("runTaskLater")) {
+                        if (failure != null) {
+                            throw failure;
+                        }
+                        if (refuse) {
+                            return null;
+                        }
+                        Runnable callback = (Runnable) args[1];
+                        tasks.add(callback);
+                        AtomicBoolean cancelled = new AtomicBoolean();
+                        return CharacterizationSupport.proxy(new Class<?>[]{BukkitTask.class},
+                            (taskProxy, taskMethod, taskArguments) -> switch (taskMethod.getName()) {
+                                case "cancel" -> {
+                                    cancelled.set(true);
+                                    tasks.remove(callback);
+                                    yield null;
+                                }
+                                case "isCancelled" -> cancelled.get();
+                                default -> CharacterizationSupport.identity(taskProxy, taskMethod, taskArguments);
+                            });
+                    }
+                    return CharacterizationSupport.identity(proxy, method, args);
+                });
+            Server server = (Server) CharacterizationSupport.proxy(new Class<?>[]{Server.class},
+                (proxy, method, args) -> switch (method.getName()) {
+                    case "getScheduler" -> scheduler;
+                    case "getGlobalRegionScheduler", "getRegionScheduler" -> null;
+                    case "getLogger" -> CharacterizationSupport.mutedLogger();
+                    case "getName", "getVersion", "getBukkitVersion" -> "Paper";
+                    default -> CharacterizationSupport.identity(proxy, method, args);
+                });
+            Gloss plugin = CharacterizationSupport.bareGloss(server);
+            CharacterizationSupport.setField(plugin, "isEnabled", true);
+            GlossConfigFile config = new GlossConfigFile();
+            config.behaviors.maxTimersGlobal = 1;
+            config.behaviors.maxTimersWithoutPlayer = 1;
+            config.normalize();
+            CharacterizationSupport.setField(plugin, "config", GlossConfig.from(config));
+            previousServer = CharacterizationSupport.installServer(server);
+            previousPlugin = CharacterizationSupport.installGloss(plugin);
+        }
+
+        @Override
+        public void close() throws ReflectiveOperationException {
+            CharacterizationSupport.restoreGloss(previousPlugin);
+            CharacterizationSupport.restoreServer(previousServer);
         }
     }
 

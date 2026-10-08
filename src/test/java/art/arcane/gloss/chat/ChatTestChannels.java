@@ -13,7 +13,7 @@ final class ChatTestChannels {
         ChannelDoc doc = new ChannelDoc(ChannelDoc.CURRENT_SCHEMA_VERSION, 1L, null,
             new ChannelDoc.Channel("global", List.of(), null, null, null, null, null, null),
             "&f{{ sender.name }}&8: &f{{ message }}", List.of(), mentions, items, links,
-            filters, throttle, List.of());
+            filters, null, throttle, List.of());
         return ChannelRuntime.of("global", doc);
     }
 

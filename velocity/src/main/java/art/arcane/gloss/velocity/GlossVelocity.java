@@ -2,6 +2,7 @@ package art.arcane.gloss.velocity;
 
 import art.arcane.gloss.expr.ExpressionScope;
 import art.arcane.gloss.proxy.OwnershipProtocol;
+import art.arcane.gloss.motd.MotdPolicy;
 import com.google.inject.Inject;
 import com.github.retrooper.packetevents.protocol.score.ScoreFormat;
 import com.github.retrooper.packetevents.PacketEvents;
@@ -99,7 +100,10 @@ public final class GlossVelocity {
             return;
         }
         try {
-            event.setPing(current.motd().render(event.getPing(), current.documents()));
+            event.setPing(current.motd().render(event.getPing(), current.documents().settings().motd(),
+                new MotdPolicy.Request(event.getConnection().getVirtualHost().map(host -> host.getHostString()).orElse(""),
+                    event.getConnection().getProtocolVersion().getProtocol() < 0 ? null
+                        : event.getConnection().getProtocolVersion().getProtocol())));
         } catch (RuntimeException failure) {
             if (!pingFailed) {
                 pingFailed = true;
@@ -124,8 +128,10 @@ public final class GlossVelocity {
             links.send(player, current.documents());
             if (event.getPreviousServer() == null) {
                 connections.joined(player, current.documents());
+                surfaces.event(player, current.documents(), "join");
             } else {
                 connections.switched(player, event.getPreviousServer().getServerInfo().getName(), current.documents());
+                surfaces.event(player, current.documents(), "server_change");
             }
         } catch (RuntimeException failure) {
             if (failedPlayers.add(player.getUniqueId())) {
@@ -156,6 +162,9 @@ public final class GlossVelocity {
         if (surfaces != null) {
             surfaces.forget(id);
         }
+        if (links != null) {
+            links.forget(id);
+        }
         if (ownership != null) {
             ownership.forget(id);
         }
@@ -168,6 +177,7 @@ public final class GlossVelocity {
         }
         ProxyDocuments.Settings settings = config.documents().settings();
         int mask = (settings.motd() ? OwnershipProtocol.MOTD : 0)
+            | (config.documents().motd().linksEnabled(settings.motd()) ? OwnershipProtocol.SERVER_LINKS : 0)
             | (settings.tablist() ? OwnershipProtocol.TABLIST : 0)
             | (settings.scoreboards() ? OwnershipProtocol.SCOREBOARD : 0)
             | (settings.surfaces() ? OwnershipProtocol.SURFACES : 0)
@@ -195,9 +205,14 @@ public final class GlossVelocity {
 
     private RuntimeConfig load() throws IOException {
         ProxyDocuments.Snapshot documents = ProxyDocuments.load(directory);
-        RuntimeConfig loaded = new RuntimeConfig(documents, new ProxyMotd(text, directory, documents.motd()));
+        ProxyTextDocuments.Content previous = text.content();
         text.content(documents.content());
-        return loaded;
+        try {
+            return new RuntimeConfig(documents, new ProxyMotd(text, directory, documents.motd()));
+        } catch (IOException | RuntimeException failure) {
+            text.content(previous);
+            throw failure;
+        }
     }
 
     private void schedule() {
@@ -208,12 +223,30 @@ public final class GlossVelocity {
             .repeat(Duration.ofMillis(config.documents().settings().refreshMillis())).schedule();
     }
 
+    public void updateTablistVisibility(ProxyTablistVisibility visibility) {
+        ProxyTablists current = tabs;
+        if (current == null) {
+            throw new IllegalStateException("Gloss proxy tablists are not running");
+        }
+        current.visibility(visibility);
+    }
+
     private synchronized void tick() {
         RuntimeConfig current = config;
         if (current == null) {
             return;
         }
-        for (Player player : proxy.getAllPlayers()) {
+        try {
+            current.motd().refresh();
+        } catch (RuntimeException failure) {
+            if (!pingFailed) {
+                pingFailed = true;
+                logger.error("Gloss MOTD refresh failed; retaining its previous snapshot.", failure);
+            }
+        }
+        ProxyRoster roster = tabs.captureRoster();
+        for (ProxyRoster.Subject subject : roster.subjects().values()) {
+            Player player = subject.player();
             if (!player.isActive() || player.getCurrentServer().isEmpty()) {
                 continue;
             }
@@ -222,7 +255,7 @@ public final class GlossVelocity {
                 continue;
             }
             try {
-                tabs.render(player, current.documents());
+                tabs.render(player, current.documents(), roster);
                 renderBoard(player, current.documents());
                 surfaces.render(player, current.documents());
             } catch (RuntimeException failure) {
@@ -294,7 +327,12 @@ public final class GlossVelocity {
             surfaces.close();
             surfaces = null;
         }
-        links = null;
+        if (links != null) {
+            for (Player player : proxy.getAllPlayers()) {
+                links.clear(player);
+            }
+            links = null;
+        }
         connections = null;
         if (text != null) {
             text.content(ProxyTextDocuments.Content.EMPTY);
@@ -337,6 +375,9 @@ public final class GlossVelocity {
                         failedPlayers.clear();
                         pingFailed = false;
                         schedule();
+                        for (Player player : proxy.getAllPlayers()) {
+                            links.send(player, loaded.documents());
+                        }
                         tick();
                         invocation.source().sendMessage(Component.text("Gloss proxy configuration reloaded."));
                     } catch (IOException | RuntimeException failure) {

@@ -30,6 +30,17 @@ class GlyphServiceRebuildTest {
     }
 
     @Test
+    void repeatedObservationsDoNotPostponeAnUnchangedPendingBuild() {
+        gate.observe("a");
+        for (int second = 0; second < GlyphService.DEBOUNCE_SECONDS; second++) {
+            advanceSeconds(1);
+            assertTrue(gate.observe("a"));
+        }
+        assertTrue(gate.due());
+        assertEquals("a", gate.built());
+    }
+
+    @Test
     void anUnchangedFingerprintNeverRebuilds() {
         gate.observe("a");
         advanceSeconds(GlyphService.DEBOUNCE_SECONDS);

@@ -78,7 +78,7 @@ public class TextMenuIcon extends MenuIcon<TextIconData> {
         new Vector(0F, ((components.size() - 1) / 2F * localLineHeight()) - localLineHeight(), 0F)
     );
     components.forEach(c -> {
-      uuids.add(DisplayEntityManager.add(textDisplay(c, lineLocation)));
+      uuids.add(DisplayEntityManager.add(session.displayGroup(), textDisplay(c, lineLocation)));
       lineLocation.add(session.getTransform().localVector(new Vector(0F, -localLineHeight(), 0F)));
     });
     return uuids;

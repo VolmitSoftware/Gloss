@@ -88,7 +88,7 @@ class ChatHookFanoutTest {
         Path folder = dataFolder.resolve(ChannelDoc.KIND);
         Files.createDirectories(folder);
         Files.writeString(folder.resolve("global.json"),
-            "{\"schemaVersion\":1,\"revision\":1,"
+            "{\"schemaVersion\":2,\"revision\":1,"
                 + "\"channel\":{\"name\":\"global\",\"default\":true,\"scope\":\"global\"},"
                 + extra
                 + "\"format\":\"&f{{ sender.name }}&8: &f{{ message }}\"}");

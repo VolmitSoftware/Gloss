@@ -89,11 +89,15 @@ final class MenuRowCommandSupport {
   }
 
   private static void requireImageFile(String path) {
+    boolean ready;
     try {
-      Gloss.instance.getImageAssets().get(path);
+      ready = Gloss.instance.getImageAssets().prepared(path).isPresent();
     } catch (IOException | RuntimeException failure) {
       throw new IllegalArgumentException(
           "image must be a readable file inside plugins/Gloss/images: " + String.valueOf(path), failure);
+    }
+    if (!ready) {
+      throw new IllegalArgumentException("image is preparing; retry this command shortly: " + path);
     }
   }
 

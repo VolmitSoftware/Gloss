@@ -33,7 +33,7 @@ class PackNamespaceTest {
     @Test
     void successfullyLoadedForTheCurrentHashCounts() {
         namespace.publish(SHA1);
-        namespace.record(PLAYER, "SUCCESSFULLY_LOADED");
+        namespace.record(PLAYER, "SUCCESSFULLY_LOADED", SHA1);
 
         assertTrue(namespace.loaded(PLAYER));
         assertEquals("successfully_loaded", namespace.status(PLAYER));
@@ -42,7 +42,7 @@ class PackNamespaceTest {
     @Test
     void aRebuildInvalidatesEveryViewerUntilTheyReloadIt() {
         namespace.publish(SHA1);
-        namespace.record(PLAYER, "SUCCESSFULLY_LOADED");
+        namespace.record(PLAYER, "SUCCESSFULLY_LOADED", SHA1);
         namespace.publish("ffffffffffffffffffffffffffffffffffffffff");
 
         assertFalse(namespace.loaded(PLAYER));
@@ -52,11 +52,11 @@ class PackNamespaceTest {
     @Test
     void anyOtherStatusIsNotLoaded() {
         namespace.publish(SHA1);
-        namespace.record(PLAYER, "DECLINED");
+        namespace.record(PLAYER, "DECLINED", SHA1);
         assertFalse(namespace.loaded(PLAYER));
         assertEquals("declined", namespace.status(PLAYER));
 
-        namespace.record(PLAYER, "ACCEPTED");
+        namespace.record(PLAYER, "ACCEPTED", SHA1);
         assertFalse(namespace.loaded(PLAYER));
         assertEquals("accepted", namespace.status(PLAYER));
     }
@@ -64,7 +64,7 @@ class PackNamespaceTest {
     @Test
     void quittingForgetsTheViewer() {
         namespace.publish(SHA1);
-        namespace.record(PLAYER, "SUCCESSFULLY_LOADED");
+        namespace.record(PLAYER, "SUCCESSFULLY_LOADED", SHA1);
         namespace.forget(PLAYER);
 
         assertFalse(namespace.loaded(PLAYER));

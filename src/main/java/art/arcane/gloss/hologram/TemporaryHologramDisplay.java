@@ -1,6 +1,8 @@
 package art.arcane.gloss.hologram;
 
 import art.arcane.gloss.Gloss;
+import art.arcane.gloss.service.VisibilityGovernor;
+import art.arcane.gloss.menu.DisplayEntityManager;
 import art.arcane.gloss.api.HologramPresentation;
 import art.arcane.gloss.bedrock.BedrockPolicy;
 import art.arcane.gloss.bedrock.BedrockSurface;
@@ -41,6 +43,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
+import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.function.LongFunction;
 import java.util.function.Predicate;
@@ -84,6 +87,7 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
     private final HologramService service;
     private final String id;
     private final String animatorGroup;
+    private final String visibilityWorkKey;
     private final long durationMs;
     private final long startedMs;
     private final Object linesLock;
@@ -96,6 +100,11 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
     private final AtomicBoolean visibilityReset;
     private final ViewerList viewerList;
     private final Object viewerTextLock = new Object();
+    private final DisplayRefreshClock contentClock = new DisplayRefreshClock();
+    private final DisplayRefreshClock visibilityClock = new DisplayRefreshClock();
+    private final DisplayRefreshClock motionClock = new DisplayRefreshClock();
+    private final Map<UUID, ConditionMemo> conditionMemos = new ConcurrentHashMap<>();
+    private volatile DisplayRefresh refresh = DisplayRefresh.DEFAULTS;
     private final Map<UUID, ViewerText> viewerTexts = new ConcurrentHashMap<>();
     private final Set<UUID> untrackedViewers = ConcurrentHashMap.newKeySet();
     private volatile LineSet lineSet;
@@ -121,13 +130,16 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
     private volatile HologramBox box = HologramBox.defaults();
     private volatile TextDisplayDecoration decoration;
     private volatile boolean personalized;
-    private volatile boolean defaultVisibilityUsable = DisplayVisibility.canHideByDefault();
+    private volatile VisibilityGovernor.Surface visibilitySurface = VisibilityGovernor.Surface.HOLOGRAM;
+    private final ViewerDisplayBudget displayBudget;
     private volatile AuthoredText authoredText;
 
     TemporaryHologramDisplay(HologramService service, String id, Location initial, long durationMs) {
         this.service = service;
+        this.displayBudget = new ViewerDisplayBudget(service.plugin(), () -> visibilitySurface);
         this.id = Objects.requireNonNull(id, "Temporary hologram requires an id.");
         this.animatorGroup = "temp:" + id + "#" + Integer.toHexString(System.identityHashCode(this));
+        this.visibilityWorkKey = animatorGroup + "#show";
         this.durationMs = durationMs;
         this.startedMs = M.ms();
         this.linesLock = new Object();
@@ -339,6 +351,7 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
             return;
         }
 
+        displayBudget.close();
         service.removeTemporary(this);
         retractAnimation();
         TextDisplay active;
@@ -350,6 +363,7 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
         }
         destroyDecoration();
         appliedVisibility.clear();
+        conditionMemos.clear();
         if (active != null) {
             service.despawnEntity(active, position);
         }
@@ -375,7 +389,11 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
             }
             return;
         }
-        sampleBindings(tick, enabled);
+        if (motionClock.due(System.nanoTime() / 50_000_000L, refresh.motionTicks())) {
+            sampleBindings(tick, enabled);
+        } else {
+            scheduleDisplayDrive(tick, enabled);
+        }
     }
 
     private void sampleBindings(HologramTick tick, boolean enabled) {
@@ -536,8 +554,13 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
         moveIfNeeded(active, anchor);
         applyStyle(active);
         applyPresentation(active, presentation);
-        applyVisibility(active);
-        applyText(active, tick, world);
+        long updateTick = System.nanoTime() / 50_000_000L;
+        if (visibilityReset.get() || visibilityClock.due(updateTick, refresh.visibilityTicks())) {
+            applyVisibility(active);
+        }
+        if (textDirty.get() || contentClock.due(updateTick, refresh.contentTicks())) {
+            applyText(active, tick, world);
+        }
         updateDecoration(anchor, presentation);
     }
 
@@ -569,6 +592,12 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
                                   HologramPresentation presentation) {
         if (!viewer.isOnline() || destroyed.get() || particleLayers.isEmpty()
             || !conditionMatches(viewer)) {
+            return;
+        }
+        Location viewerLocation = viewer.getLocation();
+        if (!displayBudget.isShown(viewer.getUniqueId()) || viewerLocation.getWorld() != anchor.getWorld()
+            || service.plugin().governor().tier(viewer, visibilitySurface, viewerLocation.distanceSquared(anchor))
+                != VisibilityGovernor.Tier.FULL) {
             return;
         }
         long tick = System.currentTimeMillis() / 50L;
@@ -662,7 +691,13 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
     }
 
     void onPlayerQuit(UUID playerId) {
+        displayBudget.forget(playerId);
+        TextDisplayDecoration activeDecoration = decoration;
+        if (activeDecoration != null) {
+            activeDecoration.forget(playerId);
+        }
         appliedVisibility.remove(playerId);
+        conditionMemos.remove(playerId);
         untrackedViewers.remove(playerId);
         removeViewerText(playerId);
     }
@@ -699,8 +734,7 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
         LineSet snapshot = lineSet;
         boolean viewerSpecific = viewerSpecific(snapshot);
         String next = viewerSpecific ? "" : renderLines(snapshot);
-        boolean whitelist = viewerList.isWhitelist() || viewerCondition != null;
-        AtomicBoolean defaultVisibilityApplied = new AtomicBoolean(!whitelist);
+
         int teleportTicks = desiredTeleportTicks();
         boolean scheduled = service.plugin().scheduler().runAt(anchor, () -> {
             try {
@@ -726,9 +760,7 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
                         spawned.setAlignment(TextDisplay.TextAlignment.LEFT);
                     }
                     applyPresentationNow(spawned, presentation, teleportTicks, false);
-                    if (whitelist) {
-                        defaultVisibilityApplied.set(DisplayVisibility.setVisibleByDefault(spawned, false));
-                    }
+                    DisplayVisibility.hideByDefault(spawned);
                     if (teleportTicks > 0) {
                         DisplayMotion.applyTeleportDuration(spawned, teleportTicks);
                     }
@@ -746,12 +778,6 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
                     appliedPresentation = presentation;
                     appliedStyle = style;
                     appliedVisibility.clear();
-                    if (whitelist) {
-                        defaultVisibilityUsable = defaultVisibilityApplied.get();
-                    }
-                    if (viewerList.isWhitelist() == whitelist) {
-                        visibilityReset.set(whitelist && !defaultVisibilityApplied.get());
-                    }
                     displayEntityId = spawned.getEntityId();
                     display = spawned;
                 }
@@ -846,7 +872,7 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
         }
         TextDisplayDecoration active = decoration;
         if (active == null) {
-            active = new TextDisplayDecoration(service, () -> visibilityReset.set(true));
+            active = new TextDisplayDecoration(new TextDisplayDecoration.Options(service, () -> visibilityReset.set(true), () -> visibilitySurface));
             decoration = active;
         }
         FrameComposer frames = frameComposer;
@@ -864,6 +890,7 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
     }
 
     private void applyText(TextDisplay active, HologramTick tick, World world) {
+        boolean dirty = textDirty.getAndSet(false);
         LineSet snapshot = lineSet;
         boolean viewerSpecific = viewerSpecific(snapshot);
         if (viewerSpecific != personalized) {
@@ -898,7 +925,6 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
         }
 
         retractAnimation();
-        boolean dirty = textDirty.compareAndSet(true, false);
         if (!dirty && !hasDynamicText(snapshot)) {
             return;
         }
@@ -992,7 +1018,7 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
                         spans.add(new ParticleText.Span(span.name(), span.start(), span.end()));
                     }
                     frame = new ViewerFrame(snapshot, emojiGeneration, renderGeneration, animationGeneration,
-                        nowMs + service.temporaryUpdateIntervalTicks() * 50L,
+                        nowMs + refresh.contentInterval(service.temporaryUpdateIntervalTicks()) * 50L,
                         bound.frames() == null ? null : bound.frames()::apply, bound.text(), binder, List.copyOf(spans));
                 } catch (RuntimeException failure) {
                     Gloss.logExceptionStackThrottled(false, "temporary-viewer-lines:" + id, failure,
@@ -1014,7 +1040,7 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
                 ? service.plugin().text().renderParticleText(viewer, authored.authored()).text()
                 : frames.compose(nowMs);
             frame = new ViewerFrame(snapshot, emojiGeneration, renderGeneration, animationGeneration,
-                nowMs + service.temporaryUpdateIntervalTicks() * 50L, frames, text, null, List.of());
+                nowMs + refresh.contentInterval(service.temporaryUpdateIntervalTicks()) * 50L, frames, text, null, List.of());
         }
         synchronized (viewerTextLock) {
             if (destroyed.get() || !personalized || display != state.display || lineSet != snapshot
@@ -1061,7 +1087,13 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
     }
 
     private void updateViewerDecoration(ViewerText state, String text) {
-        if (!box.enabled()) {
+        Location anchor = position;
+        Location viewerLocation = state.player.getLocation();
+        boolean detailed = displayBudget.isShown(state.player.getUniqueId())
+            && viewerLocation.getWorld() == anchor.getWorld()
+            && service.plugin().governor().tier(state.player, visibilitySurface, viewerLocation.distanceSquared(anchor))
+                == VisibilityGovernor.Tier.FULL;
+        if (!box.enabled() || !detailed) {
             if (state.decoration != null) {
                 state.decoration.remove();
                 state.decoration = null;
@@ -1069,7 +1101,7 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
             return;
         }
         if (state.decoration == null) {
-            state.decoration = new PacketTextDecoration(state.player);
+            state.decoration = new PacketTextDecoration(state.player, DisplayEntityManager.group(state.player, visibilitySurface));
         }
         IconDisplayStyle currentStyle = style == null ? IconDisplayStyle.hologramDefaults() : style;
         String renderedText = state.frame != null && state.frame.binder() != null ? text : TextUtils.renderLegacy(text);
@@ -1086,10 +1118,7 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
             service.animator().remove(animatorGroup, viewerId.toString());
             service.animator().discardText(viewerId, state.entityId);
             if (state.decoration != null) {
-                Runnable remove = once(state.decoration::remove);
-                if (!FoliaScheduler.runEntity(service.plugin(), state.player, remove, 0L, remove)) {
-                    remove.run();
-                }
+                state.decoration.retire(service.plugin());
             }
         }
     }
@@ -1228,207 +1257,59 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
         return template;
     }
 
+    void setVisibilityObserver(BiConsumer<UUID, Boolean> observer) {
+        displayBudget.visibilityObserver(observer);
+    }
+
+    void setVisibilitySurface(VisibilityGovernor.Surface surface) {
+        visibilitySurface = Objects.requireNonNull(surface);
+        displayBudget.clear();
+        visibilityReset.set(true);
+    }
+
+    void setRefresh(DisplayRefresh refresh) {
+        this.refresh = DisplayRefresh.resolve(refresh);
+        contentClock.reset();
+        visibilityClock.reset();
+        motionClock.reset();
+        conditionMemos.clear();
+    }
+
     private void applyVisibility(TextDisplay active) {
-        if (viewerCondition != null) {
-            if (visibilityReset.compareAndSet(true, false)) {
-                DisplayVisibility.setVisibleByDefault(active, false);
-                setDecorationDefaultVisibility(false);
-                appliedVisibility.clear();
-            }
-            for (UUID viewerId : appliedVisibility.keySet()) {
-                Player viewer = Bukkit.getPlayer(viewerId);
-                if (viewer == null) {
-                    appliedVisibility.remove(viewerId);
-                } else {
-                    dispatchConditionalVisibility(active, viewer);
-                }
-            }
-            service.forEachNearbyViewer(position, viewDistance() * viewDistance(), viewer -> {
-                if (!appliedVisibility.containsKey(viewer.getUniqueId())) {
-                    dispatchConditionalVisibility(active, viewer);
-                }
-            });
-            return;
-        }
-        boolean whitelist = viewerList.isWhitelist();
-        Set<UUID> members = viewerList.members();
-        boolean reset = visibilityReset.compareAndSet(true, false);
-        if (reset) {
-            applyDefaultVisibility(active, !whitelist);
-            setDecorationDefaultVisibility(!whitelist);
-            if (!defaultVisibilityUsable) {
-                appliedVisibility.clear();
-                reconcileRoster(active, whitelist, members);
-                return;
-            }
-        }
-        if (whitelist) {
-            reconcileWhitelist(active, members, reset);
-            return;
-        }
-        if (!reset && members.isEmpty() && appliedVisibility.isEmpty()) {
-            return;
-        }
-
-        reconcileBlacklist(active, members, reset);
-    }
-
-    /**
-     * A reset flips the display's default, which inverts the meaning of every per player override
-     * already in place, so the members and everyone holding an override are re-dispatched. Players
-     * at the default are carried by the default itself and are never touched.
-     */
-    private void reconcileWhitelist(TextDisplay active, Set<UUID> members, boolean forced) {
-        for (Map.Entry<UUID, Boolean> entry : appliedVisibility.entrySet()) {
-            if (members.contains(entry.getKey())) {
-                continue;
-            }
-
-            appliedVisibility.remove(entry.getKey());
-            if (!forced && !entry.getValue()) {
-                continue;
-            }
-
-            Player watcher = Bukkit.getPlayer(entry.getKey());
-            if (watcher != null) {
-                dispatchVisibility(active, watcher, false);
-            }
-        }
-
-        for (UUID member : members) {
-            if (!forced && Boolean.TRUE.equals(appliedVisibility.get(member))) {
-                continue;
-            }
-
-            Player viewer = Bukkit.getPlayer(member);
+        visibilityReset.set(false);
+        for (UUID viewerId : appliedVisibility.keySet()) {
+            Player viewer = Bukkit.getPlayer(viewerId);
             if (viewer == null) {
-                continue;
-            }
-
-            appliedVisibility.put(member, true);
-            dispatchVisibility(active, viewer, true);
-        }
-    }
-
-    private void reconcileBlacklist(TextDisplay active, Set<UUID> members, boolean forced) {
-        for (UUID member : members) {
-            if (!forced && Boolean.FALSE.equals(appliedVisibility.get(member))) {
-                continue;
-            }
-
-            Player viewer = Bukkit.getPlayer(member);
-            if (viewer == null) {
-                continue;
-            }
-
-            appliedVisibility.put(member, false);
-            dispatchVisibility(active, viewer, false);
-        }
-
-        for (Map.Entry<UUID, Boolean> entry : appliedVisibility.entrySet()) {
-            if (members.contains(entry.getKey())) {
-                continue;
-            }
-
-            appliedVisibility.remove(entry.getKey());
-            if (!forced && entry.getValue()) {
-                continue;
-            }
-
-            Player watcher = Bukkit.getPlayer(entry.getKey());
-            if (watcher != null) {
-                dispatchVisibility(active, watcher, true);
+                appliedVisibility.remove(viewerId);
+                displayBudget.forget(viewerId);
+            } else {
+                dispatchConditionalVisibility(active, viewer);
             }
         }
-    }
-
-    private void applyDefaultVisibility(TextDisplay active, boolean visible) {
-        service.plugin().scheduler().runEntity(active, () -> {
-            if (DisplayVisibility.setVisibleByDefault(active, visible) || !defaultVisibilityUsable) {
-                return;
+        service.forEachNearbyViewer(position, viewDistance() * viewDistance(), viewer -> {
+            if (!appliedVisibility.containsKey(viewer.getUniqueId())) {
+                dispatchConditionalVisibility(active, viewer);
             }
-            // First failure only: without a usable default every non-member has to be hidden by
-            // hand, so re-arm the reset once to take the roster path.
-            defaultVisibilityUsable = false;
-            visibilityReset.set(true);
         });
-    }
-
-    private void reconcileRoster(TextDisplay active, boolean whitelist, Set<UUID> members) {
-        for (Player online : Bukkit.getOnlinePlayers()) {
-            UUID viewerId = online.getUniqueId();
-            boolean visible = whitelist ? members.contains(viewerId) : !members.contains(viewerId);
-            Boolean applied = appliedVisibility.get(viewerId);
-            if (applied != null && applied == visible) {
-                continue;
-            }
-
-            appliedVisibility.put(viewerId, visible);
-            dispatchVisibility(active, online, visible);
-        }
     }
 
     void reconcileVisibilityFor(Player player) {
         TextDisplay active = display;
-        if (active == null || !player.isOnline()) {
-            return;
-        }
-        if (viewerCondition != null) {
+        if (active != null && player.isOnline()) {
             dispatchConditionalVisibility(active, player);
-            return;
-        }
-        UUID viewerId = player.getUniqueId();
-        boolean whitelist = viewerList.isWhitelist();
-        boolean visible = whitelist == viewerList.members().contains(viewerId);
-        Boolean previous = appliedVisibility.put(viewerId, visible);
-        if (previous == null || previous != visible) {
-            dispatchVisibility(active, player, visible);
-        }
-    }
-
-    private void dispatchVisibility(TextDisplay active, Player player, boolean visible) {
-        service.plugin().scheduler().runEntity(player, () -> {
-            if (destroyed.get() || display != active || !player.isOnline()) {
-                return;
-            }
-            removeViewerText(player.getUniqueId());
-            if (visible) {
-                player.showEntity(service.plugin(), active);
-            } else {
-                player.hideEntity(service.plugin(), active);
-            }
-            applyDecorationVisibility(player, visible);
-        });
-    }
-
-    private void setDecorationDefaultVisibility(boolean visible) {
-        TextDisplayDecoration active = decoration;
-        if (active == null) {
-            return;
-        }
-        for (TextDisplay display : active.displays()) {
-            service.plugin().scheduler().runEntity(display,
-                () -> DisplayVisibility.setVisibleByDefault(display, visible));
         }
     }
 
     private void applyDecorationVisibility(Player player, boolean visible) {
         TextDisplayDecoration active = decoration;
-        if (active == null) {
-            return;
-        }
-        for (TextDisplay display : active.displays()) {
-            if (visible) {
-                player.showEntity(service.plugin(), display);
-            } else {
-                player.hideEntity(service.plugin(), display);
-            }
+        if (active != null) {
+            active.setVisible(player, visible);
         }
     }
 
     private void dispatchConditionalVisibility(TextDisplay active, Player player) {
         int entityId = displayEntityId;
-        service.runViewerWork(player, player.getUniqueId(), animatorGroup + "#show", () -> {
+        service.runViewerWork(player, player.getUniqueId(), visibilityWorkKey, () -> {
             if (destroyed.get() || display != active || !player.isOnline()) {
                 return;
             }
@@ -1437,32 +1318,63 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
             Location anchor = position;
             boolean nearby = viewerLocation.getWorld() == anchor.getWorld()
                 && viewerLocation.distanceSquared(anchor) <= viewDistance() * viewDistance();
-            boolean visible = nearby && viewerList.isWhitelist() == viewerList.members().contains(viewerId)
-                && conditionMatches(player);
+            VisibilityGovernor.Tier tier = nearby ? service.plugin().governor().tier(player, visibilitySurface,
+                viewerLocation.distanceSquared(anchor)) : VisibilityGovernor.Tier.CULLED;
+            BedrockPolicy bedrock = BedrockPolicy.of(service.plugin());
+            boolean eligible = nearby && (bedrock == null || !bedrock.hides(BedrockSurface.HOLOGRAM, player))
+                && tier != VisibilityGovernor.Tier.CULLED
+                && viewerList.isWhitelist() == viewerList.members().contains(viewerId) && conditionMatches(player);
+            if (destroyed.get() || display != active || !player.isOnline()) {
+                return;
+            }
+            boolean visible;
+            if (eligible) {
+                visible = displayBudget.show(player, List.of(active));
+            } else {
+                displayBudget.hide(player);
+                visible = false;
+            }
+            applyDecorationVisibility(player, visible && tier == VisibilityGovernor.Tier.FULL);
             Boolean previous = appliedVisibility.put(viewerId, visible);
             if (previous == null || previous != visible) {
+                if (personalized && refresh.contentTicks() != null) {
+                    textDirty.set(true);
+                }
                 removeViewerText(viewerId);
                 if (!personalized) {
                     retractAnimation();
                 }
                 service.animator().discardText(viewerId, entityId);
-                if (visible) {
-                    player.showEntity(service.plugin(), active);
-                } else {
-                    player.hideEntity(service.plugin(), active);
-                }
-                applyDecorationVisibility(player, visible);
+
             }
             if (!nearby) {
                 appliedVisibility.remove(viewerId);
+                conditionMemos.remove(viewerId);
             }
         });
     }
 
     private boolean conditionMatches(Player viewer) {
         Predicate<Player> condition = viewerCondition;
-        return condition == null || condition.test(viewer);
+        if (condition == null) {
+            return true;
+        }
+        Integer interval = refresh.visibilityTicks();
+        if (interval == null) {
+            return condition.test(viewer);
+        }
+        long now = System.nanoTime() / 50_000_000L;
+        UUID viewerId = viewer.getUniqueId();
+        ConditionMemo memo = conditionMemos.get(viewerId);
+        if (memo != null && memo.condition() == condition && now < memo.nextTick()) {
+            return memo.visible();
+        }
+        boolean visible = condition.test(viewer);
+        conditionMemos.put(viewerId, new ConditionMemo(condition, now + interval, visible));
+        return visible;
     }
+
+    private record ConditionMemo(Predicate<Player> condition, long nextTick, boolean visible) {}
 
     private record ViewerFrame(LineSet snapshot, long emojiGeneration, long renderGeneration,
                                long animationGeneration, long refreshAfterMs, TextFrameSource frames, String text,
@@ -1489,7 +1401,7 @@ final class TemporaryHologramDisplay implements TemporaryHologram {
         BedrockPolicy policy = BedrockPolicy.of(service.plugin());
         boolean whitelist = viewerList.isWhitelist();
         Set<UUID> members = viewerList.members();
-        boolean conditional = viewerCondition != null && display != null;
+        boolean conditional = display != null;
         if (members.isEmpty() && !conditional) {
             return whitelist ? List.of()
                 : withoutBedrock(policy, tick.temporaryPlayers(world, position, viewDistance()));

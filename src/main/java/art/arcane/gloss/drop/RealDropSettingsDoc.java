@@ -10,6 +10,7 @@ import art.arcane.gloss.api.IconTextAlignment;
 import art.arcane.gloss.condition.ShowCondition;
 import art.arcane.gloss.doc.DocumentEnvelope;
 import art.arcane.gloss.doc.DocumentParsers;
+import art.arcane.gloss.hologram.DisplayRefresh;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -243,9 +244,11 @@ public record RealDropSettingsDoc(
         IconDisplayStyle style,
         HologramBox box,
         ShowCondition show,
-        Boolean preserveCustomNames
+        Boolean preserveCustomNames,
+        DisplayRefresh refresh
     ) {
         public Labels {
+            refresh = DisplayRefresh.resolve(refresh);
             show = show == null ? ShowCondition.ALWAYS : show;
             preserveCustomNames = preserveCustomNames == null || preserveCustomNames;
             enabled = enabled == null || enabled;
@@ -258,9 +261,16 @@ public record RealDropSettingsDoc(
             box = box == null ? HologramBox.defaults() : box;
         }
 
+        public Labels(Boolean enabled, Double yOffset, String format, Boolean useItemDisplayNames,
+                      Map<String, String> names, LabelBundle bundle, IconDisplayStyle style,
+                      HologramBox box, ShowCondition show, Boolean preserveCustomNames) {
+            this(enabled, yOffset, format, useItemDisplayNames, names, bundle, style, box, show,
+                preserveCustomNames, null);
+        }
+
         GlossConfig.RealDrops.Labels toConfig() {
             return new GlossConfig.RealDrops.Labels(enabled, yOffset.floatValue(), format, useItemDisplayNames,
-                names, bundle.toConfig(), style, box, show, preserveCustomNames);
+                names, bundle.toConfig(), style, box, show, preserveCustomNames, refresh);
         }
 
         public static IconDisplayStyle defaultStyle() {

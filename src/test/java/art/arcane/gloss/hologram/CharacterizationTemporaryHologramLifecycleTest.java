@@ -177,25 +177,15 @@ class CharacterizationTemporaryHologramLifecycleTest {
     }
 
     @Test
-    void whitelistFallbackScansTheRosterOnlyOnReset() {
+    void unsupportedDefaultVisibilityCannotPublishAnUnbudgetedDisplay() {
         world.visibleByDefaultSupported = false;
-        PlayerHandle bob = harness.join("Bob", world, 2.0D, 64.0D, 2.0D);
-        TemporaryHologramDisplay temporary = temporary("t-visibility-fallback", List.of("private"));
+        harness.join("Other", world, 2.0D, 64.0D, 2.0D);
+        TemporaryHologramDisplay temporary = temporary("private", List.of("private"));
         temporary.viewers().whitelist();
         temporary.viewers().add(owner.uuid);
-
         temporary.drive(true);
-        DisplayHandle display = harness.onlySpawned(world);
-        int resetQueries = harness.onlinePlayerQueries.get();
-        temporary.drive(true);
-        temporary.drive(true);
-        harness.reconcileViewers();
-        harness.reconcileViewers();
-
-        assertEquals(resetQueries, harness.onlinePlayerQueries.get(),
-            "fallback whitelist drives and periodic viewer reconciliation must not rescan every player");
-        assertFalse(bob.perceivedVisibility(display),
-            "a failed visible-by-default setter must hide every nonmember during initial reconciliation");
+        assertTrue(harness.liveSpawned(world).isEmpty());
+        assertTrue(harness.appliedVisibility(temporary).isEmpty());
     }
 
     @Test

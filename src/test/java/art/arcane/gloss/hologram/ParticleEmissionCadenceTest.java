@@ -12,9 +12,10 @@ import org.junit.jupiter.api.io.TempDir;
 import java.io.File;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
+import java.util.function.Function;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -153,7 +154,6 @@ class ParticleEmissionCadenceTest {
         private final ParticleService service;
         private final ParticleFrame frame;
 
-        @SuppressWarnings("unchecked")
         private Fixture(File folder) throws Exception {
             harness = new CharacterizationHarness(folder);
             world = harness.world("world");
@@ -166,9 +166,12 @@ class ParticleEmissionCadenceTest {
             constructor.setAccessible(true);
             Field particles = ParticleService.class.getDeclaredField("particles");
             particles.setAccessible(true);
-            Map<ParticleLayer.ParticleSpec, Object> cache =
-                (Map<ParticleLayer.ParticleSpec, Object>) particles.get(service);
-            cache.put(layer("frame", 4).particle(), constructor.newInstance(Particle.END_ROD, null));
+            Object cache = particles.get(service);
+            Method get = cache.getClass().getDeclaredMethod("get", Object.class, Function.class);
+            get.setAccessible(true);
+            Object resolved = constructor.newInstance(Particle.END_ROD, null);
+            Function<ParticleLayer.ParticleSpec, Object> factory = ignored -> resolved;
+            assertEquals(resolved, get.invoke(cache, layer("frame", 4).particle(), factory));
         }
 
         private void emit(Object source, ParticleLayer layer, long tick) {

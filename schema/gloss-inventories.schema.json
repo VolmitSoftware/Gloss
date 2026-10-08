@@ -9,6 +9,13 @@
     "revision"
   ],
   "properties": {
+    "preset": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1
+    },
     "schemaVersion": {
       "type": "integer",
       "const": 1
@@ -17,6 +24,43 @@
       "type": "integer",
       "minimum": 1,
       "maximum": 9007199254740991
+    },
+    "refresh": {
+      "type": "object",
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": [
+            "dynamic",
+            "always"
+          ],
+          "default": "dynamic"
+        },
+        "titleTicks": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1200,
+          "default": 20
+        },
+        "slotsTicks": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1200,
+          "default": 20
+        },
+        "conditionsTicks": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1200,
+          "default": 20
+        },
+        "listTicks": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1200,
+          "description": "Defaults to list.refreshTicks."
+        }
+      }
     },
     "title": {
       "description": "Window title, run through the text pipeline.",
@@ -109,7 +153,10 @@
     },
     "show": {
       "description": "Condition deciding whether this document is offered to a viewer at all.",
-      "type": "string"
+      "type": [
+        "boolean",
+        "string"
+      ]
     },
     "select": {
       "description": "Board-model selection: the highest matching priority wins, ties break on the lowest id.",
@@ -181,6 +228,20 @@
           }
         }
       }
+    },
+    "actions": {
+      "type": "object",
+      "maxProperties": 256,
+      "propertyNames": {
+        "pattern": "^[A-Za-z0-9_-]{1,64}$"
+      },
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "type": "object"
+        }
+      },
+      "description": "Named action lists invoked with call. Cycles, more than 32 nested calls and expanded documents over 100000 JSON nodes are rejected."
     }
   }
 }

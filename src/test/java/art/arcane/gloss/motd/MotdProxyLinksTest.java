@@ -27,6 +27,7 @@ import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Logger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -67,6 +68,7 @@ class MotdProxyLinksTest {
         set(plugin, JavaPlugin.class, "logger", Logger.getAnonymousLogger());
         set(plugin, JavaPlugin.class, "isEnabled", true);
         GlossConfigFile config = new GlossConfigFile();
+        config.features.motd = true;
         config.text.functions = false;
         config.text.placeholders = false;
         config.normalize();
@@ -113,6 +115,7 @@ class MotdProxyLinksTest {
                "show":"server.online == 0","max":"40"}]}
             """);
         registry().reload();
+        refreshSnapshot();
         ServerListPingEvent event = new ServerListPingEvent("example.test", InetAddress.getLoopbackAddress(),
             "Original", 20) {};
         Method handler = MotdService.class.getDeclaredMethod("handlePing", ServerListPingEvent.class);
@@ -128,7 +131,7 @@ class MotdProxyLinksTest {
     void backendPublishesItsOwnLinksWhileNoProxyOwnsTheMotd() {
         motd.refreshProxyOwnership();
 
-        assertFalse(ownership.ownsMotd());
+        assertFalse(ownership.ownsServerLinks());
         assertEquals(1, publisher.published.size());
         assertEquals(0, publisher.clears);
         List<MotdDoc.MotdLink> links = publisher.published.getLast();
@@ -140,13 +143,13 @@ class MotdProxyLinksTest {
     }
 
     @Test
-    void proxyOwnedMotdClearsTheBackendLinksAndReleasingRepublishesThem() throws Exception {
+    void proxyOwnedLinksClearTheBackendLinksAndReleasingRepublishesThem() throws Exception {
         motd.refreshProxyOwnership();
         assertEquals(1, publisher.published.size());
 
-        apply(OwnershipProtocol.MOTD, System.currentTimeMillis() + 15_000L);
+        apply(OwnershipProtocol.SERVER_LINKS, System.currentTimeMillis() + 15_000L);
 
-        assertTrue(ownership.ownsMotd());
+        assertTrue(ownership.ownsServerLinks());
         assertEquals(1, publisher.clears);
         assertEquals(1, publisher.published.size());
         motd.refreshProxyOwnership();
@@ -155,9 +158,66 @@ class MotdProxyLinksTest {
 
         apply(0, 0L);
 
-        assertFalse(ownership.ownsMotd());
+        assertFalse(ownership.ownsServerLinks());
         assertEquals(2, publisher.published.size());
         assertEquals(2, publisher.clears);
+    }
+
+    @Test
+    void pingsReadPreparedTextWithoutInvokingProviders() throws Exception {
+        GlossConfigFile config = new GlossConfigFile();
+        config.text.functions = true;
+        config.normalize();
+        set(plugin, Gloss.class, "config", GlossConfig.from(config));
+        AtomicInteger calls = new AtomicInteger();
+        plugin.text().registerFunction("snapshot_test", viewer -> Integer.toString(calls.incrementAndGet()));
+        Files.writeString(new File(folder, "motd.json").toPath(), """
+            {"schemaVersion":1,"revision":5,"entries":[{"lines":["|snapshot_test|"]}]}
+            """);
+        registry().reload();
+        refreshSnapshot();
+        int preparedCalls = calls.get();
+        assertTrue(preparedCalls > 0);
+        Method handler = MotdService.class.getDeclaredMethod("handlePing", ServerListPingEvent.class);
+        handler.setAccessible(true);
+        for (int index = 0; index < 20; index++) {
+            ServerListPingEvent event = new ServerListPingEvent("example.test", InetAddress.getLoopbackAddress(),
+                "Original", 20) {};
+            handler.invoke(motd, event);
+            assertEquals(Integer.toString(preparedCalls), event.getMotd());
+        }
+        assertEquals(preparedCalls, calls.get());
+        refreshSnapshot();
+        assertEquals(preparedCalls + 1, calls.get());
+    }
+
+    @Test
+    void explicitLinksRemainEnabledWithMotdDisabledAndHidden() throws Exception {
+        GlossConfigFile config = new GlossConfigFile();
+        config.normalize();
+        set(plugin, Gloss.class, "config", GlossConfig.from(config));
+        Files.writeString(new File(folder, "motd.json").toPath(), """
+            {"schemaVersion":1,"revision":5,"show":false,"entries":[{"lines":["Hidden"]}],
+             "serverLinks":{"enabled":true,"links":[{"type":"website","url":"https://example.org"}]}}
+            """);
+        registry().reload();
+        motd.refreshProxyOwnership();
+        assertEquals(1, publisher.published.getLast().size());
+        apply(OwnershipProtocol.MOTD, System.currentTimeMillis() + 15000);
+        motd.refreshProxyOwnership();
+        assertEquals(0, publisher.clears);
+        assertEquals(1, publisher.published.getLast().size());
+    }
+
+    private void refreshSnapshot() throws Exception {
+        Method doc = MotdService.class.getDeclaredMethod("doc");
+        doc.setAccessible(true);
+        Method prepare = MotdService.class.getDeclaredMethod("prepare", MotdDoc.class);
+        prepare.setAccessible(true);
+        set(motd, MotdService.class, "prepared", prepare.invoke(motd, doc.invoke(motd)));
+        Method refresh = MotdService.class.getDeclaredMethod("refreshSnapshot");
+        refresh.setAccessible(true);
+        refresh.invoke(motd);
     }
 
     private void apply(int mask, long expires) throws Exception {

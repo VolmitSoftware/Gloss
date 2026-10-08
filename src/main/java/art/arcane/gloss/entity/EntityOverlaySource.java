@@ -2,7 +2,8 @@ package art.arcane.gloss.entity;
 
 import art.arcane.gloss.api.HologramBox;
 import art.arcane.gloss.api.IconDisplayStyle;
-import org.bukkit.entity.LivingEntity;
+import art.arcane.gloss.condition.EntityRelationshipSnapshot;
+import art.arcane.gloss.expr.ExprScope;
 import org.bukkit.entity.Player;
 
 import java.util.UUID;
@@ -20,10 +21,34 @@ public interface EntityOverlaySource {
                 double offset) {
     }
 
-    boolean wants(LivingEntity target);
+    record Context(Player viewer, EntityRelationshipSnapshot relationship,
+                   EntityOverlayText.Snapshot snapshot, ExprScope scope) { }
 
-    /** @return the pane this source wants drawn, or null to draw nothing for this viewer */
-    Pane prepare(Player viewer, LivingEntity target, EntityOverlayText.Snapshot snapshot);
+    record ScanPolicy(double range, int subjects, int intervalTicks) {
+        public static final ScanPolicy INHERIT = new ScanPolicy(0, 0, 0);
+
+        public ScanPolicy {
+            if (!Double.isFinite(range) || range < 0 || range > 64 || subjects < 0 || subjects > 256
+                || intervalTicks < 0 || intervalTicks > 200) {
+                throw new IllegalArgumentException("Invalid overlay source scan policy");
+            }
+        }
+    }
+
+    boolean wants(EntityRelationshipSnapshot target);
+
+    Pane prepare(Context context);
+
+    default void displayed(Player viewer, EntityRelationshipSnapshot relationship) {
+    }
+
+    default ScanPolicy scanPolicy() {
+        return ScanPolicy.INHERIT;
+    }
+
+    default boolean includesSelf() {
+        return false;
+    }
 
     /**
      * The pane for this pair has stopped being drawn: the subject left range, left the world, or

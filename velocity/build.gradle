@@ -52,6 +52,10 @@ shadowJar {
     relocate('art.arcane.gloss.animation', 'art.arcane.gloss.velocity.animation')
     relocate('art.arcane.gloss.emoji', 'art.arcane.gloss.velocity.emoji')
     relocate('art.arcane.gloss.names', 'art.arcane.gloss.velocity.names')
+    relocate('art.arcane.gloss.tab', 'art.arcane.gloss.velocity.tab')
+    relocate('art.arcane.gloss.doc', 'art.arcane.gloss.velocity.doc')
+    relocate('art.arcane.gloss.motd', 'art.arcane.gloss.velocity.motd')
+    relocate('art.arcane.gloss.surface', 'art.arcane.gloss.velocity.surface')
     relocate('com.google.gson', 'art.arcane.gloss.velocity.libs.gson')
     relocate('com.github.retrooper.packetevents', 'art.arcane.gloss.velocity.libs.packetevents.api')
     relocate('io.github.retrooper.packetevents', 'art.arcane.gloss.velocity.libs.packetevents.impl')
@@ -65,6 +69,14 @@ tasks.named('build') { dependsOn tasks.named('shadowJar') }
 sourceSets.main.java {
     srcDir '../src/main/java'
     include 'art/arcane/gloss/velocity/**'
+    include 'art/arcane/gloss/motd/MotdPolicy.java'
+    include 'art/arcane/gloss/tab/TablistLayoutDefinition.java'
+    include 'art/arcane/gloss/doc/DocumentPresetCatalog.java'
+    include 'art/arcane/gloss/doc/DocumentEnvelope.java'
+    include 'art/arcane/gloss/tab/PlayerInfoRewriteListener.java'
+    include 'art/arcane/gloss/surface/SurfaceDispatchPolicy.java'
+    include 'art/arcane/gloss/surface/SurfaceQueue.java'
+    include 'art/arcane/gloss/surface/SurfaceTrigger.java'
     include 'art/arcane/gloss/proxy/OwnershipProtocol.java'
     include 'art/arcane/gloss/expr/Expr.java'
     include 'art/arcane/gloss/expr/ExpressionScope.java'

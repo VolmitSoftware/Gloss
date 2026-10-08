@@ -78,6 +78,9 @@ public abstract class MenuAction<E extends MenuActionData> {
 
   /** One step of the runner: trigger filter, then the gate and cooldown, then the action; a filtered action continues. */
   public static ActionOutcome executeAt(List<MenuAction<?>> actions, int index, ActionContext context) {
+    if (!context.current()) {
+      return ActionOutcome.STOP;
+    }
     MenuAction<?> action = actions.get(index);
     if (!action.data.triggerOrDefault().matches(context.trigger())) {
       return ActionOutcome.CONTINUE;

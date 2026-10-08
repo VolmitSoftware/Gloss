@@ -13,6 +13,7 @@ import org.bukkit.entity.Player;
 
 import java.util.List;
 import java.util.Map;
+import java.util.function.BooleanSupplier;
 
 /**
  * The context a chest slot's actions run in. Its scope answers {@code args.*} and {@code session.*}
@@ -26,15 +27,34 @@ public final class InventoryActionContext implements ActionContext {
     private final HoloClickTrigger trigger;
     private final Map<String, Object> args;
     private final MenuNavigator navigator;
+    private final ExprScope scope;
+    private final SessionVariables variables;
+    private final BooleanSupplier current;
 
     public InventoryActionContext(Player player, String inventoryId, int slot, HoloClickTrigger trigger,
                                   Map<String, Object> args, MenuNavigator navigator) {
+        this(player, new Options(inventoryId, slot, trigger, args, navigator, null,
+            currentVariables(player), () -> true));
+    }
+
+    public InventoryActionContext(Player player, Options options) {
         this.player = player;
-        this.inventoryId = inventoryId;
-        this.slot = slot;
-        this.trigger = trigger;
-        this.args = args == null ? Map.of() : Map.copyOf(args);
-        this.navigator = navigator;
+        this.inventoryId = options.inventoryId();
+        this.slot = options.slot();
+        this.trigger = options.trigger();
+        this.args = options.args() == null ? Map.of() : Map.copyOf(options.args());
+        this.navigator = options.navigator();
+        this.scope = options.scope();
+        this.variables = options.variables();
+        this.current = options.current();
+    }
+
+    public record Options(String inventoryId, int slot, HoloClickTrigger trigger, Map<String, Object> args,
+                          MenuNavigator navigator, ExprScope scope, SessionVariables variables,
+                          BooleanSupplier current) {
+        public Options {
+            current = current == null ? () -> true : current;
+        }
     }
 
     @Override
@@ -64,11 +84,20 @@ public final class InventoryActionContext implements ActionContext {
 
     @Override
     public ExprScope conditionScope() {
-        return new WindowScope(player, args);
+        return scope == null ? new WindowScope(player, args) : scope;
     }
 
     @Override
     public SessionVariables sessionVariables() {
+        return variables;
+    }
+
+    @Override
+    public boolean current() {
+        return current.getAsBoolean();
+    }
+
+    private static SessionVariables currentVariables(Player player) {
         InventoryMenuService service = InventoryMenuService.active();
         return service == null || player == null ? null : service.sessionVariables(player.getUniqueId());
     }

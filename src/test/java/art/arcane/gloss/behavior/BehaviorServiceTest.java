@@ -16,6 +16,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.LinkedHashMap;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -23,7 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class BehaviorServiceTest {
-    private static final String HEAD = "{\"schemaVersion\":1,\"revision\":1,";
+    private static final String HEAD = "{\"schemaVersion\":2,\"revision\":1,";
     private static final String STATE = "\"state\":{\"visits\":{\"scope\":\"player\",\"type\":\"number\"},"
         + "\"tag\":{\"scope\":\"player\",\"type\":\"string\"}},";
     private static final String ADD = "{\"type\":\"addState\",\"key\":\"visits\",\"value\":\"1\"}";
@@ -63,6 +64,35 @@ class BehaviorServiceTest {
 
     private void fire(BehaviorSubscriptions subscriptions, BehaviorTrigger trigger, TriggerEvent event) {
         BehaviorDispatcher.fire(subscriptions, trigger, event, BehaviorTestSupport.contexts());
+    }
+
+    @Test
+    void chatInputAndDocumentWorkLimitsSkipMatching() {
+        BehaviorSubscriptions input = compile(Map.of("input", doc(STATE
+            + "\"matching\":{\"maxInputCharacters\":2},\"on\":[{\"trigger\":\"chat\",\"do\":[" + ADD + "]}]")));
+        fire(input, BehaviorTrigger.CHAT, TriggerEvent.chat(alice, "long"));
+        assertEquals(0.0D, visits(alice));
+        BehaviorSubscriptions work = compile(Map.of("work", doc(STATE
+            + "\"matching\":{\"maxWorkUnits\":1},\"on\":[{\"trigger\":\"chat\",\"do\":[" + ADD + "]},"
+            + "{\"trigger\":\"chat\",\"do\":[" + ADD + "]}]")));
+        fire(work, BehaviorTrigger.CHAT, TriggerEvent.chat(alice, "hello"));
+        assertEquals(1.0D, visits(alice));
+    }
+
+    @Test
+    void sharedChatWorkLimitBoundsAllDocumentsTogether() {
+        Map<String, BehaviorDoc> documents = new LinkedHashMap<>();
+        for (int index = 0; index < 256; index++) {
+            documents.put("chat" + index, doc("\"on\":[{\"trigger\":\"chat\",\"pattern\":\"a\",\"do\":[]}]"));
+        }
+        BehaviorSubscriptions subscriptions = compile(documents);
+        String message = "a".repeat(4000);
+        long work = 1L + subscriptions.subscribed(BehaviorTrigger.CHAT).getFirst().entry().pattern().programSize()
+            * (message.length() + 1L);
+        int matched = BehaviorDispatcher.fire(subscriptions, BehaviorTrigger.CHAT, TriggerEvent.chat(alice, message),
+            BehaviorTestSupport.contexts());
+        assertEquals(2000000L / work, matched);
+        assertTrue(matched < documents.size());
     }
 
     @Test

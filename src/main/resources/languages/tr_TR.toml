@@ -13,6 +13,15 @@
 #
 # === Değişkenler ===
 # Değişken adlarını değiştirmeyin ve yalnızca ilgili iletinin değişkenlerini kullanın.
+#   {viewers}  İzleyiciler
+#   {entries}  Önbellek kayıtları
+#   {admissions}  Kabuller
+#   {refusals}  Retler
+#   {waiting}  Bekleyen
+#   {expired}  Süresi dolan sıralar
+#   {retiring}  Bekleyen temizleme
+#   {bytes}  Saklanan veri (bayt)
+#   {completed}  Tamamlanan
 #   {absorbed}  Mevcut verilerle birleştirilen içe aktarılmış kayıtlar
 #   {active}  Etkin sağlayıcı sayısı
 #   {actual}  Geçerli belge sürümü
@@ -225,8 +234,8 @@ indicators = "Hasar ve iyileştirme göstergesi araçları"
 status = "Kısa çalışma zamanı sayımlarını göster"
 import = "Eski hologramları kaynak dosyaları değiştirmeden taşı"
 "import.apply" = "Üzerine yazmayan bir eski hologram taşımasını uygula"
-"import.holoui" = "HoloUi verilerini plugins/holoui klasöründen kopyala; önceki içe aktarmaların üzerine yazar"
-"import.legacy" = "Birleşme öncesi Gloss veri dosyalarını v2 zarflarına taşı"
+"import.holoui" = "HoloUi içe aktarımını işlem bütünlüğüyle önizle veya uygula"
+"import.legacy" = "Gloss veri yükseltmesini işlem bütünlüğüyle önizle veya uygula"
 "import.preview" = "Yıkıcı olmayan bir eski hologram taşımasını önizle"
 item = "Özel eşya sağlayıcı araçları"
 "item.export" = "Özel eşya kataloğunu web editörü için dışa aktar"
@@ -294,6 +303,9 @@ web = "Gloss web düzenleyicisini aç ve yönet"
 "web.sessions.revoke" = "Web düzenleyicisinin erişim bağlantısını iptal et"
 "web.sessions.status" = "Bir web düzenleyicisi oturumunu göster"
 language = "Kendi dilinizi veya sunucunun varsayılan dilini seçin"
+
+"import.mode" = "preview veya apply"
+"import.overwrite" = "Mevcut dosyaların değiştirilmesini önizle"
 
 [command.help.arg]
 reset_name = "Sıfırlanacak ad veya tüm yerleşik varsayılanlar için *"
@@ -421,6 +433,9 @@ emoji = "&7Emoji: &f{enabled}&8/&f{total}"
 animations = "&7Animasyonlar: &f{count}"
 effects = "&7Balonlar: &f{bubbles} &8| &7Göstergeler: &f{indicators} &8| &7Düşen eşyalar: &f{drops}"
 
+visibility = "&7Görünür varlık kopyaları: &f{entities} &8| &7İzleyiciler: &f{viewers} &8| &7Kabuller: &f{admissions} &8| &7Retler: &f{refusals} &8| &7Bekleyen: &f{waiting} &8| &7Süresi dolan sıralar: &f{expired} &8| &7Bekleyen temizleme: &f{retiring}"
+images = "&7Görüntü önbelleği: &f{entries} &8| &7Bekleyen: &f{pending} &8| &7Saklanan veri: &f{bytes} &7bayt &8| &7Tamamlanan: &f{completed} &8| &7Retler: &f{refusals}"
+
 [command.reset]
 done = "&8[&dGloss&8] &a&f{count}&a yerleşik {kind} varsayılanı geri yüklendi."
 none = "&8[&dGloss&8] &c'&f{name}&c' ile eşleşen yerleşik {kind} varsayılanı yok."
@@ -433,12 +448,19 @@ style_unknown = "&8[&dGloss&8] &c'&f{style}&c' adında bir balon stili yok."
 [command.import]
 config_unreadable = "&8[&dGloss&8] &cgloss.toml yüklenemedi: &f{reason}"
 
+mode_invalid = "&8[&dGloss&8] &cİçe aktarma modu olarak preview veya apply kullanın."
+preview_capacity = "&8[&dGloss&8] &cİncelenen içe aktarmaların önbelleği dolu. Mevcut bir önizlemeyi uygulayın veya süresinin dolmasını bekleyip yeniden önizleyin."
+
 [command.import.holoui]
 missing = "&8[&dGloss&8] &cGloss veri klasörünün yanında holoui veri klasörü bulunamadı."
 done = "&8[&dGloss&8] &aHoloUi içe aktarımı tamamlandı: &f{copied}&a kopyalandı, &f{skipped}&a atlandı, &f{overlaid}&a yapılandırma anahtarı, &f{errors}&a hata."
 
+preview_required = "&8[&dGloss&8] &cÖnce /gloss import holoui mode=preview komutunu çalıştırın. Önizlemeler yapılandırılan süre boyunca geçerlidir. Mevcut dosyaların değiştirilmesini önizlemek için overwrite=true ekleyin."
+
 [command.import.legacy]
 done = "&8[&dGloss&8] &aEski veri taşıma tamamlandı: &f{migrated}&a taşındı, &f{absorbed}&a birleştirildi, &f{overlaid}&a yapılandırma anahtarı, &f{errors}&a hata."
+
+preview_required = "&8[&dGloss&8] &cÖnce /gloss import legacy mode=preview komutunu çalıştırın. Önizlemeler yapılandırılan süre boyunca geçerlidir."
 
 [director.help]
 no_subcommands = "Bu sayfada alt komut yok."
@@ -829,6 +851,7 @@ empty = "(boş)"
 # Lane message tables. Each lane appends its [gloss.message.<lane>] and [command.help.<group>]
 # tables inside its own anchor so parallel branches never share a line.
 # --- lane:screen ---
+
 [gloss.message.screen]
 "surfaces.empty" = "&8[&dGloss&8] &7Yüklü yüzey yok."
 "surfaces.unknown" = "&8[&dGloss&8]: &c&f{id}&c adında bir yüzey yok."
@@ -865,6 +888,7 @@ who = "Her HUD yuvasını hangi eklentinin tuttuğunu gösterir"
 "who.player" = "İncelenecek oyuncu; varsayılan sensin"
 
 # --- lane:chat ---
+
 [gloss.message.chat]
 filtered = "&8[&dGloss&8]: &cBir sohbet filtresi mesajını engelledi."
 too_fast = "&8[&dGloss&8]: &eBaşka bir mesaj göndermeden önce biraz bekle."
@@ -915,6 +939,7 @@ sample = "Bir sıralamayı çevrimiçi tüm oyuncular için şimdi örnekle"
 "sample.id" = "Belge kimliği"
 
 # --- lane:forms ---
+
 [gloss.message.forms]
 icon_unsupported = "&7Sandık yuvasında çizilemez ({kind})"
 no_inventories = "&8[&dGloss&8]: &7Yapılandırılmış sandık menüsü yok."
@@ -964,6 +989,7 @@ hologram_actions_header = "&8[&dGloss&8] &7Hologram &f{id}&7 eylemleri (&f{count
 hologram_actions_entry = "&8[&dGloss&8] &7  &f{kind}&7 uzerinde &f{value}"
 
 # --- lane:world ---
+
 [gloss.message.world]
 players_only = "&cBu komutu bir oyuncu çalıştırmalı."
 disabled = "&cBu özellik gloss.toml içinde kapalı."
@@ -1055,6 +1081,7 @@ color = "Adlandırılmış metin rengi"
 ticks = "Parlamanın süreceği tick sayısı veya korumak için 0"
 
 # --- lane:behaviors ---
+
 [command.help.behavior]
 root = "Davranis belgelerini incele ve calistir"
 list = "Yuklenen davranis belgelerini listele"
@@ -1119,6 +1146,7 @@ fired = "&8[&dGloss&8]: &a{id}&a belgesinin &f{line}&a numarali girdisi calistir
 "explain.missing" = "&8[&dGloss&8]: &c\"{id}\" adinda bir {kind} yok."
 
 # --- lane:authoring ---
+
 [command.help.pack]
 root = "Gloss paketlerini kur ve yönet"
 install = "Bir paketi dosyadan veya HTTPS adresinden kur"
@@ -1188,8 +1216,10 @@ preview = "&8[&dGloss&8] &f{source}&7 &f{count}&7 belge yazar."
 entry = "&8[&dGloss&8] &7{state} &f{path}&7 {reason}"
 applied = "&8[&dGloss&8] &f{source}&7 kaynağından &f{count}&7 belge içe aktarıldı."
 absent = "&8[&dGloss&8] &7&f{path}&7 konumunda &f{source}&7 verisi yok."
+preview_required = "&8[&dGloss&8] &cÖnce /gloss import preview {source} komutunu çalıştırın. Önizlemeler yapılandırılan süre boyunca geçerlidir."
 
 # --- lane:forge ---
+
 [gloss.message.forge]
 disabled = "&8[&dGloss&8] &cGlif atölyesi kapalı. gloss.toml içinde features.forge değerini true yapın."
 built = "&8[&dGloss&8] &a&f{value}&a paketi {count} glif ile derlendi."
@@ -1211,6 +1241,7 @@ serve = "Gömülü paket dinleyicisini başlat veya durdur"
 reset = "Birlikte gelen glif belgelerini geri yükle"
 
 # --- lane:fixes ---
+
 [gloss.message.fixes]
 status_bedrock = "&7bedrock: &f{name}&7, &f{count}&7 çevrimiçi"
 status_textimage_oversize = "&7textimage-çok-büyük: &f{count}"

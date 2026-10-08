@@ -1,6 +1,7 @@
 package art.arcane.gloss.hologram;
 
 import art.arcane.gloss.Gloss;
+import art.arcane.gloss.service.VisibilityGovernor;
 import art.arcane.gloss.GlossConfig;
 import art.arcane.gloss.animation.AnimationClip;
 import art.arcane.gloss.animation.AnimationMode;
@@ -130,6 +131,11 @@ final class CharacterizationHarness implements AutoCloseable {
             this.uuid = uuid;
         }
 
+        boolean effectivelyVisible(DisplayHandle display) {
+            Boolean applied = perceived.get(display.uuid);
+            return applied == null ? display.visibleByDefault == null || display.visibleByDefault : applied;
+        }
+
         /** Empty when no visibility dispatch ever reached this player for the display. */
         Boolean perceivedVisibility(DisplayHandle display) {
             return perceived.get(display.uuid);
@@ -218,6 +224,7 @@ final class CharacterizationHarness implements AutoCloseable {
             this.animations = new AnimationService(gloss);
 
             setDeclaredField(gloss, Gloss.class, "scheduler", scheduler);
+            setDeclaredField(gloss, Gloss.class, "governor", VisibilityGovernor.passthrough());
             setDeclaredField(gloss, Gloss.class, "config", config);
             setDeclaredField(gloss, Gloss.class, "text", text);
             setDeclaredField(gloss, Gloss.class, "animator", animator);
@@ -442,6 +449,22 @@ final class CharacterizationHarness implements AutoCloseable {
 
     List<HologramTick.Viewer> indexedViewers(Location anchor, double range) {
         return viewerIndex().nearby(anchor, range);
+    }
+
+    void enabled(boolean enabled) {
+        try {
+            setDeclaredField(gloss, JavaPlugin.class, "isEnabled", enabled);
+        } catch (ReflectiveOperationException failure) {
+            throw new IllegalStateException(failure);
+        }
+    }
+
+    void governor(VisibilityGovernor governor) {
+        try {
+            setDeclaredField(gloss, Gloss.class, "governor", governor);
+        } catch (ReflectiveOperationException failure) {
+            throw new IllegalStateException(failure);
+        }
     }
 
     void reconcileViewers() {

@@ -8,6 +8,7 @@ import art.arcane.gloss.condition.ConditionSource;
 import art.arcane.gloss.condition.ShowCondition;
 import art.arcane.gloss.doc.DocumentEnvelope;
 import art.arcane.gloss.doc.DocumentParsers;
+import art.arcane.gloss.hologram.DisplayRefresh;
 import org.bukkit.util.Vector;
 
 import java.util.HashSet;
@@ -76,14 +77,22 @@ public record DamageIndicatorSettingsDoc(
         return DocumentParsers.parseJson(fileName, raw, DamageIndicatorSettingsDoc.class);
     }
 
-    public record Limits(Integer maxPerSecond, Long lifetimeMs, Double minimumDelta, Integer decimals, Double viewRange, Long debounceMs) {
+    public record Limits(Integer maxPerSecond, Long lifetimeMs, Double minimumDelta, Integer decimals, Double viewRange,
+                         Long debounceMs, Integer aggregationTicks, Integer maxPendingSamples) {
         public Limits {
+            aggregationTicks = clamp(aggregationTicks, 1, 200, 2);
+            maxPendingSamples = clamp(maxPendingSamples, 1, 16384, 256);
             viewRange = clamp(viewRange, 4.0D, 128.0D, 48.0D);
             debounceMs = clamp(debounceMs, 0L, 60000L, 150L);
             maxPerSecond = clamp(maxPerSecond, 1, 1000, 40);
             lifetimeMs = clamp(lifetimeMs, 250L, 30000L, 3000L);
             minimumDelta = clamp(minimumDelta, 0.0D, 1000.0D, 0.009D);
             decimals = clamp(decimals, 0, 4, 0);
+        }
+
+        public Limits(Integer maxPerSecond, Long lifetimeMs, Double minimumDelta, Integer decimals,
+                      Double viewRange, Long debounceMs) {
+            this(maxPerSecond, lifetimeMs, minimumDelta, decimals, viewRange, debounceMs, null, null);
         }
     }
 
@@ -107,13 +116,20 @@ public record DamageIndicatorSettingsDoc(
 
     public record IndicatorPresentation(String format, Vector offset, Motion motion,
                                         Transform transform, List<ParticleLayer> particleLayers,
-                                        IconDisplayStyle style, HologramBox box) {
+                                        IconDisplayStyle style, HologramBox box, DisplayRefresh refresh) {
         public IndicatorPresentation {
+            refresh = DisplayRefresh.resolve(refresh);
             offset = normalizeOffset(offset);
             particleLayers = particleLayers == null ? null
                 : ParticleLayer.copyLayers(particleLayers, "damage-indicator presentation");
             style = style == null ? IconDisplayStyle.hologramDefaults() : style;
             box = box == null ? HologramBox.defaults() : box;
+        }
+
+        public IndicatorPresentation(String format, Vector offset, Motion motion,
+                                     Transform transform, List<ParticleLayer> particleLayers,
+                                     IconDisplayStyle style, HologramBox box) {
+            this(format, offset, motion, transform, particleLayers, style, box, null);
         }
 
         @Override
@@ -187,7 +203,7 @@ public record DamageIndicatorSettingsDoc(
             motion,
             transform,
             source.particleLayers() == null ? defaults.particleLayers() : source.particleLayers(),
-            source.style(), source.box());
+            source.style(), source.box(), source.refresh());
     }
 
     private static Motion resolveMotion(Motion source, Motion defaults) {

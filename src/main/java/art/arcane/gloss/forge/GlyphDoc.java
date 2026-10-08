@@ -18,7 +18,8 @@ import java.util.regex.Pattern;
  * so a document can be reordered or rewritten without renumbering anything.
  */
 public record GlyphDoc(int schemaVersion, long revision, String namespace, String font,
-                       List<Glyph> glyphs, Space space, List<Overlay> overlays) {
+                       List<Glyph> glyphs, Space space, List<Overlay> overlays,
+                       List<WaypointStyleAsset> waypointStyles) {
     public static final String KIND = "glyphs";
     public static final int CURRENT_SCHEMA_VERSION = 1;
     public static final String DEFAULT_NAMESPACE = "gloss";
@@ -38,6 +39,11 @@ public record GlyphDoc(int schemaVersion, long revision, String namespace, Strin
     public static final GlyphDoc DEFAULTS =
         new GlyphDoc(CURRENT_SCHEMA_VERSION, DocumentEnvelope.INITIAL_REVISION, null, null, null, null, null);
 
+    public GlyphDoc(int schemaVersion, long revision, String namespace, String font,
+                    List<Glyph> glyphs, Space space, List<Overlay> overlays) {
+        this(schemaVersion, revision, namespace, font, glyphs, space, overlays, List.of());
+    }
+
     public GlyphDoc {
         DocumentEnvelope.requireSchemaVersion(KIND, schemaVersion, CURRENT_SCHEMA_VERSION);
         DocumentEnvelope.requireRevision(KIND, revision);
@@ -47,6 +53,16 @@ public record GlyphDoc(int schemaVersion, long revision, String namespace, Strin
         overlays = overlays == null ? List.of() : List.copyOf(overlays);
         space = space == null ? Space.DEFAULT : space;
         requireDistinctIds(glyphs, overlays);
+        waypointStyles = waypointStyles == null ? List.of() : List.copyOf(waypointStyles);
+        if (waypointStyles.size() > 128) {
+            throw new IllegalArgumentException("A glyph document may declare at most 128 waypoint styles");
+        }
+        Set<String> styleIds = new HashSet<>();
+        for (WaypointStyleAsset style : waypointStyles) {
+            if (!styleIds.add(style.id())) {
+                throw new IllegalArgumentException("Duplicate waypoint style: " + style.id());
+            }
+        }
     }
 
     public static GlyphDoc parse(String fileName, String raw) {
@@ -175,6 +191,30 @@ public record GlyphDoc(int schemaVersion, long revision, String namespace, Strin
             if (!ANCHORS.contains(anchor)) {
                 throw new IllegalArgumentException("overlay anchor must be top, center or bottom: " + anchor);
             }
+        }
+    }
+
+    public record WaypointStyleAsset(String id, Double nearDistance, Double farDistance,
+                                     List<WaypointSprite> sprites) {
+        public WaypointStyleAsset {
+            id = requireId(id);
+            nearDistance = nearDistance == null ? 128.0D : nearDistance;
+            farDistance = farDistance == null ? 332.0D : farDistance;
+            if (!Double.isFinite(nearDistance) || !Double.isFinite(farDistance)
+                || nearDistance < 0 || farDistance <= nearDistance) {
+                throw new IllegalArgumentException("Waypoint style distances require 0 <= nearDistance < farDistance");
+            }
+            sprites = sprites == null ? List.of() : List.copyOf(sprites);
+            if (sprites.isEmpty() || sprites.size() > 64) {
+                throw new IllegalArgumentException("Waypoint styles require 1 to 64 sprites");
+            }
+        }
+    }
+
+    public record WaypointSprite(String id, String image) {
+        public WaypointSprite {
+            id = requireId(id);
+            image = requireImage(image);
         }
     }
 

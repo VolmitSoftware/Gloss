@@ -23,8 +23,9 @@ public final class CompositorDelivery implements SurfaceDelivery {
     private final Gloss plugin;
     private final HudBossBarLane bossBars;
     private final HudTitleService titles;
-    private final Map<UUID, TitleQueue> queues = new ConcurrentHashMap<>();
+    private final Map<UUID, SurfaceQueue<TitleRequest>> queues = new ConcurrentHashMap<>();
     private final Map<UUID, HudTitleClaim> titleClaims = new ConcurrentHashMap<>();
+    private final Map<UUID, SurfaceQueue.Active<TitleRequest>> presented = new ConcurrentHashMap<>();
 
     public CompositorDelivery(Gloss plugin) {
         this.plugin = plugin;
@@ -41,6 +42,7 @@ public final class CompositorDelivery implements SurfaceDelivery {
         titles.shutdown();
         queues.clear();
         titleClaims.clear();
+        presented.clear();
     }
 
     @Override
@@ -62,6 +64,13 @@ public final class CompositorDelivery implements SurfaceDelivery {
     }
 
     @Override
+    public boolean bossBar(Player viewer, String laneId, BossBarOptions options) {
+        return bossBars.show(viewer, laneId, new HudBossBarLane.Options(options.priority(), options.title(),
+            options.progress(), options.color(), options.style(), options.staleMillis(),
+            plugin.cfg().modules().surfaces().maxBossBarsPerViewer(), options.flags()));
+    }
+
+    @Override
     public void hideBossBar(Player viewer, String laneId) {
         bossBars.hide(viewer, laneId);
     }
@@ -69,10 +78,12 @@ public final class CompositorDelivery implements SurfaceDelivery {
     @Override
     public void title(Player viewer, String purpose, int priority, String title, String subtitle, int fadeInTicks,
                       int stayTicks, int fadeOutTicks) {
-        TitleQueue queue = queues.computeIfAbsent(viewer.getUniqueId(),
-            key -> new TitleQueue(plugin.cfg().modules().surfaces().titleQueueLimit()));
-        queue.offer(new TitleQueue.TitleRequest(purpose, priority, title, subtitle, fadeInTicks, stayTicks,
-            fadeOutTicks));
+        SurfaceQueue<TitleRequest> queue = queues.computeIfAbsent(viewer.getUniqueId(), key -> new SurfaceQueue<>());
+        TitleRequest request = new TitleRequest(purpose, priority, title, subtitle, fadeInTicks, stayTicks, fadeOutTicks);
+        SurfaceDispatchPolicy policy = new SurfaceDispatchPolicy("queue", "higher",
+            plugin.cfg().modules().surfaces().titleQueueLimit(), "drop-oldest", 0, "content", Math.min(72000, request.durationTicks()));
+        queue.offer(new SurfaceQueue.Request<>(purpose, title + "\u0000" + subtitle, priority,
+            request.durationTicks(), policy, request), now());
         drain(viewer, queue);
     }
 
@@ -83,14 +94,15 @@ public final class CompositorDelivery implements SurfaceDelivery {
      */
     @Override
     public void clearTitle(Player viewer, String purpose) {
-        TitleQueue queue = queues.get(viewer.getUniqueId());
+        SurfaceQueue<TitleRequest> queue = queues.get(viewer.getUniqueId());
         if (queue != null) {
-            queue.drop(purpose);
+            queue.remove(request -> request.purpose().equals(purpose));
         }
         HudTitleClaim held = titleClaims.get(viewer.getUniqueId());
         if (held != null && held.purpose().equals(purpose)
             && titleClaims.remove(viewer.getUniqueId(), held)) {
             held.release();
+            presented.remove(viewer.getUniqueId());
         }
         if (queue != null) {
             drain(viewer, queue);
@@ -99,10 +111,11 @@ public final class CompositorDelivery implements SurfaceDelivery {
 
     @Override
     public void forget(UUID viewerId) {
-        TitleQueue queue = queues.remove(viewerId);
+        SurfaceQueue<TitleRequest> queue = queues.remove(viewerId);
         if (queue != null) {
             queue.clear();
         }
+        presented.remove(viewerId);
         HudTitleClaim held = titleClaims.remove(viewerId);
         if (held != null) {
             held.retire();
@@ -115,23 +128,61 @@ public final class CompositorDelivery implements SurfaceDelivery {
         titles.clear(viewer);
     }
 
-    private void drain(Player viewer, TitleQueue queue) {
-        TitleQueue.TitleRequest head = queue.peek();
-        if (head == null) {
+    public void tick(Player viewer) {
+        SurfaceQueue<TitleRequest> queue = queues.get(viewer.getUniqueId());
+        if (queue != null) {
+            drain(viewer, queue);
+        }
+    }
+
+    private void drain(Player viewer, SurfaceQueue<TitleRequest> queue) {
+        SurfaceQueue.Active<TitleRequest> active = queue.advance(now());
+        UUID id = viewer.getUniqueId();
+        if (active == presented.get(id)) {
             return;
         }
-        HudTitleClaim held = titleClaims.remove(viewer.getUniqueId());
+        HudTitleClaim held = titleClaims.remove(id);
         if (held != null) {
             held.release();
         }
-        HudTitleClaim claim = titles.open(viewer, head.purpose(), head.priority(), head.ttlMillis(),
-            preempted -> {
-            });
-        if (claim.show(head.title(), head.subtitle(), head.fadeInTicks(), head.stayTicks(), head.fadeOutTicks())) {
-            queue.poll();
-            titleClaims.put(viewer.getUniqueId(), claim);
+        presented.remove(id);
+        if (active == null) {
             return;
         }
-        queue.dropStaleHead();
+        TitleRequest head = active.request().value();
+        HudTitleClaim claim = titles.open(viewer, head.purpose(), head.priority(),
+            Math.max(1, active.endsAt() - now()) * 50L, preempted -> {
+                titleClaims.remove(id, preempted);
+                presented.remove(id, active);
+            });
+        TitleTiming timing = TitleTiming.remaining(new TitleTiming(head.fadeInTicks(), head.stayTicks(), head.fadeOutTicks()),
+            Math.max(0, now() - active.startedAt()));
+        if (claim.show(head.title(), head.subtitle(), timing.fadeIn(), timing.stay(), timing.fadeOut())) {
+            titleClaims.put(id, claim);
+            presented.put(id, active);
+        } else {
+            claim.release();
+        }
+    }
+
+    private static long now() {
+        return System.nanoTime() / 50_000_000L;
+    }
+
+    record TitleTiming(int fadeIn, int stay, int fadeOut) {
+        static TitleTiming remaining(TitleTiming original, long elapsed) {
+            int fadeIn = (int) Math.max(0, original.fadeIn() - elapsed);
+            long afterFade = Math.max(0, elapsed - original.fadeIn());
+            int stay = (int) Math.max(0, original.stay() - afterFade);
+            int fadeOut = (int) Math.max(0, original.fadeOut() - Math.max(0, afterFade - original.stay()));
+            return new TitleTiming(fadeIn, stay, fadeOut);
+        }
+    }
+
+    private record TitleRequest(String purpose, int priority, String title, String subtitle,
+                                int fadeInTicks, int stayTicks, int fadeOutTicks) {
+        private int durationTicks() {
+            return Math.max(1, fadeInTicks + stayTicks + fadeOutTicks);
+        }
     }
 }

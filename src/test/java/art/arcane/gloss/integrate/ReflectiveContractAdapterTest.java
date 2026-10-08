@@ -6,10 +6,14 @@ import art.arcane.volmlib.integration.IntegrationHandshakeRequest;
 import art.arcane.volmlib.integration.IntegrationHandshakeResponse;
 import art.arcane.volmlib.integration.IntegrationMetricDescriptor;
 import art.arcane.volmlib.integration.IntegrationMetricSample;
+import art.arcane.volmlib.integration.IntegrationMetricSnapshot;
+import art.arcane.volmlib.integration.IntegrationSnapshotProvider;
 import art.arcane.volmlib.integration.IntegrationMetricType;
 import art.arcane.volmlib.integration.IntegrationProtocolVersion;
 import org.junit.jupiter.api.Test;
 
+import java.util.AbstractMap;
+import java.util.List;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
@@ -134,7 +138,95 @@ class ReflectiveContractAdapterTest {
             () -> ReflectiveContractAdapter.create(new RelocatedProvider("adapt", true), "com.example.NotAContract"));
     }
 
-    public static final class MalformedProvider implements IntegrationServiceContract {
+    @Test
+    void requestedKeysAreConvertedWithoutTraversingProviderResponse() {
+        RequestedOnlyProvider provider = new RequestedOnlyProvider();
+        ReflectiveContractAdapter adapter = ReflectiveContractAdapter.create(provider, RelocatedProvider.SERVICE_CLASS_NAME);
+        assertEquals(7D, adapter.sampleMetrics(Set.of("bad.integral")).get("bad.integral").valueOr(0));
+        assertEquals(1, provider.legacyCalls);
+        assertFalse(adapter.supportsSnapshotMetrics());
+    }
+
+    @Test
+    void snapshotCapabilityAndCaptureSequenceCrossTheRelocationBoundary() {
+        ForeignSnapshotProvider provider = new ForeignSnapshotProvider();
+        ReflectiveContractAdapter adapter = ReflectiveContractAdapter.create(provider,
+            "foreign.integration.IntegrationSnapshotProvider");
+        assertTrue(adapter.supportsSnapshotMetrics());
+        assertTrue(adapter.snapshotMetrics(Set.of()).samples().isEmpty());
+        IntegrationMetricSnapshot snapshot = adapter.snapshotMetrics(Set.of("bad.integral"));
+        assertEquals(7, snapshot.generation());
+        assertEquals(100, snapshot.capturedAtMs());
+        assertEquals(90, snapshot.samples().get("bad.integral").sampledAtMs());
+        IntegrationBridge bridge = new IntegrationBridge("gloss", "1", new MetricReferences(8, 1000));
+        bridge.adopt(List.of(adapter));
+        bridge.render("bad.integral", 100);
+        bridge.sample(100);
+        assertEquals("7", bridge.render("bad.integral", 100));
+        assertEquals(IntegrationBridge.SamplingMode.SNAPSHOT, bridge.samplingModes().get("broken"));
+        assertEquals(0, ((RequestedOnlyProvider) provider).legacyCalls);
+    }
+
+    @Test
+    void rewrappingSameForeignProviderPreservesItsAcceptedCaptureSequence() {
+        ForeignSnapshotProvider provider = new ForeignSnapshotProvider();
+        IntegrationBridge bridge = new IntegrationBridge("gloss", "1", new MetricReferences(8, 1000));
+        bridge.adopt(List.of(ReflectiveContractAdapter.create(provider, RelocatedProvider.SERVICE_CLASS_NAME)));
+        bridge.render("bad.integral", 100);
+        bridge.sample(100);
+        provider.generation = 6;
+        bridge.adopt(List.of(ReflectiveContractAdapter.create(provider, RelocatedProvider.SERVICE_CLASS_NAME)));
+        bridge.sample(101);
+        assertTrue(bridge.published().isEmpty());
+    }
+
+    public static class RequestedOnlyProvider extends MalformedProvider {
+        private int legacyCalls;
+
+        @Override
+        public Map<String, Sample> sampleMetrics(Set<String> keys) {
+            legacyCalls++;
+            return guardedSamples();
+        }
+
+        protected Map<String, Sample> guardedSamples() {
+            return new AbstractMap<>() {
+                @Override
+                public boolean containsKey(Object key) {
+                    return "bad.integral".equals(key);
+                }
+
+                @Override
+                public Sample get(Object key) {
+                    return containsKey(key) ? new Sample(new Descriptor("bad.integral", Type.LONG, "", Map.of()),
+                        7D, true, 90, "") : null;
+                }
+
+                @Override
+                public Set<Entry<String, Sample>> entrySet() {
+                    throw new AssertionError("Unrequested response entries must not be traversed");
+                }
+            };
+        }
+    }
+
+    public static final class ForeignSnapshotProvider extends RequestedOnlyProvider {
+        private long generation = 7;
+
+        @Override
+        public Set<String> capabilities() {
+            return Set.of("metrics", IntegrationSnapshotProvider.CAPABILITY);
+        }
+
+        public ForeignSnapshot snapshotMetrics(Set<String> keys) {
+            return new ForeignSnapshot(generation, 100, guardedSamples());
+        }
+    }
+
+    public record ForeignSnapshot(long generation, long capturedAtMs, Map<String, IntegrationServiceContract.Sample> samples) {
+    }
+
+    public static class MalformedProvider implements IntegrationServiceContract {
         @Override
         public String pluginId() {
             return "broken";

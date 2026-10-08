@@ -9,6 +9,14 @@
     "anchor"
   ],
   "properties": {
+    "preset": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1,
+      "description": "Named preset from this collection in presets.json; document fields override inherited values."
+    },
     "schemaVersion": {
       "type": "integer",
       "const": 3
@@ -108,6 +116,9 @@
       },
       "default": [],
       "description": "First matching presentation by descending priority, then id. Omitted fields inherit the base presentation."
+    },
+    "refresh": {
+      "$ref": "#/$defs/displayRefresh"
     }
   },
   "$defs": {
@@ -737,6 +748,30 @@
         }
       },
       "additionalProperties": false
+    },
+    "displayRefresh": {
+      "type": "object",
+      "description": "Independent display refresh intervals. Omitted fields retain the surface default cadence.",
+      "properties": {
+        "contentTicks": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1200,
+          "description": "Text content refresh interval; animation frames retain their own clock."
+        },
+        "visibilityTicks": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1200,
+          "description": "Visibility and presentation condition interval."
+        },
+        "motionTicks": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1200,
+          "description": "Motion-binding or persistent object and box refresh interval."
+        }
+      }
     }
   }
 }

@@ -29,6 +29,11 @@ public final class SessionActionContext implements ActionContext {
   }
 
   @Override
+  public boolean current() {
+    return session.isActive();
+  }
+
+  @Override
   public String menuId() {
     return session.getId();
   }

@@ -50,7 +50,7 @@ class HologramVisibilityReconcileTest {
     }
 
     @Test
-    void blacklistBookkeepingIsBoundedToTheMembers() {
+    void visibilityBookkeepingTracksOnlyNearbyViewers() {
         TemporaryHologramDisplay temporary = spawned("t-bounded");
         temporary.viewers().add(bob.uuid);
         temporary.drive(true);
@@ -58,14 +58,14 @@ class HologramVisibilityReconcileTest {
 
         DisplayHandle display = harness.onlySpawned(world);
         Map<UUID, Boolean> applied = harness.appliedVisibility(temporary);
-        assertEquals(1, applied.size(), "only blacklisted members belong in the applied set");
+        assertEquals(3, applied.size(), "each nearby viewer has an explicit admission decision");
         assertEquals(Boolean.FALSE, applied.get(bob.uuid));
-        assertNull(alice.perceivedVisibility(display), "non-members must never receive a visibility dispatch");
-        assertNull(cara.perceivedVisibility(display));
+        assertTrue(alice.effectivelyVisible(display));
+        assertTrue(cara.effectivelyVisible(display));
     }
 
     @Test
-    void blacklistRemovalUnhidesAndDropsTheAppliedEntry() {
+    void blacklistRemovalUnhidesAndRetainsTheAdmittedViewer() {
         TemporaryHologramDisplay temporary = spawned("t-drop");
         temporary.viewers().add(bob.uuid);
         temporary.drive(true);
@@ -75,7 +75,7 @@ class HologramVisibilityReconcileTest {
 
         DisplayHandle display = harness.onlySpawned(world);
         assertEquals(Boolean.TRUE, bob.perceivedVisibility(display), "the former member must be shown again");
-        assertTrue(harness.appliedVisibility(temporary).isEmpty(), "the applied set must not retain former members");
+        assertEquals(Boolean.TRUE, harness.appliedVisibility(temporary).get(bob.uuid));
     }
 
     @Test
@@ -94,21 +94,16 @@ class HologramVisibilityReconcileTest {
         DisplayHandle display = harness.onlySpawned(world);
         assertEquals(rosterScans, harness.onlinePlayerQueries.get(),
             "a visibility reset must not walk the online roster");
-        assertEquals(Boolean.TRUE, display.visibleByDefault,
-            "the blacklist default carries every non-member");
-        assertEquals(Boolean.FALSE, alice.perceivedVisibility(display));
-        assertNull(bob.perceivedVisibility(display), "non-members must not be dispatched to");
-        assertNull(cara.perceivedVisibility(display));
-        assertEquals(Map.of(alice.uuid, Boolean.FALSE), harness.appliedVisibility(temporary),
-            "only the members belong in the applied set after a reset");
+        assertEquals(Boolean.FALSE, display.visibleByDefault);
+        assertFalse(alice.effectivelyVisible(display));
+        assertTrue(bob.effectivelyVisible(display));
+        assertTrue(cara.effectivelyVisible(display));
+        assertEquals(Map.of(alice.uuid, false, bob.uuid, true, cara.uuid, true),
+            harness.appliedVisibility(temporary));
     }
 
-    /**
-     * Flipping the default visibility inverts every per-player override that is already in place,
-     * so a reset must re-dispatch to the players who carry one even when the recorded value matches.
-     */
     @Test
-    void aVisibilityResetRedispatchesToPlayersCarryingAnOverride() {
+    void aVisibilityResetKeepsTheDefaultHiddenAndPreservesUnchangedOverrides() {
         TemporaryHologramDisplay temporary = spawned("t-invert");
         temporary.viewers().add(bob.uuid);
         temporary.drive(true);
@@ -121,14 +116,14 @@ class HologramVisibilityReconcileTest {
         temporary.drive(true);
 
         assertEquals(Boolean.FALSE, display.visibleByDefault);
-        assertTrue(bob.hideCallsFor(display) > hides,
-            "the former member's override must be re-dispatched under the new default");
-        assertFalse(harness.appliedVisibility(temporary).containsKey(bob.uuid));
+        assertEquals(hides, bob.hideCallsFor(display));
+        assertFalse(bob.effectivelyVisible(display));
+        assertEquals(Boolean.FALSE, harness.appliedVisibility(temporary).get(bob.uuid));
         assertEquals(Boolean.TRUE, alice.perceivedVisibility(display));
     }
 
     @Test
-    void aWhitelistResetShowsEveryMemberEvenWhenItWasAlreadyShown() {
+    void aWhitelistResetDoesNotResendUnchangedAdmission() {
         TemporaryHologramDisplay temporary = harness.temporary("t-white-reset",
             harness.at(world, 0.5D, 64.0D, 0.5D), 60_000L);
         temporary.setLines(List.of("hi"));
@@ -146,8 +141,8 @@ class HologramVisibilityReconcileTest {
         temporary.drive(true);
 
         assertEquals(Boolean.FALSE, display.visibleByDefault);
-        assertTrue(alice.showCallsFor(display) > shows,
-            "a member must be re-shown after the default is re-applied");
+        assertEquals(shows, alice.showCallsFor(display));
+        assertTrue(alice.effectivelyVisible(display));
         assertNull(bob.perceivedVisibility(display));
     }
 

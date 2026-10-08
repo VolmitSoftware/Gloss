@@ -46,12 +46,28 @@ class MetricReferencesTest {
         references.reference("b", 20L);
         references.reference("c", 30L);
 
+        assertEquals(2, references.tracked());
+        assertEquals(1, references.evictions());
         Set<String> active = references.active(30L);
         assertEquals(2, active.size());
         assertTrue(active.contains("c"));
         assertTrue(active.contains("b"));
         assertFalse(active.contains("a"));
         assertEquals(2, references.tracked());
+    }
+
+    @Test
+    void refreshingAKeyProtectsItAndLoweredCapacityAppliesImmediately() {
+        MetricReferences references = new MetricReferences(2, 10000L);
+        references.reference("a", 0);
+        references.reference("b", 1);
+        references.reference("a", 2);
+        references.reference("c", 3);
+        assertEquals(Set.of("a", "c"), references.active(3));
+        references.configure(1, 10);
+        assertEquals(1, references.tracked());
+        assertEquals(Set.of("c"), references.active(3));
+        assertTrue(references.active(14).isEmpty());
     }
 
     @Test

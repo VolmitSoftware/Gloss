@@ -1,76 +1,86 @@
 package art.arcane.gloss.importer;
 
 import art.arcane.gloss.Gloss;
+import art.arcane.gloss.GlossConfig;
 import art.arcane.gloss.config.GlossConfigFile;
 import art.arcane.gloss.config.GlossConfigLoader;
+import art.arcane.gloss.config.MenuComponentData;
+import art.arcane.gloss.config.MenuDefinitionData;
+import art.arcane.gloss.config.action.MenuActionData;
+import art.arcane.gloss.config.components.ButtonComponentData;
+import art.arcane.gloss.config.components.ComponentData;
+import art.arcane.gloss.config.components.ListComponentData;
+import art.arcane.gloss.config.components.ToggleComponentData;
+import art.arcane.gloss.config.menu.MenuDocument;
+import art.arcane.gloss.doc.DocumentHashes;
+import art.arcane.gloss.history.HistoryKinds;
+import art.arcane.gloss.lint.Diagnostic;
+import art.arcane.gloss.lint.ImageRule;
+import art.arcane.gloss.lint.LintContext;
+import art.arcane.gloss.lint.LintRule;
+import art.arcane.gloss.lint.NavigateTargetRule;
+import art.arcane.gloss.lint.PanelRootRule;
+import art.arcane.gloss.panel.PanelDefinition;
+import art.arcane.gloss.persistence.GlossPersistenceCoordinator;
+import art.arcane.gloss.persistence.GlossProjectTransaction;
+import art.arcane.volmlib.util.config.TomlCodec;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.google.gson.JsonPrimitive;
+import org.apache.commons.imaging.Imaging;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Comparator;
-import java.util.EnumMap;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
+import java.util.TreeMap;
+import java.util.UUID;
 import java.util.function.Consumer;
-import java.util.stream.Stream;
 
 /**
- * One-shot COPY of a retired {@code plugins/holoui} data folder into the Gloss data folder. The
- * source directory is never modified; every touched path lands in the {@code holoui-import.json}
- * receipt, whose presence makes the boot-time run a no-op. {@code /gloss import holoui} re-runs
- * with force semantics (overwrites previously imported files, still never touches the source).
- *
- * <p>Mapping: {@code menus/**} and {@code images/**} copy verbatim, {@code boards/**} copies to
- * {@code panels/**} (byte-compatible contract), {@code previews/*.json} copy with their
- * {@code lang()} keys rewritten from {@code holoui.preview.*} to {@code gloss.preview.*} unless
- * the rewritten bytes are identical to a shipped default (those re-extract anyway; the receipt
- * disposition detail notes the rewrite), {@code preview-scales.json} copies verbatim,
- * and {@code settings.json} overlays its flat keys onto the
- * just-loaded {@link GlossConfigFile} before re-serializing {@code gloss.toml} through the loader
- * so comments regenerate. Editor sync sessions, transactions, and backups are secrets and never
- * copy; {@code custom-items.json} is regenerable and never copies either.
+ * Prepares HoloUi content against captured source and destination bytes. Validated changes and
+ * their receipt commit together; the source folder and editor credentials remain untouched.
  */
 public final class HoloUiDataImporter {
     public static final String RECEIPT_FILE_NAME = "holoui-import.json";
-    public static final int RECEIPT_SCHEMA_VERSION = 1;
+    public static final int RECEIPT_SCHEMA_VERSION = 2;
 
-    static final String CATEGORY_MENUS = "menus";
-    static final String CATEGORY_IMAGES = "images";
-    static final String CATEGORY_PANELS = "panels";
-    static final String CATEGORY_PREVIEWS = "previews";
-    static final String CATEGORY_FILES = "files";
-    static final String CATEGORY_CONFIG = "config";
-    static final String CATEGORY_SECRETS = "secrets";
+    private static final Gson JSON = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();
+    private static final List<String> COLLECTIONS = List.of("menus", "images", "boards", "previews");
+    private static final Set<String> SECRETS = Set.of("editor-sync-sessions.json", "editor-sync-transactions",
+        "editor-sync-backups", "custom-items.json");
+    private static final Set<String> SETTING_KEYS = Set.of("debugHitbox", "debugPosition", "builderUrl",
+        "editorSyncEnabled", "editorSyncCreateToken", "editorSyncSessionMinutes", "editorSyncPollSeconds",
+        "editorSyncMaxProjectMiB", "previewEnabled", "previewLookDistance", "previewScale", "uiScale",
+        "customItems", "customItemProviders");
 
-    private static final String[] SOURCE_DIRECTORY_NAMES = {"holoui", "HoloUi"};
-    private static final String JSON_EXTENSION = ".json";
-    private static final String SHIPPED_PREVIEW_RESOURCE_ROOT = "/previews/";
-    private static final String LEGACY_PREVIEW_LANG_PREFIX = "holoui.preview.";
-    private static final String PREVIEW_LANG_PREFIX = "gloss.preview.";
-    private static final String PREVIEW_LANG_REWRITE_DETAIL =
-        "lang keys rewritten " + LEGACY_PREVIEW_LANG_PREFIX + "* -> " + PREVIEW_LANG_PREFIX + "*";
-    private static final Gson RECEIPT_GSON = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();
+    private final Path root;
+    private final Services services;
 
-    private final File dataFolder;
-    private final GlossConfigLoader configLoader;
+    public record Services(GlossConfigLoader configLoader, GlossProjectTransaction transaction,
+                           GlossPersistenceCoordinator coordinator) {
+        public Services {
+            Objects.requireNonNull(configLoader, "configLoader");
+            Objects.requireNonNull(transaction, "transaction");
+            Objects.requireNonNull(coordinator, "coordinator");
+        }
+    }
 
-    public record Result(boolean sourcePresent, String sourcePath, List<HoloUiImportEntry> entries) {
+    public record Result(boolean sourcePresent, String sourcePath, List<HoloUiImportEntry> entries,
+                         String backupPath, boolean applied) {
         public Result {
             entries = List.copyOf(entries);
         }
@@ -80,25 +90,68 @@ public final class HoloUiDataImporter {
         }
     }
 
-    public HoloUiDataImporter(File dataFolder, GlossConfigLoader configLoader) {
-        this.dataFolder = Objects.requireNonNull(dataFolder, "dataFolder").getAbsoluteFile();
-        this.configLoader = Objects.requireNonNull(configLoader, "configLoader");
+    public static final class Plan {
+        private final HoloUiDataImporter owner;
+        private final Path root;
+        private final Path source;
+        private final List<HoloUiImportEntry> entries;
+        private final PreparedImport preparation;
+
+        private Plan(HoloUiDataImporter owner, Draft draft) {
+            this.owner = owner;
+            this.root = draft.root;
+            this.source = draft.source;
+            this.entries = List.copyOf(draft.entries);
+            this.preparation = draft.preparation;
+        }
+
+        public boolean sourcePresent() {
+            return source != null;
+        }
+
+        public String sourcePath() {
+            return source == null ? null : source.toString();
+        }
+
+        public List<HoloUiImportEntry> entries() {
+            return entries;
+        }
+
+        public long retainedBytes() {
+            return preparation.retainedBytes();
+        }
+
+        public List<String> targets() {
+            return preparation.targets();
+        }
+
+        public boolean ready() {
+            return sourcePresent() && entries.stream().noneMatch(entry -> switch (entry.disposition()) {
+                case ERROR, CONFLICT, UNSUPPORTED -> true;
+                default -> false;
+            });
+        }
+    }
+
+    public HoloUiDataImporter(File dataFolder, Services services) {
+        this.root = Objects.requireNonNull(dataFolder, "dataFolder").toPath().toAbsolutePath().normalize();
+        this.services = Objects.requireNonNull(services, "services");
     }
 
     public File receiptFile() {
-        return new File(dataFolder, RECEIPT_FILE_NAME);
+        return root.resolve(RECEIPT_FILE_NAME).toFile();
     }
 
     /** The {@code holoui} (or {@code HoloUi}) directory beside the Gloss data folder, or null. */
     public File sourceDirectory() {
-        File parent = dataFolder.getParentFile();
+        Path parent = root.getParent();
         if (parent == null) {
             return null;
         }
-        for (String name : SOURCE_DIRECTORY_NAMES) {
-            File candidate = new File(parent, name);
-            if (candidate.isDirectory()) {
-                return candidate;
+        for (String name : List.of("holoui", "HoloUi")) {
+            Path source = parent.resolve(name);
+            if (Files.isDirectory(source, LinkOption.NOFOLLOW_LINKS)) {
+                return source.toFile();
             }
         }
         return null;
@@ -109,304 +162,522 @@ public final class HoloUiDataImporter {
         return !receiptFile().exists() && sourceDirectory() != null;
     }
 
-    public Result run(GlossConfigFile config, boolean force) {
-        Objects.requireNonNull(config, "config");
-        File source = sourceDirectory();
-        if (source == null) {
-            return new Result(false, null, List.of());
-        }
-        List<HoloUiImportEntry> entries = new ArrayList<>();
-        copyTree(new File(source, "menus"), new File(dataFolder, "menus"), CATEGORY_MENUS, "menus/", true, force, entries);
-        copyTree(new File(source, "images"), new File(dataFolder, "images"), CATEGORY_IMAGES, "images/", false, force, entries);
-        copyTree(new File(source, "boards"), new File(dataFolder, "panels"), CATEGORY_PANELS, "boards/", true, force, entries);
-        copyPreviews(source, force, entries);
-        copyRootFile(source, "preview-scales.json", force, entries);
-        recordSecrets(source, entries);
-        overlaySettings(source, config, entries);
-        writeReceipt(source, force, entries);
-        logSummary(source, entries);
-        return new Result(true, source.getAbsolutePath(), entries);
+    public Plan preview(boolean overwrite) {
+        return preview(overwrite, GlossConfig.current().imports());
     }
 
-    private void copyTree(File sourceRoot, File targetRoot, String category, String reportPrefix,
-                          boolean jsonOnly, boolean force, List<HoloUiImportEntry> entries) {
-        for (Path sourceFile : importableFiles(sourceRoot, jsonOnly)) {
-            Path relative = sourceRoot.toPath().toAbsolutePath().normalize().relativize(sourceFile);
-            String reportPath = reportPrefix + relative.toString().replace(File.separatorChar, '/');
-            copyOne(sourceFile, targetRoot.toPath().resolve(relative), category, reportPath, force, entries);
+    Plan preview(boolean overwrite, GlossConfig.Imports limits) {
+        File directory = sourceDirectory();
+        Draft draft = new Draft(root, directory == null ? null : directory.toPath(), limits);
+        if (draft.source == null) {
+            return new Plan(this, draft);
         }
-    }
-
-    private void copyPreviews(File source, boolean force, List<HoloUiImportEntry> entries) {
-        File previewDir = new File(source, "previews");
-        File[] files = previewDir.listFiles(file -> file.isFile()
-            && file.getName().toLowerCase(Locale.ROOT).endsWith(JSON_EXTENSION)
-            && !file.getName().startsWith("."));
-        if (files == null) {
-            return;
-        }
-        Arrays.sort(files, Comparator.comparing(File::getName));
-        for (File file : files) {
-            String reportPath = "previews/" + file.getName();
-            byte[] rewritten;
-            boolean langKeysRewritten;
-            try {
-                byte[] sourceBytes = Files.readAllBytes(file.toPath());
-                String content = new String(sourceBytes, StandardCharsets.UTF_8);
-                String updated = content.replace(LEGACY_PREVIEW_LANG_PREFIX, PREVIEW_LANG_PREFIX);
-                langKeysRewritten = !updated.equals(content);
-                rewritten = langKeysRewritten ? updated.getBytes(StandardCharsets.UTF_8) : sourceBytes;
-                if (matchesShippedPreview(file.getName(), rewritten)) {
-                    entries.add(HoloUiImportEntry.of(CATEGORY_PREVIEWS, reportPath,
-                        HoloUiImportDisposition.SKIPPED_SHIPPED_IDENTICAL));
-                    continue;
+        try {
+            draft.sourceFiles.addAll(sourceFiles(draft.source, draft.limits));
+            List<Path> capturedFiles = List.copyOf(draft.sourceFiles);
+            draft.preparation.checkBeforeApply(() -> {
+                if (!capturedFiles.equals(sourceFiles(draft.source, draft.limits))) {
+                    throw new IOException("HoloUi source file set changed after preview");
                 }
-            } catch (IOException failure) {
-                entries.add(new HoloUiImportEntry(CATEGORY_PREVIEWS, reportPath,
-                    HoloUiImportDisposition.ERROR, detail(failure)));
+            });
+            JsonObject settings = readObject(draft, draft.source.resolve("settings.json"));
+            for (String collection : COLLECTIONS) {
+                prepareCollection(draft, collection, settings, overwrite);
+            }
+            prepareScales(draft, overwrite);
+            prepareSettings(draft, settings, overwrite);
+            recordExcluded(draft);
+            validateProject(draft);
+            draft.preparation.validateDocuments();
+            prepareReceipt(draft, overwrite);
+        } catch (IOException | RuntimeException failure) {
+            draft.error("import", ".", failure);
+        }
+        return new Plan(this, draft);
+    }
+
+    public Result run(boolean overwrite) {
+        return apply(preview(overwrite));
+    }
+
+    public Result apply(Plan plan) {
+        Objects.requireNonNull(plan, "plan");
+        if (plan.owner != this || !root.equals(plan.root)) {
+            throw new IllegalArgumentException("Import plan belongs to another data directory");
+        }
+        if (!plan.ready()) {
+            return unapplied(plan, null);
+        }
+        try {
+            String backup = plan.preparation.apply("import-holoui", services.transaction(), services.coordinator());
+            return new Result(true, plan.sourcePath(), plan.entries(), backup, true);
+        } catch (IOException | RuntimeException failure) {
+            Gloss.logExceptionStack(false, failure, "HoloUi import did not commit.");
+            return unapplied(plan, failure);
+        }
+    }
+
+    private Result unapplied(Plan plan, Throwable failure) {
+        List<HoloUiImportEntry> entries = new ArrayList<>();
+        for (HoloUiImportEntry entry : plan.entries()) {
+            entries.add(switch (entry.disposition()) {
+                case COPIED, OVERLAID_CONFIG_KEY, APPROXIMATED -> new HoloUiImportEntry(entry.category(),
+                    entry.path(), HoloUiImportDisposition.NOT_APPLIED, "not applied: the import did not commit");
+                default -> entry;
+            });
+        }
+        if (failure != null) {
+            entries.add(new HoloUiImportEntry("transaction", RECEIPT_FILE_NAME,
+                HoloUiImportDisposition.ERROR, detail(failure)));
+        }
+        return new Result(plan.sourcePresent(), plan.sourcePath(), entries, null, false);
+    }
+
+    private void prepareCollection(Draft draft, String collection, JsonObject settings, boolean overwrite) {
+        String destination = collection.equals("boards") ? "panels" : collection;
+        Path sourceRoot = draft.source.resolve(collection);
+        for (Path source : draft.sourceFiles) {
+            if (!source.startsWith(sourceRoot)) {
                 continue;
             }
-            writePreview(rewritten, new File(dataFolder, "previews").toPath().resolve(file.getName()),
-                reportPath, force, langKeysRewritten, entries);
+            String relative = slash(sourceRoot.relativize(source));
+            String report = collection + "/" + relative;
+            Path target = root.resolve(destination).resolve(relative);
+            try {
+                byte[] content = draft.read(source);
+                String conversion = "exact";
+                if (collection.equals("previews")) {
+                    JsonObject preview = object(content);
+                    rewritePreviewKeys(preview);
+                    for (String key : List.of("previewLookDistance", "previewScale")) {
+                        if (settings.has(key)) {
+                            double value = finiteNumber(settings.get(key));
+                            preview.addProperty(key.equals("previewScale") ? "scale" : "viewDistance", value);
+                        }
+                    }
+                    byte[] updated = encode(preview);
+                    if (!preview.equals(object(content))) {
+                        content = updated;
+                        conversion = "exact: preview language namespace and global settings converted";
+                    }
+                } else if (collection.equals("images")) {
+                    if (Imaging.getBufferedImage(content) == null) {
+                        throw new IOException("Image decoder returned no image");
+                    }
+                }
+                if (collection.equals("images")) {
+                    draft.images.put(relative, content);
+                } else {
+                    HistoryKinds.DocumentPath document = HistoryKinds.resolve(root, slash(root.relativize(target)));
+                    if (document == null) {
+                        throw new IOException("Unsupported document path");
+                    }
+                    document.kind().parse(document.id(), new String(content, StandardCharsets.UTF_8));
+                    draft.documents.put(target, content);
+                }
+                stage(draft, target, content, destination, report, overwrite, conversion);
+            } catch (IOException | RuntimeException failure) {
+                draft.error(destination, report, failure);
+            }
         }
     }
 
-    private void writePreview(byte[] content, Path targetFile, String reportPath, boolean force,
-                              boolean langKeysRewritten, List<HoloUiImportEntry> entries) {
+    private void prepareScales(Draft draft, boolean overwrite) {
+        Path source = draft.source.resolve("preview-scales.json");
         try {
-            if (!force && Files.exists(targetFile)) {
-                entries.add(new HoloUiImportEntry(CATEGORY_PREVIEWS, reportPath,
-                    HoloUiImportDisposition.SKIPPED_EXISTING, "destination already exists"));
+            byte[] content = draft.read(source);
+            if (content == null) {
                 return;
             }
-            Path parent = targetFile.getParent();
-            if (parent != null) {
-                Files.createDirectories(parent);
+            JsonObject scales = object(content);
+            for (Map.Entry<String, JsonElement> entry : scales.entrySet()) {
+                UUID.fromString(entry.getKey());
+                double factor = finiteNumber(entry.getValue());
+                if (factor < 0.25D || factor > 2.5D) {
+                    throw new IllegalArgumentException("Preview scale must be between 0.25 and 2.5");
+                }
             }
-            Files.write(targetFile, content);
-            entries.add(new HoloUiImportEntry(CATEGORY_PREVIEWS, reportPath,
-                HoloUiImportDisposition.COPIED, langKeysRewritten ? PREVIEW_LANG_REWRITE_DETAIL : null));
-        } catch (IOException failure) {
-            entries.add(new HoloUiImportEntry(CATEGORY_PREVIEWS, reportPath,
-                HoloUiImportDisposition.ERROR, detail(failure)));
-        }
-    }
-
-    private void copyRootFile(File source, String name, boolean force, List<HoloUiImportEntry> entries) {
-        File sourceFile = new File(source, name);
-        if (!sourceFile.isFile()) {
-            return;
-        }
-        copyOne(sourceFile.toPath(), new File(dataFolder, name).toPath(), CATEGORY_FILES, name, force, entries);
-    }
-
-    private void copyOne(Path sourceFile, Path targetFile, String category, String reportPath,
-                         boolean force, List<HoloUiImportEntry> entries) {
-        try {
-            if (!force && Files.exists(targetFile)) {
-                entries.add(new HoloUiImportEntry(category, reportPath,
-                    HoloUiImportDisposition.SKIPPED_EXISTING, "destination already exists"));
-                return;
-            }
-            Path parent = targetFile.getParent();
-            if (parent != null) {
-                Files.createDirectories(parent);
-            }
-            Files.copy(sourceFile, targetFile, StandardCopyOption.REPLACE_EXISTING);
-            entries.add(HoloUiImportEntry.of(category, reportPath, HoloUiImportDisposition.COPIED));
-        } catch (IOException failure) {
-            entries.add(new HoloUiImportEntry(category, reportPath, HoloUiImportDisposition.ERROR, detail(failure)));
-        }
-    }
-
-    private void recordSecrets(File source, List<HoloUiImportEntry> entries) {
-        recordSecret(source, "editor-sync-sessions.json", "session secrets are never imported", entries);
-        recordSecret(source, "editor-sync-transactions", "editor sync state is never imported", entries);
-        recordSecret(source, "editor-sync-backups", "editor sync state is never imported", entries);
-        recordSecret(source, "custom-items.json", "regenerable via /gloss item export", entries);
-    }
-
-    private void recordSecret(File source, String name, String reason, List<HoloUiImportEntry> entries) {
-        if (new File(source, name).exists()) {
-            entries.add(new HoloUiImportEntry(CATEGORY_SECRETS, name, HoloUiImportDisposition.SKIPPED_SECRET, reason));
-        }
-    }
-
-    private void overlaySettings(File source, GlossConfigFile config, List<HoloUiImportEntry> entries) {
-        File settingsFile = new File(source, "settings.json");
-        if (!settingsFile.isFile()) {
-            return;
-        }
-        JsonObject settings;
-        try {
-            JsonElement parsed = JsonParser.parseString(Files.readString(settingsFile.toPath(), StandardCharsets.UTF_8));
-            if (!parsed.isJsonObject()) {
-                throw new IllegalArgumentException("settings.json is not a JSON object");
-            }
-            settings = parsed.getAsJsonObject();
+            stage(draft, root.resolve("preview-scales.json"), content, "files", "preview-scales.json",
+                overwrite, "exact");
         } catch (IOException | RuntimeException failure) {
-            entries.add(new HoloUiImportEntry(CATEGORY_CONFIG, "settings.json",
-                HoloUiImportDisposition.ERROR, detail(failure)));
+            draft.error("files", "preview-scales.json", failure);
+        }
+    }
+
+    private void prepareSettings(Draft draft, JsonObject settings, boolean overwrite) {
+        if (settings.size() == 0) {
             return;
         }
-        overlayBoolean(settings, "debugHitbox", value -> config.debug.hitbox = value, entries);
-        overlayBoolean(settings, "debugPosition", value -> config.debug.position = value, entries);
-        overlayString(settings, "builderUrl", value -> config.editor.builderUrl = value, entries);
-        overlayBoolean(settings, "editorSyncEnabled", value -> config.editor.sync.enabled = value, entries);
-        overlayString(settings, "editorSyncCreateToken", value -> config.editor.sync.createToken = value, entries);
-        overlayInt(settings, "editorSyncSessionMinutes", value -> config.editor.sync.sessionMinutes = value, entries);
-        overlayInt(settings, "editorSyncPollSeconds", value -> config.editor.sync.pollSeconds = value, entries);
-        overlayInt(settings, "editorSyncMaxProjectMiB", value -> config.editor.sync.maxProjectMiB = value, entries);
-        overlayBoolean(settings, "previewEnabled", value -> config.features.previews = value, entries);
-        overlayDouble(settings, "uiScale", value -> config.menus.uiScale = value, entries);
-        overlayBoolean(settings, "customItems", value -> config.items.customItems = value, entries);
-        overlayString(settings, "customItemProviders",
-            value -> config.items.customItemProviders = splitCsv(value), entries);
         try {
-            configLoader.save(config);
-        } catch (IOException failure) {
-            entries.add(new HoloUiImportEntry(CATEGORY_CONFIG, GlossConfigLoader.FILE_NAME,
-                HoloUiImportDisposition.ERROR, detail(failure)));
+            byte[] current = draft.preparation.read(services.configLoader().file().toPath());
+            GlossConfigFile candidate = current == null ? new GlossConfigFile()
+                : TomlCodec.fromToml(new String(current, StandardCharsets.UTF_8), GlossConfigFile.class);
+            Objects.requireNonNull(candidate, "configuration").normalize();
+            GlossConfigFile defaults = new GlossConfigFile();
+            defaults.normalize();
+            JsonObject previousReceipt = readObject(draft, root.resolve(RECEIPT_FILE_NAME));
+            String settingsHash = draft.hashes.get("settings.json");
+            boolean alreadyImported = previousReceipt.has("settingsSha256")
+                && Objects.equals(settingsHash, previousReceipt.get("settingsSha256").getAsString());
+            for (String key : settings.keySet()) {
+                if (!SETTING_KEYS.contains(key)) {
+                    draft.add("config", "settings.json:" + key, HoloUiImportDisposition.UNSUPPORTED,
+                        "no verified conversion for this setting");
+                }
+            }
+            if (settings.has("editorSyncCreateToken")) {
+                draft.add("secrets", "settings.json:editorSyncCreateToken", HoloUiImportDisposition.SKIPPED_SECRET,
+                    "editor credentials are never imported");
+            }
+            for (String key : List.of("previewLookDistance", "previewScale")) {
+                if (settings.has(key)) {
+                    boolean hasPreviews = draft.documents.keySet().stream().anyMatch(path -> path.startsWith(root.resolve("previews")));
+                    draft.add("config", "settings.json:" + key, hasPreviews ? HoloUiImportDisposition.OVERLAID_CONFIG_KEY
+                        : HoloUiImportDisposition.UNSUPPORTED, hasPreviews ? "exact: moved into imported preview documents"
+                        : "no preview documents available to receive this setting");
+                }
+            }
+            if (alreadyImported && !overwrite) {
+                draft.add("config", "settings.json", HoloUiImportDisposition.UNCHANGED,
+                    "this settings snapshot was already imported; destination settings retained");
+                return;
+            }
+            JsonObject before = JSON.toJsonTree(candidate).getAsJsonObject();
+            overlay(draft, settings, "debugHitbox", value -> candidate.debug.hitbox = bool(value));
+            overlay(draft, settings, "debugPosition", value -> candidate.debug.position = bool(value));
+            overlay(draft, settings, "builderUrl", value -> candidate.editor.builderUrl = string(value));
+            overlay(draft, settings, "editorSyncEnabled", value -> candidate.editor.sync.enabled = bool(value));
+            overlay(draft, settings, "editorSyncSessionMinutes", value -> candidate.editor.sync.sessionMinutes = integer(value));
+            overlay(draft, settings, "editorSyncPollSeconds", value -> candidate.editor.sync.pollSeconds = integer(value));
+            overlay(draft, settings, "editorSyncMaxProjectMiB", value -> candidate.editor.sync.maxProjectMiB = integer(value));
+            overlay(draft, settings, "previewEnabled", value -> candidate.features.previews = bool(value));
+            overlay(draft, settings, "uiScale", value -> candidate.menus.uiScale = finiteNumber(value));
+            overlay(draft, settings, "customItems", value -> candidate.items.customItems = bool(value));
+            overlay(draft, settings, "customItemProviders", value -> candidate.items.customItemProviders = splitCsv(string(value)));
+            JsonObject authored = JSON.toJsonTree(candidate).getAsJsonObject();
+            byte[] encoded = services.configLoader().encode(candidate);
+            JsonObject normalized = JSON.toJsonTree(candidate).getAsJsonObject();
+            if (!authored.equals(normalized)) {
+                draft.add("config", "settings.json", HoloUiImportDisposition.APPROXIMATED,
+                    "configuration values normalize to current supported ranges and provider identifiers");
+            }
+            if (!overwrite && conflicts(before, normalized, JSON.toJsonTree(defaults).getAsJsonObject())) {
+                draft.add("config", GlossConfigLoader.FILE_NAME, HoloUiImportDisposition.CONFLICT,
+                    "import would replace customized destination settings; preview with overwrite to replace them");
+            }
+            if (!before.equals(normalized)) {
+                draft.preparation.stage(services.configLoader().file().toPath(), encoded);
+            }
+        } catch (IOException | RuntimeException failure) {
+            draft.error("config", "settings.json", failure);
         }
     }
 
-    static List<String> splitCsv(String csv) {
-        if (csv == null || csv.isBlank()) {
-            return new ArrayList<>();
-        }
-        List<String> values = new ArrayList<>();
-        for (String token : csv.split(",")) {
-            String cleaned = token.trim();
-            if (!cleaned.isEmpty()) {
-                values.add(cleaned);
+    private static boolean conflicts(JsonObject before, JsonObject after, JsonObject defaults) {
+        for (String key : after.keySet()) {
+            JsonElement oldValue = before.get(key);
+            JsonElement next = after.get(key);
+            JsonElement baseline = defaults.get(key);
+            if (Objects.equals(oldValue, next)) {
+                continue;
+            }
+            if (oldValue != null && oldValue.isJsonObject() && next.isJsonObject()
+                && baseline != null && baseline.isJsonObject()) {
+                if (conflicts(oldValue.getAsJsonObject(), next.getAsJsonObject(), baseline.getAsJsonObject())) {
+                    return true;
+                }
+            } else if (!Objects.equals(oldValue, baseline)) {
+                return true;
             }
         }
-        return values;
+        return false;
     }
 
-    private void overlayBoolean(JsonObject settings, String key, Consumer<Boolean> apply,
-                                List<HoloUiImportEntry> entries) {
-        overlayValue(settings, key, element -> apply.accept(element.getAsBoolean()), entries);
-    }
-
-    private void overlayInt(JsonObject settings, String key, Consumer<Integer> apply,
-                            List<HoloUiImportEntry> entries) {
-        overlayValue(settings, key, element -> apply.accept(element.getAsInt()), entries);
-    }
-
-    private void overlayDouble(JsonObject settings, String key, Consumer<Double> apply,
-                               List<HoloUiImportEntry> entries) {
-        overlayValue(settings, key, element -> apply.accept(element.getAsDouble()), entries);
-    }
-
-    private void overlayString(JsonObject settings, String key, Consumer<String> apply,
-                               List<HoloUiImportEntry> entries) {
-        overlayValue(settings, key, element -> apply.accept(element.getAsString()), entries);
-    }
-
-    private void overlayValue(JsonObject settings, String key, Consumer<JsonElement> apply,
-                              List<HoloUiImportEntry> entries) {
+    private static void overlay(Draft draft, JsonObject settings, String key, Consumer<JsonElement> setter) {
         if (!settings.has(key)) {
             return;
         }
         try {
-            apply.accept(settings.get(key));
-            entries.add(HoloUiImportEntry.of(CATEGORY_CONFIG, settingsPath(key),
-                HoloUiImportDisposition.OVERLAID_CONFIG_KEY));
+            setter.accept(settings.get(key));
+            draft.add("config", "settings.json:" + key, HoloUiImportDisposition.OVERLAID_CONFIG_KEY, "exact");
         } catch (RuntimeException failure) {
-            entries.add(new HoloUiImportEntry(CATEGORY_CONFIG, settingsPath(key),
-                HoloUiImportDisposition.ERROR, detail(failure)));
+            draft.error("config", "settings.json:" + key, failure);
         }
     }
 
-    private static String settingsPath(String key) {
-        return "settings.json:" + key;
+    private static void stage(Draft draft, Path target, byte[] content, String category,
+                              String report, boolean overwrite, String conversion) throws IOException {
+        byte[] previous = draft.preparation.read(target);
+        if (Arrays.equals(previous, content)) {
+            draft.add(category, report, HoloUiImportDisposition.UNCHANGED, "destination already matches");
+        } else if (previous != null && !overwrite) {
+            draft.add(category, report, HoloUiImportDisposition.CONFLICT, "destination differs from imported content");
+        } else {
+            draft.preparation.stage(target, content);
+            draft.add(category, report, HoloUiImportDisposition.COPIED, conversion);
+        }
     }
 
-    private boolean matchesShippedPreview(String name, byte[] candidate) throws IOException {
-        try (InputStream shipped = HoloUiDataImporter.class.getResourceAsStream(
-            SHIPPED_PREVIEW_RESOURCE_ROOT + name)) {
-            if (shipped == null) {
-                return false;
+    private void validateProject(Draft draft) throws IOException {
+        LintContext.Builder builder = LintContext.builder();
+        Map<UUID, String> panelIds = new LinkedHashMap<>();
+        ImportSourceFiles sources = new ImportSourceFiles(draft.limits);
+        for (String collection : List.of("menus", "panels", "previews")) {
+            for (Path file : files(sources, root.resolve(collection), true)) {
+                if (!draft.documents.containsKey(file)) {
+                    draft.documents.put(file, draft.preparation.read(file));
+                }
             }
-            return Arrays.equals(shipped.readAllBytes(), candidate);
+        }
+        for (Map.Entry<Path, byte[]> entry : draft.documents.entrySet()) {
+            HistoryKinds.DocumentPath document = HistoryKinds.resolve(root, slash(root.relativize(entry.getKey())));
+            String raw = new String(entry.getValue(), StandardCharsets.UTF_8);
+            Object parsed = document.kind().parse(document.id(), raw).value();
+            if (parsed instanceof MenuDocument menu) {
+                validateComponents(menu.definition().getComponents());
+                for (MenuDefinitionData.Variant variant : menu.definition().getVariants()) {
+                    validateComponents(variant.components());
+                }
+            }
+            if (parsed instanceof PanelDefinition panel) {
+                String previous = panelIds.putIfAbsent(panel.uuid(), panel.id());
+                if (previous != null) {
+                    throw new IOException("Panel UUID is shared by " + previous + " and " + panel.id());
+                }
+            }
+            builder.document(document.collection(), document.id(), raw);
+        }
+        for (Path file : files(sources, root.resolve("images"), false)) {
+            draft.preparation.read(file);
+            builder.image(slash(root.resolve("images").relativize(file)));
+        }
+        draft.images.keySet().forEach(builder::image);
+        LintContext context = builder.build();
+        for (LintRule rule : List.of(new PanelRootRule(), new NavigateTargetRule(), new ImageRule())) {
+            for (Diagnostic diagnostic : rule.check(context)) {
+                draft.add(diagnostic.kind(), diagnostic.id(), HoloUiImportDisposition.ERROR, diagnostic.message());
+            }
         }
     }
 
-    /** Regular files below the root, excluding dot-segments and symlinks per menu discovery rules. */
-    private static List<Path> importableFiles(File root, boolean jsonOnly) {
-        if (!root.isDirectory()) {
-            return List.of();
+    private static void recordExcluded(Draft draft) {
+        for (String secret : SECRETS) {
+            if (Files.exists(draft.source.resolve(secret), LinkOption.NOFOLLOW_LINKS)) {
+                draft.add("secrets", secret, HoloUiImportDisposition.SKIPPED_SECRET,
+                    "credentials, editor state, and regenerable provider exports are not imported");
+            }
         }
-        Path rootPath = root.toPath().toAbsolutePath().normalize();
-        List<Path> files = new ArrayList<>();
-        try (Stream<Path> stream = Files.walk(rootPath)) {
-            stream.sorted().forEach(candidate -> {
-                if (!Files.isRegularFile(candidate, LinkOption.NOFOLLOW_LINKS)) {
-                    return;
-                }
-                if (jsonOnly && !candidate.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(JSON_EXTENSION)) {
-                    return;
-                }
-                for (Path segment : rootPath.relativize(candidate)) {
-                    if (segment.toString().startsWith(".")) {
-                        return;
-                    }
-                }
-                files.add(candidate);
-            });
-        } catch (IOException failure) {
-            Gloss.logExceptionStack(false, failure, "HoloUi import could not scan %s.", rootPath);
+        if (Files.exists(draft.source.resolve("language.yml"), LinkOption.NOFOLLOW_LINKS)) {
+            draft.add("config", "language.yml", HoloUiImportDisposition.UNSUPPORTED,
+                "no verified conversion to the current localization catalog");
         }
-        return files;
     }
 
-    private void writeReceipt(File source, boolean force, List<HoloUiImportEntry> entries) {
+    private static void validateComponents(List<MenuComponentData> components) {
+        if (components == null) {
+            throw new IllegalArgumentException("Menu components are missing");
+        }
+        for (MenuComponentData component : components) {
+            if (component == null || component.data() == null) {
+                throw new IllegalArgumentException("Menu contains an incomplete component");
+            }
+            validateComponent(component.data());
+        }
+    }
+
+    private static void validateComponent(ComponentData component) {
+        if (component instanceof ButtonComponentData button) {
+            validateActions(button.actions());
+        } else if (component instanceof ToggleComponentData toggle) {
+            validateActions(toggle.trueActions());
+            validateActions(toggle.falseActions());
+        } else if (component instanceof ListComponentData list) {
+            validateComponent(list.template());
+        }
+    }
+
+    private static void validateActions(List<MenuActionData> actions) {
+        if (actions == null) {
+            return;
+        }
+        for (MenuActionData action : actions) {
+            if (action == null) {
+                throw new IllegalArgumentException("Menu contains an empty action");
+            }
+            String invalid = action.invalidReason();
+            if (invalid != null) {
+                throw new IllegalArgumentException(invalid);
+            }
+            if (action.createAction() == null) {
+                throw new IllegalArgumentException("Unsupported menu action");
+            }
+            validateActions(action.nestedActions());
+        }
+    }
+
+    private void prepareReceipt(Draft draft, boolean overwrite) throws IOException {
+        byte[] previous = draft.preparation.read(root.resolve(RECEIPT_FILE_NAME));
+        if (previous != null && draft.preparation.targets().isEmpty()) {
+            return;
+        }
         JsonObject receipt = new JsonObject();
         receipt.addProperty("schemaVersion", RECEIPT_SCHEMA_VERSION);
-        receipt.addProperty("importedAtMs", System.currentTimeMillis());
-        receipt.addProperty("source", source.getAbsolutePath());
-        receipt.addProperty("force", force);
-        JsonArray lines = new JsonArray();
-        for (HoloUiImportEntry entry : entries) {
-            JsonObject line = new JsonObject();
-            line.addProperty("path", entry.path());
-            line.addProperty("disposition", entry.disposition().id());
-            if (entry.detail() != null) {
-                line.addProperty("detail", entry.detail());
-            }
-            lines.add(line);
+        receipt.addProperty("source", draft.source.toString());
+        receipt.addProperty("overwrite", overwrite);
+        receipt.addProperty("settingsSha256", draft.hashes.get("settings.json"));
+        receipt.add("sourceHashes", JSON.toJsonTree(draft.hashes));
+        JsonArray entries = new JsonArray();
+        for (HoloUiImportEntry entry : draft.entries) {
+            JsonObject row = new JsonObject();
+            row.addProperty("category", entry.category());
+            row.addProperty("path", entry.path());
+            row.addProperty("disposition", entry.disposition().id());
+            row.addProperty("detail", entry.detail());
+            entries.add(row);
         }
-        receipt.add("entries", lines);
-        try {
-            if (!dataFolder.isDirectory()) {
-                dataFolder.mkdirs();
+        receipt.add("entries", entries);
+        draft.preparation.stage(root.resolve(RECEIPT_FILE_NAME), encode(receipt));
+    }
+
+    private static JsonObject readObject(Draft draft, Path file) throws IOException {
+        byte[] content = file.startsWith(draft.source) ? draft.read(file) : draft.preparation.read(file);
+        return content == null ? new JsonObject() : object(content);
+    }
+
+    private static JsonObject object(byte[] content) {
+        JsonElement parsed = JsonParser.parseString(new String(content, StandardCharsets.UTF_8));
+        if (!parsed.isJsonObject()) {
+            throw new IllegalArgumentException("Expected a JSON object");
+        }
+        return parsed.getAsJsonObject();
+    }
+
+    private static void rewritePreviewKeys(JsonElement node) {
+        if (node.isJsonObject()) {
+            for (Map.Entry<String, JsonElement> entry : node.getAsJsonObject().entrySet()) {
+                if (entry.getValue().isJsonPrimitive() && entry.getValue().getAsJsonPrimitive().isString()) {
+                    entry.setValue(new JsonPrimitive(entry.getValue().getAsString()
+                        .replace("holoui.preview.", "gloss.preview.")));
+                } else {
+                    rewritePreviewKeys(entry.getValue());
+                }
             }
-            Files.writeString(receiptFile().toPath(),
-                RECEIPT_GSON.toJson(receipt) + System.lineSeparator(), StandardCharsets.UTF_8);
-        } catch (IOException failure) {
-            Gloss.logExceptionStack(false, failure, "HoloUi import could not write %s.", RECEIPT_FILE_NAME);
+        } else if (node.isJsonArray()) {
+            for (int index = 0; index < node.getAsJsonArray().size(); index++) {
+                JsonElement value = node.getAsJsonArray().get(index);
+                if (value.isJsonPrimitive() && value.getAsJsonPrimitive().isString()) {
+                    node.getAsJsonArray().set(index, new JsonPrimitive(value.getAsString()
+                        .replace("holoui.preview.", "gloss.preview.")));
+                } else {
+                    rewritePreviewKeys(value);
+                }
+            }
         }
     }
 
-    private void logSummary(File source, List<HoloUiImportEntry> entries) {
-        Gloss.info("HoloUi import from %s: %d entries.", source.getAbsolutePath(), entries.size());
-        Map<String, EnumMap<HoloUiImportDisposition, Integer>> byCategory = new LinkedHashMap<>();
-        for (HoloUiImportEntry entry : entries) {
-            byCategory.computeIfAbsent(entry.category(), key -> new EnumMap<>(HoloUiImportDisposition.class))
-                .merge(entry.disposition(), 1, Integer::sum);
+    private static List<Path> sourceFiles(Path source, GlossConfig.Imports limits) throws IOException {
+        ImportSourceFiles sources = new ImportSourceFiles(limits);
+        List<Path> paths = new ArrayList<>();
+        for (String collection : COLLECTIONS) {
+            paths.addAll(files(sources, source.resolve(collection), !collection.equals("images")));
         }
-        for (Map.Entry<String, EnumMap<HoloUiImportDisposition, Integer>> category : byCategory.entrySet()) {
-            StringBuilder line = new StringBuilder(category.getKey()).append(':');
-            for (Map.Entry<HoloUiImportDisposition, Integer> count : category.getValue().entrySet()) {
-                line.append(' ').append(count.getValue()).append(' ').append(count.getKey().id());
-            }
-            Gloss.info("HoloUi import: %s", line);
+        for (String name : List.of("settings.json", "preview-scales.json")) {
+            paths.addAll(sources.single(source.resolve(name)));
         }
+        paths.sort(Path::compareTo);
+        return List.copyOf(paths);
+    }
+
+    private static List<Path> files(ImportSourceFiles sources, Path directory, boolean jsonOnly) throws IOException {
+        return sources.collect(directory, true, path ->
+            (!jsonOnly || path.getFileName().toString().endsWith(".json"))
+                && visible(directory.relativize(path)));
+    }
+
+    static List<String> splitCsv(String csv) {
+        return csv == null || csv.isBlank() ? new ArrayList<>()
+            : new ArrayList<>(Arrays.stream(csv.split(",")).map(String::trim).filter(value -> !value.isEmpty()).toList());
+    }
+
+    private static double finiteNumber(JsonElement value) {
+        if (!value.isJsonPrimitive() || !value.getAsJsonPrimitive().isNumber() || !Double.isFinite(value.getAsDouble())) {
+            throw new IllegalArgumentException("Expected a finite number");
+        }
+        return value.getAsDouble();
+    }
+
+    private static int integer(JsonElement value) {
+        finiteNumber(value);
+        return value.getAsBigDecimal().intValueExact();
+    }
+
+    private static boolean bool(JsonElement value) {
+        if (!value.isJsonPrimitive() || !value.getAsJsonPrimitive().isBoolean()) {
+            throw new IllegalArgumentException("Expected a boolean");
+        }
+        return value.getAsBoolean();
+    }
+
+    private static String string(JsonElement value) {
+        if (!value.isJsonPrimitive() || !value.getAsJsonPrimitive().isString()) {
+            throw new IllegalArgumentException("Expected a string");
+        }
+        return value.getAsString();
+    }
+
+    private static byte[] encode(JsonElement value) {
+        return (JSON.toJson(value) + System.lineSeparator()).getBytes(StandardCharsets.UTF_8);
+    }
+
+    private static String slash(Path path) {
+        return path.toString().replace(File.separatorChar, '/');
     }
 
     private static String detail(Throwable failure) {
-        String message = failure.getMessage();
-        return message == null || message.isBlank() ? failure.getClass().getSimpleName() : message;
+        return failure.getMessage() == null ? failure.getClass().getSimpleName() : failure.getMessage();
+    }
+
+    private static final class Draft {
+        private final Path root;
+        private final Path source;
+        private final GlossConfig.Imports limits;
+        private final PreparedImport preparation;
+        private final List<Path> sourceFiles = new ArrayList<>();
+        private final List<HoloUiImportEntry> entries = new ArrayList<>();
+        private final Map<String, String> hashes = new TreeMap<>();
+        private final Map<Path, byte[]> documents = new LinkedHashMap<>();
+        private final Map<String, byte[]> images = new LinkedHashMap<>();
+
+        private Draft(Path root, Path source, GlossConfig.Imports limits) {
+            this.root = root;
+            this.source = source;
+            this.limits = limits;
+            this.preparation = new PreparedImport(root, limits);
+        }
+
+        private byte[] read(Path file) throws IOException {
+            byte[] content = preparation.read(file);
+            if (content != null) {
+                hashes.put(slash(source.relativize(file)), DocumentHashes.sha256(content));
+            }
+            return content;
+        }
+
+        private void add(String category, String path, HoloUiImportDisposition disposition, String detail) {
+            entries.add(new HoloUiImportEntry(category, path, disposition, detail));
+        }
+
+        private void error(String category, String path, Throwable failure) {
+            add(category, path, HoloUiImportDisposition.ERROR, HoloUiDataImporter.detail(failure));
+        }
+    }
+
+    private static boolean visible(Path relative) {
+        for (Path segment : relative) {
+            if (segment.toString().startsWith(".")) {
+                return false;
+            }
+        }
+        return true;
     }
 }

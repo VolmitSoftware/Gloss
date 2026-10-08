@@ -6,10 +6,13 @@ package art.arcane.gloss.importer;
  */
 public enum HoloUiImportDisposition {
     COPIED("copied"),
-    SKIPPED_SHIPPED_IDENTICAL("skipped-shipped-identical"),
-    SKIPPED_EXISTING("skipped-existing"),
     SKIPPED_SECRET("skipped-secret"),
     OVERLAID_CONFIG_KEY("overlaid-config-key"),
+    APPROXIMATED("approximated"),
+    UNCHANGED("unchanged"),
+    CONFLICT("conflict"),
+    UNSUPPORTED("unsupported"),
+    NOT_APPLIED("not-applied"),
     ERROR("error");
 
     private final String id;

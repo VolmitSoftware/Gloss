@@ -26,6 +26,7 @@ public final class ProxyText {
         .character('&').hexColors().useUnusualXRepeatedCharacterHexFormat().build();
     private final ProxyServer proxy;
     private final Map<String, Expr> expressions = new ConcurrentHashMap<>();
+    private volatile ProxyTablistVisibility visibility = ProxyTablistVisibility.EMPTY;
     private volatile ProxyTextDocuments.Content content = ProxyTextDocuments.Content.EMPTY;
 
     public ProxyText(ProxyServer proxy) {
@@ -35,6 +36,10 @@ public final class ProxyText {
     /** Swaps in the emoji and animation catalogs of a freshly loaded document snapshot. */
     public void content(ProxyTextDocuments.Content replacement) {
         this.content = replacement == null ? ProxyTextDocuments.Content.EMPTY : replacement;
+    }
+
+    public void visibility(ProxyTablistVisibility visibility) {
+        this.visibility = visibility;
     }
 
     public ProxyTextDocuments.Content content() {
@@ -71,7 +76,7 @@ public final class ProxyText {
                 String name = variable.name();
                 int dot = name.indexOf('.');
                 boolean player = dot > 0 && Set.of("viewer", "subject", "player").contains(name.substring(0, dot))
-                    && Set.of("present", "name", "uuid", "ping", "server").contains(name.substring(dot + 1));
+                    && Set.of("present", "name", "uuid", "ping", "server", "bedrock", "npc", "visible").contains(name.substring(dot + 1));
                 if (!player && !Set.of("server.online", "server.maxPlayers", "time.ms", "time.seconds", "time.ticks",
                     "connection.from", "connection.to").contains(name)) {
                     throw new IllegalArgumentException("Unknown proxy variable: " + name);
@@ -327,6 +332,9 @@ public final class ProxyText {
         private Object player(Player player, String field) {
             return switch (field) {
                 case "present" -> player != null;
+                case "bedrock" -> player != null && visibility.bedrock().contains(player.getUniqueId());
+                case "npc" -> player != null && visibility.npcs().contains(player.getUniqueId());
+                case "visible" -> player != null && viewer != null && visibility.visible(viewer.getUniqueId(), player.getUniqueId());
                 case "name" -> player == null ? "" : player.getUsername();
                 case "uuid" -> player == null ? "" : player.getUniqueId().toString();
                 case "ping" -> player == null ? 0.0 : (double) player.getPing();

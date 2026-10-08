@@ -116,7 +116,7 @@ final class ProxyDocumentsTest {
         assertThrows(ExprException.class, () -> ProxyDocuments.load(directory));
         Files.delete(directory.resolve("boards/default.json"));
         Files.writeString(directory.resolve("tablist.json"), """
-            {"schemaVersion":2,"headerFooter":{"presentation":{"header":"{{ missing"}}}
+            {"schemaVersion":3,"headerFooter":{"presentation":{"header":"{{ missing"}}}
             """);
         assertThrows(IllegalArgumentException.class, () -> ProxyDocuments.load(directory));
     }
@@ -243,5 +243,47 @@ final class ProxyDocumentsTest {
                 return null;
             }
         };
+    }    @Test
+    void onePresetCatalogResolvesProxyTabLayoutAndKeepsSourcesSparse() throws IOException {
+        Files.writeString(directory.resolve("presets.json"), """
+            {"schemaVersion":1,"revision":1,
+             "defaults":{"tablist":{"layout":{"enabled":true,"entries":21}}},
+             "presets":{"tablist":{"branded":{"values":{"layout":{"slots":[{"column":1,"row":9,"text":"brand"}]}}}}}}
+            """);
+        String source = "{\"schemaVersion\":3,\"revision\":7,\"preset\":\"branded\"}";
+        Files.writeString(directory.resolve("tablist.json"), source);
+        ProxyDocuments.Snapshot snapshot = ProxyDocuments.load(directory);
+        assertEquals(21, snapshot.tablist().layout().presentation().source().entries());
+        assertEquals("brand", snapshot.tablist().layout().presentation().source().slots().getFirst().text());
+        assertEquals(source, Files.readString(directory.resolve("tablist.json")));
     }
+
+    @Test
+    void proxyLayoutsRejectUnavailableCellsAndBackendOnlyExpressions() throws IOException {
+        Files.writeString(directory.resolve("tablist.json"), """
+            {"schemaVersion":3,"layout":{"enabled":true,"entries":21,
+             "slots":[{"column":1,"row":10,"text":"absent"}]}}
+            """);
+        RuntimeException invalid = assertThrows(RuntimeException.class, () -> ProxyDocuments.load(directory));
+        assertTrue(invalid.getCause().getMessage().contains("falls outside"));
+        Files.writeString(directory.resolve("tablist.json"), """
+            {"schemaVersion":3,"layout":{"enabled":true,"entries":20,
+             "sections":[{"id":"world","column":0,"row":0,"columns":1,"rows":20,"filter":"subject.world == 'lobby'"}]}}
+            """);
+        assertThrows(IllegalArgumentException.class, () -> ProxyDocuments.load(directory));
+    }
+
+    @Test
+    void proxyLayoutsRejectDuplicateNormalizedVariantIds() throws IOException {
+        Files.writeString(directory.resolve("tablist.json"), """
+            {"schemaVersion":3,"layout":{"enabled":true,"entries":20,"variants":[
+             {"id":"event","when":"true","presentation":{"entries":20}},
+             {"id":" event ","when":"true","presentation":{"entries":20}}]}}
+            """);
+        IllegalArgumentException failure = assertThrows(IllegalArgumentException.class,
+            () -> ProxyDocuments.load(directory));
+        assertTrue(failure.getMessage().contains("duplicate tablist layout variant id"));
+    }
+
+
 }

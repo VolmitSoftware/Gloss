@@ -1,5 +1,8 @@
 package art.arcane.gloss.panel;
 
+import art.arcane.gloss.doc.DocumentPresetCatalog;
+import art.arcane.gloss.doc.DocumentPresetSource;
+
 import art.arcane.gloss.Gloss;
 import art.arcane.gloss.doc.AtomicFiles;
 import art.arcane.gloss.doc.DocumentDelta;
@@ -10,6 +13,7 @@ import art.arcane.volmlib.util.io.FolderWatcher;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
 import java.io.File;
@@ -27,6 +31,7 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -34,6 +39,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Objects;
+import java.util.Set;
 import java.util.Optional;
 import java.util.TreeMap;
 import java.util.UUID;
@@ -61,6 +67,7 @@ public final class PanelRepository implements PanelStore {
       .create();
 
   private final Path directory;
+  private final DocumentPresetSource presetSource;
   private final Map<String, PanelDefinition> boards = new HashMap<>();
   private final LongSupplier clock;
   private final Map<Path, String> observedFiles = new HashMap<>();
@@ -70,6 +77,10 @@ public final class PanelRepository implements PanelStore {
   private FolderWatcher watcher;
   private long nextReconciliation;
   private boolean closed;
+  private DocumentPresetCatalog presets = DocumentPresetCatalog.empty();
+  private final Set<Path> presetChanges = new HashSet<>();
+  private String presetFailureFingerprint;
+  private String presetFingerprint;
 
   public PanelRepository(File pluginDataDirectory) {
     this(Objects.requireNonNull(pluginDataDirectory, "pluginDataDirectory").toPath());
@@ -82,6 +93,7 @@ public final class PanelRepository implements PanelStore {
   PanelRepository(Path pluginDataDirectory, LongSupplier clock) {
     Path dataDirectory = Objects.requireNonNull(pluginDataDirectory, "pluginDataDirectory").toAbsolutePath().normalize();
     this.directory = dataDirectory.resolve(DIRECTORY_NAME).normalize();
+    this.presetSource = DocumentPresetSource.acquire(dataDirectory);
     this.clock = Objects.requireNonNull(clock, "clock");
   }
 
@@ -98,6 +110,15 @@ public final class PanelRepository implements PanelStore {
   @Override
   public synchronized PanelLoadResult load() throws IOException {
     requireOpen();
+    DocumentPresetSource.Snapshot catalog = presetSource.refresh(true);
+    if (catalog.failure() != null) {
+      throw new IOException("Cannot load panel presets", catalog.failure());
+    }
+    DocumentPresetCatalog nextPresets = catalog.catalog();
+    boolean presetsChanged = !Objects.equals(presetFingerprint, catalog.fingerprint());
+    presets = nextPresets;
+    presetFingerprint = catalog.fingerprint();
+    presetChanges.clear();
     Map<String, PanelDefinition> previous = new HashMap<>(boards);
     Map<String, PanelDefinition> loadedBoards = new HashMap<>();
     Map<UUID, String> loadedUuids = new HashMap<>();
@@ -131,7 +152,8 @@ public final class PanelRepository implements PanelStore {
         if (!definition.id().equals(id)) {
           throw new IllegalArgumentException("file id " + id + " does not match document id " + definition.id());
         }
-        validateReload(previous.get(id), definition);
+        validateReload(previous.get(id), definition,
+            presetsChanged && Objects.equals(observedFiles.get(file), captured.fingerprint()));
         String previousOwner = previousUuidOwners.get(definition.uuid());
         if (previousOwner != null && !previousOwner.equals(id)) {
           throw new IllegalArgumentException("panel uuid is reserved by " + previousOwner);
@@ -180,6 +202,7 @@ public final class PanelRepository implements PanelStore {
     if (closed) {
       return DocumentDelta.EMPTY;
     }
+    refreshPresets();
     if (watcher == null) {
       resetWatcher();
       nextReconciliation = 0L;
@@ -229,7 +252,11 @@ public final class PanelRepository implements PanelStore {
 
   @Override
   public synchronized void close() {
+    if (!closed) {
+      DocumentPresetSource.release(presetSource);
+    }
     closed = true;
+    presetChanges.clear();
     if (watcher != null) {
       watcher.close();
       watcher = null;
@@ -269,7 +296,7 @@ public final class PanelRepository implements PanelStore {
       throw new FileAlreadyExistsException(target.toString());
     }
 
-    String raw = writeAtomic(target, created, false);
+    String raw = writeAtomic(target, encode(created), false);
     boards.put(created.id(), created);
     remember(created, raw);
     return created;
@@ -298,7 +325,7 @@ public final class PanelRepository implements PanelStore {
 
     Path target = pathForCanonical(canonicalId);
     prepareTarget(target);
-    String raw = writeAtomic(target, next, true);
+    String raw = writeAtomic(target, editedSource(target, current, next), true);
     boards.put(canonicalId, next);
     remember(next, raw);
     return next;
@@ -338,7 +365,11 @@ public final class PanelRepository implements PanelStore {
       throw new IOException("refusing to rename symbolic-link panel file: " + source);
     }
 
-    String raw = writeAtomic(target, renamed, false);
+    PanelFile original = capture(source);
+    if (original.failure() != null) {
+      throw original.failure();
+    }
+    String raw = writeAtomic(target, editedSource(source, current, renamed), false);
     boolean sourceDeleted = false;
     try {
       Files.delete(source);
@@ -347,7 +378,7 @@ public final class PanelRepository implements PanelStore {
     } catch (IOException failure) {
       try {
         if (sourceDeleted) {
-          writeAtomic(source, current, false);
+          writeAtomic(source, original.raw(), false);
         }
         Files.deleteIfExists(target);
         AtomicFiles.forceDirectory(target.getParent());
@@ -518,7 +549,7 @@ public final class PanelRepository implements PanelStore {
     if (captured.missing()) {
       throw new NoSuchFileException("panel file disappeared before it could be read");
     }
-    JsonElement element = JsonParser.parseString(captured.raw());
+    JsonElement element = JsonParser.parseString(presets.resolve(DIRECTORY_NAME, captured.raw()));
     if (!element.isJsonObject()) {
       throw new IllegalArgumentException("panel document must be a JSON object");
     }
@@ -600,7 +631,8 @@ public final class PanelRepository implements PanelStore {
   }
 
   private void pollFile(Path file, PanelFile captured, long now, List<String> loaded, List<String> removed) {
-    if (captured.fingerprint().equals(observedFiles.get(file))) {
+    boolean unchangedSource = captured.fingerprint().equals(observedFiles.get(file));
+    if (unchangedSource && !presetChanges.contains(file)) {
       pendingFiles.remove(file);
       reportedFailures.remove(file);
       return;
@@ -635,13 +667,14 @@ public final class PanelRepository implements PanelStore {
         throw new IllegalArgumentException("file id " + id + " does not match document id " + definition.id());
       }
       PanelDefinition current = boards.get(id);
-      validateReload(current, definition);
+      validateReload(current, definition, unchangedSource && presetChanges.contains(file));
       ensureUniqueUuid(definition.uuid(), id);
       if (!definition.equals(current)) {
         boards.put(id, definition);
         loaded.add(id);
       }
       remember(definition, captured.raw());
+      presetChanges.remove(file);
     } catch (IOException | RuntimeException failure) {
       if (DocumentEnvelope.isUnsupportedSchemaVersion(failure)) {
         reportUnsupportedSchema(file, captured.fingerprint(), failure);
@@ -649,6 +682,26 @@ public final class PanelRepository implements PanelStore {
         reportFailure(file, captured.fingerprint(), failure);
       }
     }
+  }
+
+  private void refreshPresets() {
+    DocumentPresetSource.Snapshot catalog = presetSource.refresh(false);
+    if (catalog.failure() != null) {
+      if (!catalog.fingerprint().equals(presetFailureFingerprint)) {
+        presetFailureFingerprint = catalog.fingerprint();
+        Gloss.logExceptionStack(false, catalog.failure(), "Cannot refresh panel presets; retaining current panels.");
+      }
+      return;
+    }
+    presetFailureFingerprint = null;
+    if (catalog.fingerprint().equals(presetFingerprint)) {
+      return;
+    }
+    presets = catalog.catalog();
+    presetFingerprint = catalog.fingerprint();
+    presetChanges.addAll(observedFiles.keySet());
+    queuedFiles.addAll(observedFiles.keySet());
+    queuedFiles.addAll(reportedFailures.keySet());
   }
 
   private void remember(PanelDefinition definition, String raw) {
@@ -660,6 +713,7 @@ public final class PanelRepository implements PanelStore {
   }
 
   private void forget(Path file) {
+    presetChanges.remove(file);
     observedFiles.remove(file);
     pendingFiles.remove(file);
     queuedFiles.remove(file);
@@ -698,7 +752,7 @@ public final class PanelRepository implements PanelStore {
     }
   }
 
-  private void validateReload(PanelDefinition previous, PanelDefinition loaded) {
+  private void validateReload(PanelDefinition previous, PanelDefinition loaded, boolean inheritedChange) {
     if (previous == null) {
       return;
     }
@@ -708,7 +762,7 @@ public final class PanelRepository implements PanelStore {
     if (loaded.revision() < previous.revision()) {
       throw new IllegalArgumentException("panel revision cannot move backwards");
     }
-    if (loaded.revision() == previous.revision() && !loaded.equals(previous)) {
+    if (loaded.revision() == previous.revision() && !loaded.equals(previous) && !inheritedChange) {
       throw new IllegalArgumentException("panel content changed without a revision increment");
     }
   }
@@ -752,12 +806,25 @@ public final class PanelRepository implements PanelStore {
     AtomicFiles.validateAncestors(directory, target, NOUN);
   }
 
-  private String writeAtomic(Path target, PanelDefinition definition, boolean replaceExisting) throws IOException {
+  private String editedSource(Path source, PanelDefinition previous, PanelDefinition next) throws IOException {
+    PanelFile captured = capture(source);
+    if (captured.failure() != null) {
+      throw captured.failure();
+    }
+    if (captured.missing()) {
+      throw new IOException("Panel no longer exists: " + source);
+    }
+    JsonObject authored = JsonParser.parseString(captured.raw()).getAsJsonObject();
+    return GSON.toJson(DocumentPresetCatalog.applyEdits(authored,
+        GSON.toJsonTree(previous).getAsJsonObject(), GSON.toJsonTree(next).getAsJsonObject()))
+        + System.lineSeparator();
+  }
+
+  private String writeAtomic(Path target, String raw, boolean replaceExisting) throws IOException {
     Path parent = target.getParent();
     if (parent == null) {
       throw new IOException("panel file has no parent directory: " + target);
     }
-    String raw = encode(definition);
     byte[] encoded = raw.getBytes(StandardCharsets.UTF_8);
     Path temporary = AtomicFiles.writeDurableTemporary(parent, "." + target.getFileName() + ".", encoded);
     try {

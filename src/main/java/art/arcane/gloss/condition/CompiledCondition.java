@@ -26,6 +26,10 @@ public final class CompiledCondition {
     return references;
   }
 
+  public boolean requiresScope() {
+    return !(expression instanceof Expr.Bool);
+  }
+
   public boolean matches(ExprScope scope) {
     return matches(scope, BoundedConditionErrorCallback.silent());
   }
@@ -33,8 +37,13 @@ public final class CompiledCondition {
   public boolean matches(ExprScope scope, BoundedConditionErrorCallback errors) {
     Objects.requireNonNull(scope);
     Objects.requireNonNull(errors);
+    if (expression instanceof Expr.Bool literal) {
+      return literal.value();
+    }
     try {
       return ExprEvaluator.bool(expression, ConditionScope.wrap(scope));
+    } catch (RoleSnapshotPendingException pending) {
+      throw pending;
     } catch (RuntimeException exception) {
       String message = exception.getMessage() == null
           ? exception.getClass().getSimpleName()

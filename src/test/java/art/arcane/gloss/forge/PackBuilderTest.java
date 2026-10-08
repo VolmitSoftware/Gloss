@@ -4,12 +4,15 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
+import art.arcane.gloss.GlossConfig;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
@@ -177,11 +180,161 @@ class PackBuilderTest {
     }
 
     @Test
+    void multipleFontsKeepTheirOwnTexturesAndFontProviders() throws IOException {
+        GlyphDoc first = GlyphDoc.parse("a.json", BRAND);
+        GlyphDoc second = GlyphDoc.parse("b.json", """
+            {"schemaVersion":1,"revision":1,"namespace":"hud","font":"labels","glyphs":[
+              {"id":"badge","image":"icons/coin.png","height":8}],"space":{"enabled":false}}
+            """);
+        GlyphRegistry registry = GlyphRegistry.build(Map.of("a", first, "b", second),
+            GlyphLedger.load(folder.resolve("ledger.json"), GlyphLedger.DEFAULT_BASE),
+            new PackBuilder(FIXTURE_IMAGES).probe());
+        PackArtifact artifact = new PackBuilder(FIXTURE_IMAGES).build(registry, folder.resolve("out"), 64);
+        String font = Files.readString(artifact.directory().resolve("assets/hud/font/labels.json"));
+        assertTrue(font.contains("hud:font/badge.png"));
+        assertFalse(font.contains("coin.png"));
+        assertEquals("hud", registry.glyph("badge").orElseThrow().namespace());
+        assertTrue(Files.isRegularFile(artifact.directory().resolve("assets/hud/textures/font/badge.png")));
+    }
+
+    @Test
+    void waypointAssetsUseTheNativeStyleAndGuiSpritePaths() throws IOException {
+        GlyphRegistry registry = registry("""
+            {"schemaVersion":1,"revision":1,"namespace":"trails","waypointStyles":[
+              {"id":"quest","nearDistance":12,"farDistance":80,"sprites":[
+                {"id":"quest-near","image":"icons/coin.png"},
+                {"id":"quest-far","image":"hud/bar.png"}]}]}
+            """);
+        PackArtifact artifact = new PackBuilder(FIXTURE_IMAGES).build(registry, folder.resolve("waypoints"), 97);
+        String style = Files.readString(artifact.directory().resolve("assets/trails/waypoint_style/quest.json"));
+        assertTrue(style.contains("\"near_distance\": 12.0"), style);
+        assertTrue(style.contains("\"far_distance\": 80.0"), style);
+        assertTrue(style.contains("trails:quest-near"), style);
+        assertTrue(style.contains("trails:quest-far"), style);
+        assertArrayEquals(Files.readAllBytes(FIXTURE_IMAGES.resolve("icons/coin.png")),
+            Files.readAllBytes(artifact.directory().resolve("assets/trails/textures/gui/sprites/hud/locator_bar_dot/quest-near.png")));
+        assertEquals(1, registry.waypointStyles().size());
+        assertTrue(registry.waypointStyles().containsKey("trails:quest"));
+    }
+
+    @Test
+    void conflictingWaypointSpritesAreRejectedBeforePublishing() {
+        assertThrows(IllegalArgumentException.class, () -> registry("""
+            {"schemaVersion":1,"revision":1,"waypointStyles":[
+              {"id":"first","sprites":[{"id":"dot","image":"icons/coin.png"}]},
+              {"id":"second","sprites":[{"id":"dot","image":"hud/bar.png"}]}]}
+            """));
+        assertThrows(IllegalArgumentException.class, () -> registry("""
+            {"schemaVersion":1,"revision":1,"waypointStyles":[
+              {"id":"first","nearDistance":50,"farDistance":10,"sprites":[{"id":"dot","image":"icons/coin.png"}]}]}
+            """));
+    }
+
+    @Test
+    void refusedNewInputPreservesThePublishedPackBytes() throws IOException {
+        PackBuilder builder = new PackBuilder(FIXTURE_IMAGES);
+        Path output = folder.resolve("out");
+        PackArtifact first = builder.build(registry(BRAND), output, 64);
+        byte[] previous = Files.readAllBytes(first.zip());
+        GlyphRegistry bad = registry("""
+            {"schemaVersion":1,"revision":1,"glyphs":[
+              {"id":"missing","image":"missing.png","height":8}],"space":{"enabled":false}}
+            """);
+        assertThrows(IllegalArgumentException.class, () -> builder.build(bad, output, 64));
+        assertArrayEquals(previous, Files.readAllBytes(first.zip()));
+        assertArrayEquals(previous, Files.readAllBytes(output.resolve(PackBuilder.ZIP_NAME)));
+    }
+
+    @Test
+    void previousArtifactBytesStayImmutableAfterAChangedBuild() throws IOException {
+        PackBuilder builder = new PackBuilder(FIXTURE_IMAGES);
+        Path output = folder.resolve("out");
+        PackArtifact first = builder.build(registry(BRAND), output, 64);
+        byte[] original = Files.readAllBytes(first.zip());
+        PackArtifact next = builder.build(registry(BRAND), output, 97);
+        assertFalse(first.zip().equals(next.zip()));
+        assertArrayEquals(original, Files.readAllBytes(first.zip()));
+    }
+
+    @Test
+    void configuredSourceLimitRejectsTexturesBeforePublication() {
+        GlossConfig.Images limits = new GlossConfig.Images(8, 256, 16, 16, 1048576, 8, 8, 1);
+        PackBuilder builder = new PackBuilder(FIXTURE_IMAGES, () -> limits);
+        assertThrows(IllegalArgumentException.class, () -> builder.build(registry(BRAND), folder.resolve("out"), 64));
+        assertFalse(Files.exists(folder.resolve("out/pack")));
+    }
+
+    @Test
     void anEmptyRegistryStillProducesALoadablePack() throws IOException {
         PackArtifact artifact = new PackBuilder(FIXTURE_IMAGES)
             .build(GlyphRegistry.EMPTY, folder.resolve("out"), 64);
 
         assertTrue(Files.isRegularFile(artifact.directory().resolve("pack.mcmeta")));
         assertTrue(Files.isRegularFile(artifact.zip()));
+    }
+
+    @Test
+    void aggregateFileByteAndPixelRefusalsPreserveTheLastPublishedPack() throws IOException {
+        List<GlossConfig.PackLimits> refusals = List.of(
+            new GlossConfig.PackLimits(2, 1000000, 1000000, 8, 10000000, 600),
+            new GlossConfig.PackLimits(100, 1, 1000000, 8, 10000000, 600),
+            new GlossConfig.PackLimits(100, 1000000, 1, 8, 10000000, 600));
+        for (int index = 0; index < refusals.size(); index++) {
+            AtomicReference<GlossConfig.PackLimits> limits = new AtomicReference<>(GlossConfig.PackLimits.DEFAULT);
+            PackBuilder builder = new PackBuilder(new PackBuilder.Options(FIXTURE_IMAGES,
+                () -> GlossConfig.current().images(), limits::get, new PackArtifactStore()));
+            Path output = folder.resolve("limited-" + index);
+            PackArtifact first = builder.build(registry(BRAND), output, 64);
+            byte[] original = Files.readAllBytes(first.zip());
+            limits.set(refusals.get(index));
+
+            assertThrows(IOException.class, () -> builder.build(registry(BRAND), output, 97));
+
+            assertArrayEquals(original, Files.readAllBytes(first.zip()));
+            assertArrayEquals(original, Files.readAllBytes(output.resolve(PackBuilder.ZIP_NAME)));
+            assertEquals(first.sha1Hex(), Files.readString(output.resolve(PackBuilder.SHA1_NAME)).strip());
+            try (Stream<Path> paths = Files.list(output)) {
+                assertFalse(paths.anyMatch(path -> path.getFileName().toString().startsWith(".build-")));
+            }
+        }
+    }
+
+    @Test
+    void zipDirectoryOverheadAlsoCountsAgainstTheBuildByteLimit() throws IOException {
+        AtomicReference<GlossConfig.PackLimits> limits = new AtomicReference<>(GlossConfig.PackLimits.DEFAULT);
+        PackBuilder builder = new PackBuilder(new PackBuilder.Options(FIXTURE_IMAGES,
+            () -> GlossConfig.current().images(), limits::get, new PackArtifactStore()));
+        Path output = folder.resolve("zip-limit");
+        PackArtifact first = builder.build(registry(BRAND), output, 64);
+        long payload = 0;
+        try (ZipFile zip = new ZipFile(first.zip().toFile())) {
+            for (ZipEntry entry : zip.stream().toList()) {
+                payload += entry.getSize();
+            }
+        }
+        assertTrue(Files.size(first.zip()) > payload);
+        limits.set(new GlossConfig.PackLimits(100, payload, 1000000, 8, 10000000, 600));
+
+        IOException failure = assertThrows(IOException.class, () -> builder.build(registry(BRAND), output, 64));
+
+        assertTrue(failure.getMessage().contains("ZIP"));
+        assertEquals(first.sha1Hex(), Files.readString(output.resolve(PackBuilder.SHA1_NAME)).strip());
+    }
+
+    @Test
+    void aFullProtectedArtifactBudgetRefusesPublicationWithoutRemovingTheCurrentPack() throws IOException {
+        PackArtifactStore artifacts = new PackArtifactStore();
+        GlossConfig.PackLimits limits = new GlossConfig.PackLimits(100, 1000000, 1000000, 2, 10000000, 600);
+        PackBuilder builder = new PackBuilder(new PackBuilder.Options(FIXTURE_IMAGES,
+            () -> GlossConfig.current().images(), () -> limits, artifacts));
+        Path output = folder.resolve("retention-limit");
+        PackArtifact first = builder.build(registry(BRAND), output, 64);
+        PackArtifact second = builder.build(registry(BRAND), output, 97);
+
+        assertThrows(IOException.class, () -> builder.build(registry(BRAND), output, 98));
+
+        assertTrue(Files.exists(first.zip()));
+        assertArrayEquals(Files.readAllBytes(second.zip()), Files.readAllBytes(output.resolve(PackBuilder.ZIP_NAME)));
+        assertEquals(second.sha1Hex(), Files.readString(output.resolve(PackBuilder.SHA1_NAME)).strip());
     }
 }

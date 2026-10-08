@@ -2,6 +2,8 @@ package art.arcane.gloss.menu;
 
 import art.arcane.gloss.Gloss;
 import art.arcane.gloss.service.GlossTelemetry;
+import art.arcane.gloss.service.VisibilityGovernor;
+import art.arcane.volmlib.util.scheduling.FoliaScheduler;
 import art.arcane.gloss.util.common.DisplayEntity;
 import art.arcane.gloss.util.common.DisplayEntity.MetadataIndex;
 import art.arcane.gloss.util.common.PacketUtils;
@@ -40,6 +42,11 @@ public class DisplayEntityManager {
   private static final long KEY_NAMESPACE = 0x676C6F73734D4E55L;
 
   private static final Map<UUID, DisplayEntity> displayEntities = new ConcurrentHashMap<>();
+  private static final Map<UUID, DisplayEntityGroup> fallbackGroups = new ConcurrentHashMap<>();
+  private static final Map<DisplayEntityGroup, Retirement> retirements = new ConcurrentHashMap<>();
+  private static final Map<UUID, DisplayEntityGroup> entityGroups = new ConcurrentHashMap<>();
+  private static final Map<DisplayEntityGroup, Set<UUID>> handlesByGroup = new ConcurrentHashMap<>();
+  private static final Map<UUID, Set<DisplayEntityGroup>> groupsByViewer = new ConcurrentHashMap<>();
   private static final Map<UUID, Player> playerVisibility = new ConcurrentHashMap<>();
   /**
    * Reverse of {@link #playerVisibility}. A quit has to drop one player's handles, and without this
@@ -63,6 +70,94 @@ public class DisplayEntityManager {
     return uuid;
   }
 
+  public static UUID add(DisplayEntityGroup group, DisplayEntity displayEntity) {
+    UUID handle = add(displayEntity);
+    attachGroup(group, handle);
+    return handle;
+  }
+
+  public static DisplayEntityGroup group(Player viewer, VisibilityGovernor.Surface surface) {
+    return new DisplayEntityGroup(new DisplayEntityGroup.Options(viewer, surface,
+        DisplayEntityManager::governor,
+        new PacketTransport(viewer)));
+  }
+
+  public static void retire(Gloss plugin, DisplayEntityGroup group) {
+    Retirement candidate = new Retirement(plugin, new AtomicBoolean());
+    Retirement previous = retirements.putIfAbsent(group, candidate);
+    dispatchRetirement(group, previous == null ? candidate : previous);
+  }
+
+  public static int pendingRetirements() {
+    return retirements.size();
+  }
+
+  public static void pumpRetirements() {
+    for (Map.Entry<DisplayEntityGroup, Retirement> entry : retirements.entrySet()) {
+      dispatchRetirement(entry.getKey(), entry.getValue());
+    }
+  }
+
+  private static void dispatchRetirement(DisplayEntityGroup group, Retirement retirement) {
+    Gloss plugin = retirement.plugin();
+    AtomicBoolean scheduled = retirement.scheduled();
+    if (plugin == null || !scheduled.compareAndSet(false, true)) {
+      return;
+    }
+    boolean accepted = FoliaScheduler.runEntity(plugin, group.viewer(), () -> {
+      try {
+        group.close();
+        retirements.remove(group, retirement);
+      } catch (RuntimeException failure) {
+        Gloss.logExceptionStackThrottled(false, "display-retirement", failure,
+            "Cannot retire a display group for %s; retaining its reservation for retry.", group.viewer().getUniqueId());
+      } finally {
+        scheduled.set(false);
+      }
+    }, 0L, () -> {
+      if (!group.viewer().isOnline()) {
+        group.disconnected();
+        retirements.remove(group, retirement);
+      }
+      scheduled.set(false);
+    });
+    if (!accepted) {
+      scheduled.set(false);
+    }
+  }
+
+  private record Retirement(Gloss plugin, AtomicBoolean scheduled) {
+  }
+
+  private static VisibilityGovernor governor() {
+    VisibilityGovernor current = Gloss.instance == null ? null : Gloss.instance.governor();
+    return current == null ? VisibilityGovernor.passthrough() : current;
+  }
+
+  private static void attachGroup(DisplayEntityGroup group, UUID handle) {
+    entityGroups.put(handle, group);
+    handlesByGroup.computeIfAbsent(group, ignored -> ConcurrentHashMap.newKeySet()).add(handle);
+    groupsByViewer.computeIfAbsent(group.viewer().getUniqueId(), ignored -> ConcurrentHashMap.newKeySet()).add(group);
+  }
+
+  private static void detachGroup(UUID handle) {
+    DisplayEntityGroup group = entityGroups.remove(handle);
+    if (group == null) {
+      return;
+    }
+    handlesByGroup.computeIfPresent(group, (ignored, handles) -> {
+      handles.remove(handle);
+      if (!handles.isEmpty()) {
+        return handles;
+      }
+      groupsByViewer.computeIfPresent(group.viewer().getUniqueId(), (viewerId, groups) -> {
+        groups.remove(group);
+        return groups.isEmpty() ? null : groups;
+      });
+      return null;
+    });
+  }
+
   public static int totalCount() {
     return displayEntities.size();
   }
@@ -78,12 +173,21 @@ public class DisplayEntityManager {
     if (displayEntity == null || player == null)
       return;
 
-    PacketUtils.send(player, displayEntity.spawn());
-    bind(uuid, player);
-    GlossTelemetry.countSpawnChurn();
+    DisplayEntityGroup group = entityGroups.get(uuid);
+    if (group == null) {
+      group = fallbackGroups.computeIfAbsent(player.getUniqueId(),
+          ignored -> group(player, VisibilityGovernor.Surface.HOLOGRAM));
+      attachGroup(group, uuid);
+    }
+    group.show(uuid);
   }
 
   public static void despawn(UUID uuid) {
+    DisplayEntityGroup group = entityGroups.get(uuid);
+    if (group != null) {
+      group.hide(uuid, false);
+      return;
+    }
     if (unsupportedVersion()) {
       unbind(uuid);
       return;
@@ -97,6 +201,11 @@ public class DisplayEntityManager {
   }
 
   public static void delete(UUID uuid) {
+    DisplayEntityGroup group = entityGroups.get(uuid);
+    if (group != null) {
+      group.hide(uuid, true);
+      return;
+    }
     if (!displayEntities.containsKey(uuid))
       return;
 
@@ -105,6 +214,11 @@ public class DisplayEntityManager {
   }
 
   public static void delete(UUID uuid, Player fallbackPlayer) {
+    DisplayEntityGroup group = entityGroups.get(uuid);
+    if (group != null) {
+      group.hide(uuid, true);
+      return;
+    }
     if (!displayEntities.containsKey(uuid))
       return;
 
@@ -132,9 +246,28 @@ public class DisplayEntityManager {
     if (uuids == null || uuids.isEmpty())
       return;
 
+    Map<DisplayEntityGroup, List<UUID>> grouped = new IdentityHashMap<>();
+    List<UUID> ungrouped = new ArrayList<>();
+    for (UUID handle : uuids) {
+      DisplayEntityGroup group = entityGroups.get(handle);
+      if (group == null) {
+        ungrouped.add(handle);
+      } else {
+        grouped.computeIfAbsent(group, ignored -> new ArrayList<>()).add(handle);
+      }
+    }
+    for (Map.Entry<DisplayEntityGroup, List<UUID>> entry : grouped.entrySet()) {
+      DisplayEntityGroup group = entry.getKey();
+      group.batch(() -> {
+        for (UUID handle : entry.getValue()) {
+          group.hide(handle, true);
+        }
+      });
+    }
+    int capacity = ungrouped.size();
     boolean unsupported = unsupportedVersion();
     Map<Player, List<DisplayEntity>> byViewer = unsupported ? null : new IdentityHashMap<>(2);
-    for (UUID uuid : uuids) {
+    for (UUID uuid : ungrouped) {
       DisplayEntity displayEntity = displayEntities.remove(uuid);
       forgetEntity(displayEntity);
       Player player = unbind(uuid);
@@ -143,7 +276,7 @@ public class DisplayEntityManager {
       Player target = player == null ? fallbackPlayer : player;
       if (target == null)
         continue;
-      byViewer.computeIfAbsent(target, ignored -> new ArrayList<>(uuids.size()))
+      byViewer.computeIfAbsent(target, ignored -> new ArrayList<>(capacity))
           .add(displayEntity);
     }
 
@@ -175,11 +308,81 @@ public class DisplayEntityManager {
   public static void forget(Player player) {
     if (player == null)
       return;
+    for (DisplayEntityGroup group : retirements.keySet()) {
+      if (group.viewer().getUniqueId().equals(player.getUniqueId())) {
+        group.disconnected();
+        retirements.remove(group);
+      }
+    }
+    fallbackGroups.remove(player.getUniqueId());
+    Set<DisplayEntityGroup> groups = groupsByViewer.remove(player.getUniqueId());
+    if (groups != null) {
+      for (DisplayEntityGroup group : groups) {
+        group.disconnected();
+        Set<UUID> grouped = handlesByGroup.remove(group);
+        if (grouped != null) {
+          for (UUID handle : grouped) {
+            entityGroups.remove(handle);
+            forgetEntity(displayEntities.remove(handle));
+          }
+        }
+      }
+    }
     Set<UUID> handles = handlesByViewer.remove(player.getUniqueId());
     if (handles == null)
       return;
     for (UUID handle : handles) {
       playerVisibility.remove(handle);
+    }
+  }
+
+  private record PacketTransport(Player viewer) implements DisplayEntityGroup.Transport {
+    @Override
+    public boolean spawn(UUID handle) {
+      DisplayEntity entity = displayEntities.get(handle);
+      if (entity == null || unsupportedVersion()) {
+        return false;
+      }
+      if (!PacketUtils.sendChecked(viewer, entity.spawn())) {
+        return false;
+      }
+      bind(handle, viewer);
+      GlossTelemetry.countSpawnChurn();
+      return true;
+    }
+
+    @Override
+    public void remove(List<UUID> handles, boolean delete) {
+      List<DisplayEntity> entities = new ArrayList<>(handles.size());
+      for (UUID handle : handles) {
+        DisplayEntity entity = displayEntities.get(handle);
+        if (entity != null) {
+          entities.add(entity);
+        }
+      }
+      if (!entities.isEmpty() && !unsupportedVersion()) {
+        int[] ids = new int[entities.size()];
+        for (int index = 0; index < ids.length; index++) {
+          ids[index] = entities.get(index).id();
+        }
+        List<PacketWrapper<?>> packets = new ArrayList<>(entities.size() + 1);
+        packets.add(DisplayEntity.destroyAll(ids));
+        for (DisplayEntity entity : entities) {
+          if (entity.isRawEntity()) {
+            packets.add(entity.collisionTeamRemove());
+          }
+        }
+        if (!PacketUtils.sendChecked(viewer, packets) && viewer.isOnline()) {
+          throw new IllegalStateException("Display channel is unavailable for " + viewer.getUniqueId());
+        }
+      }
+      for (UUID handle : handles) {
+        unbind(handle);
+        if (delete) {
+          forgetEntity(displayEntities.remove(handle));
+          detachGroup(handle);
+        }
+      }
     }
   }
 
@@ -252,11 +455,12 @@ public class DisplayEntityManager {
       return null;
     DisplayEntity displayEntity = displayEntities.get(uuid);
     Player player = playerVisibility.get(uuid);
-    if (displayEntity == null || player == null)
+    if (displayEntity == null)
       return null;
     if (isAlreadyAt(displayEntity, location))
       return null;
-    return displayEntity.goTo(location);
+    PacketWrapper<?> packet = displayEntity.goTo(location);
+    return player == null ? null : packet;
   }
 
   private static boolean isAlreadyAt(DisplayEntity displayEntity, Location location) {
@@ -275,9 +479,12 @@ public class DisplayEntityManager {
       return;
     DisplayEntity displayEntity = displayEntities.get(uuid);
     Player player = playerVisibility.get(uuid);
-    if (displayEntity == null || player == null)
+    if (displayEntity == null)
       return;
-    PacketUtils.sendOne(player, displayEntity.move(offset));
+    PacketWrapper<?> packet = displayEntity.move(offset);
+    if (player != null) {
+      PacketUtils.sendOne(player, packet);
+    }
   }
 
   /**
@@ -356,13 +563,15 @@ public class DisplayEntityManager {
       return;
     DisplayEntity displayEntity = displayEntities.get(uuid);
     Player player = playerVisibility.get(uuid);
-    if (displayEntity == null || player == null)
+    if (displayEntity == null)
       return;
     if (!displayEntity.isTextDisplay())
       return;
     Component text = name == null ? Component.empty() : name;
     displayEntity.text(text);
-    PacketUtils.sendOne(player, DisplayEntity.textUpdate(displayEntity.id(), text));
+    if (player != null) {
+      PacketUtils.sendOne(player, DisplayEntity.textUpdate(displayEntity.id(), text));
+    }
   }
 
   public static void changeNames(List<UUID> uuids, List<Component> names) {
@@ -374,7 +583,7 @@ public class DisplayEntityManager {
       UUID uuid = uuids.get(index);
       DisplayEntity displayEntity = displayEntities.get(uuid);
       Player player = playerVisibility.get(uuid);
-      if (displayEntity == null || player == null || !displayEntity.isTextDisplay()) {
+      if (displayEntity == null || !displayEntity.isTextDisplay()) {
         continue;
       }
       Component text = names.get(index) == null ? Component.empty() : names.get(index);
@@ -382,8 +591,10 @@ public class DisplayEntityManager {
         continue;
       }
       displayEntity.text(text);
-      byViewer.computeIfAbsent(player, ignored -> new ArrayList<>(uuids.size()))
-          .add(DisplayEntity.textUpdate(displayEntity.id(), text));
+      if (player != null) {
+        byViewer.computeIfAbsent(player, ignored -> new ArrayList<>(uuids.size()))
+            .add(DisplayEntity.textUpdate(displayEntity.id(), text));
+      }
     }
     for (Map.Entry<Player, List<PacketWrapper<?>>> entry : byViewer.entrySet()) {
       PacketUtils.send(entry.getKey(), entry.getValue());
@@ -402,12 +613,12 @@ public class DisplayEntityManager {
       return null;
     DisplayEntity displayEntity = displayEntities.get(uuid);
     Player player = playerVisibility.get(uuid);
-    if (displayEntity == null || player == null)
+    if (displayEntity == null)
       return null;
     if (!displayEntity.isTextDisplay())
       return null;
     displayEntity.backgroundColor(backgroundColor);
-    return displayEntity.metadataPacket(MetadataIndex.TEXT_BACKGROUND);
+    return player == null ? null : displayEntity.metadataPacket(MetadataIndex.TEXT_BACKGROUND);
   }
 
   public static void rescale(UUID uuid, Location anchor, float ratio) {
@@ -441,10 +652,12 @@ public class DisplayEntityManager {
       return;
     DisplayEntity displayEntity = displayEntities.get(uuid);
     Player player = playerVisibility.get(uuid);
-    if (displayEntity == null || player == null)
+    if (displayEntity == null)
       return;
     displayEntity.scale(new Vector3f(x, y, z));
-    PacketUtils.sendOne(player, displayEntity.metadataPacket(MetadataIndex.SCALE));
+    if (player != null) {
+      PacketUtils.sendOne(player, displayEntity.metadataPacket(MetadataIndex.SCALE));
+    }
   }
 
   public static void changeTransform(UUID uuid, float x, float y, float z, Vector3f translation) {
@@ -459,11 +672,11 @@ public class DisplayEntityManager {
       return null;
     DisplayEntity displayEntity = displayEntities.get(uuid);
     Player player = playerVisibility.get(uuid);
-    if (displayEntity == null || player == null)
+    if (displayEntity == null)
       return null;
     displayEntity.scale(new Vector3f(x, y, z));
     displayEntity.translation(translation == null ? new Vector3f(0, 0, 0) : translation);
-    return displayEntity.metadataPacket(MetadataIndex.TRANSLATION, MetadataIndex.SCALE);
+    return player == null ? null : displayEntity.metadataPacket(MetadataIndex.TRANSLATION, MetadataIndex.SCALE);
   }
 
   public static void changeItem(UUID uuid, ItemStack itemStack) {
@@ -471,12 +684,14 @@ public class DisplayEntityManager {
       return;
     DisplayEntity displayEntity = displayEntities.get(uuid);
     Player player = playerVisibility.get(uuid);
-    if (displayEntity == null || player == null)
+    if (displayEntity == null)
       return;
     if (!displayEntity.isItemDisplay())
       return;
     displayEntity.item(itemStack == null ? new ItemStack(Material.AIR) : itemStack.clone());
-    PacketUtils.sendOne(player, displayEntity.metadataPacket(MetadataIndex.CONTENT));
+    if (player != null) {
+      PacketUtils.sendOne(player, displayEntity.metadataPacket(MetadataIndex.CONTENT));
+    }
   }
 
   private static boolean unsupportedVersion() {

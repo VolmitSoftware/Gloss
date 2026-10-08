@@ -17,7 +17,8 @@ import java.util.Locale;
 import java.util.Set;
 
 public record SurfaceDoc(int schemaVersion, long revision, SurfaceKind surface, ShowCondition show,
-                         Selection select, Presentation presentation, List<Variant> variants) {
+                         Selection select, Presentation presentation, List<Variant> variants, String group,
+                         Boolean automatic, SurfaceDispatchPolicy delivery, List<SurfaceTrigger> on) {
     public static final String KIND = "surfaces";
     public static final int CURRENT_SCHEMA_VERSION = 1;
     public static final int MAX_TTL_TICKS = 1200;
@@ -35,6 +36,11 @@ public record SurfaceDoc(int schemaVersion, long revision, SurfaceKind surface, 
         new Presentation("&7Surface", null, null, null, null, null, null, null, null, null, null, null, null, null),
         List.of());
 
+    public SurfaceDoc(int schemaVersion, long revision, SurfaceKind surface, ShowCondition show,
+                      Selection select, Presentation presentation, List<Variant> variants) {
+        this(schemaVersion, revision, surface, show, select, presentation, variants, null, null, null, null);
+    }
+
     public SurfaceDoc {
         DocumentEnvelope.requireSchemaVersion(KIND, schemaVersion, CURRENT_SCHEMA_VERSION);
         DocumentEnvelope.requireRevision(KIND, revision);
@@ -49,6 +55,23 @@ public record SurfaceDoc(int schemaVersion, long revision, SurfaceKind surface, 
         }
         presentation = presentation.forKind(surface, "surfaces.presentation");
         variants = copyVariants(surface, variants);
+        group = group == null ? "main" : group;
+        if (!group.matches("[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}")) {
+            throw new IllegalArgumentException("surface group requires 1..64 letters, digits, dots, underscores or hyphens");
+        }
+        if (surface != SurfaceKind.BOSSBAR && !group.equals("main")) {
+            throw new IllegalArgumentException("Only bossbar surfaces support independent groups");
+        }
+        automatic = automatic == null || automatic;
+        delivery = delivery == null ? SurfaceDispatchPolicy.DEFAULTS : delivery;
+        on = on == null ? List.of() : List.copyOf(on);
+        if (on.size() > 64) {
+            throw new IllegalArgumentException("A surface may declare at most 64 triggers");
+        }
+        for (SurfaceTrigger trigger : on) {
+            trigger.requirePlatform(false);
+            ConditionCompiler.compile(new ConditionSource("surfaces.on.when", trigger.when()));
+        }
     }
 
     public static SurfaceDoc parse(String fileName, String raw) {
@@ -85,7 +108,15 @@ public record SurfaceDoc(int schemaVersion, long revision, SurfaceKind surface, 
 
     public record Presentation(String text, List<String> slots, String title, String subtitle, String progress,
                                String color, String style, String priority, Integer ttlTicks, Integer fadeInTicks,
-                               Integer stayTicks, Integer fadeOutTicks, String trigger, Integer repeatTicks) {
+                               Integer stayTicks, Integer fadeOutTicks, String trigger, Integer repeatTicks,
+                               List<String> flags) {
+        public Presentation(String text, List<String> slots, String title, String subtitle, String progress,
+                            String color, String style, String priority, Integer ttlTicks, Integer fadeInTicks,
+                            Integer stayTicks, Integer fadeOutTicks, String trigger, Integer repeatTicks) {
+            this(text, slots, title, subtitle, progress, color, style, priority, ttlTicks, fadeInTicks,
+                stayTicks, fadeOutTicks, trigger, repeatTicks, null);
+        }
+
         public Presentation {
             text = trimToNull(text);
             slots = copySlots(slots);
@@ -104,6 +135,11 @@ public record SurfaceDoc(int schemaVersion, long revision, SurfaceKind surface, 
             fadeOutTicks = clamp(fadeOutTicks, 0, MAX_FADE_TICKS);
             trigger = normalizeName(trigger, TRIGGERS, "surface trigger");
             repeatTicks = clamp(repeatTicks, 1, MAX_REPEAT_TICKS);
+            flags = flags == null ? List.of() : List.copyOf(flags);
+            if (flags.size() > 3 || new HashSet<>(flags).size() != flags.size()
+                || !List.of("darken_sky", "play_boss_music", "create_fog").containsAll(flags)) {
+                throw new IllegalArgumentException("surface flags must be unique darken_sky, play_boss_music or create_fog values");
+            }
         }
 
         public List<HudSlot> hudSlots() {
@@ -119,6 +155,9 @@ public record SurfaceDoc(int schemaVersion, long revision, SurfaceKind surface, 
         }
 
         Presentation forKind(SurfaceKind surface, String owner) {
+            if (surface != SurfaceKind.BOSSBAR && !flags.isEmpty()) {
+                throw new IllegalArgumentException(owner + " flags are only supported by bossbar surfaces");
+            }
             return switch (surface) {
                 case ACTIONBAR -> forActionBar(owner);
                 case BOSSBAR -> forBossBar(owner);
@@ -140,7 +179,7 @@ public record SurfaceDoc(int schemaVersion, long revision, SurfaceKind surface, 
             }
             return new Presentation(null, slots, title, null, progress == null ? "1" : progress,
                 color == null ? "white" : color, style == null ? "solid" : style,
-                SurfacePriorities.name(priority), ttlTicks, null, null, null, null, null);
+                SurfacePriorities.name(priority), ttlTicks, null, null, null, null, null, flags);
         }
 
         private Presentation forTitle(String owner) {

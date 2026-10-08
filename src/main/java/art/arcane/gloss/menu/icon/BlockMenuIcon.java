@@ -47,7 +47,7 @@ public final class BlockMenuIcon extends MenuIcon<BlockIconData> {
     float scaleZ = styledScale.getZ() * DISPLAY_SIZE;
     displayEntity.scale(new Vector3f(scaleX, scaleY, scaleZ));
     displayEntity.translation(new Vector3f(-scaleX / 2F, -scaleY / 2F, -scaleZ / 2F));
-    return List.of(DisplayEntityManager.add(displayEntity));
+    return List.of(DisplayEntityManager.add(session.displayGroup(), displayEntity));
   }
 
   @Override

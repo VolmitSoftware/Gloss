@@ -23,6 +23,23 @@ public class PreviewDocumentParserTest {
   private static final double EPSILON = 1.0E-9;
   private static final double DEFAULT_WELL_COLOR = (double) 0xFF15151BL;
 
+  @Test
+  public void previewCadencesAreValidatedAndDefaulted() {
+    CompiledPreviewDocument defaults = parse("defaults.json", "{}");
+    assertEquals(4, defaults.contentRefreshTicks());
+    assertEquals(10, defaults.accessCheckTicks());
+    CompiledPreviewDocument custom = parse("custom.json",
+        "{\"contentRefreshTicks\":1200,\"accessCheckTicks\":1}");
+    assertEquals(1200, custom.contentRefreshTicks());
+    assertEquals(1, custom.accessCheckTicks());
+    for (String key : List.of("contentRefreshTicks", "accessCheckTicks")) {
+      for (String invalid : List.of("0", "-1", "1201", "1.5", "\"4\"", "true", "[]")) {
+        assertTrue(expectFailure("invalid.json", "{\"" + key + "\":" + invalid + "}")
+            .getMessage().contains(key));
+      }
+    }
+  }
+
   // ---------------------------------------------------------------------
   // Minimal valid document
   // ---------------------------------------------------------------------

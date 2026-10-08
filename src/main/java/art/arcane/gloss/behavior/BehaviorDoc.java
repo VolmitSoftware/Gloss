@@ -8,6 +8,8 @@ import art.arcane.gloss.enums.MenuActionCommandSource;
 import art.arcane.gloss.state.StateSchema;
 import art.arcane.gloss.state.StateScope;
 import art.arcane.gloss.state.StateType;
+import art.arcane.gloss.text.BoundedRegexCompiler;
+import com.google.re2j.Pattern;
 import com.google.gson.annotations.SerializedName;
 
 import java.util.ArrayList;
@@ -22,9 +24,9 @@ import java.util.Map;
  * commands is console authority handed to whoever can fire the trigger.
  */
 public record BehaviorDoc(int schemaVersion, long revision, Boolean enabled, Boolean allowServerCommands,
-                          Map<String, StateDeclaration> state, List<BehaviorEntry> on) {
+                          Map<String, StateDeclaration> state, List<BehaviorEntry> on, Matching matching) {
     public static final String KIND = "behaviors";
-    public static final int CURRENT_SCHEMA_VERSION = 1;
+    public static final int CURRENT_SCHEMA_VERSION = 2;
     public static final int MAX_ENTRIES = 256;
 
     public BehaviorDoc {
@@ -34,6 +36,12 @@ public record BehaviorDoc(int schemaVersion, long revision, Boolean enabled, Boo
         allowServerCommands = allowServerCommands != null && allowServerCommands;
         state = state == null ? Map.of() : copyState(state);
         on = on == null ? List.of() : copyEntries(on, allowServerCommands);
+        matching = matching == null ? Matching.DEFAULTS : matching;
+        for (int index = 0; index < on.size(); index++) {
+            if (on.get(index).pattern() != null) {
+                matching.compile(on.get(index).pattern(), "on[" + index + "].pattern");
+            }
+        }
     }
 
     public static BehaviorDoc parse(String fileName, String raw) {
@@ -91,6 +99,36 @@ public record BehaviorDoc(int schemaVersion, long revision, Boolean enabled, Boo
             if (!nested.isEmpty()) {
                 refuseServerCommands(nested, actionPath);
             }
+        }
+    }
+
+    public record Matching(String syntax, Integer maxInputCharacters, Integer maxPatternCharacters,
+                           Integer maxProgramSize, Integer maxNestingDepth, Integer maxWorkUnits) {
+        public static final Matching DEFAULTS = new Matching(null, null, null, null, null, null);
+
+        public Matching {
+            syntax = syntax == null ? "re2" : syntax;
+            if (!syntax.equals("re2")) {
+                throw new IllegalArgumentException("matching.syntax must be re2");
+            }
+            maxInputCharacters = limit(maxInputCharacters, 1, 32768, 4096, "maxInputCharacters");
+            maxPatternCharacters = limit(maxPatternCharacters, 1, 4096, 1024, "maxPatternCharacters");
+            maxProgramSize = limit(maxProgramSize, 16, 1000000, 16384, "maxProgramSize");
+            maxNestingDepth = limit(maxNestingDepth, 1, 128, 32, "maxNestingDepth");
+            maxWorkUnits = limit(maxWorkUnits, 1, 100000000, 2000000, "maxWorkUnits");
+        }
+
+        public Pattern compile(String source, String owner) {
+            return BoundedRegexCompiler.compile(source,
+                new BoundedRegexCompiler.Limits(maxPatternCharacters, maxProgramSize, maxNestingDepth), owner);
+        }
+
+        private static int limit(Integer value, int minimum, int maximum, int fallback, String name) {
+            int resolved = value == null ? fallback : value;
+            if (resolved < minimum || resolved > maximum) {
+                throw new IllegalArgumentException("matching." + name + " must be within " + minimum + ".." + maximum);
+            }
+            return resolved;
         }
     }
 

@@ -2,6 +2,7 @@ package art.arcane.gloss.entity;
 
 import org.bukkit.Location;
 import org.bukkit.entity.LivingEntity;
+import art.arcane.gloss.condition.EntityRelationshipSnapshot;
 import org.bukkit.entity.Player;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.junit.jupiter.api.Test;
@@ -75,12 +76,12 @@ class EntityOverlayRetireTest {
         private final List<String> retired = new ArrayList<>();
 
         @Override
-        public boolean wants(LivingEntity target) {
-            return target instanceof Player;
+        public boolean wants(EntityRelationshipSnapshot target) {
+            return target.player();
         }
 
         @Override
-        public Pane prepare(Player viewer, LivingEntity target, EntityOverlayText.Snapshot snapshot) {
+        public Pane prepare(Context context) {
             return null;
         }
 

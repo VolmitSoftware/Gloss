@@ -1,6 +1,7 @@
 package art.arcane.gloss.menu;
 
 import art.arcane.gloss.Gloss;
+import art.arcane.gloss.service.VisibilityGovernor;
 import art.arcane.gloss.api.HoloClickTrigger;
 import art.arcane.gloss.GlossConfig;
 import art.arcane.gloss.api.internal.ApiMenuHandle;
@@ -66,6 +67,8 @@ public class MenuSession {
    * expansion) per component per tick. Outside a pass the conditions are live, so a click or a
    * freeze check still sees the state as it is now.
    */
+  private final DisplayEntityGroup displayGroup;
+  private VisibilityGovernor.Tier detailTier = VisibilityGovernor.Tier.FULL;
   private long conditionEpoch;
   private long conditionSequence;
   private long showEpoch;
@@ -74,6 +77,7 @@ public class MenuSession {
   public MenuSession(MenuDefinitionData data, Player p, MenuSessionOptions options) {
     this.id = data.getId();
     this.player = p;
+    this.displayGroup = DisplayEntityManager.group(p, VisibilityGovernor.Surface.MENU);
     this.options = Objects.requireNonNull(options, "options");
     this.apiHandle = options.apiHandle();
     this.scaleMultiplier = options.scaleMultiplier();
@@ -156,6 +160,18 @@ public class MenuSession {
     return scope == null ? new SessionScope(player, variables) : scope;
   }
 
+  public DisplayEntityGroup displayGroup() {
+    return displayGroup;
+  }
+
+  public void setVisibilitySurface(VisibilityGovernor.Surface surface) {
+    displayGroup.surface(surface);
+  }
+
+  public boolean isRendered() {
+    return displayGroup.visible();
+  }
+
   public String getId() {
     return id;
   }
@@ -170,6 +186,10 @@ public class MenuSession {
 
   public boolean isShown() {
     return active && conditionsMatch();
+  }
+
+  public boolean isActive() {
+    return active;
   }
 
   /** The pass component memos key off, or zero when no pass is running; see {@link #conditionEpoch}. */
@@ -298,14 +318,17 @@ public class MenuSession {
       return;
     }
     conditionEpoch = ++conditionSequence;
+    displayGroup.begin();
     try {
       tickPass();
     } finally {
       conditionEpoch = 0L;
+      displayGroup.end();
     }
   }
 
   private void tickPass() {
+    updateDetailTier();
     refreshVariant();
     drainApiUpdates();
     boolean shown = isShown();
@@ -329,6 +352,11 @@ public class MenuSession {
   }
 
   public void open() {
+    displayGroup.batch(this::openComponents);
+  }
+
+  private void openComponents() {
+    updateDetailTier();
     refreshVariant();
     active = true;
     if (options.faceViewerOnOpen()) {
@@ -346,7 +374,13 @@ public class MenuSession {
 
   public void close() {
     active = false;
-    closeComponents();
+    try {
+      displayGroup.batch(this::closeComponents);
+      displayGroup.close();
+    } catch (RuntimeException failure) {
+      DisplayEntityManager.retire(Gloss.instance, displayGroup);
+      throw failure;
+    }
   }
 
   private void closeComponents() {
@@ -370,8 +404,21 @@ public class MenuSession {
         && centerPoint.distanceSquared(loc) <= maxDistance * maxDistance + offsetDistance;
   }
 
+  private void updateDetailTier() {
+    VisibilityGovernor governor = Gloss.instance == null ? null : Gloss.instance.governor();
+    if (governor == null) {
+      detailTier = VisibilityGovernor.Tier.FULL;
+      return;
+    }
+    Location anchor = transform.anchor();
+    Location location = player.getLocation();
+    detailTier = location.getWorld() != anchor.getWorld() ? VisibilityGovernor.Tier.CULLED
+        : governor.tier(player, displayGroup.surface(), location.distanceSquared(anchor));
+    displayGroup.culled(detailTier == VisibilityGovernor.Tier.CULLED);
+  }
+
   private void emitParticleLayers() {
-    if (particleLayers.isEmpty() || !Gloss.instance.cfg().particles().enabled()) {
+    if (detailTier != VisibilityGovernor.Tier.FULL || !displayGroup.visible() || particleLayers.isEmpty() || !Gloss.instance.cfg().particles().enabled()) {
       return;
     }
     long tick = System.currentTimeMillis() / 50L;

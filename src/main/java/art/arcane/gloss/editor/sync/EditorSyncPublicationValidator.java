@@ -1,5 +1,6 @@
 package art.arcane.gloss.editor.sync;
 
+import art.arcane.gloss.doc.DocumentPresetCatalog;
 import art.arcane.gloss.panel.PanelDefinition;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -50,13 +51,18 @@ final class EditorSyncPublicationValidator {
     }
     requireImmutableConstraints(session, published.json());
     requireEchoedUnhandledKinds(session.baseProject(), published.json());
+    if (session.kind() != EditorSyncKind.WORKSPACE && session.kind() != EditorSyncKind.PRESETS
+        && !presets(session.baseProject()).document().equals(presets(serverProject).document())) {
+      throw new IllegalArgumentException("Preset catalog changed after this session opened; open a new session");
+    }
     Map<DocumentKey, ParsedEntry> serverDocuments = parseDocuments(serverProject);
     Map<DocumentKey, ParsedEntry> sessionDocuments = parseDocuments(session.baseProject());
     Map<DocumentKey, ParsedEntry> publishedDocuments = parseDocuments(published.json());
     enforceDocumentScope(session, sessionDocuments, publishedDocuments);
     Reconciliation reconciled = applyServerRevisions(serverDocuments, sessionDocuments,
-        publishedDocuments);
-    Map<DocumentKey, ParsedEntry> appliedDocuments = reconciled.applied();
+        publishedDocuments, presets(published.json()));
+    Map<DocumentKey, ParsedEntry> appliedDocuments = prepareApplied(reconciled.applied(), presets(serverProject),
+        session.kind() == EditorSyncKind.WORKSPACE);
     validatePanels(session, serverDocuments, appliedDocuments);
     Map<String, byte[]> baseImages = parseImages(serverProject, maximumBytes,
         session.kind() == EditorSyncKind.WORKSPACE);
@@ -134,6 +140,11 @@ final class EditorSyncPublicationValidator {
           "allowDeletes", "newMenuPrefix", "newImagePrefix");
       default -> Set.of("subjectId", "documentKinds", "createDocumentKinds", "allowDeletes");
     };
+    if (constraints.has("presets")) {
+      expectedKeys = new HashSet<>(expectedKeys);
+      expectedKeys.add("presets");
+      DocumentPresetCatalog.parse(DocumentPresetCatalog.FILE_NAME, constraints.get("presets").toString());
+    }
     requireExactKeys(constraints, expectedKeys, "sync constraints");
     if (!session.subjectId().equals(EditorSyncJson.requireString(constraints, "subjectId"))) {
       throw new IllegalArgumentException("sync constraints do not match the session subject");
@@ -213,12 +224,13 @@ final class EditorSyncPublicationValidator {
 
   private Map<DocumentKey, ParsedEntry> parseDocuments(JsonObject project) {
     Map<DocumentKey, ParsedEntry> documents = new LinkedHashMap<>();
+    DocumentPresetCatalog presets = presets(project);
     for (EditorSyncDocuments.Entry entry : EditorSyncDocuments.parse(project)) {
       if (EditorSyncDocuments.handledKind(entry.kind()) == null) {
         continue;
       }
       EditorSyncDocumentKind kind = EditorSyncDocumentKind.parseWireName(entry.kind());
-      EditorSyncDocumentKind.ParsedDocument parsed = kind.parse(entry.id(), entry.json());
+      EditorSyncDocumentKind.ParsedDocument parsed = kind.parse(entry.id(), entry.json(), presets);
       if (!Objects.equals(entry.revision(), parsed.revision())) {
         throw new IllegalArgumentException("sync document entry revision does not match its JSON: "
             + entry.kind() + " " + entry.id());
@@ -279,10 +291,37 @@ final class EditorSyncPublicationValidator {
     }
   }
 
+  static DocumentPresetCatalog presets(JsonObject project) {
+    for (EditorSyncDocuments.Entry entry : EditorSyncDocuments.parse(project)) {
+      if (entry.kind().equals(EditorSyncDocumentKind.PRESETS.wireName())) {
+        return DocumentPresetCatalog.parse(DocumentPresetCatalog.FILE_NAME, entry.json());
+      }
+    }
+    JsonObject constraints = EditorSyncJson.requireObject(project, "constraints");
+    return constraints.has("presets")
+        ? DocumentPresetCatalog.parse(DocumentPresetCatalog.FILE_NAME, constraints.get("presets").toString())
+        : DocumentPresetCatalog.empty();
+  }
+
+  private Map<DocumentKey, ParsedEntry> prepareApplied(Map<DocumentKey, ParsedEntry> entries,
+                                                      DocumentPresetCatalog fallback, boolean workspace) {
+    ParsedEntry catalog = entries.get(new DocumentKey(EditorSyncDocumentKind.PRESETS, "presets"));
+    DocumentPresetCatalog presets = catalog == null ? workspace ? DocumentPresetCatalog.empty() : fallback
+        : DocumentPresetCatalog.parse(DocumentPresetCatalog.FILE_NAME, catalog.entry().json());
+    Map<DocumentKey, ParsedEntry> prepared = new LinkedHashMap<>();
+    for (Map.Entry<DocumentKey, ParsedEntry> entry : entries.entrySet()) {
+      DocumentKey key = entry.getKey();
+      ParsedEntry value = entry.getValue();
+      Object parsed = key.kind().parse(key.id(), value.entry().json(), presets).value();
+      prepared.put(key, new ParsedEntry(value.entry(), parsed));
+    }
+    return Map.copyOf(prepared);
+  }
+
   private Reconciliation applyServerRevisions(
       Map<DocumentKey, ParsedEntry> base,
       Map<DocumentKey, ParsedEntry> session,
-      Map<DocumentKey, ParsedEntry> published) {
+      Map<DocumentKey, ParsedEntry> published, DocumentPresetCatalog presets) {
     Map<DocumentKey, ParsedEntry> applied = new LinkedHashMap<>();
     List<DocumentKey> conflicts = new ArrayList<>();
     for (Map.Entry<DocumentKey, ParsedEntry> publishedEntry : published.entrySet()) {
@@ -307,13 +346,13 @@ final class EditorSyncPublicationValidator {
           throw new IllegalArgumentException("new versioned documents must start at revision 1: "
               + key.kind().wireName() + " " + key.id());
         }
-        applied.put(key, normalizeNew(incoming));
+        applied.put(key, normalizeNew(incoming, presets));
         continue;
       }
       if (!key.kind().versioned()) {
         applied.put(key, sameSource(previous.entry().json(), incoming.entry().json())
             ? previous
-            : normalizeNew(incoming));
+            : normalizeNew(incoming, presets));
         continue;
       }
       long previousRevision = Objects.requireNonNull(previous.entry().revision());
@@ -332,8 +371,8 @@ final class EditorSyncPublicationValidator {
       JsonObject changed = JsonParser.parseString(incoming.entry().json()).getAsJsonObject();
       changed.addProperty("revision", previousRevision + 1L);
       String persistedShape = GSON.toJson(changed) + System.lineSeparator();
-      EditorSyncDocumentKind.ParsedDocument parsed = key.kind().parse(key.id(), persistedShape);
-      String normalized = key.kind().wireSource(key.id(), persistedShape, parsed);
+      EditorSyncDocumentKind.ParsedDocument parsed = key.kind().parse(key.id(), persistedShape, presets);
+      String normalized = key.kind().wireSource(key.id(), persistedShape, parsed, presets);
       EditorSyncDocuments.Entry revised = new EditorSyncDocuments.Entry(
           key.kind().wireName(), key.id(), previousRevision + 1L, normalized,
           EditorSyncDocuments.contentRevision(normalized));
@@ -371,11 +410,11 @@ final class EditorSyncPublicationValidator {
     return entry == null ? null : EditorSyncDocuments.contentRevision(entry.entry().json());
   }
 
-  private ParsedEntry normalizeNew(ParsedEntry incoming) {
+  private ParsedEntry normalizeNew(ParsedEntry incoming, DocumentPresetCatalog presets) {
     EditorSyncDocumentKind kind = EditorSyncDocumentKind.parseWireName(incoming.entry().kind());
     String persistedShape = ensureLineEnd(incoming.entry().json());
-    EditorSyncDocumentKind.ParsedDocument parsed = kind.parse(incoming.entry().id(), persistedShape);
-    String source = kind.wireSource(incoming.entry().id(), persistedShape, parsed);
+    EditorSyncDocumentKind.ParsedDocument parsed = kind.parse(incoming.entry().id(), persistedShape, presets);
+    String source = kind.wireSource(incoming.entry().id(), persistedShape, parsed, presets);
     if (source.equals(incoming.entry().json())) {
       return incoming;
     }

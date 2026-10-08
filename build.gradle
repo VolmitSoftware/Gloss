@@ -144,6 +144,7 @@ shadowJarTask.configure {
     relocate('com.github.retrooper.packetevents', "${lib}.packetevents.api")
     relocate('io.github.retrooper.packetevents', "${lib}.packetevents.impl")
     relocate('org.bstats', "${lib}.bstats")
+    relocate('com.google.re2j', "${lib}.re2j")
 }
 
 slimJar {
@@ -284,6 +285,7 @@ repositories {
 
 dependencies {
     implementation('de.crazydev22.slimjar.helper:spigot:2.1.9')
+    implementation('com.google.re2j:re2j:1.8')
     compileOnly('me.clip:placeholderapi:2.11.6') { transitive = false }
     compileOnly('com.github.MilkBowl:VaultAPI:1.7') { transitive = false }
     compileOnly(libs.paper)
@@ -335,6 +337,7 @@ dependencies {
     testImplementation('com.willfp:libreforge:2026.39:shadow') { transitive = false }
     testImplementation('org.jetbrains.kotlin:kotlin-stdlib:2.3.0')
     testRuntimeOnly('net.kyori:adventure-platform-bukkit:4.4.1')
+    testRuntimeOnly('io.netty:netty-buffer:4.2.16.Final')
     testImplementation(libs.junitJupiter)
     testImplementation(libs.junit4)
     testRuntimeOnly(libs.junitVintage)

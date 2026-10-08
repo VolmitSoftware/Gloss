@@ -101,6 +101,14 @@ public final class CommandGlossWebEdit {
     web.openSubject("names", id, sender);
   }
 
+  @Director(name = "presets", description = "Open this live document in the web editor",
+      descriptionKey = "command.help.web.edit.document")
+  public void presets(@Param(name = "id", description = "Live Gloss document id",
+                           descriptionKey = "command.help.arg.web_subject", customHandler = PresetsIdHandler.class) String id,
+                      @Param(name = "sender", contextual = true) CommandSender sender) {
+    web.openSubject("presets", id, sender);
+  }
+
   @Director(name = "motd", description = "Open this live document in the web editor",
       descriptionKey = "command.help.web.edit.document")
   public void motd(@Param(name = "id", description = "Live Gloss document id",
@@ -342,6 +350,10 @@ public final class CommandGlossWebEdit {
 
   public static final class NamesIdHandler extends SubjectIdHandler {
     public NamesIdHandler() { super("names"); }
+  }
+
+  public static final class PresetsIdHandler extends SubjectIdHandler {
+    public PresetsIdHandler() { super("presets"); }
   }
 
   public static final class MotdIdHandler extends SubjectIdHandler {

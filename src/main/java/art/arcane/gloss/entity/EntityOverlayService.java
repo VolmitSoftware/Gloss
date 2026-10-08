@@ -1,6 +1,7 @@
 package art.arcane.gloss.entity;
 
 import art.arcane.gloss.Gloss;
+import art.arcane.gloss.service.VisibilityGovernor;
 import art.arcane.gloss.integration.EcoMobsEntityNames;
 import art.arcane.gloss.bedrock.BedrockPolicy;
 import art.arcane.gloss.bedrock.BedrockSurface;
@@ -16,6 +17,14 @@ import art.arcane.gloss.doc.GlossDocument;
 import art.arcane.gloss.doc.RegistryOwner;
 import art.arcane.gloss.doc.ShippedDefaults;
 import art.arcane.gloss.condition.ShowCondition;
+import art.arcane.gloss.condition.RoleSnapshotStore;
+import art.arcane.gloss.condition.EntityRoleSnapshotRuntime;
+import art.arcane.gloss.condition.EntityRelationshipSnapshot;
+import art.arcane.gloss.condition.RoleSnapshotScope;
+import art.arcane.gloss.condition.RoleSnapshotPendingException;
+import art.arcane.gloss.condition.GlossConditionScope;
+import art.arcane.gloss.expr.ExprVariableContext;
+import art.arcane.gloss.expr.ExprRoleSnapshot;
 import art.arcane.gloss.expr.ExprScope;
 import art.arcane.gloss.doc.ShippedDocumentCatalog;
 import art.arcane.volmlib.util.scheduling.FoliaScheduler;
@@ -49,6 +58,9 @@ import org.bukkit.persistence.PersistentDataType;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Comparator;
+import java.util.PriorityQueue;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -67,6 +79,7 @@ public final class EntityOverlayService implements Listener, RegistryOwner {
     private final ShippedDefaults defaults;
     private final DocumentRegistry<EntityOverlayDoc> registry;
     private final NameplateSuppression suppression;
+    private final RoleSnapshotStore roleSnapshots;
     private final ConcurrentMap<UUID, EntityOverlayCell.Anchor> anchors = new ConcurrentHashMap<>();
     private final ConcurrentMap<UUID, EntityOverlayTarget> overlays = new ConcurrentHashMap<>();
     private final ConcurrentMap<UUID, Insight> insights = new ConcurrentHashMap<>();
@@ -93,9 +106,13 @@ public final class EntityOverlayService implements Listener, RegistryOwner {
     private volatile long emojiGeneration = -1;
     private volatile long animationGeneration = -1;
     private int taskId = -1;
+    private volatile int driverIntervalTicks;
+    private final AtomicLong driveTicks = new AtomicLong();
 
     public EntityOverlayService(Gloss plugin) {
         this.plugin = plugin;
+        roleSnapshots = new RoleSnapshotStore(new EntityRoleSnapshotRuntime(plugin, () -> started),
+            () -> settings == null ? 4096 : settings.snapshotReadLimit());
         suppression = new NameplateSuppression(plugin.teams(), "entity-overlay");
         File folder = new File(plugin.getDataFolder(), EntityOverlayDoc.KIND);
         defaults = new ShippedDefaults(EntityOverlayDoc.KIND, folder,
@@ -202,10 +219,46 @@ public final class EntityOverlayService implements Listener, RegistryOwner {
      */
     public void registerSource(EntityOverlaySource source) {
         sources.add(Objects.requireNonNull(source, "source"));
+        refreshSources();
     }
 
     public void unregisterSource(EntityOverlaySource source) {
         sources.remove(source);
+        refreshSources();
+    }
+
+    public void refreshSources() {
+        EntityOverlayDoc current = settings;
+        if (!enabled() || current == null) {
+            return;
+        }
+        int interval = current.updateIntervalTicks();
+        for (EntityOverlaySource source : sources) {
+            int requested = source.scanPolicy().intervalTicks();
+            if (requested > 0) {
+                interval = Math.min(interval, requested);
+            }
+        }
+        for (EntityOverlayTarget overlay : overlays.values()) {
+            overlay.dirty = true;
+            overlay.nextRenderTick = 0;
+        }
+        if (interval == driverIntervalTicks && taskId != -1) {
+            return;
+        }
+        if (taskId != -1) {
+            plugin.scheduler().csr(taskId);
+        }
+        driverIntervalTicks = interval;
+        taskId = plugin.scheduler().sr(this::drive, interval);
+    }
+
+    private double scanRange(EntityOverlayDoc current) {
+        double range = current.range();
+        for (EntityOverlaySource source : sources) {
+            range = Math.max(range, source.scanPolicy().range());
+        }
+        return range;
     }
 
     /** True while another lane owns player panes. */
@@ -320,9 +373,7 @@ public final class EntityOverlayService implements Listener, RegistryOwner {
         trackDistance = updated != null && EntityOverlayText.usesDistance(updated);
         personalText = updated != null && EntityOverlayText.personalRequired(updated,
             plugin.animations()::framesViewerSpecific);
-        if (enabled()) {
-            taskId = plugin.scheduler().sr(this::drive, settings.updateIntervalTicks());
-        }
+        refreshSources();
     }
 
     private void stopDriver() {
@@ -330,6 +381,8 @@ public final class EntityOverlayService implements Listener, RegistryOwner {
             plugin.scheduler().csr(taskId);
             taskId = -1;
         }
+        driverIntervalTicks = 0;
+        roleSnapshots.clear();
         anchors.clear();
         insights.clear();
         insightTargets.clear();
@@ -348,6 +401,7 @@ public final class EntityOverlayService implements Listener, RegistryOwner {
             return;
         }
         long sequence = driveSequence.incrementAndGet();
+        driveTicks.addAndGet(driverIntervalTicks);
         long now = System.currentTimeMillis();
         sweepHits(now);
         sweepInsights(now);
@@ -433,6 +487,12 @@ public final class EntityOverlayService implements Listener, RegistryOwner {
     private void destroy(EntityOverlayTarget overlay) {
         List<UUID> audience = List.copyOf(overlay.audience.keySet());
         overlay.destroy();
+        overlays.compute(overlay.targetId(), (targetId, active) -> {
+            if (active == null || active == overlay) {
+                roleSnapshots.forget(targetId);
+            }
+            return active;
+        });
         retired(overlay, audience);
     }
 
@@ -446,20 +506,17 @@ public final class EntityOverlayService implements Listener, RegistryOwner {
             return;
         }
         overlays.compute(overlay.targetId(), (targetId, active) -> {
+            if (active != null && active != overlay) {
+                return active;
+            }
             for (UUID viewerId : viewerIds) {
-                if (active == null || active == overlay) {
-                    suppression.retire(viewerId, targetId);
-                } else {
-                    updateNametag(active, viewerId);
+                suppression.retire(viewerId, targetId);
+                for (EntityOverlaySource source : sources) {
+                    source.retired(viewerId, targetId);
                 }
             }
             return active;
         });
-        for (EntityOverlaySource source : sources) {
-            for (UUID viewerId : viewerIds) {
-                source.retired(viewerId, overlay.targetId());
-            }
-        }
     }
 
     private void sampleAnchors(EntityOverlayDoc current, long sequence) {
@@ -511,7 +568,7 @@ public final class EntityOverlayService implements Listener, RegistryOwner {
             return;
         }
         try {
-            BoundingBox box = cell.box(current.range());
+            BoundingBox box = cell.box(scanRange(current));
             if (!EntityOverlayCell.owned(cell.world(), box, folia())) {
                 splitCell(cell, current, sequence);
                 return;
@@ -549,7 +606,7 @@ public final class EntityOverlayService implements Listener, RegistryOwner {
         }
         try {
             BoundingBox box = EntityOverlayCell.ownedPortion(anchor.world(),
-                anchor.box(current.range()), anchor.x(), anchor.z(), folia());
+                anchor.box(scanRange(current)), anchor.x(), anchor.z(), folia());
             if (box == null) {
                 return;
             }
@@ -569,8 +626,13 @@ public final class EntityOverlayService implements Listener, RegistryOwner {
         long now = System.currentTimeMillis();
         for (Entity candidate : world.getNearbyEntities(box, EntityOverlayService::isLivingCandidate)) {
             LivingEntity target = (LivingEntity) candidate;
-            if (!eligible(target, current)) {
+            EntityRelationshipSnapshot relationship = EntityRelationshipSnapshot.captureOnOwner(target);
+            EntityOverlaySource source = sourceFor(relationship);
+            if (!eligible(target, current, relationship, source)) {
                 continue;
+            }
+            if (roleSnapshots.isTracked(target.getUniqueId())) {
+                roleSnapshots.captureOnOwner(target, Set.of());
             }
             Location position = target.getLocation();
             Hit hit = hits.get(target.getUniqueId());
@@ -583,7 +645,7 @@ public final class EntityOverlayService implements Listener, RegistryOwner {
                 stackCount(target), target.getType().getKey().getKey(), 0);
             targets.add(new CellTarget(target, target.getUniqueId(), position.getX(), position.getY(),
                 position.getZ(), snapshot,
-                position.clone().add(0, target.getHeight() + current.verticalOffset(), 0)));
+                position.clone().add(0, target.getHeight() + current.verticalOffset(), 0), relationship, source));
         }
         return targets;
     }
@@ -607,33 +669,47 @@ public final class EntityOverlayService implements Listener, RegistryOwner {
             return;
         }
         UUID viewerId = anchor.viewerId();
-        double rangeSquared = current.range() * current.range();
-        List<Admission> admissions = new ArrayList<>(Math.min(targets.size(), current.maxEntitiesPerViewer()));
+        Comparator<Admission> nearest = Comparator.comparingDouble(Admission::distanceSquared)
+            .thenComparing(admission -> admission.target().targetId());
+        Map<EntityOverlaySource, PriorityQueue<Admission>> groups = new HashMap<>();
         for (CellTarget target : targets) {
-            if (viewerId.equals(target.targetId())) {
+            EntityOverlaySource source = target.source();
+            if (source != null && !sources.contains(source)) {
                 continue;
             }
+            if (viewerId.equals(target.targetId()) && (source == null || !source.includesSelf())) {
+                continue;
+            }
+            EntityOverlaySource.ScanPolicy sourcePolicy = source == null ? EntityOverlaySource.ScanPolicy.INHERIT : source.scanPolicy();
+            double range = sourcePolicy.range() > 0 ? sourcePolicy.range() : current.range();
             double distanceSquared = anchor.distanceSquared(target.x(), target.y(), target.z());
-            if (distanceSquared > rangeSquared || !viewer.canSee(target.entity())) {
+            if (distanceSquared > range * range || !viewer.canSee(target.entity())) {
                 continue;
             }
-            admissions.add(new Admission(target, distanceSquared));
+            int maximum = sourcePolicy.subjects() > 0 ? sourcePolicy.subjects() : current.maxEntitiesPerViewer();
+            EntityOverlaySource group = sourcePolicy.subjects() > 0 ? source : null;
+            PriorityQueue<Admission> selected = groups.get(group);
+            if (selected == null) {
+                selected = new PriorityQueue<>(maximum, nearest.reversed());
+                groups.put(group, selected);
+            }
+            Admission admission = new Admission(target, distanceSquared);
+            if (selected.size() < maximum) {
+                selected.add(admission);
+            }
+            else if (nearest.compare(admission, selected.peek()) < 0) {
+                selected.poll();
+                selected.add(admission);
+            }
         }
-        if (admissions.size() > current.maxEntitiesPerViewer()
-            || overlays.size() + admissions.size() > current.maxActiveOverlays()) {
-            admissions.sort((left, right) -> Double.compare(left.distanceSquared(), right.distanceSquared()));
+        List<Admission> admissions = new ArrayList<>();
+        for (PriorityQueue<Admission> group : groups.values()) {
+            admissions.addAll(group);
         }
-        int admitted = 0;
+        admissions.sort(nearest);
         for (Admission admission : admissions) {
-            if (admitted >= current.maxEntitiesPerViewer()) {
-                break;
-            }
             EntityOverlayTarget overlay = admit(viewerId, admission.target(), current, sequence);
-            if (overlay == null) {
-                continue;
-            }
-            admitted++;
-            if (overlay.dirty) {
+            if (overlay != null && overlay.dirty) {
                 dispatchRender(overlay, viewer, current);
             }
         }
@@ -648,9 +724,11 @@ public final class EntityOverlayService implements Listener, RegistryOwner {
             overlay = overlays.computeIfAbsent(target.targetId(), EntityOverlayTarget::new);
         }
         overlay.target = target.entity();
+        overlay.relationship = target.relationship();
+        overlay.source = target.source();
         overlay.publish(target.snapshot(), target.anchor(), target.x(), target.y(), target.z());
         NametagService nametags = plugin.service(NametagService.class);
-        boolean personal = personalText || claimed(target.entity())
+        boolean personal = personalText || target.source() != null
             || target.entity() instanceof Player && nametags != null && nametags.viewerDependent()
             || insightFor(viewerId, target.targetId()) != null;
         overlay.audience.put(viewerId, sequence);
@@ -684,8 +762,16 @@ public final class EntityOverlayService implements Listener, RegistryOwner {
         }
         EntityOverlayCell.Anchor anchor = anchors.get(viewerId);
         LivingEntity target = insight.target();
-        if (anchor == null || !eligible(target, current)) {
+        if (anchor == null) {
             return;
+        }
+        EntityRelationshipSnapshot relationship = EntityRelationshipSnapshot.captureOnOwner(target);
+        EntityOverlaySource source = sourceFor(relationship);
+        if (!eligible(target, current, relationship, source)) {
+            return;
+        }
+        if (roleSnapshots.isTracked(target.getUniqueId())) {
+            roleSnapshots.captureOnOwner(target, Set.of());
         }
         Location position = target.getLocation();
         if (position.getWorld() != anchor.world()) {
@@ -702,7 +788,7 @@ public final class EntityOverlayService implements Listener, RegistryOwner {
             stackCount(target), target.getType().getKey().getKey(), 0);
         CellTarget cellTarget = new CellTarget(target, insight.targetId(), position.getX(), position.getY(),
             position.getZ(), snapshot,
-            position.clone().add(0, target.getHeight() + current.verticalOffset(), 0));
+            position.clone().add(0, target.getHeight() + current.verticalOffset(), 0), relationship, source);
         Player viewer = anchor.player();
         Runnable admit = () -> {
             if (!enabled() || settings != current || !viewer.isOnline() || !viewer.canSee(target)) {
@@ -719,9 +805,11 @@ public final class EntityOverlayService implements Listener, RegistryOwner {
     }
 
     private void dispatchRender(EntityOverlayTarget overlay, Player representative, EntityOverlayDoc current) {
-        if (!overlay.rendering.compareAndSet(false, true)) {
+        if (driveTicks.get() < overlay.nextRenderTick || !overlay.rendering.compareAndSet(false, true)) {
             return;
         }
+        int requested = overlay.source == null ? 0 : overlay.source.scanPolicy().intervalTicks();
+        overlay.nextRenderTick = driveTicks.get() + (requested > 0 ? requested : current.updateIntervalTicks());
         Runnable retired = () -> overlay.rendering.set(false);
         if (!FoliaScheduler.runEntity(plugin, representative, () -> {
             try {
@@ -745,6 +833,8 @@ public final class EntityOverlayService implements Listener, RegistryOwner {
         synchronized (overlay.shared) {
             try {
                 renderShared(overlay, representative, target, current, sample);
+            } catch (RoleSnapshotPendingException pending) {
+                overlay.dirty = true;
             } catch (RuntimeException failure) {
                 overlay.shared.hide();
                 Gloss.logExceptionStackThrottled(false, "entity-overlay-render", failure,
@@ -816,6 +906,8 @@ public final class EntityOverlayService implements Listener, RegistryOwner {
                 if (apply(overlay, personal, viewer, target, current, snapshot, details, sample.anchor())) {
                     syncWhitelist(personal, List.of(viewerId));
                 }
+            } catch (RoleSnapshotPendingException pending) {
+                overlay.dirty = true;
             } catch (RuntimeException failure) {
                 personal.hide();
                 Gloss.logExceptionStackThrottled(false, "entity-overlay-render", failure,
@@ -847,11 +939,14 @@ public final class EntityOverlayService implements Listener, RegistryOwner {
         if (overlay.retired || !enabled() || current == null || !current.overrideNametag()
             || target == null || target instanceof Player || !overlay.audience.containsKey(viewerId)
             || render == null || render.display == null || !render.whitelist.contains(viewerId)
+            || !render.admitted.contains(viewerId)
             || viewer == null || plugin.bedrock() != null && plugin.bedrock().isBedrock(viewerId)) {
-            suppression.retire(viewerId, overlay.targetId());
             return;
         }
-        suppression.admit(viewer, target, false);
+        EntityRelationshipSnapshot relationship = overlay.relationship;
+        if (relationship != null) {
+            suppression.admit(viewer, relationship.id(), relationship.teamEntry(), false);
+        }
     }
 
     private EntityOverlayText.Snapshot personalSnapshot(EntityOverlayTarget.Sample sample, UUID viewerId) {
@@ -870,12 +965,17 @@ public final class EntityOverlayService implements Listener, RegistryOwner {
     private boolean apply(EntityOverlayTarget overlay, EntityOverlayTarget.Render render, Player viewer,
                           LivingEntity target, EntityOverlayDoc current,
                           EntityOverlayText.Snapshot snapshot, List<String> details, Location anchor) {
-        if (target instanceof Player player) {
-            snapshot = snapshot.withName(plugin.text().playerName(viewer, player));
+        ExprRoleSnapshot subject = roleSnapshots.view(target);
+        ExprScope pairScope = new RoleSnapshotScope(GlossConditionScope.viewer(plugin, viewer),
+            new ExprVariableContext(viewer, target, target, null, Map.of("subject", subject, "target", subject)));
+        if (overlay.relationship != null && overlay.relationship.player()) {
+            NametagService nametags = plugin.service(NametagService.class);
+            snapshot = snapshot.withName(nametags == null ? overlay.relationship.teamEntry()
+                : nametags.displayNameFromScope(viewer, pairScope));
         }
         EntityOverlayDoc selected = current;
         if (!presentationVariants.isEmpty()) {
-            ExprScope scope = EntityOverlayText.variantScope(plugin, viewer, snapshot, !details.isEmpty());
+            ExprScope scope = EntityOverlayText.variantScope(pairScope, snapshot, !details.isEmpty());
             for (PresentationVariant variant : presentationVariants) {
                 if (variant.condition().matches(scope)) {
                     selected = variant.document();
@@ -888,20 +988,26 @@ public final class EntityOverlayService implements Listener, RegistryOwner {
         long render0 = plugin.text().renderGeneration();
         long emoji = TextPipeline.emojiGeneration();
         long animation = plugin.animations().generation();
-        EntityOverlaySource source = sourceFor(target);
-        boolean prepare = source != null || presentationChanged || render.prepared == null || refreshText || !snapshot.equals(render.snapshot)
+        EntityOverlaySource source = overlay.source;
+        boolean prepare = source != null || source != render.source || presentationChanged || render.prepared == null || refreshText || !snapshot.equals(render.snapshot)
             || !details.equals(render.details) || render0 != render.renderGeneration
             || emoji != render.emojiGeneration || animation != render.animationGeneration;
+        EntityOverlaySource.Pane previousPane = render.pane;
+        if (source != render.source && render.display != null) {
+            render.hide();
+        }
         if (prepare) {
             textPreparations.incrementAndGet();
-            EntityOverlaySource.Pane pane = source == null ? null : source.prepare(viewer, target, snapshot);
+            EntityOverlaySource.Pane pane = source == null ? null : source.prepare(
+                new EntityOverlaySource.Context(viewer, overlay.relationship, snapshot, pairScope));
             if (source != null && pane == null) {
                 render.hide();
                 return false;
             }
             render.pane = pane;
+            render.source = source;
             render.prepared = pane == null
-                ? EntityOverlayText.prepare(plugin, viewer, current, snapshot, details)
+                ? EntityOverlayText.prepare(plugin.text(), plugin.animator(), viewer, pairScope, current, snapshot, details)
                 : pane.prepared();
             render.snapshot = snapshot;
             render.details = details;
@@ -917,14 +1023,16 @@ public final class EntityOverlayService implements Listener, RegistryOwner {
         }
         EntityOverlaySource.Pane pane = render.pane;
         EntityOverlayDoc presentation = current;
-        if (!overlay.attach(render, () -> createDisplay(target, presentation, anchor, pane))) {
+        if (!overlay.attach(render, () -> createDisplay(overlay, render, target, presentation, anchor, pane))) {
             return false;
         }
-        if (presentationChanged && pane == null) {
-            render.display.setStyle(current.style());
-            render.display.setBox(current.box());
-            render.display.setParticleLayers(current.particleLayers());
-            double offset = current.verticalOffset();
+        if (presentationChanged || pane != null && (previousPane == null
+            || !pane.style().equals(previousPane.style()) || !pane.box().equals(previousPane.box())
+            || pane.offset() != previousPane.offset())) {
+            render.display.setStyle(pane == null ? current.style() : pane.style());
+            render.display.setBox(pane == null ? current.box() : pane.box());
+            render.display.setParticleLayers(pane == null ? current.particleLayers() : List.of());
+            double offset = pane == null ? current.verticalOffset() : pane.offset();
             render.display.bindPosition(target, () -> target.getLocation().add(0, target.getHeight() + offset, 0));
         }
         render.presentation = current;
@@ -944,11 +1052,18 @@ public final class EntityOverlayService implements Listener, RegistryOwner {
         return true;
     }
 
-    private TemporaryHologram createDisplay(LivingEntity target, EntityOverlayDoc current, Location anchor,
+    private TemporaryHologram createDisplay(EntityOverlayTarget overlay, EntityOverlayTarget.Render render,
+                                            LivingEntity target, EntityOverlayDoc current, Location anchor,
                                             EntityOverlaySource.Pane pane) {
         double offset = pane == null ? current.verticalOffset() : pane.offset();
         TemporaryHologram display = plugin.holograms().createTemporary(
             "entity-overlay:" + target.getUniqueId(), anchor, Long.MAX_VALUE);
+        plugin.holograms().setVisibilitySurface(display, pane == null
+            ? VisibilityGovernor.Surface.OVERLAY : VisibilityGovernor.Surface.NAMEPLATE);
+        EntityOverlaySource source = render.source;
+        DisplayVisibility visibility = new DisplayVisibility(overlay, render, display, source);
+        plugin.holograms().setVisibilityObserver(display, (viewerId, visible) ->
+            displayVisibility(visibility, viewerId, visible));
         display.viewers().whitelist();
         display.setStyle(pane == null ? current.style() : pane.style());
         display.setBox(pane == null ? current.box() : pane.box());
@@ -956,6 +1071,48 @@ public final class EntityOverlayService implements Listener, RegistryOwner {
         display.bindPosition(target, () -> target.getLocation()
             .add(0, target.getHeight() + offset, 0));
         return display;
+    }
+
+    private record DisplayVisibility(EntityOverlayTarget overlay, EntityOverlayTarget.Render render,
+                                     TemporaryHologram display, EntityOverlaySource source) { }
+
+    private void displayVisibility(DisplayVisibility context, UUID viewerId, boolean visible) {
+        EntityOverlayTarget overlay = context.overlay();
+        EntityOverlayTarget.Render render = context.render();
+        TemporaryHologram display = context.display();
+        EntityOverlaySource source = context.source();
+        if (render.display != null && render.display != display) {
+            return;
+        }
+        if (!visible) {
+            if (!render.admitted.remove(viewerId)) {
+                return;
+            }
+            EntityOverlayTarget active = overlays.get(overlay.targetId());
+            if (active != null && active != overlay) {
+                return;
+            }
+            EntityOverlayTarget.Render replacement = active == null ? null
+                : active.personalViewers.contains(viewerId) ? active.personal.get(viewerId) : active.shared;
+            if (replacement != null && replacement != render && replacement.admitted.contains(viewerId)) {
+                return;
+            }
+            suppression.retire(viewerId, overlay.targetId());
+            if (source != null) {
+                source.retired(viewerId, overlay.targetId());
+            }
+            return;
+        }
+        if (overlay.retired || overlays.get(overlay.targetId()) != overlay
+            || !overlay.audience.containsKey(viewerId)) {
+            return;
+        }
+        render.admitted.add(viewerId);
+        Player viewer = Bukkit.getPlayer(viewerId);
+        if (source != null && viewer != null && overlay.relationship != null) {
+            source.displayed(viewer, overlay.relationship);
+        }
+        updateNametag(overlay, viewerId);
     }
 
     private static void syncWhitelist(EntityOverlayTarget.Render render, List<UUID> audience) {
@@ -987,25 +1144,21 @@ public final class EntityOverlayService implements Listener, RegistryOwner {
         }
     }
 
-    private boolean eligible(LivingEntity target, EntityOverlayDoc current) {
-        return target.isValid() && !target.isDead() && !target.isInvisible()
-            && (current.includePlayers() || !(target instanceof Player) || claimed(target))
-            && !(target instanceof Player other && other.getGameMode() == GameMode.SPECTATOR)
-            && !current.excludedEntityTypes().contains(target.getType().name());
+    private boolean eligible(LivingEntity target, EntityOverlayDoc current,
+                             EntityRelationshipSnapshot relationship, EntityOverlaySource source) {
+        return target.isValid() && !target.isDead()
+            && (source != null || !relationship.invisible() && !relationship.spectator()
+                && (current.includePlayers() || !relationship.player())
+                && !current.excludedEntityTypes().contains(target.getType().name()));
     }
 
-    /** @return the source that owns this target's pane, or null when the document owns it */
-    private EntityOverlaySource sourceFor(LivingEntity target) {
+    private EntityOverlaySource sourceFor(EntityRelationshipSnapshot target) {
         for (EntityOverlaySource source : sources) {
             if (source.wants(target)) {
                 return source;
             }
         }
         return null;
-    }
-
-    private boolean claimed(LivingEntity target) {
-        return sourceFor(target) != null;
     }
 
     private static boolean isLivingCandidate(Entity entity) {
@@ -1087,6 +1240,7 @@ public final class EntityOverlayService implements Listener, RegistryOwner {
     }
 
     private void removeEntity(UUID entityId) {
+        roleSnapshots.forget(entityId);
         hits.remove(entityId);
         stackCounts.remove(entityId);
         Set<UUID> viewers = insightTargets.remove(entityId);
@@ -1142,7 +1296,8 @@ public final class EntityOverlayService implements Listener, RegistryOwner {
     }
 
     private record CellTarget(LivingEntity entity, UUID targetId, double x, double y, double z,
-                              EntityOverlayText.Snapshot snapshot, Location anchor) {
+                              EntityOverlayText.Snapshot snapshot, Location anchor, EntityRelationshipSnapshot relationship,
+                              EntityOverlaySource source) {
     }
 
     private record Admission(CellTarget target, double distanceSquared) {

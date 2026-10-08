@@ -7,6 +7,12 @@ import art.arcane.gloss.behavior.Explainable;
 import art.arcane.gloss.condition.BoundedConditionErrorCallback;
 import art.arcane.gloss.condition.GlossConditionContext;
 import art.arcane.gloss.condition.GlossConditionScope;
+import art.arcane.gloss.condition.RoleSnapshotStore;
+import art.arcane.gloss.condition.EntityRoleSnapshotRuntime;
+import art.arcane.gloss.condition.RoleSnapshotScope;
+import art.arcane.gloss.condition.RoleSnapshotPendingException;
+import art.arcane.gloss.expr.ExprScope;
+import art.arcane.gloss.expr.ExprVariableContext;
 import art.arcane.gloss.doc.DocumentDelta;
 import art.arcane.gloss.doc.DocumentRegistry;
 import art.arcane.gloss.doc.GlossDocument;
@@ -20,6 +26,10 @@ import com.github.retrooper.packetevents.PacketEvents;
 import com.github.retrooper.packetevents.event.PacketListenerCommon;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
+import org.bukkit.entity.Entity;
+import com.github.retrooper.packetevents.protocol.player.TextureProperty;
+import com.github.retrooper.packetevents.protocol.player.User;
+import com.github.retrooper.packetevents.protocol.player.ClientVersion;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.HandlerList;
@@ -33,6 +43,7 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -42,6 +53,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.UnaryOperator;
 import java.util.function.IntConsumer;
 import java.util.function.IntSupplier;
 
@@ -79,6 +92,10 @@ public final class TablistService implements Listener, Explainable, RegistryOwne
     private final BoundedConditionErrorCallback conditionErrors;
     private final TablistSortService sorts;
     private final TablistLayoutService layouts;
+    private final RoleSnapshotStore snapshots;
+    private final AtomicReference<RosterPass> pendingRoster = new AtomicReference<>();
+    private volatile Map<UUID, CapturedSubject> roster = Map.of();
+    private volatile Map<String, TablistLayoutDefinition.Skin> rosterTextures = Map.of();
     private volatile TablistLayoutRuntime activeLayout;
     private volatile PacketListenerCommon layoutListener;
     private volatile TablistDoc activeDoc;
@@ -113,9 +130,10 @@ public final class TablistService implements Listener, Explainable, RegistryOwne
             Gloss.logExceptionStackThrottled(false, "tablist-condition-" + error.path(), error.cause(),
                 "Tablist condition %s failed and was treated as false.", error.path()));
         this.sorts = new TablistSortService(this::sendSortOrders);
+        this.snapshots = new RoleSnapshotStore(new EntityRoleSnapshotRuntime(plugin, () -> running), () -> plugin.cfg().tablist().snapshotReadLimit());
         this.layouts = new TablistLayoutService(new PacketLayoutSink(),
-            new TablistLayoutService.Renderers(raw -> plugin.text().renderStatic(raw),
-                (viewer, subject) -> layoutPlayerName(subject, appliedListNames), this::layoutPlayerOrder));
+            new TablistLayoutService.Renderers((viewer, raw) -> plugin.text().render(viewer, raw),
+                this::renderLayoutName, this::layoutPlayerOrder, this::layoutSubject, name -> rosterTextures.get(name)));
         this.activeDoc = TablistDoc.DEFAULTS;
         this.activeRuntime = TablistRuntime.compile(activeDoc);
         this.activeLayout = TablistLayoutRuntime.compile(activeDoc.layout());
@@ -128,6 +146,17 @@ public final class TablistService implements Listener, Explainable, RegistryOwne
     @Override
     public ExplainReport explain(String id, Player viewer) {
         return ExplainReports.tablist(doc(), GlossConditionScope.viewer(plugin, viewer));
+    }
+
+    public Map<String, Object> cadenceSnapshot() {
+        synchronized (fastDriverLifecycle) {
+            return Map.of(
+                "configuredIntervalTicks", plugin.cfg().tablist().updateIntervalTicks(),
+                "ordinaryDriverRunning", driverTaskId != -1,
+                "ordinaryDriverIntervalTicks", driverTaskId == -1 ? 0 : driverIntervalTicks,
+                "fastDriverRunning", fastDriverLifecycle.taskId() != -1,
+                "fastDriverIntervalTicks", fastDriverLifecycle.taskId() == -1 ? 0 : ANIMATION_REFRESH_INTERVAL_TICKS);
+        }
     }
 
     public static String substituteTokens(String raw, String playerName, String groupName) {
@@ -193,6 +222,9 @@ public final class TablistService implements Listener, Explainable, RegistryOwne
         }
         playerApplyQueues.clear();
         sorts.clear();
+        snapshots.clear();
+        roster = Map.of();
+        rosterTextures = Map.of();
         restoreLayouts();
         if (layoutListener != null) {
             PacketEvents.getAPI().getEventManager().unregisterListener(layoutListener);
@@ -293,6 +325,7 @@ public final class TablistService implements Listener, Explainable, RegistryOwne
     @EventHandler(priority = EventPriority.MONITOR)
     public void on(PlayerQuitEvent event) {
         UUID uuid = event.getPlayer().getUniqueId();
+        snapshots.forget(uuid);
         synchronized (fastDriverLifecycle) {
             overrides.remove(uuid);
             fastOverridePlayers.remove(uuid);
@@ -324,19 +357,17 @@ public final class TablistService implements Listener, Explainable, RegistryOwne
 
     @EventHandler(priority = EventPriority.MONITOR)
     public void on(PlayerChangedWorldEvent event) {
+        snapshots.forget(event.getPlayer().getUniqueId());
         invalidateAndPush(event.getPlayer());
     }
 
-    /** One layout pass per driver cycle; only the rows whose text changed leave the server. */
-    private void layoutPass() {
-        TablistLayoutRuntime layout = activeLayout;
-        List<Player> players = new ArrayList<>(Bukkit.getOnlinePlayers());
-        for (Player viewer : players) {
-            plugin.scheduler().runEntity(viewer, () -> {
-                if (viewer.isOnline() && !suppressForProxy(viewer)) {
-                    layouts.apply(viewer, layout, players, this::sortScope, conditionErrors);
-                }
-            });
+    private void rosterPass() {
+        if (activeLayout == null && activeRuntime.sortWeight() == null) {
+            return;
+        }
+        RosterPass pass = new RosterPass(new ArrayList<>(Bukkit.getOnlinePlayers()));
+        if (!pass.players.isEmpty() && pendingRoster.compareAndSet(null, pass)) {
+            pass.capture();
         }
     }
 
@@ -346,6 +377,8 @@ public final class TablistService implements Listener, Explainable, RegistryOwne
      * grid the previous compile produced.
      */
     private void adoptLayout(TablistDoc updated) {
+        snapshots.clear();
+        pendingRoster.set(null);
         restoreLayouts();
         activeLayout = TablistLayoutRuntime.compile(updated.layout());
         syncLayoutListener();
@@ -362,8 +395,9 @@ public final class TablistService implements Listener, Explainable, RegistryOwne
         }
         if (wanted) {
             layoutListener = PacketEvents.getAPI().getEventManager()
-                .registerListener(new PlayerInfoRewriteListener(
-                    uuid -> !proxyOwnsTablist(uuid) && layouts.hasLayout(uuid), layouts::recordUnlisted));
+                .registerListener(new PlayerInfoRewriteListener(new PlayerInfoRewriteListener.Ownership(
+                    uuid -> !proxyOwnsTablist(uuid) && layouts.hasLayout(uuid),
+                    uuid -> Bukkit.getPlayer(uuid) != null, layouts::recordUnlisted)));
             return;
         }
         PacketEvents.getAPI().getEventManager().unregisterListener(layoutListener);
@@ -372,20 +406,8 @@ public final class TablistService implements Listener, Explainable, RegistryOwne
 
     private void restoreLayouts() {
         for (Player viewer : Bukkit.getOnlinePlayers()) {
-            layouts.restore(viewer);
+            plugin.scheduler().runEntity(viewer, () -> layouts.restore(viewer));
         }
-        layouts.forgetAll();
-    }
-
-    /** One ordering pass per driver cycle: weights are cheap, the packets are change-gated. */
-    private void sortPass() {
-        TablistRuntime runtime = activeRuntime;
-        if (runtime.sortWeight() == null) {
-            return;
-        }
-        List<Player> players = new ArrayList<>(Bukkit.getOnlinePlayers());
-        players.removeIf(player -> proxyOwnsTablist(player.getUniqueId()));
-        sorts.pass(runtime, players, this::sortScope, conditionErrors);
     }
 
     private void sendSortOrders(List<Player> viewers, Map<UUID, Integer> orders) {
@@ -404,20 +426,39 @@ public final class TablistService implements Listener, Explainable, RegistryOwne
         }
     }
 
-    static String layoutPlayerName(Player subject, Map<UUID, String> names) {
-        String rendered = names.get(subject.getUniqueId());
-        return rendered == null ? subject.getName() : rendered;
-    }
-
     private int layoutPlayerOrder(Player viewer, Player subject) {
         TablistRuntime runtime = activeRuntime;
         return runtime.sortWeight() == null ? 0
             : sorts.publishedOrder(viewer.getUniqueId(), subject.getUniqueId(), runtime.sortViewerDependent());
     }
 
-    private GlossConditionScope sortScope(Player viewer, Player subject) {
-        return new GlossConditionScope(plugin,
-            GlossConditionContext.subject(viewer, subject, null, Map.of()));
+    private ExprScope sortScope(Player viewer, Player subject) {
+        if (viewer == subject) {
+            return new GlossConditionScope(plugin, GlossConditionContext.subject(viewer, subject, null, Map.of()));
+        }
+        return new RoleSnapshotScope(GlossConditionScope.viewer(plugin, viewer),
+            new ExprVariableContext(viewer, subject, null, null, Map.of("subject", snapshots.view(subject))));
+    }
+
+    private TablistLayoutService.Subject layoutSubject(Player viewer, Player subject) {
+        CapturedSubject captured = roster.get(subject.getUniqueId());
+        return captured == null || Bukkit.getPlayer(subject.getUniqueId()) != subject
+            ? null : new TablistLayoutService.Subject(captured.name(), captured.ping(),
+            viewer.canSee(subject)
+                && !layouts.externallyHidden(viewer.getUniqueId(), subject.getUniqueId()), captured.npc());
+    }
+
+    private String renderLayoutName(Player viewer, Player subject, String format) {
+        ExprScope scope = sortScope(viewer, subject);
+        TablistRuntime.ListNameProfile profile = activeRuntime.listName(scope, conditionErrors);
+        CapturedSubject captured = roster.get(subject.getUniqueId());
+        if (profile == null && format == null) {
+            return captured == null ? "" : captured.name();
+        }
+        String selected = format == null ? profile.presentation().format() : format;
+        Object group = selected.contains(GROUP_TOKEN) ? scope.variable("subject.group") : null;
+        String raw = substituteTokens(selected, plugin.text().playerName(viewer, subject), group == null ? null : group.toString());
+        return plugin.text().renderScoped(viewer, raw, scope, UnaryOperator.identity());
     }
 
     private TablistDoc doc() {
@@ -479,6 +520,7 @@ public final class TablistService implements Listener, Explainable, RegistryOwne
             return;
         }
         driverEpoch.incrementAndGet();
+        pendingRoster.set(null);
         running = true;
         int intervalTicks = desiredDriverIntervalTicks();
         // The driver ticks every tick and applies a slice of the fleet, so the configured interval
@@ -498,6 +540,7 @@ public final class TablistService implements Listener, Explainable, RegistryOwne
     private void stopDriverLocked() {
         running = false;
         driverEpoch.incrementAndGet();
+        pendingRoster.set(null);
         if (driverTaskId != -1) {
             plugin.scheduler().csr(driverTaskId);
             driverTaskId = -1;
@@ -554,8 +597,7 @@ public final class TablistService implements Listener, Explainable, RegistryOwne
             applyOrder.clear();
             applyCursor = 0;
             HeaderFooterHeartbeatCycle cycle = new HeaderFooterHeartbeatCycle(HEADER_FOOTER_HEARTBEAT_LIMIT_PER_CYCLE);
-            sortPass();
-            layoutPass();
+            rosterPass();
             for (Player player : Bukkit.getOnlinePlayers()) {
                 requestApply(player, epoch, APPLY_FULL, cycle);
             }
@@ -566,8 +608,7 @@ public final class TablistService implements Listener, Explainable, RegistryOwne
         }
         if (applyStripeIndex == 0) {
             beginApplyCycle();
-            sortPass();
-            layoutPass();
+            rosterPass();
         }
         int remaining = applyOrder.size() - applyCursor;
         if (remaining > 0) {
@@ -1034,6 +1075,121 @@ public final class TablistService implements Listener, Explainable, RegistryOwne
         } else {
             fastPlayers.remove(uuid);
         }
+    }
+
+    private final class RosterPass {
+        private final List<Player> players;
+        private final Map<UUID, CapturedSubject> captured = new ConcurrentHashMap<>();
+        private final long epoch = driverEpoch.get();
+        private final long generation = docGeneration.get();
+        private final TablistRuntime runtime = activeRuntime;
+        private final TablistLayoutRuntime layout = activeLayout;
+
+        private RosterPass(List<Player> players) {
+            this.players = players;
+        }
+
+        private boolean current() {
+            return isActiveEpoch(epoch) && generation == docGeneration.get() && pendingRoster.get() == this;
+        }
+
+        private void capture() {
+            AtomicInteger remaining = new AtomicInteger(players.size());
+            for (Player player : players) {
+                AtomicBoolean completed = new AtomicBoolean();
+                Runnable complete = () -> {
+                    if (completed.compareAndSet(false, true) && remaining.decrementAndGet() == 0) {
+                        publish();
+                    }
+                };
+                if (!FoliaScheduler.runEntity(plugin, player, () -> capturePlayer(player, complete), 0L, complete)) {
+                    complete.run();
+                }
+            }
+        }
+
+        private void capturePlayer(Player player, Runnable complete) {
+            try {
+                if (!current() || !player.isOnline() || Bukkit.getPlayer(player.getUniqueId()) != player) {
+                    return;
+                }
+                snapshots.captureOnOwner(player, Set.of("subject.name", "subject.uuid"));
+                List<TextureProperty> textures = new ArrayList<>(1);
+                User user = PacketEvents.getAPI() == null ? null : PacketEvents.getAPI().getPlayerManager().getUser(player);
+                if (user != null && user.getProfile() != null) {
+                    for (TextureProperty texture : user.getProfile().getTextureProperties()) {
+                        if (texture.getName().equals("textures")) {
+                            textures.add(texture);
+                        }
+                    }
+                }
+                captured.put(player.getUniqueId(), new CapturedSubject(player.getName(), player.getPing(),
+                    player.hasMetadata("NPC"), List.copyOf(textures)));
+                sorts.captureSubject(runtime, player, sortScope(player, player), conditionErrors);
+            } catch (RoleSnapshotPendingException pending) {
+                return;
+            } catch (RuntimeException failure) {
+                Gloss.logExceptionStackThrottled(false, "tablist-roster-capture", failure,
+                    "Could not capture tablist subject %s.", player.getUniqueId());
+            } finally {
+                complete.run();
+            }
+        }
+
+        private void publish() {
+            if (!current()) {
+                pendingRoster.compareAndSet(this, null);
+                return;
+            }
+            roster = Map.copyOf(captured);
+            Map<String, TablistLayoutDefinition.Skin> textures = new HashMap<>(captured.size());
+            for (CapturedSubject subject : captured.values()) {
+                if (!subject.textures().isEmpty()) {
+                    TextureProperty texture = subject.textures().getFirst();
+                    textures.put(subject.name(), new TablistLayoutDefinition.Skin(texture.getValue(), texture.getSignature()));
+                }
+            }
+            rosterTextures = Map.copyOf(textures);
+            AtomicInteger remaining = new AtomicInteger(players.size());
+            for (Player viewer : players) {
+                AtomicBoolean completed = new AtomicBoolean();
+                Runnable complete = () -> {
+                    if (completed.compareAndSet(false, true) && remaining.decrementAndGet() == 0) {
+                        pendingRoster.compareAndSet(this, null);
+                    }
+                };
+                if (!FoliaScheduler.runEntity(plugin, viewer, () -> applyViewer(viewer, complete), 0L, complete)) {
+                    complete.run();
+                }
+            }
+        }
+
+        private void applyViewer(Player viewer, Runnable complete) {
+            try {
+                if (!current() || !viewer.isOnline() || Bukkit.getPlayer(viewer.getUniqueId()) != viewer
+                    || suppressForProxy(viewer)) {
+                    return;
+                }
+                sorts.applyViewer(runtime, viewer, players, TablistService.this::sortScope, conditionErrors);
+                User user = PacketEvents.getAPI() == null ? null : PacketEvents.getAPI().getPlayerManager().getUser(viewer);
+                boolean supportsLayout = user != null && user.getClientVersion() != null
+                    && user.getClientVersion().isNewerThanOrEquals(ClientVersion.V_1_21_2);
+                boolean documentVisible = runtime.documentVisible(sortScope(viewer, viewer), conditionErrors);
+                layouts.apply(viewer, supportsLayout && documentVisible ? layout : null, players,
+                    TablistService.this::sortScope, conditionErrors);
+            } catch (RoleSnapshotPendingException pending) {
+                return;
+            } catch (RuntimeException failure) {
+                Gloss.logExceptionStackThrottled(false, "tablist-roster-apply", failure,
+                    "Could not apply tablist roster for %s.", viewer.getUniqueId());
+            } finally {
+                complete.run();
+            }
+        }
+    }
+
+
+    private record CapturedSubject(String name, int ping, boolean npc, List<TextureProperty> textures) {
     }
 
     private record TabOverride(String header, String footer) {

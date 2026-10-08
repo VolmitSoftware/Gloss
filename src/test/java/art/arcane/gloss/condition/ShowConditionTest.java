@@ -25,6 +25,16 @@ class ShowConditionTest {
     }
 
     @Test
+    void literalScopeRequirementDoesNotChangeAuthoredCadenceClassification() {
+        ShowCondition parenthesized = ShowCondition.of("(true)");
+        assertTrue(parenthesized.isDynamic());
+        assertFalse(parenthesized.requiresScope());
+        assertTrue(parenthesized.matches(new Values(Map.of())));
+        assertThrows(NullPointerException.class, () -> parenthesized.matches(null));
+        assertTrue(ShowCondition.of("viewer.op").requiresScope());
+    }
+
+    @Test
     void worldAndTimeAreReevaluatedAcrossBothTransitions() {
         ShowCondition show = parse("\"world.name == 'survival' && world.time > 12000\"");
         assertFalse(show.matches(scope("survival", 12000)));

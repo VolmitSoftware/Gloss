@@ -1,7 +1,9 @@
 package art.arcane.gloss.forge;
 
+import art.arcane.gloss.GlossConfig;
 import org.bukkit.entity.Player;
 import org.bukkit.event.player.PlayerResourcePackStatusEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -14,11 +16,13 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicLong;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class PackDeliveryTest {
     private static final UUID PLAYER = UUID.fromString("00000000-0000-0000-0000-0000000000f0");
@@ -59,7 +63,7 @@ class PackDeliveryTest {
     }
 
     private static PackDelivery.Settings settings(String url) {
-        return new PackDelivery.Settings(url, false, "127.0.0.1", 0, "Gloss glyphs and icons", false);
+        return new PackDelivery.Settings(url, false, "127.0.0.1", 0, "Gloss glyphs and icons", false, 4, 32);
     }
 
     @Test
@@ -70,7 +74,7 @@ class PackDeliveryTest {
         assertTrue(delivery.send(player()));
 
         Object[] call = sent.getFirst();
-        assertEquals(PackDelivery.PACK_ID, call[0]);
+        assertEquals(PackDelivery.id(artifact), call[0]);
         assertEquals("https://cdn.example/gloss.zip", call[1]);
         assertArrayEquals(artifact.sha1(), (byte[]) call[2]);
         assertEquals("Gloss glyphs and icons", call[3]);
@@ -107,8 +111,9 @@ class PackDeliveryTest {
         PackArtifact artifact = artifact("pack");
         delivery.enable(settings("https://cdn.example/gloss.zip"), artifact);
         Player viewer = player();
+        delivery.send(viewer);
 
-        delivery.onStatus(new PlayerResourcePackStatusEvent(viewer, PackDelivery.PACK_ID,
+        delivery.onStatus(new PlayerResourcePackStatusEvent(viewer, PackDelivery.id(artifact),
             PlayerResourcePackStatusEvent.Status.SUCCESSFULLY_LOADED));
 
         assertTrue(namespace.loaded(PLAYER));
@@ -127,9 +132,10 @@ class PackDeliveryTest {
 
     @Test
     void aRebuildResendsAndInvalidatesTheOldStatus() throws IOException {
-        delivery.enable(settings("https://cdn.example/gloss-{sha1}.zip"), artifact("pack"));
+        PackArtifact original = artifact("pack");
+        delivery.enable(settings("https://cdn.example/gloss-{sha1}.zip"), original);
         delivery.send(player());
-        delivery.onStatus(new PlayerResourcePackStatusEvent(player(), PackDelivery.PACK_ID,
+        delivery.onStatus(new PlayerResourcePackStatusEvent(player(), PackDelivery.id(original),
             PlayerResourcePackStatusEvent.Status.SUCCESSFULLY_LOADED));
         assertTrue(namespace.loaded(PLAYER));
 
@@ -139,4 +145,64 @@ class PackDeliveryTest {
         assertFalse(namespace.loaded(PLAYER));
         assertEquals("https://cdn.example/gloss-" + rebuilt.sha1Hex() + ".zip", delivery.url());
     }
+    @Test
+    void aLatePreviousPackSuccessCannotAuthorizeTheCurrentGlyphs() throws IOException {
+        PackArtifact first = artifact("old");
+        PackArtifact second = artifact("updated");
+        Player viewer = player();
+        delivery.enable(settings("https://cdn.example/gloss-{sha1}.zip"), first);
+        delivery.send(viewer);
+        delivery.publish(second);
+        delivery.send(viewer);
+        delivery.onStatus(new PlayerResourcePackStatusEvent(viewer, PackDelivery.id(first),
+            PlayerResourcePackStatusEvent.Status.SUCCESSFULLY_LOADED));
+        assertFalse(namespace.loaded(PLAYER));
+        delivery.onStatus(new PlayerResourcePackStatusEvent(viewer, PackDelivery.id(second),
+            PlayerResourcePackStatusEvent.Status.SUCCESSFULLY_LOADED));
+        assertTrue(namespace.loaded(PLAYER));
+    }
+
+    @Test
+    void replacingAnOfferKeepsItsArtifactUntilTheOldRequestFinishes() throws IOException {
+        AtomicLong clock = new AtomicLong(System.currentTimeMillis());
+        PackArtifactStore artifacts = new PackArtifactStore(clock::get);
+        GlossConfig.PackLimits limits = new GlossConfig.PackLimits(100, 100000, 10000, 2, 1000, 10);
+        PackDelivery retainedDelivery = new PackDelivery(new PackDelivery.Options(null, namespace, artifacts));
+        PackArtifact first = managed(artifacts, "one", limits);
+        retainedDelivery.enable(settings("https://cdn.example/{sha1}.zip"), first);
+        Player viewer = player();
+        retainedDelivery.send(viewer);
+        PackArtifact second = managed(artifacts, "second", limits);
+        retainedDelivery.publish(second);
+        retainedDelivery.send(viewer);
+        clock.addAndGet(20000);
+
+        assertThrows(IOException.class, () -> managed(artifacts, "third-value", limits));
+        retainedDelivery.onStatus(new PlayerResourcePackStatusEvent(viewer, PackDelivery.id(first),
+            PlayerResourcePackStatusEvent.Status.ACCEPTED));
+        assertThrows(IOException.class, () -> managed(artifacts, "third-value", limits));
+        retainedDelivery.onStatus(new PlayerResourcePackStatusEvent(viewer, PackDelivery.id(first),
+            PlayerResourcePackStatusEvent.Status.SUCCESSFULLY_LOADED));
+        assertFalse(namespace.loaded(PLAYER));
+        clock.addAndGet(10001);
+        managed(artifacts, "third-value", limits);
+
+        assertFalse(Files.exists(first.zip()));
+        assertTrue(Files.exists(second.zip()));
+        retainedDelivery.onQuit(new PlayerQuitEvent(viewer, ""));
+        retainedDelivery.disable();
+    }
+
+    private PackArtifact managed(PackArtifactStore artifacts, String content, GlossConfig.PackLimits limits)
+        throws IOException {
+        PackArtifact source = artifact(content);
+        Path output = folder.resolve("managed");
+        PackArtifact managed = new PackArtifact(output.resolve("pack"),
+            output.resolve("artifacts/" + source.sha1Hex() + ".zip"), source.sha1(), source.sha1Hex(), 0);
+        try (PackArtifactStore.Lease lease = artifacts.install(managed, source.zip(), limits)) {
+            artifacts.published(managed);
+        }
+        return managed;
+    }
+
 }

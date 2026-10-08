@@ -7,8 +7,9 @@ import art.arcane.volmlib.util.director.annotations.Director;
 import art.arcane.volmlib.util.director.annotations.Param;
 import art.arcane.volmlib.util.localization.MessageArgument;
 import org.bukkit.command.CommandSender;
+import org.bukkit.entity.Player;
+import art.arcane.volmlib.util.scheduling.SchedulerUtils;
 
-import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Locale;
@@ -33,14 +34,16 @@ public class CommandGlossForge {
             GlossCommandMessages.send(sender, GlossMessages.FORGE_DISABLED);
             return;
         }
-        if (!service.build()) {
-            GlossCommandMessages.send(sender, GlossMessages.FORGE_BUILD_FAILED);
-            return;
-        }
-        GlossCommandMessages.send(sender, GlossMessages.FORGE_BUILT,
-            MessageArgument.trusted("count", service.glyphs().all().size()),
-            MessageArgument.untrusted("value", service.artifact()
-                .map(artifact -> artifact.sha1Hex().substring(0, 8)).orElse("")));
+        service.build().whenComplete((success, failure) -> feedback(sender, () -> {
+            if (failure != null || !Boolean.TRUE.equals(success)) {
+                GlossCommandMessages.send(sender, GlossMessages.FORGE_BUILD_FAILED);
+                return;
+            }
+            GlossCommandMessages.send(sender, GlossMessages.FORGE_BUILT,
+                MessageArgument.trusted("count", service.glyphs().all().size()),
+                MessageArgument.untrusted("value", service.artifact()
+                    .map(artifact -> artifact.sha1Hex().substring(0, 8)).orElse("")));
+        }));
     }
 
     @Director(name = "status", descriptionKey = "command.help.forge.status",
@@ -73,14 +76,23 @@ public class CommandGlossForge {
             GlossCommandMessages.send(sender, GlossMessages.FORGE_DISABLED);
             return;
         }
+        Path target;
         try {
-            int files = service.export(Path.of(path));
-            GlossCommandMessages.send(sender, GlossMessages.FORGE_EXPORTED,
-                MessageArgument.trusted("count", files), MessageArgument.untrusted("path", path));
-        } catch (IOException | RuntimeException failure) {
+            target = Path.of(path);
+        } catch (RuntimeException failure) {
             GlossCommandMessages.send(sender, GlossMessages.FORGE_EXPORT_FAILED,
                 MessageArgument.untrusted("reason", String.valueOf(failure.getMessage())));
+            return;
         }
+        service.exportAsync(target).whenComplete((files, failure) -> feedback(sender, () -> {
+            if (failure != null) {
+                GlossCommandMessages.send(sender, GlossMessages.FORGE_EXPORT_FAILED,
+                    MessageArgument.untrusted("reason", String.valueOf(failure.getMessage())));
+                return;
+            }
+            GlossCommandMessages.send(sender, GlossMessages.FORGE_EXPORTED,
+                MessageArgument.trusted("count", files), MessageArgument.untrusted("path", path));
+        }));
     }
 
     @Director(name = "serve", sync = true, descriptionKey = "command.help.forge.serve",
@@ -118,6 +130,16 @@ public class CommandGlossForge {
         }
         List<String> written = service.resetToDefault(name);
         GlossCommandMessages.sendResetResult(sender, "glyph", name, written);
+    }
+
+    private void feedback(CommandSender sender, Runnable message) {
+        Gloss current = plugin == null ? Gloss.instance : plugin;
+        boolean accepted = sender instanceof Player player
+            ? SchedulerUtils.runEntity(current, player, message) : SchedulerUtils.runGlobal(current, message);
+        if (!accepted) {
+            Gloss.logExceptionStack(false, new IllegalStateException("Owner scheduler rejected forge command feedback"),
+                "Cannot deliver forge command result.");
+        }
     }
 
     private GlyphService service() {

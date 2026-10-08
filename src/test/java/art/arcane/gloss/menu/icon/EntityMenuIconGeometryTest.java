@@ -18,6 +18,8 @@ import com.github.retrooper.packetevents.manager.server.ServerManager;
 import com.github.retrooper.packetevents.manager.server.ServerVersion;
 import com.github.retrooper.packetevents.netty.NettyManager;
 import org.bukkit.Location;
+import org.bukkit.entity.Player;
+import java.lang.reflect.Proxy;
 import org.bukkit.entity.EntityType;
 import org.bukkit.util.Vector;
 import org.junit.AfterClass;
@@ -62,7 +64,7 @@ public class EntityMenuIconGeometryTest {
     , Map.of(), List.of());
     MenuSession session = new MenuSession(
         definition,
-        null,
+        viewer(),
         MenuSessionOptions.positioned(transform, request -> null, 1F)
     );
     EntityMenuIcon icon = new EntityMenuIcon(
@@ -129,5 +131,11 @@ public class EntityMenuIconGeometryTest {
     public ChannelInjector getInjector() {
       return null;
     }
-  }
+  }    private static Player viewer() {
+        return (Player) Proxy.newProxyInstance(Player.class.getClassLoader(), new Class<?>[]{Player.class},
+            (proxy, method, arguments) -> {
+                throw new UnsupportedOperationException(method.getName());
+            });
+    }
+
 }

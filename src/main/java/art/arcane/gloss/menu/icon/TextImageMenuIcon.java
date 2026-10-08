@@ -1,6 +1,7 @@
 package art.arcane.gloss.menu.icon;
 
 import art.arcane.gloss.Gloss;
+import art.arcane.gloss.image.ImageAssets;
 import art.arcane.gloss.config.icon.TextImageIconData;
 import art.arcane.gloss.forge.GlyphAtlas;
 import art.arcane.gloss.forge.GlyphRegistry;
@@ -13,13 +14,9 @@ import art.arcane.gloss.util.common.TextUtils;
 import art.arcane.gloss.util.common.math.CollisionPlane;
 import com.google.common.collect.Lists;
 import net.kyori.adventure.text.Component;
-import org.apache.commons.imaging.ImageFormat;
-import org.apache.commons.imaging.ImageFormats;
-import org.apache.commons.lang3.tuple.Pair;
 import org.bukkit.Location;
 import org.bukkit.util.Vector;
 
-import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
@@ -27,7 +24,7 @@ import java.util.UUID;
 
 public class TextImageMenuIcon extends MenuIcon<TextImageIconData> {
 
-  public static final List<Component> MISSING = Lists.newArrayList(
+  public static final List<Component> MISSING = List.of(
       TextUtils.textColor("████", "#000000").append(TextUtils.textColor("████", "#f800f8")),
       TextUtils.textColor("████", "#000000").append(TextUtils.textColor("████", "#f800f8")),
       TextUtils.textColor("████", "#000000").append(TextUtils.textColor("████", "#f800f8")),
@@ -69,7 +66,7 @@ public class TextImageMenuIcon extends MenuIcon<TextImageIconData> {
         new Vector(0F, ((components.size() - 1) / 2F * localLineHeight()) - localLineHeight(), 0F)
     );
     components.forEach(c -> {
-      uuids.add(DisplayEntityManager.add(textDisplay(c, lineLocation)));
+      uuids.add(DisplayEntityManager.add(session.displayGroup(), textDisplay(c, lineLocation)));
       lineLocation.add(session.getTransform().localVector(new Vector(0F, -localLineHeight(), 0F)));
     });
     return uuids;
@@ -97,19 +94,21 @@ public class TextImageMenuIcon extends MenuIcon<TextImageIconData> {
 
   private List<Component> createComponents() throws MenuIconException {
     String path = data.requirePath();
-    BufferedImage image = null;
     try {
-      Pair<ImageFormat, BufferedImage> imageData = Gloss.instance.getImageAssets().get(path);
-      image = imageData.getRight();
-      return TextImageRasterCache.lines(image, imageData.getLeft() == ImageFormats.JPEG);
-    } catch (IOException | RuntimeException e) {
-      if (image != null && (image.getWidth() > TextImageRasterCache.MAX_DIMENSION
-          || image.getHeight() > TextImageRasterCache.MAX_DIMENSION)) {
-        TextImageRasterCache.reportOversize(path, image.getWidth(), image.getHeight());
+      Optional<ImageAssets.PreparedImage> prepared = Gloss.instance.getImageAssets().prepared(path);
+      if (prepared.isEmpty()) {
+        return MISSING;
       }
-      MenuIconException ex = new MenuIconException("Failed to load relative image \"%s\"!", path);
-      ex.initCause(e);
-      throw ex;
+      ImageAssets.PreparedImage image = prepared.get();
+      if (image.rows().isEmpty()) {
+        TextImageRasterCache.reportOversize(path, image.width(), image.height());
+        return MISSING;
+      }
+      return image.rows();
+    } catch (IOException | RuntimeException failure) {
+      MenuIconException rejected = new MenuIconException("Failed to load relative image \"%s\"!", path);
+      rejected.initCause(failure);
+      throw rejected;
     }
   }
 }

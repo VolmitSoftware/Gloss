@@ -4,6 +4,7 @@
   "title": "Gloss Scoreboard Document",
   "type": "object",
   "properties": {
+    "preset": {"type": ["string", "null"], "minLength": 1, "description": "Named preset from this collection in presets.json; document fields override inherited values."},
     "schemaVersion": {
       "const": 2
     },
@@ -65,6 +66,18 @@
         ],
         "additionalProperties": false
       }
+    },
+    "objectives": {
+      "type": "object",
+      "properties": {
+        "playerList": {
+          "$ref": "#/$defs/objective"
+        },
+        "belowName": {
+          "$ref": "#/$defs/objective"
+        }
+      },
+      "additionalProperties": false
     }
   },
   "required": [
@@ -80,20 +93,13 @@
           "type": "string"
         },
         "lines": {
-          "type": "array",
-          "items": {
-            "oneOf": [
-              {
-                "type": "string"
-              },
-              {
-                "$ref": "#/$defs/line"
-              }
-            ]
-          }
+          "$ref": "#/$defs/rows"
         },
         "hideNumbers": {
           "type": "boolean"
+        },
+        "layout": {
+          "$ref": "#/$defs/layout"
         }
       },
       "required": [],
@@ -115,9 +121,202 @@
             "styled",
             "number"
           ]
+        },
+        "id": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}$"
+        },
+        "show": {
+          "type": [
+            "string",
+            "boolean"
+          ]
+        },
+        "section": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}$"
         }
       },
       "required": [],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "required": [
+              "section"
+            ]
+          },
+          "then": {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "text"
+                  ]
+                },
+                {
+                  "required": [
+                    "value"
+                  ]
+                },
+                {
+                  "required": [
+                    "format"
+                  ]
+                },
+                {
+                  "required": [
+                    "id"
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "rows": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "$ref": "#/$defs/line"
+          }
+        ]
+      },
+      "maxItems": 256
+    },
+    "layout": {
+      "type": "object",
+      "properties": {
+        "sections": {
+          "type": "object",
+          "maxProperties": 64,
+          "propertyNames": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}$"
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/rows"
+          }
+        },
+        "pages": {
+          "type": "array",
+          "maxItems": 64,
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}$"
+              },
+              "title": {
+                "type": "string"
+              },
+              "lines": {
+                "$ref": "#/$defs/rows"
+              },
+              "show": {
+                "type": [
+                  "string",
+                  "boolean"
+                ]
+              },
+              "durationTicks": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 72000
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "id"
+            ]
+          }
+        },
+        "overflow": {
+          "enum": [
+            "truncate",
+            "error"
+          ]
+        },
+        "refresh": {
+          "type": "object",
+          "properties": {
+            "titleTicks": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 72000
+            },
+            "textTicks": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 72000
+            },
+            "valueTicks": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 72000
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "objective": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        },
+        "renderType": {
+          "enum": [
+            "integer",
+            "hearts"
+          ]
+        },
+        "format": {
+          "enum": [
+            "blank",
+            "fixed",
+            "styled",
+            "number"
+          ]
+        },
+        "valueText": {
+          "type": "string"
+        },
+        "show": {
+          "type": [
+            "string",
+            "boolean"
+          ]
+        },
+        "subjects": {
+          "type": [
+            "string",
+            "boolean"
+          ]
+        },
+        "refreshTicks": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 72000
+        },
+        "conflict": {
+          "enum": [
+            "yield",
+            "override"
+          ]
+        }
+      },
       "additionalProperties": false
     }
   }

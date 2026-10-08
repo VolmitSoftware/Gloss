@@ -30,7 +30,7 @@ class PackListenerTest {
     }
 
     private PackArtifact artifact(String content) throws IOException {
-        Path zip = folder.resolve("gloss-pack.zip");
+        Path zip = folder.resolve(content + ".zip");
         Files.writeString(zip, content, StandardCharsets.UTF_8);
         byte[] sha1 = new byte[20];
         Arrays.fill(sha1, (byte) content.length());
@@ -81,13 +81,18 @@ class PackListenerTest {
     }
 
     @Test
-    void aRebuildChangesTheRouteAndRetiresTheOldOne() throws IOException {
+    void aRebuildKeepsTheOldImmutableRouteAvailableForPendingDownloads() throws IOException {
         PackArtifact first = artifact("one");
         listener.start(first);
         PackArtifact second = artifact("two-bytes");
         listener.publish(second);
 
-        assertEquals(404, status(first.route()));
+        HttpURLConnection old = open(first.route());
+        try (InputStream body = old.getInputStream()) {
+            assertEquals("one", new String(body.readAllBytes(), StandardCharsets.UTF_8));
+        } finally {
+            old.disconnect();
+        }
         assertEquals(200, status(second.route()));
     }
 

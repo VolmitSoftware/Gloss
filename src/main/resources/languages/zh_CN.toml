@@ -13,6 +13,15 @@
 #
 # === 变量 ===
 # 请勿更改变量名，仅使用各消息中原有的变量。
+#   {viewers}  观看者
+#   {entries}  缓存条目数
+#   {admissions}  准入次数
+#   {refusals}  拒绝次数
+#   {waiting}  等待中
+#   {expired}  已过期轮次
+#   {retiring}  等待清理
+#   {bytes}  保留数据 (字节)
+#   {completed}  已完成
 #   {absorbed}  合并到现有数据的导入条目数
 #   {active}  活动提供程序数量
 #   {actual}  当前修订版本
@@ -225,8 +234,8 @@ indicators = "伤害与治疗指示器工具"
 status = "显示简要的运行时计数"
 import = "迁移旧版全息图而不修改源文件"
 "import.apply" = "应用不覆盖已有数据的旧版全息图迁移"
-"import.holoui" = "从 plugins/holoui 复制 HoloUi 数据，覆盖之前的导入"
-"import.legacy" = "将合并前的 Gloss 数据文件迁移到 v2 封装格式"
+"import.holoui" = "预览或应用事务式 HoloUi 导入"
+"import.legacy" = "预览或应用事务式 Gloss 数据升级"
 "import.preview" = "预览非破坏性的旧版全息图迁移"
 item = "自定义物品提供者工具"
 "item.export" = "为网页编辑器导出自定义物品目录"
@@ -294,6 +303,9 @@ web = "打开和管理 Gloss 网页编辑器"
 "web.sessions.revoke" = "撤销网页编辑授权"
 "web.sessions.status" = "显示一个网页编辑器会话"
 language = "选择你的语言或服务器默认语言"
+
+"import.mode" = "preview 或 apply"
+"import.overwrite" = "预览替换现有文件"
 
 [command.help.arg]
 reset_name = "要重置的名称，或 * 表示所有内置默认"
@@ -421,6 +433,9 @@ emoji = "&7表情符号: &f{enabled}&8/&f{total}"
 animations = "&7动画: &f{count}"
 effects = "&7气泡: &f{bubbles} &8| &7指示器: &f{indicators} &8| &7掉落: &f{drops}"
 
+visibility = "&7可见实体副本: &f{entities} &8| &7观看者: &f{viewers} &8| &7准入次数: &f{admissions} &8| &7拒绝次数: &f{refusals} &8| &7等待中: &f{waiting} &8| &7已过期轮次: &f{expired} &8| &7等待清理: &f{retiring}"
+images = "&7图像缓存: &f{entries} &8| &7待处理: &f{pending} &8| &7保留数据: &f{bytes} &7字节 &8| &7已完成: &f{completed} &8| &7拒绝次数: &f{refusals}"
+
 [command.reset]
 done = "&8[&dGloss&8] &a已恢复 &f{count}&a 个内置 {kind} 默认配置。"
 none = "&8[&dGloss&8] &c没有与 '&f{name}&c' 匹配的内置 {kind} 默认配置。"
@@ -433,12 +448,19 @@ style_unknown = "&8[&dGloss&8] &c没有名为 '&f{style}&c' 的气泡样式。"
 [command.import]
 config_unreadable = "&8[&dGloss&8] &cgloss.toml 无法加载: &f{reason}"
 
+mode_invalid = "&8[&dGloss&8] &c请使用 preview 或 apply 作为导入模式。"
+preview_capacity = "&8[&dGloss&8] &c已审核导入的缓存已满。请应用现有预览或等待其过期，然后重新预览。"
+
 [command.import.holoui]
 missing = "&8[&dGloss&8] &c在 Gloss 数据文件夹旁未找到 holoui 数据文件夹。"
 done = "&8[&dGloss&8] &aHoloUi 导入完成: 复制 &f{copied}&a 个，跳过 &f{skipped}&a 个，&f{overlaid}&a 个配置键，&f{errors}&a 个错误。"
 
+preview_required = "&8[&dGloss&8] &c请先运行 /gloss import holoui mode=preview。 预览使用配置的有效期。 添加 overwrite=true 以预览替换现有文件。"
+
 [command.import.legacy]
 done = "&8[&dGloss&8] &a旧版迁移完成: 迁移 &f{migrated}&a 个，吸收 &f{absorbed}&a 个，&f{overlaid}&a 个配置键，&f{errors}&a 个错误。"
+
+preview_required = "&8[&dGloss&8] &c请先运行 /gloss import legacy mode=preview。 预览使用配置的有效期。"
 
 [director.help]
 no_subcommands = "此页面没有子命令。"
@@ -829,6 +851,7 @@ empty = "(空)"
 # Lane message tables. Each lane appends its [gloss.message.<lane>] and [command.help.<group>]
 # tables inside its own anchor so parallel branches never share a line.
 # --- lane:screen ---
+
 [gloss.message.screen]
 "surfaces.empty" = "&8[&dGloss&8] &7未加载任何界面文档。"
 "surfaces.unknown" = "&8[&dGloss&8]: &c没有名为 &f{id}&c 的界面文档。"
@@ -865,6 +888,7 @@ who = "显示每个 HUD 槽位由哪个插件占用"
 "who.player" = "要查看的玩家，默认是你自己"
 
 # --- lane:chat ---
+
 [gloss.message.chat]
 filtered = "&8[&dGloss&8]: &c聊天过滤器拦截了你的消息。"
 too_fast = "&8[&dGloss&8]: &e请稍等片刻再发送下一条消息。"
@@ -915,6 +939,7 @@ sample = "立即为所有在线玩家采样排行榜"
 "sample.id" = "排行榜文档 ID"
 
 # --- lane:forms ---
+
 [gloss.message.forms]
 icon_unsupported = "&7无法在箱子格中显示 ({kind})"
 no_inventories = "&8[&dGloss&8]: &7尚未配置任何箱子菜单。"
@@ -964,6 +989,7 @@ hologram_actions_header = "&8[&dGloss&8] &7全息图 &f{id}&7 的动作（&f{cou
 hologram_actions_entry = "&8[&dGloss&8] &7  &f{kind}&7 于 &f{value}"
 
 # --- lane:world ---
+
 [gloss.message.world]
 players_only = "&c该命令必须由玩家执行。"
 disabled = "&c该功能已在 gloss.toml 中关闭。"
@@ -1055,6 +1081,7 @@ color = "命名文本颜色"
 ticks = "发光持续的刻数，0 表示保持"
 
 # --- lane:behaviors ---
+
 [command.help.behavior]
 root = "查看并触发行为文档"
 list = "列出已加载的行为文档"
@@ -1119,6 +1146,7 @@ fired = "&8[&dGloss&8]: &a已运行 &f{id}&a 的条目 &f{line}&a。"
 "explain.missing" = "&8[&dGloss&8]: &c没有名为 \"{id}\" 的 {kind}。"
 
 # --- lane:authoring ---
+
 [command.help.pack]
 root = "安装和管理 Gloss 包"
 install = "从文件或 HTTPS 网址安装一个包"
@@ -1188,8 +1216,10 @@ preview = "&8[&dGloss&8] &f{source}&7 将写入 &f{count}&7 个文档。"
 entry = "&8[&dGloss&8] &7{state} &f{path}&7 {reason}"
 applied = "&8[&dGloss&8] 已从 &f{source}&7 导入 &f{count}&7 个文档。"
 absent = "&8[&dGloss&8] &7&f{path}&7 没有 &f{source}&7 数据。"
+preview_required = "&8[&dGloss&8] &c请先运行 /gloss import preview {source}。 预览使用配置的有效期。"
 
 # --- lane:forge ---
+
 [gloss.message.forge]
 disabled = "&8[&dGloss&8] &c字形工坊已关闭。请在 gloss.toml 中将 features.forge 设为 true。"
 built = "&8[&dGloss&8] &a已构建资源包 &f{value}&a，共 {count} 个字形。"
@@ -1211,6 +1241,7 @@ serve = "启动或停止内置资源包监听器"
 reset = "恢复随附的字形文档"
 
 # --- lane:fixes ---
+
 [gloss.message.fixes]
 status_bedrock = "&7bedrock: &f{name}&7，在线 &f{count}&7 人"
 status_textimage_oversize = "&7textimage-超出尺寸: &f{count}"

@@ -1,6 +1,8 @@
 package art.arcane.gloss.panel;
 
 import art.arcane.gloss.Gloss;
+import art.arcane.gloss.GlossConfig;
+import art.arcane.gloss.config.GlossConfigFile;
 import art.arcane.gloss.config.menu.MenuCatalog;
 import art.arcane.gloss.doc.StorageTaskRunner;
 import art.arcane.gloss.menu.CharacterizationSupport;
@@ -96,6 +98,97 @@ public class PanelRuntimeCostTest {
     }
     CharacterizationSupport.restoreGloss(previousInstance);
     CharacterizationSupport.restoreServer((org.bukkit.Server) previousServer);
+  }
+
+  @Test
+  public void activeFollowersMoveBetweenVisibilityChecks() throws Exception {
+    GlossConfigFile config = new GlossConfigFile();
+    config.panels.visibilityIntervalTicks = 10;
+    CharacterizationSupport.setField(Gloss.instance, "config", GlossConfig.from(config));
+    PanelDefinition board = publishFollowedBoard();
+    queueFollowPose(0.0D);
+    CharacterizationSupport.invoke(runtime, "applyPendingFollowPoses", new Class<?>[0]);
+    Object state = viewerState(player(new AtomicReference<>(at(10.0D, 0.0D, 0.0D)), new AtomicInteger()));
+    tick(state);
+    assertEquals(1, runtime.visibleBoardCount());
+    queueFollowPose(5.0D);
+    CharacterizationSupport.invoke(runtime, "applyPendingFollowPoses", new Class<?>[0]);
+    tick(state);
+    Map<?, ?> views = (Map<?, ?>) CharacterizationSupport.getField(state, "views");
+    PanelViewSession view = (PanelViewSession) views.get(board.uuid());
+    assertEquals(5.0D, view.effectiveTransform().x(), 0.0D);
+  }
+
+  @Test
+  public void capturedFollowPosesApplyAtTheirIndependentCadence() throws Exception {
+    GlossConfigFile config = new GlossConfigFile();
+    config.panels.followIntervalTicks = 3;
+    CharacterizationSupport.setField(Gloss.instance, "config", GlossConfig.from(config));
+    PanelDefinition board = publishFollowedBoard();
+    queueFollowPose(0.0D);
+    CharacterizationSupport.invoke(runtime, "scheduleTick", new Class<?>[0]);
+    queueFollowPose(5.0D);
+    CharacterizationSupport.invoke(runtime, "scheduleTick", new Class<?>[0]);
+    CharacterizationSupport.invoke(runtime, "scheduleTick", new Class<?>[0]);
+    assertEquals(0.0D, runtime.effectiveBoard(board.uuid()).orElseThrow().transform().x(), 0.0D);
+    CharacterizationSupport.invoke(runtime, "scheduleTick", new Class<?>[0]);
+    assertEquals(5.0D, runtime.effectiveBoard(board.uuid()).orElseThrow().transform().x(), 0.0D);
+  }
+
+  private PanelDefinition publishFollowedBoard() {
+    CompletableFuture<PanelDefinition> created = service.create(
+        PanelDefinition.create("cost-follow", "cost",
+            PanelTransform.at("example:world", WORLD_UUID, 0.0D, 0.0D, 0.0D, 0.0D))
+            .withFollow(PanelFollow.player(VIEWER, PanelFollowRotation.FIXED)));
+    runner.runAll();
+    return created.join();
+  }
+
+  @SuppressWarnings("unchecked")
+  private void queueFollowPose(double x) throws Exception {
+    Map<UUID, PanelFollowPose> pending = (Map<UUID, PanelFollowPose>)
+        CharacterizationSupport.getField(runtime, "pendingFollowPoses");
+    pending.put(VIEWER, new PanelFollowPose("example:world", WORLD_UUID, x, 0.0D, 0.0D, 0.0F, 0.0F));
+  }
+
+  @Test
+  public void visibilityCadenceDefersRangeChecksAndReloadAppliesImmediately() throws Exception {
+    GlossConfigFile config = new GlossConfigFile();
+    config.panels.visibilityIntervalTicks = 3;
+    config.panels.permissionCacheTicks = 0;
+    CharacterizationSupport.setField(Gloss.instance, "config", GlossConfig.from(config));
+    publishGatedBoard();
+    AtomicInteger lookups = new AtomicInteger();
+    AtomicReference<Location> position = new AtomicReference<>(at(10.0D, 64.0D, 0.0D));
+    Object state = viewerState(player(position, lookups));
+    tick(state);
+    assertEquals(1, lookups.get());
+    position.set(at(4000.0D, 64.0D, 4000.0D));
+    tick(state);
+    tick(state);
+    assertEquals(1, runtime.visibleBoardCount());
+    assertEquals(1, lookups.get());
+    tick(state);
+    assertEquals(0, runtime.visibleBoardCount());
+    position.set(at(10.0D, 64.0D, 0.0D));
+    config.panels.visibilityIntervalTicks = 1;
+    CharacterizationSupport.setField(Gloss.instance, "config", GlossConfig.from(config));
+    tick(state);
+    assertEquals(1, runtime.visibleBoardCount());
+  }
+
+  @Test
+  public void zeroPermissionCacheRechecksAtEachVisibilityEvaluation() throws Exception {
+    GlossConfigFile config = new GlossConfigFile();
+    config.panels.permissionCacheTicks = 0;
+    CharacterizationSupport.setField(Gloss.instance, "config", GlossConfig.from(config));
+    publishGatedBoard();
+    AtomicInteger lookups = new AtomicInteger();
+    Object state = viewerState(player(new AtomicReference<>(at(10.0D, 64.0D, 0.0D)), lookups));
+    tick(state);
+    tick(state);
+    tick(state);
+    assertEquals(3, lookups.get());
   }
 
   @Test

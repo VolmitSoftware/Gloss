@@ -1,9 +1,13 @@
 package art.arcane.gloss.hologram;
 
+import art.arcane.gloss.Gloss;
+
 import art.arcane.gloss.api.HologramBox;
 import art.arcane.gloss.api.HologramPresentation;
 import art.arcane.gloss.api.IconDisplayStyle;
 import art.arcane.gloss.menu.DisplayEntityManager;
+import art.arcane.gloss.menu.DisplayEntityGroup;
+import art.arcane.gloss.service.VisibilityGovernor;
 import art.arcane.gloss.util.common.DisplayEntity;
 import art.arcane.gloss.util.common.PacketUtils;
 import com.github.retrooper.packetevents.util.Vector3f;
@@ -22,6 +26,7 @@ import java.util.UUID;
 
 public final class PacketTextDecoration {
     private final Player viewer;
+    private final DisplayEntityGroup group;
     private final List<UUID> displays = new ArrayList<>(5);
     private Update previous;
     private HologramBoxLayout measured;
@@ -29,10 +34,19 @@ public final class PacketTextDecoration {
     private List<HologramBoxLayout.Part> measuredParts;
 
     public PacketTextDecoration(Player viewer) {
+        this(viewer, DisplayEntityManager.group(viewer, VisibilityGovernor.Surface.HOLOGRAM));
+    }
+
+    public PacketTextDecoration(Player viewer, DisplayEntityGroup group) {
         this.viewer = Objects.requireNonNull(viewer);
+        this.group = Objects.requireNonNull(group);
     }
 
     public void update(Update update) {
+        group.batch(() -> updateParts(update));
+    }
+
+    private void updateParts(Update update) {
         if (!update.box().enabled()) {
             remove();
             return;
@@ -82,7 +96,7 @@ public final class PacketTextDecoration {
                 display.lineWidth(16384);
                 display.scale(new Vector3f(scale.getX(), scale.getY(), scale.getZ()));
                 display.translation(positioned);
-                UUID id = DisplayEntityManager.add(display);
+                UUID id = DisplayEntityManager.add(group, display);
                 displays.add(id);
                 DisplayEntityManager.orient(id, update.anchor().getYaw(), update.anchor().getPitch(),
                     orientation);
@@ -131,8 +145,17 @@ public final class PacketTextDecoration {
         return packets;
     }
 
+    public void retire(Gloss plugin) {
+        DisplayEntityManager.retire(plugin, group);
+    }
+
     public void remove() {
-        DisplayEntityManager.deleteAll(displays, viewer);
+        try {
+            DisplayEntityManager.deleteAll(displays, viewer);
+        } catch (RuntimeException failure) {
+            DisplayEntityManager.retire(Gloss.instance, group);
+            throw failure;
+        }
         displays.clear();
         previous = null;
         measured = null;

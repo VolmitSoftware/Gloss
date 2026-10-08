@@ -9,20 +9,21 @@ import java.util.Map;
  * against. Built by the board render and read by the packet thread, so it is immutable and
  * swapped whole.
  */
-public record BoardFormatIndex(String objectiveName, Map<String, ScoreFormat> formats) {
+public record BoardFormatIndex(String objectiveName, Map<String, ScoreFormat> formats, boolean hideNumbers) {
     public BoardFormatIndex {
         formats = Map.copyOf(formats);
     }
 
-    /** Null when there is nothing to decorate, so the packet thread can skip on one reference check. */
-    public static BoardFormatIndex of(String objectiveName, Map<String, ScoreFormat> formats) {
-        if (objectiveName == null || formats == null || formats.isEmpty()) {
+    /** Null when no sidebar objective is owned; empty formats retain the default number policy. */
+    public static BoardFormatIndex of(String objectiveName, Map<String, ScoreFormat> formats, boolean hideNumbers) {
+        if (objectiveName == null || formats == null) {
             return null;
         }
-        return new BoardFormatIndex(objectiveName, formats);
+        return new BoardFormatIndex(objectiveName, formats, hideNumbers);
     }
 
     public ScoreFormat format(String objective, String entryName) {
-        return objectiveName.equals(objective) ? formats.get(entryName) : null;
+        return objectiveName.equals(objective)
+            ? formats.getOrDefault(entryName, hideNumbers ? ScoreFormat.blankScore() : null) : null;
     }
 }

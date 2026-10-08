@@ -202,6 +202,23 @@ public class CharacterizationPreviewRefreshTest {
   }
 
   @Test
+  public void documentCadencesApplyToStaticAndProtectedPreviews() throws ReflectiveOperationException {
+    CompiledPreviewDocument document = PreviewDocumentParser.parse("cadence.json",
+        "{\"contentRefreshTicks\":6,\"accessCheckTicks\":7}");
+    for (boolean contents : List.of(false, true)) {
+      AtomicInteger labelReads = new AtomicInteger();
+      ContainerPreview preview = preview(List.of(countingLabel(labelReads)), contents);
+      trackVisibility(preview, document, null);
+      preview.open();
+      for (int tick = 0; tick <= 21; tick++) {
+        assertTrue(preview.tick());
+      }
+      assertEquals(contents ? 8 : 5, labelReads.get());
+      preview.close();
+    }
+  }
+
+  @Test
   public void refreshTracksTheLiveInventoryContent() throws ReflectiveOperationException {
     PreviewFakes.InventoryFake inventoryFake = PreviewFakes.inventory(27)
         .item(0, PreviewFakes.stack(Material.STICK, 3));

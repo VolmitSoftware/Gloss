@@ -1,12 +1,12 @@
 package art.arcane.gloss.config;
 
 import art.arcane.gloss.Gloss;
+import art.arcane.gloss.doc.AtomicFiles;
 import art.arcane.gloss.doc.DocumentHashes;
 import art.arcane.volmlib.util.config.ConfigExposePolicy;
 import art.arcane.volmlib.util.config.ConfigFileSupport;
 import art.arcane.volmlib.util.config.ConfigIo;
 import art.arcane.volmlib.util.config.TomlCodec;
-import art.arcane.volmlib.util.io.IO;
 
 import java.io.File;
 import java.io.IOException;
@@ -106,8 +106,13 @@ public final class GlossConfigLoader {
         if (parent != null && !parent.exists()) {
             parent.mkdirs();
         }
-        IO.writeAll(file, TomlCodec.toToml(config, SOURCE_TAG, ConfigExposePolicy.ALL));
+        AtomicFiles.replace(file.toPath(), encode(config));
         lastCanonicalSha256 = hashCurrentFile();
+    }
+
+    public byte[] encode(GlossConfigFile config) {
+        Objects.requireNonNull(config, "config").normalize();
+        return TomlCodec.toToml(config, SOURCE_TAG, ConfigExposePolicy.ALL).getBytes(StandardCharsets.UTF_8);
     }
 
     public File file() {

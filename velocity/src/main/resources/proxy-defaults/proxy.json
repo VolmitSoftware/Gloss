@@ -3,10 +3,11 @@
   "motd": { "enabled": true },
   "tablist": { "enabled": true },
   "scoreboards": { "enabled": true },
-  "surfaces": { "enabled": true },
+  "surfaces": { "enabled": true, "maxBossBarsPerViewer": 3 },
   "connections": { "enabled": true },
   "emoji": { "enabled": true },
   "animations": { "enabled": true },
   "refreshMillis": 500,
-  "networkTablist": true
+  "networkTablist": true,
+  "networkVisibility": "true"
 }

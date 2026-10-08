@@ -326,7 +326,7 @@ class SessionHolder {
 
   ClickSnapshot snapshotClick(Location eyeLocation) {
     MenuSession current = session;
-    if (current == null) return null;
+    if (current == null || !current.isRendered()) return null;
 
     ClickableComponent<?> nearest = null;
     double nearestDistance = Double.POSITIVE_INFINITY;

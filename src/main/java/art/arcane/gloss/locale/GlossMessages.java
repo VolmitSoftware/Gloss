@@ -159,8 +159,10 @@ public final class GlossMessages {
     public static final TextKey HELP_ARG_WEB_SESSION = text("command.help.arg.web_session", "Web editor session id");
     public static final TextKey HELP_IMPORT = text("command.help.import", "Migrate legacy holograms without modifying source files");
     public static final TextKey HELP_IMPORT_APPLY = text("command.help.import.apply", "Apply a no-overwrite legacy hologram migration");
-    public static final TextKey HELP_IMPORT_HOLOUI = text("command.help.import.holoui", "Copy HoloUi data from plugins/holoui, overwriting earlier imports");
-    public static final TextKey HELP_IMPORT_LEGACY = text("command.help.import.legacy", "Migrate pre-merger Gloss data files to the v2 envelopes");
+    public static final TextKey HELP_IMPORT_HOLOUI = text("command.help.import.holoui", "Preview or apply a transactional HoloUi import");
+    public static final TextKey HELP_IMPORT_LEGACY = text("command.help.import.legacy", "Preview or apply a transactional Gloss data upgrade");
+    public static final TextKey HELP_IMPORT_MODE = text("command.help.import.mode", "preview or apply");
+    public static final TextKey HELP_IMPORT_OVERWRITE = text("command.help.import.overwrite", "Preview replacement of existing files");
     public static final TextKey HELP_IMPORT_PREVIEW = text("command.help.import.preview", "Preview a non-destructive legacy hologram migration");
     public static final TextKey HELP_ITEM = text("command.help.item", "Custom item provider tools");
     public static final TextKey HELP_ITEM_EXPORT = text("command.help.item.export", "Export the custom item catalog for the web editor");
@@ -292,6 +294,8 @@ public final class GlossMessages {
     public static final TextKey STATUS_EMOJI = text("command.status.emoji", "&7Emoji: &f{enabled}&8/&f{total}");
     public static final TextKey STATUS_ANIMATIONS = text("command.status.animations", "&7Animations: &f{count}");
     public static final TextKey STATUS_EFFECTS = text("command.status.effects", "&7Bubbles: &f{bubbles} &8| &7Indicators: &f{indicators} &8| &7Drops: &f{drops}");
+    public static final TextKey STATUS_VISIBILITY = text("command.status.visibility", "&7Visible entity copies: &f{entities} &8| &7Viewers: &f{viewers} &8| &7Admissions: &f{admissions} &8| &7Refusals: &f{refusals} &8| &7Waiting: &f{waiting} &8| &7Expired turns: &f{expired} &8| &7Cleanup pending: &f{retiring}");
+    public static final TextKey STATUS_IMAGES = text("command.status.images", "&7Image cache: &f{entries} &8| &7Pending: &f{pending} &8| &7Retained weight: &f{bytes} &7bytes &8| &7Completed: &f{completed} &8| &7Refusals: &f{refusals}");
 
     public static final TextKey RESET_DONE = text("command.reset.done", PREFIX + "&aRestored &f{count}&a shipped {kind} defaults.");
     public static final TextKey RESET_NONE = text("command.reset.none", PREFIX + "&cNo shipped {kind} defaults match '&f{name}&c'.");
@@ -301,6 +305,10 @@ public final class GlossMessages {
     public static final TextKey BUBBLES_STYLE_UNKNOWN = text("command.bubbles.style_unknown", PREFIX + "&cNo bubble style named '&f{style}&c'.");
 
     public static final TextKey IMPORT_HOLOUI_MISSING = text("command.import.holoui.missing", PREFIX + "&cNo holoui data folder found beside the Gloss data folder.");
+    public static final TextKey IMPORT_MODE_INVALID = text("command.import.mode_invalid", PREFIX + "&cUse preview or apply as the import mode.");
+    public static final TextKey IMPORT_HOLOUI_PREVIEW_REQUIRED = text("command.import.holoui.preview_required", PREFIX + "&cRun /gloss import holoui mode=preview first. Previews use the configured lifetime; add overwrite=true to preview replacement of existing files.");
+    public static final TextKey IMPORT_LEGACY_PREVIEW_REQUIRED = text("command.import.legacy.preview_required", PREFIX + "&cRun /gloss import legacy mode=preview first. Previews use the configured lifetime.");
+    public static final TextKey IMPORT_PREVIEW_CAPACITY = text("command.import.preview_capacity", PREFIX + "&cThe reviewed-import cache is full. Apply an existing preview or wait for it to expire, then preview again.");
     public static final TextKey IMPORT_HOLOUI_DONE = text("command.import.holoui.done", PREFIX + "&aHoloUi import finished: &f{copied}&a copied, &f{skipped}&a skipped, &f{overlaid}&a config keys, &f{errors}&a errors.");
     public static final TextKey IMPORT_LEGACY_DONE = text("command.import.legacy.done", PREFIX + "&aLegacy migration finished: &f{migrated}&a migrated, &f{absorbed}&a absorbed, &f{overlaid}&a config keys, &f{errors}&a errors.");
     public static final TextKey IMPORT_CONFIG_UNREADABLE = text("command.import.config_unreadable", PREFIX + "&cgloss.toml could not be loaded: &f{reason}");
@@ -763,6 +771,7 @@ public final class GlossMessages {
     public static final TextKey EXPORT_DONE = text("gloss.message.authoring.export.done", PREFIX + "Exported &f{count}&7 document(s) to &f{path}&7.");
     public static final TextKey EXPORT_FAILED = text("gloss.message.authoring.export.failed", PREFIX + "&cExport failed: {reason}");
     public static final TextKey IMPORT_DOCUMENT_PREVIEW = text("gloss.message.authoring.import.preview", PREFIX + "&f{source}&7 would write &f{count}&7 document(s).");
+    public static final TextKey IMPORT_DOCUMENT_PREVIEW_REQUIRED = text("gloss.message.authoring.import.preview_required", PREFIX + "&cRun /gloss import preview {source} first. Previews use the configured lifetime.");
     public static final TextKey IMPORT_DOCUMENT_ENTRY = text("gloss.message.authoring.import.entry", PREFIX + "&7{state} &f{path}&7 {reason}");
     public static final TextKey IMPORT_DOCUMENT_APPLIED = text("gloss.message.authoring.import.applied", PREFIX + "Imported &f{count}&7 document(s) from &f{source}&7.");
     public static final TextKey IMPORT_DOCUMENT_ABSENT = text("gloss.message.authoring.import.absent", PREFIX + "&7No &f{source}&7 data at &f{path}&7.");

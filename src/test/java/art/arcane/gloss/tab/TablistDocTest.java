@@ -22,7 +22,7 @@ class TablistDocTest {
     void parseReadsIndependentConditionalSurfaces() {
         String json = """
             {
-              "schemaVersion": 2,
+              "schemaVersion": 3,
               "revision": 2,
               "headerFooter": {
                 "enabled": true,
@@ -45,7 +45,7 @@ class TablistDocTest {
 
         TablistDoc doc = TablistDoc.parse("tablist.json", json);
 
-        assertEquals(2, doc.schemaVersion());
+        assertEquals(3, doc.schemaVersion());
         assertEquals(2L, doc.revision());
         assertTrue(doc.headerFooter().enabled());
         assertEquals("&d&lGloss", doc.headerFooter().presentation().header());
@@ -74,14 +74,14 @@ class TablistDocTest {
         assertThrows(IllegalArgumentException.class,
             () -> TablistDoc.parse("tablist.json", "{\"schemaVersion\":1,\"revision\":1}"));
         assertThrows(IllegalArgumentException.class,
-            () -> new TablistDoc(2, 0L, ShowCondition.ALWAYS, null, null, null, null));
+            () -> new TablistDoc(TablistDoc.CURRENT_SCHEMA_VERSION, 0L, ShowCondition.ALWAYS, null, null, null, null));
         assertThrows(IllegalArgumentException.class,
-            () -> new TablistDoc(2, DocumentEnvelope.MAX_SAFE_REVISION + 1L, ShowCondition.ALWAYS, null, null, null, null));
+            () -> new TablistDoc(TablistDoc.CURRENT_SCHEMA_VERSION, DocumentEnvelope.MAX_SAFE_REVISION + 1L, ShowCondition.ALWAYS, null, null, null, null));
     }
 
     @Test
     void missingSurfacesUseOperationalDefaults() {
-        TablistDoc doc = TablistDoc.parse("tablist.json", "{\"schemaVersion\":2,\"revision\":1}");
+        TablistDoc doc = TablistDoc.parse("tablist.json", "{\"schemaVersion\":3,\"revision\":1}");
 
         assertEquals(TablistDoc.HeaderFooter.DEFAULTS, doc.headerFooter());
         assertEquals(TablistDoc.ListNames.DEFAULTS, doc.listNames());
@@ -142,9 +142,9 @@ class TablistDocTest {
 
     @Test
     void missingAndNullShowRemainVisible() {
-        TablistDoc missing = TablistDoc.parse("tablist.json", "{\"schemaVersion\":2,\"revision\":1}");
+        TablistDoc missing = TablistDoc.parse("tablist.json", "{\"schemaVersion\":3,\"revision\":1}");
         TablistDoc explicitNull = TablistDoc.parse("tablist.json", """
-            {"schemaVersion":2,"revision":1,"show":null,
+            {"schemaVersion":3,"revision":1,"show":null,
              "headerFooter":{"enabled":true,"show":null},
              "listNames":{"enabled":true,"show":null}}
             """);
@@ -157,9 +157,9 @@ class TablistDocTest {
     }
 
     @Test
-    void topLevelShowGatesBothSurfacesAndTheirVariants() {
+    void topLevelShowGatesSurfacesAndTheirVariants() {
         TablistDoc doc = TablistDoc.parse("tablist.json", """
-            {"schemaVersion":2,"revision":1,"show":false,
+            {"schemaVersion":3,"revision":1,"show":false,
              "headerFooter":{"enabled":true,"variants":[
                {"id":"always","when":"true","presentation":{"header":"Visible"}}]},
              "listNames":{"enabled":true,"variants":[
@@ -171,6 +171,7 @@ class TablistDocTest {
         assertNull(runtime.headerFooter(scope, BoundedConditionErrorCallback.silent()));
         assertNull(runtime.listName(scope, BoundedConditionErrorCallback.silent()));
         assertFalse(runtime.headerFooterVisible(scope, BoundedConditionErrorCallback.silent()));
+        assertFalse(runtime.documentVisible(scope, BoundedConditionErrorCallback.silent()));
         assertTrue(doc.headerFooter().enabled());
         assertTrue(doc.listNames().enabled());
     }
@@ -178,7 +179,7 @@ class TablistDocTest {
     @Test
     void showReevaluatesWorldAndTimeWithoutLosingVariantSelection() {
         TablistDoc doc = TablistDoc.parse("tablist.json", """
-            {"schemaVersion":2,"revision":1,"show":"{{ player.world != 'hidden' }}",
+            {"schemaVersion":3,"revision":1,"show":"{{ player.world != 'hidden' }}",
              "headerFooter":{"enabled":true,"show":"world.time < 12000",
                "variants":[{"id":"staff","when":"viewer.op",
                  "presentation":{"header":"Staff"}}]},
@@ -194,6 +195,8 @@ class TablistDocTest {
             "viewer.op", true, "subject.op", true));
         BoundedConditionErrorCallback errors = BoundedConditionErrorCallback.silent();
 
+        assertTrue(runtime.documentVisible(day, errors));
+        assertFalse(runtime.documentVisible(hidden, errors));
         assertEquals("staff", runtime.headerFooter(day, errors).id());
         assertNull(runtime.listName(day, errors));
         assertNull(runtime.headerFooter(night, errors));
@@ -207,7 +210,7 @@ class TablistDocTest {
     @Test
     void enabledFalseStillDisablesVisibleSurfaces() {
         TablistDoc doc = TablistDoc.parse("tablist.json", """
-            {"schemaVersion":2,"revision":1,"show":true,
+            {"schemaVersion":3,"revision":1,"show":true,
              "headerFooter":{"enabled":false,"show":true},
              "listNames":{"enabled":false,"show":true}}
             """);
@@ -228,7 +231,7 @@ class TablistDocTest {
                                        List<TablistDoc.HeaderFooterVariant> headerVariants,
                                        TablistDoc.ListNamePresentation names,
                                        List<TablistDoc.ListNameVariant> nameVariants) {
-        return new TablistDoc(2, 1L, ShowCondition.ALWAYS,
+        return new TablistDoc(TablistDoc.CURRENT_SCHEMA_VERSION, 1L, ShowCondition.ALWAYS,
             new TablistDoc.HeaderFooter(true, ShowCondition.ALWAYS, header, headerVariants),
             new TablistDoc.ListNames(true, ShowCondition.ALWAYS, names, nameVariants), null, null);
     }
@@ -236,7 +239,7 @@ class TablistDocTest {
     @Test
     void anAbsentSortBlockIsInactive() {
         TablistDoc doc = TablistDoc.parse("tablist.json", """
-            {"schemaVersion":2,"revision":1}
+            {"schemaVersion":3,"revision":1}
             """);
 
         assertEquals(TablistDoc.Sort.DISABLED, doc.sort());
@@ -246,7 +249,7 @@ class TablistDocTest {
     @Test
     void aSortBlockParsesItsWeightExpression() {
         TablistDoc doc = TablistDoc.parse("tablist.json", """
-            {"schemaVersion":2,"revision":1,
+            {"schemaVersion":3,"revision":1,
              "sort":{"enabled":true,"weight":"inGroup('subject', 'admin') ? 1000 : subject.level"}}
             """);
 

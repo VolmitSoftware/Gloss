@@ -1,6 +1,9 @@
 package art.arcane.gloss.interaction;
 
 import art.arcane.gloss.Gloss;
+import art.arcane.gloss.menu.DisplayEntityGroup;
+import art.arcane.gloss.menu.DisplayEntityManager;
+import art.arcane.gloss.service.VisibilityGovernor;
 import art.arcane.gloss.api.HoloClickTrigger;
 import art.arcane.gloss.hologram.HologramService;
 import art.arcane.gloss.menu.action.MenuAction;
@@ -80,6 +83,8 @@ public final class InteractionHitboxService implements GlossService, Listener {
         private final InteractionTarget target;
         private final DisplayEntity entity;
         private final Map<UUID, Player> spawned = new ConcurrentHashMap<>();
+        private final Map<UUID, DisplayEntityGroup> groups = new ConcurrentHashMap<>();
+        private final UUID displayHandle = UUID.randomUUID();
         private volatile Location lastPosition;
 
         private Registration(Handle handle, InteractionTarget target, DisplayEntity entity) {
@@ -169,9 +174,7 @@ public final class InteractionHitboxService implements GlossService, Listener {
             return;
         }
         byEntityId.remove(handle.entityId());
-        for (Player viewer : List.copyOf(registration.spawned.values())) {
-            despawn(registration, viewer);
-        }
+        retire(registration);
     }
 
     public InteractionTarget target(int entityId) {
@@ -199,6 +202,10 @@ public final class InteractionHitboxService implements GlossService, Listener {
     public void forgetViewer(UUID viewerId) {
         for (Registration registration : registrations.values()) {
             registration.spawned.remove(viewerId);
+            DisplayEntityGroup group = registration.groups.remove(viewerId);
+            if (group != null) {
+                group.disconnected();
+            }
         }
     }
 
@@ -207,27 +214,68 @@ public final class InteractionHitboxService implements GlossService, Listener {
      * nearest up to the per-viewer cap, then spawn and despawn to match.
      */
     void walk() {
-        List<Sampled> live = new ArrayList<>(registrations.size());
-        Map<UUID, List<Candidate>> byViewer = new LinkedHashMap<>();
+        Map<UUID, ViewerPass> passes = new LinkedHashMap<>();
         for (Registration registration : registrations.values()) {
             Sampled sampled = sample(registration);
             if (sampled == null) {
                 continue;
             }
-            live.add(sampled);
+            Map<UUID, Player> candidates = new LinkedHashMap<>();
             for (Player viewer : viewers.nearby(sampled.position(), INTERACTION_RANGE)) {
-                if (bedrock.test(viewer.getUniqueId())) {
-                    continue;
+                candidates.put(viewer.getUniqueId(), viewer);
+            }
+            Set<UUID> nearby = Set.copyOf(candidates.keySet());
+            for (DisplayEntityGroup group : registration.groups.values()) {
+                candidates.putIfAbsent(group.viewer().getUniqueId(), group.viewer());
+            }
+            for (Map.Entry<UUID, Player> entry : candidates.entrySet()) {
+                ViewerPass pass = passes.computeIfAbsent(entry.getKey(),
+                    ignored -> new ViewerPass(entry.getValue(), new ArrayList<>(), new LinkedHashSet<>()));
+                pass.samples().add(sampled);
+                if (nearby.contains(entry.getKey())) {
+                    pass.offered().add(registration.handle.id());
                 }
-                byViewer.computeIfAbsent(viewer.getUniqueId(), ignored -> new ArrayList<>())
-                    .add(new Candidate(registration.handle.id(), viewer,
-                        distanceSquared(viewer, sampled.position())));
             }
         }
-        Map<Long, Map<UUID, Player>> admitted = admit(byViewer);
-        for (Sampled sampled : live) {
-            settle(sampled, admitted.getOrDefault(sampled.registration().handle.id(), Map.of()));
+        for (ViewerPass pass : passes.values()) {
+            runner.run(pass.viewer(), () -> settleViewer(pass));
         }
+    }
+
+    private void settleViewer(ViewerPass pass) {
+        Player viewer = pass.viewer();
+        List<Sampled> candidates = new ArrayList<>(pass.samples().size());
+        if (viewer.isOnline() && !bedrock.test(viewer.getUniqueId())) {
+            for (Sampled sampled : pass.samples()) {
+                if (pass.offered().contains(sampled.registration().handle.id())
+                    && registrations.get(sampled.registration().handle.id()) == sampled.registration()
+                    && sampled.registration().target.visibility().shown().test(viewer)
+                    && distanceSquared(viewer, sampled.position()) <= INTERACTION_RANGE * INTERACTION_RANGE) {
+                    candidates.add(sampled);
+                }
+            }
+        }
+        if (candidates.size() > MAX_HITBOXES_PER_VIEWER) {
+            candidates.sort(Comparator.comparingDouble(sampled -> distanceSquared(viewer, sampled.position())));
+        }
+        Set<Long> selected = new LinkedHashSet<>();
+        for (int index = 0; index < Math.min(candidates.size(), MAX_HITBOXES_PER_VIEWER); index++) {
+            selected.add(candidates.get(index).registration().handle.id());
+        }
+        for (Sampled sampled : pass.samples()) {
+            Registration registration = sampled.registration();
+            if (!selected.contains(registration.handle.id())) {
+                despawn(registration, viewer);
+                continue;
+            }
+            spawn(registration, viewer);
+            if (sampled.moved() && registration.spawned.containsKey(viewer.getUniqueId())) {
+                sink.send(viewer, List.of(registration.entity.goTo(sampled.position())));
+            }
+        }
+    }
+
+    private record ViewerPass(Player viewer, List<Sampled> samples, Set<Long> offered) {
     }
 
     /** @return where this registration is this pass, or null when it has gone away */
@@ -235,9 +283,7 @@ public final class InteractionHitboxService implements GlossService, Listener {
         InteractionTarget target = registration.target;
         Location position = target.live().getAsBoolean() ? target.position().get() : null;
         if (position == null || position.getWorld() == null) {
-            for (Player viewer : List.copyOf(registration.spawned.values())) {
-                despawn(registration, viewer);
-            }
+            retire(registration);
             return null;
         }
         Location previous = registration.lastPosition;
@@ -248,44 +294,6 @@ public final class InteractionHitboxService implements GlossService, Listener {
             registration.lastPosition = position.clone();
         }
         return new Sampled(registration, position, moved);
-    }
-
-    private static Map<Long, Map<UUID, Player>> admit(Map<UUID, List<Candidate>> byViewer) {
-        Map<Long, Map<UUID, Player>> admitted = new HashMap<>();
-        for (Map.Entry<UUID, List<Candidate>> entry : byViewer.entrySet()) {
-            List<Candidate> candidates = entry.getValue();
-            if (candidates.size() > MAX_HITBOXES_PER_VIEWER) {
-                candidates.sort(Comparator.comparingDouble(Candidate::distanceSquared));
-            }
-            int count = Math.min(candidates.size(), MAX_HITBOXES_PER_VIEWER);
-            for (int index = 0; index < count; index++) {
-                Candidate candidate = candidates.get(index);
-                admitted.computeIfAbsent(candidate.registrationId(), ignored -> new LinkedHashMap<>())
-                    .put(entry.getKey(), candidate.viewer());
-            }
-        }
-        return admitted;
-    }
-
-    private void settle(Sampled sampled, Map<UUID, Player> keep) {
-        Registration registration = sampled.registration();
-        for (Map.Entry<UUID, Player> entry : keep.entrySet()) {
-            Player viewer = entry.getValue();
-            Player current = registration.spawned.get(entry.getKey());
-            if (current == null || current != viewer) {
-                if (current != null) {
-                    despawn(registration, current);
-                }
-                spawn(registration, viewer);
-            } else if (sampled.moved()) {
-                sink.send(viewer, List.of(registration.entity.goTo(sampled.position())));
-            }
-        }
-        for (Player viewer : List.copyOf(registration.spawned.values())) {
-            if (!keep.containsKey(viewer.getUniqueId())) {
-                despawn(registration, viewer);
-            }
-        }
     }
 
     /** Far enough to sort last when the two are not comparable, never near enough to win a slot. */
@@ -300,23 +308,69 @@ public final class InteractionHitboxService implements GlossService, Listener {
     private record Sampled(Registration registration, Location position, boolean moved) {
     }
 
-    private record Candidate(long registrationId, Player viewer, double distanceSquared) {
+    private void retire(Registration registration) {
+        for (DisplayEntityGroup group : registration.groups.values()) {
+            if (plugin == null) {
+                group.close();
+            } else {
+                DisplayEntityManager.retire(plugin, group);
+            }
+        }
+        registration.groups.clear();
     }
 
     private void spawn(Registration registration, Player viewer) {
-        registration.spawned.put(viewer.getUniqueId(), viewer);
-        List<PacketWrapper<?>> packets = new ArrayList<>(registration.entity.spawn());
-        packets.add(DisplayEntity.interactionSize(registration.handle.entityId(), registration.target.width(),
-            registration.target.height()));
-        sink.send(viewer, packets);
+        DisplayEntityGroup group = registration.groups.computeIfAbsent(viewer.getUniqueId(), ignored ->
+            new DisplayEntityGroup(new DisplayEntityGroup.Options(viewer, registration.target.visibility().surface(),
+                () -> plugin == null ? VisibilityGovernor.passthrough() : plugin.governor(),
+                new HitboxTransport(registration, viewer))));
+        VisibilityGovernor governor = plugin == null ? VisibilityGovernor.passthrough() : plugin.governor();
+        group.culled(governor.tier(viewer, registration.target.visibility().surface(),
+            distanceSquared(viewer, registration.lastPosition)) == VisibilityGovernor.Tier.CULLED);
+        group.show(registration.displayHandle);
     }
 
     private void despawn(Registration registration, Player viewer) {
-        if (registration.spawned.remove(viewer.getUniqueId()) == null) {
+        DisplayEntityGroup group = registration.groups.remove(viewer.getUniqueId());
+        if (group == null) {
             return;
         }
-        if (viewer.isOnline()) {
-            sink.send(viewer, List.of(registration.entity.remove()));
+        try {
+            group.close();
+        } catch (RuntimeException failure) {
+            DisplayEntityManager.retire(plugin, group);
+            throw failure;
+        }
+    }
+
+    private final class HitboxTransport implements DisplayEntityGroup.Transport {
+        private final Registration registration;
+        private final Player viewer;
+
+        private HitboxTransport(Registration registration, Player viewer) {
+            this.registration = registration;
+            this.viewer = viewer;
+        }
+
+        @Override
+        public boolean spawn(UUID handle) {
+            if (!viewer.isOnline()) {
+                return false;
+            }
+            List<PacketWrapper<?>> packets = new ArrayList<>(registration.entity.spawn());
+            packets.add(DisplayEntity.interactionSize(registration.handle.entityId(), registration.target.width(),
+                registration.target.height()));
+            sink.send(viewer, packets);
+            registration.spawned.put(viewer.getUniqueId(), viewer);
+            return true;
+        }
+
+        @Override
+        public void remove(List<UUID> handles, boolean delete) {
+            if (viewer.isOnline()) {
+                sink.send(viewer, List.of(registration.entity.remove()));
+            }
+            registration.spawned.remove(viewer.getUniqueId());
         }
     }
 
@@ -340,7 +394,7 @@ public final class InteractionHitboxService implements GlossService, Listener {
 
     private void dispatch(Registration registration, Player player, HoloClickTrigger trigger) {
         InteractionTarget target = registration.target;
-        if (!target.live().getAsBoolean() || !player.isOnline()) {
+        if (!target.live().getAsBoolean() || !player.isOnline() || !target.visibility().shown().test(player)) {
             return;
         }
         Location position = target.position().get();
@@ -396,7 +450,9 @@ public final class InteractionHitboxService implements GlossService, Listener {
     }
 
     private static void sendPackets(Player viewer, List<PacketWrapper<?>> packets) {
-        PacketUtils.send(viewer, packets);
+        if (!PacketUtils.sendChecked(viewer, packets) && viewer.isOnline()) {
+            throw new IllegalStateException("Interaction channel is unavailable for " + viewer.getUniqueId());
+        }
     }
 
     private static void runOnRegion(Gloss plugin, Player player, Runnable action) {

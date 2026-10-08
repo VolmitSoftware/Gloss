@@ -7,7 +7,9 @@ import art.arcane.gloss.config.components.ButtonComponentData;
 import art.arcane.gloss.config.components.ComponentData;
 import art.arcane.gloss.config.components.ToggleComponentData;
 import art.arcane.gloss.menu.action.MenuAction;
+import art.arcane.gloss.menu.action.ActionReferences;
 import art.arcane.gloss.doc.DocumentParsers;
+import art.arcane.gloss.doc.DocumentPresetCatalog;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonParser;
 
@@ -26,7 +28,7 @@ public final class MenuDocumentParser {
     if (!root.isJsonObject()) {
       throw new IllegalArgumentException("menu document must be a JSON object");
     }
-    MenuDefinitionData definition = DocumentParsers.GSON.fromJson(source, MenuDefinitionData.class);
+    MenuDefinitionData definition = DocumentParsers.GSON.fromJson(ActionReferences.resolve(source), MenuDefinitionData.class);
     if (definition == null) {
       throw new IllegalArgumentException("menu document must not be null");
     }
@@ -36,6 +38,11 @@ public final class MenuDocumentParser {
       precompileActions(definition.getId(), variant.components());
     }
     return new MenuDocument(requiredId, MenuDocument.revisionOf(source), source, definition);
+  }
+
+  public static MenuDocument parse(String menuId, String source, DocumentPresetCatalog presets) {
+    MenuDocument resolved = parse(menuId, presets.resolve("menus", source));
+    return new MenuDocument(resolved.id(), MenuDocument.revisionOf(source), source, resolved.definition());
   }
 
   private static void precompileActions(String menuId, List<MenuComponentData> components) {

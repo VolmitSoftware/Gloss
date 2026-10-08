@@ -15,6 +15,15 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class BubbleStyleDocTest {
     @Test
+    void overflowHasAnExplicitValidatedPolicy() {
+        assertEquals("replace-oldest", BubbleStyleDoc.DEFAULTS.overflow());
+        assertEquals("reject-new", BubbleStyleDoc.parse("policy.json",
+            "{\"schemaVersion\":5,\"revision\":1,\"overflow\":\"reject-new\"}").overflow());
+        assertThrows(RuntimeException.class, () -> BubbleStyleDoc.parse("policy.json",
+            "{\"schemaVersion\":5,\"revision\":1,\"overflow\":\"queue\"}"));
+    }
+
+    @Test
     void parseReadsTheSchemaFourShape() {
         String json = """
             {

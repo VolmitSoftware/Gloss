@@ -10,10 +10,18 @@
   ],
   "additionalProperties": false,
   "properties": {
+    "preset": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1,
+      "description": "Named preset from this collection in presets.json; document fields override inherited values."
+    },
     "schemaVersion": {
       "description": "Document format revision. Server owned and monotonic.",
       "type": "integer",
-      "const": 1
+      "const": 2
     },
     "revision": {
       "description": "Bumped by the server on every write; the editor and the hot reloader compare it.",
@@ -46,6 +54,48 @@
       "maxItems": 256,
       "items": {
         "$ref": "#/$defs/entry"
+      }
+    },
+    "matching": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Bounded RE2 chat matching. Limits skip behavior matching without cancelling ordinary chat.",
+      "properties": {
+        "syntax": {
+          "type": "string",
+          "const": "re2",
+          "default": "re2"
+        },
+        "maxInputCharacters": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 32768,
+          "default": 4096
+        },
+        "maxPatternCharacters": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4096,
+          "default": 1024
+        },
+        "maxProgramSize": {
+          "type": "integer",
+          "minimum": 16,
+          "maximum": 1000000,
+          "default": 16384
+        },
+        "maxNestingDepth": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 128,
+          "default": 32
+        },
+        "maxWorkUnits": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100000000,
+          "default": 2000000
+        }
       }
     }
   },
@@ -159,7 +209,7 @@
           "default": "player"
         },
         "pattern": {
-          "description": "Java regular expression matched against the chat line; the entry fires when it finds a match anywhere. Omitted matches every line.",
+          "description": "Bounded RE2 expression searched in the chat line. Lookaround, backreferences and unsupported flags are rejected. Omitted accepts every line within matching limits.",
           "type": "string"
         },
         "name": {

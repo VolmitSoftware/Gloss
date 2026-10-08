@@ -10,7 +10,10 @@ import com.github.retrooper.packetevents.event.PacketListenerCommon;
 import com.github.retrooper.packetevents.protocol.entity.data.EntityData;
 import com.github.retrooper.packetevents.protocol.entity.data.EntityDataTypes;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityMetadata;
-import org.bukkit.Bukkit;
+import art.arcane.volmlib.util.scheduling.FoliaScheduler;
+import org.bukkit.Location;
+import org.bukkit.event.entity.EntityRemoveEvent;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -37,7 +40,6 @@ import java.util.concurrent.ConcurrentMap;
 public final class GlowService implements GlossService, Listener {
     public static final String NAME = "glow";
     public static final String PURPOSE = "glow";
-    static final int SWEEP_INTERVAL_TICKS = 20;
 
     private static final Comparator<GlowTag> STRONGEST_FIRST =
         Comparator.comparingInt(GlowTag::priority).reversed().thenComparing(GlowTag::purpose);
@@ -48,13 +50,27 @@ public final class GlowService implements GlossService, Listener {
     private static final class Entry {
         private static final int NO_ENTITY = -1;
 
+        private final Player viewer;
+        private final Entity target;
+        private final AtomicBoolean pending = new AtomicBoolean();
+        private long revision;
+        private Byte sentFlags;
+
+        private Entry(Player viewer, Entity target) {
+            this.viewer = viewer;
+            this.target = target;
+        }
+
         private final List<GlowTag> tags = new ArrayList<>(2);
         private TeamAllocator.TeamHandle handle;
         private int entityId = NO_ENTITY;
     }
 
     private final Gloss plugin;
+    private final EntityTasks tasks;
     private final ConcurrentMap<Key, Entry> entries = new ConcurrentHashMap<>();
+    private final ConcurrentMap<UUID, Set<UUID>> targets = new ConcurrentHashMap<>();
+    private final Object[] viewerLocks = createViewerLocks();
     /**
      * The entity ids a viewer currently has tagged. {@code ENTITY_METADATA} is one of the highest
      * volume packets the server sends, and the listener runs on the Netty thread for every one of
@@ -68,6 +84,12 @@ public final class GlowService implements GlossService, Listener {
 
     public GlowService(Gloss plugin) {
         this.plugin = Objects.requireNonNull(plugin, "plugin");
+        this.tasks = this::dispatchOwned;
+    }
+
+    GlowService(Gloss plugin, EntityTasks tasks) {
+        this.plugin = Objects.requireNonNull(plugin, "plugin");
+        this.tasks = Objects.requireNonNull(tasks, "tasks");
     }
 
     @Override
@@ -83,7 +105,7 @@ public final class GlowService implements GlossService, Listener {
         }
         if (sweepTaskId == -1) {
             sweepTaskId = plugin.scheduler().sr(() -> sweep(System.currentTimeMillis()),
-                SWEEP_INTERVAL_TICKS);
+                plugin.cfg().modules().glow().sweepIntervalTicks());
         }
     }
 
@@ -105,6 +127,24 @@ public final class GlowService implements GlossService, Listener {
     }
 
     @Override
+    public void reload() {
+        if (sweepTaskId != -1) {
+            plugin.scheduler().csr(sweepTaskId);
+            sweepTaskId = plugin.scheduler().sr(() -> sweep(System.currentTimeMillis()),
+                plugin.cfg().modules().glow().sweepIntervalTicks());
+        }
+        if (!enabled()) {
+            for (Key key : List.copyOf(entries.keySet())) {
+                clear(key);
+            }
+        } else {
+            for (Map.Entry<Key, Entry> entry : entries.entrySet()) {
+                refresh(entry.getKey(), entry.getValue());
+            }
+        }
+    }
+
+    @Override
     public boolean reloadOnConfigChange(GlossConfig previous, GlossConfig next) {
         return !previous.modules().glow().equals(next.modules().glow());
     }
@@ -120,34 +160,42 @@ public final class GlowService implements GlossService, Listener {
                     long ttlTicks) {
         Key key = new Key(viewer.getUniqueId(), target.getUniqueId());
         GlowTag tag = new GlowTag(purpose, priority, color,
-            ttlTicks <= 0L ? 0L : System.currentTimeMillis() + ttlTicks * 50L);
-        Entry entry = entries.computeIfAbsent(key, ignored -> new Entry());
-        synchronized (entry) {
-            bindEntityId(key.viewerId(), entry, target.getEntityId());
-            entry.tags.removeIf(existing -> existing.purpose().equals(tag.purpose()));
-            entry.tags.add(tag);
-            entry.tags.sort(STRONGEST_FIRST);
-            apply(viewer, target, entry);
+            expiresAt(ttlTicks));
+        if (!enabled()) {
+            throw new IllegalStateException("Glow is disabled");
         }
+        Entry entry;
+        synchronized (viewerLock(key.viewerId())) {
+            entry = admit(key, viewer, target);
+            synchronized (entry) {
+                entry.tags.removeIf(existing -> existing.purpose().equals(tag.purpose()));
+                entry.tags.add(tag);
+                entry.tags.sort(STRONGEST_FIRST);
+                entry.revision++;
+            }
+        }
+        refresh(key, entry);
     }
 
     public void untag(Player viewer, Entity target, String purpose) {
         Key key = new Key(viewer.getUniqueId(), target.getUniqueId());
-        Entry entry = entries.get(key);
-        if (entry == null) {
-            return;
-        }
-        synchronized (entry) {
-            entry.tags.removeIf(existing -> existing.purpose().equals(purpose));
-            if (entry.tags.isEmpty()) {
-                entries.remove(key, entry);
-                release(entry);
-                dropEntityId(key.viewerId(), entry);
-                send(viewer, target, false);
+        Entry entry;
+        synchronized (viewerLock(key.viewerId())) {
+            entry = entries.get(key);
+            if (entry == null) {
                 return;
             }
-            apply(viewer, target, entry);
+            synchronized (entry) {
+                entry.tags.removeIf(existing -> existing.purpose().equals(purpose));
+                if (entry.tags.isEmpty()) {
+                    entries.remove(key, entry);
+                    clearEntry(key, entry);
+                    return;
+                }
+                entry.revision++;
+            }
         }
+        refresh(key, entry);
     }
 
     /** @return the tag this viewer actually sees on this entity, or null when there is none */
@@ -199,20 +247,24 @@ public final class GlowService implements GlossService, Listener {
     void sweep(long nowMs) {
         for (Map.Entry<Key, Entry> mapped : entries.entrySet()) {
             Entry entry = mapped.getValue();
-            synchronized (entry) {
-                if (!entry.tags.removeIf(tag -> tag.expired(nowMs))) {
-                    continue;
+            boolean refresh = false;
+            synchronized (viewerLock(mapped.getKey().viewerId())) {
+                synchronized (entry) {
+                    if (entries.get(mapped.getKey()) != entry) {
+                        continue;
+                    }
+                    boolean changed = entry.tags.removeIf(tag -> tag.expired(nowMs));
+                    if (entry.tags.isEmpty()) {
+                        entries.remove(mapped.getKey(), entry);
+                        clearEntry(mapped.getKey(), entry);
+                    } else if (changed || plugin.cfg().modules().glow().viewerRange() > 0) {
+                        entry.revision++;
+                        refresh = true;
+                    }
                 }
-                if (entry.tags.isEmpty()) {
-                    entries.remove(mapped.getKey(), entry);
-                    clearEntry(mapped.getKey(), entry);
-                    continue;
-                }
-                Player viewer = Bukkit.getPlayer(mapped.getKey().viewerId());
-                Entity target = Bukkit.getEntity(mapped.getKey().targetId());
-                if (viewer != null && target != null) {
-                    apply(viewer, target, entry);
-                }
+            }
+            if (refresh) {
+                refresh(mapped.getKey(), entry);
             }
         }
     }
@@ -230,34 +282,227 @@ public final class GlowService implements GlossService, Listener {
         forget(event.getPlayer().getUniqueId());
     }
 
+    @EventHandler
+    public void onRemove(EntityRemoveEvent event) {
+        UUID id = event.getEntity().getUniqueId();
+        for (Key key : List.copyOf(entries.keySet())) {
+            if (key.targetId().equals(id)) {
+                clear(key);
+            }
+        }
+    }
+
+    private Entry admit(Key key, Player viewer, Entity target) {
+        synchronized (viewerLock(key.viewerId())) {
+            Set<UUID> mine = viewerTargets(key.viewerId());
+            if (!mine.contains(key.targetId()) && mine.size() >= plugin.cfg().modules().glow().maxTargetsPerViewer()) {
+                pruneExpired(key.viewerId(), System.currentTimeMillis());
+                mine = viewerTargets(key.viewerId());
+            }
+            if (!mine.contains(key.targetId()) && mine.size() >= plugin.cfg().modules().glow().maxTargetsPerViewer()) {
+                throw new IllegalStateException("Glow target limit exceeded for " + key.viewerId());
+            }
+            mine.add(key.targetId());
+            return entries.computeIfAbsent(key, ignored -> new Entry(viewer, target));
+        }
+    }
+
+    private static Object[] createViewerLocks() {
+        Object[] locks = new Object[256];
+        for (int index = 0; index < locks.length; index++) {
+            locks[index] = new Object();
+        }
+        return locks;
+    }
+
+    private Object viewerLock(UUID viewerId) {
+        return viewerLocks[viewerId.hashCode() & (viewerLocks.length - 1)];
+    }
+
+    private static long expiresAt(long ticks) {
+        if (ticks <= 0) {
+            return 0;
+        }
+        long now = System.currentTimeMillis();
+        return ticks > (Long.MAX_VALUE - now) / 50 ? Long.MAX_VALUE : now + ticks * 50;
+    }
+
+    private void pruneExpired(UUID viewerId, long now) {
+        Set<UUID> mine = targets.get(viewerId);
+        if (mine == null) {
+            return;
+        }
+        for (UUID targetId : List.copyOf(mine)) {
+            Key key = new Key(viewerId, targetId);
+            Entry entry = entries.get(key);
+            if (entry == null) {
+                continue;
+            }
+            synchronized (entry) {
+                if (entry.tags.removeIf(tag -> tag.expired(now))) {
+                    entry.revision++;
+                }
+                if (entry.tags.isEmpty() && entries.remove(key, entry)) {
+                    clearEntry(key, entry);
+                }
+            }
+        }
+    }
+
+    private void retire(Key key, Entry expected) {
+        synchronized (viewerLock(key.viewerId())) {
+            if (entries.remove(key, expected)) {
+                synchronized (expected) {
+                    clearEntry(key, expected);
+                }
+            }
+        }
+    }
+
+    private Set<UUID> viewerTargets(UUID viewerId) {
+        return targets.computeIfAbsent(viewerId, ignored -> ConcurrentHashMap.newKeySet());
+    }
+
     private void clear(Key key) {
-        Entry entry = entries.remove(key);
-        if (entry != null) {
-            clearEntry(key, entry);
+        synchronized (viewerLock(key.viewerId())) {
+            Entry entry = entries.remove(key);
+            if (entry != null) {
+                synchronized (entry) {
+                    clearEntry(key, entry);
+                }
+            }
         }
     }
 
     private void clearEntry(Key key, Entry entry) {
         release(entry);
         dropEntityId(key.viewerId(), entry);
-        Player viewer = Bukkit.getPlayer(key.viewerId());
-        Entity target = Bukkit.getEntity(key.targetId());
-        if (viewer != null && target != null) {
-            send(viewer, target, false);
+        Set<UUID> mine = targets.get(key.viewerId());
+        if (mine != null) {
+            synchronized (viewerLock(key.viewerId())) {
+                if (!entries.containsKey(key)) {
+                    mine.remove(key.targetId());
+                    if (mine.isEmpty()) {
+                        targets.remove(key.viewerId(), mine);
+                    }
+                }
+            }
         }
+        tasks.dispatch(entry.target, () -> {
+            if (!entry.target.isValid()) {
+                return;
+            }
+            int entityId = entry.target.getEntityId();
+            byte flags = GlowFlags.of(entry.target, false);
+            tasks.dispatch(entry.viewer, () -> {
+                if (!entries.containsKey(key) && entry.viewer.isOnline()) {
+                    send(entry.viewer, entityId, flags);
+                }
+            }, null);
+        }, null);
     }
 
-    private void apply(Player viewer, Entity target, Entry entry) {
+    private void refresh(Key key, Entry entry) {
+        if (!entry.pending.compareAndSet(false, true)) {
+            return;
+        }
+        long revision;
+        synchronized (entry) {
+            revision = entry.revision;
+        }
+        Runnable complete = () -> {
+            entry.pending.set(false);
+            boolean repeat;
+            synchronized (entry) {
+                repeat = entries.get(key) == entry && entry.revision != revision;
+            }
+            if (repeat) {
+                refresh(key, entry);
+            }
+        };
+        Runnable retired = () -> {
+            retire(key, entry);
+            complete.run();
+        };
+        tasks.dispatch(entry.target, () -> {
+            if (entries.get(key) != entry || !entry.target.isValid()) {
+                retire(key, entry);
+                complete.run();
+                return;
+            }
+            Sample sample;
+            try {
+                sample = new Sample(entry.target.getEntityId(), entryName(entry.target),
+                    GlowFlags.of(entry.target, false), plugin.cfg().modules().glow().viewerRange() > 0
+                        ? entry.target.getLocation().clone() : null);
+            } catch (RuntimeException failure) {
+                retired.run();
+                Gloss.logExceptionStackThrottled(false, "glow-capture-" + key.targetId(), failure,
+                    "Failed to capture glow state for %s.", key.targetId());
+                return;
+            }
+            tasks.dispatch(entry.viewer, () -> {
+                try {
+                    synchronized (viewerLock(key.viewerId())) {
+                        synchronized (entry) {
+                            if (entries.get(key) != entry || entry.revision != revision || !entry.viewer.isOnline()) {
+                                return;
+                            }
+                            apply(key, entry, sample);
+                        }
+                    }
+                } finally {
+                    complete.run();
+                }
+            }, retired);
+        }, retired);
+    }
+
+    private void apply(Key key, Entry entry, Sample sample) {
+        double range = plugin.cfg().modules().glow().viewerRange();
+        Location viewerAt = range > 0 ? entry.viewer.getLocation() : null;
+        boolean inRange = range <= 0 || sample.location() != null && viewerAt.getWorld() != null
+            && viewerAt.getWorld().equals(sample.location().getWorld())
+            && viewerAt.distanceSquared(sample.location()) <= range * range;
+        if (!inRange || !entry.viewer.canSee(entry.target)) {
+            release(entry);
+            dropEntityId(key.viewerId(), entry);
+            if (entry.sentFlags != null) {
+                send(entry.viewer, sample.entityId(), sample.flags());
+            }
+            entry.sentFlags = null;
+            return;
+        }
+        bindEntityId(key.viewerId(), entry, sample.entityId());
         GlowTag top = entry.tags.getFirst();
         TeamAllocator.TeamStyle style = new TeamAllocator.TeamStyle("", "", top.color(),
             TeamAllocator.NameTagVisibility.ALWAYS, TeamAllocator.CollisionRule.ALWAYS);
         if (entry.handle == null) {
-            entry.handle = plugin.teams().claim(viewer, PURPOSE, entryName(target), style);
+            entry.handle = plugin.teams().claim(entry.viewer, PURPOSE, sample.name(), style);
         } else {
             plugin.teams().update(entry.handle, style);
         }
-        send(viewer, target, true);
+        byte flags = (byte) (sample.flags() | GlowFlags.GLOWING);
+        if (entry.sentFlags == null || entry.sentFlags != flags) {
+            send(entry.viewer, sample.entityId(), flags);
+            entry.sentFlags = flags;
+        }
     }
+
+    private void dispatchOwned(Entity entity, Runnable task, Runnable retired) {
+        if (FoliaScheduler.isOwnedByCurrentRegion(entity)) {
+            task.run();
+        } else if (!FoliaScheduler.runEntity(plugin, entity, task, 0, retired) && retired != null) {
+            retired.run();
+        }
+    }
+
+    @FunctionalInterface
+    interface EntityTasks {
+        void dispatch(Entity entity, Runnable task, Runnable retired);
+    }
+
+    private record Sample(int entityId, String name, byte flags, Location location) { }
 
     private void bindEntityId(UUID viewerId, Entry entry, int entityId) {
         if (entry.entityId != entityId) {
@@ -286,11 +531,10 @@ public final class GlowService implements GlossService, Listener {
         }
     }
 
-    private void send(Player viewer, Entity target, boolean glowing) {
+    private void send(Player viewer, int entityId, byte flags) {
         List<EntityData<?>> metadata = new ArrayList<>(1);
-        metadata.add(new EntityData<>(GlowFlags.INDEX, EntityDataTypes.BYTE,
-            GlowFlags.of(target, glowing)));
-        PacketUtils.send(viewer, new WrapperPlayServerEntityMetadata(target.getEntityId(), metadata));
+        metadata.add(new EntityData<>(GlowFlags.INDEX, EntityDataTypes.BYTE, flags));
+        PacketUtils.send(viewer, new WrapperPlayServerEntityMetadata(entityId, metadata));
     }
 
     /** Teams hold player names and entity uuids; a team entry is one or the other, never both. */

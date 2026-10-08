@@ -5,7 +5,6 @@ import art.arcane.gloss.GlossConfig;
 import art.arcane.gloss.api.GlossCameraRideEvent;
 import art.arcane.gloss.service.GlossService;
 import art.arcane.gloss.state.PlayerSections;
-import art.arcane.gloss.util.common.Teleports;
 import art.arcane.volmlib.util.scheduling.FoliaScheduler;
 import org.bukkit.Bukkit;
 import org.bukkit.GameMode;
@@ -21,15 +20,19 @@ import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.player.PlayerChangedWorldEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.event.player.PlayerRespawnEvent;
 import org.bukkit.event.player.PlayerTeleportEvent;
 import org.bukkit.event.player.PlayerToggleSneakEvent;
 
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
+import java.lang.reflect.Method;
+import java.lang.reflect.InvocationTargetException;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.logging.Level;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Spectator camera rides along a spline. The player watches a real, invisible carrier entity
@@ -60,12 +63,20 @@ public final class CameraService implements GlossService, Listener {
     private final Gloss plugin;
     private final PlayerSections sections;
     private final CameraJournal journal;
+    private final Transport transport;
     private final ConcurrentMap<UUID, CameraRide> rides = new ConcurrentHashMap<>();
+    private final ConcurrentMap<UUID, UUID> restoring = new ConcurrentHashMap<>();
+    private final ConcurrentMap<Entity, AtomicBoolean> retiringCarriers = new ConcurrentHashMap<>();
     private int driverTaskId = -1;
 
     public CameraService(Gloss plugin, PlayerSections sections) {
-        this.plugin = Objects.requireNonNull(plugin, "plugin");
-        this.sections = Objects.requireNonNull(sections, "sections");
+        this(new Dependencies(plugin, sections, new EntityTransport(plugin)));
+    }
+
+    CameraService(Dependencies dependencies) {
+        this.plugin = Objects.requireNonNull(dependencies.plugin(), "plugin");
+        this.sections = Objects.requireNonNull(dependencies.sections(), "sections");
+        this.transport = Objects.requireNonNull(dependencies.transport(), "transport");
         this.journal = new CameraJournal(this.sections);
     }
 
@@ -114,10 +125,20 @@ public final class CameraService implements GlossService, Listener {
      *     not be spawned
      */
     public boolean ride(Player player, List<Spline.Node> path, Options options) {
-        if (!enabled() || path.isEmpty() || rides.containsKey(player.getUniqueId())) {
+        if (!enabled() || path.isEmpty() || riding(player.getUniqueId()) || restoring.containsKey(player.getUniqueId())) {
             return false;
         }
         Spline spline = new Spline(path);
+        AtomicBoolean accepted = new AtomicBoolean(true);
+        return transport.execute(player, () -> accepted.set(begin(player, spline, options)),
+            () -> accepted.set(false)) && accepted.get();
+    }
+
+    private boolean begin(Player player, Spline spline, Options options) {
+        if (!enabled() || riding(player.getUniqueId()) || restoring.containsKey(player.getUniqueId())
+            || journal.read(player.getUniqueId()).isPresent()) {
+            return false;
+        }
         long maxTicks = (long) plugin.cfg().modules().camera().maxRideSeconds() * 20L;
         GlossCameraRideEvent event = new GlossCameraRideEvent(player,
             (int) Math.min(Integer.MAX_VALUE, Math.min(spline.totalTicks(), maxTicks)));
@@ -126,14 +147,28 @@ public final class CameraService implements GlossService, Listener {
             return false;
         }
         CameraRide ride = new CameraRide(player, spline, options.skippable(), maxTicks);
-        Entity carrier = spawnCarrier(player, spline);
-        if (carrier == null) {
+        try {
+            journal.write(player, ride.savedLocation(), ride.savedGameMode());
+        } catch (RuntimeException failure) {
+            report(player.getUniqueId(), "saving recovery state", failure);
             return false;
         }
-        journal.write(player, ride.savedLocation(), ride.savedGameMode());
+        Entity carrier = spawnCarrier(player);
+        if (carrier == null) {
+            clearJournal(player.getUniqueId());
+            return false;
+        }
         rides.put(player.getUniqueId(), ride);
         ride.start(carrier);
-        letterbox(player, options.letterbox(), true);
+        try {
+            player.setGameMode(GameMode.SPECTATOR);
+            move(ride, ride.position(0L), () -> attach(ride, options));
+        } catch (RuntimeException failure) {
+            report(player.getUniqueId(), "starting the ride", failure);
+            ride.moved();
+            abort(ride);
+            return false;
+        }
         return true;
     }
 
@@ -143,17 +178,14 @@ public final class CameraService implements GlossService, Listener {
 
     /** Puts a player back where a crash mid-ride left them, then forgets the journal. */
     public void restoreJournalled(Player player) {
-        journal.read(player.getUniqueId()).ifPresent(entry -> {
-            journal.clear(player.getUniqueId());
-            World world = Bukkit.getWorld(entry.world());
-            if (world == null) {
-                return;
-            }
-            player.setSpectatorTarget(null);
-            player.setGameMode(gameMode(entry.gameMode()));
-            Teleports.teleportAsync(player, new Location(world, entry.x(), entry.y(), entry.z(),
-                entry.yaw(), entry.pitch()), PlayerTeleportEvent.TeleportCause.PLUGIN);
-        });
+        UUID id = player.getUniqueId();
+        UUID restoration = UUID.randomUUID();
+        if (riding(id) || restoring.putIfAbsent(id, restoration) != null) {
+            return;
+        }
+        if (!transport.execute(player, () -> restore(player, restoration), () -> restoring.remove(id, restoration))) {
+            restoring.remove(id, restoration);
+        }
     }
 
     @EventHandler
@@ -165,12 +197,19 @@ public final class CameraService implements GlossService, Listener {
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
         end(event.getPlayer().getUniqueId(), EndReason.QUIT);
+        restoring.remove(event.getPlayer().getUniqueId());
         sections.evict(event.getPlayer().getUniqueId());
     }
 
     @EventHandler
     public void onDeath(PlayerDeathEvent event) {
         end(event.getEntity().getUniqueId(), EndReason.DEATH);
+    }
+
+    @EventHandler
+    public void onRespawn(PlayerRespawnEvent event) {
+        Player player = event.getPlayer();
+        FoliaScheduler.runEntity(plugin, player, () -> restoreJournalled(player), 1L);
     }
 
     @EventHandler
@@ -188,6 +227,7 @@ public final class CameraService implements GlossService, Listener {
 
     /** One driver pass: advance every ride and end the ones that ran out. */
     void tick() {
+        retiringCarriers.forEach(this::scheduleCarrierRemoval);
         for (UUID riderId : List.copyOf(rides.keySet())) {
             CameraRide ride = rides.get(riderId);
             if (ride == null) {
@@ -196,6 +236,11 @@ public final class CameraService implements GlossService, Listener {
             if (!ride.tick()) {
                 end(riderId, ride.durationTicks() >= (long) plugin.cfg().modules().camera()
                     .maxRideSeconds() * 20L ? EndReason.TIMEOUT : EndReason.END);
+                continue;
+            }
+            Location next = ride.beginMove();
+            if (next != null) {
+                move(ride, next, ride::moved);
             }
         }
     }
@@ -210,34 +255,222 @@ public final class CameraService implements GlossService, Listener {
         if (ride == null) {
             return;
         }
-        if (reason != EndReason.QUIT) {
-            journal.clear(riderId);
-        }
-        letterbox(ride.player(), true, false);
-        Runnable restore = () -> {
-            try {
-                ride.end();
-            } catch (RuntimeException failure) {
-                Gloss.logExceptionStack(false, failure,
-                    "Camera ride for %s could not be restored after %s.", ride.player().getName(), reason);
-            }
-        };
-        if (!FoliaScheduler.runEntity(plugin, ride.player(), restore, 0, restore)) {
-            restore.run();
+        ride.end(reason != EndReason.QUIT);
+        finishEnd(ride);
+    }
+
+    private Entity spawnCarrier(Player player) {
+        Location at = player.getLocation();
+        try {
+            return at.getWorld().spawn(at, ArmorStand.class, CameraRide::prepare);
+        } catch (RuntimeException failure) {
+            report(player.getUniqueId(), "spawning the carrier", failure);
+            return null;
         }
     }
 
-    private Entity spawnCarrier(Player player, Spline spline) {
-        Spline.Pose start = spline.at(0L);
-        World world = player.getWorld();
-        Location at = new Location(world, start.x(), start.y(), start.z(), start.yaw(), start.pitch());
-        try {
-            return world.spawn(at, ArmorStand.class, CameraRide::prepare);
-        } catch (RuntimeException failure) {
-            Gloss.log(Level.WARNING, "Camera ride for %s could not spawn its carrier: %s",
-                player.getName(), failure.getMessage());
-            return null;
+    private void move(CameraRide ride, Location destination, Runnable success) {
+        Entity carrier = ride.carrier();
+        Runnable refused = () -> {
+            ride.moved();
+            abort(ride);
+        };
+        if (!transport.execute(carrier, () -> {
+            if (ride.ended()) {
+                ride.moved();
+                finishEnd(ride);
+                return;
+            }
+            teleport(carrier, destination).whenComplete((moved, failure) -> {
+                if (failure != null) {
+                    report(ride.player().getUniqueId(), "moving the carrier", failure);
+                }
+                if (ride.ended()) {
+                    ride.moved();
+                    finishEnd(ride);
+                } else if (failure != null || !Boolean.TRUE.equals(moved)) {
+                    refused.run();
+                } else {
+                    try {
+                        success.run();
+                        if (ride.ended()) {
+                            finishEnd(ride);
+                        }
+                    } catch (RuntimeException startFailure) {
+                        report(ride.player().getUniqueId(), "continuing the ride", startFailure);
+                        refused.run();
+                    }
+                }
+            });
+        }, refused)) {
+            refused.run();
         }
+    }
+
+    private void attach(CameraRide ride, Options options) {
+        Player player = ride.player();
+        Runnable refused = () -> {
+            ride.moved();
+            abort(ride);
+        };
+        if (!transport.execute(player, () -> {
+            if (ride.ended()) {
+                ride.moved();
+                finishEnd(ride);
+                return;
+            }
+            teleport(player, ride.position(0L)).whenComplete((moved, failure) -> {
+                if (failure != null) {
+                    report(player.getUniqueId(), "positioning the rider", failure);
+                }
+                if (ride.ended() || failure != null || !Boolean.TRUE.equals(moved)) {
+                    refused.run();
+                    return;
+                }
+                if (!transport.execute(player, () -> {
+                    if (ride.ended()) {
+                        ride.moved();
+                        finishEnd(ride);
+                        return;
+                    }
+                    try {
+                        player.setSpectatorTarget(ride.carrier());
+                        letterbox(player, options.letterbox(), true);
+                        ride.attached();
+                        if (ride.ended()) {
+                            finishEnd(ride);
+                        }
+                    } catch (RuntimeException attachFailure) {
+                        report(player.getUniqueId(), "attaching the rider", attachFailure);
+                        refused.run();
+                    }
+                }, refused)) {
+                    refused.run();
+                }
+            });
+        }, refused)) {
+            refused.run();
+        }
+    }
+
+    private CompletableFuture<Boolean> teleport(Entity entity, Location destination) {
+        try {
+            return transport.teleport(entity, destination);
+        } catch (RuntimeException failure) {
+            return CompletableFuture.failedFuture(failure);
+        }
+    }
+
+    private void abort(CameraRide ride) {
+        if (rides.remove(ride.player().getUniqueId(), ride)) {
+            ride.end(true);
+        }
+        finishEnd(ride);
+    }
+
+    private void finishEnd(CameraRide ride) {
+        if (!ride.finalizeEnd()) {
+            return;
+        }
+        removeCarrier(ride);
+        if (ride.restoreOnEnd()) {
+            restoreJournalled(ride.player());
+        }
+    }
+
+    private void removeCarrier(CameraRide ride) {
+        Entity carrier = ride.carrier();
+        if (carrier != null) {
+            scheduleCarrierRemoval(carrier, retiringCarriers.computeIfAbsent(carrier, ignored -> new AtomicBoolean()));
+        }
+    }
+
+    private void scheduleCarrierRemoval(Entity carrier, AtomicBoolean scheduled) {
+        if (!scheduled.compareAndSet(false, true)) {
+            return;
+        }
+        Runnable retired = () -> retiringCarriers.remove(carrier, scheduled);
+        if (!transport.execute(carrier, () -> {
+            try {
+                carrier.remove();
+                retired.run();
+            } catch (RuntimeException failure) {
+                Gloss.logExceptionStackThrottled(false, "camera-carrier-removal", failure,
+                    "Camera carrier %s could not be removed.", carrier.getUniqueId());
+            } finally {
+                scheduled.set(false);
+            }
+        }, retired)) {
+            scheduled.set(false);
+        }
+    }
+
+    private void restore(Player player, UUID restoration) {
+        UUID id = player.getUniqueId();
+        if (!restoration.equals(restoring.get(id))) {
+            return;
+        }
+        CameraJournal.Entry entry = journal.read(id).orElse(null);
+        World world = entry == null ? null : Bukkit.getWorld(entry.world());
+        if (world == null || !player.isOnline()) {
+            restoring.remove(id, restoration);
+            return;
+        }
+        try {
+            letterbox(player, true, false);
+            player.setSpectatorTarget(null);
+            player.setGameMode(gameMode(entry.gameMode()));
+            Location destination = new Location(world, entry.x(), entry.y(), entry.z(), entry.yaw(), entry.pitch());
+            teleport(player, destination).whenComplete((moved, failure) -> {
+                if (failure != null) {
+                    report(id, "restoring the rider", failure);
+                }
+                if (failure != null || !Boolean.TRUE.equals(moved)) {
+                    restoring.remove(id, restoration);
+                    return;
+                }
+                Runnable retired = () -> restoring.remove(id, restoration);
+                if (!transport.execute(player, () -> finishRestore(player, entry, restoration), retired)) {
+                    retired.run();
+                }
+            });
+        } catch (RuntimeException failure) {
+            restoring.remove(id, restoration);
+            report(id, "restoring the rider", failure);
+        }
+    }
+
+    private void finishRestore(Player player, CameraJournal.Entry entry, UUID restoration) {
+        UUID id = player.getUniqueId();
+        try {
+            if (!player.isOnline() || !restoration.equals(restoring.get(id))) {
+                return;
+            }
+            if (entry.allowFlight() != null) {
+                player.setAllowFlight(entry.allowFlight());
+            }
+            if (entry.flying() != null) {
+                player.setFlying(entry.flying());
+            }
+            player.setVelocity(entry.velocity());
+            journal.clear(id);
+        } catch (RuntimeException failure) {
+            report(id, "finishing rider restoration", failure);
+        } finally {
+            restoring.remove(id, restoration);
+        }
+    }
+
+    private void clearJournal(UUID id) {
+        try {
+            journal.clear(id);
+        } catch (RuntimeException failure) {
+            report(id, "clearing recovery state", failure);
+        }
+    }
+
+    private static void report(UUID id, String operation, Throwable failure) {
+        Gloss.logExceptionStack(false, failure, "Camera ride for %s failed while %s.", id, operation);
     }
 
     /** The bars are only asked for when some lane published a title provider. */
@@ -258,6 +491,61 @@ public final class CameraService implements GlossService, Listener {
             return GameMode.valueOf(name);
         } catch (IllegalArgumentException unknown) {
             return GameMode.SURVIVAL;
+        }
+    }
+
+    record Dependencies(Gloss plugin, PlayerSections sections, Transport transport) {
+    }
+
+    interface Transport {
+        boolean execute(Entity entity, Runnable action, Runnable retired);
+
+        CompletableFuture<Boolean> teleport(Entity entity, Location destination);
+    }
+
+    private static final class EntityTransport implements Transport {
+        private static final Method TELEPORT_ASYNC = teleportMethod();
+        private final Gloss plugin;
+
+        private EntityTransport(Gloss plugin) {
+            this.plugin = plugin;
+        }
+
+        @Override
+        public boolean execute(Entity entity, Runnable action, Runnable retired) {
+            if (FoliaScheduler.isOwnedByCurrentRegion(entity)) {
+                if (entity.isValid()) {
+                    action.run();
+                } else {
+                    retired.run();
+                }
+                return true;
+            }
+            return FoliaScheduler.runEntity(plugin, entity, action, 0L, retired);
+        }
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public CompletableFuture<Boolean> teleport(Entity entity, Location destination) {
+            if (TELEPORT_ASYNC == null) {
+                return CompletableFuture.completedFuture(entity.teleport(destination, PlayerTeleportEvent.TeleportCause.PLUGIN));
+            }
+            try {
+                return (CompletableFuture<Boolean>) TELEPORT_ASYNC.invoke(entity, destination,
+                    PlayerTeleportEvent.TeleportCause.PLUGIN);
+            } catch (InvocationTargetException failure) {
+                return CompletableFuture.failedFuture(failure.getCause());
+            } catch (ReflectiveOperationException | RuntimeException failure) {
+                return CompletableFuture.failedFuture(failure);
+            }
+        }
+
+        private static Method teleportMethod() {
+            try {
+                return Entity.class.getMethod("teleportAsync", Location.class, PlayerTeleportEvent.TeleportCause.class);
+            } catch (NoSuchMethodException absent) {
+                return null;
+            }
         }
     }
 }

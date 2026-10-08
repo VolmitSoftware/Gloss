@@ -1,13 +1,10 @@
 package art.arcane.gloss.camera;
 
-import art.arcane.gloss.util.common.Teleports;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.entity.ArmorStand;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
-import org.bukkit.event.player.PlayerTeleportEvent;
-import org.bukkit.util.Vector;
 
 import java.util.Objects;
 
@@ -17,26 +14,27 @@ import java.util.Objects;
  * same ride in the same tick.
  */
 public final class CameraRide {
-    private record Saved(Location location, GameMode gameMode, boolean allowFlight, boolean flying,
-                         Vector velocity) {
-    }
-
     private final Player player;
     private final Spline spline;
     private final boolean skippable;
-    private final Saved saved;
+    private final Location origin;
+    private final GameMode gameMode;
     private final long maxTicks;
     private Entity carrier;
     private long elapsedTicks;
     private boolean ended;
+    private boolean moving;
+    private boolean started;
+    private boolean restoreOnEnd;
+    private boolean finalized;
 
     CameraRide(Player player, Spline spline, boolean skippable, long maxTicks) {
         this.player = Objects.requireNonNull(player, "player");
         this.spline = Objects.requireNonNull(spline, "spline");
         this.skippable = skippable;
         this.maxTicks = maxTicks;
-        this.saved = new Saved(player.getLocation().clone(), player.getGameMode(),
-            player.getAllowFlight(), player.isFlying(), player.getVelocity().clone());
+        this.origin = player.getLocation().clone();
+        this.gameMode = player.getGameMode();
     }
 
     public Player player() {
@@ -44,11 +42,11 @@ public final class CameraRide {
     }
 
     public Location savedLocation() {
-        return saved.location().clone();
+        return origin.clone();
     }
 
     public GameMode savedGameMode() {
-        return saved.gameMode();
+        return gameMode;
     }
 
     public boolean skippable() {
@@ -59,49 +57,67 @@ public final class CameraRide {
         return Math.min(spline.totalTicks(), maxTicks);
     }
 
-    void start(Entity carrier) {
+    synchronized void start(Entity carrier) {
         this.carrier = carrier;
-        player.setGameMode(GameMode.SPECTATOR);
-        player.setSpectatorTarget(carrier);
+        moving = true;
     }
 
     /** @return false once the ride has run its course and should be ended */
-    boolean tick() {
-        if (ended) {
-            return false;
+    synchronized boolean tick() {
+        if (ended || !started) {
+            return !ended;
         }
         elapsedTicks++;
-        if (elapsedTicks > durationTicks()) {
-            return false;
-        }
-        if (carrier == null || !carrier.isValid()) {
-            return false;
-        }
-        Spline.Pose pose = spline.at(elapsedTicks);
-        Location at = new Location(saved.location().getWorld(), pose.x(), pose.y(), pose.z(),
-            pose.yaw(), pose.pitch());
-        carrier.teleport(at);
-        return true;
+        return elapsedTicks <= durationTicks();
     }
 
-    void end() {
+    synchronized Location beginMove() {
+        if (ended || !started || moving) {
+            return null;
+        }
+        moving = true;
+        return position(elapsedTicks);
+    }
+
+    Location position(long tick) {
+        Spline.Pose pose = spline.at(tick);
+        return new Location(origin.getWorld(), pose.x(), pose.y(), pose.z(), pose.yaw(), pose.pitch());
+    }
+
+    synchronized void moved() {
+        moving = false;
+    }
+
+    synchronized void attached() {
+        started = true;
+        moving = false;
+    }
+
+    synchronized Entity carrier() {
+        return carrier;
+    }
+
+    synchronized void end(boolean restore) {
         if (ended) {
             return;
         }
         ended = true;
-        if (carrier != null) {
-            carrier.remove();
-            carrier = null;
-        }
-        player.setSpectatorTarget(null);
-        player.setGameMode(saved.gameMode());
-        Teleports.teleportAsync(player, saved.location(), PlayerTeleportEvent.TeleportCause.PLUGIN);
-        player.setAllowFlight(saved.allowFlight());
-        player.setFlying(saved.flying());
-        player.setVelocity(saved.velocity());
+        restoreOnEnd = restore;
     }
 
-    boolean ended() {
+    synchronized boolean finalizeEnd() {
+        if (!ended || moving || finalized) {
+            return false;
+        }
+        finalized = true;
+        return true;
+    }
+
+    synchronized boolean restoreOnEnd() {
+        return restoreOnEnd;
+    }
+
+    synchronized boolean ended() {
         return ended;
     }
 

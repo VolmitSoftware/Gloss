@@ -25,7 +25,7 @@ class PaperServerLinksBridgeTest {
     @Test
     void theServerStillDeclaresTheStringTypedLinkSettersTheBridgeUses() throws ReflectiveOperationException {
         Method labelled = ServerLinks.class.getMethod("addLink", String.class, URI.class);
-        Method typed = ServerLinks.class.getMethod("setLink", ServerLinks.Type.class, URI.class);
+        Method typed = ServerLinks.class.getMethod("addLink", ServerLinks.Type.class, URI.class);
         Method remove = ServerLinks.class.getMethod("removeLink", ServerLinks.ServerLink.class);
 
         assertNotNull(labelled);

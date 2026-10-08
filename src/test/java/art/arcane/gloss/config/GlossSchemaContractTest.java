@@ -158,7 +158,7 @@ public class GlossSchemaContractTest {
   public void realDropsSchemaCoversEveryDocumentBlockTheParserAccepts() throws IOException {
     JsonObject properties = realDropsSchema().getAsJsonObject("properties");
 
-    assertEquals(List.of("schemaVersion", "revision", "presentation", "variants", "audience"),
+    assertEquals(List.of("preset", "schemaVersion", "revision", "presentation", "variants", "audience"),
         List.copyOf(properties.keySet()));
     assertEquals(4, properties.getAsJsonObject("schemaVersion").get("const").getAsInt());
     assertEquals(List.of("schemaVersion", "revision", "presentation", "variants", "audience"),

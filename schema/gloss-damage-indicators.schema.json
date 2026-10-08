@@ -13,6 +13,14 @@
     "audience"
   ],
   "properties": {
+    "preset": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1,
+      "description": "Named preset from this collection in presets.json; document fields override inherited values."
+    },
     "schemaVersion": {
       "description": "Document format version. Must be exactly 4.",
       "type": "integer",
@@ -79,6 +87,18 @@
           "minimum": 0,
           "maximum": 60000,
           "default": 150
+        },
+        "aggregationTicks": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 200,
+          "default": 2
+        },
+        "maxPendingSamples": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 16384,
+          "default": 256
         }
       }
     },
@@ -175,6 +195,9 @@
         "box": {
           "description": "Measured panel and complete perimeter.",
           "$ref": "#/$defs/box"
+        },
+        "refresh": {
+          "$ref": "#/$defs/displayRefresh"
         }
       }
     },
@@ -214,6 +237,9 @@
         "box": {
           "description": "Measured panel and complete perimeter.",
           "$ref": "#/$defs/box"
+        },
+        "refresh": {
+          "$ref": "#/$defs/displayRefresh"
         }
       }
     },
@@ -753,6 +779,30 @@
         }
       ],
       "description": "Boolean or Gloss boolean expression. Entity variables include entity.name, named, type, health, maxHealth, healthPercent (0..100), damage, damaged, attack, armor, stackCount, distance, and insight.active. Viewer, world, server, time, permissions, groups, regions and integration functions use the shared condition scope."
+    },
+    "displayRefresh": {
+      "type": "object",
+      "description": "Independent display refresh intervals. Omitted fields retain the surface default cadence.",
+      "properties": {
+        "contentTicks": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1200,
+          "description": "Text content refresh interval; animation frames retain their own clock."
+        },
+        "visibilityTicks": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1200,
+          "description": "Visibility and presentation condition interval."
+        },
+        "motionTicks": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1200,
+          "description": "Motion-binding or persistent object and box refresh interval."
+        }
+      }
     }
   }
 }

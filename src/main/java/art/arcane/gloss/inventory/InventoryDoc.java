@@ -9,6 +9,7 @@ import art.arcane.gloss.config.components.ToggleComponentData;
 import art.arcane.gloss.doc.DocumentEnvelope;
 import art.arcane.gloss.doc.DocumentParsers;
 import art.arcane.gloss.menu.action.MenuAction;
+import art.arcane.gloss.menu.action.ActionReferences;
 
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -28,16 +29,25 @@ public record InventoryDoc(int schemaVersion, long revision, String title, Strin
                            List<String> mask, Map<String, ComponentData> keys,
                            Map<String, ComponentData> slots, ListSection list,
                            Boolean closeOnTeleport, ShowCondition show, Selection select,
-                           List<Variant> variants) {
+                           List<Variant> variants, InventoryRefreshPolicy refresh) {
     public static final String KIND = "inventories";
     public static final int CURRENT_SCHEMA_VERSION = 1;
     public static final String DEFAULT_RESOLUTION = "9x3";
     public static final List<String> RESOLUTIONS =
         List.of("9x1", "9x2", "9x3", "9x4", "9x5", "9x6", "5x1", "3x3");
 
+    public InventoryDoc(int schemaVersion, long revision, String title, String resolution,
+                        List<String> mask, Map<String, ComponentData> keys, Map<String, ComponentData> slots,
+                        ListSection list, Boolean closeOnTeleport, ShowCondition show, Selection select,
+                        List<Variant> variants) {
+        this(schemaVersion, revision, title, resolution, mask, keys, slots, list, closeOnTeleport, show,
+            select, variants, InventoryRefreshPolicy.DEFAULT);
+    }
+
     public InventoryDoc {
         DocumentEnvelope.requireSchemaVersion(KIND, schemaVersion, CURRENT_SCHEMA_VERSION);
         DocumentEnvelope.requireRevision(KIND, revision);
+        refresh = refresh == null ? InventoryRefreshPolicy.DEFAULT : refresh;
         title = title == null ? "" : title;
         resolution = requireResolution(resolution);
         keys = keys == null ? Map.of() : Map.copyOf(keys);
@@ -53,14 +63,14 @@ public record InventoryDoc(int schemaVersion, long revision, String title, Strin
     }
 
     public static InventoryDoc parse(String fileName, String raw) {
-        InventoryDoc doc = DocumentParsers.parseJson(fileName, raw, InventoryDoc.class);
+        InventoryDoc doc = DocumentParsers.parseJson(fileName, ActionReferences.resolve(raw), InventoryDoc.class);
         doc.precompileActions();
         return doc;
     }
 
     public InventoryDoc withRevision(long revision) {
         return new InventoryDoc(schemaVersion, revision, title, resolution, mask, keys, slots, list,
-            closeOnTeleport, show, select, variants);
+            closeOnTeleport, show, select, variants, refresh);
     }
 
     public int width() {

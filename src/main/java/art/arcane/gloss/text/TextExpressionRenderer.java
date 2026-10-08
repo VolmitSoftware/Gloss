@@ -1,6 +1,7 @@
 package art.arcane.gloss.text;
 
 import art.arcane.gloss.Gloss;
+import art.arcane.gloss.condition.RoleSnapshotPendingException;
 import art.arcane.gloss.expr.Expr;
 import art.arcane.gloss.expr.ExprEvaluator;
 import art.arcane.gloss.bedrock.BedrockService;
@@ -217,6 +218,8 @@ public final class TextExpressionRenderer {
         try {
             Expr expression = cached(source);
             return ExprEvaluator.string(expression, scope);
+        } catch (RoleSnapshotPendingException pending) {
+            throw pending;
         } catch (RuntimeException failure) {
             if (failed.add(source)) {
                 Gloss.logExceptionStack(false, failure, "Text expression {{ %s }} failed.", source);

@@ -14,6 +14,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.Set;
+import java.util.HashSet;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -26,17 +28,18 @@ class TablistLayoutServiceTest {
     private final List<String> sends = new ArrayList<>();
     private final Map<UUID, String> names = new LinkedHashMap<>();
     private final Map<UUID, Integer> pings = new LinkedHashMap<>();
+    private final Set<UUID> hidden = new HashSet<>();
     private final List<TablistLayoutService.SlotEntry> written = new ArrayList<>();
     private final TablistLayoutService layouts = new TablistLayoutService(new RecordingSink(),
-        new TablistLayoutService.Renderers(skin -> skin, (viewer, subject) -> subject.getName(),
-            (viewer, subject) -> 0));
+        new TablistLayoutService.Renderers((viewer, skin) -> skin, (viewer, subject, format) -> subject.getName(),
+            (viewer, subject) -> 0, this::subject, ignored -> null));
 
     @Test
     void theFirstPassSendsTheWholeGridOnce() {
         Player viewer = player("viewer");
         TablistLayoutRuntime runtime = runtime(1, 2, List.of(
-            new TablistDoc.Slot(0, 0, "&6Staff", null, null),
-            new TablistDoc.Slot(0, 1, "&7Online", null, 0)), null);
+            new TablistLayoutDefinition.Slot(0, 0, "&6Staff", null, null, true),
+            new TablistLayoutDefinition.Slot(0, 1, "&7Online", null, 0, true)), null);
 
         layouts.apply(viewer, runtime, List.of(viewer), this::scope, silent());
 
@@ -49,7 +52,7 @@ class TablistLayoutServiceTest {
     void aSecondPassWithNoChangeSendsNothing() {
         Player viewer = player("viewer");
         TablistLayoutRuntime runtime = runtime(1, 1, List.of(
-            new TablistDoc.Slot(0, 0, "&6Staff", null, null)), null);
+            new TablistLayoutDefinition.Slot(0, 0, "&6Staff", null, null, true)), null);
 
         layouts.apply(viewer, runtime, List.of(viewer), this::scope, silent());
         sends.clear();
@@ -62,9 +65,9 @@ class TablistLayoutServiceTest {
     void onlyTheRowsWhoseTextChangedAreResent() {
         Player viewer = player("viewer");
         Player second = player("second");
-        TablistLayoutRuntime runtime = runtime(2, 1, List.of(
-            new TablistDoc.Slot(0, 0, "&6Staff", null, null)),
-            new TablistDoc.Players(1, 1, 1, "true", "hide", null));
+        TablistLayoutRuntime runtime = runtime(1, 2, List.of(
+            new TablistLayoutDefinition.Slot(0, 0, "&6Staff", null, null, true)),
+            new TablistLayoutDefinition.Section("players", 0, 1, 1, 1, "true", null, List.of(), "hide", null, false, null, true));
 
         layouts.apply(viewer, runtime, List.of(viewer), this::scope, silent());
         sends.clear();
@@ -81,9 +84,9 @@ class TablistLayoutServiceTest {
         Player second = player("bbb");
         Player third = player("ccc");
         TablistLayoutRuntime hide = runtime(1, 2, List.of(),
-            new TablistDoc.Players(0, 1, 2, "true", "hide", null));
+            section(0, 1, 2, "true", "hide", null));
         TablistLayoutRuntime count = runtime(1, 2, List.of(),
-            new TablistDoc.Players(0, 1, 2, "true", "count", "and {count} more"));
+            section(0, 1, 2, "true", "count", "and {count} more"));
 
         layouts.apply(viewer, hide, List.of(third, viewer, second), this::scope, silent());
         assertEquals("add aaa [ gloss_slot_0=aaa,  gloss_slot_1=bbb]", sends.get(0));
@@ -99,7 +102,7 @@ class TablistLayoutServiceTest {
         Player viewer = player("aaa");
         Player hidden = player("bbb");
         TablistLayoutRuntime runtime = runtime(1, 2, List.of(),
-            new TablistDoc.Players(0, 1, 2, "subject.name != 'bbb'", "hide", null));
+            section(0, 1, 2, "subject.name != 'bbb'", "hide", null));
 
         layouts.apply(viewer, runtime, List.of(viewer, hidden), this::scope, silent());
 
@@ -110,7 +113,7 @@ class TablistLayoutServiceTest {
     void restoringAViewerRemovesTheGridAndRelistsRealPlayers() {
         Player viewer = player("viewer");
         TablistLayoutRuntime runtime = runtime(1, 1, List.of(
-            new TablistDoc.Slot(0, 0, "&6Staff", null, null)), null);
+            new TablistLayoutDefinition.Slot(0, 0, "&6Staff", null, null, true)), null);
 
         layouts.apply(viewer, runtime, List.of(viewer), this::scope, silent());
         sends.clear();
@@ -123,7 +126,7 @@ class TablistLayoutServiceTest {
     void aLayoutThatStopsShowingForAViewerRestoresIt() {
         Player viewer = player("viewer");
         TablistLayoutRuntime runtime = runtime(1, 1, List.of(
-            new TablistDoc.Slot(0, 0, "&6Staff", null, null)), null);
+            new TablistLayoutDefinition.Slot(0, 0, "&6Staff", null, null, true)), null);
 
         layouts.apply(viewer, runtime, List.of(viewer), this::scope, silent());
         sends.clear();
@@ -150,11 +153,11 @@ class TablistLayoutServiceTest {
         Player staff = player("zzz");
         pings.put(staff.getUniqueId(), 73);
         TablistLayoutService weighted = new TablistLayoutService(new RecordingSink(),
-            new TablistLayoutService.Renderers(text -> text,
-                (observer, subject) -> "[Staff] " + subject.getName(),
-                (observer, subject) -> subject == staff ? 10 : 0));
+            new TablistLayoutService.Renderers((recipient, text) -> text,
+                (observer, subject, format) -> "[Staff] " + subject.getName(),
+                (observer, subject) -> subject == staff ? 10 : 0, this::subject, ignored -> null));
         TablistLayoutRuntime runtime = runtime(1, 2, List.of(),
-            new TablistDoc.Players(0, 1, 2, "true", "hide", null));
+            section(0, 1, 2, "true", "hide", null));
 
         weighted.apply(viewer, runtime, List.of(viewer, staff), this::scope, silent());
 
@@ -174,10 +177,10 @@ class TablistLayoutServiceTest {
         Player viewer = player("aaa");
         Player replacement = player("bbb");
         TablistLayoutService identicalNames = new TablistLayoutService(new RecordingSink(),
-            new TablistLayoutService.Renderers(text -> text, (observer, subject) -> "Same",
-                (observer, subject) -> 0));
+            new TablistLayoutService.Renderers((recipient, text) -> text, (observer, subject, format) -> "Same",
+                (observer, subject) -> 0, this::subject, ignored -> null));
         TablistLayoutRuntime runtime = runtime(1, 1, List.of(),
-            new TablistDoc.Players(0, 1, 1, "true", "hide", null));
+            section(0, 1, 1, "true", "hide", null));
         identicalNames.apply(viewer, runtime, List.of(viewer), this::scope, silent());
         sends.clear();
         written.clear();
@@ -200,22 +203,9 @@ class TablistLayoutServiceTest {
             "add viewer [ gloss_slot_0=,  gloss_slot_1=]", "unlist viewer [viewer]"), sends);
     }
 
-    @Test
-    void listNamesUseThePublishedSubjectRenderWithoutReadingPlayerState() {
-        Player subject = player("ListedPlayer");
-        Map<UUID, String> rendered = new LinkedHashMap<>();
-        assertEquals("ListedPlayer", TablistService.layoutPlayerName(subject, rendered));
-
-        rendered.put(subject.getUniqueId(), "&a[Staff] ListedPlayer");
-        assertEquals("&a[Staff] ListedPlayer", TablistService.layoutPlayerName(subject, rendered));
-
-        rendered.put(subject.getUniqueId(), "&b[Member] ListedPlayer");
-        assertEquals("&b[Member] ListedPlayer", TablistService.layoutPlayerName(subject, rendered));
-    }
-
-    private TablistLayoutRuntime runtime(int columns, int rows, List<TablistDoc.Slot> slots,
-                                         TablistDoc.Players players) {
-        return TablistLayoutRuntime.compile(new TablistDoc.Layout(true, columns, rows, slots, players, null));
+    private TablistLayoutRuntime runtime(int columns, int rows, List<TablistLayoutDefinition.Slot> slots,
+                                         TablistLayoutDefinition.Section players) {
+        return TablistLayoutRuntime.compile(new TablistDoc.Layout(true, columns * rows, slots, players == null ? List.of() : List.of(players), null, Map.of(), List.of()));
     }
 
     private ExprScope scope(Player viewer, Player subject) {
@@ -225,6 +215,120 @@ class TablistLayoutServiceTest {
 
     private static BoundedConditionErrorCallback silent() {
         return BoundedConditionErrorCallback.silent();
+    }
+
+    @Test
+    void fixedCellsRenderInTheirViewersContext() {
+        Player viewer = player("reader");
+        TablistLayoutService personal = new TablistLayoutService(new RecordingSink(),
+            new TablistLayoutService.Renderers((reader, text) -> reader.getName() + ":" + text,
+                (reader, subject, format) -> subject.getName(), (reader, subject) -> 0, this::subject, ignored -> null));
+        personal.apply(viewer, runtime(1, 1, List.of(new TablistLayoutDefinition.Slot(0, 0, "cell", null, 0, true)), null),
+            List.of(viewer), this::scope, silent());
+        assertEquals("reader:cell", written.getFirst().text());
+    }
+
+    @Test
+    void hiddenPlayersAreExcludedAndNotRelistedDuringRestore() {
+        Player viewer = player("reader");
+        Player other = player("hidden");
+        TablistLayoutRuntime runtime = runtime(1, 2, List.of(),
+            section(0, 1, 2, "true", "hide", null));
+        layouts.apply(viewer, runtime, List.of(viewer, other), this::scope, silent());
+        hidden.add(other.getUniqueId());
+        layouts.apply(viewer, runtime, List.of(viewer, other), this::scope, silent());
+        sends.clear();
+        layouts.restore(viewer);
+        assertEquals("relist reader [reader]", sends.getLast());
+    }
+
+    @Test
+    void externalUnlistingRelinquishesRestorationOwnership() {
+        Player viewer = player("reader");
+        Player other = player("other");
+        layouts.apply(viewer, runtime(1, 1, List.of(), null), List.of(viewer, other), this::scope, silent());
+        layouts.recordUnlisted(viewer.getUniqueId(), Set.of(), Set.of(other.getUniqueId()));
+        assertTrue(layouts.externallyHidden(viewer.getUniqueId(), other.getUniqueId()));
+        sends.clear();
+        layouts.restore(viewer);
+        assertEquals("relist reader [reader]", sends.getLast());
+    }
+
+    @Test
+    void playerRowsReadCapturedIdentityAndLatencyWithoutForeignEntityGetters() {
+        UUID id = UUID.randomUUID();
+        Player foreign = (Player) Proxy.newProxyInstance(Player.class.getClassLoader(), new Class<?>[]{Player.class},
+            (proxy, method, arguments) -> {
+                if (method.getName().equals("getUniqueId")) {
+                    return id;
+                }
+                throw new AssertionError("Foreign getter: " + method.getName());
+            });
+        Player viewer = player("reader");
+        TablistLayoutService captured = new TablistLayoutService(new RecordingSink(),
+            new TablistLayoutService.Renderers((reader, text) -> text, (reader, subject, format) -> "Captured",
+                (reader, subject) -> 0, (reader, subject) -> new TablistLayoutService.Subject("Captured", 91, true, false), ignored -> null));
+        captured.apply(viewer, runtime(1, 1, List.of(),
+            section(0, 1, 1, "true", "hide", null)), List.of(foreign),
+            (reader, subject) -> new TestScope(Map.of("viewer.bedrock", false)), silent());
+        assertEquals("Captured", written.getFirst().skin());
+        assertEquals(91, written.getFirst().ping());
+    }
+
+    @Test
+    void conditionalLayoutsUsePriorityThenIdentifierAndNamedSkins() {
+        Player viewer = player("reader");
+        TablistLayoutDefinition.Skin skin = new TablistLayoutDefinition.Skin("texture-value", "signature");
+        TablistLayoutDefinition.LayoutPresentation selected = new TablistLayoutDefinition.LayoutPresentation(1,
+            List.of(new TablistLayoutDefinition.Slot(0, 0, "selected", "brand", 3, false)), List.of(), Map.of("brand", skin));
+        TablistDoc.Layout layout = new TablistDoc.Layout(true, 1, List.of(), List.of(), null, Map.of(), List.of(
+            new TablistLayoutDefinition.LayoutVariant("z", 9, "true", new TablistLayoutDefinition.LayoutPresentation(2, List.of(), List.of(), Map.of())),
+            new TablistLayoutDefinition.LayoutVariant("a", 9, "viewer.name == 'reader'", selected)));
+        layouts.apply(viewer, TablistLayoutRuntime.compile(layout), List.of(viewer), this::scope, silent());
+        assertEquals(1, written.size());
+        assertEquals("selected", written.getFirst().text());
+        assertEquals(skin, written.getFirst().texture());
+        assertEquals(false, written.getFirst().hat());
+    }
+
+    @Test
+    void independentSectionsSortMultipleKeysAndStartAtTheirAuthoredRows() {
+        Player viewer = player("reader");
+        Player first = player("aaa");
+        Player second = player("bbb");
+        TablistLayoutDefinition.Section ascending = new TablistLayoutDefinition.Section("first", 0, 1, 1, 2, "subject.name != 'reader'",
+            null, List.of(new TablistLayoutDefinition.SortKey("1", "number", "descending"),
+                new TablistLayoutDefinition.SortKey("subject.name", "text", "ascending")), "hide", null, false, null, true);
+        TablistLayoutDefinition.Section descending = new TablistLayoutDefinition.Section("second", 0, 4, 1, 2, "subject.name != 'reader'",
+            null, List.of(new TablistLayoutDefinition.SortKey("subject.name", "text", "descending")), "hide", null, false, null, true);
+        TablistDoc.Layout layout = new TablistDoc.Layout(true, 6, List.of(), List.of(ascending, descending), null, Map.of(), List.of());
+        layouts.apply(viewer, TablistLayoutRuntime.compile(layout), List.of(second, viewer, first), this::scope, silent());
+        assertEquals("", written.get(0).text());
+        assertEquals("aaa", written.get(1).text());
+        assertEquals("bbb", written.get(2).text());
+        assertEquals("bbb", written.get(4).text());
+        assertEquals("aaa", written.get(5).text());
+    }
+
+    @Test
+    void changedCapturedTextureReplacesSlotEvenWhenAccountNameIsUnchanged() {
+        Player viewer = player("reader");
+        Map<String, TablistLayoutDefinition.Skin> textures = new LinkedHashMap<>();
+        textures.put("reader", new TablistLayoutDefinition.Skin("first", "signature"));
+        TablistLayoutService captured = new TablistLayoutService(new RecordingSink(),
+            new TablistLayoutService.Renderers((reader, text) -> text, (reader, subject, format) -> subject.getName(),
+                (reader, subject) -> 0, this::subject, textures::get));
+        TablistLayoutRuntime runtime = runtime(1, 1, List.of(), section(0, 1, 1, "true", "hide", null));
+        captured.apply(viewer, runtime, List.of(viewer), this::scope, silent());
+        sends.clear();
+        textures.put("reader", new TablistLayoutDefinition.Skin("second", "signature"));
+        captured.apply(viewer, runtime, List.of(viewer), this::scope, silent());
+        assertEquals(List.of("remove reader [ gloss_slot_0]", "add reader [ gloss_slot_0=reader]"), sends);
+    }
+
+    private TablistLayoutService.Subject subject(Player viewer, Player player) {
+        return new TablistLayoutService.Subject(player.getName(), pings.getOrDefault(player.getUniqueId(), 0),
+            !hidden.contains(player.getUniqueId()), false);
     }
 
     private Player player(String name) {
@@ -289,4 +393,10 @@ class TablistLayoutServiceTest {
             return parts.toString();
         }
     }
+    private static TablistLayoutDefinition.Section section(int column, int columns, int rows, String filter, String overflow,
+                                               String overflowFormat) {
+        return new TablistLayoutDefinition.Section("players", column, 0, columns, rows, filter, null, List.of(), overflow,
+            overflowFormat, false, null, true);
+    }
+
 }

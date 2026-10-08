@@ -2,6 +2,7 @@ package art.arcane.gloss.waypoint;
 
 import art.arcane.gloss.api.MarkerAnchor;
 import art.arcane.gloss.api.WaypointSpec;
+import art.arcane.gloss.api.WaypointOptions;
 import art.arcane.gloss.api.Waypoints;
 import art.arcane.gloss.menu.CharacterizationSupport;
 import org.bukkit.entity.Player;
@@ -68,6 +69,18 @@ class WaypointsApiTest {
         Waypoints.forget(VIEWER);
 
         Assertions.assertEquals(List.of(), Waypoints.tracked(VIEWER));
+    }
+
+    @Test
+    void customStyleOptionsAreAdditiveAndLegacyTrackingKeepsItsDefault() {
+        Plugin owner = plugin("Quests");
+        WaypointSpec custom = new WaypointSpec("quest", MarkerAnchor.position("world", 1, 2, 3),
+            0xFFFFFF, "trails:quest", 128);
+        Waypoints.track(owner, player(VIEWER), custom, new WaypointOptions("bowtie"));
+        Assertions.assertEquals("bowtie", Waypoints.registered(VIEWER).getFirst().options().fallbackStyle());
+        Assertions.assertEquals(custom, Waypoints.tracked(VIEWER).getFirst());
+        Waypoints.track(owner, player(VIEWER), custom);
+        Assertions.assertEquals("default", Waypoints.registered(VIEWER).getFirst().options().fallbackStyle());
     }
 
     private static WaypointSpec spec(String id, int color) {

@@ -53,7 +53,7 @@ public final class SurfaceRuntime {
                                                 BoundedConditionErrorCallback errors) {
         SurfaceRuntime selected = null;
         for (SurfaceRuntime candidate : candidates) {
-            if (!candidate.selected(scope, errors)) {
+            if (!candidate.doc().automatic() || !candidate.selected(scope, errors)) {
                 continue;
             }
             if (selected == null || candidate.selectionPriority() > selected.selectionPriority()
@@ -107,7 +107,11 @@ public final class SurfaceRuntime {
                 return 1.0D;
             }
             try {
-                return Math.clamp(ExprEvaluator.number(progressExpression, scope), 0.0D, 1.0D);
+                double value = ExprEvaluator.number(progressExpression, scope);
+                if (!Double.isFinite(value)) {
+                    throw new IllegalArgumentException("Bossbar progress must be finite");
+                }
+                return Math.clamp(value, 0.0D, 1.0D);
             } catch (RuntimeException failure) {
                 Gloss.logExceptionStackThrottled(false, "surface-progress-" + progressPath, failure,
                     "Surface progress %s failed and was treated as 0.", progressPath);

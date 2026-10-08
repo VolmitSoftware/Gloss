@@ -21,7 +21,7 @@ public record HologramDoc(int schemaVersion, long revision, Anchor anchor, List<
                           IconDisplayStyle style, HologramBox box, Double yaw, Double pitch,
                           List<ParticleLayer> particleLayers, ShowCondition show,
                           List<HologramPage> pages, List<MenuActionData> actions, Hitbox hitbox,
-                          Double viewDistance, Integer refreshTicks, List<Variant> variants) {
+                          Double viewDistance, Integer refreshTicks, List<Variant> variants, DisplayRefresh refresh) {
     public static final String KIND = "holograms";
     public static final int CURRENT_SCHEMA_VERSION = 3;
     public static final double DEFAULT_SCALE = 1.0D;
@@ -73,6 +73,7 @@ public record HologramDoc(int schemaVersion, long revision, Anchor anchor, List<
     }
 
     public HologramDoc {
+        refresh = DisplayRefresh.resolve(refresh);
         DocumentEnvelope.requireSchemaVersion(KIND, schemaVersion, CURRENT_SCHEMA_VERSION);
         DocumentEnvelope.requireRevision(KIND, revision);
         viewDistance = viewDistance == null ? 48.0D : viewDistance;
@@ -99,6 +100,15 @@ public record HologramDoc(int schemaVersion, long revision, Anchor anchor, List<
         variants = copyVariants(variants);
     }
 
+    public HologramDoc(int schemaVersion, long revision, Anchor anchor, List<HologramLine> lines,
+                       IconDisplayStyle style, HologramBox box, Double yaw, Double pitch,
+                       List<ParticleLayer> particleLayers, ShowCondition show,
+                       List<HologramPage> pages, List<MenuActionData> actions, Hitbox hitbox,
+                       Double viewDistance, Integer refreshTicks, List<Variant> variants) {
+        this(schemaVersion, revision, anchor, lines, style, box, yaw, pitch, particleLayers, show,
+            pages, actions, hitbox, viewDistance, refreshTicks, variants, null);
+    }
+
     /** The text-only form used by the importer and by holograms created from commands. */
     public HologramDoc(int schemaVersion, long revision, Anchor anchor, List<String> lines,
                        IconDisplayStyle style, HologramBox box, Double yaw, Double pitch,
@@ -109,7 +119,7 @@ public record HologramDoc(int schemaVersion, long revision, Anchor anchor, List<
 
     public HologramDoc withRevision(long revision) {
         return new HologramDoc(schemaVersion, revision, anchor, lines, style, box, yaw, pitch,
-            particleLayers, show, pages, actions, hitbox, viewDistance, refreshTicks, variants);
+            particleLayers, show, pages, actions, hitbox, viewDistance, refreshTicks, variants, refresh);
     }
 
     public record Variant(String id, Integer priority, String when, Presentation presentation) {

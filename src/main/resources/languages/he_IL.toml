@@ -13,6 +13,15 @@
 #
 # === משתנים ===
 # יש לשמור על שמות המשתנים ולהשתמש רק במשתנים הקיימים בכל הודעה.
+#   {viewers}  צופים
+#   {entries}  רשומות במטמון
+#   {admissions}  אישורים
+#   {refusals}  סירובים
+#   {waiting}  ממתינים
+#   {expired}  תורים שפג תוקפם
+#   {retiring}  ניקוי ממתין
+#   {bytes}  נתונים שמורים (בתים)
+#   {completed}  הושלמו
 #   {absorbed}  רשומות שיובאו ומוזגו בנתונים קיימים
 #   {active}  מספר הספקים הפעילים
 #   {actual}  הגרסה הנוכחית
@@ -225,8 +234,8 @@ indicators = "כלים למחווני נזק וריפוי"
 status = "הצגת ספירות זמן ריצה תמציתיות"
 import = "העברת הולוגרמות מדור קודם בלי לשנות את קובצי המקור"
 "import.apply" = "החלת העברת הולוגרמות מדור קודם ללא דריסה"
-"import.holoui" = "העתקת נתוני HoloUi מתוך plugins/holoui, תוך דריסת ייבואים קודמים"
-"import.legacy" = "העברת קובצי נתונים של Gloss מלפני המיזוג למעטפות v2"
+"import.holoui" = "תצוגה מקדימה או החלה של ייבוא HoloUi בעסקה אחת"
+"import.legacy" = "תצוגה מקדימה או החלה של שדרוג נתוני Gloss בעסקה אחת"
 "import.preview" = "תצוגה מקדימה של העברת הולוגרמות מדור קודם שאינה הרסנית"
 item = "כלי ספקי פריטים מותאמים אישית"
 "item.export" = "ייצוא קטלוג הפריטים המותאמים אישית עבור העורך המקוון"
@@ -294,6 +303,9 @@ web = "פתיחה וניהול של עורך האינטרנט של Gloss"
 "web.sessions.revoke" = "ביטול הרשאת גישה לעורך האינטרנט"
 "web.sessions.status" = "הצגת הפעלה אחת של עורך האינטרנט"
 language = "בחירת השפה שלך או שפת ברירת המחדל של השרת"
+
+"import.mode" = "preview או apply"
+"import.overwrite" = "תצוגה מקדימה של החלפת קבצים קיימים"
 
 [command.help.arg]
 reset_name = "השם לאיפוס, או * לכל ברירות המחדל המובנות"
@@ -421,6 +433,9 @@ emoji = "&7אימוג'ים: &f{enabled}&8/&f{total}"
 animations = "&7אנימציות: &f{count}"
 effects = "&7בועות: &f{bubbles} &8| &7מחוונים: &f{indicators} &8| &7דרופים: &f{drops}"
 
+visibility = "&7עותקי ישויות גלויים: &f{entities} &8| &7צופים: &f{viewers} &8| &7אישורים: &f{admissions} &8| &7סירובים: &f{refusals} &8| &7ממתינים: &f{waiting} &8| &7תורים שפג תוקפם: &f{expired} &8| &7ניקוי ממתין: &f{retiring}"
+images = "&7מטמון תמונות: &f{entries} &8| &7ממתינים: &f{pending} &8| &7נתונים שמורים: &f{bytes} &7בתים &8| &7הושלמו: &f{completed} &8| &7סירובים: &f{refusals}"
+
 [command.reset]
 done = "&8[&dGloss&8] &aשוחזרו &f{count}&a ברירות מחדל מובנות של {kind}."
 none = "&8[&dGloss&8] &cאין ברירות מחדל מובנות של {kind} התואמות ל-'&f{name}&c'."
@@ -433,12 +448,19 @@ style_unknown = "&8[&dGloss&8] &cאין סגנון בועה בשם '&f{style}&c'
 [command.import]
 config_unreadable = "&8[&dGloss&8] &cלא ניתן לטעון את gloss.toml: &f{reason}"
 
+mode_invalid = "&8[&dGloss&8] &cיש להשתמש ב-preview או ב-apply כמצב הייבוא."
+preview_capacity = "&8[&dGloss&8] &cהמטמון של ייבואים שנבדקו מלא. יש להחיל תצוגה מקדימה קיימת או להמתין לפקיעתה ואז ליצור תצוגה חדשה."
+
 [command.import.holoui]
 missing = "&8[&dGloss&8] &cלא נמצאה תיקיית נתונים של holoui לצד תיקיית הנתונים של Gloss."
 done = "&8[&dGloss&8] &aייבוא HoloUi הסתיים: &f{copied}&a הועתקו, &f{skipped}&a דולגו, &f{overlaid}&a מפתחות תצורה, &f{errors}&a שגיאות."
 
+preview_required = "&8[&dGloss&8] &cיש להריץ תחילה /gloss import holoui mode=preview. התצוגות המקדימות משתמשות במשך התוקף שהוגדר. יש להוסיף overwrite=true כדי להציג החלפה של קבצים קיימים."
+
 [command.import.legacy]
 done = "&8[&dGloss&8] &aההעברה מדור קודם הסתיימה: &f{migrated}&a הועברו, &f{absorbed}&a נקלטו, &f{overlaid}&a מפתחות תצורה, &f{errors}&a שגיאות."
+
+preview_required = "&8[&dGloss&8] &cיש להריץ תחילה /gloss import legacy mode=preview. התצוגות המקדימות משתמשות במשך התוקף שהוגדר."
 
 [director.help]
 no_subcommands = "אין פקודות משנה בעמוד זה."
@@ -829,6 +851,7 @@ empty = "(ריק)"
 # Lane message tables. Each lane appends its [gloss.message.<lane>] and [command.help.<group>]
 # tables inside its own anchor so parallel branches never share a line.
 # --- lane:screen ---
+
 [gloss.message.screen]
 "surfaces.empty" = "&8[&dGloss&8] &7לא נטענו משטחים."
 "surfaces.unknown" = "&8[&dGloss&8]: &cאין משטח בשם &f{id}&c."
@@ -865,6 +888,7 @@ who = "מציג איזה תוסף תופס כל משבצת HUD"
 "who.player" = "השחקן לבדיקה; ברירת המחדל היא אתה"
 
 # --- lane:chat ---
+
 [gloss.message.chat]
 filtered = "&8[&dGloss&8]: &cמסנן הצ'אט חסם את ההודעה שלך."
 too_fast = "&8[&dGloss&8]: &eהמתן רגע לפני שליחת הודעה נוספת."
@@ -915,6 +939,7 @@ sample = "דגימת טבלת מובילים כעת עבור כל המחוברי
 "sample.id" = "מזהה המסמך"
 
 # --- lane:forms ---
+
 [gloss.message.forms]
 icon_unsupported = "&7לא ניתן להצגה במשבצת תיבה ({kind})"
 no_inventories = "&8[&dGloss&8]: &7לא הוגדרו תפריטי תיבה."
@@ -964,6 +989,7 @@ hologram_actions_header = "&8[&dGloss&8] &7פעולות ההולוגרמה &f{id
 hologram_actions_entry = "&8[&dGloss&8] &7  &f{kind}&7 על &f{value}"
 
 # --- lane:world ---
+
 [gloss.message.world]
 players_only = "&cפקודה זו חייבת להתבצע על ידי שחקן."
 disabled = "&cתכונה זו כבויה ב-gloss.toml."
@@ -1055,6 +1081,7 @@ color = "צבע טקסט בשם"
 ticks = "טיקים שהזוהר נמשך, או 0 לשמירה"
 
 # --- lane:behaviors ---
+
 [command.help.behavior]
 root = "בדיקה והפעלה של מסמכי התנהגות"
 list = "הצגת מסמכי ההתנהגות הטעונים"
@@ -1119,6 +1146,7 @@ fired = "&8[&dGloss&8]: &aרשומה &f{line}&a של &f{id}&a הורצה."
 "explain.missing" = "&8[&dGloss&8]: &cאין {kind} בשם \"{id}\"."
 
 # --- lane:authoring ---
+
 [command.help.pack]
 root = "התקנה וניהול של חבילות Gloss"
 install = "התקנת חבילה מקובץ או מכתובת HTTPS"
@@ -1188,8 +1216,10 @@ preview = "&8[&dGloss&8] &f{source}&7 יכתוב &f{count}&7 מסמכים."
 entry = "&8[&dGloss&8] &7{state} &f{path}&7 {reason}"
 applied = "&8[&dGloss&8] &f{count}&7 מסמכים יובאו מ-&f{source}&7."
 absent = "&8[&dGloss&8] &7אין נתוני &f{source}&7 בנתיב &f{path}&7."
+preview_required = "&8[&dGloss&8] &cיש להריץ תחילה /gloss import preview {source}. התצוגות המקדימות משתמשות במשך התוקף שהוגדר."
 
 # --- lane:forge ---
+
 [gloss.message.forge]
 disabled = "&8[&dGloss&8] &cמפעל הגליפים כבוי. הגדר את features.forge לערך true בקובץ gloss.toml."
 built = "&8[&dGloss&8] &aהחבילה &f{value}&a נבנתה עם {count} גליפים."
@@ -1211,6 +1241,7 @@ serve = "הפעל או עצור את שרת החבילה המובנה"
 reset = "שחזר את מסמכי הגליפים המצורפים"
 
 # --- lane:fixes ---
+
 [gloss.message.fixes]
 status_bedrock = "&7bedrock: &f{name}&7, &f{count}&7 מחוברים"
 status_textimage_oversize = "&7textimage-גדול מדי: &f{count}"

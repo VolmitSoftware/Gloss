@@ -24,8 +24,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.regex.Pattern;
-import java.util.regex.PatternSyntaxException;
 
 /**
  * One {@code on[]} entry: a trigger, its trigger-specific options (flattened beside the trigger in
@@ -120,12 +118,8 @@ public record BehaviorEntry(BehaviorTrigger trigger, Map<String, Object> options
             throw new IllegalArgumentException("scope must be player or global");
         }
         Object pattern = options.get("pattern");
-        if (pattern != null) {
-            try {
-                Pattern.compile(String.valueOf(pattern));
-            } catch (PatternSyntaxException invalid) {
-                throw new IllegalArgumentException("pattern is not a valid regular expression: " + invalid.getDescription());
-            }
+        if (pattern != null && (!(pattern instanceof String text) || text.isBlank())) {
+            throw new IllegalArgumentException("pattern must be a non-empty string");
         }
         for (String option : List.of("region", "name", "menu", "component", "material")) {
             Object value = options.get(option);

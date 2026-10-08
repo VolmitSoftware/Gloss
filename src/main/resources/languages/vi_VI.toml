@@ -13,6 +13,15 @@
 #
 # === Biến ===
 # Giữ nguyên tên biến và chỉ dùng những biến có sẵn trong từng thông báo.
+#   {viewers}  Người xem
+#   {entries}  Số mục trong bộ nhớ đệm
+#   {admissions}  Lượt chấp nhận
+#   {refusals}  Lượt từ chối
+#   {waiting}  Đang chờ
+#   {expired}  Lượt hết hạn
+#   {retiring}  Chờ dọn dẹp
+#   {bytes}  Dữ liệu lưu giữ (byte)
+#   {completed}  Đã hoàn tất
 #   {absorbed}  Số mục nhập đã gộp vào dữ liệu hiện có
 #   {active}  Số nhà cung cấp đang hoạt động
 #   {actual}  Phiên bản sửa đổi hiện tại
@@ -225,8 +234,8 @@ indicators = "Công cụ chỉ báo sát thương và hồi máu"
 status = "Hiển thị số liệu thời gian chạy ngắn gọn"
 import = "Di chuyển hologram cũ mà không sửa đổi tệp nguồn"
 "import.apply" = "Áp dụng di chuyển hologram cũ không ghi đè"
-"import.holoui" = "Sao chép dữ liệu HoloUi từ plugins/holoui, ghi đè các lần nhập trước"
-"import.legacy" = "Di chuyển các tệp dữ liệu Gloss trước hợp nhất sang định dạng gói v2"
+"import.holoui" = "Xem trước hoặc áp dụng nhập HoloUi theo giao dịch"
+"import.legacy" = "Xem trước hoặc áp dụng nâng cấp dữ liệu Gloss theo giao dịch"
 "import.preview" = "Xem trước di chuyển hologram cũ không phá hủy"
 item = "Công cụ nhà cung cấp vật phẩm tùy chỉnh"
 "item.export" = "Xuất danh mục vật phẩm tùy chỉnh cho trình chỉnh sửa web"
@@ -294,6 +303,9 @@ web = "Mở và quản lý trình chỉnh sửa web Gloss"
 "web.sessions.revoke" = "Thu hồi quyền truy cập trình chỉnh sửa web"
 "web.sessions.status" = "Hiển thị một phiên trình chỉnh sửa web"
 language = "Chọn ngôn ngữ của bạn hoặc ngôn ngữ mặc định của máy chủ"
+
+"import.mode" = "preview hoặc apply"
+"import.overwrite" = "Xem trước việc thay thế các tệp hiện có"
 
 [command.help.arg]
 reset_name = "Tên cần đặt lại, hoặc * cho mọi mặc định đi kèm"
@@ -421,6 +433,9 @@ emoji = "&7Emoji: &f{enabled}&8/&f{total}"
 animations = "&7Hoạt ảnh: &f{count}"
 effects = "&7Bong bóng: &f{bubbles} &8| &7Chỉ báo: &f{indicators} &8| &7Vật rơi: &f{drops}"
 
+visibility = "&7Bản sao thực thể hiển thị: &f{entities} &8| &7Người xem: &f{viewers} &8| &7Lượt chấp nhận: &f{admissions} &8| &7Lượt từ chối: &f{refusals} &8| &7Đang chờ: &f{waiting} &8| &7Lượt hết hạn: &f{expired} &8| &7Chờ dọn dẹp: &f{retiring}"
+images = "&7Bộ nhớ đệm ảnh: &f{entries} &8| &7Đang chờ: &f{pending} &8| &7Dữ liệu lưu giữ: &f{bytes} &7byte &8| &7Đã hoàn tất: &f{completed} &8| &7Lượt từ chối: &f{refusals}"
+
 [command.reset]
 done = "&8[&dGloss&8] &aĐã khôi phục &f{count}&a mặc định {kind} đi kèm."
 none = "&8[&dGloss&8] &cKhông có mặc định {kind} đi kèm nào khớp với '&f{name}&c'."
@@ -433,12 +448,19 @@ style_unknown = "&8[&dGloss&8] &cKhông có kiểu bong bóng nào tên '&f{styl
 [command.import]
 config_unreadable = "&8[&dGloss&8] &cKhông thể tải gloss.toml: &f{reason}"
 
+mode_invalid = "&8[&dGloss&8] &cDùng preview hoặc apply làm chế độ nhập."
+preview_capacity = "&8[&dGloss&8] &cBộ nhớ đệm các lượt nhập đã duyệt đã đầy. Hãy áp dụng bản xem trước hiện có hoặc chờ bản đó hết hạn rồi xem trước lại."
+
 [command.import.holoui]
 missing = "&8[&dGloss&8] &cKhông tìm thấy thư mục dữ liệu holoui bên cạnh thư mục dữ liệu Gloss."
 done = "&8[&dGloss&8] &aNhập HoloUi hoàn tất: &f{copied}&a đã sao chép, &f{skipped}&a đã bỏ qua, &f{overlaid}&a khóa cấu hình, &f{errors}&a lỗi."
 
+preview_required = "&8[&dGloss&8] &cTrước tiên hãy chạy /gloss import holoui mode=preview. Bản xem trước dùng thời hạn hiệu lực đã cấu hình. Thêm overwrite=true để xem trước việc thay thế các tệp hiện có."
+
 [command.import.legacy]
 done = "&8[&dGloss&8] &aDi chuyển dữ liệu cũ hoàn tất: &f{migrated}&a đã di chuyển, &f{absorbed}&a đã hấp thụ, &f{overlaid}&a khóa cấu hình, &f{errors}&a lỗi."
+
+preview_required = "&8[&dGloss&8] &cTrước tiên hãy chạy /gloss import legacy mode=preview. Bản xem trước dùng thời hạn hiệu lực đã cấu hình."
 
 [director.help]
 no_subcommands = "Không có lệnh con trên trang này."
@@ -829,6 +851,7 @@ empty = "(trống)"
 # Lane message tables. Each lane appends its [gloss.message.<lane>] and [command.help.<group>]
 # tables inside its own anchor so parallel branches never share a line.
 # --- lane:screen ---
+
 [gloss.message.screen]
 "surfaces.empty" = "&8[&dGloss&8] &7Chưa tải bề mặt nào."
 "surfaces.unknown" = "&8[&dGloss&8]: &cKhông có bề mặt tên &f{id}&c."
@@ -865,6 +888,7 @@ who = "Hiển thị plugin nào đang chiếm từng ô HUD"
 "who.player" = "Người chơi để kiểm tra; mặc định là bạn"
 
 # --- lane:chat ---
+
 [gloss.message.chat]
 filtered = "&8[&dGloss&8]: &cMột bộ lọc trò chuyện đã chặn tin nhắn của bạn."
 too_fast = "&8[&dGloss&8]: &eHãy chờ một chút trước khi gửi tin nhắn tiếp theo."
@@ -915,6 +939,7 @@ sample = "Lấy mẫu bảng xếp hạng ngay cho mọi người chơi trực t
 "sample.id" = "Id tài liệu"
 
 # --- lane:forms ---
+
 [gloss.message.forms]
 icon_unsupported = "&7Không thể vẽ trong ô rương ({kind})"
 no_inventories = "&8[&dGloss&8]: &7Chưa cấu hình menu rương nào."
@@ -964,6 +989,7 @@ hologram_actions_header = "&8[&dGloss&8] &7Hanh dong cua hologram &f{id}&7 (&f{c
 hologram_actions_entry = "&8[&dGloss&8] &7  &f{kind}&7 tren &f{value}"
 
 # --- lane:world ---
+
 [gloss.message.world]
 players_only = "&cLệnh này phải do một người chơi thực hiện."
 disabled = "&cTính năng này đang tắt trong gloss.toml."
@@ -1055,6 +1081,7 @@ color = "Màu chữ có tên"
 ticks = "Số tick phát sáng, hoặc 0 để giữ lại"
 
 # --- lane:behaviors ---
+
 [command.help.behavior]
 root = "Xem va kich hoat cac tai lieu hanh vi"
 list = "Liet ke cac tai lieu hanh vi da nap"
@@ -1119,6 +1146,7 @@ fired = "&8[&dGloss&8]: &aDa chay muc &f{line}&a cua &f{id}&a."
 "explain.missing" = "&8[&dGloss&8]: &cKhong co {kind} ten \"{id}\"."
 
 # --- lane:authoring ---
+
 [command.help.pack]
 root = "Cài đặt và quản lý gói Gloss"
 install = "Cài một gói từ tệp hoặc địa chỉ HTTPS"
@@ -1188,8 +1216,10 @@ preview = "&8[&dGloss&8] &f{source}&7 sẽ ghi &f{count}&7 tài liệu."
 entry = "&8[&dGloss&8] &7{state} &f{path}&7 {reason}"
 applied = "&8[&dGloss&8] Đã nhập &f{count}&7 tài liệu từ &f{source}&7."
 absent = "&8[&dGloss&8] &7Không có dữ liệu &f{source}&7 tại &f{path}&7."
+preview_required = "&8[&dGloss&8] &cTrước tiên hãy chạy /gloss import preview {source}. Bản xem trước dùng thời hạn hiệu lực đã cấu hình."
 
 # --- lane:forge ---
+
 [gloss.message.forge]
 disabled = "&8[&dGloss&8] &cLò rèn glyph đang tắt. Đặt features.forge thành true trong gloss.toml."
 built = "&8[&dGloss&8] &aĐã dựng gói &f{value}&a với {count} glyph."
@@ -1211,6 +1241,7 @@ serve = "Bật hoặc tắt bộ phục vụ gói tích hợp"
 reset = "Khôi phục các tài liệu glyph đi kèm"
 
 # --- lane:fixes ---
+
 [gloss.message.fixes]
 status_bedrock = "&7bedrock: &f{name}&7, &f{count}&7 đang trực tuyến"
 status_textimage_oversize = "&7textimage-quá-lớn: &f{count}"

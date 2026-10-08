@@ -1,0 +1,150 @@
+{
+  "historicalBoard": {
+    "schemaVersion": 1,
+    "revision": 1,
+    "title": "Legacy board",
+    "lines": [
+      "Welcome"
+    ],
+    "primary": true,
+    "permission": "default",
+    "groups": []
+  },
+  "historicalConfig": "motd:\n  texts:\n    - Legacy ping\n",
+  "presets": {
+    "schemaVersion": 1,
+    "revision": 3,
+    "presets": {
+      "boards": {
+        "display": {
+          "values": {
+            "presentation": {
+              "layout": {
+                "sections": {
+                  "status": [
+                    "Inherited status"
+                  ]
+                },
+                "custom": {
+                  "retain": "preset"
+                }
+              }
+            },
+            "objectives": {
+              "belowName": {
+                "title": "Health",
+                "value": "subject.health",
+                "conflict": "yield"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "canonical": {
+    "board": {
+      "schemaVersion": 2,
+      "revision": 2,
+      "preset": "display",
+      "show": true,
+      "select": {
+        "priority": 0,
+        "when": "true"
+      },
+      "presentation": {
+        "title": "Legacy board",
+        "lines": [
+          "Welcome"
+        ],
+        "hideNumbers": false
+      }
+    },
+    "motd": {
+      "schemaVersion": 1,
+      "revision": 1,
+      "show": true,
+      "entries": [
+        {
+          "lines": [
+            "Legacy ping"
+          ]
+        }
+      ]
+    }
+  },
+  "edited": {
+    "board": {
+      "schemaVersion": 2,
+      "revision": 2,
+      "preset": "display",
+      "show": true,
+      "select": {
+        "priority": 0,
+        "when": "true"
+      },
+      "presentation": {
+        "title": "Edited board",
+        "lines": [
+          "Welcome"
+        ],
+        "hideNumbers": false,
+        "layout": {
+          "pages": [
+            {
+              "id": "overview",
+              "lines": [
+                {
+                  "section": "status"
+                }
+              ],
+              "durationTicks": 80
+            }
+          ],
+          "refresh": {
+            "titleTicks": 80,
+            "textTicks": 20,
+            "valueTicks": 5
+          }
+        }
+      },
+      "objectives": {
+        "belowName": {
+          "conflict": "override",
+          "refreshTicks": 10
+        }
+      }
+    },
+    "motd": {
+      "schemaVersion": 1,
+      "revision": 1,
+      "show": true,
+      "entries": [
+        {
+          "lines": [
+            "Legacy ping"
+          ],
+          "counts": {
+            "onlineMode": "offset",
+            "onlineValue": 2,
+            "maximumMode": "fixed",
+            "maximumValue": 200
+          }
+        }
+      ],
+      "rotation": {
+        "mode": "sequence",
+        "intervalSeconds": 30
+      },
+      "serverLinks": {
+        "enabled": true,
+        "links": [
+          {
+            "label": "Rules",
+            "url": "https://example.org/rules"
+          }
+        ]
+      }
+    }
+  }
+}

@@ -1,10 +1,12 @@
 package art.arcane.gloss.paper;
 
 import art.arcane.gloss.motd.PingDecorator;
+import art.arcane.gloss.motd.MotdPolicy;
 import com.destroystokyo.paper.event.server.PaperServerListPingEvent;
 import org.bukkit.event.server.ServerListPingEvent;
 
 import java.nio.charset.StandardCharsets;
+import java.net.InetSocketAddress;
 import java.util.List;
 import java.util.UUID;
 
@@ -15,23 +17,37 @@ import java.util.UUID;
  */
 public final class PaperServerListPingBridge implements PingDecorator {
     @Override
+    public MotdPolicy.Request request(ServerListPingEvent event) {
+        if (!(event instanceof PaperServerListPingEvent paper)) {
+            return new MotdPolicy.Request(event.getHostname(), null);
+        }
+        int protocol = paper.getClient().getProtocolVersion();
+        InetSocketAddress host = paper.getClient().getVirtualHost();
+        return new MotdPolicy.Request(host == null ? event.getHostname() : host.getHostString(), protocol < 0 ? null : protocol);
+    }
+
+    @Override
     public void decorate(ServerListPingEvent event, RenderedPing rendered) {
         if (!(event instanceof PaperServerListPingEvent paper)) {
             return;
         }
-        applySample(paper, rendered.sample());
-        if (rendered.online() != null) {
+        if (!rendered.sampleMode().equals("inherit")) {
+            applySample(paper, rendered.sampleMode().equals("hide") ? List.of() : rendered.sample());
+        }
+        if (!rendered.counts().onlineMode().equals("inherit")) {
+            paper.setNumPlayers(MotdPolicy.count(rendered.counts().onlineMode(), rendered.counts().onlineValue(), paper.getNumPlayers()));
+        } else if (rendered.online() != null) {
             paper.setNumPlayers(rendered.online());
         }
         if (rendered.version() != null) {
             paper.setVersion(rendered.version());
         }
+        if (rendered.counts().hide()) {
+            paper.setHidePlayers(true);
+        }
     }
 
     private static void applySample(PaperServerListPingEvent paper, List<String> sample) {
-        if (sample.isEmpty()) {
-            return;
-        }
         List<PaperServerListPingEvent.ListedPlayerInfo> listed = paper.getListedPlayers();
         listed.clear();
         for (String line : sample) {

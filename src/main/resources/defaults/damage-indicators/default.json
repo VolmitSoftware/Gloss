@@ -8,7 +8,9 @@
     "minimumDelta": 0.009,
     "decimals": 0,
     "viewRange": 48,
-    "debounceMs": 150
+    "debounceMs": 150,
+    "aggregationTicks": 2,
+    "maxPendingSamples": 256
   },
   "damage": {
     "when": "true",

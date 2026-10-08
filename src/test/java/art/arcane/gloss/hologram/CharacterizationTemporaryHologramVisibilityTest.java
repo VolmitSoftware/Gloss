@@ -68,18 +68,18 @@ class CharacterizationTemporaryHologramVisibilityTest {
     }
 
     @Test
-    void blacklistWithoutMembersDispatchesNothingAndStaysVisible() {
+    void blacklistWithoutMembersAdmitsEveryNearbyViewer() {
         TemporaryHologramDisplay temporary = spawned("t-none");
         temporary.drive(true);
         temporary.drive(true);
 
         DisplayHandle display = harness.onlySpawned(world);
         for (PlayerHandle player : java.util.List.of(alice, bob, cara)) {
-            assertNull(player.perceivedVisibility(display), player.name + " must receive no dispatch");
+            assertEquals(Boolean.TRUE, player.perceivedVisibility(display));
             assertTrue(effectivelyVisible(player, display));
         }
-        assertNull(display.visibleByDefault, "blacklist spawn must not override default visibility");
-        assertTrue(harness.appliedVisibility(temporary).isEmpty());
+        assertEquals(Boolean.FALSE, display.visibleByDefault);
+        assertEquals(3, harness.appliedVisibility(temporary).size());
     }
 
     @Test
@@ -160,7 +160,7 @@ class CharacterizationTemporaryHologramVisibilityTest {
     }
 
     @Test
-    void modeFlipToBlacklistRestoresDefaultVisibilityAndReconciles() {
+    void modeFlipToBlacklistKeepsDefaultHiddenAndReconciles() {
         TemporaryHologramDisplay temporary = harness.temporary("t-flip", harness.at(world, 0.5D, 64.0D, 0.5D), 60_000L);
         temporary.setLines(java.util.List.of("hi"));
         temporary.viewers().whitelist();
@@ -173,8 +173,7 @@ class CharacterizationTemporaryHologramVisibilityTest {
         temporary.drive(true);
 
         DisplayHandle display = harness.onlySpawned(world);
-        assertEquals(Boolean.TRUE, display.visibleByDefault,
-            "flip to blacklist must restore visible-by-default");
+        assertEquals(Boolean.FALSE, display.visibleByDefault);
         assertFalse(effectivelyVisible(alice, display), "surviving member is now blacklisted");
         assertTrue(effectivelyVisible(bob, display));
         assertTrue(effectivelyVisible(cara, display));

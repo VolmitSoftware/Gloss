@@ -49,11 +49,11 @@ class WaypointServiceTest {
     }
 
     @Test
-    void updatesWhenTheColorChanges() {
+    void replacesTheTrackedEntryWhenTheColorChanges() {
         WaypointTracker tracker = new WaypointTracker();
         tracker.reconcile(VIEWER, List.of(target("mill", 0xFFAA00, 10, 64, -5)));
 
-        Assertions.assertEquals(List.of(WrapperPlayServerWaypoint.Operation.UPDATE),
+        Assertions.assertEquals(List.of(WrapperPlayServerWaypoint.Operation.TRACK),
             operations(tracker.reconcile(VIEWER, List.of(target("mill", 0x00FF00, 10, 64, -5)))));
     }
 
@@ -81,16 +81,18 @@ class WaypointServiceTest {
     }
 
     @Test
-    void switchingBetweenPositionAndAzimuthUpdates() {
+    void switchingBetweenPositionAndAzimuthReplacesTheTrackedEntry() {
         WaypointTracker tracker = new WaypointTracker();
         tracker.reconcile(VIEWER, List.of(target("mill", 0xFFAA00, 10, 64, -5)));
 
         WaypointTarget azimuth = new WaypointTarget("mill", 0xFFAA00, WaypointStyle.DEFAULT,
             10, 64, -5, 1.2F);
 
-        Assertions.assertEquals(List.of(WrapperPlayServerWaypoint.Operation.UPDATE),
+        Assertions.assertEquals(List.of(WrapperPlayServerWaypoint.Operation.TRACK),
             operations(tracker.reconcile(VIEWER, List.of(azimuth))));
         Assertions.assertEquals(List.of(), tracker.reconcile(VIEWER, List.of(azimuth)));
+        Assertions.assertEquals(List.of(WrapperPlayServerWaypoint.Operation.TRACK),
+            operations(tracker.reconcile(VIEWER, List.of(target("mill", 0xFFAA00, 10, 64, -5)))));
     }
 
     @Test
@@ -142,6 +144,64 @@ class WaypointServiceTest {
 
         Assertions.assertEquals(com.github.retrooper.packetevents.protocol.world.waypoint.WaypointIcon
             .ICON_STYLE_BOWTIE, packet.getWaypoint().getIcon().getStyle());
+    }
+
+    @Test
+    void refusedAndFailedPacketBatchesRetainThePreviousClientStateForRetry() {
+        WaypointTracker tracker = new WaypointTracker();
+        List<WaypointTarget> desired = List.of(target("mill", 0xFFAA00, 10, 64, -5));
+        Assertions.assertEquals(List.of(WrapperPlayServerWaypoint.Operation.TRACK),
+            operations(tracker.reconcile(VIEWER, desired, changes -> false)));
+        Assertions.assertThrows(IllegalStateException.class,
+            () -> tracker.reconcile(VIEWER, desired, changes -> { throw new IllegalStateException("channel closed"); }));
+        Assertions.assertEquals(List.of(WrapperPlayServerWaypoint.Operation.TRACK),
+            operations(tracker.reconcile(VIEWER, desired, changes -> true)));
+        Assertions.assertEquals(List.of(WrapperPlayServerWaypoint.Operation.UNTRACK),
+            operations(tracker.reconcile(VIEWER, List.of(), changes -> false)));
+        Assertions.assertEquals(List.of(), tracker.reconcile(VIEWER, desired));
+        Assertions.assertEquals(List.of(WrapperPlayServerWaypoint.Operation.UNTRACK),
+            operations(tracker.reconcile(VIEWER, List.of(), changes -> true)));
+    }
+
+    @Test
+    void configuredThresholdsApplyAndBearingsWrapAtPi() {
+        WaypointTracker tracker = new WaypointTracker(() -> new WaypointTracker.Thresholds(4, 0.05));
+        tracker.reconcile(VIEWER, List.of(target("mill", 1, 0, 0, 0)));
+        Assertions.assertEquals(List.of(), tracker.reconcile(VIEWER, List.of(target("mill", 1, 3, 0, 0))));
+        Assertions.assertEquals(1, tracker.reconcile(VIEWER, List.of(target("mill", 1, 5, 0, 0))).size());
+        tracker.reconcile(VIEWER, List.of(new WaypointTarget("mill", 1, WaypointStyle.DEFAULT, 5, 0, 0, 3.13F)));
+        Assertions.assertEquals(List.of(), tracker.reconcile(VIEWER,
+            List.of(new WaypointTarget("mill", 1, WaypointStyle.DEFAULT, 5, 0, 0, -3.13F))));
+    }
+
+    @Test
+    void customStyleIsCarriedByThePacketAndSwitchingToFallbackReplacesIt() {
+        WaypointTarget custom = new WaypointTarget("quest", 0xFFFFFF, WaypointStyle.DEFAULT,
+            1, 2, 3, null, "trails:quest");
+        WrapperPlayServerWaypoint packet = WaypointPackets.of(new WaypointTracker.Change(
+            WrapperPlayServerWaypoint.Operation.TRACK, custom));
+        Assertions.assertEquals("trails:quest", packet.getWaypoint().getIcon().getStyle().toString());
+        WaypointTracker tracker = new WaypointTracker();
+        tracker.reconcile(VIEWER, List.of(custom));
+        Assertions.assertEquals(List.of(WrapperPlayServerWaypoint.Operation.TRACK),
+            operations(tracker.reconcile(VIEWER, List.of(target("quest", 0xFFFFFF, 1, 2, 3)))));
+    }
+
+    @Test
+    void loadingACustomPackReplacesTheFallbackAndRetriesUntilAccepted() {
+        WaypointTracker tracker = new WaypointTracker();
+        WaypointTarget fallback = new WaypointTarget("quest", 0xFFFFFF, WaypointStyle.BOWTIE,
+            1, 2, 3, null);
+        WaypointTarget custom = new WaypointTarget("quest", 0xFFFFFF, WaypointStyle.DEFAULT,
+            1, 2, 3, null, "trails:quest");
+        tracker.reconcile(VIEWER, List.of(fallback));
+        List<WaypointTracker.Change> refused = tracker.reconcile(VIEWER, List.of(custom), changes -> false);
+        Assertions.assertEquals(List.of(WrapperPlayServerWaypoint.Operation.TRACK), operations(refused));
+        Assertions.assertEquals("trails:quest", WaypointPackets.of(refused.getFirst()).getWaypoint().getIcon().getStyle().toString());
+        Assertions.assertEquals(List.of(), tracker.reconcile(VIEWER, List.of(fallback)));
+        Assertions.assertEquals(List.of(WrapperPlayServerWaypoint.Operation.TRACK),
+            operations(tracker.reconcile(VIEWER, List.of(custom), changes -> true)));
+        Assertions.assertEquals(List.of(), tracker.reconcile(VIEWER, List.of(custom)));
     }
 
     private static List<WrapperPlayServerWaypoint.Operation> operations(List<WaypointTracker.Change> changes) {

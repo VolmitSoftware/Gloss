@@ -116,12 +116,12 @@ public final class LayoutFunctions implements SpaceGlyphs {
         for (int segment = 0; segment < segments; segment++) {
             out.append(segment < filled ? full : empty);
         }
-        return font(out.toString());
+        return font(glyph, out.toString());
     }
 
     /** The font-tagged character for a glyph id, for callers outside the expression language. */
     public Optional<String> fontTag(String glyphId) {
-        return registry.get().glyph(glyphId).map(glyph -> font(glyph.character()));
+        return registry.get().glyph(glyphId).map(glyph -> font(glyph, glyph.character()));
     }
 
     private Object render(ExprScope scope, Optional<GlyphRegistry.ResolvedGlyph> found) {
@@ -129,7 +129,11 @@ public final class LayoutFunctions implements SpaceGlyphs {
             return "";
         }
         GlyphRegistry.ResolvedGlyph glyph = found.get();
-        return PixelFunctions.packLoaded(scope) ? font(glyph.character()) : glyph.fallback();
+        return PixelFunctions.packLoaded(scope) ? font(glyph, glyph.character()) : glyph.fallback();
+    }
+
+    private static String font(GlyphRegistry.ResolvedGlyph glyph, String characters) {
+        return "<font:" + glyph.namespace() + ":" + glyph.font() + ">" + characters + "</font>";
     }
 
     private String font(String characters) {

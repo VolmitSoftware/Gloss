@@ -2,6 +2,7 @@ package art.arcane.gloss.tab;
 
 import art.arcane.gloss.Gloss;
 import art.arcane.gloss.condition.BoundedConditionErrorCallback;
+import art.arcane.gloss.condition.RoleSnapshotPendingException;
 import art.arcane.gloss.expr.Expr;
 import art.arcane.gloss.expr.ExprEvaluator;
 import art.arcane.gloss.expr.ExprScope;
@@ -46,26 +47,36 @@ public final class TablistSortService {
         return (int) Math.max(Integer.MIN_VALUE, Math.min(Integer.MAX_VALUE, rounded));
     }
 
-    public void pass(TablistRuntime runtime, List<Player> players, ScopeFactory scopes,
-                     BoundedConditionErrorCallback errors) {
-        Expr weight = runtime.sortWeight();
-        if (weight == null || players.isEmpty()) {
+    public void captureSubject(TablistRuntime runtime, Player subject, ExprScope scope,
+                               BoundedConditionErrorCallback errors) {
+        if (runtime.sortWeight() != null && !runtime.sortViewerDependent()) {
+            lastOrder.put(subject.getUniqueId(), evaluate(runtime.sortWeight(), scope, errors));
+        }
+    }
+
+    public void applyViewer(TablistRuntime runtime, Player viewer, List<Player> subjects,
+                            ScopeFactory scopes, BoundedConditionErrorCallback errors) {
+        if (runtime.sortWeight() == null) {
             return;
         }
-        if (runtime.sortViewerDependent()) {
-            passPerViewer(weight, players, scopes, errors);
-            return;
-        }
+        Map<UUID, Integer> seen = lastViewerOrder.computeIfAbsent(viewer.getUniqueId(),
+            key -> new ConcurrentHashMap<>());
         Map<UUID, Integer> changed = new LinkedHashMap<>();
-        for (Player subject : players) {
-            int order = evaluate(weight, scopes.scope(subject, subject), errors);
-            Integer previous = lastOrder.put(subject.getUniqueId(), order);
-            if (previous == null || previous.intValue() != order) {
-                changed.put(subject.getUniqueId(), order);
+        for (Player subject : subjects) {
+            UUID id = subject.getUniqueId();
+            try {
+                Integer order = runtime.sortViewerDependent()
+                    ? evaluate(runtime.sortWeight(), scopes.scope(viewer, subject), errors) : lastOrder.get(id);
+                if (order != null && !order.equals(seen.get(id))) {
+                    changed.put(id, order);
+                }
+            } catch (RoleSnapshotPendingException pending) {
+                continue;
             }
         }
         if (!changed.isEmpty()) {
-            sink.order(players, changed);
+            sink.order(List.of(viewer), changed);
+            seen.putAll(changed);
         }
     }
 
@@ -87,28 +98,11 @@ public final class TablistSortService {
         lastViewerOrder.clear();
     }
 
-    private void passPerViewer(Expr weight, List<Player> players, ScopeFactory scopes,
-                               BoundedConditionErrorCallback errors) {
-        for (Player viewer : players) {
-            Map<UUID, Integer> seen = lastViewerOrder.computeIfAbsent(viewer.getUniqueId(),
-                key -> new ConcurrentHashMap<>());
-            Map<UUID, Integer> changed = new LinkedHashMap<>();
-            for (Player subject : players) {
-                int order = evaluate(weight, scopes.scope(viewer, subject), errors);
-                Integer previous = seen.put(subject.getUniqueId(), order);
-                if (previous == null || previous.intValue() != order) {
-                    changed.put(subject.getUniqueId(), order);
-                }
-            }
-            if (!changed.isEmpty()) {
-                sink.order(List.of(viewer), changed);
-            }
-        }
-    }
-
     private static int evaluate(Expr weight, ExprScope scope, BoundedConditionErrorCallback errors) {
         try {
             return listOrder(ExprEvaluator.number(weight, scope));
+        } catch (RoleSnapshotPendingException pending) {
+            throw pending;
         } catch (RuntimeException failure) {
             Gloss.logExceptionStackThrottled(false, "tablist-sort-weight", failure,
                 "Tablist sort weight failed and was treated as 0.");

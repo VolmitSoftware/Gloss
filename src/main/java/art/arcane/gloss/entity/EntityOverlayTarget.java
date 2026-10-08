@@ -1,6 +1,7 @@
 package art.arcane.gloss.entity;
 
 import art.arcane.gloss.api.TemporaryHologram;
+import art.arcane.gloss.condition.EntityRelationshipSnapshot;
 import art.arcane.gloss.particle.ParticleText;
 import org.bukkit.Location;
 import org.bukkit.entity.LivingEntity;
@@ -19,8 +20,10 @@ final class EntityOverlayTarget {
 
     static final class Render {
         EntityOverlayDoc presentation;
+        EntityOverlaySource source;
+        final Set<UUID> admitted = ConcurrentHashMap.newKeySet();
         final Set<UUID> whitelist = ConcurrentHashMap.newKeySet();
-        TemporaryHologram display;
+        volatile TemporaryHologram display;
         ParticleText.Rendered frame;
         EntityOverlayText.Prepared prepared;
         EntityOverlaySource.Pane pane;
@@ -38,9 +41,11 @@ final class EntityOverlayTarget {
             frame = null;
             prepared = null;
             pane = null;
+            source = null;
             snapshot = null;
             details = List.of();
             whitelist.clear();
+            admitted.clear();
         }
     }
 
@@ -50,6 +55,9 @@ final class EntityOverlayTarget {
     final Set<UUID> personalViewers = ConcurrentHashMap.newKeySet();
     final AtomicBoolean rendering = new AtomicBoolean();
     volatile LivingEntity target;
+    volatile EntityRelationshipSnapshot relationship;
+    volatile EntityOverlaySource source;
+    volatile long nextRenderTick;
     volatile Sample sample;
     volatile boolean dirty = true;
     volatile boolean retired;

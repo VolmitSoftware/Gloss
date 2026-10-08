@@ -79,8 +79,11 @@ final class TablistRuntime {
         if (!doc.sort().active()) {
             return false;
         }
+        if (!TablistDoc.Sort.references(doc.sort().weight()).functions().isEmpty()) {
+            return true;
+        }
         for (String variable : TablistDoc.Sort.references(doc.sort().weight()).variables()) {
-            if (variable.startsWith(VIEWER_PREFIX)) {
+            if (variable.startsWith(VIEWER_PREFIX) || !variable.startsWith("subject.")) {
                 return true;
             }
         }
@@ -110,6 +113,10 @@ final class TablistRuntime {
             }
         }
         return baseListName;
+    }
+
+    boolean documentVisible(ExprScope scope, BoundedConditionErrorCallback errors) {
+        return doc.show().matches(scope, errors);
     }
 
     boolean headerFooterVisible(ExprScope scope, BoundedConditionErrorCallback errors) {

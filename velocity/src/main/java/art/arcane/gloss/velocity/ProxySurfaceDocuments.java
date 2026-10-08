@@ -1,6 +1,10 @@
 package art.arcane.gloss.velocity;
 
 import art.arcane.gloss.expr.Expr;
+import art.arcane.gloss.doc.DocumentPresetCatalog;
+import art.arcane.gloss.surface.SurfaceDispatchPolicy;
+import art.arcane.gloss.surface.SurfaceTrigger;
+import com.google.gson.Gson;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 
@@ -17,7 +21,7 @@ import java.util.stream.Stream;
 
 /**
  * The proxy's {@code surfaces/*.json} folder: schema-1 action bar, boss bar and title documents in
- * the same shape the server edition reads. HUD slots have no meaning on the proxy and are ignored.
+ * the same shape the server edition reads. Proxy action bars use the native centered slot.
  */
 public final class ProxySurfaceDocuments {
     public static final List<String> KINDS = List.of("actionbar", "bossbar", "title");
@@ -35,12 +39,13 @@ public final class ProxySurfaceDocuments {
     private static final int SCHEMA_VERSION = 1;
     private static final String FOLDER = "surfaces";
     private static final String SUFFIX = ".json";
+    private static final Gson GSON = new Gson();
     private static final Expr FULL_PROGRESS = ProxyText.parseExpression("1");
 
     private ProxySurfaceDocuments() {
     }
 
-    public static List<Document> load(Path directory) throws IOException {
+    public static List<Document> load(Path directory, DocumentPresetCatalog presets) throws IOException {
         Path folder = directory.resolve(FOLDER);
         if (!Files.isDirectory(folder)) {
             return List.of();
@@ -52,6 +57,7 @@ public final class ProxySurfaceDocuments {
                 if (object.isEmpty()) {
                     continue;
                 }
+                object = GSON.fromJson(presets.resolve("surfaces", object.toString()), JsonObject.class);
                 String name = path.getFileName().toString();
                 documents.add(document(name.substring(0, name.length() - SUFFIX.length()), object));
             }
@@ -70,7 +76,43 @@ public final class ProxySurfaceDocuments {
         return new Document(id, kind, ProxyDocuments.expression(object, "show", "true"),
             ProxyDocuments.integer(selection, "priority", 0),
             ProxyDocuments.expression(selection, "when", "false"),
-            presentation(object, kind, "surfaces." + id + ".presentation"), variants(object, id, kind));
+            presentation(object, kind, "surfaces." + id + ".presentation"), variants(object, id, kind),
+            group(object, kind), !object.has("automatic") || object.get("automatic").getAsBoolean(),
+            object.has("delivery") ? GSON.fromJson(object.get("delivery"), SurfaceDispatchPolicy.class)
+                : SurfaceDispatchPolicy.DEFAULTS, triggers(object));
+    }
+
+    private static String group(JsonObject object, String kind) {
+        String group = ProxyDocuments.string(object, "group", "main");
+        if (!group.matches("[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}") || !kind.equals("bossbar") && !group.equals("main")) {
+            throw new IllegalArgumentException("Only bossbars support named groups of 1..64 letters, digits, dots, underscores or hyphens");
+        }
+        return group;
+    }
+
+    private static List<Trigger> triggers(JsonObject object) {
+        List<Trigger> triggers = new ArrayList<>();
+        for (JsonElement entry : ProxyDocuments.array(object, "on")) {
+            SurfaceTrigger trigger = GSON.fromJson(entry, SurfaceTrigger.class);
+            trigger.requirePlatform(true);
+            triggers.add(new Trigger(trigger, ProxyText.parseExpression(trigger.when())));
+        }
+        if (triggers.size() > 64) {
+            throw new IllegalArgumentException("A surface may declare at most 64 triggers");
+        }
+        return List.copyOf(triggers);
+    }
+
+    private static List<String> flags(JsonObject object) {
+        List<String> flags = new ArrayList<>();
+        for (JsonElement value : ProxyDocuments.array(object, "flags")) {
+            String flag = value.getAsString();
+            if (!List.of("darken_sky", "play_boss_music", "create_fog").contains(flag) || flags.contains(flag)) {
+                throw new IllegalArgumentException("Bossbar flags must be unique darken_sky, play_boss_music or create_fog values");
+            }
+            flags.add(flag);
+        }
+        return List.copyOf(flags);
     }
 
     private static List<Variant> variants(JsonObject object, String id, String kind) {
@@ -95,20 +137,48 @@ public final class ProxySurfaceDocuments {
             throw new IllegalArgumentException(path + " is required");
         }
         JsonObject object = ProxyDocuments.object(owner, "presentation");
-        return switch (kind) {
+        if (!kind.equals("bossbar") && !flags(object).isEmpty()) {
+            throw new IllegalArgumentException(path + " flags are only supported by bossbars");
+        }
+        Presentation parsed = switch (kind) {
             case "actionbar" -> actionBar(object, path);
             case "bossbar" -> bossBar(object, path);
             default -> title(object, path);
         };
+        String priority = ProxyDocuments.string(object, "priority", "status");
+        int rank = List.of("ambient", "notice", "status", "progress", "interactive", "modal", "pinned").indexOf(priority);
+        if (rank < 0) {
+            throw new IllegalArgumentException("Unknown surface priority: " + priority);
+        }
+        return new Presentation(parsed.text(), parsed.title(), parsed.subtitle(), parsed.progress(), parsed.color(),
+            parsed.style(), parsed.ttlTicks(), parsed.fadeInTicks(), parsed.stayTicks(), parsed.fadeOutTicks(),
+            parsed.trigger(), parsed.repeatTicks(), parsed.flags(), rank);
     }
 
     private static Presentation actionBar(JsonObject object, String path) {
+        JsonElement slots = object.get("slots");
+        if (slots != null && !slots.isJsonNull()) {
+            if (slots.isJsonArray()) {
+                for (JsonElement slot : slots.getAsJsonArray()) {
+                    requireCenterSlot(slot, path);
+                }
+            } else {
+                requireCenterSlot(slots, path);
+            }
+        }
         String text = trimToNull(ProxyDocuments.string(object, "text", null));
         if (text == null) {
             throw new IllegalArgumentException(path + " requires text for an actionbar surface");
         }
         return new Presentation(text, null, null, null, null, null, ticks(object, "ttlTicks", 1, MAX_TTL_TICKS),
             null, null, null, null, null);
+    }
+
+    private static void requireCenterSlot(JsonElement slot, String path) {
+        if (!slot.isJsonPrimitive() || !slot.getAsJsonPrimitive().isString()
+            || !slot.getAsString().equalsIgnoreCase("center")) {
+            throw new IllegalArgumentException(path + " slots supports only center on Velocity; backend compositor slots are unavailable");
+        }
     }
 
     private static Presentation bossBar(JsonObject object, String path) {
@@ -120,7 +190,7 @@ public final class ProxySurfaceDocuments {
         String style = name(ProxyDocuments.string(object, "style", null), STYLES, path + " style");
         return new Presentation(null, title, null, progress(ProxyDocuments.string(object, "progress", null)),
             color == null ? "white" : color, style == null ? "solid" : style,
-            ticks(object, "ttlTicks", 1, MAX_TTL_TICKS), null, null, null, null, null);
+            ticks(object, "ttlTicks", 1, MAX_TTL_TICKS), null, null, null, null, null, flags(object), 2);
     }
 
     private static Presentation title(JsonObject object, String path) {
@@ -196,7 +266,10 @@ public final class ProxySurfaceDocuments {
     }
 
     public record Document(String id, String kind, Expr show, int priority, Expr when, Presentation presentation,
-                           List<Variant> variants) {
+                           List<Variant> variants, String group, boolean automatic, SurfaceDispatchPolicy delivery, List<Trigger> on) {
+    }
+
+    public record Trigger(SurfaceTrigger settings, Expr when) {
     }
 
     public record Variant(String id, int priority, Expr when, Presentation presentation) {
@@ -204,6 +277,12 @@ public final class ProxySurfaceDocuments {
 
     public record Presentation(String text, String title, String subtitle, Expr progress, String color,
                                String style, Integer ttlTicks, Integer fadeInTicks, Integer stayTicks,
-                               Integer fadeOutTicks, String trigger, Integer repeatTicks) {
+                               Integer fadeOutTicks, String trigger, Integer repeatTicks, List<String> flags, int priority) {
+        public Presentation(String text, String title, String subtitle, Expr progress, String color, String style,
+                            Integer ttlTicks, Integer fadeInTicks, Integer stayTicks, Integer fadeOutTicks,
+                            String trigger, Integer repeatTicks) {
+            this(text, title, subtitle, progress, color, style, ttlTicks, fadeInTicks, stayTicks, fadeOutTicks,
+                trigger, repeatTicks, List.of(), 2);
+        }
     }
 }

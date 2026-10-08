@@ -12,7 +12,7 @@ import java.util.List;
 import java.util.Set;
 
 public record BoardDoc(int schemaVersion, long revision, ShowCondition show, Selection select, Presentation presentation,
-                       List<Variant> variants) {
+                       List<Variant> variants, BoardObjectives objectives) {
     public static final String KIND = "boards";
     public static final int CURRENT_SCHEMA_VERSION = 2;
 
@@ -23,10 +23,16 @@ public record BoardDoc(int schemaVersion, long revision, ShowCondition show, Sel
         select = select == null ? Selection.NEVER : select;
         presentation = presentation == null ? Presentation.EMPTY : presentation;
         variants = copyVariants(variants);
+        objectives = objectives == null ? BoardObjectives.NONE : objectives;
+    }
+
+    public BoardDoc(int schemaVersion, long revision, ShowCondition show, Selection select,
+                    Presentation presentation, List<Variant> variants) {
+        this(schemaVersion, revision, show, select, presentation, variants, null);
     }
 
     public BoardDoc withRevision(long revision) {
-        return new BoardDoc(schemaVersion, revision, show, select, presentation, variants);
+        return new BoardDoc(schemaVersion, revision, show, select, presentation, variants, objectives);
     }
 
     public static BoardDoc parse(String fileName, String raw) {
@@ -60,12 +66,24 @@ public record BoardDoc(int schemaVersion, long revision, ShowCondition show, Sel
         }
     }
 
-    public record Presentation(String title, List<BoardLine> lines, boolean hideNumbers) {
+    public record Presentation(String title, List<BoardLine> lines, boolean hideNumbers, BoardLayout layout) {
         public static final Presentation EMPTY = new Presentation("", List.of(), false);
 
         public Presentation {
             title = title == null ? "" : title;
             lines = copyLines(lines);
+            layout = layout == null ? BoardLayout.DEFAULTS : layout;
+            layout.expand(lines);
+            for (BoardLayout.Page page : layout.pages()) {
+                layout.expand(page.lines());
+            }
+            for (List<BoardLine> section : layout.sections().values()) {
+                layout.expand(section);
+            }
+        }
+
+        public Presentation(String title, List<BoardLine> lines, boolean hideNumbers) {
+            this(title, lines, hideNumbers, null);
         }
 
         public static Presentation ofStrings(String title, List<String> lines, boolean hideNumbers) {

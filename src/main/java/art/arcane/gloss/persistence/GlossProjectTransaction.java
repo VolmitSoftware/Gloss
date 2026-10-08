@@ -1,5 +1,6 @@
 package art.arcane.gloss.persistence;
 
+import art.arcane.gloss.Gloss;
 import art.arcane.gloss.doc.AtomicFiles;
 import art.arcane.gloss.doc.DocumentHashes;
 import art.arcane.gloss.editor.sync.EditorSyncDocumentKind;
@@ -11,17 +12,30 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.ByteBuffer;
+import java.nio.channels.Channels;
 import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.DirectoryStream;
+import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
+import java.nio.file.SecureDirectoryStream;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.attribute.BasicFileAttributeView;
+import java.nio.file.attribute.BasicFileAttributes;
+import java.nio.file.attribute.FileTime;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.time.Instant;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
+import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -34,7 +48,8 @@ import java.util.stream.Stream;
 
 public final class GlossProjectTransaction {
   private static final int JOURNAL_VERSION = 2;
-  private static final int MAX_BACKUPS = 20;
+  private static final int MAX_RETENTION_ENTRIES = 1048576;
+  private static final int MAX_RETENTION_DEPTH = 128;
   private static final int UUID_CHARACTERS = 36;
   private static final String IMAGES_COLLECTION = "images";
   private static final long MAX_JOURNAL_BYTES = 1024L * 1024L;
@@ -50,6 +65,9 @@ public final class GlossProjectTransaction {
   private final Path backupsDirectory;
   private final DirectoryForceProbe directoryForceProbe;
   private final Set<String> uncertainCommits;
+  private volatile RetentionSettings retentionSettings;
+  private volatile RetentionSettings completedRetention;
+  private volatile RetentionStatus retentionStatus = new RetentionStatus(0, 0, 0, 0, false, false, false);
 
   public GlossProjectTransaction(Path dataDirectory) {
     this(dataDirectory, directory -> {
@@ -91,11 +109,33 @@ public final class GlossProjectTransaction {
         archive(transaction, journal.id());
       }
     }
+  }
+
+  public void configureRetention(RetentionPolicy policy) {
+    retentionSettings = new RetentionSettings(Objects.requireNonNull(policy, "policy"));
+  }
+
+  public boolean retentionPending() {
+    return retentionSettings != null && retentionSettings != completedRetention;
+  }
+
+  public RetentionStatus retentionStatus() {
+    return retentionStatus;
+  }
+
+  public void pruneRetainedBackups() throws IOException {
     pruneBackups();
   }
 
   public Pending apply(String transactionId, Map<Path, Mutation> requestedMutations,
                        Map<Path, byte[]> expectedExisting) throws IOException {
+    return apply(transactionId, requestedMutations, expectedExisting,
+        new TransactionPreparation(new TransactionPreparation.Limits(Long.MAX_VALUE, Long.MAX_VALUE)));
+  }
+
+  public Pending apply(String transactionId, Map<Path, Mutation> requestedMutations,
+                       Map<Path, byte[]> expectedExisting, TransactionPreparation preparation) throws IOException {
+    Objects.requireNonNull(preparation).check();
     ensureRootDirectories();
     String label = safeLabel(transactionId);
     String id = Instant.now().toEpochMilli() + "-" + label + "-" + UUID.randomUUID();
@@ -103,6 +143,24 @@ public final class GlossProjectTransaction {
     if (mutations.isEmpty()) {
       throw new IllegalArgumentException("editor sync transaction has no mutations");
     }
+    List<Entry> capacityEntries = new ArrayList<>(mutations.size());
+    String hashCapacity = "0".repeat(64);
+    long preparationBytes = 0;
+    for (Map.Entry<Path, Mutation> mutation : mutations.entrySet()) {
+      preparation.check();
+      validateTarget(mutation.getKey());
+      if (mutation.getValue().operation() == Operation.WRITE) {
+        preparationBytes = Math.addExact(preparationBytes, mutation.getValue().contentLength());
+      }
+      if (Files.exists(mutation.getKey(), LinkOption.NOFOLLOW_LINKS)) {
+        preparationBytes = Math.addExact(preparationBytes, Files.size(mutation.getKey()));
+      }
+      preparation.requireCapacity(preparationBytes);
+      capacityEntries.add(new Entry(relativePath(dataDirectory.relativize(mutation.getKey())),
+          mutation.getValue().operation(), false, hashCapacity,
+          mutation.getValue().operation() == Operation.WRITE ? hashCapacity : null));
+    }
+    journalBytes(new Journal(JOURNAL_VERSION, id, "publishing", capacityEntries));
     Path transaction = transactionsDirectory.resolve(id).normalize();
     createChildDirectory(transactionsDirectory, transaction);
     Path stage = transaction.resolve("stage");
@@ -115,6 +173,7 @@ public final class GlossProjectTransaction {
       for (Map.Entry<Path, Mutation> mutationEntry : mutations.entrySet()) {
         Path target = mutationEntry.getKey();
         Mutation mutation = mutationEntry.getValue();
+        preparation.check();
         validateTarget(target);
         Path relative = dataDirectory.relativize(target);
         boolean existed = Files.exists(target, LinkOption.NOFOLLOW_LINKS);
@@ -125,17 +184,16 @@ public final class GlossProjectTransaction {
         if (mutation.operation() == Operation.WRITE) {
           Path staged = stage.resolve(relative).normalize();
           safePrepareParent(stage, staged);
-          writeNewFile(staged, mutation.content());
-          stagedHash = DocumentHashes.sha256(mutation.content());
+          preparation.reserve(mutation.contentLength());
+          writeNewFile(staged, mutation.content, preparation);
+          stagedHash = DocumentHashes.sha256(mutation.content);
         }
         String originalHash = null;
         if (existed) {
-          byte[] original = readRegularFile(target);
-          originalHash = DocumentHashes.sha256(original);
           ensureChildDirectory(transaction, backup);
           Path backupFile = backup.resolve(relative).normalize();
           safePrepareParent(backup, backupFile);
-          writeNewFile(backupFile, original);
+          originalHash = copyRegularFile(target, backupFile, preparation);
         }
         entries.add(new Entry(relativePath(relative), mutation.operation(), existed,
             originalHash, stagedHash));
@@ -152,7 +210,8 @@ public final class GlossProjectTransaction {
     Journal prepared = new Journal(JOURNAL_VERSION, id, "prepared", List.copyOf(entries));
     writeJournal(transaction, prepared);
     try {
-      verifyExpected(expectedExisting);
+      verifyExpected(expectedExisting, preparation);
+      preparation.check();
     } catch (IOException | RuntimeException failure) {
       try {
         rollback(transaction, prepared);
@@ -249,8 +308,9 @@ public final class GlossProjectTransaction {
     return mutations;
   }
 
-  private void verifyExpected(Map<Path, byte[]> expectedExisting) throws IOException {
+  private void verifyExpected(Map<Path, byte[]> expectedExisting, TransactionPreparation preparation) throws IOException {
     for (Map.Entry<Path, byte[]> entry : expectedExisting.entrySet()) {
+      preparation.check();
       Path target = entry.getKey().toAbsolutePath().normalize();
       validateTarget(target);
       byte[] expected = entry.getValue();
@@ -258,7 +318,7 @@ public final class GlossProjectTransaction {
         if (Files.exists(target, LinkOption.NOFOLLOW_LINKS)) {
           throw new IOException("transaction target was created after the session snapshot: " + target);
         }
-      } else if (!java.util.Arrays.equals(expected, readRegularFile(target))) {
+      } else if (!matchesExpected(target, expected, preparation)) {
         throw new IOException("transaction target changed after the session snapshot: " + target);
       }
     }
@@ -278,7 +338,7 @@ public final class GlossProjectTransaction {
         requireChild(stage, stagedFile);
         if (entry.operation() == Operation.WRITE) {
           if (Files.exists(stagedFile, LinkOption.NOFOLLOW_LINKS)) {
-            if (!DocumentHashes.sha256(readRegularFile(stagedFile)).equals(entry.stagedHash())) {
+            if (!hashRegularFile(stagedFile).equals(entry.stagedHash())) {
               throw new IOException("editor sync staged-file hash mismatch: " + entry.relativePath());
             }
           } else if (journal.state().equals("prepared")) {
@@ -292,19 +352,18 @@ public final class GlossProjectTransaction {
         if (entry.existed()) {
           Path backupFile = backup.resolve(entry.relativePath()).normalize();
           requireChild(backup, backupFile);
-          byte[] original = readRegularFile(backupFile);
-          if (!DocumentHashes.sha256(original).equals(entry.originalHash())) {
+          if (!hashRegularFile(backupFile).equals(entry.originalHash())) {
             throw new IOException("editor sync backup hash mismatch: " + entry.relativePath());
           }
           if (!Files.exists(target, LinkOption.NOFOLLOW_LINKS)) {
             if (entry.operation() == Operation.DELETE) {
-              replaceDurably(target, original);
+              restoreDurably(target, backupFile, entry.originalHash());
               continue;
             }
             throw new IOException("editor sync target disappeared during recovery: "
                 + entry.relativePath());
           }
-          String targetHash = DocumentHashes.sha256(readRegularFile(target));
+          String targetHash = hashRegularFile(target);
           if (targetHash.equals(entry.originalHash())) {
             continue;
           }
@@ -312,14 +371,14 @@ public final class GlossProjectTransaction {
             throw new IOException("editor sync target changed independently during recovery: "
                 + entry.relativePath());
           }
-          replaceDurably(target, original);
+          restoreDurably(target, backupFile, entry.originalHash());
         } else {
           if (entry.operation() != Operation.WRITE) {
             throw new IOException("delete mutation has no original file: " + entry.relativePath());
           }
           validateTarget(target);
           if (Files.exists(target, LinkOption.NOFOLLOW_LINKS)) {
-            String targetHash = DocumentHashes.sha256(readRegularFile(target));
+            String targetHash = hashRegularFile(target);
             if (!targetHash.equals(entry.stagedHash())) {
               throw new IOException("new editor sync target changed independently during recovery: "
                   + entry.relativePath());
@@ -354,14 +413,235 @@ public final class GlossProjectTransaction {
   }
 
   private void pruneBackups() throws IOException {
-    List<Path> backups = childDirectories(backupsDirectory);
-    if (backups.size() <= MAX_BACKUPS) {
+    RetentionSettings settings = retentionSettings;
+    if (settings == null) {
       return;
     }
-    for (Path backup : backups.subList(0, backups.size() - MAX_BACKUPS)) {
-      deleteTree(backup);
-      forceDirectory(backupsDirectory);
+    try {
+      pruneBackups(settings);
+    } catch (IOException | ArithmeticException failure) {
+      RetentionStatus previous = retentionStatus;
+      retentionStatus = new RetentionStatus(previous.retainedBackups(), previous.retainedBytes(),
+          previous.protectedBackups(), previous.protectedBytes(), previous.overBudget(),
+          previous.recoveryBlocked(), false);
+      if (failure instanceof IOException io) {
+        throw io;
+      }
+      throw new IOException("transaction retention byte accounting overflowed", failure);
+    } finally {
+      completedRetention = settings;
     }
+  }
+
+  private void pruneBackups(RetentionSettings settings) throws IOException {
+    RetentionPolicy policy = settings.policy();
+    if (!Files.exists(backupsDirectory, LinkOption.NOFOLLOW_LINKS)) {
+      retentionStatus = new RetentionStatus(0, 0, 0, 0, false, false, true);
+      return;
+    }
+    requireDirectory(backupsDirectory);
+    ScanBudget budget = new ScanBudget();
+    List<RetainedArchive> archives = new ArrayList<>();
+    try (DirectoryStream<Path> children = Files.newDirectoryStream(backupsDirectory)) {
+      for (Path child : children) {
+        budget.visit();
+        archives.add(inspectArchive(child, budget));
+      }
+    }
+    archives.sort(Comparator.comparing(RetainedArchive::completedAt)
+        .thenComparing(archive -> archive.path().getFileName().toString()));
+    boolean recoveryBlocked = !uncertainCommits.isEmpty() || unresolvedTransactions();
+    long bytes = 0;
+    for (RetainedArchive archive : archives) {
+      bytes = Math.addExact(bytes, archive.bytes());
+    }
+    boolean pruningRequired = archives.size() > policy.maxBackups() || bytes > policy.maxBytes();
+    RetainedArchive newest = null;
+    if (!recoveryBlocked) {
+      newest = newestArchive(archives, true, pruningRequired);
+      if (newest == null) {
+        newest = newestArchive(archives, false, pruningRequired);
+      }
+    }
+    long protectedBytes = 0;
+    int protectedCount = 0;
+    for (RetainedArchive archive : archives) {
+      if (recoveryBlocked || !archive.terminal() || archive == newest) {
+        protectedCount++;
+        protectedBytes = Math.addExact(protectedBytes, archive.bytes());
+      }
+    }
+    int count = archives.size();
+    retentionStatus = retentionStatus(policy, count, bytes, protectedCount, protectedBytes, recoveryBlocked, true);
+    if (recoveryBlocked) {
+      return;
+    }
+    for (RetainedArchive archive : archives) {
+      if (retentionSettings != settings || count <= policy.maxBackups() && bytes <= policy.maxBytes()) {
+        break;
+      }
+      if (!archive.terminal() || archive == newest) {
+        continue;
+      }
+      try {
+        deleteRetainedArchive(archive);
+        count--;
+        bytes -= archive.bytes();
+        forceDirectory(backupsDirectory);
+      } catch (IOException failure) {
+        retentionStatus = retentionStatus(policy, count, bytes, protectedCount, protectedBytes, false, false);
+        throw failure;
+      }
+      retentionStatus = retentionStatus(policy, count, bytes, protectedCount, protectedBytes, false, true);
+    }
+  }
+
+  private RetainedArchive newestArchive(List<RetainedArchive> archives, boolean committedOriginals,
+                                        boolean verifyContents) {
+    for (int index = archives.size() - 1; index >= 0; index--) {
+      RetainedArchive archive = archives.get(index);
+      if (!archive.terminal() || committedOriginals && !archive.committedOriginals()) {
+        continue;
+      }
+      try {
+        if (verifyContents) {
+          verifyArchiveOriginals(archive);
+        }
+        return archive;
+      } catch (IOException failure) {
+        archives.set(index, new RetainedArchive(archive.path(), archive.bytes(), false,
+            archive.committedOriginals(), archive.fileKey(), archive.completedAt(), archive.journal()));
+        Gloss.logExceptionStack(false, failure, "Transaction retention preserved a damaged rollback archive: %s", archive.path());
+      }
+    }
+    return null;
+  }
+
+  private void verifyArchiveOriginals(RetainedArchive archive) throws IOException {
+    for (Entry entry : archive.journal().entries()) {
+      if (!entry.existed()) {
+        continue;
+      }
+      Path original = archive.path().resolve("backup").resolve(entry.relativePath()).normalize();
+      requireChild(archive.path(), original);
+      Path parent = archive.path();
+      requireDirectory(parent);
+      for (Path segment : archive.path().relativize(original.getParent())) {
+        parent = parent.resolve(segment);
+        requireDirectory(parent);
+      }
+      if (!hashRegularFile(original).equals(entry.originalHash())) {
+        throw new IOException("transaction archive original hash mismatch: " + original);
+      }
+    }
+  }
+
+  private RetainedArchive inspectArchive(Path path, ScanBudget budget) throws IOException {
+    BasicFileAttributes attributes = Files.readAttributes(path, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
+    ArchiveInventory inventory = new ArchiveInventory(budget);
+    if (attributes.isDirectory()) {
+      Files.walkFileTree(path, Set.of(), MAX_RETENTION_DEPTH, inventory);
+    } else {
+      inventory.visitFile(path, attributes);
+      inventory.safe = false;
+    }
+    boolean terminal = false;
+    boolean committedOriginals = false;
+    Journal verifiedJournal = null;
+    FileTime completedAt = attributes.lastModifiedTime();
+    if (inventory.safe && TRANSACTION_DIRECTORY.matcher(path.getFileName().toString()).matches()) {
+      try {
+        Journal journal = readJournal(backupsDirectory, path);
+        verifiedJournal = journal;
+        completedAt = Files.getLastModifiedTime(path.resolve("journal.json"), LinkOption.NOFOLLOW_LINKS);
+        terminal = journal.state().equals("committed") || journal.state().equals("rolledback");
+        for (Entry entry : journal.entries()) {
+          if (entry.existed()) {
+            terminal &= Files.isRegularFile(path.resolve("backup").resolve(entry.relativePath()), LinkOption.NOFOLLOW_LINKS);
+            committedOriginals |= journal.state().equals("committed");
+          }
+        }
+      } catch (IOException | RuntimeException invalid) {
+        Gloss.logExceptionStack(false, invalid, "Transaction retention preserved an unreadable archive: %s", path);
+      }
+    }
+    return new RetainedArchive(path, inventory.bytes, terminal, committedOriginals, attributes.fileKey(),
+        completedAt, verifiedJournal);
+  }
+
+  private boolean unresolvedTransactions() throws IOException {
+    if (!Files.exists(transactionsDirectory, LinkOption.NOFOLLOW_LINKS)) {
+      return false;
+    }
+    requireDirectory(transactionsDirectory);
+    try (DirectoryStream<Path> transactions = Files.newDirectoryStream(transactionsDirectory)) {
+      return transactions.iterator().hasNext();
+    }
+  }
+
+  private void deleteRetainedArchive(RetainedArchive archive) throws IOException {
+    try (DirectoryStream<Path> directory = Files.newDirectoryStream(backupsDirectory)) {
+      if (!(directory instanceof SecureDirectoryStream<Path> secure)) {
+        throw new IOException("transaction retention requires secure directory deletion support");
+      }
+      Path name = archive.path().getFileName();
+      BasicFileAttributes current = secure.getFileAttributeView(name, BasicFileAttributeView.class,
+          LinkOption.NOFOLLOW_LINKS).readAttributes();
+      if (!current.isDirectory() || archive.fileKey() == null || !archive.fileKey().equals(current.fileKey())) {
+        throw new IOException("transaction archive changed during retention: " + archive.path());
+      }
+      if (!Objects.equals(archive.journal(), readJournal(backupsDirectory, archive.path()))) {
+        throw new IOException("transaction archive journal changed during retention: " + archive.path());
+      }
+      try (SecureDirectoryStream<Path> child = secure.newDirectoryStream(name, LinkOption.NOFOLLOW_LINKS)) {
+        BasicFileAttributes opened = child.getFileAttributeView(BasicFileAttributeView.class).readAttributes();
+        if (!archive.fileKey().equals(opened.fileKey())) {
+          throw new IOException("transaction archive changed while opening retention directory: " + archive.path());
+        }
+        deleteRetainedContents(child, new ScanBudget(), 0);
+      }
+      BasicFileAttributes remaining = secure.getFileAttributeView(name, BasicFileAttributeView.class,
+          LinkOption.NOFOLLOW_LINKS).readAttributes();
+      if (!archive.fileKey().equals(remaining.fileKey())) {
+        throw new IOException("transaction archive changed before retention directory removal: " + archive.path());
+      }
+      secure.deleteDirectory(name);
+    }
+  }
+
+  private void deleteRetainedContents(SecureDirectoryStream<Path> directory, ScanBudget budget, int depth)
+      throws IOException {
+    if (depth >= MAX_RETENTION_DEPTH) {
+      throw new IOException("transaction retention exceeds directory depth limit");
+    }
+    List<Path> files = new ArrayList<>();
+    for (Path child : directory) {
+      budget.visit();
+      files.add(child.getFileName());
+    }
+    files.sort(Comparator.comparing(path -> path.toString().equals("journal.json")));
+    for (Path name : files) {
+      BasicFileAttributes attributes = directory.getFileAttributeView(name, BasicFileAttributeView.class,
+          LinkOption.NOFOLLOW_LINKS).readAttributes();
+      if (attributes.isSymbolicLink() || !attributes.isDirectory() && !attributes.isRegularFile()) {
+        throw new IOException("transaction archive contains an unsafe entry: " + name);
+      }
+      if (attributes.isDirectory()) {
+        try (SecureDirectoryStream<Path> child = directory.newDirectoryStream(name, LinkOption.NOFOLLOW_LINKS)) {
+          deleteRetainedContents(child, budget, depth + 1);
+        }
+        directory.deleteDirectory(name);
+      } else {
+        directory.deleteFile(name);
+      }
+    }
+  }
+
+  private static RetentionStatus retentionStatus(RetentionPolicy policy, int count, long bytes,
+                                                 int protectedCount, long protectedBytes,
+                                                 boolean recoveryBlocked, boolean complete) {
+    return new RetentionStatus(count, bytes, protectedCount, protectedBytes,
+        count > policy.maxBackups() || bytes > policy.maxBytes(), recoveryBlocked, complete);
   }
 
   private void cleanupUnjournaled(Path transaction) throws IOException {
@@ -427,7 +707,13 @@ public final class GlossProjectTransaction {
     requireChild(root, transaction);
     Path journalPath = transaction.resolve("journal.json").normalize();
     requireChild(transaction, journalPath);
-    byte[] journalBytes = readRegularFile(journalPath);
+    byte[] journalBytes;
+    try (FileChannel channel = openRegularFile(journalPath)) {
+      if (channel.size() > MAX_JOURNAL_BYTES) {
+        throw new IOException("editor sync transaction journal exceeds the size limit");
+      }
+      journalBytes = Channels.newInputStream(channel).readNBytes((int) MAX_JOURNAL_BYTES + 1);
+    }
     if (journalBytes.length > MAX_JOURNAL_BYTES) {
       throw new IOException("editor sync transaction journal exceeds the size limit");
     }
@@ -492,6 +778,10 @@ public final class GlossProjectTransaction {
   }
 
   private void writeJournal(Path transaction, Journal journal) throws IOException {
+    replaceDurably(transaction.resolve("journal.json"), journalBytes(journal));
+  }
+
+  private byte[] journalBytes(Journal journal) throws IOException {
     JsonObject object = new JsonObject();
     object.addProperty("version", journal.version());
     object.addProperty("id", journal.id());
@@ -515,8 +805,11 @@ public final class GlossProjectTransaction {
       entries.add(value);
     }
     object.add("entries", entries);
-    replaceDurably(transaction.resolve("journal.json"),
-        (GSON.toJson(object) + System.lineSeparator()).getBytes(StandardCharsets.UTF_8));
+    byte[] content = (GSON.toJson(object) + System.lineSeparator()).getBytes(StandardCharsets.UTF_8);
+    if (content.length > MAX_JOURNAL_BYTES) {
+      throw new IOException("editor sync transaction journal exceeds the size limit");
+    }
+    return content;
   }
 
   private void ensureRootDirectories() throws IOException {
@@ -611,6 +904,9 @@ public final class GlossProjectTransaction {
     String normalized = relativePath(relative);
     String collection = relative.getName(0).toString();
     if (relative.getNameCount() == 1) {
+      if (Set.of("gloss.toml", "legacy-import.json", "holoui-import.json", "preview-scales.json").contains(collection)) {
+        return true;
+      }
       EditorSyncDocumentKind single = EditorSyncDocumentKind.byStorageCollection(collection);
       return single != null && single.layout() == EditorSyncDocumentKind.Layout.SINGLE;
     }
@@ -630,17 +926,130 @@ public final class GlossProjectTransaction {
     return relative.getNameCount() == 2;
   }
 
-  private byte[] readRegularFile(Path file) throws IOException {
+  private FileChannel openRegularFile(Path file) throws IOException {
     if (Files.isSymbolicLink(file) || !Files.isRegularFile(file, LinkOption.NOFOLLOW_LINKS)) {
       throw new IOException("expected a regular non-symbolic file: " + file);
     }
-    return Files.readAllBytes(file);
+    return FileChannel.open(file, StandardOpenOption.READ, LinkOption.NOFOLLOW_LINKS);
   }
 
-  private void writeNewFile(Path target, byte[] content) throws IOException {
+  private boolean matchesExpected(Path file, byte[] expected, TransactionPreparation preparation) throws IOException {
+    try (FileChannel channel = openRegularFile(file)) {
+      if (channel.size() != expected.length) {
+        return false;
+      }
+      InputStream input = Channels.newInputStream(channel);
+      byte[] buffer = new byte[8192];
+      int offset = 0;
+      while (offset < expected.length) {
+        preparation.check();
+        int count = input.read(buffer, 0, Math.min(buffer.length, expected.length - offset));
+        if (count < 0 || !Arrays.equals(expected, offset, offset + count, buffer, 0, count)) {
+          return false;
+        }
+        offset += count;
+      }
+      return input.read() == -1;
+    }
+  }
+
+  private String hashRegularFile(Path file) throws IOException {
+    return transferRegularFile(file, null);
+  }
+
+  private String copyRegularFile(Path source, Path target) throws IOException {
+    return copyRegularFile(source, target, null);
+  }
+
+  private String copyRegularFile(Path source, Path target, TransactionPreparation preparation) throws IOException {
+    String hash;
+    try (FileChannel output = FileChannel.open(target, StandardOpenOption.CREATE_NEW,
+        StandardOpenOption.WRITE, LinkOption.NOFOLLOW_LINKS)) {
+      hash = transferRegularFile(source, output, preparation);
+      output.force(true);
+    }
+    forceDirectory(target.getParent());
+    return hash;
+  }
+
+  private String transferRegularFile(Path source, FileChannel output) throws IOException {
+    return transferRegularFile(source, output, null);
+  }
+
+  private String transferRegularFile(Path source, FileChannel output, TransactionPreparation preparation) throws IOException {
+    MessageDigest digest;
+    try {
+      digest = MessageDigest.getInstance("SHA-256");
+    } catch (NoSuchAlgorithmException failure) {
+      throw new IllegalStateException("SHA-256 unavailable", failure);
+    }
+    try (FileChannel input = openRegularFile(source)) {
+      long remaining = input.size();
+      if (preparation != null) {
+        preparation.reserve(remaining);
+      }
+      ByteBuffer buffer = ByteBuffer.allocate(8192);
+      while (remaining > 0) {
+        if (preparation != null) {
+          preparation.check();
+        }
+        buffer.clear().limit((int) Math.min(buffer.capacity(), remaining));
+        int count = input.read(buffer);
+        if (count < 0) {
+          throw new IOException("transaction file changed while reading: " + source);
+        }
+        remaining -= count;
+        digest.update(buffer.array(), 0, count);
+        if (output != null) {
+          buffer.flip();
+          while (buffer.hasRemaining()) {
+            output.write(buffer);
+          }
+        }
+      }
+      buffer.clear().limit(1);
+      if (input.read(buffer) != -1) {
+        throw new IOException("transaction file changed while reading: " + source);
+      }
+    }
+    return HexFormat.of().formatHex(digest.digest());
+  }
+
+  private void restoreDurably(Path target, Path backup, String expectedHash) throws IOException {
+    Path parent = target.getParent();
+    if (parent == null) {
+      throw new IOException("replacement target has no parent directory");
+    }
+    safePrepareParent(dataDirectory, target);
+    Path temporary = parent.resolve(".gloss-sync-" + UUID.randomUUID() + ".tmp");
+    boolean moved = false;
+    try {
+      if (!copyRegularFile(backup, temporary).equals(expectedHash)) {
+        throw new IOException("editor sync backup hash mismatch: " + backup);
+      }
+      Files.move(temporary, target, StandardCopyOption.ATOMIC_MOVE,
+          StandardCopyOption.REPLACE_EXISTING);
+      moved = true;
+      forceDirectoryAfterReplace(parent, target);
+    } finally {
+      if (!moved) {
+        Files.deleteIfExists(temporary);
+      }
+    }
+  }
+
+  private void writeNewFile(Path target, byte[] content, TransactionPreparation preparation) throws IOException {
     try (FileChannel channel = FileChannel.open(target, StandardOpenOption.CREATE_NEW,
         StandardOpenOption.WRITE)) {
-      write(channel, content);
+      ByteBuffer buffer = ByteBuffer.wrap(content);
+      while (buffer.hasRemaining()) {
+        preparation.check();
+        buffer.limit(Math.min(content.length, buffer.position() + Math.min(8192, buffer.remaining())));
+        channel.write(buffer);
+        buffer.limit(content.length);
+      }
+      preparation.check();
+      channel.force(true);
     }
     forceDirectory(target.getParent());
   }
@@ -764,19 +1173,6 @@ public final class GlossProjectTransaction {
     }
   }
 
-  private void deleteTree(Path root) throws IOException {
-    requireChild(backupsDirectory, root);
-    try (Stream<Path> paths = Files.walk(root)) {
-      List<Path> ordered = paths.sorted(Comparator.reverseOrder()).toList();
-      for (Path path : ordered) {
-        if (Files.isSymbolicLink(path)) {
-          throw new IOException("refusing to remove symbolic link from editor sync backup: " + path);
-        }
-        Files.delete(path);
-      }
-    }
-  }
-
   private static boolean validHash(String value) {
     return value != null && value.matches("[0-9a-f]{64}");
   }
@@ -788,6 +1184,66 @@ public final class GlossProjectTransaction {
   private static String safeLabel(String label) {
     String normalized = label == null ? "sync" : label.replaceAll("[^A-Za-z0-9_-]", "_");
     return normalized.isBlank() ? "sync" : normalized.substring(0, Math.min(normalized.length(), 64));
+  }
+
+  public record RetentionPolicy(int maxBackups, long maxBytes) {
+    public RetentionPolicy {
+      if (maxBackups < 1 || maxBytes < 1) {
+        throw new IllegalArgumentException("Transaction retention limits must be positive");
+      }
+    }
+  }
+
+  public record RetentionStatus(int retainedBackups, long retainedBytes, int protectedBackups,
+                                long protectedBytes, boolean overBudget, boolean recoveryBlocked,
+                                boolean inventoryComplete) {
+  }
+
+  private record RetentionSettings(RetentionPolicy policy) {
+  }
+
+  private record RetainedArchive(Path path, long bytes, boolean terminal, boolean committedOriginals,
+                                 Object fileKey, FileTime completedAt, Journal journal) {
+  }
+
+  private static final class ScanBudget {
+    private int visited;
+
+    private void visit() throws IOException {
+      if (++visited > MAX_RETENTION_ENTRIES || Thread.currentThread().isInterrupted()) {
+        throw new IOException("transaction retention inventory exceeded its entry limit or was interrupted");
+      }
+    }
+  }
+
+  private static final class ArchiveInventory extends SimpleFileVisitor<Path> {
+    private final ScanBudget budget;
+    private long bytes;
+    private boolean safe = true;
+
+    private ArchiveInventory(ScanBudget budget) {
+      this.budget = budget;
+    }
+
+    @Override
+    public FileVisitResult preVisitDirectory(Path directory, BasicFileAttributes attributes) throws IOException {
+      budget.visit();
+      return FileVisitResult.CONTINUE;
+    }
+
+    @Override
+    public FileVisitResult visitFile(Path file, BasicFileAttributes attributes) throws IOException {
+      budget.visit();
+      if (attributes.isDirectory()) {
+        throw new IOException("transaction retention inventory exceeded its directory depth limit");
+      }
+      if (attributes.isRegularFile()) {
+        bytes = Math.addExact(bytes, attributes.size());
+      } else {
+        safe = false;
+      }
+      return FileVisitResult.CONTINUE;
+    }
   }
 
   public record Pending(Path transactionDirectory, String id, List<Path> publishedFiles) {
@@ -818,6 +1274,10 @@ public final class GlossProjectTransaction {
     @Override
     public byte[] content() {
       return content == null ? null : content.clone();
+    }
+
+    public int contentLength() {
+      return content == null ? 0 : content.length;
     }
 
     public static Mutation write(byte[] content) {

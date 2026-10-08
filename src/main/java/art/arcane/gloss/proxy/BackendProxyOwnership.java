@@ -32,6 +32,7 @@ public final class BackendProxyOwnership implements Listener, PluginMessageListe
     private byte[] key;
     private volatile boolean enabled;
     private volatile int lastClaimedMask;
+    private volatile GlobalClaims globalClaims = new GlobalClaims(0L, 0L, 0L);
     private int task = -1;
     private int reportedMask;
 
@@ -66,7 +67,10 @@ public final class BackendProxyOwnership implements Listener, PluginMessageListe
         Bukkit.getMessenger().unregisterIncomingPluginChannel(plugin, OwnershipProtocol.CHANNEL, this);
         Bukkit.getMessenger().unregisterOutgoingPluginChannel(plugin, OwnershipProtocol.CHANNEL);
         pending.clear();
-        claims.clear();
+        synchronized (claims) {
+            claims.clear();
+            globalClaims = new GlobalClaims(0L, 0L, 0L);
+        }
         reportedMask = 0;
     }
 
@@ -97,6 +101,10 @@ public final class BackendProxyOwnership implements Listener, PluginMessageListe
         return owns(playerId, OwnershipProtocol.SURFACES);
     }
 
+    public boolean ownsServerLinks() {
+        return ownsAnywhere(OwnershipProtocol.SERVER_LINKS);
+    }
+
     public boolean ownsMotd() {
         return ownsAnywhere(OwnershipProtocol.MOTD);
     }
@@ -110,13 +118,31 @@ public final class BackendProxyOwnership implements Listener, PluginMessageListe
     }
 
     private boolean ownsAnywhere(int feature) {
-        long now = System.currentTimeMillis();
-        for (Claim claim : claims.values()) {
-            if (claim.expiresAtMillis() > now && (claim.mask() & feature) != 0) {
-                return true;
+        GlobalClaims current = globalClaims;
+        long expires = switch (feature) {
+            case OwnershipProtocol.MOTD -> current.motd();
+            case OwnershipProtocol.SERVER_LINKS -> current.links();
+            case OwnershipProtocol.CONNECTIONS -> current.connections();
+            default -> 0L;
+        };
+        return expires > System.currentTimeMillis();
+    }
+
+    private Claim replaceClaim(UUID playerId, Claim replacement) {
+        synchronized (claims) {
+            Claim previous = replacement == null ? claims.remove(playerId) : claims.put(playerId, replacement);
+            if (replacement != null && (previous == null || (previous.mask() & ~replacement.mask()) == 0
+                && replacement.expiresAtMillis() >= previous.expiresAtMillis())) {
+                globalClaims = globalClaims.include(replacement);
+                return previous;
             }
+            GlobalClaims rebuilt = new GlobalClaims(0L, 0L, 0L);
+            for (Claim claim : claims.values()) {
+                rebuilt = rebuilt.include(claim);
+            }
+            globalClaims = rebuilt;
+            return previous;
         }
-        return false;
     }
 
     @EventHandler
@@ -129,7 +155,7 @@ public final class BackendProxyOwnership implements Listener, PluginMessageListe
     public void onQuit(PlayerQuitEvent event) {
         UUID playerId = event.getPlayer().getUniqueId();
         pending.remove(playerId);
-        claims.remove(playerId);
+        replaceClaim(playerId, null);
     }
 
     @Override
@@ -188,6 +214,12 @@ public final class BackendProxyOwnership implements Listener, PluginMessageListe
             return;
         }
         int released = reportedMask & ~mask;
+        if ((reportedMask & OwnershipProtocol.SERVER_LINKS) != (mask & OwnershipProtocol.SERVER_LINKS)) {
+            MotdService motd = plugin.motd();
+            if (motd != null) {
+                motd.refreshProxyOwnership();
+            }
+        }
         reportedMask = mask;
         Gloss.info("Velocity Gloss ownership: backend features suspended: %s; returned to local configuration: %s.",
                 featureNames(mask), featureNames(released));
@@ -203,7 +235,10 @@ public final class BackendProxyOwnership implements Listener, PluginMessageListe
             names.add("scoreboards (proxy-owned players)");
         }
         if ((mask & OwnershipProtocol.MOTD) != 0) {
-            names.add("MOTD and server links");
+            names.add("MOTD");
+        }
+        if ((mask & OwnershipProtocol.SERVER_LINKS) != 0) {
+            names.add("server links");
         }
         if ((mask & OwnershipProtocol.SURFACES) != 0) {
             names.add("surfaces (proxy-owned players)");
@@ -237,7 +272,7 @@ public final class BackendProxyOwnership implements Listener, PluginMessageListe
         if (mask != 0) {
             lastClaimedMask = mask;
         }
-        Claim previous = mask == 0 ? claims.remove(playerId) : claims.put(playerId, new Claim(mask, expiresAtMillis));
+        Claim previous = replaceClaim(playerId, mask == 0 ? null : new Claim(mask, expiresAtMillis));
         int previousMask = previous == null ? 0 : previous.mask();
         if ((previousMask & OwnershipProtocol.TABLIST) != (mask & OwnershipProtocol.TABLIST)) {
             plugin.tablist().refreshProxyOwnership(player);
@@ -251,7 +286,7 @@ public final class BackendProxyOwnership implements Listener, PluginMessageListe
                 surfaces.refreshProxyOwnership(player);
             }
         }
-        if ((previousMask & OwnershipProtocol.MOTD) != (mask & OwnershipProtocol.MOTD)) {
+        if ((previousMask & OwnershipProtocol.SERVER_LINKS) != (mask & OwnershipProtocol.SERVER_LINKS)) {
             MotdService motd = plugin.motd();
             if (motd != null) {
                 motd.refreshProxyOwnership();
@@ -271,6 +306,15 @@ public final class BackendProxyOwnership implements Listener, PluginMessageListe
         }
         Optional<ProxyForwardingAccess> access = NativeAdapters.find(ProxyForwardingAccess.class);
         return access.isPresent() ? access.get().velocityKey() : null;
+    }
+
+    private record GlobalClaims(long motd, long links, long connections) {
+        private GlobalClaims include(Claim claim) {
+            return new GlobalClaims(
+                (claim.mask() & OwnershipProtocol.MOTD) == 0 ? motd : Math.max(motd, claim.expiresAtMillis()),
+                (claim.mask() & OwnershipProtocol.SERVER_LINKS) == 0 ? links : Math.max(links, claim.expiresAtMillis()),
+                (claim.mask() & OwnershipProtocol.CONNECTIONS) == 0 ? connections : Math.max(connections, claim.expiresAtMillis()));
+        }
     }
 
     private record Claim(int mask, long expiresAtMillis) {

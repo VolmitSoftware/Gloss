@@ -19,6 +19,8 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicLong;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -252,6 +254,79 @@ final class ProxySurfacesTest {
         service.close();
         verify(viewer, times(2)).showBossBar(shown.capture());
         verify(viewer).hideBossBar(shown.getValue());
+    }
+
+    @Test
+    void independentGroupsHonorFlagsAndConfiguredCap() throws IOException {
+        write("a.json", """
+            {"schemaVersion":1,"surface":"bossbar","group":"health","select":{"when":"true"},
+             "presentation":{"title":"Health","flags":["create_fog"]}}
+            """);
+        write("b.json", """
+            {"schemaVersion":1,"surface":"bossbar","group":"quests","select":{"when":"true"},
+             "presentation":{"title":"Quests","priority":"pinned"}}
+            """);
+        service.render(viewer, snapshot());
+        ArgumentCaptor<BossBar> bars = ArgumentCaptor.forClass(BossBar.class);
+        verify(viewer, times(2)).showBossBar(bars.capture());
+        assertEquals(Set.of(Set.of(), Set.of(BossBar.Flag.CREATE_WORLD_FOG)),
+            Set.of(bars.getAllValues().get(0).flags(), bars.getAllValues().get(1).flags()));
+        Files.writeString(directory.resolve("proxy.json"), """
+            {"schemaVersion":1,"surfaces":{"enabled":true,"maxBossBarsPerViewer":1}}
+            """);
+        service.render(viewer, snapshot());
+        verify(viewer).hideBossBar(bars.getAllValues().get(1));
+    }
+
+    @Test
+    void eventOnlyDeliveryWaitsForDelayExpiresAndRestoresPersistentFallback() throws IOException {
+        AtomicLong clock = new AtomicLong();
+        service.close();
+        service = new ProxySurfaces(new ProxyText(mock(ProxyServer.class)), mock(Logger.class), clock::get);
+        write("base.json", """
+            {"schemaVersion":1,"surface":"actionbar","select":{"when":"true"},"presentation":{"text":"Base"}}
+            """);
+        write("notice.json", """
+            {"schemaVersion":1,"surface":"actionbar","automatic":false,"select":{"when":"true"},
+             "on":[{"trigger":"join","delayTicks":2}],"presentation":{"text":"Notice","ttlTicks":3}}
+            """);
+        ProxyDocuments.Snapshot snapshot = snapshot();
+        service.render(viewer, snapshot);
+        service.event(viewer, snapshot, "join");
+        clock.set(2);
+        service.render(viewer, snapshot);
+        clock.set(4);
+        service.render(viewer, snapshot);
+        clock.set(5);
+        service.render(viewer, snapshot);
+        ArgumentCaptor<Component> sent = ArgumentCaptor.forClass(Component.class);
+        verify(viewer, times(5)).sendActionBar(sent.capture());
+        assertEquals(List.of(Component.text("Base"), Component.text("Base"), Component.text("Notice"),
+            Component.text("Notice"), Component.text("Base")), sent.getAllValues());
+    }
+
+    @Test
+    void intervalsUseExistingSweepAndRespectViewerConditions() throws IOException {
+        AtomicLong clock = new AtomicLong();
+        service.close();
+        service = new ProxySurfaces(new ProxyText(mock(ProxyServer.class)), mock(Logger.class), clock::get);
+        write("interval.json", """
+            {"schemaVersion":1,"surface":"title","automatic":false,"select":{"when":"true"},
+             "on":[{"trigger":"interval","everyTicks":20,"when":"viewer.ping < 100"}],
+             "presentation":{"title":"Scheduled","stayTicks":1,"fadeInTicks":0,"fadeOutTicks":0}}
+            """);
+        ProxyDocuments.Snapshot snapshot = snapshot();
+        service.render(viewer, snapshot);
+        clock.set(19);
+        service.render(viewer, snapshot);
+        verify(viewer, never()).showTitle(any(Title.class));
+        clock.set(20);
+        service.render(viewer, snapshot);
+        verify(viewer).showTitle(any(Title.class));
+        ping(500);
+        clock.set(40);
+        service.render(viewer, snapshot);
+        verify(viewer).showTitle(any(Title.class));
     }
 
     private ProxyDocuments.Snapshot snapshot() throws IOException {

@@ -1,6 +1,7 @@
 package art.arcane.gloss.indicator;
 
 import art.arcane.gloss.Gloss;
+import art.arcane.gloss.service.VisibilityGovernor;
 import art.arcane.gloss.bedrock.BedrockPolicy;
 import art.arcane.gloss.bedrock.BedrockSurface;
 import art.arcane.gloss.GlossConfig;
@@ -50,22 +51,21 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Supplier;
 
 public final class DamageIndicatorsService implements Listener, RegistryOwner {
-    private static final long SAMPLE_DELAY_TICKS = 2L;
     private static final int DRIVER_INTERVAL_TICKS = 2;
     private static final long BUDGET_WINDOW_MS = 1000L;
-    static final int MAX_LIVE_INDICATORS = 2048;
 
     private final Gloss plugin;
     private final ShippedDefaults defaults;
     private final DocumentRegistry<DamageIndicatorSettingsDoc> settings;
     private final Map<UUID, Long> debounce = new ConcurrentHashMap<>();
+    private final IndicatorSampleWindow samples = new IndicatorSampleWindow();
     private final SlidingWindowRateLimiter rateLimiter = new SlidingWindowRateLimiter();
     private final Map<String, LiveIndicator> live = new ConcurrentHashMap<>();
     private final IndicatorChunkIndex<LiveIndicator> index = new IndicatorChunkIndex<>();
     private final AtomicLong sequence = new AtomicLong();
     private final AtomicLong lifecycleEpoch = new AtomicLong();
     private final IndicatorBudget budget = new IndicatorBudget(BUDGET_WINDOW_MS);
-    private final AdmissionBudget admissions = new AdmissionBudget(MAX_LIVE_INDICATORS);
+    private final AdmissionBudget admissions = new AdmissionBudget(Integer.MAX_VALUE);
     private final BoundedConditionErrorCallback conditionErrors = BoundedConditionErrorCallback.bounded(
         32, error -> Gloss.logExceptionStackThrottled(false,
             "damage-indicator-condition-" + error.path(), error.cause(),
@@ -282,15 +282,29 @@ public final class DamageIndicatorsService implements Listener, RegistryOwner {
         if (!(entity instanceof LivingEntity living)) {
             return;
         }
-        DamageIndicatorEventSnapshot captured = admit(living.getUniqueId(),
-            snapshot.document().limits().maxPerSecond(), nowMs(), eventSnapshot);
-        if (captured == null) {
+        UUID entityId = living.getUniqueId();
+        DamageIndicatorSettingsDoc.Limits limits = snapshot.document().limits();
+        AdmissionBudget.Lease lease = samples.begin(entityId, limits.maxPendingSamples());
+        if (lease == null) {
             return;
         }
-
-        double before = living.getHealth();
-        FoliaScheduler.runEntity(plugin, living,
-            () -> compare(living, before, snapshot, captured), SAMPLE_DELAY_TICKS);
+        boolean scheduled = false;
+        try {
+            DamageIndicatorEventSnapshot captured = admit(entityId, limits.maxPerSecond(), nowMs(), eventSnapshot);
+            if (captured == null) {
+                return;
+            }
+            double before = living.getHealth();
+            scheduled = FoliaScheduler.runEntity(plugin, living, () -> {
+                if (samples.finish(entityId, lease)) {
+                    compare(living, before, snapshot, captured);
+                }
+            }, limits.aggregationTicks(), () -> samples.finish(entityId, lease));
+        } finally {
+            if (!scheduled) {
+                samples.finish(entityId, lease);
+            }
+        }
     }
 
     /** Builds the event snapshot only once the rate and debounce gates have admitted the event. */
@@ -353,7 +367,7 @@ public final class DamageIndicatorsService implements Listener, RegistryOwner {
         }
         DamageIndicatorSettingsDoc.Limits limits = snapshot.document().limits();
         AdmissionBudget.Lease admission = admissions.tryAcquire(
-            liveLimit(limits.maxPerSecond(), limits.lifetimeMs()));
+            liveLimit(limits.maxPerSecond(), limits.lifetimeMs(), plugin.cfg().indicators().maxActive()));
         if (admission == null) {
             return;
         }
@@ -375,6 +389,8 @@ public final class DamageIndicatorsService implements Listener, RegistryOwner {
             id = (damage ? "dmg-" : "heal-") + target.getUniqueId() + "-"
                 + M.ms() + "-" + sequence.incrementAndGet();
             hologram = plugin.holograms().createTemporary(id, initial, limits.lifetimeMs());
+        plugin.holograms().setVisibilitySurface(hologram, VisibilityGovernor.Surface.INDICATOR);
+            plugin.holograms().setRefresh(hologram, presentation.refresh());
             plugin.holograms().setViewDistance(hologram, limits.viewRange());
             hologram.setStyle(presentation.style());
             hologram.setBox(presentation.box());
@@ -435,6 +451,7 @@ public final class DamageIndicatorsService implements Listener, RegistryOwner {
     }
 
     private void destroyAll() {
+        samples.clear();
         int failures = 0;
         for (Map.Entry<String, LiveIndicator> entry : live.entrySet()) {
             LiveIndicator indicator = entry.getValue();
@@ -484,11 +501,15 @@ public final class DamageIndicatorsService implements Listener, RegistryOwner {
             && (first.getBlockZ() >> 4) == (second.getBlockZ() >> 4);
     }
 
-    static int liveLimit(int maxPerSecond, long maxMsAlive) {
+    static int liveLimit(int maxPerSecond, long maxMsAlive, int maximum) {
         long rate = Math.max(1L, maxPerSecond);
         long lifetime = Math.max(1L, maxMsAlive);
+        int limit = Math.max(1, maximum);
+        if (lifetime > (limit * 1000L) / rate) {
+            return limit;
+        }
         long expected = (rate * lifetime + 999L) / 1000L;
-        return (int) Math.min(MAX_LIVE_INDICATORS, Math.max(1L, expected));
+        return (int) Math.min(limit, Math.max(1L, expected));
     }
 
     static boolean spawnStillCurrent(boolean listening, long currentEpoch, long spawnEpoch, boolean enabled) {

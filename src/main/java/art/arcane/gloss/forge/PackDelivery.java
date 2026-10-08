@@ -14,27 +14,32 @@ import org.bukkit.event.player.PlayerResourcePackStatusEvent;
 
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Hands the built pack to players. The pack is always addressed by its own stable id, so a rebuild
- * replaces the previous download instead of stacking, and every send carries the sha1 the client
+ * Hands the built pack to players. Each content hash has its own request id, and a replacement removes
+ * the previous request before sending its successor, and every send carries the sha1 the client
  * verifies against: without it a client reuses whatever it cached under that URL.
  */
 public final class PackDelivery implements Listener {
-    public static final UUID PACK_ID = UUID.nameUUIDFromBytes("gloss:forge".getBytes(StandardCharsets.UTF_8));
     public static final String SHA1_PLACEHOLDER = "{sha1}";
     private static final long JOIN_DELAY_TICKS = 1L;
 
     private final Gloss plugin;
     private final PackNamespace namespace;
+    private final PackArtifactStore artifacts;
+    private final Map<UUID, Request> requested = new ConcurrentHashMap<>();
+    private final Map<UUID, Map<UUID, Request>> offers = new ConcurrentHashMap<>();
 
-    private volatile Settings settings = new Settings("", false, "0.0.0.0", 8085, "", false);
+    private volatile Settings settings = new Settings("", false, "0.0.0.0", 8085, "", false, 4, 32);
     private volatile PackArtifact artifact;
     private volatile PackListener listener;
+    private PackArtifactStore.Lease currentLease;
 
     /** The delivery half of {@code [forge]}: where the pack lives and how the client is asked for it. */
     public record Settings(String url, boolean serve, String serveBind, int servePort, String prompt,
-                           boolean required) {
+                           boolean required, int listenerThreads, int listenerBacklog) {
         public Settings {
             url = url == null ? "" : url.trim();
             serveBind = serveBind == null || serveBind.isBlank() ? "0.0.0.0" : serveBind.trim();
@@ -43,16 +48,26 @@ public final class PackDelivery implements Listener {
     }
 
     public PackDelivery(Gloss plugin, PackNamespace namespace) {
-        this.plugin = plugin;
-        this.namespace = namespace;
+        this(new Options(plugin, namespace, new PackArtifactStore()));
     }
 
-    public void enable(Settings next, PackArtifact current) {
+    public PackDelivery(Options options) {
+        Gloss plugin = options.plugin();
+        PackNamespace namespace = options.namespace();
+        this.plugin = plugin;
+        this.namespace = namespace;
+        this.artifacts = options.artifacts();
+    }
+
+    public record Options(Gloss plugin, PackNamespace namespace, PackArtifactStore artifacts) {
+    }
+
+    public synchronized void enable(Settings next, PackArtifact current) {
         settings = next;
-        artifact = current;
+        replaceCurrent(current);
         namespace.publish(current == null ? "" : current.sha1Hex());
         if (next.serve()) {
-            PackListener started = new PackListener(next.serveBind(), next.servePort());
+            PackListener started = new PackListener(new PackListener.Options(next.serveBind(), next.servePort(), next.listenerThreads(), next.listenerBacklog()), artifacts);
             if (started.start(current)) {
                 listener = started;
             }
@@ -62,19 +77,44 @@ public final class PackDelivery implements Listener {
         }
     }
 
-    public void disable() {
+    public synchronized void disable() {
         HandlerList.unregisterAll(this);
         PackListener current = listener;
         listener = null;
         if (current != null) {
             current.stop();
         }
-        artifact = null;
+        replaceCurrent(null);
+        for (Map<UUID, Request> pending : offers.values()) {
+            for (Request request : pending.values()) {
+                request.lease().close();
+            }
+        }
+        offers.clear();
+        requested.clear();
+    }
+
+    public synchronized void reconfigure(Settings next) {
+        boolean changed = settings.serve() != next.serve() || !settings.serveBind().equals(next.serveBind())
+            || settings.servePort() != next.servePort() || settings.listenerThreads() != next.listenerThreads()
+            || settings.listenerBacklog() != next.listenerBacklog();
+        settings = next;
+        if (!changed) {
+            return;
+        }
+        PackListener previous = listener;
+        listener = null;
+        if (previous != null) {
+            previous.stop();
+        }
+        if (next.serve()) {
+            serve(true);
+        }
     }
 
     /** A rebuild retires every viewer's status and re-offers the pack to everyone online. */
-    public void publish(PackArtifact current) {
-        artifact = current;
+    public synchronized void publish(PackArtifact current) {
+        replaceCurrent(current);
         namespace.publish(current == null ? "" : current.sha1Hex());
         PackListener running = listener;
         if (running != null) {
@@ -95,7 +135,7 @@ public final class PackDelivery implements Listener {
             return false;
         }
         if (on) {
-            PackListener started = new PackListener(settings.serveBind(), settings.servePort());
+            PackListener started = new PackListener(new PackListener.Options(settings.serveBind(), settings.servePort(), settings.listenerThreads(), settings.listenerBacklog()), artifacts);
             if (!started.start(artifact)) {
                 return false;
             }
@@ -114,7 +154,10 @@ public final class PackDelivery implements Listener {
 
     /** The URL sent to clients: the operator's, with {@code {sha1}} filled in, else the listener's. */
     public String url() {
-        PackArtifact current = artifact;
+        return url(artifact);
+    }
+
+    private String url(PackArtifact current) {
         if (current == null) {
             return "";
         }
@@ -123,20 +166,39 @@ public final class PackDelivery implements Listener {
             return configured.replace(SHA1_PLACEHOLDER, current.sha1Hex());
         }
         PackListener running = listener;
-        return running == null ? "" : running.url();
+        return running == null ? "" : running.url(current);
     }
 
     /** @return true when the request was actually sent to this viewer */
-    public boolean send(Player viewer) {
+    public synchronized boolean send(Player viewer) {
         PackArtifact current = artifact;
-        String url = url();
+        String url = url(current);
         if (viewer == null || current == null || url.isEmpty()) {
             return false;
         }
         if (plugin != null && plugin.bedrock() != null && plugin.bedrock().isBedrock(viewer.getUniqueId())) {
             return false;
         }
-        viewer.setResourcePack(PACK_ID, url, current.sha1(), settings.prompt(), settings.required());
+        UUID playerId = viewer.getUniqueId();
+        Request request = new Request(id(current), current.sha1Hex(), artifacts.retain(current));
+        Request previous = requested.put(playerId, request);
+        Map<UUID, Request> pending = offers.computeIfAbsent(playerId, ignored -> new ConcurrentHashMap<>());
+        Request repeated = pending.put(request.id(), request);
+        if (repeated != null) {
+            repeated.lease().close();
+        }
+        namespace.forget(playerId);
+        try {
+            if (previous != null && !previous.id().equals(request.id())) {
+                viewer.removeResourcePack(previous.id());
+            }
+            viewer.setResourcePack(request.id(), url, current.sha1(), settings.prompt(), settings.required());
+        } catch (RuntimeException failure) {
+            requested.remove(playerId, request);
+            pending.remove(request.id(), request);
+            request.lease().close();
+            throw failure;
+        }
         return true;
     }
 
@@ -157,16 +219,66 @@ public final class PackDelivery implements Listener {
     }
 
     @EventHandler(priority = EventPriority.MONITOR)
-    public void onQuit(PlayerQuitEvent event) {
+    public synchronized void onQuit(PlayerQuitEvent event) {
         namespace.forget(event.getPlayer().getUniqueId());
+        requested.remove(event.getPlayer().getUniqueId());
+        Map<UUID, Request> pending = offers.remove(event.getPlayer().getUniqueId());
+        if (pending != null) {
+            for (Request request : pending.values()) {
+                request.lease().close();
+            }
+        }
     }
 
     @EventHandler(priority = EventPriority.MONITOR)
-    public void onStatus(PlayerResourcePackStatusEvent event) {
-        if (!PACK_ID.equals(event.getID())) {
+    public synchronized void onStatus(PlayerResourcePackStatusEvent event) {
+        UUID playerId = event.getPlayer().getUniqueId();
+        String status = event.getStatus().name();
+        Map<UUID, Request> pending = offers.get(playerId);
+        if (pending != null && !status.equals("ACCEPTED") && !status.equals("DOWNLOADED")) {
+            Request completed = pending.remove(event.getID());
+            if (completed != null) {
+                completed.lease().close();
+            }
+            if (pending.isEmpty()) {
+                offers.remove(playerId, pending);
+            }
+        }
+        Request request = requested.get(playerId);
+        PackArtifact current = artifact;
+        if (request == null || !request.id().equals(event.getID())) {
             return;
         }
-        namespace.record(event.getPlayer().getUniqueId(), event.getStatus().name());
+        if (current == null || !request.sha1().equals(current.sha1Hex())) {
+            return;
+        }
+        namespace.record(playerId, event.getStatus().name(), request.sha1());
+        if (plugin != null) {
+            FoliaScheduler.runGlobal(plugin, () -> {
+                if (plugin.getSessionManager() != null) {
+                    plugin.getSessionManager().refreshVisuals();
+                }
+                if (plugin.getPanelRuntime() != null) {
+                    plugin.getPanelRuntime().refreshVisuals();
+                }
+            });
+        }
+    }
+
+    static UUID id(PackArtifact artifact) {
+        return UUID.nameUUIDFromBytes(("gloss:forge:" + artifact.sha1Hex()).getBytes(StandardCharsets.UTF_8));
+    }
+
+    private record Request(UUID id, String sha1, PackArtifactStore.Lease lease) {
+    }
+
+    private void replaceCurrent(PackArtifact current) {
+        PackArtifactStore.Lease previous = currentLease;
+        currentLease = artifacts.retain(current);
+        artifact = current;
+        if (previous != null) {
+            previous.close();
+        }
     }
 
     private void sendLater(Player viewer) {

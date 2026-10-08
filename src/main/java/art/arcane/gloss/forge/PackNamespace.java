@@ -79,11 +79,11 @@ public final class PackNamespace implements ExprVariableNamespace {
         return sha1;
     }
 
-    public void record(UUID playerId, String status) {
+    public void record(UUID playerId, String status, String offeredHash) {
         if (playerId == null || status == null) {
             return;
         }
-        statuses.put(playerId, new Status(status.toLowerCase(Locale.ROOT), sha1));
+        statuses.put(playerId, new Status(status.toLowerCase(Locale.ROOT), offeredHash));
     }
 
     public void forget(UUID playerId) {

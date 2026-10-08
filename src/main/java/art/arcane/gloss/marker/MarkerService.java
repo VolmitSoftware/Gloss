@@ -12,7 +12,6 @@ import art.arcane.gloss.doc.GlossDocument;
 import art.arcane.gloss.expr.ExprScope;
 import art.arcane.gloss.expr.ExprVariableNamespaces;
 import art.arcane.gloss.service.GlossService;
-import art.arcane.gloss.service.ViewerLeases;
 import art.arcane.gloss.service.VisibilityGovernor;
 import art.arcane.gloss.state.PlayerSections;
 import art.arcane.gloss.waypoint.WaypointService;
@@ -20,7 +19,6 @@ import art.arcane.volmlib.util.scheduling.FoliaScheduler;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.World;
-import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.HandlerList;
@@ -53,7 +51,6 @@ public final class MarkerService implements GlossService, Listener {
     private final ConcurrentMap<UUID, MarkerLifetimes> lifetimes = new ConcurrentHashMap<>();
     private volatile long lifetimeTick;
     private final ConcurrentMap<UUID, MarkerRenderer> renderers = new ConcurrentHashMap<>();
-    private final ViewerLeases leases = new ViewerLeases(VisibilityGovernor.Surface.MARKER);
     private volatile List<MarkerRuntime> documents = List.of();
     private boolean namespaceRegistered;
     private int driverTaskId = -1;
@@ -203,7 +200,6 @@ public final class MarkerService implements GlossService, Listener {
             if (bedrock != null) {
                 bedrock.destroyAll();
             }
-            leases.release(viewer.getUniqueId());
             return;
         }
         if (selected.isEmpty()) {
@@ -211,10 +207,6 @@ public final class MarkerService implements GlossService, Listener {
             if (idle != null) {
                 idle.destroyAll();
             }
-            leases.release(viewer.getUniqueId());
-            return;
-        }
-        if (!admit(viewer, selected.size())) {
             return;
         }
         MarkerRenderer renderer = renderers.computeIfAbsent(viewer.getUniqueId(),
@@ -253,7 +245,8 @@ public final class MarkerService implements GlossService, Listener {
     /** A trail is the viewer's own particle line to the marker, re-walked only when they move. */
     private void renderTrail(Player viewer, MarkerCandidate candidate, Location eye, Location anchor) {
         MarkerSpec.Trail trail = candidate.spec().trail();
-        if (!trail.enabled()) {
+        if (!trail.enabled() || plugin.governor().tier(viewer, VisibilityGovernor.Surface.MARKER,
+            candidate.distance() * candidate.distance()) != VisibilityGovernor.Tier.FULL) {
             return;
         }
         BeamService beams = plugin.service(BeamService.class);
@@ -329,20 +322,7 @@ public final class MarkerService implements GlossService, Listener {
     }
 
     private Location resolve(MarkerAnchor anchor, World world) {
-        if (anchor.isPosition()) {
-            World anchored = Bukkit.getWorld(anchor.world());
-            return anchored == null ? null : new Location(anchored, anchor.x(), anchor.y(), anchor.z());
-        }
-        if (anchor.followsEntity()) {
-            Entity entity = Bukkit.getEntity(anchor.entity());
-            return entity == null || !entity.isValid() ? null : entity.getLocation();
-        }
-        Player target = Bukkit.getPlayerExact(anchor.player());
-        return target == null || !target.isOnline() ? null : target.getLocation();
-    }
-
-    private boolean admit(Player viewer, int entities) {
-        return leases.admit(plugin.governor(), viewer, entities, () -> forget(viewer.getUniqueId()));
+        return plugin.anchorSnapshots().position(anchor, world);
     }
 
     private void forget(UUID viewerId) {
@@ -350,7 +330,6 @@ public final class MarkerService implements GlossService, Listener {
         if (renderer != null) {
             renderer.destroyAll();
         }
-        leases.release(viewerId);
         BeamService beams = plugin.service(BeamService.class);
         if (beams != null) {
             beams.forget(viewerId);

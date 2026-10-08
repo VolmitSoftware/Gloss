@@ -1,6 +1,7 @@
 package art.arcane.gloss.editor.sync;
 
 import art.arcane.gloss.doc.DocumentEnvelope;
+import art.arcane.gloss.doc.DocumentPresetCatalog;
 import art.arcane.gloss.panel.PanelDefinition;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
@@ -46,7 +47,8 @@ final class EditorSyncContentSnapshotBuilder {
                          ServerSections serverSections) {
     requireSubject(kind, subjectId);
     List<String> skipped = new ArrayList<>();
-    Map<DocumentKey, EditorSyncDocuments.Entry> allDocuments = readScopedDocuments(kind, skipped);
+    DocumentPresetCatalog presets = readPresets();
+    Map<DocumentKey, EditorSyncDocuments.Entry> allDocuments = readScopedDocuments(kind, skipped, presets);
     List<EditorSyncDocuments.Entry> documents = switch (kind) {
       case WORKSPACE -> sorted(allDocuments.values());
       case MENU -> menuDocuments(allDocuments, subjectId);
@@ -56,7 +58,10 @@ final class EditorSyncContentSnapshotBuilder {
     Map<String, byte[]> images = kind == EditorSyncKind.WORKSPACE
         ? readAllImages(maximumBytes)
         : readReferencedImages(documents, maximumBytes);
-    JsonObject constraints = constraints(kind, subjectId, documents);
+    JsonObject constraints = constraints(kind, subjectId, documents, presets);
+    if (kind != EditorSyncKind.WORKSPACE && kind != EditorSyncKind.PRESETS && !presets.kinds().isEmpty()) {
+      constraints.add("presets", presets.document());
+    }
     List<String> warnings = new ArrayList<>(skipped);
     warnings.addAll(warnings(documents));
     warnings.addAll(serverSections.warnings(documents));
@@ -71,7 +76,7 @@ final class EditorSyncContentSnapshotBuilder {
     }
     EditorSyncDocumentKind documentKind = EditorSyncDocumentKind.forSubject(kind);
     List<String> ids = new ArrayList<>();
-    for (EditorSyncDocuments.Entry entry : readKind(documentKind, new ArrayList<>())) {
+    for (EditorSyncDocuments.Entry entry : readKind(documentKind, new ArrayList<>(), readPresets())) {
       ids.add(entry.id());
     }
     ids.sort(String::compareTo);
@@ -155,10 +160,10 @@ final class EditorSyncContentSnapshotBuilder {
     return EditorSyncProject.validated(project, maximumBytes);
   }
 
-  private Map<DocumentKey, EditorSyncDocuments.Entry> readDocuments(List<String> skipped) {
+  private Map<DocumentKey, EditorSyncDocuments.Entry> readDocuments(List<String> skipped, DocumentPresetCatalog presets) {
     Map<DocumentKey, EditorSyncDocuments.Entry> documents = new LinkedHashMap<>();
     for (EditorSyncDocumentKind kind : EditorSyncDocumentKind.ORDERED) {
-      for (EditorSyncDocuments.Entry entry : readKind(kind, skipped)) {
+      for (EditorSyncDocuments.Entry entry : readKind(kind, skipped, presets)) {
         DocumentKey key = new DocumentKey(kind, entry.id());
         if (documents.putIfAbsent(key, entry) != null) {
           throw new IllegalStateException("duplicate sync document: " + entry.kind() + " " + entry.id());
@@ -173,16 +178,16 @@ final class EditorSyncContentSnapshotBuilder {
   }
 
   private Map<DocumentKey, EditorSyncDocuments.Entry> readScopedDocuments(EditorSyncKind kind,
-                                                                          List<String> skipped) {
+                                                                          List<String> skipped, DocumentPresetCatalog presets) {
     if (kind == EditorSyncKind.WORKSPACE) {
-      return readDocuments(skipped);
+      return readDocuments(skipped, presets);
     }
     List<EditorSyncDocumentKind> kinds = kind == EditorSyncKind.PANEL
         ? List.of(EditorSyncDocumentKind.MENU, EditorSyncDocumentKind.PANEL)
         : List.of(EditorSyncDocumentKind.forSubject(kind));
     Map<DocumentKey, EditorSyncDocuments.Entry> documents = new LinkedHashMap<>();
     for (EditorSyncDocumentKind documentKind : kinds) {
-      for (EditorSyncDocuments.Entry entry : readKind(documentKind, skipped)) {
+      for (EditorSyncDocuments.Entry entry : readKind(documentKind, skipped, presets)) {
         documents.put(new DocumentKey(documentKind, entry.id()), entry);
       }
     }
@@ -190,14 +195,14 @@ final class EditorSyncContentSnapshotBuilder {
   }
 
   private List<EditorSyncDocuments.Entry> readKind(EditorSyncDocumentKind kind,
-                                                   List<String> skipped) {
+                                                   List<String> skipped, DocumentPresetCatalog presets) {
     Path target = dataDirectory.resolve(kind.storageName()).normalize();
     if (kind.layout() == EditorSyncDocumentKind.Layout.SINGLE) {
       if (!Files.exists(target, LinkOption.NOFOLLOW_LINKS)) {
         return List.of();
       }
       String id = kind.singletonId();
-      return readSupportedDocument(kind, id, target, skipped).map(List::of).orElseGet(List::of);
+      return readSupportedDocument(kind, id, target, skipped, presets).map(List::of).orElseGet(List::of);
     }
     if (!Files.exists(target, LinkOption.NOFOLLOW_LINKS)) {
       return List.of();
@@ -232,16 +237,16 @@ final class EditorSyncContentSnapshotBuilder {
       String relative = target.relativize(file).toString()
           .replace(java.io.File.separatorChar, '/');
       String id = relative.substring(0, relative.length() - ".json".length());
-      readSupportedDocument(kind, id, file, skipped).ifPresent(documents::add);
+      readSupportedDocument(kind, id, file, skipped, presets).ifPresent(documents::add);
     }
     documents.sort(Comparator.comparing(EditorSyncDocuments.Entry::id));
     return List.copyOf(documents);
   }
 
   private Optional<EditorSyncDocuments.Entry> readSupportedDocument(
-      EditorSyncDocumentKind kind, String id, Path file, List<String> skipped) {
+      EditorSyncDocumentKind kind, String id, Path file, List<String> skipped, DocumentPresetCatalog presets) {
     try {
-      return Optional.of(readDocument(kind, id, file));
+      return Optional.of(readDocument(kind, id, file, presets));
     } catch (RuntimeException failure) {
       if (DocumentEnvelope.isUnsupportedSchemaVersion(failure)) {
         skipped.add(SCHEMA_SKIPPED_CODE + "|" + kind.wireName() + "|" + id
@@ -252,7 +257,8 @@ final class EditorSyncContentSnapshotBuilder {
     }
   }
 
-  private EditorSyncDocuments.Entry readDocument(EditorSyncDocumentKind kind, String id, Path file) {
+  private EditorSyncDocuments.Entry readDocument(EditorSyncDocumentKind kind, String id, Path file,
+                                                 DocumentPresetCatalog presets) {
     if (Files.isSymbolicLink(file) || !Files.isRegularFile(file, LinkOption.NOFOLLOW_LINKS)) {
       throw new IllegalStateException("sync document is not a regular non-symbolic file: " + file);
     }
@@ -263,8 +269,8 @@ final class EditorSyncContentSnapshotBuilder {
             + EditorSyncDocuments.MAX_DOCUMENT_BYTES + " bytes: " + kind.wireName() + " " + id);
       }
       String source = new String(bytes, StandardCharsets.UTF_8);
-      EditorSyncDocumentKind.ParsedDocument parsed = kind.parse(id, source);
-      String wireSource = kind.wireSource(id, source, parsed);
+      EditorSyncDocumentKind.ParsedDocument parsed = kind.parse(id, source, presets);
+      String wireSource = kind.wireSource(id, source, parsed, presets);
       return new EditorSyncDocuments.Entry(kind.wireName(), kind.canonicalId(id),
           parsed.revision(), wireSource, EditorSyncDocuments.contentRevision(wireSource));
     } catch (IOException failure) {
@@ -428,7 +434,7 @@ final class EditorSyncContentSnapshotBuilder {
   }
 
   private JsonObject constraints(EditorSyncKind kind, String subjectId,
-                                 List<EditorSyncDocuments.Entry> documents) {
+                                 List<EditorSyncDocuments.Entry> documents, DocumentPresetCatalog presets) {
     JsonObject constraints = new JsonObject();
     constraints.addProperty("subjectId", subjectId);
     JsonArray documentKinds = new JsonArray();
@@ -457,7 +463,7 @@ final class EditorSyncContentSnapshotBuilder {
           .findFirst()
           .orElseThrow();
       PanelDefinition definition = (PanelDefinition) EditorSyncDocumentKind.PANEL
-          .parse(panel.id(), panel.json()).value();
+          .parse(panel.id(), panel.json(), presets).value();
       String rootMenuId = definition.rootMenuId();
       int separator = rootMenuId.lastIndexOf('/');
       constraints.addProperty("newMenuPrefix", separator >= 0
@@ -468,6 +474,14 @@ final class EditorSyncContentSnapshotBuilder {
       constraints.addProperty("newImagePrefix", "sync/menus/" + subjectId + "/");
     }
     return constraints;
+  }
+
+  private DocumentPresetCatalog readPresets() {
+    try {
+      return DocumentPresetCatalog.read(dataDirectory);
+    } catch (IOException failure) {
+      throw new IllegalStateException("Cannot read preset catalog", failure);
+    }
   }
 
   private List<String> warnings(List<EditorSyncDocuments.Entry> documents) {

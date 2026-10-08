@@ -1,6 +1,7 @@
 package art.arcane.gloss.panel;
 
 import art.arcane.gloss.Gloss;
+import art.arcane.gloss.GlossConfig;
 import art.arcane.gloss.bedrock.BedrockPolicy;
 import art.arcane.gloss.bedrock.BedrockSurface;
 import art.arcane.gloss.menu.MenuSession;
@@ -55,13 +56,6 @@ public final class PanelRuntimeManager implements PanelServiceListener {
    */
   private static final double CHUNK_QUERY_PADDING = CHUNK_SIZE * Math.sqrt(2.0D);
 
-  /**
-   * How long a viewer reuses one permission answer. A permission changes when an operator edits a
-   * group, never between ticks, so a viewer samples each node about once a second instead of once
-   * per candidate panel per tick.
-   */
-  private static final long PERMISSION_TTL_NANOS = TimeUnit.SECONDS.toNanos(1L);
-
   private final Gloss plugin;
   private final PanelService boards;
   private final Object definitionLock = new Object();
@@ -82,6 +76,8 @@ public final class PanelRuntimeManager implements PanelServiceListener {
   private final Events respawnListener;
   private final Events worldListener;
 
+  private int followTicksRemaining;
+  private int followInterval;
   private volatile boolean running = true;
   private volatile Map<UUID, Set<UUID>> followedBoardsByTarget = Map.of();
 
@@ -245,7 +241,12 @@ public final class PanelRuntimeManager implements PanelServiceListener {
       return;
     }
     try {
-      applyPendingFollowPoses();
+      int interval = plugin.cfg().panels().followIntervalTicks();
+      if (followInterval != interval || --followTicksRemaining <= 0) {
+        followInterval = interval;
+        followTicksRemaining = interval;
+        applyPendingFollowPoses();
+      }
     } catch (RuntimeException failure) {
       Gloss.logExceptionStackThrottled(false, "panel-follow-sampling", failure,
           "Failed to sample persistent panel follow targets.");
@@ -555,6 +556,8 @@ public final class PanelRuntimeManager implements PanelServiceListener {
     private volatile boolean closed;
 
     private volatile boolean anyViews;
+    private int visibilityTicksRemaining;
+    private int visibilityInterval;
 
     private ViewerState(Player player) {
       this.player = player;
@@ -583,7 +586,43 @@ public final class PanelRuntimeManager implements PanelServiceListener {
         discardViews();
         return;
       }
-      applyViews(world, location, candidates(world, location), previews.get(player.getUniqueId()));
+      GlossConfig.Panels settings = plugin.cfg().panels();
+      PanelPreview preview = previews.get(player.getUniqueId());
+      if (preview != null || !world.getUID().equals(permissionWorld)
+          || visibilityInterval != settings.visibilityIntervalTicks() || --visibilityTicksRemaining <= 0) {
+        visibilityInterval = settings.visibilityIntervalTicks();
+        visibilityTicksRemaining = visibilityInterval;
+        applyViews(world, location, candidates(world, location), preview);
+      } else {
+        tickExistingViews(world);
+      }
+    }
+
+    private synchronized void tickExistingViews(World world) {
+      if (closed || !running) {
+        close();
+        return;
+      }
+      Iterator<Map.Entry<UUID, PanelViewSession>> iterator = views.entrySet().iterator();
+      while (iterator.hasNext()) {
+        PanelViewSession view = iterator.next().getValue();
+        PanelDefinition definition = view.definition();
+        if (definition.follow().mode() == PanelFollowMode.PLAYER) {
+          PanelFollowPose pose = followPoses.get(definition.follow().targetPlayerUuid());
+          if (pose != null) {
+            PanelTransform transform = PanelFollowTransform.resolve(definition, pose);
+            if (!world.getUID().equals(transform.worldUuid())
+                || view.update(definition, transform) != NavigationResult.APPLIED) {
+              view.close();
+              iterator.remove();
+              visibleBoards.add(visibleBoardEpoch, -1);
+              continue;
+            }
+          }
+        }
+        view.tick();
+      }
+      anyViews = !views.isEmpty();
     }
 
     private synchronized void discardViews() {
@@ -859,10 +898,15 @@ public final class PanelRuntimeManager implements PanelServiceListener {
       permissions.clear();
     }
 
+    /**
+     * Reuses each viewer's permission answer for the configured cache lifetime, one second by
+     * default, instead of consulting the permission provider for every candidate on every tick.
+     */
     private boolean hasPermission(String node) {
       long now = System.nanoTime();
       PermissionSample sample = permissions.get(node);
-      if (sample != null && now - sample.sampledAtNanos() < PERMISSION_TTL_NANOS) {
+      if (sample != null && now - sample.sampledAtNanos()
+          < TimeUnit.MILLISECONDS.toNanos(plugin.cfg().panels().permissionCacheTicks() * 50L)) {
         return sample.granted();
       }
       boolean granted = player.hasPermission(node);

@@ -78,7 +78,9 @@ class CharacterizationPersistentHologramRoutingTest {
         DisplayHandle display = harness.onlySpawned(world);
         assertEquals("§aHello§r\nWorld", display.lastText(),
             "static lines must render once through the static pipeline");
-        assertNull(display.visibleByDefault, "the shared display must stay visible to everyone");
+        assertEquals(Boolean.FALSE, display.visibleByDefault);
+        assertTrue(alice.effectivelyVisible(display));
+        assertTrue(bob.effectivelyVisible(display));
 
         int assignments = display.textHistory.size();
         hologram.update();
@@ -106,7 +108,7 @@ class CharacterizationPersistentHologramRoutingTest {
 
         DisplayHandle display = harness.onlySpawned(world);
         assertEquals("", display.lastText(), "the server entity base text must not expose personalized content");
-        assertNull(display.visibleByDefault);
+        assertEquals(Boolean.FALSE, display.visibleByDefault);
         assertEquals(Map.of(alice.uuid, "%score% Alice", bob.uuid, "%score% Bob"), latestViewerText(),
             "one entity id must receive viewer-specific metadata on each player connection");
         for (CharacterizationHarness.Sent sent : harness.sender.sent) {
@@ -164,24 +166,13 @@ class CharacterizationPersistentHologramRoutingTest {
     }
 
     @Test
-    void blankBaseTextKeepsPersonalizedContentPrivateOnEveryServerApi() {
+    void unsupportedDefaultVisibilityCannotPublishPersonalizedContent() {
         world.visibleByDefaultSupported = false;
-        harness.moveTo(bob, world, 200.0D, 64.0D, 200.0D);
-        PersistentHologram hologram = hologram("h-private-fallback",
-            List.of("Hello {{ player.name }}"));
+        PersistentHologram hologram = hologram("private", List.of("Hello {{ player.name }}"));
         hologram.update();
         harness.drainDelayed();
-        DisplayHandle display = harness.onlySpawned(world);
-        assertEquals("", display.lastText(), "an unaddressed tracker can only receive blank server text");
-
-        PlayerHandle late = harness.join("Late", world, 300.0D, 64.0D, 300.0D);
-        hologram.invalidateTrackingFor(late.proxy, true);
-        assertTrue(!latestViewerText().containsKey(late.uuid));
-
-        harness.moveTo(bob, world, 2.0D, 64.0D, 2.0D);
-        hologram.update();
-        assertEquals("Hello Bob", latestViewerText().get(bob.uuid),
-            "an approaching viewer receives only its own metadata text");
+        assertTrue(harness.liveSpawned(world).isEmpty());
+        assertTrue(latestViewerText().isEmpty());
     }
 
     @Test

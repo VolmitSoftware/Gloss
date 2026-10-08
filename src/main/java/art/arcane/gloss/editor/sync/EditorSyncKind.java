@@ -3,6 +3,7 @@ package art.arcane.gloss.editor.sync;
 import java.util.regex.Pattern;
 
 public enum EditorSyncKind {
+  PRESETS("presets"),
   ANIMATION("animation"),
   BUBBLE_STYLE("bubble-style"),
   CONTAINER_PREVIEW("container-preview"),

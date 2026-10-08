@@ -7,9 +7,12 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.function.Predicate;
+import java.util.function.Supplier;
 
 /**
  * What each viewer is already tracking, and the minimum set of operations that turns that into the
@@ -29,6 +32,23 @@ public final class WaypointTracker {
     }
 
     private final ConcurrentMap<UUID, Map<String, WaypointTarget>> tracked = new ConcurrentHashMap<>();
+    private final Supplier<Thresholds> thresholds;
+
+    public WaypointTracker() {
+        this(() -> new Thresholds(POSITION_EPSILON, AZIMUTH_EPSILON));
+    }
+
+    public WaypointTracker(Supplier<Thresholds> thresholds) {
+        this.thresholds = Objects.requireNonNull(thresholds);
+    }
+
+    public record Thresholds(double position, double azimuth) {
+        public Thresholds {
+            if (!Double.isFinite(position) || !Double.isFinite(azimuth) || position < 0 || azimuth < 0) {
+                throw new IllegalArgumentException("Waypoint thresholds must be finite and nonnegative");
+            }
+        }
+    }
 
     public static List<WaypointTarget> capByDistance(List<WaypointTarget> targets, double x, double y,
                                                      double z, int maxPerViewer) {
@@ -45,6 +65,11 @@ public final class WaypointTracker {
     }
 
     public List<Change> reconcile(UUID viewerId, List<WaypointTarget> desired) {
+        return reconcile(viewerId, desired, changes -> true);
+    }
+
+    public List<Change> reconcile(UUID viewerId, List<WaypointTarget> desired,
+                                  Predicate<List<Change>> delivery) {
         Map<String, WaypointTarget> current = tracked.computeIfAbsent(viewerId,
             ignored -> new LinkedHashMap<>());
         List<Change> changes = new ArrayList<>();
@@ -55,7 +80,7 @@ public final class WaypointTracker {
             }
             for (Map.Entry<String, WaypointTarget> entry : next.entrySet()) {
                 WaypointTarget previous = current.get(entry.getKey());
-                if (previous == null) {
+                if (previous == null || requiresReplacement(previous, entry.getValue())) {
                     changes.add(new Change(WrapperPlayServerWaypoint.Operation.TRACK, entry.getValue()));
                 } else if (changed(previous, entry.getValue())) {
                     changes.add(new Change(WrapperPlayServerWaypoint.Operation.UPDATE, entry.getValue()));
@@ -68,8 +93,10 @@ public final class WaypointTracker {
                     changes.add(new Change(WrapperPlayServerWaypoint.Operation.UNTRACK, previous));
                 }
             }
-            current.clear();
-            current.putAll(next);
+            if (changes.isEmpty() || delivery.test(List.copyOf(changes))) {
+                current.clear();
+                current.putAll(next);
+            }
         }
         return List.copyOf(changes);
     }
@@ -93,14 +120,16 @@ public final class WaypointTracker {
         tracked.clear();
     }
 
-    private static boolean changed(WaypointTarget previous, WaypointTarget next) {
-        if (previous.color() != next.color() || previous.style() != next.style()
-            || previous.azimuth() != next.azimuth()) {
-            return true;
-        }
+    private boolean requiresReplacement(WaypointTarget previous, WaypointTarget next) {
+        return previous.color() != next.color() || !previous.styleKey().equals(next.styleKey())
+            || previous.azimuth() != next.azimuth();
+    }
+
+    private boolean changed(WaypointTarget previous, WaypointTarget next) {
         if (next.azimuth()) {
-            return Math.abs(next.azimuthRadians() - previous.azimuthRadians()) > AZIMUTH_EPSILON;
+            double delta = next.azimuthRadians() - previous.azimuthRadians();
+            return Math.abs(Math.atan2(Math.sin(delta), Math.cos(delta))) > thresholds.get().azimuth();
         }
-        return next.distanceTo(previous.x(), previous.y(), previous.z()) > POSITION_EPSILON;
+        return next.distanceTo(previous.x(), previous.y(), previous.z()) > thresholds.get().position();
     }
 }

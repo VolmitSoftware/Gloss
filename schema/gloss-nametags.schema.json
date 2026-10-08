@@ -10,6 +10,7 @@
     "presentation"
   ],
   "properties": {
+    "preset": {"type": ["string", "null"], "minLength": 1, "description": "Named preset from this collection in presets.json; document fields override inherited values."},
     "schemaVersion": {
       "description": "Document format version. Files on any other version are ignored.",
       "type": "integer",

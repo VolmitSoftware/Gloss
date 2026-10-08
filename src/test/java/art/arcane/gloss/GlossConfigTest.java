@@ -25,6 +25,65 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class GlossConfigTest {
     @Test
+    void integrationFreshnessNormalizesAndRoundTrips() throws IOException {
+        GlossConfigFile source = new GlossConfigFile();
+        source.integration.maxReferencedMetrics = Integer.MAX_VALUE;
+        source.integration.referenceWindowMs = 0;
+        source.integration.maxSampleAgeMs = -1;
+        source.integration.retainUnavailableMs = Integer.MAX_VALUE;
+        source.integration.errorRetryTicks = 0;
+        source.integration.unavailableText = "x".repeat(1025);
+        source.normalize();
+        GlossConfig.Integration expected = GlossConfig.from(source).integration();
+        assertEquals(65536, expected.maxReferencedMetrics());
+        assertEquals(1, expected.referenceWindowMs());
+        assertEquals(0, expected.maxSampleAgeMs());
+        assertEquals(86400000, expected.retainUnavailableMs());
+        assertEquals(1, expected.errorRetryTicks());
+        assertEquals(1024, expected.unavailableText().length());
+        GlossConfigFile decoded = TomlCodec.fromToml(
+            TomlCodec.toToml(source, "gloss", ConfigExposePolicy.ALL), GlossConfigFile.class);
+        decoded.normalize();
+        assertEquals(expected, GlossConfig.from(decoded).integration());
+    }
+
+    @Test
+    void nametagBudgetsNormalizeAndSurviveConfigurationRoundTrip() throws IOException {
+        GlossConfigFile source = new GlossConfigFile();
+        source.nametags.snapshotReadLimit = -1;
+        source.nametags.viewerRange = Double.NaN;
+        source.nametags.maxSubjectsPerViewer = Integer.MAX_VALUE;
+        source.tablist.snapshotReadLimit = Integer.MAX_VALUE;
+        source.normalize();
+        GlossConfig.Nametags limits = GlossConfig.from(source).modules().nametags();
+
+        assertEquals(16, limits.snapshotReadLimit());
+        assertEquals(64.0D, limits.viewerRange());
+        assertEquals(10000, limits.maxSubjectsPerViewer());
+        assertEquals(65536, GlossConfig.from(source).tablist().snapshotReadLimit());
+        GlossConfigFile decoded = TomlCodec.fromToml(
+            TomlCodec.toToml(source, "gloss", ConfigExposePolicy.ALL), GlossConfigFile.class);
+        decoded.normalize();
+        assertEquals(limits, GlossConfig.from(decoded).modules().nametags());
+        assertEquals(65536, GlossConfig.from(decoded).tablist().snapshotReadLimit());
+    }
+
+    @Test
+    void motdSnapshotCadenceNormalizesAndRoundTrips() throws IOException {
+        GlossConfigFile file = new GlossConfigFile();
+        file.motd.snapshotRefreshTicks = 0;
+        file.normalize();
+        assertEquals(1, GlossConfig.from(file).motd().snapshotRefreshTicks());
+        file.motd.snapshotRefreshTicks = 1201;
+        file.normalize();
+        assertEquals(1200, GlossConfig.from(file).motd().snapshotRefreshTicks());
+        GlossConfigFile decoded = TomlCodec.fromToml(
+            TomlCodec.toToml(file, "gloss", ConfigExposePolicy.ALL), GlossConfigFile.class);
+        decoded.normalize();
+        assertEquals(1200, GlossConfig.from(decoded).motd().snapshotRefreshTicks());
+    }
+
+    @Test
     void defaultsRoundTripThroughToml() throws IOException {
         GlossConfigFile defaults = new GlossConfigFile();
         defaults.normalize();
@@ -47,6 +106,7 @@ class GlossConfigTest {
         assertEquals(120, snapshot.holograms().maxAnimationFps());
         assertEquals(20000, snapshot.holograms().animationPacketBudget());
         assertEquals(40, snapshot.tablist().updateIntervalTicks());
+        assertEquals(4096, snapshot.tablist().snapshotReadLimit());
         assertTrue(snapshot.groups().useVault());
         assertTrue(snapshot.bubbles().enabled());
         assertTrue(snapshot.indicators().enabled());
@@ -158,6 +218,9 @@ class GlossConfigTest {
                     }
                 }
                 String where = section.getKey().isEmpty() ? leaf : section.getKey() + "." + leaf;
+                if (index < 0) {
+                    index = lines.indexOf("[" + where + "]");
+                }
                 assertTrue(index >= 0, "knob " + where + " is missing from the emitted toml");
                 assertTrue(index > 0 && lines.get(index - 1).startsWith("#"),
                     "knob " + where + " is not preceded by a comment line");
@@ -305,6 +368,30 @@ class GlossConfigTest {
         assertEquals("", GlossConfigFile.sanitizeSyncCreateToken("a".repeat(129)));
         assertEquals("", GlossConfigFile.sanitizeSyncCreateToken("a".repeat(21) + "/"));
         assertEquals("", GlossConfigFile.sanitizeSyncCreateToken(" " + "a".repeat(22)));
+    }
+
+    @Test
+    void teamPoliciesAndGlowLimitsRoundTripWithTypedNormalization() throws IOException {
+        GlossConfigFile source = new GlossConfigFile();
+        source.teams.foreignPolicy = "OVERRIDE";
+        source.teams.visibilityPolicy = "priority";
+        source.teams.layerPriorities.put("nametag", Integer.MAX_VALUE);
+        source.glow.sweepIntervalTicks = 0;
+        source.glow.viewerRange = Double.POSITIVE_INFINITY;
+        source.glow.maxTargetsPerViewer = 100000;
+        source.normalize();
+        GlossConfig settings = GlossConfig.from(source);
+        assertEquals("OVERRIDE", settings.teams().foreignPolicy().name());
+        assertEquals("PRIORITY", settings.teams().visibilityPolicy().name());
+        assertEquals(1000000, settings.teams().layerPriorities().get("nametag"));
+        assertEquals(1, settings.modules().glow().sweepIntervalTicks());
+        assertEquals(0, settings.modules().glow().viewerRange());
+        assertEquals(65536, settings.modules().glow().maxTargetsPerViewer());
+        GlossConfigFile decoded = TomlCodec.fromToml(
+            TomlCodec.toToml(source, "gloss", ConfigExposePolicy.ALL), GlossConfigFile.class);
+        decoded.normalize();
+        assertEquals(settings.teams(), GlossConfig.from(decoded).teams());
+        assertEquals(settings.modules().glow(), GlossConfig.from(decoded).modules().glow());
     }
 
     private static void collectLeaves(String path, Class<?> type, Map<String, List<String>> leavesBySection) {

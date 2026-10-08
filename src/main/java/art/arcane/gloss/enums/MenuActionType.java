@@ -6,6 +6,7 @@ import art.arcane.gloss.config.action.BookActionData;
 import art.arcane.gloss.config.action.BossBarActionData;
 import art.arcane.gloss.config.action.BroadcastActionData;
 import art.arcane.gloss.config.action.CameraActionData;
+import art.arcane.gloss.config.action.CallActionData;
 import art.arcane.gloss.config.action.ChanceActionData;
 import art.arcane.gloss.config.action.ClearStateActionData;
 import art.arcane.gloss.config.action.CloseActionData;
@@ -13,6 +14,7 @@ import art.arcane.gloss.config.action.CommandActionData;
 import art.arcane.gloss.config.action.ConnectActionData;
 import art.arcane.gloss.config.action.CooldownActionData;
 import art.arcane.gloss.config.action.DelayActionData;
+import art.arcane.gloss.config.action.DialogActionData;
 import art.arcane.gloss.config.action.EconomyActionData;
 import art.arcane.gloss.config.action.EffectActionData;
 import art.arcane.gloss.config.action.EmitActionData;
@@ -37,6 +39,7 @@ import art.arcane.gloss.config.action.SwitchActionData;
 import art.arcane.gloss.config.action.TakeActionData;
 import art.arcane.gloss.config.action.TeleportActionData;
 import art.arcane.gloss.config.action.TitleActionData;
+import art.arcane.gloss.config.action.SurfaceActionData;
 import art.arcane.volmlib.util.json.EnumType;
 
 public enum MenuActionType implements EnumType.Values<MenuActionData> {
@@ -51,12 +54,14 @@ public enum MenuActionType implements EnumType.Values<MenuActionData> {
   TITLE("title", TitleActionData.class),
   ACTIONBAR("actionbar", ActionBarActionData.class),
   BOSSBAR("bossbar", BossBarActionData.class),
+  SURFACE("surface", SurfaceActionData.class),
 
   // --- lane:forms ---
   CLOSE("close", CloseActionData.class),
   INVENTORY("inventory", InventoryActionData.class),
   SET_SESSION("setSession", SetSessionActionData.class),
   PROMPT("prompt", PromptActionData.class),
+  DIALOG("dialog", DialogActionData.class),
   BOOK("book", BookActionData.class),
   GIVE("give", GiveActionData.class),
   TAKE("take", TakeActionData.class),
@@ -65,6 +70,7 @@ public enum MenuActionType implements EnumType.Values<MenuActionData> {
 
   // --- lane:behaviors ---
   DELAY("delay", DelayActionData.class),
+  CALL("call", CallActionData.class),
   SEQUENCE("sequence", SequenceActionData.class),
   PARALLEL("parallel", ParallelActionData.class),
   REPEAT("repeat", RepeatActionData.class),

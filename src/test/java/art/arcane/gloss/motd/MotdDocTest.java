@@ -44,8 +44,8 @@ class MotdDocTest {
     void gsonRoundTripPreservesAllFields() {
         MotdDoc original = new MotdDoc(1, 4L, ShowCondition.ALWAYS, "icons/default.png", List.of(
             MotdDoc.MotdEntry.ofLines(List.of("&aHello")),
-            new MotdDoc.MotdEntry(List.of("&aHello", "&7World"), "icons/season4.png", null, null, null, null, null, null)),
-            List.of());
+            new MotdDoc.MotdEntry(List.of("&aHello", "&7World"), "icons/season4.png", null, null, null, null, null, null, null, null, null, null)),
+            List.of(), null, null, null, null);
 
         MotdDoc decoded = MotdDoc.parse("motd.json", BukkitJson.GSON.toJson(original));
 
@@ -103,16 +103,16 @@ class MotdDocTest {
     void revisionBoundsAreEnforced() {
         List<MotdDoc.MotdEntry> entries = List.of(MotdDoc.MotdEntry.ofLines(List.of("hi")));
 
-        assertThrows(IllegalArgumentException.class, () -> new MotdDoc(1, 0L, ShowCondition.ALWAYS, null, entries, List.of()));
+        assertThrows(IllegalArgumentException.class, () -> new MotdDoc(1, 0L, ShowCondition.ALWAYS, null, entries, List.of(), null, null, null, null));
         assertThrows(IllegalArgumentException.class,
             () -> new MotdDoc(1, DocumentEnvelope.MAX_SAFE_REVISION + 1L, ShowCondition.ALWAYS, null, entries,
-                List.of()));
+                List.of(), null, null, null, null));
     }
 
     @Test
     void atLeastOneEntryIsRequired() {
-        assertThrows(IllegalArgumentException.class, () -> new MotdDoc(1, 1L, ShowCondition.ALWAYS, null, null, List.of()));
-        assertThrows(IllegalArgumentException.class, () -> new MotdDoc(1, 1L, ShowCondition.ALWAYS, null, List.of(), List.of()));
+        assertThrows(IllegalArgumentException.class, () -> new MotdDoc(1, 1L, ShowCondition.ALWAYS, null, null, List.of(), null, null, null, null));
+        assertThrows(IllegalArgumentException.class, () -> new MotdDoc(1, 1L, ShowCondition.ALWAYS, null, List.of(), List.of(), null, null, null, null));
     }
 
     @Test
@@ -227,7 +227,7 @@ class MotdDocTest {
     @Test
     void linksDefaultToNoneAndRoundTrip() {
         MotdDoc doc = new MotdDoc(1, 1L, ShowCondition.ALWAYS, null,
-            List.of(MotdDoc.MotdEntry.ofLines(List.of("hi"))), null);
+            List.of(MotdDoc.MotdEntry.ofLines(List.of("hi"))), null, null, null, null, null);
 
         assertEquals(List.of(), doc.links());
         assertEquals(doc, MotdDoc.parse("motd.json", BukkitJson.GSON.toJson(doc)));

@@ -1,6 +1,9 @@
 package art.arcane.gloss.velocity;
 
 import art.arcane.gloss.expr.Expr;
+import art.arcane.gloss.doc.DocumentPresetCatalog;
+import art.arcane.gloss.motd.MotdPolicy;
+import com.google.gson.Gson;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -22,6 +25,7 @@ import java.util.function.Function;
 import java.util.stream.Stream;
 
 public final class ProxyDocuments {
+    private static final Gson GSON = new Gson();
     private static final int MAX_LINKS = 16;
     private static final Set<String> LINK_TYPES = Set.of("report_bug", "community_guidelines", "support",
         "status", "feedback", "community", "website", "forums", "news", "announcements");
@@ -63,12 +67,15 @@ public final class ProxyDocuments {
     }
 
     public static Snapshot load(Path directory) throws IOException {
+        DocumentPresetCatalog presets = DocumentPresetCatalog.read(directory);
         JsonObject config = read(directory.resolve("proxy.json"), 1);
         Settings settings = new Settings(enabled(config, "motd"), enabled(config, "tablist"),
             enabled(config, "scoreboards"), enabled(config, "surfaces"), enabled(config, "connections"),
             enabled(config, "emoji"), enabled(config, "animations"),
-            Math.clamp(integer(config, "refreshMillis", 500), 50, 60000), bool(config, "networkTablist", true));
-        JsonObject motd = read(directory.resolve("motd.json"), 1);
+            Math.clamp(integer(config, "refreshMillis", 500), 50, 60000), bool(config, "networkTablist", true),
+            Math.clamp(integer(object(config, "surfaces"), "maxBossBarsPerViewer", 3), 1, 64),
+            expression(config, "networkVisibility", "true"));
+        JsonObject motd = resolve(presets, "motd", read(directory.resolve("motd.json"), 1));
         String motdFavicon = string(motd, "favicon", null);
         if (motdFavicon != null && motdFavicon.isBlank()) {
             motdFavicon = null;
@@ -86,7 +93,9 @@ public final class ProxyDocuments {
             }
             entries.add(new MotdEntry(lines, string(entry, "favicon", null), sample,
                 count(entry, "online"), count(entry, "max"), string(entry, "version", null),
-                expression(entry, "show", "true"), integer(entry, "weight", 1)));
+                expression(entry, "show", "true"), integer(entry, "weight", 1),
+                GSON.fromJson(entry.get("select"), MotdPolicy.Selector.class), strings(array(entry, "icons")),
+                GSON.fromJson(entry.get("counts"), MotdPolicy.Counts.class), string(entry, "sampleMode", null)));
         }
         if (!motd.isEmpty() && entries.isEmpty()) {
             throw new IllegalArgumentException("MOTD requires at least one entry");
@@ -101,18 +110,19 @@ public final class ProxyDocuments {
             links.add(new MotdLink(string(link, "type", null), string(link, "label", null),
                 string(link, "url", null)));
         }
-        JsonObject tab = read(directory.resolve("tablist.json"), 2);
+        JsonObject tab = resolve(presets, "tablist", read(directory.resolve("tablist.json"), 3));
         JsonObject sorting = object(tab, "sort");
         Expr sort = bool(sorting, "enabled", false) ? expression(sorting, "weight", "0") : null;
         Tablist tablist = new Tablist(expression(tab, "show", tab.isEmpty() ? "false" : "true"),
             surface(object(tab, "headerFooter"), p -> new HeaderFooter(string(p, "header", ""), string(p, "footer", ""))),
-            surface(object(tab, "listNames"), p -> new ListName(string(p, "format", "$player"))), sort);
+            surface(object(tab, "listNames"), p -> new ListName(string(p, "format", "$player"))), sort,
+            ProxyTabLayout.parse(object(tab, "layout")));
         List<Board> boards = new ArrayList<>();
         Path boardDirectory = directory.resolve("boards");
         if (Files.isDirectory(boardDirectory)) {
             try (Stream<Path> paths = Files.list(boardDirectory)) {
                 for (Path path : paths.filter(p -> p.getFileName().toString().endsWith(".json")).sorted().toList()) {
-                    JsonObject board = read(path, 2);
+                    JsonObject board = resolve(presets, "boards", read(path, 2));
                     if (board.isEmpty()) {
                         continue;
                     }
@@ -125,9 +135,15 @@ public final class ProxyDocuments {
         }
         boards.sort(Comparator.comparingInt(Board::priority).reversed().thenComparing(Board::id));
         return new Snapshot(settings, new Motd(expression(motd, "show", motd.isEmpty() ? "false" : "true"),
-            motdFavicon, List.copyOf(entries), List.copyOf(links)), tablist, List.copyOf(boards),
-            ProxySurfaceDocuments.load(directory), ProxyConnectionDocuments.load(directory),
-            ProxyTextDocuments.load(directory, settings));
+            motdFavicon, List.copyOf(entries), List.copyOf(links),
+            GSON.fromJson(motd.get("rotation"), MotdPolicy.Rotation.class), strings(array(motd, "icons")),
+            string(motd, "state", "normal"), GSON.fromJson(motd.get("serverLinks"), ServerLinks.class)), tablist, List.copyOf(boards),
+            ProxySurfaceDocuments.load(directory, presets), ProxyConnectionDocuments.load(directory, presets),
+            ProxyTextDocuments.load(directory, settings, presets));
+    }
+
+    static JsonObject resolve(DocumentPresetCatalog presets, String kind, JsonObject document) {
+        return document.isEmpty() ? document : JsonParser.parseString(presets.resolve(kind, document.toString())).getAsJsonObject();
     }
 
     static JsonObject read(Path path, int schema) throws IOException {
@@ -139,7 +155,9 @@ public final class ProxyDocuments {
         }
         try {
             JsonObject object = JsonParser.parseString(Files.readString(path)).getAsJsonObject();
-            if (integer(object, "schemaVersion", 0) != schema) {
+            JsonElement version = object.get("schemaVersion");
+            if (version == null || !version.isJsonPrimitive() || !version.getAsJsonPrimitive().isNumber()
+                || version.getAsBigDecimal().intValueExact() != schema) {
                 return new JsonObject();
             }
             return object;
@@ -249,8 +267,55 @@ public final class ProxyDocuments {
                            List<ProxySurfaceDocuments.Document> surfaces, ProxyConnectionDocuments.Document connections,
                            ProxyTextDocuments.Content content) {}
     public record Settings(boolean motd, boolean tablist, boolean scoreboards, boolean surfaces, boolean connections,
-                           boolean emoji, boolean animations, long refreshMillis, boolean networkTablist) {}
-    public record Motd(Expr show, String favicon, List<MotdEntry> entries, List<MotdLink> links) {}
+                           boolean emoji, boolean animations, long refreshMillis, boolean networkTablist,
+                           int surfaceMaxBossBarsPerViewer, Expr networkVisibility) {
+        public Settings(boolean motd, boolean tablist, boolean scoreboards, boolean surfaces, boolean connections,
+                        boolean emoji, boolean animations, long refreshMillis, boolean networkTablist) {
+            this(motd, tablist, scoreboards, surfaces, connections, emoji, animations, refreshMillis, networkTablist, 3, ProxyText.parseExpression("true"));
+        }
+    }
+    public record Motd(Expr show, String favicon, List<MotdEntry> entries, List<MotdLink> links,
+                       MotdPolicy.Rotation rotation, List<String> icons, String state, ServerLinks serverLinks) {
+        public Motd {
+            rotation = rotation == null ? MotdPolicy.Rotation.DEFAULT : rotation;
+            icons = MotdPolicy.icons(icons);
+            state = state == null ? "normal" : state;
+            if (state.isBlank()) {
+                throw new IllegalArgumentException("MOTD state must not be blank");
+            }
+        }
+
+        public boolean linksEnabled(boolean motdEnabled) {
+            return serverLinks == null ? motdEnabled && !links.isEmpty() : serverLinks.enabled();
+        }
+
+        public List<MotdLink> enabledLinks(boolean motdEnabled) {
+            return !linksEnabled(motdEnabled) ? List.of() : serverLinks == null ? links : serverLinks.links();
+        }
+
+        public List<String> iconsFor(MotdEntry entry) {
+            if (!entry.icons().isEmpty()) {
+                return entry.icons();
+            }
+            if (entry.favicon() != null && !entry.favicon().isBlank()) {
+                return List.of(entry.favicon());
+            }
+            if (!icons.isEmpty()) {
+                return icons;
+            }
+            return favicon == null ? List.of() : List.of(favicon);
+        }
+    }
+
+    public record ServerLinks(Boolean enabled, List<MotdLink> links) {
+        public ServerLinks {
+            enabled = enabled == null || enabled;
+            links = links == null ? List.of() : List.copyOf(links);
+            if (links.size() > MAX_LINKS) {
+                throw new IllegalArgumentException("MOTD supports at most " + MAX_LINKS + " links");
+            }
+        }
+    }
     /** One pause-menu link: a client-known {@code type} or a custom {@code label}, and an http(s) url. */
     public record MotdLink(String type, String label, String url) {
         public MotdLink {
@@ -297,14 +362,19 @@ public final class ProxyDocuments {
         }
     }
     public record MotdEntry(List<String> lines, String favicon, List<String> sample, String online, String max,
-                            String version, Expr show, int weight) {
+                            String version, Expr show, int weight, MotdPolicy.Selector select,
+                            List<String> icons, MotdPolicy.Counts counts, String sampleMode) {
         public MotdEntry {
+            select = select == null ? MotdPolicy.Selector.ANY : select;
+            icons = MotdPolicy.icons(icons);
+            counts = counts == null ? MotdPolicy.Counts.DEFAULT : counts;
+            sampleMode = MotdPolicy.sampleMode(sampleMode, sample);
             if (weight < 1 || weight > 1_000_000) {
                 throw new IllegalArgumentException("MOTD entry weight must be within 1..1000000");
             }
         }
     }
-    public record Tablist(Expr show, Surface<HeaderFooter> headerFooter, Surface<ListName> listNames, Expr sortWeight) {}
+    public record Tablist(Expr show, Surface<HeaderFooter> headerFooter, Surface<ListName> listNames, Expr sortWeight, ProxyTabLayout layout) {}
     public record Surface<T>(boolean enabled, Expr show, T presentation, List<Variant<T>> variants) {}
     public record Variant<T>(int priority, Expr when, T presentation) {}
     public record HeaderFooter(String header, String footer) {}

@@ -14,9 +14,10 @@ import org.junit.jupiter.api.io.TempDir;
 import java.io.File;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
+import java.util.function.Function;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -95,7 +96,6 @@ class TemporaryHologramParticleTest {
         }
     }
 
-    @SuppressWarnings("unchecked")
     private static void cacheParticle(ParticleService service, ParticleLayer.ParticleSpec spec) throws Exception {
         Class<?> resolvedClass = Class.forName("art.arcane.gloss.particle.ParticleService$ResolvedParticle");
         Constructor<?> constructor = resolvedClass.getDeclaredConstructor(Particle.class, Object.class);
@@ -104,7 +104,10 @@ class TemporaryHologramParticleTest {
             new Particle.DustOptions(Color.fromRGB(0xFF9900), 0.5F));
         Field particles = ParticleService.class.getDeclaredField("particles");
         particles.setAccessible(true);
-        Map<ParticleLayer.ParticleSpec, Object> cache = (Map<ParticleLayer.ParticleSpec, Object>) particles.get(service);
-        cache.put(spec, resolved);
+        Object cache = particles.get(service);
+        Method get = cache.getClass().getDeclaredMethod("get", Object.class, Function.class);
+        get.setAccessible(true);
+        Function<ParticleLayer.ParticleSpec, Object> factory = ignored -> resolved;
+        assertEquals(resolved, get.invoke(cache, spec, factory));
     }
 }

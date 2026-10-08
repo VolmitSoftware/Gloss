@@ -1,6 +1,8 @@
 package art.arcane.gloss.menu;
 
 import art.arcane.gloss.Gloss;
+import art.arcane.gloss.GlossConfig;
+import art.arcane.gloss.config.GlossConfigFile;
 import org.bukkit.Bukkit;
 import org.bukkit.Server;
 import org.bukkit.World;
@@ -133,6 +135,7 @@ public final class CharacterizationSupport {
     setField(gloss, "description",
         new PluginDescriptionFile("Gloss", "0.0-characterization", "art.arcane.gloss.Gloss"));
     setField(gloss, "server", server);
+    setField(gloss, "config", GlossConfig.from(new GlossConfigFile()));
     setField(gloss, "logger", new PluginLogger(gloss));
     return gloss;
   }

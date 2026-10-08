@@ -13,6 +13,7 @@ import art.arcane.gloss.expr.ExprFunctionRegistry;
 import art.arcane.gloss.expr.ExprVariableNamespaces;
 import art.arcane.gloss.image.ImageAssets;
 import art.arcane.gloss.service.GlossService;
+import art.arcane.volmlib.util.scheduling.FoliaScheduler;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 
@@ -28,6 +29,10 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.function.LongSupplier;
 import java.util.stream.Stream;
 import java.util.logging.Level;
@@ -54,14 +59,20 @@ public final class GlyphService implements GlossService {
     private final PackNamespace packNamespace;
     private final PixelFunctions pixelFunctions;
     private final LayoutFunctions layoutFunctions;
+    private final GlyphAtlas atlas;
     private final PackFormats packFormats;
     private final PackBuilder builder;
     private final PackDelivery delivery;
+    private final PackArtifactStore artifacts;
     private final RebuildGate gate;
 
     private volatile GlyphRegistry registry = GlyphRegistry.EMPTY;
     private volatile PackArtifact artifact;
     private volatile boolean enabled;
+    private long lifecycle;
+    private CompletableFuture<Boolean> building;
+    private ThreadPoolExecutor worker;
+    private int activePackFormat;
 
     public GlyphService(Gloss plugin) {
         this.plugin = plugin;
@@ -74,10 +85,13 @@ public final class GlyphService implements GlossService {
         this.metrics = FontMetrics.load();
         this.packNamespace = new PackNamespace();
         this.layoutFunctions = new LayoutFunctions(() -> registry, metrics);
+        this.atlas = new GlyphAtlas(() -> registry, layoutFunctions);
         this.pixelFunctions = new PixelFunctions(metrics, () -> layoutFunctions);
         this.packFormats = PackFormats.load();
-        this.builder = new PackBuilder(imagesRoot);
-        this.delivery = new PackDelivery(plugin, packNamespace);
+        this.artifacts = new PackArtifactStore();
+        this.builder = new PackBuilder(new PackBuilder.Options(imagesRoot, () -> plugin.cfg().images(),
+            () -> plugin.cfg().modules().forge().limits(), artifacts));
+        this.delivery = new PackDelivery(new PackDelivery.Options(plugin, packNamespace, artifacts));
         this.gate = new RebuildGate(System::nanoTime, TimeUnit.SECONDS.toNanos(DEBOUNCE_SECONDS));
     }
 
@@ -87,7 +101,7 @@ public final class GlyphService implements GlossService {
      */
     public static final class RebuildGate {
         private final LongSupplier clock;
-        private final long debounceNanos;
+        private long debounceNanos;
         private String built = "";
         private String pending;
         private long dueAt;
@@ -104,6 +118,9 @@ public final class GlyphService implements GlossService {
                 pending = null;
                 return false;
             }
+            if (value.equals(pending)) {
+                return true;
+            }
             pending = value;
             dueAt = clock.getAsLong() + debounceNanos;
             return true;
@@ -117,6 +134,17 @@ public final class GlyphService implements GlossService {
             built = pending;
             pending = null;
             return true;
+        }
+
+        public synchronized void configure(long nanos) {
+            debounceNanos = Math.max(0L, nanos);
+        }
+
+        public synchronized void completed(String fingerprint) {
+            built = fingerprint;
+            if (built.equals(pending)) {
+                pending = null;
+            }
         }
 
         public synchronized String built() {
@@ -143,21 +171,26 @@ public final class GlyphService implements GlossService {
     }
 
     @Override
-    public void enable() {
+    public synchronized void enable() {
         if (!plugin.cfg().modules().forge().enabled()) {
             return;
         }
         enabled = true;
+        atlas.install();
+        lifecycle++;
+        gate.configure(TimeUnit.MILLISECONDS.toNanos(plugin.cfg().modules().forge().buildDebounceTicks() * 50L));
+        activePackFormat = packFormats.forServer(Bukkit.getBukkitVersion(), plugin.cfg().modules().forge().packFormat());
         defaults.extractMissing();
-        documents.reload();
-        rebuild();
+        build();
         plugin.watchdog().register(GlyphDoc.KIND, this::poll);
         delivery.enable(deliverySettings(), artifact);
     }
 
     @Override
-    public void disable() {
+    public synchronized void disable() {
         enabled = false;
+        atlas.uninstall();
+        lifecycle++;
         plugin.watchdog().unregister(GlyphDoc.KIND);
         delivery.disable();
         documents.close();
@@ -169,14 +202,36 @@ public final class GlyphService implements GlossService {
     }
 
     @Override
-    public void reload() {
-        disable();
-        enable();
+    public synchronized void reload() {
+        if (!plugin.cfg().modules().forge().enabled()) {
+            disable();
+            return;
+        }
+        if (!enabled) {
+            enable();
+            return;
+        }
+        long generation = ++lifecycle;
+        gate.configure(TimeUnit.MILLISECONDS.toNanos(plugin.cfg().modules().forge().buildDebounceTicks() * 50L));
+        activePackFormat = packFormats.forServer(Bukkit.getBukkitVersion(), plugin.cfg().modules().forge().packFormat());
+        delivery.reconfigure(deliverySettings());
+        if (building != null && !building.isDone()) {
+            building.whenComplete((ignored, failure) -> rebuildAfterReload(generation));
+        } else {
+            build();
+        }
+    }
+
+    private synchronized void rebuildAfterReload(long generation) {
+        if (enabled && lifecycle == generation) {
+            build();
+        }
     }
 
     @Override
     public boolean reloadOnConfigChange(GlossConfig previous, GlossConfig next) {
-        return !previous.modules().forge().equals(next.modules().forge());
+        return !previous.modules().forge().equals(next.modules().forge())
+            || !previous.images().equals(next.images());
     }
 
     public GlyphRegistry glyphs() {
@@ -211,14 +266,64 @@ public final class GlyphService implements GlossService {
         return defaults.resetToDefault(nameOrStar);
     }
 
-    /** Forces a build on the caller's thread; {@code /gloss forge build} and the command path use it. */
-    public synchronized boolean build() {
+    public synchronized CompletableFuture<Boolean> build() {
         if (!enabled) {
-            return false;
+            return CompletableFuture.completedFuture(false);
         }
-        documents.reload();
-        gate.failed();
-        return rebuild();
+        if (building != null && !building.isDone()) {
+            return building;
+        }
+        CompletableFuture<Boolean> result = new CompletableFuture<>();
+        building = result;
+        long generation = lifecycle;
+        GlossConfig.Forge config = plugin.cfg().modules().forge();
+        int format = activePackFormat;
+        try {
+            worker().execute(() -> rebuild(generation, config, format, result));
+        } catch (RejectedExecutionException failure) {
+            gate.failed();
+            result.complete(false);
+            Gloss.logExceptionStack(false, failure, "forge: build queue is full; retry later.");
+        }
+        return result;
+    }
+
+    public synchronized CompletableFuture<Integer> exportAsync(Path target) {
+        CompletableFuture<Integer> result = new CompletableFuture<>();
+        if (!enabled) {
+            return CompletableFuture.failedFuture(new IOException("Forge is disabled"));
+        }
+        long generation = lifecycle;
+        try {
+            worker().execute(() -> {
+                try {
+                    synchronized (this) {
+                        if (!enabled || lifecycle != generation) {
+                            throw new IOException("Forge lifecycle changed before export");
+                        }
+                    }
+                    result.complete(export(target));
+                } catch (IOException | RuntimeException failure) {
+                    Gloss.logExceptionStack(false, failure, "forge: pack export failed.");
+                    result.completeExceptionally(failure);
+                }
+            });
+        } catch (RejectedExecutionException failure) {
+            result.completeExceptionally(failure);
+        }
+        return result;
+    }
+
+    private ThreadPoolExecutor worker() {
+        if (worker == null) {
+            worker = new ThreadPoolExecutor(1, 1, 30, TimeUnit.SECONDS, new ArrayBlockingQueue<>(plugin.cfg().modules().forge().buildQueueCapacity()), work -> {
+                Thread thread = new Thread(work, "Gloss pack preparation");
+                thread.setDaemon(true);
+                return thread;
+            });
+            worker.allowCoreThreadTimeOut(true);
+        }
+        return worker;
     }
 
     /** Copies the mergeable pack directory somewhere an operator names. */
@@ -243,7 +348,7 @@ public final class GlyphService implements GlossService {
     private PackDelivery.Settings deliverySettings() {
         GlossConfig.Forge forge = plugin.cfg().modules().forge();
         return new PackDelivery.Settings(forge.url(), forge.serve(), forge.serveBind(), forge.servePort(),
-            forge.prompt(), forge.required());
+            forge.prompt(), forge.required(), forge.listenerThreads(), forge.listenerBacklog());
     }
 
     private void poll() {
@@ -256,12 +361,40 @@ public final class GlyphService implements GlossService {
         }
         gate.observe(fingerprint());
         if (gate.due()) {
-            rebuild();
+            build();
         }
     }
 
-    private synchronized boolean rebuild() {
+    private void rebuild(long generation, GlossConfig.Forge config, int format, CompletableFuture<Boolean> result) {
+        synchronized (this) {
+            if (!enabled || lifecycle != generation) {
+                result.complete(false);
+                return;
+            }
+        }
+        try {
+            documents.reload();
+            PreparedPack built = preparePack(config, format);
+            if (built == null) {
+                result.complete(false);
+                return;
+            }
+            if (!FoliaScheduler.runGlobal(plugin, () -> publish(generation, built, result))) {
+                gate.failed();
+                result.complete(false);
+                Gloss.logExceptionStack(false, new IllegalStateException("Owner scheduler rejected pack publication"),
+                    "forge: cannot publish prepared pack; retaining the previous runtime registry.");
+            }
+        } catch (RuntimeException failure) {
+            gate.failed();
+            result.complete(false);
+            Gloss.logExceptionStack(false, failure, "forge: pack preparation failed.");
+        }
+    }
+
+    private PreparedPack preparePack(GlossConfig.Forge config, int format) {
         long started = System.nanoTime();
+        String fingerprint = fingerprint();
         Map<String, GlyphDoc> loaded = new LinkedHashMap<>();
         for (Map.Entry<String, GlossDocument<GlyphDoc>> entry : new TreeMap<>(documents.snapshot()).entrySet()) {
             loaded.put(entry.getKey(), entry.getValue().value());
@@ -269,11 +402,11 @@ public final class GlyphService implements GlossService {
 
         GlyphLedger ledger;
         try {
-            ledger = GlyphLedger.load(ledgerFile, plugin.cfg().modules().forge().codepointBase());
+            ledger = GlyphLedger.load(ledgerFile, config.codepointBase());
         } catch (RuntimeException refused) {
             gate.failed();
-            Gloss.log(Level.SEVERE, "forge: %s", refused.getMessage());
-            return false;
+            Gloss.logExceptionStack(false, refused, "forge: ledger could not be loaded.");
+            return null;
         }
 
         GlyphRegistry built;
@@ -281,31 +414,52 @@ public final class GlyphService implements GlossService {
             built = GlyphRegistry.build(loaded, ledger, builder.probe());
         } catch (RuntimeException refused) {
             gate.failed();
-            Gloss.log(Level.WARNING, "forge: glyph documents refused, keeping the previous pack. %s",
-                refused.getMessage());
-            return false;
+            Gloss.logExceptionStack(false, refused, "forge: glyph documents refused, keeping the previous pack.");
+            return null;
         }
 
         PackArtifact freshly;
         try {
-            freshly = builder.build(built, outDirectory, packFormats.forServer(
-                Bukkit.getBukkitVersion(), plugin.cfg().modules().forge().packFormat()));
+            freshly = builder.build(built, outDirectory, format);
         } catch (IOException | RuntimeException failure) {
             gate.failed();
             Gloss.logExceptionStack(false, failure, "forge: pack build failed, keeping the previous pack.");
-            return false;
+            return null;
         }
 
-        registry = built;
-        artifact = freshly;
-        metrics.replaceDeclared(built.declaredWidths());
-        packNamespace.publish(freshly.sha1Hex());
-        installEmojiSubstitution(built);
-        delivery.publish(freshly);
-        Gloss.log(Level.INFO, "forge: pack %s built in %dms (%d glyphs, %d spaces)",
-            freshly.sha1Hex().substring(0, 8), TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started),
-            built.all().size(), built.spaces().codepoints().size());
-        return true;
+        return new PreparedPack(built, freshly, TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started), fingerprint);
+    }
+
+    private void publish(long generation, PreparedPack built, CompletableFuture<Boolean> result) {
+        boolean accepted;
+        try {
+            synchronized (this) {
+                accepted = enabled && lifecycle == generation;
+                if (accepted) {
+                    registry = built.registry();
+                    artifact = built.artifact();
+                    metrics.replaceDeclared(registry.declaredWidths());
+                    packNamespace.publish(artifact.sha1Hex());
+                    installEmojiSubstitution(registry);
+                    delivery.publish(artifact);
+                    gate.completed(built.fingerprint());
+                }
+            }
+        } catch (RuntimeException failure) {
+            gate.failed();
+            result.complete(false);
+            Gloss.logExceptionStack(false, failure, "forge: prepared pack publication failed.");
+            return;
+        }
+        result.complete(accepted);
+        if (accepted) {
+            Gloss.log(Level.INFO, "forge: pack %s built in %dms (%d glyphs, %d spaces)",
+                built.artifact().sha1Hex().substring(0, 8), built.elapsedMillis(),
+                built.registry().all().size(), built.registry().spaces().codepoints().size());
+        }
+    }
+
+    private record PreparedPack(GlyphRegistry registry, PackArtifact artifact, long elapsedMillis, String fingerprint) {
     }
 
     private void installEmojiSubstitution(GlyphRegistry built) {
@@ -338,19 +492,21 @@ public final class GlyphService implements GlossService {
     private String fingerprint() {
         List<String> parts = new ArrayList<>();
         for (Map.Entry<String, GlossDocument<GlyphDoc>> entry : new TreeMap<>(documents.snapshot()).entrySet()) {
-            parts.add(entry.getKey() + "=" + entry.getValue().contentHash());
+            parts.add(entry.getKey() + "=" + documents.preparedFingerprint(entry.getKey()));
         }
         parts.add("base=" + plugin.cfg().modules().forge().codepointBase());
         parts.add("format=" + plugin.cfg().modules().forge().packFormat());
-        for (GlyphRegistry.ResolvedGlyph glyph : registry.all()) {
-            parts.add(glyph.image() + "=" + stamp(imagesRoot.resolve(glyph.image())));
-        }
         for (Map.Entry<String, GlossDocument<GlyphDoc>> entry : new TreeMap<>(documents.snapshot()).entrySet()) {
             for (GlyphDoc.Glyph glyph : entry.getValue().value().glyphs()) {
                 parts.add(glyph.image() + "=" + stamp(imagesRoot.resolve(glyph.image())));
             }
             for (GlyphDoc.Overlay overlay : entry.getValue().value().overlays()) {
                 parts.add(overlay.image() + "=" + stamp(imagesRoot.resolve(overlay.image())));
+            }
+            for (GlyphDoc.WaypointStyleAsset style : entry.getValue().value().waypointStyles()) {
+                for (GlyphDoc.WaypointSprite sprite : style.sprites()) {
+                    parts.add(sprite.image() + "=" + stamp(imagesRoot.resolve(sprite.image())));
+                }
             }
         }
         return DocumentHashes.sha256(String.join("\n", parts));

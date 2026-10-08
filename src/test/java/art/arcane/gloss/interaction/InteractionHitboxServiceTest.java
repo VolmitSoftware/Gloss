@@ -1,6 +1,7 @@
 package art.arcane.gloss.interaction;
 
 import art.arcane.gloss.api.HoloClickTrigger;
+import art.arcane.gloss.service.VisibilityGovernor;
 import art.arcane.gloss.config.action.MenuActionData;
 import art.arcane.gloss.config.action.MessageActionData;
 import art.arcane.gloss.enums.MenuActionType;
@@ -186,7 +187,7 @@ class InteractionHitboxServiceTest {
             (player, trigger) -> {
                 lastTrigger.set(trigger);
                 return new TestContext(player, trigger);
-            }, () -> true);
+            }, () -> true, new InteractionTarget.Visibility(VisibilityGovernor.Surface.SURFACE, ignored -> true));
     }
 
     @Test

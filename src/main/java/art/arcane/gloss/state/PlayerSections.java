@@ -37,7 +37,7 @@ public final class PlayerSections {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();
 
     private final Path root;
-    private final ConcurrentMap<UUID, Object> locks = new ConcurrentHashMap<>();
+    private final Object[] locks = locks();
     private final ConcurrentMap<UUID, Map<String, Map<String, Object>>> cached = new ConcurrentHashMap<>();
 
     public PlayerSections(Path dataFolder) {
@@ -54,10 +54,18 @@ public final class PlayerSections {
     }
 
     public void write(UUID player, String section, Map<String, Object> values) {
+        try {
+            writeChecked(player, section, values);
+        } catch (IOException failure) {
+            Gloss.logExceptionStack(false, failure, "state/players/%s.json could not be written.", player);
+        }
+    }
+
+    public void writeChecked(UUID player, String section, Map<String, Object> values) throws IOException {
         Objects.requireNonNull(player, "player");
         Objects.requireNonNull(section, "section");
         synchronized (lock(player)) {
-            Map<String, Map<String, Object>> file = load(player);
+            Map<String, Map<String, Object>> file = new LinkedHashMap<>(load(player));
             boolean empty = values == null || values.isEmpty();
             Map<String, Object> present = file.get(section);
             if (empty ? present == null : present != null && present.equals(values)) {
@@ -68,7 +76,10 @@ public final class PlayerSections {
             } else {
                 file.put(section, new LinkedHashMap<>(values));
             }
-            store(player, file);
+            Path target = file(player);
+            AtomicFiles.createParentDirectories(target);
+            AtomicFiles.replace(target, GSON.toJson(file, FILE_TYPE).getBytes(StandardCharsets.UTF_8));
+            cached.put(player, file);
         }
     }
 
@@ -79,8 +90,9 @@ public final class PlayerSections {
     /** Drops a player's cached file. The file itself stays; the next read parses it again. */
     public void evict(UUID player) {
         Objects.requireNonNull(player, "player");
-        cached.remove(player);
-        locks.remove(player);
+        synchronized (lock(player)) {
+            cached.remove(player);
+        }
     }
 
     public void forget(UUID player) {
@@ -93,7 +105,6 @@ public final class PlayerSections {
                 Gloss.logExceptionStack(false, failure, "state/players/%s.json could not be deleted.", player);
             }
         }
-        locks.remove(player);
     }
 
     private Map<String, Map<String, Object>> load(UUID player) {
@@ -121,16 +132,6 @@ public final class PlayerSections {
         }
     }
 
-    private void store(UUID player, Map<String, Map<String, Object>> file) {
-        Path target = file(player);
-        try {
-            AtomicFiles.createParentDirectories(target);
-            AtomicFiles.replace(target, GSON.toJson(file, FILE_TYPE).getBytes(StandardCharsets.UTF_8));
-        } catch (IOException failure) {
-            Gloss.logExceptionStack(false, failure, "state/players/%s.json could not be written.", player);
-        }
-    }
-
     private void quarantine(Path file, Throwable failure) {
         Path aside = file.resolveSibling(file.getFileName() + ".corrupt-" + System.currentTimeMillis());
         try {
@@ -147,7 +148,15 @@ public final class PlayerSections {
         return root.resolve(player + ".json");
     }
 
+    private static Object[] locks() {
+        Object[] stripes = new Object[1024];
+        for (int index = 0; index < stripes.length; index++) {
+            stripes[index] = new Object();
+        }
+        return stripes;
+    }
+
     private Object lock(UUID player) {
-        return locks.computeIfAbsent(player, ignored -> new Object());
+        return locks[player.hashCode() & (locks.length - 1)];
     }
 }

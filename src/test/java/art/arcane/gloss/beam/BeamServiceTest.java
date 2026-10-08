@@ -1,6 +1,7 @@
 package art.arcane.gloss.beam;
 
 import art.arcane.gloss.Gloss;
+import art.arcane.gloss.service.VisibilityGovernor;
 import art.arcane.gloss.api.BeamHandle;
 import art.arcane.gloss.api.BeamSpec;
 import art.arcane.gloss.menu.CharacterizationSupport;
@@ -56,6 +57,8 @@ class BeamServiceTest {
                 case "getName" -> "beam-viewer";
                 case "isOnline" -> online.get();
                 case "getWorld" -> world;
+                case "getLocation" -> new Location(world, 0, 64, 0);
+                case "isValid" -> online.get();
                 default -> CharacterizationSupport.identity(proxy, method, args);
             });
         Server server = (Server) CharacterizationSupport.proxy(new Class<?>[]{Server.class},
@@ -63,11 +66,13 @@ class BeamServiceTest {
                 case "getPlayer" -> VIEWER.equals(args[0]) ? viewer : null;
                 case "getLogger" -> CharacterizationSupport.mutedLogger();
                 case "getWorld" -> worldId.equals(args[0]) ? world : null;
-                case "isPrimaryThread" -> true;
+                case "isPrimaryThread", "isOwnedByCurrentRegion" -> true;
                 default -> CharacterizationSupport.identity(proxy, method, args);
             });
         previousServer = CharacterizationSupport.installServer(server);
         plugin = CharacterizationSupport.bareGloss(server);
+        CharacterizationSupport.setField(plugin, "isEnabled", true);
+        CharacterizationSupport.setField(plugin, "governor", VisibilityGovernor.passthrough());
         previousPlugin = CharacterizationSupport.installGloss(plugin);
         beams = new BeamService(plugin);
     }

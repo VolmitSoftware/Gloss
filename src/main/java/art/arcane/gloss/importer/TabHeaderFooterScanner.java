@@ -1,5 +1,7 @@
 package art.arcane.gloss.importer;
 
+import art.arcane.gloss.GlossConfig;
+
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
 
@@ -32,7 +34,7 @@ public final class TabHeaderFooterScanner {
         if (!Files.isRegularFile(file, LinkOption.NOFOLLOW_LINKS)) {
             return null;
         }
-        return read(Files.readString(file, StandardCharsets.UTF_8));
+        return read(new String(new ImportSourceFiles(GlossConfig.current().imports()).read(file), StandardCharsets.UTF_8));
     }
 
     Draft read(String source) {
@@ -61,6 +63,17 @@ public final class TabHeaderFooterScanner {
         if (headerFooter.getConfigurationSection("per-world") != null) {
             warnings.add("per-world header and footer overrides were not imported; add world "
                     + "conditions to the tablist variants by hand");
+        }
+        for (String section : List.of("per-server", "display-condition", "disable-condition")) {
+            if (headerFooter.contains(section)) {
+                warnings.add("header-footer." + section + " was not imported; configure Gloss header-footer conditions explicitly");
+            }
+        }
+        for (String section : List.of("scoreboard", "scoreboard-teams", "tablist-name-formatting",
+            "sorting-types", "layout", "playerlist-objective", "belowname-objective", "bossbar")) {
+            if (yaml.contains(section)) {
+                warnings.add(section + " was not imported; this source imports only headers and footers");
+            }
         }
         return new Draft(enabled, header, footer, Map.copyOf(groups), List.copyOf(warnings));
     }
