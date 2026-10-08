@@ -263,9 +263,6 @@ repositories {
         url = uri('https://repo.nexomc.com/releases/')
     }
     maven {
-        url = uri('https://maven.devs.beer/')
-    }
-    maven {
         url = uri('https://nexus.phoenixdevt.fr/repository/maven-public/')
     }
     exclusiveContent {

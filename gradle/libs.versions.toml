@@ -15,7 +15,7 @@ junit4 = "4.13.2"
 
 # custom item providers, compileOnly only
 craftEngine = "26.9.1"
-itemsAdder = "4.0.10"
+itemsAdder = "4.0.17"
 oraxen = "1.189.0"
 nexo = "1.25.0"
 mmoItems = "6.10.1-SNAPSHOT"
@@ -47,7 +47,7 @@ junit4 = { module = "junit:junit", version.ref = "junit4" }
 junitVintage = { module = "org.junit.vintage:junit-vintage-engine", version.ref = "junit" }
 craftengine-core = { module = "net.momirealms:craft-engine-core", version.ref = "craftEngine" }
 craftengine-bukkit = { module = "net.momirealms:craft-engine-bukkit", version.ref = "craftEngine" }
-itemsadder = { module = "dev.lone:api-itemsadder", version.ref = "itemsAdder" }
+itemsadder = { module = "beer.devs:itemsadder-api", version.ref = "itemsAdder" }
 oraxen = { module = "io.th0rgal:oraxen", version.ref = "oraxen" }
 nexo = { module = "com.nexomc:nexo", version.ref = "nexo" }
 mmoitems = { module = "net.Indyuce:MMOItems-API", version.ref = "mmoItems" }
