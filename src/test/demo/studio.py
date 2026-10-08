@@ -34,7 +34,7 @@ def initialize() -> None:
     properties: dict[str, str] = dict(line.split("=", 1) for line in (server / "server.properties").read_text().splitlines() if "=" in line and not line.startswith("#"))
     properties.update({"level-type": "minecraft:flat", "generate-structures": "false", "level-seed": "4817362", "view-distance": "8", "simulation-distance": "4", "motd": "Gloss demonstration studio", "enable-rcon": "true", "rcon.port": str(rig.free_port()), "rcon.password": secrets.token_hex(20), "generator-settings": json.dumps({"biome": "minecraft:plains", "layers": [{"block": "minecraft:bedrock", "height": 1}, {"block": "minecraft:stone", "height": 64}, {"block": "minecraft:dirt", "height": 4}, {"block": "minecraft:grass_block", "height": 1}]}, separators=(",", ":"))})
     (server / "server.properties").write_text("".join(key + "=" + value + "\n" for key, value in properties.items()))
-    shutil.copy2(ROOT / "build/libs/Gloss-3.2.1-26.2.jar", server / "plugins/Gloss.jar")
+    shutil.copy2(ROOT / "build/libs/Gloss-3.2.2-26.2.jar", server / "plugins/Gloss.jar")
     if (OUTPUT / "GlossDemo.jar").is_file():
         shutil.copy2(OUTPUT / "GlossDemo.jar", server / "plugins/GlossDemo.jar")
     state: dict = {"instance": name, "path": str(server), "port": port}
