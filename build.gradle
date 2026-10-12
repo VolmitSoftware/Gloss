@@ -23,7 +23,8 @@ plugins {
 apply plugin: 'art.arcane.volmit-packaging'
 
 group = 'art.arcane'
-version = '3.2.2-26.2'
+version = '3.2.2'
+ext.bukkitMinecraftRange = providers.gradleProperty('bukkitMinecraftRange').getOrElse('26.1.2-26.3')
 def apiVersion = '26.1'
 def main = 'art.arcane.gloss.Gloss'
 def lib = 'art.arcane.gloss.libs'
@@ -81,7 +82,7 @@ tasks.register('buildPsychoLT', Copy) {
         project.copy {
             from(tasks.named('packedJar').get().outputJar.get().asFile)
             into(pluginOutDirectory)
-            rename { String fileName -> fileName.replaceFirst(/-packed\.jar$/, '.jar') }
+            rename { String fileName -> "Gloss v${project.version} [CraftBukkit] ${project.bukkitMinecraftRange}.jar" }
         }
     }
 }
