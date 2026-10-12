@@ -1,6 +1,8 @@
 package art.arcane.gloss;
 
+import art.arcane.volmlib.util.update.BukkitUpdateService;
 import java.util.concurrent.CompletionStage;
+
 import art.arcane.volmlib.util.diagnostics.BukkitDebugDump;
 import art.arcane.volmlib.util.diagnostics.DebugDumpContributor;
 import art.arcane.gloss.marker.AnchorSnapshots;
@@ -129,6 +131,9 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
     private DataWatchdog watchdog;
     private volatile GlossConfig config;
     private BukkitLanguageSwitcher languageSwitcher;
+    private CompletableFuture<Void> reloadCommit;
+    private boolean disabling;
+    private BukkitUpdateService updateService;
     private BukkitDebugDump debugDump;
     private TextPipeline text;
     private AnimationService animations;
@@ -288,6 +293,8 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
     @Override
     public void onEnable() {
         instance = this;
+        disabling = false;
+        reloadCommit = null;
         boolean success = true;
         Throwable startupFailure = null;
         try {
@@ -385,6 +392,22 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
             if (!config.language().equals(localization.activeLocale())) {
                 localization.reloadConfigured(config.language());
             }
+            enableService("update-notifications", () -> updateService = BukkitUpdateService.register(this,
+                new BukkitUpdateService.Options("VolmitSoftware", "Gloss", "gloss.update",
+                    () -> config.updateNotifications())), () -> {
+                updateService.close();
+                updateService = null;
+            });
+            persistenceCoordinator = new GlossPersistenceCoordinator();
+            projectTransaction = new GlossProjectTransaction(getDataFolder().toPath());
+            try {
+                persistenceCoordinator.write(() -> {
+                    projectTransaction.recover();
+                    return null;
+                });
+            } catch (Exception failure) {
+                throw new IllegalStateException("Unable to recover Gloss editor sync persistence", failure);
+            }
             menuCatalog = new MenuCatalog(getDataFolder());
             imageAssets = new ImageAssets(getDataFolder(), () -> cfg().images());
             panelService = new PanelService(this);
@@ -466,7 +489,11 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
     }
 
     @Override
-    public void onDisable() {
+    public synchronized void onDisable() {
+        disabling = true;
+        if (reloadCommit != null && !reloadCommit.isDone()) {
+            reloadCommit.completeExceptionally(new IllegalStateException("Gloss disabled before reload cleanup completed"));
+        }
         shutdownServices();
         SchedulerUtils.cancelPluginTasks(this);
         if (scheduler != null) {
@@ -477,14 +504,57 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
     }
 
     @Override
-    public CompletionStage<Void> commitReload(PreUnloadReason reason) {
-        log(Level.INFO, "Pre-unload hook fired (%s). Tearing down Gloss sessions and PacketEvents.", reason);
-        shutdownServices();
-        SchedulerUtils.cancelPluginTasks(this);
-        if (scheduler != null) {
-            scheduler.cancelPluginTasks();
+    public synchronized CompletionStage<Void> commitReload(PreUnloadReason reason) {
+        if (disabling || !isEnabled()) {
+            return CompletableFuture.failedFuture(new IllegalStateException("Gloss is disabled"));
         }
-        return CompletableFuture.completedFuture(null);
+        if (reloadCommit != null && !reloadCommit.isCompletedExceptionally()) {
+            return reloadCommit.copy();
+        }
+        log(Level.INFO, "Reload commit started (%s). Tearing down Gloss sessions and PacketEvents.", reason);
+        CompletableFuture<Void> completion = new CompletableFuture<>();
+        reloadCommit = completion;
+        try {
+            CompletableFuture<Void> editors = languageSwitcher == null
+                ? CompletableFuture.completedFuture(null) : languageSwitcher.closeAsync();
+            editors.whenComplete((ignored, failure) -> scheduleReloadShutdown(completion, failure));
+        } catch (Throwable failure) {
+            completion.completeExceptionally(failure);
+        }
+        return completion.copy();
+    }
+
+    private void scheduleReloadShutdown(CompletableFuture<Void> completion, Throwable failure) {
+        if (completion.isDone()) {
+            return;
+        }
+        if (failure != null) {
+            completion.completeExceptionally(failure);
+            return;
+        }
+        try {
+            if (!FoliaScheduler.runGlobal(this, () -> finishReloadShutdown(completion))) {
+                completion.completeExceptionally(new IllegalStateException("Gloss reload shutdown scheduling was rejected"));
+            }
+        } catch (Throwable schedulingFailure) {
+            completion.completeExceptionally(schedulingFailure);
+        }
+    }
+
+    private synchronized void finishReloadShutdown(CompletableFuture<Void> completion) {
+        if (completion.isDone()) {
+            return;
+        }
+        try {
+            shutdownServices();
+            SchedulerUtils.cancelPluginTasks(this);
+            if (scheduler != null) {
+                scheduler.cancelPluginTasks();
+            }
+            completion.complete(null);
+        } catch (Throwable failure) {
+            completion.completeExceptionally(failure);
+        }
     }
 
     /**
@@ -556,7 +626,9 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
         GlossConfig previous = config;
         GlossConfig next = GlossConfig.from(reloaded);
         config = next;
-        configureTransactionRetention(next);
+        if (updateService != null) {
+            updateService.reconfigure();
+        }
         reloadServices(previous, next, cycleEveryService);
         applyMergedConfigHooks(previous, next, cycleEveryService);
         info("Reloaded in-place from disk.");

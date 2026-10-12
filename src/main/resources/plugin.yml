@@ -31,6 +31,9 @@ commands:
     description: Choose your chat channel.
     usage: /<command> <channel|list>
 permissions:
+  gloss.update:
+    description: Receive shared Volmit update notifications and check this plugin for updates
+    default: op
   gloss.debugdump:
     description: Allows creating and optionally uploading diagnostic reports.
     default: op

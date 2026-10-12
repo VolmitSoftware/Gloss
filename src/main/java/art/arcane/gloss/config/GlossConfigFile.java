@@ -30,6 +30,9 @@ public final class GlossConfigFile {
     @ConfigDoc("Sends anonymous bStats usage metrics.")
     public boolean metrics = true;
 
+    @ConfigDoc("Checks GitHub releases and includes Gloss in the shared Volmit update notice. Does not download or install updates.")
+    public boolean updateNotifications = true;
+
     @ConfigDoc("Prints the Gloss splash screen during startup.")
     public boolean splashScreen = true;
 

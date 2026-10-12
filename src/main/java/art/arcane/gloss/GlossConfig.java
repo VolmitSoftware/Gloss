@@ -31,6 +31,7 @@ import java.util.function.Function;
 public record GlossConfig(
     String language,
     boolean metrics,
+    boolean updateNotifications,
     boolean splashScreen,
     Holograms holograms,
     Particles particles,
@@ -65,7 +66,7 @@ public record GlossConfig(
     private static final GlossConfig DEFAULTS = defaults();
 
     public GlossConfig withLanguage(String locale) {
-        return new GlossConfig(locale, metrics, splashScreen, holograms, particles, boards, tablist,
+        return new GlossConfig(locale, metrics, updateNotifications, splashScreen, holograms, particles, boards, tablist,
             emoji, animations, chat, text, bubbles, indicators, drops, realDrops, motd, groups,
             hotload, commands, menus, panels, previews, editorSync, debug, customItems, playerHeads, integration,
             modules, visibility, images, teams, imports);
@@ -674,6 +675,7 @@ public record GlossConfig(
         return new GlossConfig(
             source.language,
             source.metrics,
+            source.updateNotifications,
             source.splashScreen,
             new Holograms(
                 source.features.holograms,
