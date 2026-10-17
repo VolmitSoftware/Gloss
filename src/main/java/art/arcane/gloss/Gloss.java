@@ -398,16 +398,6 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
                 updateService.close();
                 updateService = null;
             });
-            persistenceCoordinator = new GlossPersistenceCoordinator();
-            projectTransaction = new GlossProjectTransaction(getDataFolder().toPath());
-            try {
-                persistenceCoordinator.write(() -> {
-                    projectTransaction.recover();
-                    return null;
-                });
-            } catch (Exception failure) {
-                throw new IllegalStateException("Unable to recover Gloss editor sync persistence", failure);
-            }
             menuCatalog = new MenuCatalog(getDataFolder());
             imageAssets = new ImageAssets(getDataFolder(), () -> cfg().images());
             panelService = new PanelService(this);
@@ -626,6 +616,7 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
         GlossConfig previous = config;
         GlossConfig next = GlossConfig.from(reloaded);
         config = next;
+        configureTransactionRetention(next);
         if (updateService != null) {
             updateService.reconfigure();
         }
