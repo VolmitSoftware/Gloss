@@ -37,7 +37,7 @@ public final class SplashScreen {
         String status = success ? "READY" : "DEGRADED";
         String pluginVersion = plugin.getDescription().getVersion();
         String releaseTrain = SplashScreenSupport.releaseTrain(pluginVersion);
-        String serverVersion = SplashScreenSupport.serverVersionWithoutMcSuffix();
+        String serverVersion = SplashScreenSupport.serverVersionWithoutMcSuffix(plugin.getServer().getVersion());
         String startupDate = SplashScreenSupport.startupDate();
 
         String[] column = {
