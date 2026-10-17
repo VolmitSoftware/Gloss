@@ -80,7 +80,7 @@ class ChannelServiceTest {
         steve.heldItem = new HeldStack(Material.DIAMOND_SWORD, 1);
         List<Runnable> queued = new ArrayList<>();
         AtomicBoolean owned = new AtomicBoolean(false);
-        Object previous = CharacterizationSupport.installServer(scheduledServer(queued, owned));
+        Object previous = CharacterizationSupport.installServer(scheduledServer(queued, owned, steve));
         try {
             RecordingSink sink = new RecordingSink();
             service.dispatchDeferred(steve.proxy, "First [item]", sink);
@@ -114,7 +114,7 @@ class ChannelServiceTest {
         }
     }
 
-    private static Server scheduledServer(List<Runnable> queued, AtomicBoolean owned) {
+    private static Server scheduledServer(List<Runnable> queued, AtomicBoolean owned, ChatTestHarness.FakePlayer player) {
         Server base = CharacterizationSupport.server(Map.of());
         BukkitTask task = (BukkitTask) Proxy.newProxyInstance(BukkitTask.class.getClassLoader(),
             new Class<?>[]{BukkitTask.class}, (proxy, method, args) -> null);
@@ -130,6 +130,7 @@ class ChannelServiceTest {
             (proxy, method, args) -> switch (method.getName()) {
                 case "isPrimaryThread", "isOwnedByCurrentRegion" -> owned.get();
                 case "getScheduler" -> scheduler;
+                case "getPlayer" -> player.online && player.proxy.getUniqueId().equals(args[0]) ? player.proxy : null;
                 default -> method.invoke(base, args);
             });
     }
