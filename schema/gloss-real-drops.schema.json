@@ -595,7 +595,7 @@
         },
         "useItemDisplayNames": {
           "type": "boolean",
-          "default": false,
+          "default": true,
           "description": "Uses the item's own display name, such as an anvil rename, as {type} when it has one."
         },
         "names": {

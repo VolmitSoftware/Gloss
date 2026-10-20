@@ -29,6 +29,23 @@ class DropItemNameTest {
     }
 
     @Test
+    void defaultLabelsPreferNamedCoresAndKeepUnnamedMaterialLabels() {
+        GlossConfig.RealDrops.Labels defaults = RealDropSettingsDoc.DEFAULTS.toConfig(true).labels();
+        ItemStack core = new NamedStack("§bAngler Core", null) {
+            @Override
+            public Material getType() {
+                return Material.FIREWORK_STAR;
+            }
+        };
+
+        DropItemName name = DropItemName.capture(core, defaults);
+        assertEquals("§bAngler Core", name.resolve(null));
+        assertTrue(name.literal());
+        assertEquals("Paper", DropItemName.capture(new NamedStack(null, null), defaults).resolve(null));
+        assertEquals("Amber Ticket", DropItemName.capture(new NamedStack(null, "Amber Ticket"), defaults).resolve(null));
+    }
+
+    @Test
     void customNameWinsOverTheItemNameComponent() {
         DropItemName name = DropItemName.capture(new NamedStack("Renamed Ticket", "Amber Ticket"), labels(true));
         assertEquals("Renamed Ticket", name.resolve(null));
@@ -85,7 +102,7 @@ class DropItemNameTest {
             });
     }
 
-    private static final class NamedStack extends ItemStack {
+    private static class NamedStack extends ItemStack {
         private final ItemMeta meta;
 
         private NamedStack(String customName, String itemName) {

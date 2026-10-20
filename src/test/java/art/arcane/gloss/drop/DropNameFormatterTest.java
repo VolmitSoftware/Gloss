@@ -196,8 +196,8 @@ class DropNameFormatterTest {
     }
 
     @Test
-    void itemDisplayNamesRequireExplicitOptIn() {
+    void itemDisplayNamesAreUsedByDefault() {
         assertTrue(RealDropSettingsDoc.DEFAULTS.presentation().labels().preserveCustomNames());
-        assertFalse(RealDropSettingsDoc.DEFAULTS.toConfig(true).labels().useItemDisplayNames());
+        assertTrue(RealDropSettingsDoc.DEFAULTS.toConfig(true).labels().useItemDisplayNames());
     }
 }

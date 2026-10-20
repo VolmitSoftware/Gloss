@@ -254,7 +254,7 @@ public record RealDropSettingsDoc(
             enabled = enabled == null || enabled;
             yOffset = clamp(yOffset, -4.0D, 16.0D, 0.55D);
             format = text(format, NAME_FORMAT_DEFAULT);
-            useItemDisplayNames = useItemDisplayNames != null && useItemDisplayNames;
+            useItemDisplayNames = useItemDisplayNames == null || useItemDisplayNames;
             names = cleanNames(names);
             bundle = bundle == null ? new LabelBundle(null, null, null, null, null, null) : bundle;
             style = style == null ? defaultStyle() : style;

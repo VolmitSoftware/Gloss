@@ -3,11 +3,15 @@ package art.arcane.gloss.drop;
 import art.arcane.gloss.GlossConfig;
 import org.junit.jupiter.api.Test;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -37,7 +41,7 @@ class RealDropSettingsDocTest {
         assertEquals(4, config.landing().settleDelayTicks());
         assertTrue(config.labels().style().seeThrough());
         assertEquals("&7{count}x {type}", config.labels().format());
-        assertFalse(config.labels().useItemDisplayNames());
+        assertTrue(config.labels().useItemDisplayNames());
         assertEquals(Map.of(), config.labels().names());
         assertEquals(RealDropSettingsDoc.BUNDLE_FORMAT_DEFAULT, config.labels().bundle().format());
         assertEquals(3, config.labels().bundle().entryLimit());
@@ -46,6 +50,29 @@ class RealDropSettingsDocTest {
         assertEquals(RealDropSettingsDoc.BUNDLE_ENTRY_FORMAT_DEFAULT, config.labels().bundle().entryFormat());
         assertEquals(RealDropSettingsDoc.BUNDLE_MORE_FORMAT_DEFAULT, config.labels().bundle().moreFormat());
         assertEquals(List.of("BEDROCK", "BARRIER"), config.filters().materialBlacklist());
+    }
+
+    @Test
+    void shippedLabelsPreferItemNames() throws IOException {
+        try (InputStream resource = getClass().getResourceAsStream("/defaults/real-drops/default.json")) {
+            assertNotNull(resource);
+            RealDropSettingsDoc parsed = RealDropSettingsDoc.parse("default.json",
+                new String(resource.readAllBytes(), StandardCharsets.UTF_8));
+            assertTrue(parsed.toConfig(true).labels().useItemDisplayNames());
+        }
+    }
+
+    @Test
+    void explicitMaterialNamesRemainDisabledAndVariantsDefaultIndependently() {
+        RealDropSettingsDoc parsed = RealDropSettingsDoc.parse("default.json", """
+            {"schemaVersion":4,"revision":1,"presentation":{"labels":{"useItemDisplayNames":false}},
+              "variants":[{"id":"named","when":"true","presentation":{"labels":{}}},
+                {"id":"material","when":"false","presentation":{"labels":{"useItemDisplayNames":false}}}]}
+            """);
+
+        assertFalse(parsed.toConfig(true).labels().useItemDisplayNames());
+        assertTrue(parsed.variants().get(0).presentation().toConfig(true).labels().useItemDisplayNames());
+        assertFalse(parsed.variants().get(1).presentation().toConfig(true).labels().useItemDisplayNames());
     }
 
     @Test
