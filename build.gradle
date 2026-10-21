@@ -1,4 +1,3 @@
-import org.gradle.api.tasks.Copy
 import org.gradle.api.tasks.WriteProperties
 import org.gradle.api.tasks.compile.JavaCompile
 import org.gradle.jvm.toolchain.JavaLanguageVersion
@@ -67,37 +66,6 @@ def universalJarTask = tasks.register('universalJar', Jar) {
 shadowJarTask.configure { finalizedBy(universalJarTask) }
 tasks.named('assemble') { dependsOn(universalJarTask) }
 tasks.named('slimJar').get()
-File pluginOutDirectory = layout.projectDirectory.dir('../PluginOuts').asFile
-
-tasks.register('buildPsychoLT', Copy) {
-    group = 'development'
-    description = 'Builds and deploys Gloss to the managed Minecraft test-server dropins.'
-    outputs.upToDateWhen { false }
-    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
-    dependsOn(tasks.named('check'), 'packedJar')
-    from({ tasks.named('packedJar').get().outputJar })
-    into(layout.projectDirectory.dir('../../[Minecraft Server]/consumers/plugin-consumers/dropins/plugins'))
-    rename { String ignored -> 'Gloss.jar' }
-    doLast {
-        project.copy {
-            from(tasks.named('packedJar').get().outputJar.get().asFile)
-            into(pluginOutDirectory)
-            rename { String fileName -> "Gloss v${project.version} [CraftBukkit] ${project.bukkitMinecraftRange}.jar" }
-        }
-    }
-}
-
-tasks.register('buildSwiftSwamp', Copy) {
-    group = 'development'
-    description = 'Builds and deploys Gloss to the local BUILDS output directory.'
-    outputs.upToDateWhen { false }
-    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
-    dependsOn(tasks.named('check'), 'packedJar')
-    from({ tasks.named('packedJar').get().outputJar })
-    into(file('C://VolmitSoftware/BUILDS'))
-    rename { String ignored -> 'Gloss.jar' }
-}
-
 tasks.named('jar').configure {
     enabled = false
 }
@@ -552,3 +520,5 @@ tasks.register('verifyPlatformPackaging') {
 }
 
 tasks.named('check') { dependsOn(tasks.named('verifyPlatformPackaging')) }
+
+apply from: 'gradle/multiplexor.gradle'
