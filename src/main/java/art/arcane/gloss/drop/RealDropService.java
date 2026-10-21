@@ -20,6 +20,7 @@ import art.arcane.gloss.hologram.TextDisplayStyle;
 import art.arcane.gloss.text.TextPipeline;
 import art.arcane.gloss.api.HologramBox;
 import art.arcane.gloss.api.IconDisplayStyle;
+import art.arcane.volmlib.projection.ProjectionViewAccess;
 import art.arcane.volmlib.util.scheduling.FoliaScheduler;
 import org.bukkit.Color;
 import org.bukkit.Location;
@@ -82,6 +83,7 @@ final class RealDropService {
 
     private volatile boolean running;
     private volatile long generation;
+    private volatile ProjectionViewAccess projectionViews;
 
     RealDropService(Gloss plugin) {
         this.plugin = plugin;
@@ -98,6 +100,9 @@ final class RealDropService {
     }
 
     void enable() {
+        if (projectionViews == null) {
+            projectionViews = new ProjectionViewAccess(plugin);
+        }
         generation++;
         running = true;
     }
@@ -105,6 +110,11 @@ final class RealDropService {
     void disable() {
         running = false;
         generation++;
+        ProjectionViewAccess views = projectionViews;
+        projectionViews = null;
+        if (views != null) {
+            views.close();
+        }
         List<State> snapshot = new ArrayList<>(states.values());
         for (State state : snapshot) {
             state.closed = true;
@@ -1470,6 +1480,20 @@ final class RealDropService {
             }
             dispatchAudience(state, selection, viewer, displays, revision, tick, anchor);
         });
+        ProjectionViewAccess views = projectionViews;
+        if (views != null) {
+            Map<UUID, Double> projected = views.viewers(anchor.getWorld().getUID(),
+                anchor.getX(), anchor.getY(), anchor.getZ(), range);
+            for (UUID viewerId : projected.keySet()) {
+                if (!current.add(viewerId) || !state.audience.refreshRequired(viewerId, revision, tick)) {
+                    continue;
+                }
+                Player viewer = plugin.getServer().getPlayer(viewerId);
+                if (viewer != null) {
+                    dispatchAudience(state, selection, viewer, displays, revision, tick, anchor);
+                }
+            }
+        }
         for (UUID viewerId : state.audience.viewers()) {
             if (current.contains(viewerId)) {
                 continue;
@@ -1508,9 +1532,14 @@ final class RealDropService {
             return;
         }
         Location location = viewer.getLocation();
+        ProjectionViewAccess views = projectionViews;
+        double projectedDistance = views == null ? Double.POSITIVE_INFINITY
+            : views.distanceSquared(viewer.getUniqueId(), anchor.getWorld().getUID(),
+                anchor.getX(), anchor.getY(), anchor.getZ());
+        double distance = audienceDistanceSquared(location, anchor, projectedDistance);
         boolean eligible = !hiddenOnBedrock(viewer) && selection.visibleTo(plugin, viewer)
-            && location.getWorld() == anchor.getWorld()
-            && plugin.governor().tier(viewer, VisibilityGovernor.Surface.DROP, location.distanceSquared(anchor))
+            && Double.isFinite(distance)
+            && plugin.governor().tier(viewer, VisibilityGovernor.Surface.DROP, distance)
                 != VisibilityGovernor.Tier.CULLED;
         boolean visible;
         if (eligible) {
@@ -1530,6 +1559,14 @@ final class RealDropService {
 
         }
         state.audience.applied(viewer.getUniqueId(), visible, revision, tick);
+    }
+
+    static double audienceDistanceSquared(Location viewer, Location anchor, double projectedDistance) {
+        double physicalDistance = viewer.getWorld() == anchor.getWorld()
+            ? viewer.distanceSquared(anchor) : Double.POSITIVE_INFINITY;
+        double virtualDistance = Double.isFinite(projectedDistance) && projectedDistance >= 0.0D
+            ? projectedDistance : Double.POSITIVE_INFINITY;
+        return Math.min(physicalDistance, virtualDistance);
     }
 
     /** The decision the label hologram and the particle emitters read; never a fresh dispatch. */

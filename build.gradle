@@ -439,6 +439,8 @@ pluginPackaging {
                 .getOrElse(!PackagingMode.resolve(providers).development())
             taskName = 'universalJar'
             policyName = 'Gloss'
+            prunePrefixes = ['art/arcane/volmlib/']
+            keepPrefixes = ['art/arcane/volmlib/util/matter/slices/', 'art/arcane/volmlib/nativelib/']
             shrinkRules = [file('packaging/shrink.pro')]
             shrinkLibraries.from(provider {
                 project(':velocity').configurations.compileClasspath.filter { File library ->
@@ -471,17 +473,7 @@ pluginPackaging {
             taskName = 'shadowJar'
             policyName = 'Gloss'
             intermediate = true
-            prunePrefixes = ['art/arcane/volmlib/']
-            keepPrefixes = ['art/arcane/volmlib/util/matter/slices/', 'art/arcane/volmlib/nativelib/']
-            shrinkRules = [file('packaging/shrink.pro')]
-            shrinkRelocations = [
-                'com.github.retrooper.packetevents': "${lib}.packetevents.api",
-                'io.github.retrooper.packetevents' : "${lib}.packetevents.impl",
-                'org.bstats'                       : "${lib}.bstats",
-                'org.apache.commons'               : "${lib}.commons",
-                'net.kyori'                        : "${lib}.kyori",
-                'com.moandjiezana.toml'            : "${lib}.toml"
-            ]
+            shrink = false
         }
     }
 }
