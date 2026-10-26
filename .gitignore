@@ -32,3 +32,5 @@ BUILDS/
 
 __pycache__/
 *.pyc
+
+.jqwik-database

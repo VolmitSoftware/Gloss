@@ -7,6 +7,8 @@ import art.arcane.gloss.api.HoloMenu;
 import art.arcane.gloss.api.HoloMenuHandle;
 import art.arcane.gloss.api.Hologram;
 import art.arcane.gloss.api.TemporaryHologram;
+import art.arcane.gloss.api.TemporaryItem;
+import art.arcane.gloss.api.TemporaryItemSpec;
 import art.arcane.gloss.api.internal.GlossApiServiceImpl;
 import org.bukkit.Location;
 import org.bukkit.entity.Item;
@@ -21,9 +23,11 @@ import java.util.UUID;
 
 public final class GlossAPIImpl implements GlossAPI {
     private final Gloss plugin;
+    private final TemporaryItemService temporaryItems;
 
     public GlossAPIImpl(Gloss plugin) {
         this.plugin = plugin;
+        temporaryItems = new TemporaryItemService(plugin);
     }
 
     @Override
@@ -120,6 +124,15 @@ public final class GlossAPIImpl implements GlossAPI {
 
 
     @Override
+    public TemporaryItem createTemporaryItem(Plugin owner, Player viewer, TemporaryItemSpec spec) {
+        return temporaryItems.create(owner, viewer, spec);
+    }
+
+    public void close() {
+        temporaryItems.close();
+    }
+
+    @Override
     public String filter(Player player, String raw) {
         return plugin.text().render(player, raw);
     }
@@ -166,3 +179,4 @@ public final class GlossAPIImpl implements GlossAPI {
         plugin.tablist().resetTab(player);
     }
 }
+

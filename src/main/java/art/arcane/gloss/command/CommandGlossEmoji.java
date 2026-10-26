@@ -37,25 +37,21 @@ public class CommandGlossEmoji {
             return;
         }
 
-        DirectorMiniMenu.ContentPage window = GlossCommandPager.window(enabled.size(), page, GlossCommandPager.EMOJI_PAGE_SIZE);
         DirectorMiniMenu.Theme theme = GlossCommandService.menuTheme();
         String hover = DirectorMiniMenu.escapeText(GlossLocalization.globalDirectorText(GlossMessages.EMOJI_HOVER, MessageArgs.empty()));
-        List<String> lines = new ArrayList<>();
-        GlossCommandPager.appendHeader(lines, LIST_COMMAND, window, theme);
-        appendEmojiRows(lines, enabled, window, theme, hover);
-        GlossCommandPager.appendFooter(lines, window, LIST_COMMAND, theme);
-        DirectorMiniMenu.deliver(sender, lines);
+        DirectorMiniMenu.deliver(sender, GlossCommandPager.menu(LIST_COMMAND, emojiRows(enabled, theme, hover), page,
+            LIST_COMMAND, theme));
     }
 
-    private void appendEmojiRows(List<String> lines, List<EmojiEntry> enabled, DirectorMiniMenu.ContentPage window,
-                                 DirectorMiniMenu.Theme theme, String hover) {
+    private List<String> emojiRows(List<EmojiEntry> enabled, DirectorMiniMenu.Theme theme, String hover) {
+        List<String> lines = new ArrayList<>((enabled.size() + GlossCommandPager.EMOJI_COLUMNS - 1) / GlossCommandPager.EMOJI_COLUMNS);
         StringBuilder row = new StringBuilder();
         int column = 0;
-        for (int index = window.startIndex(); index < window.endIndex(); index++) {
+        for (EmojiEntry entry : enabled) {
             if (column > 0) {
                 row.append(' ');
             }
-            row.append(renderEmojiEntry(enabled.get(index), theme, hover));
+            row.append(renderEmojiEntry(entry, theme, hover));
             column++;
             if (column < GlossCommandPager.EMOJI_COLUMNS) {
                 continue;
@@ -67,6 +63,7 @@ public class CommandGlossEmoji {
         if (column > 0) {
             lines.add(row.toString());
         }
+        return lines;
     }
 
     @Director(name = "reset", sync = true, descriptionKey = "command.help.emoji.reset", description = "Restore shipped emoji defaults")

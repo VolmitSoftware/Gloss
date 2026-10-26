@@ -5,90 +5,107 @@ import org.junit.Test;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.IntStream;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
 public class GlossCommandPagerTest {
+  private static final DirectorMiniMenu.Theme THEME = DirectorMiniMenu.Theme.irisGreen();
+  private static final String WRAPPING_DETAILS = String.join(" ", IntStream.range(0, 10).mapToObj(index -> "abcde").toList());
+
   @Test
-  public void pageSizesShareTheNineteenLineMenuBudget() {
-    assertEquals(19, DirectorMiniMenu.MENU_LINE_COUNT);
-    assertEquals(17, GlossCommandPager.TEXT_PAGE_SIZE);
-    assertEquals(15, GlossCommandPager.ITEM_STATUS_PAGE_SIZE);
-    assertEquals(3, GlossCommandPager.EMOJI_COLUMNS);
-    assertEquals(51, GlossCommandPager.EMOJI_PAGE_SIZE);
-    assertEquals(DirectorMiniMenu.MENU_LINE_COUNT, 1 + GlossCommandPager.TEXT_PAGE_SIZE + 1);
-    assertEquals(DirectorMiniMenu.MENU_LINE_COUNT,
-        1 + 1 + GlossCommandPager.ITEM_STATUS_PAGE_SIZE + 1 + 1);
-    assertEquals(DirectorMiniMenu.MENU_LINE_COUNT,
-        1 + (GlossCommandPager.EMOJI_PAGE_SIZE / GlossCommandPager.EMOJI_COLUMNS) + 1);
-    assertEquals(new DirectorMiniMenu.ContentPage(2, 2, 51, 67, 67),
-        GlossCommandPager.window(67, 2, GlossCommandPager.EMOJI_PAGE_SIZE));
+  public void menuPagesFillTheTwentyChatLines() {
+    List<String> entries = entries(40, "menu=main");
+    List<String> lines = GlossCommandPager.menu("/gloss panel list", entries, 1, "/gloss panel list", THEME);
+
+    assertEquals(new DirectorMiniMenu.ContentPage(1, 3, 0, 18, 40),
+        GlossCommandPager.window(entries, 1, GlossCommandPager.MENU_RESERVED_LINES));
+    assertEquals(DirectorMiniMenu.CHAT_LINE_COUNT, lines.size());
+    assertEquals(DirectorMiniMenu.CHAT_LINE_COUNT, rows(lines));
   }
 
   @Test
-  public void windowBoundsEveryPageToTheListSize() {
-    assertEquals(new DirectorMiniMenu.ContentPage(2, 2, 17, 25, 25),
-        GlossCommandPager.window(25, 2, GlossCommandPager.TEXT_PAGE_SIZE));
-    assertEquals(new DirectorMiniMenu.ContentPage(2, 2, 17, 25, 25),
-        GlossCommandPager.window(25, 3, GlossCommandPager.TEXT_PAGE_SIZE));
-    assertEquals(new DirectorMiniMenu.ContentPage(1, 1, 0, 0, 0),
-        GlossCommandPager.window(0, 1, GlossCommandPager.TEXT_PAGE_SIZE));
+  public void wrappedEntriesTakeTheLinesTheyWrapTo() {
+    List<String> entries = entries(20, WRAPPING_DETAILS);
+    assertEquals(2, DirectorMiniMenu.chatRows(entries.get(0)));
+
+    List<String> lines = GlossCommandPager.menu("/gloss panel list", entries, 1, "/gloss panel list", THEME);
+
+    assertEquals(new DirectorMiniMenu.ContentPage(1, 3, 0, 9, 20),
+        GlossCommandPager.window(entries, 1, GlossCommandPager.MENU_RESERVED_LINES));
+    assertEquals(11, lines.size());
+    assertTrue(rows(lines) <= DirectorMiniMenu.CHAT_LINE_COUNT);
+  }
+
+  @Test
+  public void extraLinesShrinkThePage() {
+    assertEquals(new DirectorMiniMenu.ContentPage(1, 3, 0, 15, 40),
+        GlossCommandPager.window(entries(40, null), 1, 5));
+    assertEquals(new DirectorMiniMenu.ContentPage(1, 2, 0, 20, 40),
+        GlossCommandPager.window(entries(40, null), 1, 0));
   }
 
   @Test
   public void windowClampsPagesOutsideTheAvailableRange() {
-    assertEquals(new DirectorMiniMenu.ContentPage(1, 2, 0, 17, 25),
-        GlossCommandPager.window(25, 0, GlossCommandPager.TEXT_PAGE_SIZE));
-    assertEquals(new DirectorMiniMenu.ContentPage(1, 2, 0, 17, 25),
-        GlossCommandPager.window(25, Integer.MIN_VALUE, GlossCommandPager.TEXT_PAGE_SIZE));
-    assertEquals(new DirectorMiniMenu.ContentPage(2, 2, 17, 25, 25),
-        GlossCommandPager.window(25, 4, GlossCommandPager.TEXT_PAGE_SIZE));
-    assertEquals(new DirectorMiniMenu.ContentPage(2, 2, 17, 25, 25),
-        GlossCommandPager.window(25, Integer.MAX_VALUE, GlossCommandPager.TEXT_PAGE_SIZE));
+    List<String> entries = entries(25, null);
+
+    assertEquals(new DirectorMiniMenu.ContentPage(1, 2, 0, 18, 25),
+        GlossCommandPager.window(entries, 0, GlossCommandPager.MENU_RESERVED_LINES));
+    assertEquals(new DirectorMiniMenu.ContentPage(1, 2, 0, 18, 25),
+        GlossCommandPager.window(entries, Integer.MIN_VALUE, GlossCommandPager.MENU_RESERVED_LINES));
+    assertEquals(new DirectorMiniMenu.ContentPage(2, 2, 18, 25, 25),
+        GlossCommandPager.window(entries, 4, GlossCommandPager.MENU_RESERVED_LINES));
+    assertEquals(new DirectorMiniMenu.ContentPage(2, 2, 18, 25, 25),
+        GlossCommandPager.window(entries, Integer.MAX_VALUE, GlossCommandPager.MENU_RESERVED_LINES));
+    assertEquals(new DirectorMiniMenu.ContentPage(1, 1, 0, 0, 0),
+        GlossCommandPager.window(List.of(), 1, GlossCommandPager.MENU_RESERVED_LINES));
   }
 
   @Test
   public void hasNextTracksTheLastPage() {
-    assertTrue(GlossCommandPager.window(25, 1, GlossCommandPager.TEXT_PAGE_SIZE).hasNext());
-    assertFalse(GlossCommandPager.window(25, 2, GlossCommandPager.TEXT_PAGE_SIZE).hasNext());
-    assertFalse(GlossCommandPager.window(25, 3, GlossCommandPager.TEXT_PAGE_SIZE).hasNext());
-    assertFalse(GlossCommandPager.window(0, 1, GlossCommandPager.TEXT_PAGE_SIZE).hasNext());
+    List<String> entries = entries(25, null);
+
+    assertTrue(GlossCommandPager.window(entries, 1, GlossCommandPager.MENU_RESERVED_LINES).hasNext());
+    assertFalse(GlossCommandPager.window(entries, 2, GlossCommandPager.MENU_RESERVED_LINES).hasNext());
+    assertFalse(GlossCommandPager.window(List.of(), 1, GlossCommandPager.MENU_RESERVED_LINES).hasNext());
   }
 
   @Test
   public void contentPageCommandsUseTheKeyedPageArgument() {
-    DirectorMiniMenu.ContentPage middle = GlossCommandPager.window(40, 2, GlossCommandPager.TEXT_PAGE_SIZE);
+    DirectorMiniMenu.ContentPage middle = GlossCommandPager.window(entries(40, null), 2,
+        GlossCommandPager.MENU_RESERVED_LINES);
+
     assertEquals("/gloss hologram list page=1", middle.previousCommand("/gloss hologram list"));
     assertEquals("/gloss hologram list page=3", middle.nextCommand("/gloss hologram list"));
-    assertEquals("/gloss emoji list page=2",
-        GlossCommandPager.window(67, 1, GlossCommandPager.EMOJI_PAGE_SIZE)
-            .nextCommand("/gloss emoji list"));
   }
 
   @Test
   public void glossContentPagesUseTheSharedIrisNavigationLayout() {
-    DirectorMiniMenu.ContentPage page = GlossCommandPager.window(40, 2, GlossCommandPager.TEXT_PAGE_SIZE);
-    DirectorMiniMenu.Theme theme = DirectorMiniMenu.Theme.irisGreen();
-    List<String> lines = new ArrayList<>();
-
-    GlossCommandPager.appendHeader(lines, "/gloss emoji list", page, theme);
-    GlossCommandPager.appendFooter(lines, page, "/gloss emoji list", theme);
+    List<String> lines = GlossCommandPager.menu("/gloss emoji list", entries(40, null), 2, "/gloss emoji list", THEME);
+    String footer = lines.get(lines.size() - 1);
 
     assertTrue(lines.get(0).contains("/gloss emoji list {2/3}"));
-    assertTrue(lines.get(1).contains("〈 Page 1"));
-    assertTrue(lines.get(1).contains("/gloss emoji list page=1"));
-    assertTrue(lines.get(1).contains("Page 3 ❭"));
-    assertTrue(lines.get(1).contains("/gloss emoji list page=3"));
+    assertTrue(footer.contains("〈 Page 1"));
+    assertTrue(footer.contains("/gloss emoji list page=1"));
+    assertTrue(footer.contains("Page 3 ❭"));
+    assertTrue(footer.contains("/gloss emoji list page=3"));
   }
 
-  @Test
-  public void rejectsNegativeCountsAndNonPositivePageSizes() {
-    assertThrows(IllegalArgumentException.class,
-        () -> GlossCommandPager.window(-1, 1, GlossCommandPager.TEXT_PAGE_SIZE));
-    assertThrows(IllegalArgumentException.class,
-        () -> GlossCommandPager.window(10, 1, 0));
+  private static List<String> entries(int count, String details) {
+    List<String> entries = new ArrayList<>(count);
+    for (int index = 1; index <= count; index++) {
+      entries.add(GlossCommandPager.entry("entry-" + index, details, THEME));
+    }
+    return entries;
+  }
+
+  private static int rows(List<String> lines) {
+    int rows = 0;
+    for (String line : lines) {
+      rows += DirectorMiniMenu.chatRows(line);
+    }
+    return rows;
   }
 }

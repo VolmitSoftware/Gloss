@@ -1306,6 +1306,9 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
     }
 
     private void shutdownServices() {
+        if (api != null) {
+            api.close();
+        }
         DataWatchdog currentWatchdog = watchdog;
         if (currentWatchdog != null) {
             currentWatchdog.stop();
@@ -1373,3 +1376,4 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
         }
     }
 }
+

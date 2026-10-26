@@ -6,10 +6,10 @@ import art.arcane.gloss.history.HistoryService;
 import art.arcane.gloss.locale.GlossMessages;
 import art.arcane.volmlib.util.director.annotations.Director;
 import art.arcane.volmlib.util.director.annotations.Param;
-import art.arcane.volmlib.util.director.help.DirectorMiniMenu;
 import art.arcane.volmlib.util.localization.MessageArgument;
 import org.bukkit.command.CommandSender;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Director(name = "history", descriptionKey = "command.help.history.root",
@@ -48,14 +48,14 @@ public final class CommandGlossHistory {
           MessageArgument.untrusted("id", id));
       return;
     }
-    DirectorMiniMenu.ContentPage window = GlossCommandPager.window(versions.size(), page,
-        GlossCommandPager.TEXT_PAGE_SIZE);
-    for (HistoryEntry entry : versions.subList(window.startIndex(), window.endIndex())) {
-      GlossCommandMessages.send(sender, GlossMessages.HISTORY_ENTRY,
+    List<GlossCommandPager.MessageRow> rows = new ArrayList<>(versions.size());
+    for (HistoryEntry entry : versions) {
+      rows.add(GlossCommandPager.row(GlossMessages.HISTORY_ENTRY,
           MessageArgument.untrusted("revision", entry.version()),
           MessageArgument.untrusted("source", entry.source()),
-          MessageArgument.trusted("count", entry.bytes()));
+          MessageArgument.trusted("count", entry.bytes())));
     }
+    GlossCommandPager.sendRows(sender, rows, page, 0);
   }
 
   private HistoryService history() {

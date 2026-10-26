@@ -49,19 +49,17 @@ public final class CommandGlossWebSessions {
       send(sender, GlossMessages.WEB_SESSION_LIST_EMPTY);
       return;
     }
-    DirectorMiniMenu.ContentPage window = GlossCommandPager.window(sessions.size(), page, GlossCommandPager.TEXT_PAGE_SIZE);
     DirectorMiniMenu.Theme theme = GlossCommandService.menuTheme();
-    List<String> lines = new ArrayList<>();
-    GlossCommandPager.appendHeader(lines, LIST_COMMAND + " · " + sessions.size(), window, theme);
-    for (EditorSyncSessionInfo session : sessions.subList(window.startIndex(), window.endIndex())) {
+    List<String> entries = new ArrayList<>(sessions.size());
+    for (EditorSyncSessionInfo session : sessions) {
       long seconds = Math.max(0L, Duration.between(Instant.now(), session.expiresAt()).toSeconds());
       String details = session.kind().wireName() + "=" + session.subjectId()
           + " expires=" + seconds + "s publication=" + session.lastPublicationRevision()
           + " pending=" + (session.pendingStatus() == null ? "-" : session.pendingStatus());
-      lines.add(GlossCommandPager.entry(EditorSyncService.abbreviate(session.sessionId()), details, theme));
+      entries.add(GlossCommandPager.entry(EditorSyncService.abbreviate(session.sessionId()), details, theme));
     }
-    GlossCommandPager.appendFooter(lines, window, LIST_COMMAND, theme);
-    DirectorMiniMenu.deliver(sender, lines);
+    DirectorMiniMenu.deliver(sender, GlossCommandPager.menu(LIST_COMMAND + " · " + sessions.size(), entries, page,
+        LIST_COMMAND, theme));
   }
 
   @Director(name = "status", description = "Show one web editor session",

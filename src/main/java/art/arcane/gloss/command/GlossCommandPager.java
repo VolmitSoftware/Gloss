@@ -3,22 +3,40 @@ package art.arcane.gloss.command;
 import art.arcane.gloss.locale.GlossLocalization;
 import art.arcane.gloss.locale.GlossMessages;
 import art.arcane.volmlib.util.director.help.DirectorMiniMenu;
+import art.arcane.volmlib.util.localization.LanguageAudience;
+import art.arcane.volmlib.util.localization.MessageArgs;
 import art.arcane.volmlib.util.localization.MessageArgument;
+import art.arcane.volmlib.util.localization.TextKey;
+import art.arcane.volmlib.util.plugin.ComponentMessenger;
+import art.arcane.volmlib.util.plugin.ComponentText;
 import org.bukkit.command.CommandSender;
+import org.bukkit.entity.Player;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 final class GlossCommandPager {
-    static final int TEXT_PAGE_SIZE = DirectorMiniMenu.MENU_LINE_COUNT - 2;
-    static final int ITEM_STATUS_PAGE_SIZE = DirectorMiniMenu.MENU_LINE_COUNT - 4;
+    static final int MENU_RESERVED_LINES = 2;
+    static final int PAGE_FOOTER_LINES = 2;
     static final int EMOJI_COLUMNS = 3;
-    static final int EMOJI_PAGE_SIZE = TEXT_PAGE_SIZE * EMOJI_COLUMNS;
 
     private GlossCommandPager() {
     }
 
-    static DirectorMiniMenu.ContentPage window(int itemCount, int requestedPage, int pageSize) {
-        return DirectorMiniMenu.paginate(itemCount, requestedPage, pageSize);
+    static DirectorMiniMenu.ContentPage window(List<String> entries, int requestedPage, int reservedLines) {
+        return DirectorMiniMenu.paginate(entries, requestedPage,
+                DirectorMiniMenu.CHAT_LINE_COUNT - reservedLines, reservedLines);
+    }
+
+    static List<String> menu(String title, List<String> entries, int requestedPage, String command,
+                             DirectorMiniMenu.Theme theme) {
+        DirectorMiniMenu.ContentPage page = window(entries, requestedPage, MENU_RESERVED_LINES);
+        List<String> lines = new ArrayList<>(page.endIndex() - page.startIndex() + MENU_RESERVED_LINES);
+        appendHeader(lines, title, page, theme);
+        lines.addAll(entries.subList(page.startIndex(), page.endIndex()));
+        appendFooter(lines, page, command, theme);
+        return lines;
     }
 
     static void appendHeader(List<String> lines, String title, DirectorMiniMenu.ContentPage page,
@@ -29,6 +47,25 @@ final class GlossCommandPager {
     static void appendFooter(List<String> lines, DirectorMiniMenu.ContentPage page, String command,
                              DirectorMiniMenu.Theme theme) {
         lines.add(DirectorMiniMenu.paginationBar(page, command, theme, GlossLocalization.globalDirectorResolver()));
+    }
+
+    static MessageRow row(TextKey key, MessageArgument... arguments) {
+        return new MessageRow(key, GlossLocalization.args(arguments));
+    }
+
+    static DirectorMiniMenu.ContentPage sendRows(CommandSender sender, List<MessageRow> rows, int requestedPage,
+                                                 int reservedLines) {
+        UUID viewer = sender instanceof Player player ? player.getUniqueId() : null;
+        List<ComponentText> rendered = LanguageAudience.call(viewer, () -> render(rows));
+        List<String> markup = new ArrayList<>(rendered.size());
+        for (ComponentText line : rendered) {
+            markup.add(line.miniMessage());
+        }
+        DirectorMiniMenu.ContentPage page = window(markup, requestedPage, reservedLines);
+        for (ComponentText line : rendered.subList(page.startIndex(), page.endIndex())) {
+            ComponentMessenger.send(sender, line);
+        }
+        return page;
     }
 
     /** The page counter and the next-page hint for a command that sends its rows as plain messages. */
@@ -59,5 +96,16 @@ final class GlossCommandPager {
                     .append("</").append(theme.description()).append(">");
         }
         return line.toString();
+    }
+
+    private static List<ComponentText> render(List<MessageRow> rows) {
+        List<ComponentText> rendered = new ArrayList<>(rows.size());
+        for (MessageRow row : rows) {
+            rendered.add(GlossLocalization.globalComponent(row.key(), row.arguments()));
+        }
+        return rendered;
+    }
+
+    record MessageRow(TextKey key, MessageArgs arguments) {
     }
 }

@@ -210,16 +210,13 @@ public class CommandGlossBoard {
             return;
         }
 
-        DirectorMiniMenu.ContentPage window = GlossCommandPager.window(boards.size(), page, GlossCommandPager.TEXT_PAGE_SIZE);
         DirectorMiniMenu.Theme theme = GlossCommandService.menuTheme();
         String hover = DirectorMiniMenu.escapeText(GlossLocalization.globalDirectorText(GlossMessages.BOARD_LIST_HOVER, MessageArgs.empty()));
-        List<String> lines = new ArrayList<>();
-        GlossCommandPager.appendHeader(lines, LIST_COMMAND, window, theme);
-        for (GlossBoardMeta meta : boards.subList(window.startIndex(), window.endIndex())) {
-            lines.add(renderListEntry(meta, theme, hover));
+        List<String> entries = new ArrayList<>(boards.size());
+        for (GlossBoardMeta meta : boards) {
+            entries.add(renderListEntry(meta, theme, hover));
         }
-        GlossCommandPager.appendFooter(lines, window, LIST_COMMAND, theme);
-        DirectorMiniMenu.deliver(sender, lines);
+        DirectorMiniMenu.deliver(sender, GlossCommandPager.menu(LIST_COMMAND, entries, page, LIST_COMMAND, theme));
     }
 
     @Director(name = "info", descriptionKey = "command.help.board.info", description = "Show a scoreboard's title, lines and settings")

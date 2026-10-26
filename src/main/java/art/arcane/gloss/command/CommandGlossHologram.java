@@ -202,16 +202,13 @@ public class CommandGlossHologram {
             return;
         }
 
-        DirectorMiniMenu.ContentPage window = GlossCommandPager.window(holograms.size(), page, GlossCommandPager.TEXT_PAGE_SIZE);
         DirectorMiniMenu.Theme theme = GlossCommandService.menuTheme();
         String hover = DirectorMiniMenu.escapeText(GlossLocalization.globalDirectorText(GlossMessages.HOLOGRAM_LIST_HOVER, MessageArgs.empty()));
-        List<String> lines = new ArrayList<>();
-        GlossCommandPager.appendHeader(lines, LIST_COMMAND, window, theme);
-        for (AnchoredHologram hologram : holograms.subList(window.startIndex(), window.endIndex())) {
-            lines.add(renderListEntry(hologram, theme, hover));
+        List<String> entries = new ArrayList<>(holograms.size());
+        for (AnchoredHologram hologram : holograms) {
+            entries.add(renderListEntry(hologram, theme, hover));
         }
-        GlossCommandPager.appendFooter(lines, window, LIST_COMMAND, theme);
-        DirectorMiniMenu.deliver(sender, lines);
+        DirectorMiniMenu.deliver(sender, GlossCommandPager.menu(LIST_COMMAND, entries, page, LIST_COMMAND, theme));
     }
 
     @Director(name = "info", descriptionKey = "command.help.hologram.info", description = "Show a hologram's location and lines")

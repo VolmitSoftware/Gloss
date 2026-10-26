@@ -105,18 +105,16 @@ public final class CommandGlossPanel {
       send(sender, GlossMessages.PANELS_LIST_EMPTY);
       return;
     }
-    DirectorMiniMenu.ContentPage window = GlossCommandPager.window(boards.size(), page, GlossCommandPager.TEXT_PAGE_SIZE);
     DirectorMiniMenu.Theme theme = GlossCommandService.menuTheme();
-    List<String> lines = new ArrayList<>();
-    GlossCommandPager.appendHeader(lines, LIST_COMMAND + " · " + boards.size(), window, theme);
-    for (PanelDefinition board : boards.subList(window.startIndex(), window.endIndex())) {
-      lines.add(GlossCommandPager.entry(
+    List<String> entries = new ArrayList<>(boards.size());
+    for (PanelDefinition board : boards) {
+      entries.add(GlossCommandPager.entry(
           board.id(),
           "menu=" + board.rootMenuId() + " revision=" + board.revision(),
           theme));
     }
-    GlossCommandPager.appendFooter(lines, window, LIST_COMMAND, theme);
-    DirectorMiniMenu.deliver(sender, lines);
+    DirectorMiniMenu.deliver(sender, GlossCommandPager.menu(LIST_COMMAND + " · " + boards.size(), entries, page,
+        LIST_COMMAND, theme));
   }
 
   @Director(name = "near", description = "List panels near your current position", descriptionKey = "command.help.panel.near")
@@ -157,20 +155,18 @@ public final class CommandGlossPanel {
       return;
     }
     String command = NEAR_COMMAND + " radius=" + format(radius);
-    DirectorMiniMenu.ContentPage window = GlossCommandPager.window(boards.size(), page, GlossCommandPager.TEXT_PAGE_SIZE);
     DirectorMiniMenu.Theme theme = GlossCommandService.menuTheme();
-    List<String> lines = new ArrayList<>();
-    GlossCommandPager.appendHeader(lines, command + " · " + boards.size(), window, theme);
-    for (PanelDefinition board : boards.subList(window.startIndex(), window.endIndex())) {
+    List<String> entries = new ArrayList<>(boards.size());
+    for (PanelDefinition board : boards) {
       PanelTransform transform = board.transform();
       double distance = Math.hypot(transform.x() - location.getX(), transform.z() - location.getZ());
-      lines.add(GlossCommandPager.entry(
+      entries.add(GlossCommandPager.entry(
           board.id(),
           "distance=" + format(distance) + " menu=" + board.rootMenuId(),
           theme));
     }
-    GlossCommandPager.appendFooter(lines, window, command, theme);
-    DirectorMiniMenu.deliver(sender, lines);
+    DirectorMiniMenu.deliver(sender, GlossCommandPager.menu(command + " · " + boards.size(), entries, page,
+        command, theme));
   }
 
   @Director(name = "info", description = "Show one panel's complete state", descriptionKey = "command.help.panel.info")

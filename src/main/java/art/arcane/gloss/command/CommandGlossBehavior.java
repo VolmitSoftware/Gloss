@@ -3,6 +3,7 @@ package art.arcane.gloss.command;
 import art.arcane.gloss.Gloss;
 import art.arcane.gloss.behavior.BehaviorRuntime;
 import art.arcane.gloss.behavior.BehaviorService;
+import art.arcane.gloss.locale.GlossLocalization;
 import art.arcane.gloss.locale.GlossMessages;
 import art.arcane.volmlib.util.director.annotations.Director;
 import art.arcane.volmlib.util.director.annotations.Param;
@@ -12,6 +13,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /** {@code /gloss behavior}: what is loaded, what each entry listens for, and a way to run one by hand. */
@@ -41,11 +43,12 @@ public final class CommandGlossBehavior {
             GlossCommandMessages.send(sender, GlossMessages.BEHAVIORS_LIST_EMPTY);
             return;
         }
-        DirectorMiniMenu.ContentPage window = GlossCommandPager.window(
-            runtimes.size(), page, GlossCommandPager.TEXT_PAGE_SIZE);
-        for (BehaviorRuntime runtime : runtimes.subList(window.startIndex(), window.endIndex())) {
-            sendHeader(sender, runtime);
+        List<GlossCommandPager.MessageRow> rows = new ArrayList<>(runtimes.size());
+        for (BehaviorRuntime runtime : runtimes) {
+            rows.add(headerRow(runtime));
         }
+        DirectorMiniMenu.ContentPage window = GlossCommandPager.sendRows(sender, rows, page,
+            GlossCommandPager.PAGE_FOOTER_LINES);
         GlossCommandPager.sendPageFooter(sender, window, "/gloss behavior list");
     }
 
@@ -66,7 +69,8 @@ public final class CommandGlossBehavior {
             GlossCommandMessages.send(sender, GlossMessages.BEHAVIORS_MISSING, MessageArgument.untrusted("id", id));
             return;
         }
-        sendHeader(sender, runtime);
+        GlossCommandPager.MessageRow header = headerRow(runtime);
+        GlossLocalization.sendGlobal(sender, header.key(), header.arguments());
         for (BehaviorRuntime.CompiledEntry entry : runtime.entries()) {
             GlossCommandMessages.send(sender, GlossMessages.BEHAVIORS_INFO_ENTRY,
                 MessageArgument.trusted("line", entry.index() + 1),
@@ -128,8 +132,8 @@ public final class CommandGlossBehavior {
         GlossCommandMessages.sendResetResult(sender, "behavior", name, service.resetToDefault(name));
     }
 
-    private void sendHeader(CommandSender sender, BehaviorRuntime runtime) {
-        GlossCommandMessages.send(sender, GlossMessages.BEHAVIORS_INFO_HEADER,
+    private static GlossCommandPager.MessageRow headerRow(BehaviorRuntime runtime) {
+        return GlossCommandPager.row(GlossMessages.BEHAVIORS_INFO_HEADER,
             MessageArgument.untrusted("id", runtime.id()),
             MessageArgument.trusted("revision", runtime.doc().revision()),
             MessageArgument.trusted("count", runtime.entries().size()),

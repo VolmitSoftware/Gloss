@@ -6,10 +6,10 @@ import art.arcane.gloss.lint.WorkspaceLint;
 import art.arcane.gloss.locale.GlossMessages;
 import art.arcane.volmlib.util.director.annotations.Director;
 import art.arcane.volmlib.util.director.annotations.Param;
-import art.arcane.volmlib.util.director.help.DirectorMiniMenu;
 import art.arcane.volmlib.util.localization.MessageArgument;
 import org.bukkit.command.CommandSender;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
@@ -49,18 +49,18 @@ public final class CommandGlossCheck {
       GlossCommandMessages.send(sender, GlossMessages.CHECK_CLEAN);
       return;
     }
-    DirectorMiniMenu.ContentPage window = GlossCommandPager.window(diagnostics.size(), page,
-        GlossCommandPager.TEXT_PAGE_SIZE);
-    for (Diagnostic diagnostic : diagnostics.subList(window.startIndex(), window.endIndex())) {
-      GlossCommandMessages.send(sender, GlossMessages.CHECK_ENTRY,
+    List<GlossCommandPager.MessageRow> rows = new ArrayList<>(diagnostics.size());
+    for (Diagnostic diagnostic : diagnostics) {
+      rows.add(GlossCommandPager.row(GlossMessages.CHECK_ENTRY,
           MessageArgument.untrusted("state",
               diagnostic.severity().name().toLowerCase(Locale.ROOT)),
           MessageArgument.untrusted("key", diagnostic.code()),
           MessageArgument.untrusted("kind", diagnostic.kind()),
           MessageArgument.untrusted("id", diagnostic.id()),
           MessageArgument.untrusted("path", diagnostic.pointer()),
-          MessageArgument.untrusted("message", diagnostic.message()));
+          MessageArgument.untrusted("message", diagnostic.message())));
     }
+    GlossCommandPager.sendRows(sender, rows, page, 1);
     GlossCommandMessages.send(sender, GlossMessages.CHECK_SUMMARY,
         MessageArgument.trusted("count", diagnostics.size()));
   }

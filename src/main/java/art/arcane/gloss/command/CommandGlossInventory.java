@@ -49,17 +49,14 @@ public class CommandGlossInventory {
       plugin.getLocalization().send(sender, GlossMessages.FORMS_NO_INVENTORIES);
       return;
     }
-    DirectorMiniMenu.ContentPage window = GlossCommandPager.window(ids.size(), page, GlossCommandPager.TEXT_PAGE_SIZE);
     DirectorMiniMenu.Theme theme = GlossCommandService.menuTheme();
-    List<String> lines = new ArrayList<>();
-    GlossCommandPager.appendHeader(lines, plugin.getLocalization().text(GlossMessages.FORMS_INVENTORY_LIST_HEADER),
-        window, theme);
-    for (String id : ids.subList(window.startIndex(), window.endIndex())) {
-      lines.add(GlossCommandPager.entry(id, plugin.getLocalization().text(GlossMessages.FORMS_INVENTORY_LIST_ENTRY,
+    List<String> entries = new ArrayList<>(ids.size());
+    for (String id : ids) {
+      entries.add(GlossCommandPager.entry(id, plugin.getLocalization().text(GlossMessages.FORMS_INVENTORY_LIST_ENTRY,
           MessageArgs.builder().untrusted("id", id).build()), theme));
     }
-    GlossCommandPager.appendFooter(lines, window, LIST_COMMAND, theme);
-    DirectorMiniMenu.deliver(sender, lines);
+    DirectorMiniMenu.deliver(sender, GlossCommandPager.menu(
+        plugin.getLocalization().text(GlossMessages.FORMS_INVENTORY_LIST_HEADER), entries, page, LIST_COMMAND, theme));
   }
 
   @Director(name = "info", description = "Show an inventory menu's size and slots",

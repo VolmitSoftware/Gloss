@@ -10,6 +10,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -45,16 +46,16 @@ public final class CommandGlossExplain {
             MessageArgument.untrusted("kind", report.kind()),
             MessageArgument.untrusted("id", report.id()),
             MessageArgument.untrusted("player", viewer == null ? "-" : viewer.getName()));
-        List<ExplainReport.Line> lines = report.lines();
-        DirectorMiniMenu.ContentPage window = GlossCommandPager.window(
-            lines.size(), page, GlossCommandPager.TEXT_PAGE_SIZE);
-        for (ExplainReport.Line line : lines.subList(window.startIndex(), window.endIndex())) {
-            GlossCommandMessages.send(sender,
+        List<GlossCommandPager.MessageRow> rows = new ArrayList<>(report.lines().size());
+        for (ExplainReport.Line line : report.lines()) {
+            rows.add(GlossCommandPager.row(
                 line.winner() ? GlossMessages.BEHAVIORS_EXPLAIN_WINNER : GlossMessages.BEHAVIORS_EXPLAIN_LINE,
                 MessageArgument.untrusted("path", line.path()),
                 MessageArgument.untrusted("when", line.expression()),
-                MessageArgument.untrusted("value", line.value()));
+                MessageArgument.untrusted("value", line.value())));
         }
+        DirectorMiniMenu.ContentPage window = GlossCommandPager.sendRows(sender, rows, page,
+            1 + GlossCommandPager.PAGE_FOOTER_LINES);
         GlossCommandPager.sendPageFooter(sender, window, "/gloss explain " + kind + " " + id + " " + player);
     }
 

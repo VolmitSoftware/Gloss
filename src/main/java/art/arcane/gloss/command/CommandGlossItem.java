@@ -62,10 +62,7 @@ public class CommandGlossItem {
     }
 
     List<ProviderStatus> statuses = Gloss.instance.getItemProviders().providerStatuses();
-    DirectorMiniMenu.ContentPage window = GlossCommandPager.window(statuses.size(), page, GlossCommandPager.ITEM_STATUS_PAGE_SIZE);
     DirectorMiniMenu.Theme theme = GlossCommandService.menuTheme();
-    List<String> lines = new ArrayList<>();
-    GlossCommandPager.appendHeader(lines, Gloss.instance.getLocalization().text(GlossMessages.ITEMS_STATUS_HEADER), window, theme);
 
     int active = 0;
     for (ProviderStatus status : statuses) {
@@ -78,31 +75,43 @@ public class CommandGlossItem {
         GlossMessages.ITEMS_STATUS_SUMMARY,
         MessageArgs.builder().untrusted("active", active).untrusted("total", statuses.size()).build()
     );
-    lines.add("<" + theme.description() + ">" + DirectorMiniMenu.escapeText(summary) + "</" + theme.description() + ">");
+    String summaryLine = "<" + theme.description() + ">" + DirectorMiniMenu.escapeText(summary) + "</" + theme.description() + ">";
 
-    for (ProviderStatus status : statuses.subList(window.startIndex(), window.endIndex())) {
+    List<String> entries = new ArrayList<>(statuses.size());
+    for (ProviderStatus status : statuses) {
       String state = stateText(Gloss.instance.getLocalization(), status);
       String hover = Gloss.instance.getLocalization().text(
           GlossMessages.ITEMS_STATUS_ENTRY,
           MessageArgs.builder().untrusted("provider", status.id()).untrusted("plugin", status.pluginName()).build()
       );
       String color = stateColor(status, theme);
-      lines.add("<hover:show_text:'" + DirectorMiniMenu.escapeText(hover).replace("\\", "\\\\").replace("'", "\\'") + "'>"
+      entries.add("<hover:show_text:'" + DirectorMiniMenu.escapeText(hover).replace("\\", "\\\\").replace("'", "\\'") + "'>"
           + "<" + theme.muted() + ">⇀</" + theme.muted() + "> "
           + "<gradient:" + theme.primaryLeft() + ":" + theme.primaryRight() + ">" + DirectorMiniMenu.escapeText(status.id()) + "</gradient> "
           + "<" + color + ">" + DirectorMiniMenu.escapeText(state) + "</" + color + ">"
           + "</hover>");
     }
 
+    List<String> trailer = new ArrayList<>(1);
     if (sender.hasPermission("gloss.items.export")) {
       String hint = Gloss.instance.getLocalization().text(GlossMessages.ITEMS_STATUS_HINT);
-      lines.add("<hover:show_text:'" + DirectorMiniMenu.escapeText(hint).replace("\\", "\\\\").replace("'", "\\'") + "'>"
+      trailer.add("<hover:show_text:'" + DirectorMiniMenu.escapeText(hint).replace("\\", "\\\\").replace("'", "\\'") + "'>"
           + "<click:run_command:/gloss item export>"
           + "<" + theme.muted() + ">⇀</" + theme.muted() + "> "
           + "<" + theme.optional() + ">/gloss item export</" + theme.optional() + ">"
           + "</click></hover>");
     }
 
+    int reservedLines = GlossCommandPager.MENU_RESERVED_LINES + DirectorMiniMenu.chatRows(summaryLine);
+    for (String line : trailer) {
+      reservedLines += DirectorMiniMenu.chatRows(line);
+    }
+    DirectorMiniMenu.ContentPage window = GlossCommandPager.window(entries, page, reservedLines);
+    List<String> lines = new ArrayList<>(window.endIndex() - window.startIndex() + 2 + trailer.size());
+    GlossCommandPager.appendHeader(lines, Gloss.instance.getLocalization().text(GlossMessages.ITEMS_STATUS_HEADER), window, theme);
+    lines.add(summaryLine);
+    lines.addAll(entries.subList(window.startIndex(), window.endIndex()));
+    lines.addAll(trailer);
     GlossCommandPager.appendFooter(lines, window, STATUS_COMMAND, theme);
     DirectorMiniMenu.deliver(sender, lines);
   }

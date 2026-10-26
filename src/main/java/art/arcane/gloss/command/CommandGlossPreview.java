@@ -62,10 +62,11 @@ public class CommandGlossPreview {
     names.sort(String::compareTo);
 
     DirectorMiniMenu.Theme theme = GlossCommandService.menuTheme();
-    List<String> lines = new ArrayList<>();
-    lines.add(DirectorMiniMenu.banner(Gloss.instance.getLocalization().text(GlossMessages.PREVIEWS_LIST_HEADER), theme));
+    String header = Gloss.instance.getLocalization().text(GlossMessages.PREVIEWS_LIST_HEADER);
 
     if (names.isEmpty()) {
+      List<String> lines = new ArrayList<>();
+      lines.add(DirectorMiniMenu.banner(header, theme));
       String empty = Gloss.instance.getLocalization().text(GlossMessages.PREVIEWS_LIST_EMPTY);
       lines.add("<" + theme.description() + ">" + DirectorMiniMenu.escapeText(empty) + "</" + theme.description() + ">");
       lines.add(DirectorMiniMenu.bar(theme));
@@ -73,18 +74,15 @@ public class CommandGlossPreview {
       return;
     }
 
-    DirectorMiniMenu.ContentPage window = GlossCommandPager.window(names.size(), page, GlossCommandPager.TEXT_PAGE_SIZE);
-    lines.set(0, DirectorMiniMenu.banner(Gloss.instance.getLocalization().text(GlossMessages.PREVIEWS_LIST_HEADER), window, theme));
-    for (String name : names.subList(window.startIndex(), window.endIndex())) {
+    List<String> entries = new ArrayList<>(names.size());
+    for (String name : names) {
       CompiledPreviewDocument document = registry.get(name);
       if (document == null) {
         continue;
       }
-      lines.add(listEntry(name, document, theme));
+      entries.add(listEntry(name, document, theme));
     }
-
-    GlossCommandPager.appendFooter(lines, window, LIST_COMMAND, theme);
-    DirectorMiniMenu.deliver(sender, lines);
+    DirectorMiniMenu.deliver(sender, GlossCommandPager.menu(header, entries, page, LIST_COMMAND, theme));
   }
 
   private String listEntry(String name, CompiledPreviewDocument document, DirectorMiniMenu.Theme theme) {

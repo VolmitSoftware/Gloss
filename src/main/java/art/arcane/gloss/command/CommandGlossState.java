@@ -112,17 +112,18 @@ public final class CommandGlossState {
             return;
         }
         Player viewer = viewer(sender, player);
-        DirectorMiniMenu.ContentPage window = GlossCommandPager.window(
-            keys.size(), page, GlossCommandPager.TEXT_PAGE_SIZE);
-        for (String key : keys.subList(window.startIndex(), window.endIndex())) {
+        List<GlossCommandPager.MessageRow> rows = new ArrayList<>(keys.size());
+        for (String key : keys) {
             StateSchema schema = store.declarations().get(key);
             UUID owner = owner(schema.scope(), viewer);
             String value = schema.scope() == StateScope.PLAYER && viewer == null
                 ? "-" : String.valueOf(store.get(schema.scope(), owner, key));
-            GlossCommandMessages.send(sender, GlossMessages.BEHAVIORS_STATE_VALUE,
+            rows.add(GlossCommandPager.row(GlossMessages.BEHAVIORS_STATE_VALUE,
                 MessageArgument.untrusted("key", key),
-                MessageArgument.untrusted("value", value));
+                MessageArgument.untrusted("value", value)));
         }
+        DirectorMiniMenu.ContentPage window = GlossCommandPager.sendRows(sender, rows, page,
+            GlossCommandPager.PAGE_FOOTER_LINES);
         GlossCommandPager.sendPageFooter(sender, window, "/gloss state dump " + player);
     }
 

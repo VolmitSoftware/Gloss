@@ -39,6 +39,8 @@ public interface GlossAPI {
     TemporaryHologram createTemporaryHologram(String id, Location initial, long durationMs);
 
 
+    TemporaryItem createTemporaryItem(Plugin owner, Player viewer, TemporaryItemSpec spec);
+
     String filter(Player player, String raw);
 
     void refreshDropName(Item item);
@@ -69,3 +71,4 @@ public interface GlossAPI {
 
     void resetTab(Player player);
 }
+

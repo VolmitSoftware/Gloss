@@ -35,16 +35,13 @@ public class CommandGlossSurface {
             GlossCommandMessages.send(sender, GlossMessages.SCREEN_SURFACES_EMPTY);
             return;
         }
-        DirectorMiniMenu.ContentPage window = GlossCommandPager.window(runtimes.size(), page,
-            GlossCommandPager.TEXT_PAGE_SIZE);
         DirectorMiniMenu.Theme theme = GlossCommandService.menuTheme();
-        List<String> lines = new ArrayList<>();
-        GlossCommandPager.appendHeader(lines, LIST_COMMAND + " · " + runtimes.size(), window, theme);
-        for (SurfaceRuntime runtime : runtimes.subList(window.startIndex(), window.endIndex())) {
-            lines.add(GlossCommandPager.entry(runtime.id(), runtime.kind().wireName(), theme));
+        List<String> entries = new ArrayList<>(runtimes.size());
+        for (SurfaceRuntime runtime : runtimes) {
+            entries.add(GlossCommandPager.entry(runtime.id(), runtime.kind().wireName(), theme));
         }
-        GlossCommandPager.appendFooter(lines, window, LIST_COMMAND, theme);
-        DirectorMiniMenu.deliver(sender, lines);
+        DirectorMiniMenu.deliver(sender, GlossCommandPager.menu(LIST_COMMAND + " · " + runtimes.size(), entries, page,
+            LIST_COMMAND, theme));
     }
 
     @Director(name = "info", descriptionKey = "command.help.surface.info", description = "Show a surface document")

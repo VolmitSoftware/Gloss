@@ -65,19 +65,17 @@ public class CommandGlossMenu {
       return;
     }
 
-    DirectorMiniMenu.ContentPage window = GlossCommandPager.window(menus.size(), page, GlossCommandPager.TEXT_PAGE_SIZE);
     DirectorMiniMenu.Theme theme = GlossCommandService.menuTheme();
-    List<String> lines = new ArrayList<>();
-    GlossCommandPager.appendHeader(lines, plugin.getLocalization().text(GlossMessages.MENU_LIST_HEADER), window, theme);
-    for (String menu : menus.subList(window.startIndex(), window.endIndex())) {
+    List<String> entries = new ArrayList<>(menus.size());
+    for (String menu : menus) {
       String hover = plugin.getLocalization().text(
           GlossMessages.MENU_LIST_ENTRY,
           MessageArgs.builder().untrusted("menu", menu).build()
       );
-      lines.add(menuEntryLine(menu, hover, theme));
+      entries.add(menuEntryLine(menu, hover, theme));
     }
-    GlossCommandPager.appendFooter(lines, window, LIST_COMMAND, theme);
-    DirectorMiniMenu.deliver(sender, lines);
+    DirectorMiniMenu.deliver(sender, GlossCommandPager.menu(
+        plugin.getLocalization().text(GlossMessages.MENU_LIST_HEADER), entries, page, LIST_COMMAND, theme));
   }
 
   @Director(name = "create", description = "Create a persistent hologram at your current position", descriptionKey = "command.help.menu.create")

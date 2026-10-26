@@ -29,15 +29,13 @@ public class CommandGlossAnimations {
             return;
         }
 
-        DirectorMiniMenu.ContentPage window = GlossCommandPager.window(names.size(), page, GlossCommandPager.TEXT_PAGE_SIZE);
         DirectorMiniMenu.Theme theme = GlossCommandService.menuTheme();
-        List<String> lines = new ArrayList<>();
-        GlossCommandPager.appendHeader(lines, LIST_COMMAND + " · " + names.size(), window, theme);
-        for (String name : names.subList(window.startIndex(), window.endIndex())) {
-            lines.add(GlossCommandPager.entry(name, null, theme));
+        List<String> entries = new ArrayList<>(names.size());
+        for (String name : names) {
+            entries.add(GlossCommandPager.entry(name, null, theme));
         }
-        GlossCommandPager.appendFooter(lines, window, LIST_COMMAND, theme);
-        DirectorMiniMenu.deliver(sender, lines);
+        DirectorMiniMenu.deliver(sender, GlossCommandPager.menu(LIST_COMMAND + " · " + names.size(), entries, page,
+            LIST_COMMAND, theme));
     }
 
     @Director(name = "reset", sync = true, descriptionKey = "command.help.animations.reset", description = "Restore shipped animation defaults")

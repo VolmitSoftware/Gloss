@@ -337,18 +337,26 @@ class GlossCommandTreeTest {
         DirectorMiniMenu.DirectorHelpPage submenu = DirectorMiniMenu.resolveHelp(
                 engine, List.of("panel")).orElseThrow();
 
-        int rootChildren = engine.getRoot().getChildren().size();
-        int expectedRootEntries = Math.min(rootChildren, DirectorMiniMenu.MAX_ENTRIES_PER_PAGE);
+        long rootChildren = engine.getRoot().getChildren().stream()
+                .filter(child -> !child.getDescriptor().isHidden())
+                .count();
+        DirectorMiniMenu.ContentPage rootWindow = DirectorMiniMenu.helpWindow(
+                root, GlossCommandService.menuTheme(), GlossLocalization.globalDirectorResolver());
+        DirectorMiniMenu.ContentPage submenuWindow = DirectorMiniMenu.helpWindow(
+                submenu, GlossCommandService.menuTheme(), GlossLocalization.globalDirectorResolver());
+        List<String> renderedRoot = DirectorMiniMenu.render(
+                root, GlossCommandService.menuTheme(), GlossLocalization.globalDirectorResolver());
+        List<String> renderedSubmenu = DirectorMiniMenu.render(
+                submenu, GlossCommandService.menuTheme(), GlossLocalization.globalDirectorResolver());
 
         // A root wider than one page still renders one banner and one pagination bar; the page
         // indicator lives inside the banner rather than on a line of its own.,
         int rootChrome = 2;
-        Assertions.assertEquals(expectedRootEntries, root.entries().size());
-        Assertions.assertEquals(expectedRootEntries + rootChrome, DirectorMiniMenu.render(
-                root, GlossCommandService.menuTheme(), GlossLocalization.globalDirectorResolver()).size());
-        Assertions.assertEquals(DirectorMiniMenu.MAX_ENTRIES_PER_PAGE, submenu.entries().size());
-        Assertions.assertEquals(DirectorMiniMenu.MAX_ENTRIES_PER_PAGE + 3, DirectorMiniMenu.render(
-                submenu, GlossCommandService.menuTheme(), GlossLocalization.globalDirectorResolver()).size());
+        Assertions.assertEquals(rootChildren, (long) root.entries().size());
+        Assertions.assertEquals(rootWindow.endIndex() - rootWindow.startIndex() + rootChrome, renderedRoot.size());
+        Assertions.assertTrue(renderedRoot.stream().mapToInt(DirectorMiniMenu::chatRows).sum() <= DirectorMiniMenu.CHAT_LINE_COUNT);
+        Assertions.assertEquals(submenuWindow.endIndex() - submenuWindow.startIndex() + 3, renderedSubmenu.size());
+        Assertions.assertTrue(renderedSubmenu.stream().mapToInt(DirectorMiniMenu::chatRows).sum() <= DirectorMiniMenu.CHAT_LINE_COUNT);
     }
 
     private static DirectorRuntimeNode glossRoot() {
