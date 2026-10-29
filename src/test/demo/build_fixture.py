@@ -10,7 +10,7 @@ CACHE: Path = Path.home() / '.gradle/caches/modules-2/files-2.1'
 
 def build() -> None:
     OUTPUT.mkdir(parents=True, exist_ok=True)
-    libraries: list[Path] = [ROOT / 'build/libs/Gloss-3.2.4.jar']
+    libraries: list[Path] = [ROOT / 'build/libs/Gloss v3.2.5 [CraftBukkit] 26.1.2-26.3.jar']
     for group, package, version in (
         ('io.papermc.paper', 'paper-api', '26.3.build.25-alpha'),
         ('net.kyori', 'adventure-api', '*'),

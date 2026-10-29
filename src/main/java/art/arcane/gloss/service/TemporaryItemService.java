@@ -19,7 +19,6 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.logging.Level;
 
 public final class TemporaryItemService implements Listener, AutoCloseable {
     private static final int MAX_ITEMS = 256;
@@ -99,7 +98,7 @@ public final class TemporaryItemService implements Listener, AutoCloseable {
                 schedule();
             } catch (RuntimeException | LinkageError exception) {
                 destroy();
-                plugin.getLogger().log(Level.WARNING, "Could not display a temporary item for " + viewer.getUniqueId(), exception);
+                Gloss.logExceptionStack(false, exception, "Could not display a temporary item for %s", viewer.getUniqueId());
             }
         }
 
@@ -119,7 +118,7 @@ public final class TemporaryItemService implements Listener, AutoCloseable {
                 schedule();
             } catch (RuntimeException | LinkageError exception) {
                 destroy();
-                plugin.getLogger().log(Level.WARNING, "Could not refresh a temporary item for " + viewer.getUniqueId(), exception);
+                Gloss.logExceptionStack(false, exception, "Could not refresh a temporary item for %s", viewer.getUniqueId());
             }
         }
 

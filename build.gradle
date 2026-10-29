@@ -22,7 +22,7 @@ plugins {
 apply plugin: 'art.arcane.volmit-packaging'
 
 group = 'art.arcane'
-version = '3.2.4'
+version = '3.2.5'
 ext.bukkitMinecraftRange = providers.gradleProperty('bukkitMinecraftRange').getOrElse('26.1.2-26.3')
 def apiVersion = '26.1'
 def main = 'art.arcane.gloss.Gloss'
@@ -49,6 +49,7 @@ def universalJarTask = tasks.register('universalJar', Jar) {
     group = 'build'
     description = 'Packages the Bukkit and Velocity entry points in one Gloss plugin jar.'
     archiveClassifier.set('')
+    archiveFileName.set("Gloss v${project.version} [CraftBukkit] ${bukkitMinecraftRange}.jar")
     duplicatesStrategy = DuplicatesStrategy.FAIL
     dependsOn(shadowJarTask, velocityJarTask)
     from(shadowJarTask.flatMap { it.archiveFile }.map { zipTree(it) }) {
@@ -305,6 +306,7 @@ dependencies {
     testRuntimeOnly('net.kyori:adventure-platform-bukkit:4.4.1')
     testRuntimeOnly('io.netty:netty-buffer:4.2.16.Final')
     testImplementation(libs.junitJupiter)
+    testImplementation('org.mockito:mockito-core:5.23.0')
     testImplementation(libs.junit4)
     testRuntimeOnly(libs.junitVintage)
     testImplementation(libs.junitPlatformLauncher)
