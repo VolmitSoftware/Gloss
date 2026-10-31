@@ -22,7 +22,7 @@ plugins {
 apply plugin: 'art.arcane.volmit-packaging'
 
 group = 'art.arcane'
-version = '3.2.5'
+version = '3.2.6'
 Configuration nativeShrinkLibraryClasspath = configurations.create('nativeShrinkLibraries') {
     canBeConsumed = false
     canBeResolved = true
