@@ -33,6 +33,7 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
@@ -608,8 +609,9 @@ public final class CommandGlossImport {
 
   private DocumentImportService documentImporter() {
     Gloss plugin = Gloss.instance;
-    return new DocumentImportService(plugin.getDataFolder().toPath().getParent().getParent(),
-        plugin.getDataFolder().toPath(), plugin.getProjectTransaction(),
+    Path data = plugin.getDataFolder().toPath().toAbsolutePath().normalize();
+    return new DocumentImportService(data.getParent().getParent(),
+        data, plugin.getProjectTransaction(),
         plugin.getPersistenceCoordinator(), this::recordHistory);
   }
 

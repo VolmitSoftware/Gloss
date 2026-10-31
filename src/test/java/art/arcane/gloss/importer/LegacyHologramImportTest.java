@@ -74,7 +74,7 @@ public class LegacyHologramImportTest {
 
     LegacyHologramScanner scanner = new LegacyHologramScanner();
     LegacyHologramScanner.LegacyScanResult scan = scanner.scan(
-        LegacyImportSource.GHOLO, source, plugins);
+        LegacyImportSource.GHOLO, source.getParent(), plugins);
     assertTrue(scan.sourcePresent());
     assertTrue(scan.issues().isEmpty());
     assertEquals(1, scan.drafts().size());
@@ -205,8 +205,10 @@ public class LegacyHologramImportTest {
     assertEquals(LegacyImportSource.ANIMATED_SCOREBOARD,
         LegacyImportSource.parse("animated-scoreboard"));
     assertEquals(LegacyImportSource.TAB_HEADER_FOOTER, LegacyImportSource.parse("tab"));
-    assertEquals(List.of("gholo", "decent-holograms", "holographic-displays", "fancy-holograms",
-            "featherboard", "animated-scoreboard", "tab"),
+    assertEquals(LegacyImportSource.CMI_HOLOGRAMS, LegacyImportSource.parse("cmi"));
+    assertEquals(LegacyImportSource.CMI_TABLIST, LegacyImportSource.parse("cmi-tablist"));
+    assertEquals(List.of("gholo", "decent-holograms", "holographic-displays", "fancy-holograms", "cmi",
+            "featherboard", "animated-scoreboard", "tab", "cmi-tablist"),
         LegacyImportSource.suggestions());
   }
 
@@ -224,7 +226,7 @@ public class LegacyHologramImportTest {
         """);
 
     LegacyHologramScanner.LegacyScanResult scan = new LegacyHologramScanner().scan(
-        LegacyImportSource.GHOLO, source, plugins);
+        LegacyImportSource.GHOLO, source.getParent(), plugins);
     assertEquals(1, scan.drafts().size());
     assertEquals(1, scan.issues().size());
     LegacyHologramConverter.ConversionResult conversion = new LegacyHologramConverter().convert(
@@ -248,7 +250,7 @@ public class LegacyHologramImportTest {
         """);
 
     LegacyHologramScanner.LegacyScanResult scan = new LegacyHologramScanner().scan(
-        LegacyImportSource.GHOLO, source, plugins);
+        LegacyImportSource.GHOLO, source.getParent(), plugins);
 
     assertTrue(scan.drafts().isEmpty());
     assertEquals(1, scan.issues().size());
@@ -271,7 +273,7 @@ public class LegacyHologramImportTest {
         """);
 
     LegacyHologramScanner.LegacyScanResult scan = new LegacyHologramScanner().scan(
-        LegacyImportSource.GHOLO, source, plugins);
+        LegacyImportSource.GHOLO, source.getParent(), plugins);
     LegacyHologramDraft.LegacyStyle style = scan.drafts().getFirst().style();
 
     assertEquals(2.0D, style.scaleX(), 0.0D);
@@ -308,7 +310,7 @@ public class LegacyHologramImportTest {
         """);
 
     LegacyHologramScanner.LegacyScanResult scan = new LegacyHologramScanner().scan(
-        LegacyImportSource.GHOLO, source, plugins);
+        LegacyImportSource.GHOLO, source.getParent(), plugins);
     LegacyHologramDraft.LegacyStyle inherited = scan.drafts().getFirst().rows().get(0).style();
     LegacyHologramDraft.LegacyStyle vector = scan.drafts().getFirst().rows().get(1).style();
 
@@ -334,7 +336,7 @@ public class LegacyHologramImportTest {
       Assume.assumeNoException(failure);
     }
     LegacyHologramScanner.LegacyScanResult scan = new LegacyHologramScanner().scan(
-        LegacyImportSource.GHOLO, link.resolve("holos"), plugins);
+        LegacyImportSource.GHOLO, link, plugins);
     assertTrue(scan.drafts().isEmpty());
     assertEquals(LegacyImportIssue.Severity.ERROR, scan.issues().getFirst().severity());
 
@@ -380,7 +382,7 @@ public class LegacyHologramImportTest {
     return new LegacyHologramDraft(id, identity,
         new LegacyHologramDraft.LegacyLocation("world", 0, 64, 0, 0, 0),
         64, null, style,
-        List.of(new LegacyHologramDraft.LegacyRow("Hello", 0, 0, 0, style)), List.of());
+        List.of(new LegacyHologramDraft.LegacyRow("Hello", 0, 0, 0, style)), null, List.of());
   }
 
   private static JsonObject icon(JsonArray components, int index) {

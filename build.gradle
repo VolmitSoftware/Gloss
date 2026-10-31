@@ -23,6 +23,11 @@ apply plugin: 'art.arcane.volmit-packaging'
 
 group = 'art.arcane'
 version = '3.2.5'
+Configuration nativeShrinkLibraryClasspath = configurations.create('nativeShrinkLibraries') {
+    canBeConsumed = false
+    canBeResolved = true
+    attributes.attribute(Attribute.of('art.arcane.volmlib.native.linkage', String), 'mapped-server')
+}
 ext.bukkitMinecraftRange = providers.gradleProperty('bukkitMinecraftRange').getOrElse('26.1.2-26.3')
 def apiVersion = '26.1'
 def main = 'art.arcane.gloss.Gloss'
@@ -262,6 +267,8 @@ dependencies {
     implementation("com.github.VolmitSoftware.VolmLib:native-common:${volmLibCoordinate.tokenize(':').last()}")
     implementation("com.github.VolmitSoftware.VolmLib:native-v26_2_R1:${volmLibCoordinate.tokenize(':').last()}")
     implementation("com.github.VolmitSoftware.VolmLib:native-v26_3_R1:${volmLibCoordinate.tokenize(':').last()}")
+    nativeShrinkLibraries("com.github.VolmitSoftware.VolmLib:native-v26_2_R1:${volmLibCoordinate.tokenize(':').last()}")
+    nativeShrinkLibraries("com.github.VolmitSoftware.VolmLib:native-v26_3_R1:${volmLibCoordinate.tokenize(':').last()}")
     implementation(volmLibCoordinate) {
         changing = true
         transitive = false
@@ -297,6 +304,7 @@ dependencies {
 
     testImplementation('me.clip:placeholderapi:2.11.6') { transitive = false }
     testImplementation('com.github.MilkBowl:VaultAPI:1.7') { transitive = false }
+    testImplementation('org.xerial:sqlite-jdbc:3.49.1.0')
     testImplementation(libs.paper)
     testImplementation(libs.eco) { transitive = false }
     testImplementation(libs.ecoMobs) { transitive = false }
@@ -412,6 +420,7 @@ pluginPackaging {
             prunePrefixes = ['art/arcane/volmlib/']
             keepPrefixes = ['art/arcane/volmlib/util/matter/slices/', 'art/arcane/volmlib/nativelib/']
             shrinkRules = [file('packaging/shrink.pro')]
+            shrinkLibraries.from(nativeShrinkLibraryClasspath)
             shrinkLibraries.from(provider {
                 project(':velocity').configurations.compileClasspath.filter { File library ->
                     !library.name.startsWith('packetevents-')

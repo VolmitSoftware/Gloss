@@ -5,7 +5,8 @@ import java.util.Objects;
 
 record LegacyHologramDraft(String legacyId, String sourceIdentity, LegacyLocation location,
                            double viewRange, String permission, LegacyStyle style,
-                           List<LegacyRow> rows, List<String> warnings) {
+                           List<LegacyRow> rows, LegacyInteraction interaction,
+                           List<String> warnings) {
   LegacyHologramDraft {
     if (legacyId == null || legacyId.isBlank()) {
       throw new IllegalArgumentException("legacy hologram id must not be blank");
@@ -21,7 +22,7 @@ record LegacyHologramDraft(String legacyId, String sourceIdentity, LegacyLocatio
     style = Objects.requireNonNull(style, "style");
     rows = List.copyOf(Objects.requireNonNull(rows, "rows"));
     warnings = List.copyOf(Objects.requireNonNull(warnings, "warnings"));
-    if (rows.isEmpty()) {
+    if (rows.isEmpty() && interaction == null) {
       throw new IllegalArgumentException("hologram has no supported text rows");
     }
   }
@@ -53,6 +54,34 @@ record LegacyHologramDraft(String legacyId, String sourceIdentity, LegacyLocatio
       requireFinite(y, "row y");
       requireFinite(z, "row z");
       style = Objects.requireNonNull(style, "style");
+    }
+  }
+
+  record LegacyInteraction(double width, double height, double x, double y, double z,
+                           List<LegacyAction> actions) {
+    LegacyInteraction {
+      requireFinite(x, "interaction x");
+      requireFinite(y, "interaction y");
+      requireFinite(z, "interaction z");
+      if (!Double.isFinite(width) || width <= 0.0D || !Double.isFinite(height) || height <= 0.0D) {
+        throw new IllegalArgumentException("interaction size must be finite and greater than zero");
+      }
+      actions = List.copyOf(Objects.requireNonNull(actions, "actions"));
+    }
+  }
+
+  record LegacyAction(Kind kind, String value, String trigger) {
+    LegacyAction {
+      kind = Objects.requireNonNull(kind, "kind");
+      value = Objects.requireNonNull(value, "value");
+    }
+
+    enum Kind {
+      MESSAGE,
+      PLAYER_COMMAND,
+      SERVER_COMMAND,
+      CONNECT,
+      TELEPORT
     }
   }
 

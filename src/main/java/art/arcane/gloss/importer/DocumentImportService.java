@@ -26,7 +26,8 @@ import java.util.Objects;
 import java.util.Set;
 
 /**
- * The whole-document legacy sources: FeatherBoard, AnimatedScoreboard and TAB's header and footer.
+ * The whole-document legacy sources: FeatherBoard, AnimatedScoreboard, TAB's header and footer and
+ * CMI's tab list.
  *
  * <p>Previewing is the default and writes nothing. Applying refuses to overwrite a document that
  * already exists unless the caller passes the overwrite flag, and the copy it replaces is handed to
@@ -54,7 +55,8 @@ public final class DocumentImportService {
     public static boolean handles(LegacyImportSource source) {
         return source == LegacyImportSource.FEATHERBOARD
                 || source == LegacyImportSource.ANIMATED_SCOREBOARD
-                || source == LegacyImportSource.TAB_HEADER_FOOTER;
+                || source == LegacyImportSource.TAB_HEADER_FOOTER
+                || source == LegacyImportSource.CMI_TABLIST;
     }
 
     public DocumentImportPlan preview(LegacyImportSource source) throws IOException {
@@ -100,6 +102,22 @@ public final class DocumentImportService {
                     }
                 } else {
                     entries.addAll(new TabHeaderFooterConverter().convert(draft));
+                }
+            }
+            case CMI_TABLIST -> {
+                CmiTabListScanner scanner = new CmiTabListScanner();
+                sourcePath = scanner.file(serverDirectory);
+                present = Files.isRegularFile(sourcePath, LinkOption.NOFOLLOW_LINKS);
+                byte[] bytes = preparation.read(sourcePath);
+                CmiTabListScanner.Draft draft = bytes == null ? null
+                    : scanner.read(new String(bytes, StandardCharsets.UTF_8));
+                if (draft == null) {
+                    if (present) {
+                        issues.add(new LegacyImportIssue(LegacyImportIssue.Severity.WARNING, "-",
+                                "TabList.yml has no TabList block"));
+                    }
+                } else {
+                    entries.addAll(new CmiTabListConverter().convert(draft));
                 }
             }
             default -> throw new IllegalArgumentException(

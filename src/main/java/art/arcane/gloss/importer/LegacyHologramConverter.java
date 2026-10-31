@@ -104,7 +104,7 @@ final class LegacyHologramConverter {
       warnings.add("Source view range " + draft.viewRange() + " was capped at Gloss's "
           + PanelVisibility.MAX_VIEW_RANGE + "-block board limit");
     }
-    MenuConversion menu = menuSource(draft, viewRange, transform.yaw(), transform.pitch());
+    MenuConversion menu = menuSource(draft, viewRange, transform.yaw(), transform.pitch(), worlds);
     String menuSource = menu.source();
     validateMenu(menuId, menuSource);
     warnings.addAll(menu.warnings());
@@ -113,7 +113,8 @@ final class LegacyHologramConverter {
   }
 
   private static MenuConversion menuSource(LegacyHologramDraft draft, double viewRange,
-                                           double facingYaw, double pitch) {
+                                           double facingYaw, double pitch,
+                                           LegacyWorldCatalog worlds) {
     JsonObject menu = new JsonObject();
     menu.add("offset", vector(0.0D, 0.0D, 0.0D));
     menu.addProperty("lockPosition", true);
@@ -138,8 +139,111 @@ final class LegacyHologramConverter {
       component.add("data", data);
       components.add(component);
     }
+    if (draft.interaction() != null) {
+      components.add(button(draft.interaction(), facingYaw, pitch, viewRange, worlds, warnings));
+    }
     menu.add("components", components);
     return new MenuConversion(DocumentParsers.GSON.toJson(menu) + System.lineSeparator(), warnings);
+  }
+
+  private static JsonObject button(LegacyHologramDraft.LegacyInteraction interaction,
+                                   double facingYaw, double pitch, double viewRange,
+                                   LegacyWorldCatalog worlds, List<String> warnings) {
+    JsonObject style = new JsonObject();
+    style.addProperty("backgroundArgb", IconArgbColor.TRANSPARENT.hex());
+    style.addProperty("viewRange", viewRange / 64.0D);
+    JsonObject icon = new JsonObject();
+    icon.addProperty("type", "text");
+    icon.addProperty("text", " ");
+    icon.add("style", style);
+    JsonObject hitbox = new JsonObject();
+    hitbox.addProperty("width", interaction.width());
+    hitbox.addProperty("height", interaction.height());
+    JsonArray actions = new JsonArray();
+    for (LegacyHologramDraft.LegacyAction action : interaction.actions()) {
+      JsonObject converted = action(action, worlds, warnings);
+      if (converted != null) {
+        actions.add(converted);
+      }
+    }
+    JsonObject data = new JsonObject();
+    data.addProperty("type", "button");
+    data.add("icon", icon);
+    data.add("hitbox", hitbox);
+    data.add("actions", actions);
+    LocalOffset offset = inverseOffset(interaction.x(), interaction.y(), interaction.z(), facingYaw, pitch);
+    JsonObject component = new JsonObject();
+    component.addProperty("id", "interaction");
+    component.add("offset", vector(offset.x(), offset.y(), offset.z()));
+    component.add("data", data);
+    return component;
+  }
+
+  private static JsonObject action(LegacyHologramDraft.LegacyAction action, LegacyWorldCatalog worlds,
+                                   List<String> warnings) {
+    JsonObject output = new JsonObject();
+    switch (action.kind()) {
+      case MESSAGE -> {
+        output.addProperty("type", "message");
+        output.addProperty("message", action.value());
+      }
+      case PLAYER_COMMAND, SERVER_COMMAND -> {
+        String command = action.value().strip();
+        output.addProperty("type", "command");
+        output.addProperty("source",
+            action.kind() == LegacyHologramDraft.LegacyAction.Kind.PLAYER_COMMAND ? "player" : "server");
+        output.addProperty("command", command.startsWith("/") ? command.substring(1) : command);
+      }
+      case CONNECT -> {
+        output.addProperty("type", "connect");
+        output.addProperty("server", action.value().strip());
+      }
+      case TELEPORT -> {
+        if (!teleport(output, action.value(), worlds, warnings)) {
+          return null;
+        }
+      }
+    }
+    if (action.trigger() != null) {
+      output.addProperty("trigger", action.trigger());
+    }
+    return output;
+  }
+
+  private static boolean teleport(JsonObject output, String value, LegacyWorldCatalog worlds,
+                                  List<String> warnings) {
+    String[] parts = value.strip().split(":", -1);
+    if (parts.length < 4) {
+      warnings.add("Teleport target '" + value + "' needs world:x:y:z and was skipped");
+      return false;
+    }
+    for (String part : parts) {
+      if (part.strip().startsWith("~")) {
+        warnings.add("Relative teleport target '" + value + "' has no Gloss equivalent and was skipped");
+        return false;
+      }
+    }
+    LegacyWorldCatalog.WorldDescriptor world = worlds.resolve(parts[0].strip()).orElse(null);
+    if (world == null) {
+      warnings.add("Teleport target '" + value + "' names a world that is not loaded and was skipped");
+      return false;
+    }
+    try {
+      output.addProperty("type", "teleport");
+      output.addProperty("world", world.key());
+      output.addProperty("x", Double.parseDouble(parts[1].strip()));
+      output.addProperty("y", Double.parseDouble(parts[2].strip()));
+      output.addProperty("z", Double.parseDouble(parts[3].strip()));
+      output.addProperty("yaw", parts.length > 4 ? Float.parseFloat(parts[4].strip()) : 0.0F);
+      output.addProperty("pitch", parts.length > 5 ? Float.parseFloat(parts[5].strip()) : 0.0F);
+    } catch (NumberFormatException failure) {
+      warnings.add("Teleport target '" + value + "' has a coordinate that is not a number and was skipped");
+      return false;
+    }
+    if (parts.length < 6) {
+      warnings.add("Teleport target '" + value + "' has no facing, so Gloss faces the player south");
+    }
+    return true;
   }
 
   private static IconConversion icon(String content, LegacyHologramDraft.LegacyStyle style,

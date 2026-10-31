@@ -1,5 +1,7 @@
 package art.arcane.gloss.importer;
 
+import art.arcane.gloss.doc.DocumentParsers;
+import com.google.gson.JsonParseException;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
 
@@ -55,7 +57,8 @@ final class LegacyHologramScanner {
 
     try {
       switch (source) {
-        case GHOLO -> scanDirectory(requiredPath, drafts, issues, this::parseGholoFile);
+        case GHOLO -> scanGholo(requiredPath, drafts, issues);
+        case CMI_HOLOGRAMS -> scanCmi(requiredPath, drafts, issues);
         case DECENT_HOLOGRAMS -> scanDirectory(requiredPath, drafts, issues, this::parseDecentFile);
         case HOLOGRAPHIC_DISPLAYS -> scanHolographicDisplays(requiredPath, drafts, issues);
         case FANCY_HOLOGRAMS -> scanFancyHolograms(requiredPath, drafts, issues);
@@ -138,7 +141,7 @@ final class LegacyHologramScanner {
             defaults, true);
         drafts.add(new LegacyHologramDraft(id, id,
             new LegacyHologramDraft.LegacyLocation(world, x, y, z, 0.0D, 0.0D),
-            DEFAULT_VIEW_RANGE, null, defaults, rows,
+            DEFAULT_VIEW_RANGE, null, defaults, rows, null,
             List.of("HolographicDisplays item, image, and interaction lines are not imported")));
       } catch (RuntimeException failure) {
         issues.add(error(id, safeMessage(failure)));
@@ -194,7 +197,7 @@ final class LegacyHologramScanner {
         List<LegacyHologramDraft.LegacyRow> rows = rows(sourceRows, style, false);
         drafts.add(new LegacyHologramDraft(id, id,
             new LegacyHologramDraft.LegacyLocation(world, x, y, z, yaw, pitch),
-            range, null, style, rows,
+            range, null, style, rows, null,
             List.of("FancyHolograms update intervals, linked NPCs, and non-text holograms are not imported")));
       } catch (RuntimeException failure) {
         issues.add(error(id, safeMessage(failure)));
@@ -202,25 +205,137 @@ final class LegacyHologramScanner {
     }
   }
 
-  private LegacyHologramDraft parseGholoFile(Path file) throws IOException {
+  private void scanGholo(Path root, List<LegacyHologramDraft> drafts, List<LegacyImportIssue> issues)
+      throws IOException {
+    if (!Files.isDirectory(root, LinkOption.NOFOLLOW_LINKS)) {
+      issues.add(error("-", "source path is not a real directory"));
+      return;
+    }
+    GholoText text = GholoText.load(root, issues);
+    Map<String, String> owners = new LinkedHashMap<>();
+    if (gholoStorage(root, issues).equals("mysql")) {
+      issues.add(error("data.yml", "GHolo stores its data in MySQL, which Gloss does not read; "
+          + "export the holograms and interactions to files with GHolo first"));
+    } else {
+      Path database = root.resolve("data/data.db");
+      if (Files.exists(database, LinkOption.NOFOLLOW_LINKS)) {
+        try {
+          GholoDatabase.Contents contents = new GholoDatabase().read(database);
+          requireHologramCount(contents.holos().size() + contents.interactions().size());
+          for (GholoDatabase.Holo holo : contents.holos()) {
+            addGholo(drafts, issues, owners, holo.id(), () -> gholoDatabaseHolo(holo, text));
+          }
+          for (GholoDatabase.Interaction interaction : contents.interactions()) {
+            addGholo(drafts, issues, owners, interaction.id(),
+                () -> gholoDatabaseInteraction(interaction));
+          }
+        } catch (IOException | IllegalArgumentException failure) {
+          issues.add(error("data.db", safeMessage(failure)));
+        }
+      }
+    }
+    List<LegacyHologramDraft> exported = new ArrayList<>();
+    Path holos = root.resolve("holos");
+    if (Files.exists(holos, LinkOption.NOFOLLOW_LINKS)) {
+      scanDirectory(holos, exported, issues, file -> parseGholoFile(file, text));
+    }
+    Path interactions = root.resolve("interactions");
+    if (Files.exists(interactions, LinkOption.NOFOLLOW_LINKS)) {
+      scanDirectory(interactions, exported, issues, this::parseGholoInteractionFile);
+    }
+    for (LegacyHologramDraft draft : exported) {
+      String owner = owners.putIfAbsent(draft.legacyId().toLowerCase(Locale.ROOT), draft.sourceIdentity());
+      if (owner != null) {
+        issues.add(warning(draft.sourceIdentity(), "export file repeats " + draft.legacyId()
+            + " from " + owner + "; the copy in " + owner + " was imported"));
+        continue;
+      }
+      if (drafts.size() >= MAX_HOLOGRAMS) {
+        issues.add(error("-", "source contains more than " + MAX_HOLOGRAMS + " holograms"));
+        return;
+      }
+      drafts.add(draft);
+    }
+  }
+
+  private static void addGholo(List<LegacyHologramDraft> drafts, List<LegacyImportIssue> issues,
+                               Map<String, String> owners, String id, DraftSource source) {
+    try {
+      LegacyHologramDraft draft = source.draft();
+      owners.putIfAbsent(draft.legacyId().toLowerCase(Locale.ROOT), "data.db");
+      drafts.add(draft);
+    } catch (RuntimeException failure) {
+      issues.add(error(id == null || id.isBlank() ? "data.db" : id, safeMessage(failure)));
+    }
+  }
+
+  private static String gholoStorage(Path root, List<LegacyImportIssue> issues) {
+    Path file = root.resolve("data/data.yml");
+    if (!Files.exists(file, LinkOption.NOFOLLOW_LINKS)) {
+      return "sqlite";
+    }
+    try {
+      return loadYaml(file).getString("Database.type", "sqlite").strip().toLowerCase(Locale.ROOT);
+    } catch (IOException failure) {
+      issues.add(warning("data.yml", "GHolo data.yml could not be read: " + safeMessage(failure)));
+      return "sqlite";
+    }
+  }
+
+  private LegacyHologramDraft gholoDatabaseHolo(GholoDatabase.Holo holo, GholoText text) {
+    List<Map<?, ?>> rows = new ArrayList<>(holo.rows().size());
+    for (GholoDatabase.Row row : holo.rows()) {
+      Map<String, Object> values = new LinkedHashMap<>();
+      values.put("content", row.content());
+      values.put("offset", jsonMap(row.offset(), "row offset"));
+      values.put("data", jsonMap(row.data(), "row data"));
+      rows.add(values);
+    }
+    return gholoDraft(requiredId(holo.id()), "data.db", jsonMap(holo.location(), "location"),
+        jsonMap(holo.data(), "data"), rows, text);
+  }
+
+  private LegacyHologramDraft gholoDatabaseInteraction(GholoDatabase.Interaction interaction) {
+    List<Map<?, ?>> actions = new ArrayList<>(interaction.actions().size());
+    for (GholoDatabase.Action action : interaction.actions()) {
+      actions.add(Map.of("type", action.type(), "parameter", action.parameter()));
+    }
+    return gholoInteraction(requiredId(interaction.id()), "data.db",
+        jsonMap(interaction.location(), "location"), jsonMap(interaction.data(), "data"), actions);
+  }
+
+  private LegacyHologramDraft parseGholoFile(Path file, GholoText text) throws IOException {
     YamlConfiguration yaml = loadYaml(file);
-    String id = sourceId(file);
-    String location = "Holo.location";
-    String world = requiredString(yaml, location + ".world");
-    double x = requiredDouble(yaml, location + ".x");
-    double y = requiredDouble(yaml, location + ".y");
-    double z = requiredDouble(yaml, location + ".z");
+    return gholoDraft(sourceId(file), displayName(file), sectionValues(yaml, "Holo.location"),
+        sectionValues(yaml, "Holo.data"), gholoRows(yaml), text);
+  }
+
+  private LegacyHologramDraft parseGholoInteractionFile(Path file) throws IOException {
+    YamlConfiguration yaml = loadYaml(file);
+    List<Map<?, ?>> actions = new ArrayList<>();
+    if (yaml.get("Interaction.actions") instanceof List<?> list) {
+      for (Object action : list) {
+        if (action instanceof Map<?, ?> map) {
+          actions.add(map);
+        }
+      }
+    }
+    return gholoInteraction(sourceId(file), displayName(file), sectionValues(yaml, "Interaction.location"),
+        sectionValues(yaml, "Interaction.data"), actions);
+  }
+
+  private LegacyHologramDraft gholoDraft(String id, String identity, Map<?, ?> location,
+                                         Map<?, ?> data, List<Map<?, ?>> sourceRows, GholoText text) {
     LegacyHologramDraft.LegacyStyle baseStyle = LegacyHologramDraft.LegacyStyle.gholoDefaults()
-        .overlay(style(yaml.getConfigurationSection("Holo.data")));
-    double range = optionalDouble(yaml, "Holo.data.range", DEFAULT_VIEW_RANGE);
-    String permission = yaml.getString("Holo.data.permission");
-    List<Map<?, ?>> sourceRows = gholoRows(yaml);
+        .overlay(style(data));
+    double range = mapNumber(data, "range", DEFAULT_VIEW_RANGE);
+    String permission = data.get("permission") instanceof String value ? value : null;
     requireRowCount(sourceRows.size());
     List<LegacyHologramDraft.LegacyRow> rows = new ArrayList<>(sourceRows.size());
     List<String> warnings = new ArrayList<>();
     for (int rowIndex = 0; rowIndex < sourceRows.size(); rowIndex++) {
       Map<?, ?> sourceRow = sourceRows.get(rowIndex);
-      String content = rowContent(sourceRow, rowIndex);
+      String content = text.apply(rowContent(sourceRow, rowIndex), warnings);
       Map<?, ?> offset = optionalMap(sourceRow, "offset", rowIndex);
       Map<?, ?> rowData = optionalMap(sourceRow, "data", rowIndex);
       LegacyHologramDraft.LegacyStyle rowStyle = style(rowData);
@@ -229,10 +344,136 @@ final class LegacyHologramScanner {
           mapNumber(offset, "z", 0.0D), effectiveGholoRowStyle(baseStyle, rowStyle)));
       appendUnsupportedRowDataWarnings(rowData, content, warnings);
     }
-    return new LegacyHologramDraft(id, displayName(file),
-        new LegacyHologramDraft.LegacyLocation(world, x, y, z,
-            nullable(baseStyle.yaw(), 0.0D), nullable(baseStyle.pitch(), 0.0D)),
-        range, permission, baseStyle, rows, List.copyOf(warnings));
+    return new LegacyHologramDraft(id, identity,
+        gholoLocation(location, nullable(baseStyle.yaw(), 0.0D), nullable(baseStyle.pitch(), 0.0D)),
+        range, permission, baseStyle, rows, null, List.copyOf(warnings));
+  }
+
+  private LegacyHologramDraft gholoInteraction(String id, String identity, Map<?, ?> location,
+                                               Map<?, ?> data, List<Map<?, ?>> sourceActions) {
+    String permission = data.get("permission") instanceof String value ? value : null;
+    double width = nullable(nestedMapDouble(data.get("size"), "size", "width", 1.0D), 1.0D);
+    double height = nullable(nestedMapDouble(data.get("size"), "size", "height", 1.0D), 1.0D);
+    List<String> warnings = new ArrayList<>();
+    List<LegacyHologramDraft.LegacyAction> actions = new ArrayList<>();
+    for (Map<?, ?> action : sourceActions) {
+      String type = action.get("type") instanceof String value ? value.toLowerCase(Locale.ROOT) : "";
+      Object parameter = action.get("parameter");
+      LegacyHologramDraft.LegacyAction.Kind kind = switch (type) {
+        case "message" -> LegacyHologramDraft.LegacyAction.Kind.MESSAGE;
+        case "command" -> LegacyHologramDraft.LegacyAction.Kind.PLAYER_COMMAND;
+        case "server_command" -> LegacyHologramDraft.LegacyAction.Kind.SERVER_COMMAND;
+        case "connect" -> LegacyHologramDraft.LegacyAction.Kind.CONNECT;
+        case "teleport" -> LegacyHologramDraft.LegacyAction.Kind.TELEPORT;
+        default -> null;
+      };
+      if (kind == null) {
+        warnings.add("GHolo interaction action type '" + type + "' has no Gloss equivalent and was skipped");
+        continue;
+      }
+      actions.add(new LegacyHologramDraft.LegacyAction(kind,
+          parameter == null ? "" : String.valueOf(parameter), null));
+    }
+    if (actions.isEmpty()) {
+      warnings.add("GHolo interaction has no actions; the imported button does nothing until actions are added");
+    }
+    return new LegacyHologramDraft("interaction-" + id, identity, gholoLocation(location, 0.0D, 0.0D),
+        DEFAULT_VIEW_RANGE, permission, LegacyHologramDraft.LegacyStyle.gholoDefaults(), List.of(),
+        new LegacyHologramDraft.LegacyInteraction(width, height, 0.0D, height / 2.0D, 0.0D, actions),
+        List.copyOf(warnings));
+  }
+
+  private static LegacyHologramDraft.LegacyLocation gholoLocation(Map<?, ?> location, double yaw,
+                                                                  double pitch) {
+    if (!(location.get("world") instanceof String world) || world.isBlank()) {
+      throw new IllegalArgumentException("location.world must not be blank");
+    }
+    return new LegacyHologramDraft.LegacyLocation(world,
+        requiredLocationNumber(location, "x"), requiredLocationNumber(location, "y"),
+        requiredLocationNumber(location, "z"), yaw, pitch);
+  }
+
+  private static double requiredLocationNumber(Map<?, ?> location, String axis) {
+    Object value = location.get(axis);
+    if (value instanceof String text) {
+      return parseNumber(text, "location." + axis);
+    }
+    return requiredMapNumber(value, "location." + axis);
+  }
+
+  private static Map<?, ?> sectionValues(YamlConfiguration yaml, String path) {
+    if (!yaml.contains(path)) {
+      return Map.of();
+    }
+    ConfigurationSection section = yaml.getConfigurationSection(path);
+    if (section == null) {
+      throw new IllegalArgumentException(path + " must be a section");
+    }
+    return section.getValues(false);
+  }
+
+  private static Map<?, ?> jsonMap(String json, String field) {
+    if (json == null || json.isBlank()) {
+      return Map.of();
+    }
+    Object value;
+    try {
+      value = DocumentParsers.GSON.fromJson(json, Object.class);
+    } catch (JsonParseException failure) {
+      throw new IllegalArgumentException(field + " is not valid JSON");
+    }
+    if (value == null) {
+      return Map.of();
+    }
+    if (!(value instanceof Map<?, ?> map)) {
+      throw new IllegalArgumentException(field + " must be a JSON object");
+    }
+    return map;
+  }
+
+  private static String requiredId(String id) {
+    if (id == null || id.isBlank()) {
+      throw new IllegalArgumentException("GHolo id must not be blank");
+    }
+    return id;
+  }
+
+  private void scanCmi(Path file, List<LegacyHologramDraft> drafts, List<LegacyImportIssue> issues)
+      throws IOException {
+    YamlConfiguration yaml = loadYaml(file);
+    double defaultRange = cmiDefaultViewRange(file, issues);
+    List<String> ids = new ArrayList<>(yaml.getKeys(false));
+    ids.sort(stableIdOrder());
+    requireHologramCount(ids.size());
+    for (String id : ids) {
+      ConfigurationSection section = yaml.getConfigurationSection(id);
+      if (section == null) {
+        continue;
+      }
+      try {
+        if (section.contains("Enabled") && !section.getBoolean("Enabled")) {
+          issues.add(warning(id, "disabled CMI hologram was skipped"));
+          continue;
+        }
+        drafts.add(new CmiHologramReader(id, section, defaultRange).draft());
+      } catch (RuntimeException failure) {
+        issues.add(error(id, safeMessage(failure)));
+      }
+    }
+  }
+
+  private static double cmiDefaultViewRange(Path hologramFile, List<LegacyImportIssue> issues) {
+    Path config = hologramFile.getParent().getParent().resolve("config.yml");
+    if (!Files.exists(config, LinkOption.NOFOLLOW_LINKS)) {
+      return CmiHologramReader.DEFAULT_VIEW_RANGE;
+    }
+    try {
+      return loadYaml(config).getDouble("Holograms.Defaults.viewRange", CmiHologramReader.DEFAULT_VIEW_RANGE);
+    } catch (IOException failure) {
+      issues.add(warning("config.yml", "CMI config.yml could not be read, so the default view range of "
+          + CmiHologramReader.DEFAULT_VIEW_RANGE + " blocks was used: " + safeMessage(failure)));
+      return CmiHologramReader.DEFAULT_VIEW_RANGE;
+    }
   }
 
   private LegacyHologramDraft parseDecentFile(Path file) throws IOException {
@@ -272,7 +513,7 @@ final class LegacyHologramScanner {
     List<LegacyHologramDraft.LegacyRow> rows = rows(text, defaults, false);
     return new LegacyHologramDraft(id, displayName(file),
         new LegacyHologramDraft.LegacyLocation(world, x, y, z, 0.0D, 0.0D),
-        range, null, defaults, rows,
+        range, null, defaults, rows, null,
         List.of("Only DecentHolograms text line content is imported; page timing, actions, flags, and non-text line fields are not"));
   }
 
@@ -423,7 +664,7 @@ final class LegacyHologramScanner {
     return value != null && Double.compare(value, expected) != 0;
   }
 
-  private static YamlConfiguration loadYaml(Path path) throws IOException {
+  static YamlConfiguration loadYaml(Path path) throws IOException {
     Path file = path.toAbsolutePath().normalize();
     if (Files.isSymbolicLink(file) || !Files.isRegularFile(file, LinkOption.NOFOLLOW_LINKS)) {
       throw new IOException("source must be a real regular file");
@@ -729,6 +970,11 @@ final class LegacyHologramScanner {
       drafts = List.copyOf(drafts);
       issues = List.copyOf(issues);
     }
+  }
+
+  @FunctionalInterface
+  private interface DraftSource {
+    LegacyHologramDraft draft();
   }
 
   @FunctionalInterface

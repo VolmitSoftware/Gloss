@@ -245,11 +245,12 @@ public final class LegacyHologramImportService {
 
   private Path sourcePath(LegacyImportSource source) {
     Path relative = switch (source) {
-      case GHOLO -> Path.of("GHolo", "holos");
+      case GHOLO -> Path.of("GHolo");
       case DECENT_HOLOGRAMS -> Path.of("DecentHolograms", "holograms");
       case HOLOGRAPHIC_DISPLAYS -> Path.of("HolographicDisplays", "database.yml");
       case FANCY_HOLOGRAMS -> Path.of("FancyHolograms", "holograms.yml");
-      case FEATHERBOARD, ANIMATED_SCOREBOARD, TAB_HEADER_FOOTER -> throw new IllegalArgumentException(
+      case CMI_HOLOGRAMS -> Path.of("CMI", "Saves", "Holograms.yml");
+      case FEATHERBOARD, ANIMATED_SCOREBOARD, TAB_HEADER_FOOTER, CMI_TABLIST -> throw new IllegalArgumentException(
           "source does not import holograms: " + source.id());
     };
     Path target = pluginsDirectory.resolve(relative).normalize();
