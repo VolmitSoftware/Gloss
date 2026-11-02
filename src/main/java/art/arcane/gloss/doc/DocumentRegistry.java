@@ -77,6 +77,7 @@ public final class DocumentRegistry<T> implements AutoCloseable {
     private final Set<String> failedIds;
     private final Set<String> reconciliationLoaded;
     private final Set<String> ownerWrites;
+    private final List<FileWatcher> retiredWatchers;
     private final long reconciliationInitialOffsetNanos;
     private volatile Map<String, GlossDocument<T>> snapshot;
     private volatile Map<String, String> publishedFingerprints = Map.of();
@@ -122,6 +123,7 @@ public final class DocumentRegistry<T> implements AutoCloseable {
         this.failedIds = new HashSet<>();
         this.reconciliationLoaded = new HashSet<>();
         this.ownerWrites = new HashSet<>();
+        this.retiredWatchers = new ArrayList<>();
         this.reconciliationInitialOffsetNanos = reconciliationInitialOffsetNanos(kind);
         this.snapshot = Map.of();
         this.reconciliationFiles = List.of();
@@ -344,6 +346,10 @@ public final class DocumentRegistry<T> implements AutoCloseable {
         polling = false;
         pollInvalidated = false;
         ownerWrites.clear();
+        for (FileWatcher watcher : retiredWatchers) {
+            watcher.close();
+        }
+        retiredWatchers.clear();
     }
 
     private synchronized void recordOwnerWrite(String id) {
@@ -727,17 +733,24 @@ public final class DocumentRegistry<T> implements AutoCloseable {
     void replaceFolderWatcher(FolderWatcher replacement) {
         FolderWatcher previous = folderWatcher;
         folderWatcher = replacement;
-        if (previous != null) {
-            previous.close();
-        }
+        retire(previous);
     }
 
     void replaceFileWatcher(FileWatcher replacement) {
         FileWatcher previous = fileWatcher;
         fileWatcher = replacement;
-        if (previous != null) {
-            previous.close();
+        retire(previous);
+    }
+
+    private synchronized void retire(FileWatcher watcher) {
+        if (watcher == null) {
+            return;
         }
+        if (polling) {
+            retiredWatchers.add(watcher);
+            return;
+        }
+        watcher.close();
     }
 
     private DocumentDelta pollSingle() {

@@ -581,31 +581,75 @@ public final class GlossProjectTransaction {
 
   private void deleteRetainedArchive(RetainedArchive archive) throws IOException {
     try (DirectoryStream<Path> directory = Files.newDirectoryStream(backupsDirectory)) {
-      if (!(directory instanceof SecureDirectoryStream<Path> secure)) {
-        throw new IOException("transaction retention requires secure directory deletion support");
+      if (directory instanceof SecureDirectoryStream<Path> secure) {
+        deleteRetainedArchive(archive, secure);
+        return;
       }
-      Path name = archive.path().getFileName();
-      BasicFileAttributes current = secure.getFileAttributeView(name, BasicFileAttributeView.class,
-          LinkOption.NOFOLLOW_LINKS).readAttributes();
-      if (!current.isDirectory() || archive.fileKey() == null || !archive.fileKey().equals(current.fileKey())) {
-        throw new IOException("transaction archive changed during retention: " + archive.path());
+    }
+    deleteRetainedArchiveByPath(archive);
+  }
+
+  private void deleteRetainedArchive(RetainedArchive archive, SecureDirectoryStream<Path> secure) throws IOException {
+    Path name = archive.path().getFileName();
+    BasicFileAttributes current = secure.getFileAttributeView(name, BasicFileAttributeView.class,
+        LinkOption.NOFOLLOW_LINKS).readAttributes();
+    if (!current.isDirectory() || archive.fileKey() == null || !archive.fileKey().equals(current.fileKey())) {
+      throw new IOException("transaction archive changed during retention: " + archive.path());
+    }
+    if (!Objects.equals(archive.journal(), readJournal(backupsDirectory, archive.path()))) {
+      throw new IOException("transaction archive journal changed during retention: " + archive.path());
+    }
+    try (SecureDirectoryStream<Path> child = secure.newDirectoryStream(name, LinkOption.NOFOLLOW_LINKS)) {
+      BasicFileAttributes opened = child.getFileAttributeView(BasicFileAttributeView.class).readAttributes();
+      if (!archive.fileKey().equals(opened.fileKey())) {
+        throw new IOException("transaction archive changed while opening retention directory: " + archive.path());
       }
-      if (!Objects.equals(archive.journal(), readJournal(backupsDirectory, archive.path()))) {
-        throw new IOException("transaction archive journal changed during retention: " + archive.path());
+      deleteRetainedContents(child, new ScanBudget(), 0);
+    }
+    BasicFileAttributes remaining = secure.getFileAttributeView(name, BasicFileAttributeView.class,
+        LinkOption.NOFOLLOW_LINKS).readAttributes();
+    if (!archive.fileKey().equals(remaining.fileKey())) {
+      throw new IOException("transaction archive changed before retention directory removal: " + archive.path());
+    }
+    secure.deleteDirectory(name);
+  }
+
+  private void deleteRetainedArchiveByPath(RetainedArchive archive) throws IOException {
+    BasicFileAttributes current = Files.readAttributes(archive.path(), BasicFileAttributes.class,
+        LinkOption.NOFOLLOW_LINKS);
+    if (!current.isDirectory() || current.isOther() || !Objects.equals(archive.fileKey(), current.fileKey())) {
+      throw new IOException("transaction archive changed during retention: " + archive.path());
+    }
+    if (!Objects.equals(archive.journal(), readJournal(backupsDirectory, archive.path()))) {
+      throw new IOException("transaction archive journal changed during retention: " + archive.path());
+    }
+    deleteRetainedContentsByPath(archive.path(), new ScanBudget(), 0);
+    Files.delete(archive.path());
+  }
+
+  private void deleteRetainedContentsByPath(Path directory, ScanBudget budget, int depth) throws IOException {
+    if (depth >= MAX_RETENTION_DEPTH) {
+      throw new IOException("transaction retention exceeds directory depth limit");
+    }
+    List<Path> entries = new ArrayList<>();
+    try (DirectoryStream<Path> children = Files.newDirectoryStream(directory)) {
+      for (Path child : children) {
+        budget.visit();
+        entries.add(child);
       }
-      try (SecureDirectoryStream<Path> child = secure.newDirectoryStream(name, LinkOption.NOFOLLOW_LINKS)) {
-        BasicFileAttributes opened = child.getFileAttributeView(BasicFileAttributeView.class).readAttributes();
-        if (!archive.fileKey().equals(opened.fileKey())) {
-          throw new IOException("transaction archive changed while opening retention directory: " + archive.path());
-        }
-        deleteRetainedContents(child, new ScanBudget(), 0);
+    }
+    entries.sort(Comparator.comparing(path -> path.getFileName().toString().equals("journal.json")));
+    for (Path entry : entries) {
+      BasicFileAttributes attributes = Files.readAttributes(entry, BasicFileAttributes.class,
+          LinkOption.NOFOLLOW_LINKS);
+      if (attributes.isSymbolicLink() || attributes.isOther()
+          || !attributes.isDirectory() && !attributes.isRegularFile()) {
+        throw new IOException("transaction archive contains an unsafe entry: " + entry);
       }
-      BasicFileAttributes remaining = secure.getFileAttributeView(name, BasicFileAttributeView.class,
-          LinkOption.NOFOLLOW_LINKS).readAttributes();
-      if (!archive.fileKey().equals(remaining.fileKey())) {
-        throw new IOException("transaction archive changed before retention directory removal: " + archive.path());
+      if (attributes.isDirectory()) {
+        deleteRetainedContentsByPath(entry, budget, depth + 1);
       }
-      secure.deleteDirectory(name);
+      Files.delete(entry);
     }
   }
 
@@ -1228,6 +1272,10 @@ public final class GlossProjectTransaction {
     @Override
     public FileVisitResult preVisitDirectory(Path directory, BasicFileAttributes attributes) throws IOException {
       budget.visit();
+      if (attributes.isOther()) {
+        safe = false;
+        return FileVisitResult.SKIP_SUBTREE;
+      }
       return FileVisitResult.CONTINUE;
     }
 

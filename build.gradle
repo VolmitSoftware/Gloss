@@ -573,4 +573,14 @@ tasks.register('verifyPlatformPackaging') {
 
 tasks.named('check') { dependsOn(tasks.named('verifyPlatformPackaging')) }
 
+tasks.register('buildSwiftSwamp', Copy) {
+    group = 'development'
+    description = 'Builds, verifies, and stages Gloss in the workspace BUILDS directory.'
+    dependsOn('check', universalJarTask)
+    outputs.upToDateWhen { false }
+    from(universalJarTask.flatMap { Jar archive -> archive.archiveFile })
+    into(providers.gradleProperty('buildsDirectory').orElse('../BUILDS'))
+    rename { String ignored -> 'Gloss.jar' }
+}
+
 apply from: 'gradle/multiplexor.gradle'

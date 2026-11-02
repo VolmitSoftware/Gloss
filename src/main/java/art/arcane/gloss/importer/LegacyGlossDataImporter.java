@@ -229,8 +229,12 @@ public final class LegacyGlossDataImporter {
         }
     }
 
+    private String relativePath(File file) {
+        return dataFolder.toPath().relativize(file.toPath()).toString().replace(File.separatorChar, '/');
+    }
+
     private void migrateFile(String kind, File file, Function<JsonObject, Object> converter, List<Entry> entries) {
-        String path = dataFolder.toPath().relativize(file.toPath()).toString();
+        String path = relativePath(file);
         try {
             String raw = new String(preparation.read(file.toPath()), StandardCharsets.UTF_8);
             JsonElement parsed = JsonParser.parseString(raw);
@@ -259,7 +263,7 @@ public final class LegacyGlossDataImporter {
     }
 
     private void migrateEnvelope(String kind, File file, JsonObject source, List<Entry> entries) throws IOException {
-        String path = dataFolder.toPath().relativize(file.toPath()).toString();
+        String path = relativePath(file);
         if (kind.equals(EmojiDoc.KIND) || kind.equals(AnimationDoc.KIND)) {
             HistoryKinds.requireCollection(kind).parse(baseName(file), source.toString());
             entries.add(Entry.of(kind, path, Status.SKIPPED_ENVELOPE));

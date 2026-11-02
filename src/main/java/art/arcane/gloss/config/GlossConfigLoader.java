@@ -56,20 +56,35 @@ public final class GlossConfigLoader {
     }
 
     public GlossConfigFile loadForBoot() throws IOException {
-        return load(true);
+        File parent = file.getParentFile();
+        if (parent != null && !parent.exists()) {
+            parent.mkdirs();
+        }
+        GlossConfigFile loaded = ConfigFileSupport.load(
+            io,
+            file,
+            null,
+            GlossConfigFile.class,
+            new GlossConfigFile(),
+            true,
+            SOURCE_TAG,
+            "Created gloss.toml with defaults.",
+            GlossConfigFile::normalize,
+            true,
+            null,
+            ConfigExposePolicy.ALL
+        );
+        lastCanonicalSha256 = hashCurrentFile();
+        return loaded;
     }
 
     public GlossConfigFile loadForReload() throws IOException {
-        return load(false);
+        return loadForReload(captureReloadSnapshot());
     }
 
     public GlossConfigFile loadForReload(ReloadSnapshot snapshot) throws IOException {
         ReloadSnapshot stable = Objects.requireNonNull(snapshot, "snapshot");
-        GlossConfigFile loaded = TomlCodec.fromToml(stable.rawContent(), GlossConfigFile.class);
-        if (loaded == null) {
-            throw new IOException("Config parser returned null");
-        }
-        loaded.normalize();
+        GlossConfigFile loaded = parse(stable);
         lastCanonicalSha256 = stable.sha256();
         return loaded;
     }
@@ -106,8 +121,21 @@ public final class GlossConfigLoader {
         if (parent != null && !parent.exists()) {
             parent.mkdirs();
         }
-        AtomicFiles.replace(file.toPath(), encode(config));
-        lastCanonicalSha256 = hashCurrentFile();
+        byte[] content = encode(config);
+        AtomicFiles.replace(file.toPath(), content);
+        lastCanonicalSha256 = DocumentHashes.sha256(content);
+    }
+
+    public void saveLanguage(String locale) throws IOException {
+        ReloadSnapshot snapshot = captureReloadSnapshot();
+        boolean applied = isSelfWrite(snapshot);
+        GlossConfigFile updated = parse(snapshot);
+        updated.language = locale;
+        byte[] content = encode(updated);
+        AtomicFiles.replace(file.toPath(), content);
+        if (applied) {
+            lastCanonicalSha256 = DocumentHashes.sha256(content);
+        }
     }
 
     public byte[] encode(GlossConfigFile config) {
@@ -142,26 +170,12 @@ public final class GlossConfigLoader {
         }
     }
 
-    private GlossConfigFile load(boolean overwriteOnReadFailure) throws IOException {
-        File parent = file.getParentFile();
-        if (parent != null && !parent.exists()) {
-            parent.mkdirs();
+    private GlossConfigFile parse(ReloadSnapshot snapshot) throws IOException {
+        GlossConfigFile loaded = TomlCodec.fromToml(snapshot.rawContent(), GlossConfigFile.class);
+        if (loaded == null) {
+            throw new IOException("Config parser returned null");
         }
-        GlossConfigFile loaded = ConfigFileSupport.load(
-            io,
-            file,
-            null,
-            GlossConfigFile.class,
-            new GlossConfigFile(),
-            overwriteOnReadFailure,
-            SOURCE_TAG,
-            "Created gloss.toml with defaults.",
-            GlossConfigFile::normalize,
-            true,
-            null,
-            ConfigExposePolicy.ALL
-        );
-        lastCanonicalSha256 = hashCurrentFile();
+        loaded.normalize();
         return loaded;
     }
 

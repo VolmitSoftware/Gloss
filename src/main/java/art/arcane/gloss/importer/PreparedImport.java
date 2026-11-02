@@ -9,6 +9,7 @@ import art.arcane.gloss.persistence.GlossPersistenceCoordinator;
 import art.arcane.gloss.persistence.GlossProjectTransaction;
 import art.arcane.gloss.persistence.TransactionPreparation;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -114,7 +115,8 @@ final class PreparedImport {
     }
 
     List<String> targets() {
-        return mutations.keySet().stream().map(root::relativize).map(Path::toString).toList();
+        return mutations.keySet().stream().map(root::relativize)
+            .map(path -> path.toString().replace(File.separatorChar, '/')).toList();
     }
 
     void checkBeforeApply(ApplyCheck check) {

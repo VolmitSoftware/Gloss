@@ -14,7 +14,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * document tree it is reading from.
  */
 class CommandGlossExportDestinationTest {
-    private static final Path DATA = Path.of("/srv/plugins/Gloss");
+    private static final Path DATA = Path.of("/srv/plugins/Gloss").toAbsolutePath();
 
     @Test
     void theDataFolderItselfIsRefused() {

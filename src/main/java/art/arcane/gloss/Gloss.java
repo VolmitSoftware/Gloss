@@ -826,10 +826,10 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
     }
 
     public synchronized void selectLanguage(String locale, LocalizationSnapshot snapshot) throws IOException {
-        GlossConfigFile updated = configLoader.loadForReload();
-        updated.language = locale;
-        configLoader.save(updated);
-        config = config.withLanguage(locale);
+        if (!locale.equals(config.language())) {
+            configLoader.saveLanguage(locale);
+            config = config.withLanguage(locale);
+        }
         localization.install(locale, snapshot);
     }
 

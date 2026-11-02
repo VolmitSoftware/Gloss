@@ -13,6 +13,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
@@ -65,6 +66,34 @@ class DocumentRegistryTest {
         assertEquals("two", registry.get("beta").value());
         assertEquals(DocumentHashes.sha256("one"), registry.get("alpha").contentHash());
         assertEquals(1L, registry.get("alpha").revision());
+    }
+
+    @Test
+    void reloadDuringAPollKeepsTheWatcherTheScanIsReadingOpen() throws IOException {
+        write("alpha.json", "one");
+        write("beta.json", "two");
+        AtomicBoolean reloadOnRead = new AtomicBoolean();
+        AtomicReference<DocumentRegistry<String>> current = new AtomicReference<>();
+        DocumentParser<String> parser = (fileName, raw) -> {
+            if (reloadOnRead.compareAndSet(true, false)) {
+                current.get().reload();
+            }
+            return PARSER.parse(fileName, raw);
+        };
+        DocumentRegistry<String> registry = DocumentRegistry.folder("test", folder, parser, value -> 1L,
+            file -> false, clock::get);
+        current.set(registry);
+        registry.reload();
+
+        write("alpha.json", "uno");
+        write("beta.json", "dos");
+        clock.addAndGet(TimeUnit.SECONDS.toNanos(19L));
+        reloadOnRead.set(true);
+
+        assertEquals(DocumentDelta.EMPTY, registry.poll());
+        assertFalse(reloadOnRead.get());
+        assertEquals("uno", registry.get("alpha").value());
+        assertEquals("dos", registry.get("beta").value());
     }
 
     @Test

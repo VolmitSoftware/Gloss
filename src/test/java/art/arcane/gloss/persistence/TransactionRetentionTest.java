@@ -5,6 +5,8 @@ import art.arcane.gloss.config.GlossConfigFile;
 import art.arcane.volmlib.util.config.ConfigExposePolicy;
 import art.arcane.volmlib.util.config.TomlCodec;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledOnOs;
+import org.junit.jupiter.api.condition.OS;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
@@ -166,6 +168,45 @@ class TransactionRetentionTest {
     }
 
     @Test
+    @EnabledOnOs(OS.WINDOWS)
+    void junctionArchiveContentsNeverDeleteTheirTarget() throws Exception {
+        GlossProjectTransaction transaction = new GlossProjectTransaction(data);
+        Path unsafe = archive(transaction, 1);
+        Path newest = archive(transaction, 2);
+        Path external = externalDirectory();
+        createJunction(unsafe.resolve("linked"), external);
+        transaction.configureRetention(new GlossProjectTransaction.RetentionPolicy(1, 1));
+        transaction.pruneRetainedBackups();
+        assertTrue(Files.exists(unsafe.resolve("journal.json")));
+        assertEquals("keep", Files.readString(external.resolve("kept.txt")));
+        assertTrue(Files.exists(newest));
+        assertEquals(2, transaction.retentionStatus().protectedBackups());
+    }
+
+    @Test
+    @EnabledOnOs(OS.WINDOWS)
+    void junctionPlantedAfterInventoryStopsDeletionAndKeepsItsTargetAndJournal() throws Exception {
+        AtomicBoolean plant = new AtomicBoolean();
+        AtomicReference<Path> victim = new AtomicReference<>();
+        Path external = externalDirectory();
+        GlossProjectTransaction transaction = new GlossProjectTransaction(data, directory -> {
+            if (directory.equals(data.resolve("editor-sync-backups")) && plant.compareAndSet(true, false)) {
+                createJunction(victim.get().resolve("linked"), external);
+            }
+        });
+        Path first = archive(transaction, 1);
+        victim.set(archive(transaction, 2));
+        Path newest = archive(transaction, 3);
+        transaction.configureRetention(new GlossProjectTransaction.RetentionPolicy(1, Long.MAX_VALUE));
+        plant.set(true);
+        assertThrows(IOException.class, transaction::pruneRetainedBackups);
+        assertFalse(Files.exists(first));
+        assertTrue(Files.exists(victim.get().resolve("journal.json")));
+        assertEquals("keep", Files.readString(external.resolve("kept.txt")));
+        assertTrue(Files.exists(newest));
+    }
+
+    @Test
     void cleanupFailureKeepsNewestAndRemainingArchivesAndCanBeRetried() throws Exception {
         AtomicBoolean fail = new AtomicBoolean();
         GlossProjectTransaction transaction = new GlossProjectTransaction(data, directory -> {
@@ -262,6 +303,26 @@ class TransactionRetentionTest {
         Path archived = data.resolve("editor-sync-backups").resolve(pending.id());
         Files.setLastModifiedTime(archived.resolve("journal.json"), FileTime.fromMillis(sequence * 1000L));
         return archived;
+    }
+
+    private Path externalDirectory() throws IOException {
+        Path external = data.resolve("external-kept");
+        Files.createDirectories(external);
+        Files.writeString(external.resolve("kept.txt"), "keep");
+        return external;
+    }
+
+    private void createJunction(Path link, Path target) throws IOException {
+        Process process = new ProcessBuilder("cmd", "/c", "mklink", "/J", link.toString(), target.toString())
+            .redirectErrorStream(true)
+            .redirectOutput(ProcessBuilder.Redirect.DISCARD)
+            .start();
+        try {
+            assertEquals(0, process.waitFor());
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            throw new IOException("interrupted creating junction " + link, interrupted);
+        }
     }
 
     private long bytes(Path directory) throws Exception {

@@ -2,6 +2,8 @@ package art.arcane.gloss;
 
 import art.arcane.gloss.config.GlossConfigFile;
 import art.arcane.gloss.config.GlossConfigLoader;
+import art.arcane.gloss.doc.AtomicFiles;
+import art.arcane.gloss.doc.DocumentHashes;
 import art.arcane.volmlib.util.config.ConfigExposePolicy;
 import art.arcane.volmlib.util.config.ConfigDoc;
 import art.arcane.volmlib.util.config.TomlCodec;
@@ -11,12 +13,14 @@ import org.junit.jupiter.api.io.TempDir;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -320,6 +324,72 @@ class GlossConfigTest {
         GlossConfigFile reloaded = loader.loadForReload();
         assertFalse(reloaded.splashScreen);
         assertTrue(loader.isSelfWrite());
+    }
+
+    @Test
+    void reloadRecordsTheHashOfTheBytesItParsedWhileTheFileIsBeingEdited(@TempDir Path tempDir) throws Exception {
+        GlossConfigLoader loader = new GlossConfigLoader(tempDir.toFile());
+        loader.loadForBoot();
+        Path file = tempDir.resolve(GlossConfigLoader.FILE_NAME);
+        String enabledText = Files.readString(file);
+        byte[] enabled = enabledText.getBytes(StandardCharsets.UTF_8);
+        byte[] disabled = enabledText.replace("splashScreen = true", "splashScreen = false")
+            .getBytes(StandardCharsets.UTF_8);
+        Map<String, Boolean> splashScreenByHash = Map.of(
+            DocumentHashes.sha256(enabled), true,
+            DocumentHashes.sha256(disabled), false);
+        AtomicBoolean editing = new AtomicBoolean(true);
+        Thread editor = new Thread(() -> {
+            boolean toggle = false;
+            while (editing.get()) {
+                try {
+                    AtomicFiles.replace(file, toggle ? enabled : disabled);
+                    toggle = !toggle;
+                } catch (IOException heldOpenByReader) {
+                    Thread.onSpinWait();
+                }
+            }
+        });
+        editor.start();
+        try {
+            for (int attempt = 0; attempt < 400; attempt++) {
+                try {
+                    GlossConfigFile loaded = loader.loadForReload();
+                    assertEquals(splashScreenByHash.get(loader.lastCanonicalSha256()), loaded.splashScreen);
+                } catch (IOException changedWhileCapturing) {
+                    Thread.onSpinWait();
+                }
+            }
+        } finally {
+            editing.set(false);
+            editor.join();
+        }
+    }
+
+    @Test
+    void languageSelectionOfAnAppliedFileIsItsOwnWrite(@TempDir Path tempDir) throws IOException {
+        GlossConfigLoader loader = new GlossConfigLoader(tempDir.toFile());
+        loader.loadForBoot();
+
+        loader.saveLanguage("pirate_SEA");
+
+        assertTrue(loader.isSelfWrite());
+        assertEquals("pirate_SEA", loader.loadForReload().language);
+    }
+
+    @Test
+    void languageSelectionLeavesAnUnappliedEditForTheReloadWatcher(@TempDir Path tempDir) throws IOException {
+        GlossConfigLoader loader = new GlossConfigLoader(tempDir.toFile());
+        loader.loadForBoot();
+        Path file = tempDir.resolve(GlossConfigLoader.FILE_NAME);
+        Files.writeString(file, Files.readString(file).replace("splashScreen = true", "splashScreen = false"));
+
+        loader.saveLanguage("pirate_SEA");
+
+        assertFalse(loader.isSelfWrite());
+        GlossConfigFile reloaded = loader.loadForReload();
+        assertEquals("pirate_SEA", reloaded.language);
+        assertFalse(reloaded.splashScreen);
     }
 
     @Test

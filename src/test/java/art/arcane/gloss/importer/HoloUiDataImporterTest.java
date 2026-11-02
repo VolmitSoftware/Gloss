@@ -18,6 +18,7 @@ import org.junit.jupiter.api.io.TempDir;
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -421,7 +422,8 @@ class HoloUiDataImporterTest {
         Map<String, String> hashes = new TreeMap<>();
         try (Stream<Path> stream = Files.walk(directory)) {
             for (Path path : stream.filter(Files::isRegularFile).toList()) {
-                hashes.put(directory.relativize(path).toString(), sha256(Files.readAllBytes(path)));
+                hashes.put(directory.relativize(path).toString().replace(File.separatorChar, '/'),
+                    sha256(Files.readAllBytes(path)));
             }
         }
         return hashes;
