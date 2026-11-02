@@ -281,8 +281,6 @@ public final class GlossMessages {
     public static final TextKey EMOJI_EMPTY = text("command.emoji.empty", PREFIX + "&7No emoji are enabled.");
     public static final TextKey EMOJI_HOVER = text("command.emoji.hover", "Click to insert into chat");
     public static final TextKey ANIMATIONS_EMPTY = text("command.animations.empty", PREFIX + "&7No animations are loaded.");
-    public static final TextKey ANIMATIONS_HEADER = text("command.animations.header", PREFIX + "&fAnimations: &d{count}");
-    public static final TextKey ANIMATIONS_ENTRY = text("command.animations.entry", "&8- &d{name}");
 
     public static final TextKey LIST_PAGE = text("command.list.page", "&7Page &f{page}&7/&f{pages} &8- &7showing &f{from}&7-&f{to} &7of &f{total}");
     public static final TextKey LIST_NEXT = text("command.list.next", "&7Next page: &f{command}");
@@ -325,7 +323,6 @@ public final class GlossMessages {
     public static final TextKey ERROR_IMPORT_SOURCE_REQUIRED = text("gloss.error.import_source_required", "Legacy import source cannot be empty");
     public static final TextKey ERROR_IMPORT_SOURCE_UNKNOWN = text("gloss.error.import_source_unknown", "Unknown legacy import source: {source}");
     public static final TextKey PERMISSION_DENIED = text("gloss.message.permission_denied", COLON_PREFIX + "&cYou lack permission &f{permission}&c.");
-    public static final TextKey UNKNOWN_COMMAND = text("gloss.message.unknown_command", COLON_PREFIX + "&cUnknown command \"&f{command}&c\".");
     public static final TextKey HOLOGRAM_MENU_CREATED = text("gloss.message.hologram.created", COLON_PREFIX + "&aCreated hologram &f{hologram}&a with root menu &f{menu}&a at your position.");
     public static final TextKey HOLOGRAM_ALREADY_EXISTS = text("gloss.message.hologram.already_exists", COLON_PREFIX + "&cA hologram, panel, or menu named &f{hologram}&c already exists.");
     public static final TextKey HOLOGRAM_CREATE_FAILED = text("gloss.message.hologram.failed", COLON_PREFIX + "&cCould not create hologram &f{hologram}&c. No changes were kept.");
@@ -392,12 +389,8 @@ public final class GlossMessages {
     public static final TextKey PREVIEWS_DUMP_NO_ERRORS = text("gloss.message.previews.dump.no_errors", COLON_PREFIX + "&aNo build errors.");
     public static final TextKey PREVIEWS_DUMP_ERROR_LINE = text("gloss.message.previews.dump.error_line", COLON_PREFIX + "&c{message}");
     public static final TextKey PREVIEWS_DUMP_ERROR_MORE = text("gloss.message.previews.dump.error_more", COLON_PREFIX + "&7+{count} more (see console log).");
-    public static final TextKey PANELS_LIST_HEADER = text("gloss.message.panels.list.header", COLON_PREFIX + "&fPersistent panels: &d{count}");
     public static final TextKey PANELS_LIST_EMPTY = text("gloss.message.panels.list.empty", COLON_PREFIX + "&7No persistent panels are loaded.");
-    public static final TextKey PANELS_LIST_ENTRY = text("gloss.message.panels.list.entry", "&8- &f{board} &7menu=&f{menu} &7revision=&f{revision}");
-    public static final TextKey PANELS_NEAR_HEADER = text("gloss.message.panels.near.header", COLON_PREFIX + "&fPanels within &d{radius}&f blocks: &d{count}");
     public static final TextKey PANELS_NEAR_EMPTY = text("gloss.message.panels.near.empty", COLON_PREFIX + "&7No panels are within that radius.");
-    public static final TextKey PANELS_NEAR_ENTRY = text("gloss.message.panels.near.entry", "&8- &f{board} &7distance=&f{distance} &7menu=&f{menu}");
     public static final TextKey PANELS_INFO_HEADER = text("gloss.message.panels.info.header", COLON_PREFIX + "&fPanel &d{board} &7({state})");
     public static final TextKey PANELS_INFO_IDENTITY = text("gloss.message.panels.info.identity", "&7uuid=&f{uuid} &7revision=&f{revision} &7menu=&f{menu}");
     public static final TextKey PANELS_INFO_TRANSFORM = text("gloss.message.panels.info.transform", "&7world=&f{world} &7position=&f{x}, {y}, {z} &7rotation=&f{yaw}, {pitch}, {roll} &7scale=&f{scale}");

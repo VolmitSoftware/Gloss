@@ -158,6 +158,7 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
 
     private HudActionBar hudBar;
     private GlossLocalization localization;
+    private final Set<String> pendingLanguageInstalls = ConcurrentHashMap.newKeySet();
     private GlossPersistenceCoordinator persistenceCoordinator;
     private GlossProjectTransaction projectTransaction;
     private MenuCatalog menuCatalog;
@@ -388,9 +389,13 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
             });
             languageSwitcher = BukkitLanguageSwitcher.register(this, localization.enableLanguages(this),
                     new BukkitLanguageSwitcher.Options("gloss", "gloss.admin",
-                            GlossCommandService.menuTheme(), localization.directorResolver(), localization.editorOptions()));
+                            GlossCommandService.menuTheme(), localization.directorResolver(), localization.editorOptions(),
+                            null, localization.updateAction(), localization.displayNames()));
+            localization.sourceFailure().ifPresent(failure -> logExceptionStack(false, failure,
+                "Language source is unavailable; built-in English and installed language files remain active"));
+            localization.startUpstreamCheck();
             if (!config.language().equals(localization.activeLocale())) {
-                localization.reloadConfigured(config.language());
+                applyConfiguredLanguage(config.language());
             }
             enableService("update-notifications", () -> updateService = BukkitUpdateService.register(this,
                 new BukkitUpdateService.Options("VolmitSoftware", "Gloss", "gloss.update",
@@ -809,6 +814,9 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
         if (projectTransaction != null) {
             values.put("transactionRetention", projectTransaction.retentionStatus());
         }
+        if (localization != null) {
+            values.put("languages", localization.diagnostics());
+        }
         Map<String, Object> captured = Map.copyOf(values);
         return () -> new GsonBuilder().setPrettyPrinting().create().toJson(captured);
     }
@@ -823,6 +831,29 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
         configLoader.save(updated);
         config = config.withLanguage(locale);
         localization.install(locale, snapshot);
+    }
+
+    private void applyConfiguredLanguage(String locale) {
+        GlossLocalization current = localization;
+        if (!current.needsInstall(locale)) {
+            current.reloadConfigured(locale);
+            return;
+        }
+        if (!pendingLanguageInstalls.add(locale)) {
+            return;
+        }
+        current.requestInstall(locale).whenComplete((content, failure) -> {
+            pendingLanguageInstalls.remove(locale);
+            if (failure != null) {
+                logExceptionStack(false, failure, "Unable to install Gloss language %s; the current language remains active",
+                    locale);
+                return;
+            }
+            info("Installed Gloss language %s.", locale);
+            if (isEnabled() && localization == current && locale.equals(cfg().language())) {
+                current.reloadConfigured(locale);
+            }
+        });
     }
 
     private void stopLocaleWatcher() {
@@ -901,9 +932,9 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
         }
         if (localization != null) {
             if (!previous.language().equals(next.language())) {
-                localization.reloadConfigured(next.language());
+                applyConfiguredLanguage(next.language());
             } else if (cycleEveryService) {
-                localization.reloadConfigured(next.language());
+                applyConfiguredLanguage(next.language());
             }
         }
         if (previous.metrics() != next.metrics()) {

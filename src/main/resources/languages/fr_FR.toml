@@ -25,6 +25,7 @@
 #   {absorbed}  Entrées importées fusionnées avec les données existantes
 #   {active}  Nombre de fournisseurs actifs
 #   {actual}  Révision actuelle
+#   {added}  Messages ajoutés par une mise à jour de langue
 #   {after}  Valeur du message après modification
 #   {argument}  Argument de commande inattendu
 #   {axis}  Axe de coordonnées ou de rotation
@@ -42,7 +43,6 @@
 #   {copied}  Nombre d’entrées copiées
 #   {count}  Nombre d’objets ou de messages correspondants
 #   {disc}  Disque de musique dans le conteneur
-#   {distance}  Distance jusqu’à la cible
 #   {drops}  Nombre d’objets au sol affichés
 #   {enabled}  État d’activation ou nombre d’entrées activées
 #   {entities}  Nombre d’entités
@@ -62,6 +62,7 @@
 #   {interactPermission}  Permission nécessaire pour interagir
 #   {interactionRange}  Distance maximale d’interaction
 #   {item}  Nom ou matériau de l’objet
+#   {kept}  Modifications locales conservées par une mise à jour de langue
 #   {key}  Clé de message ou de configuration
 #   {kind}  Type d’objet ou de fournisseur
 #   {kinds}  Types d’objets ou de fournisseurs disponibles
@@ -99,9 +100,9 @@
 #   {priority}  Priorité de sélection ou de rendu
 #   {provider}  Nom du fournisseur
 #   {providers}  Liste ou nombre de fournisseurs
-#   {radius}  Rayon de recherche
 #   {ready}  Nombre d’entrées prêtes à importer
 #   {reason}  Motif de l’erreur ou de la décision
+#   {remaining}  Délai restant avant la prochaine vérification des langues
 #   {resume}  Nombre d’entrées dont l’importation peut reprendre
 #   {revision}  Révision du document
 #   {roll}  Angle de roulis en degrés
@@ -125,6 +126,7 @@
 #   {to}  Valeur cible ou fin d’un intervalle
 #   {total}  Nombre total d’entrées
 #   {type}  Type de valeur ou d’objet attendu
+#   {updated}  Messages modifiés par une mise à jour de langue
 #   {url}  Adresse web
 #   {uuid}  Identifiant unique de l’objet ou du joueur
 #   {value}  Valeur actuelle du message ou du paramètre
@@ -419,8 +421,6 @@ hover = "Cliquez pour l'insérer dans le tchat"
 
 [command.animations]
 empty = "&8[&dGloss&8] &7Aucune animation n'est chargée."
-header = "&8[&dGloss&8] &fAnimations : &d{count}"
-entry = "&8- &d{name}"
 
 [command.list]
 page = "&7Page &f{page}&7/&f{pages} &8- &7affichage de &f{from}&7-&f{to} &7sur &f{total}"
@@ -433,11 +433,11 @@ emoji = "&7Émojis : &f{enabled}&8/&f{total}"
 animations = "&7Animations : &f{count}"
 effects = "&7Bulles : &f{bubbles} &8| &7Indicateurs : &f{indicators} &8| &7Drops : &f{drops}"
 
-visibility = "&7Copies d’entités visibles: &f{entities} &8| &7Observateurs: &f{viewers} &8| &7Admissions: &f{admissions} &8| &7Refus: &f{refusals} &8| &7En attente: &f{waiting} &8| &7Tours expirés: &f{expired} &8| &7Nettoyage en attente: &f{retiring}"
-images = "&7Cache d’images: &f{entries} &8| &7En attente: &f{pending} &8| &7Données conservées: &f{bytes} &7octets &8| &7Terminées: &f{completed} &8| &7Refus: &f{refusals}"
+visibility = "&7Copies d’entités visibles : &f{entities} &8| &7Observateurs : &f{viewers} &8| &7Admissions : &f{admissions} &8| &7Refus : &f{refusals} &8| &7En attente : &f{waiting} &8| &7Tours expirés : &f{expired} &8| &7Nettoyage en attente : &f{retiring}"
+images = "&7Cache d’images : &f{entries} &8| &7En attente : &f{pending} &8| &7Données conservées : &f{bytes} &7octets &8| &7Terminées : &f{completed} &8| &7Refus : &f{refusals}"
 
 [command.reset]
-done = "&8[&dGloss&8] &aRestauration de &f{count}&a valeurs par défaut ({kind})."
+done = "&8[&dGloss&8] &a&f{count}&a valeurs par défaut fournies ({kind}) restaurées."
 none = "&8[&dGloss&8] &cAucune valeur par défaut ({kind}) ne correspond à '&f{name}&c'."
 
 [command.bubbles]
@@ -513,7 +513,6 @@ import_source_unknown = "Source d’importation de l’ancien format inconnue : 
 
 [gloss.message]
 permission_denied = "&8[&dGloss&8]: &cVous n'avez pas la permission &f{permission}&c."
-unknown_command = "&8[&dGloss&8]: &cCommande inconnue \"&f{command}&c\"."
 
 [gloss.message.hologram]
 created = "&8[&dGloss&8]: &aHologramme &f{hologram}&a créé avec le menu racine &f{menu}&a à votre position."
@@ -576,7 +575,7 @@ apply_started = "&8[&dGloss&8]: &7Analyse et migration de &f{source}&7 sans écr
 source_missing = "&8[&dGloss&8]: &7Aucune source &f{source}&7 trouvée dans &f{path}&7."
 preview_summary = "&8[&dGloss&8]: &f{source}&7, aperçu : &a{ready} prêts&7, &d{resume} reprenables&7, &e{conflicts} conflits&7, &c{errors} erreurs&7, {warnings} avertissements. Source : &f{path}"
 preview_entry = "&8- &f{legacy} &7-> &f{board} &7état=&f{state} &7avertissements=&f{warnings}"
-apply_summary = "&8[&dGloss&8]: &fMigration de {source}&7 : &a{imported} importés&7, &e{skipped} ignorés&7, &c{failed} échoués&7 ; l’analyse a signalé {errors} erreurs et {warnings} avertissements."
+apply_summary = "&8[&dGloss&8]: &f{source}&7, migration : &a{imported} importés&7, &e{skipped} ignorés&7, &c{failed} échoués&7 ; l’analyse a signalé {errors} erreurs et {warnings} avertissements."
 apply_entry = "&8- &f{legacy} &7état=&f{state} &7motif=&f{reason}"
 issue = "&8- &f{legacy} &7{severity}: &f{reason}"
 busy = "&8[&dGloss&8]: &cUne autre migration d’hologrammes de l’ancien format est déjà en cours."
@@ -655,14 +654,10 @@ revision_conflict = "&8[&dGloss&8]: &cLe panneau &f{board}&c a changé pendant l
 failed = "&8[&dGloss&8]: &cÉchec de l’opération sur le panneau &f{board}&c : {reason}"
 
 [gloss.message.panels.list]
-header = "&8[&dGloss&8]: &fPanneaux persistants : &d{count}"
 empty = "&8[&dGloss&8]: &7Aucun panneau persistant n’est chargé."
-entry = "&8- &f{board} &7menu=&f{menu} &7révision=&f{revision}"
 
 [gloss.message.panels.near]
-header = "&8[&dGloss&8]: &fPanneaux dans un rayon de &d{radius}&f blocs : &d{count}"
 empty = "&8[&dGloss&8]: &7Aucun panneau dans ce rayon."
-entry = "&8- &f{board} &7distance=&f{distance} &7menu=&f{menu}"
 
 [gloss.message.panels.info]
 header = "&8[&dGloss&8]: &fPanneau &d{board} &7({state})"
@@ -695,7 +690,7 @@ blasting = "Fusion au haut fourneau {percent}%"
 smoking_item = "Fumage de {item} {percent}%"
 smoking = "Fumage {percent}%"
 heating = "Chauffage"
-needs_fuel = "Carburant requis"
+needs_fuel = "Combustible requis"
 no_input = "Aucune entrée"
 surge_suffix = "  +{seconds}s"
 disc_playing = "Lecture de {disc}"
@@ -703,11 +698,11 @@ disc_loaded = "Chargé : {disc}"
 no_disc = "Aucun disque"
 
 [gloss.preview.stat]
-fuel_level = "Carburant {fuel}/{maximum}"
-no_fuel = "Aucun carburant"
+fuel_level = "Combustible {fuel}/{maximum}"
+no_fuel = "Aucun combustible"
 bottles = "Fioles {bottles}/{maximum}"
-fuel_seconds = "Carburant {seconds}s"
-fuel_ready = "Carburant prêt"
+fuel_seconds = "Combustible {seconds}s"
+fuel_ready = "Combustible prêt"
 xp_gain = "XP +{experience}"
 xp_zero = "XP 0"
 bees_and_honey = "Abeilles {bees}/{maximumBees}   Miel {honey}/{maximumHoney}"
@@ -752,39 +747,48 @@ current = "Langue actuelle : {locale}"
 current_with_personal = "Langue actuelle : {locale} (La vôtre : {personal})"
 your_description = "Modifiez uniquement les messages que vous voyez."
 reset_description = "Utilisez la langue par défaut du serveur."
-server_description = "Modifiez la langue par défaut du serveur."
-edit_description = "Ouvrez l’éditeur de messages pour chaque langue."
+server_description = "Modifiez la langue par défaut du serveur"
+edit_description = "Ouvrez l'éditeur de messages pour chaque langue."
 select_description = "Cliquez pour sélectionner cette langue."
 remove_personal_description = "Supprimez votre choix de langue personnel."
 no_controls = "Aucune option de langue ne vous est accessible."
-command = "Commande: {command}"
+command = "Commande : {command}"
 selected = "sélectionné"
-all-volmit-plugins = "Tous les plugins Volmit"
+all-volmit-plugins = "tous les plugins Volmit"
 
 [language.error]
 stopping = "La sélection de la langue est indisponible pendant que le plugin s'arrête."
 editor-player-only = "Ouvrez l'éditeur de langue dans le jeu."
-no-providers = "Aucun fournisseur de langue Volmit n’est disponible."
+no-providers = "Aucun fournisseur de langue Volmit n'est disponible."
 numeric-page = "Saisissez un numéro de page."
-personal-player-only = "Les préférences linguistiques du joueur doivent être sélectionnées dans le jeu."
+personal-player-only = "Les préférences linguistiques des joueurs doivent être sélectionnées dans le jeu."
 personal-permission = "Vous n'avez pas la permission de sélectionner votre langue."
-plugin-personal-permission = "Vous n’avez pas la permission de choisir votre langue pour {plugin}."
-plugin-server-permission = "Vous n’avez pas la permission de changer la langue du serveur pour {plugin}."
+plugin-personal-permission = "Vous n'avez pas la permission de choisir votre langue pour {plugin}."
+plugin-server-permission = "Vous n'avez pas la permission de changer la langue du serveur pour {plugin}."
 server-locale-required = "Choisissez un code de langue comme en_US pour la langue par défaut du serveur."
-unavailable-for-all = "La langue {locale} n’est pas disponible pour tous les plugins sélectionnés."
+unavailable-for-all = "La langue {locale} n'est pas disponible pour tous les plugins sélectionnés."
 
 [language.usage]
-editor = "Utilisation: /{command} language server edit [locale]"
-selection = "Utilisation: /{command} language self [locale|reset] or server [locale]"
-volmit-selection = "Utilisation: /volmit plugins languages [locale]"
+editor = "Utilisation : /{command} language server edit [locale]"
+selection = "Utilisation : /{command} language self [locale|reset] ou server [locale]"
+volmit-selection = "Utilisation : /volmit plugins languages [locale]"
+update = "Utilisation : /{command} language update"
 
 [language.selection]
 preparing = "Préparation de la langue {locale} pour {target}..."
-save-failed = "{plugin} : impossible d’enregistrer le choix de langue ; consultez la console du serveur."
-english-fallback = "{plugin} : {locale} est indisponible ; l’anglais (en_US) est utilisé."
+save-failed = "{plugin}: impossible d'enregistrer le choix de langue ; consultez la console du serveur."
+english-fallback = "{plugin}: {locale} est indisponible ; l'anglais (en_US) est utilisé."
 personal-selected = "{plugin}: votre langue est maintenant {locale}."
 server-selected = "{plugin}: la langue du serveur est maintenant {locale}."
-server-default-selected = "{plugin} : votre langue suit désormais la langue par défaut du serveur."
+server-default-selected = "{plugin}: votre langue suit désormais la langue par défaut du serveur."
+
+[language.update]
+checking = "{plugin}: recherche de modifications dans le dépôt de langues..."
+unchanged = "{plugin}: les langues installées correspondent déjà au dépôt."
+applied = "{plugin}: {locale} mis à jour ({added} ajoutés, {updated} modifiés, {kept} modifications locales conservées)."
+cooldown = "{plugin}: le dépôt de langues a été vérifié récemment ; réessayez dans {remaining}."
+locale-failed = "{plugin}: {locale} n'a pas été mis à jour : {reason}"
+failed = "{plugin}: la mise à jour des langues a échoué : {reason}"
 
 [language.editor]
 title = "{plugin} › {section}"
@@ -800,13 +804,13 @@ group-title = "{locale} / {group}"
 search = "Recherchez une clé de message ou du texte. Saisissez cancel pour revenir."
 value = "Saisissez une nouvelle valeur pour {key} dans le chat."
 current = "Valeur actuelle : {value}"
-variables = "Variables disponibles : {variables}"
+variables = "Variables : {variables}"
 guidance = "Utilisez \\n pour un saut de ligne, \\\\ pour une barre oblique inverse, ou saisissez cancel pour revenir."
 
 [language.editor.input]
-expired = "Le délai de saisie dans l’éditeur de langue a expiré."
+expired = "Le délai de saisie dans l'éditeur de langue a expiré."
 too-long = "La saisie doit contenir au maximum {maximum} caractères."
-unable-to-save = "Impossible d’enregistrer : {reason}"
+unable-to-save = "Impossible d'enregistrer : {reason}"
 
 [language.editor.navigation]
 back = "&eRetour&r"
@@ -820,7 +824,7 @@ messages-lore = "Cliquez pour rechercher parmi tous les messages."
 clear = "Effacer la recherche"
 
 [language.editor.message]
-current-value = "&7Valeur actuelle:&r"
+current-value = "&7Valeur actuelle :&r"
 variables = "&8{variables}&r"
 edit-plural = "&7Cliquez pour modifier une forme plurielle.&r"
 edit-lines = "&7Cliquez pour modifier les lignes individuellement.&r"
@@ -830,7 +834,7 @@ edit-chat = "&7Cliquez pour modifier dans le chat.&r"
 open = "&8Cliquez pour ouvrir cette langue.&r"
 
 [language.editor.category]
-message-count = "&7{count} messages disponibles&r"
+message-count = "&7{count} messages&r"
 open = "&8Cliquez pour ouvrir cette catégorie.&r"
 
 [language.editor.error]
@@ -884,22 +888,22 @@ refresh = "Réappliquer toutes les étiquettes maintenant"
 
 [command.help.hud]
 root = "Inspecter le compositeur HUD partagé"
-who = "Montre quel plugin occupe chaque emplacement du HUD"
+who = "Montre quel plugin occupe chaque emplacement du HUD d'un joueur"
 "who.player" = "Joueur à inspecter ; vous par défaut"
 
 # --- lane:chat ---
 
 [gloss.message.chat]
-filtered = "&8[&dGloss&8]: &cUn filtre de chat a bloqué ton message."
-too_fast = "&8[&dGloss&8]: &eAttends un instant avant d'envoyer un autre message."
-repeat = "&8[&dGloss&8]: &eTu viens déjà de dire cela."
-channel_set = "&8[&dGloss&8]: &aTu parles maintenant dans &d{name}&a."
+filtered = "&8[&dGloss&8]: &cUn filtre de chat a bloqué votre message."
+too_fast = "&8[&dGloss&8]: &eAttendez un instant avant d'envoyer un autre message."
+repeat = "&8[&dGloss&8]: &eVous venez déjà de dire cela."
+channel_set = "&8[&dGloss&8]: &aVous parlez maintenant dans &d{name}&a."
 channel_unknown = "&8[&dGloss&8]: &cAucun canal ne s'appelle &d{name}&c."
 channel_list = "&8[&dGloss&8]: &7Canaux : &f{value}"
 msg_usage = "&8[&dGloss&8]: &eUtilisation : &f{command}"
 msg_offline = "&8[&dGloss&8]: &c{player} n'est pas connecté."
-reply_none = "&8[&dGloss&8]: &cTu n'as personne à qui répondre."
-msg_self = "&8[&dGloss&8]: &cTu ne peux pas t'envoyer un message."
+reply_none = "&8[&dGloss&8]: &cVous n'avez personne à qui répondre."
+msg_self = "&8[&dGloss&8]: &cVous ne pouvez pas vous envoyer de message."
 channels_header = "&dCanaux &7({count})"
 channels_empty = "&7Aucun canal n'est chargé."
 channel_missing = "&8[&dGloss&8]: &cAucun document de canal ne s'appelle &f{id}&c."
@@ -917,37 +921,37 @@ leaderboard_sampled = "&8[&dGloss&8]: &aClassement &f{id}&a relevé pour tous le
 root = "Canaux de discussion"
 list = "Lister les canaux chargés"
 info = "Afficher la portée, le format et les variantes d'un canal"
-"info.id" = "Id du document de canal"
+"info.id" = "Identifiant du document de canal"
 reset = "Restaurer les documents de canal fournis"
 
 [command.help.strings]
 root = "Textes de contenu rédigés"
-list = "Lister les langues de texte chargées et leurs entrées"
+list = "Lister les langues de texte chargées et leur nombre d'entrées"
 missing = "Lister les clés présentes dans en_US et absentes d'une langue"
 "missing.locale" = "Langue à comparer à en_US"
 reset = "Restaurer les documents de texte fournis"
 
 [command.help.leaderboard]
 root = "Classements calculés"
-list = "Lister les classements chargés et leurs entrées"
+list = "Lister les classements chargés et leur nombre d'entrées"
 info = "Afficher la source, l'ordre et les entrées d'un classement"
-"info.id" = "Id du document"
+"info.id" = "Identifiant du document de classement"
 reset = "Effacer la période ou les totaux d'un classement"
-"reset.id" = "Id du document"
+"reset.id" = "Identifiant du document de classement"
 "reset.period" = "all ou current"
-sample = "Relever un classement maintenant pour tous les connectés"
-"sample.id" = "Id du document"
+sample = "Relever un classement maintenant pour tous les joueurs en ligne"
+"sample.id" = "Identifiant du document de classement"
 
 # --- lane:forms ---
 
 [gloss.message.forms]
 icon_unsupported = "&7Non affichable dans un emplacement de coffre ({kind})"
-no_inventories = "&8[&dGloss&8]: &7Aucun menu de coffre n'est configuré."
-inventory_list_header = "&dMenus de coffre"
-inventory_list_entry = "&7Ouvrir le menu de coffre &f{id}"
+no_inventories = "&8[&dGloss&8]: &7Aucun menu d'inventaire n'est configuré."
+inventory_list_header = "&dMenus d'inventaire"
+inventory_list_entry = "&7Ouvrir le menu d'inventaire &f{id}"
 inventory_info = "&8[&dGloss&8]: &d{id} &8- &7taille &f{kind}&7, emplacements &f{count}"
-unknown_inventory = "&8[&dGloss&8]: &cAucun menu de coffre nommé {id}."
-inventory_opened = "&8[&dGloss&8]: &aMenu de coffre {id} ouvert pour {player}."
+unknown_inventory = "&8[&dGloss&8]: &cAucun menu d'inventaire nommé {id}."
+inventory_opened = "&8[&dGloss&8]: &aMenu d'inventaire {id} ouvert pour {player}."
 bad_args = "&8[&dGloss&8]: &cLes arguments doivent être des paires clé=valeur : {value}"
 prompt_timeout = "&8[&dGloss&8]: &7La saisie a expiré."
 prompt_busy = "&8[&dGloss&8]: &cVous avez déjà une saisie en attente."
@@ -960,31 +964,29 @@ give_dropped = "&8[&dGloss&8]: &7Votre inventaire était plein, les objets sont 
 args = "Arguments clé=valeur séparés par des espaces"
 
 [command.help.inventory]
-root = "Inspecter et ouvrir des menus de coffre"
-list = "Lister les menus de coffre configurés"
+root = "Inspecter et ouvrir des menus d'inventaire"
+list = "Lister les menus d'inventaire configurés"
 "list.page" = "Page de liste, à partir de 1"
-info = "Afficher la taille et les emplacements d'un menu de coffre"
-"info.id" = "Identifiant du menu de coffre"
-open = "Ouvrir un menu de coffre pour un joueur"
-"open.id" = "Identifiant du menu de coffre"
+info = "Afficher la taille et les emplacements d'un menu d'inventaire"
+"info.id" = "Identifiant du menu d'inventaire"
+open = "Ouvrir un menu d'inventaire pour un joueur"
+"open.id" = "Identifiant du menu d'inventaire"
 "open.player" = "Joueur pour qui l'ouvrir ; vous par défaut"
 "open.args" = "Arguments clé=valeur séparés par des espaces"
-reset = "Restaurer les menus de coffre fournis par défaut"
+reset = "Restaurer les menus d'inventaire fournis par défaut"
 "reset.name" = "Nom à réinitialiser, ou * pour tous les fichiers fournis"
 
 ["command.help.hologram"]
 page = "Placer un spectateur sur une page d'hologramme"
-"page.page" = "Id de page, next ou prev"
-"page.player" = "Nom du joueur ; vide vous designe"
-motion = "Jouer un clip de mouvement sur un hologramme"
-"motion.motion" = "Id de mouvement, ou clear pour arreter"
-actions = "Lister les actions qu'un hologramme execute au clic"
+"page.page" = "Identifiant de page, next ou prev"
+"page.player" = "Nom du joueur ; vide vous désigne"
+actions = "Lister les actions qu'un hologramme exécute au clic"
 
 [gloss.message.hologram_interaction]
 hologram_page_set = "&8[&dGloss&8] &a{player}&a est maintenant sur la page &f{page}&a de &f{id}&a."
-hologram_page_player_missing = "&8[&dGloss&8] &cLe joueur &f{player}&c n'est pas connecte."
+hologram_page_player_missing = "&8[&dGloss&8] &cLe joueur &f{player}&c n'est pas connecté."
 hologram_page_unknown = "&8[&dGloss&8] &cL'hologramme &f{id}&c n'a pas de page '&f{page}&c'."
-hologram_actions_empty = "&8[&dGloss&8] &7L'hologramme &f{id}&7 ne declare aucune action."
+hologram_actions_empty = "&8[&dGloss&8] &7L'hologramme &f{id}&7 ne déclare aucune action."
 hologram_actions_header = "&8[&dGloss&8] &7Actions de l'hologramme &f{id}&7 (&f{count}&7) :"
 hologram_actions_entry = "&8[&dGloss&8] &7  &f{kind}&7 sur &f{value}"
 
@@ -1000,7 +1002,7 @@ info = "&7Marqueur &f{id} &7à &f{world} {x} {y} {z}"
 created = "&aMarqueur &f{id} &acréé."
 removed = "&aMarqueur &f{id} &asupprimé."
 missing = "&cAucun marqueur nommé &f{id}&c."
-here = "&7Tu es à &f{world} {x} {y} {z}&7."
+here = "&7Vous êtes à &f{world} {x} {y} {z}&7."
 
 [gloss.message.world.waypoint]
 saved = "&aPoint de repère &f{name} &aenregistré."
@@ -1008,7 +1010,7 @@ removed = "&aPoint de repère &f{name} &asupprimé."
 missing = "&cAucun point de repère nommé &f{name}&c."
 list = "&7Points de repère &8({count})&7 : &f{value}"
 info = "&7Point de repère &f{id} &7à &f{world} {x} {y} {z}"
-full = "&cTu as déjà le maximum de {count} points de repère."
+full = "&cVous avez déjà le maximum de {count} points de repère."
 
 [gloss.message.world.camera]
 started = "&7Trajet de caméra démarré."
@@ -1023,7 +1025,7 @@ missing = "&cAucune plaque de nom nommée &f{id}&c."
 refreshed = "&aPlaques de nom actualisées."
 
 [gloss.message.world.glow]
-set = "&f{target} &7brille désormais en &f{value}&a."
+set = "&f{target} &abrille désormais &7en &f{value}&a."
 cleared = "&7Brillance de &f{target} &7retirée."
 missing = "&cAucun joueur nommé &f{player} &cn'est connecté."
 
@@ -1031,9 +1033,9 @@ missing = "&cAucun joueur nommé &f{player} &cn'est connecté."
 root = "Outils de marqueurs du monde"
 list = "Lister les documents de marqueur"
 info = "Afficher un marqueur"
-create = "Écrire un document de marqueur à ta position"
+create = "Écrire un document de marqueur à votre position"
 remove = "Supprimer un document de marqueur"
-here = "Afficher ta position en coordonnées d'ancrage"
+here = "Afficher votre position en coordonnées d'ancrage"
 
 [command.help.marker.arg]
 id = "Identifiant du document de marqueur"
@@ -1041,9 +1043,9 @@ label = "Libellé affiché au-dessus du marqueur"
 
 [command.help.waypoint]
 root = "Outils de points de repère de la barre de localisation"
-set = "Enregistrer ta position comme point de repère personnel"
-remove = "Supprimer un de tes points de repère personnels"
-list = "Lister tes points de repère personnels"
+set = "Enregistrer votre position comme point de repère personnel"
+remove = "Supprimer un de vos points de repère personnels"
+list = "Lister vos points de repère personnels"
 info = "Afficher un document de point de repère"
 
 [command.help.waypoint.arg]
@@ -1052,12 +1054,12 @@ id = "Identifiant du document de point de repère"
 
 [command.help.camera]
 root = "Outils de trajets de caméra"
-test = "Voler un trajet de démonstration autour de toi"
+test = "Effectuer un trajet de démonstration autour de vous"
 stop = "Terminer un trajet de caméra plus tôt"
 
 [command.help.camera.arg]
 seconds = "Durée du trajet en secondes"
-player = "Passager à arrêter ; toi par défaut"
+player = "Passager à arrêter ; vous par défaut"
 
 [command.help.nameplate]
 root = "Outils de plaques de nom des joueurs"
@@ -1071,8 +1073,8 @@ id = "Identifiant du document de plaque de nom"
 
 [command.help.glow]
 root = "Outils de brillance d'entité"
-set = "Faire briller un joueur pour toi"
-clear = "Retirer la brillance d'un joueur pour toi"
+set = "Faire briller un joueur pour vous"
+clear = "Retirer la brillance d'un joueur pour vous"
 
 [command.help.glow.arg]
 player = "Joueur à mettre en surbrillance"
@@ -1083,58 +1085,58 @@ ticks = "Ticks de durée de la brillance, ou 0 pour la garder"
 # --- lane:behaviors ---
 
 [command.help.behavior]
-root = "Inspecter et declencher les documents de comportement"
-list = "Lister les documents de comportement charges"
-info = "Afficher les declencheurs et les conditions d'un document de comportement"
-fire = "Executer une entree de comportement maintenant"
-reset = "Restaurer les comportements fournis par defaut"
+root = "Inspecter et déclencher les documents de comportement"
+list = "Lister les documents de comportement chargés"
+info = "Afficher les déclencheurs et les conditions d'un document de comportement"
+fire = "Exécuter une entrée de comportement maintenant"
+reset = "Restaurer les comportements fournis par défaut"
 id = "Identifiant du document de comportement"
-entry = "Numero d'entree, a partir de 1"
-player = "Joueur pour lequel executer l'entree, ou * pour aucun"
+entry = "Numéro d'entrée, à partir de 1"
+player = "Joueur pour lequel exécuter l'entrée, ou * pour aucun"
 
 [command.help.state]
-root = "Lire et ecrire l'etat de comportement persiste"
-get = "Afficher une valeur d'etat"
-set = "Ecrire une valeur d'etat"
-clear = "Remettre une valeur d'etat a sa valeur par defaut"
-dump = "Lister chaque cle d'etat declaree et sa valeur"
-key = "Cle d'etat declaree"
-value = "Nouvelle valeur; mettez-la entre guillemets pour inclure des espaces"
-player = "Joueur auquel appartient la valeur, ou * pour vous-meme"
+root = "Lire et écrire l'état de comportement enregistré"
+get = "Afficher une valeur d'état"
+set = "Écrire une valeur d'état"
+clear = "Remettre une valeur d'état à sa valeur par défaut"
+dump = "Lister chaque clé d'état déclarée et sa valeur"
+key = "Clé d'état déclarée"
+value = "Nouvelle valeur ; mettez-la entre guillemets pour inclure des espaces"
+player = "Joueur auquel appartient la valeur, ou * pour vous-même"
 
 [command.help.do]
-root = "Declencher les entrees de comportement command portant ce nom"
+root = "Déclencher les entrées de comportement command portant ce nom"
 name = "Nom de la commande de comportement"
-args = "Arguments sous forme de paires cle=valeur; mettez-les entre guillemets pour inclure des espaces"
+args = "Arguments sous forme de paires clé=valeur ; mettez-les entre guillemets pour inclure des espaces"
 
 [command.help.expr]
-root = "Evaluer une expression et montrer ce qui y a repondu"
-expression = "Expression a evaluer; mettez-la entre guillemets pour inclure des espaces"
+root = "Évaluer une expression et montrer ce qui y a répondu"
+expression = "Expression à évaluer ; mettez-la entre guillemets pour inclure des espaces"
 
 [command.help.explain]
-root = "Montrer quelles conditions un runtime a consultees et laquelle a gagne"
-kind = "Runtime a expliquer, par exemple board ou behavior"
-id = "Identifiant du document a expliquer"
-player = "Joueur pour lequel expliquer, ou * pour vous-meme"
+root = "Montrer quelles conditions un runtime a consultées et laquelle a gagné"
+kind = "Runtime à expliquer, par exemple board ou behavior"
+id = "Identifiant du document à expliquer"
+player = "Joueur pour lequel expliquer, ou * pour vous-même"
 
 [gloss.message.behaviors]
-off = "&8[&dGloss&8]: &eLes comportements sont desactives dans features.behaviors."
-"list.empty" = "&8[&dGloss&8]: &7Aucun document de comportement n'est charge."
-missing = "&8[&dGloss&8]: &cAucun document de comportement nomme \"{id}\"."
-"info.header" = "&8[&dGloss&8]: &d{id} &7revision &f{revision} &8| &7entrees &f{count} &8| &7actif &f{enabled}"
+off = "&8[&dGloss&8]: &eLes comportements sont désactivés dans features.behaviors."
+"list.empty" = "&8[&dGloss&8]: &7Aucun document de comportement n'est chargé."
+missing = "&8[&dGloss&8]: &cAucun document de comportement nommé \"{id}\"."
+"info.header" = "&8[&dGloss&8]: &d{id} &7révision &f{revision} &8| &7entrées &f{count} &8| &7activées &f{enabled}"
 "info.entry" = " &8{line}. &f{name} &7si &f{when} &8| &7permission &f{permission}"
-fired = "&8[&dGloss&8]: &aEntree &f{line}&a de &f{id}&a executee."
-"fire.missing" = "&8[&dGloss&8]: &c{id} n'a pas d'entree {line}."
-"do.ran" = "&8[&dGloss&8]: &a&f{count}&a entrees de comportement declenchees pour &f{name}&a."
-"do.none" = "&8[&dGloss&8]: &7Aucune entree de comportement ne repond a la commande \"{name}\"."
+fired = "&8[&dGloss&8]: &aEntrée &f{line}&a de &f{id}&a exécutée."
+"fire.missing" = "&8[&dGloss&8]: &c{id} n'a pas d'entrée {line}."
+"do.ran" = "&8[&dGloss&8]: &a&f{count}&a entrées de comportement déclenchées pour &f{name}&a."
+"do.none" = "&8[&dGloss&8]: &7Aucune entrée de comportement ne répond à la commande \"{name}\"."
 "state.value" = " &7{key} &8= &f{value}"
 "state.set" = "&8[&dGloss&8]: &a{key} vaut maintenant &f{value}&a."
-"state.cleared" = "&8[&dGloss&8]: &a{key} est revenu a sa valeur par defaut."
-"state.unknown" = "&8[&dGloss&8]: &cAucun document de comportement ne declare la cle d'etat \"{key}\"."
+"state.cleared" = "&8[&dGloss&8]: &a{key} est revenu à sa valeur par défaut."
+"state.unknown" = "&8[&dGloss&8]: &cAucun document de comportement ne déclare la clé d'état \"{key}\"."
 "state.invalid" = "&8[&dGloss&8]: &c\"{value}\" n'est pas une valeur {type}."
-"state.empty" = "&8[&dGloss&8]: &7Aucun document de comportement ne declare d'etat."
-"state.player" = "&8[&dGloss&8]: &cIndiquez un joueur: &f{key}&c n'est pas une cle globale."
-"player.missing" = "&8[&dGloss&8]: &cAucun joueur nomme \"{player}\" n'est connecte."
+"state.empty" = "&8[&dGloss&8]: &7Aucun document de comportement ne déclare d'état."
+"state.player" = "&8[&dGloss&8]: &cIndiquez un joueur : &f{key}&c n'est pas une clé globale."
+"player.missing" = "&8[&dGloss&8]: &cAucun joueur nommé \"{player}\" n'est connecté."
 "expr.value" = "&8[&dGloss&8]: &f{value} &8({type})"
 "expr.reference" = " &7{name} &8= &f{value} &8via &7{source}"
 "expr.functions" = " &7fonctions &8= &f{value}"
@@ -1142,8 +1144,8 @@ fired = "&8[&dGloss&8]: &aEntree &f{line}&a de &f{id}&a executee."
 "explain.header" = "&8[&dGloss&8]: &d{kind} &f{id} &7pour &f{player}"
 "explain.line" = " &8{path} &7{when} &8= &f{value}"
 "explain.winner" = " &a> &f{path} &7{when} &8= &f{value}"
-"explain.unknown" = "&8[&dGloss&8]: &cRien n'explique \"{kind}\"; essayez {options}."
-"explain.missing" = "&8[&dGloss&8]: &cAucun {kind} nomme \"{id}\"."
+"explain.unknown" = "&8[&dGloss&8]: &cRien n'explique \"{kind}\" ; essayez {options}."
+"explain.missing" = "&8[&dGloss&8]: &cAucun {kind} nommé \"{id}\"."
 
 # --- lane:authoring ---
 
@@ -1156,13 +1158,13 @@ list = "Lister les packs installés"
 info = "Montrer les fichiers que possède un pack"
 arg_source = "Fichier de pack dans le dossier de données Gloss, ou une URL HTTPS"
 arg_dry = "Signaler ce qui changerait sans rien écrire"
-arg_id = "Id du pack installé"
+arg_id = "Identifiant du pack installé"
 
 [command.help.history]
 root = "Lister les versions stockées d'un document"
 arg_kind = "Dossier du document, par exemple boards ou menus"
-arg_id = "Id du document"
-arg_page = "Page de liste commençant à un"
+arg_id = "Identifiant du document"
+arg_page = "Page de liste, à partir de 1"
 
 [command.help.restore]
 root = "Réécrire une version stockée par-dessus le document actif"
@@ -1186,7 +1188,7 @@ outcome = "&8[&dGloss&8] &7{state} &f{path}&7 {reason}"
 installed = "&8[&dGloss&8] Pack &f{id}&7 installé avec &f{count}&7 fichier(s)."
 updated = "&8[&dGloss&8] Pack &f{id}&7 mis à jour sur &f{count}&7 fichier(s)."
 removed = "&8[&dGloss&8] Pack &f{id}&7 et &f{count}&7 fichier(s) retirés."
-unknown = "&8[&dGloss&8] &cAucun pack installé ne porte l'id &f{id}&c."
+unknown = "&8[&dGloss&8] &cAucun pack installé ne porte l'identifiant &f{id}&c."
 failed = "&8[&dGloss&8] &cLe pack &f{id}&c a échoué : {reason}"
 entry = "&8[&dGloss&8] &f{id} &7{value} &8{count} fichier(s)"
 empty = "&8[&dGloss&8] &7Aucun pack n'est installé."

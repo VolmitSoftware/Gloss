@@ -25,6 +25,7 @@
 #   {absorbed}  Entradas importadas fundidas com os dados existentes
 #   {active}  Número de fornecedores ativos
 #   {actual}  Revisão atual
+#   {added}  Mensagens adicionadas por uma atualização de idioma
 #   {after}  Valor da mensagem após a edição
 #   {argument}  Argumento de comando inesperado
 #   {axis}  Eixo de coordenadas ou de rotação
@@ -32,7 +33,7 @@
 #   {before}  Valor da mensagem antes da edição
 #   {billboard}  Modo de orientação do elemento visual
 #   {blocks}  Número de elementos visuais de blocos
-#   {board}  Identificador do quadro ou painel
+#   {board}  Identificador da tabela de pontuação ou do painel
 #   {bottles}  Número de frascos no recipiente
 #   {bubbles}  Número de balões de conversa ativos
 #   {cells}  Número de células do menu
@@ -42,7 +43,6 @@
 #   {copied}  Número de entradas copiadas
 #   {count}  Número de objetos ou mensagens correspondentes
 #   {disc}  Disco de música no recipiente
-#   {distance}  Distância até ao alvo
 #   {drops}  Número de itens largados apresentados
 #   {enabled}  Estado de ativação ou número de entradas ativas
 #   {entities}  Número de entidades
@@ -62,6 +62,7 @@
 #   {interactPermission}  Permissão necessária para interagir
 #   {interactionRange}  Distância máxima de interação
 #   {item}  Nome ou material do item
+#   {kept}  Edições locais mantidas por uma atualização de idioma
 #   {key}  Chave da mensagem ou da configuração
 #   {kind}  Tipo de objeto ou fornecedor
 #   {kinds}  Tipos de objetos ou fornecedores disponíveis
@@ -80,7 +81,7 @@
 #   {minimum}  Valor mínimo permitido
 #   {mode}  Modo de operação ou apresentação selecionado
 #   {name}  Nome do objeto
-#   {oldBoard}  Identificador do quadro anterior
+#   {oldBoard}  Identificador anterior do painel
 #   {operation}  Nome da operação
 #   {options}  Opções de comando disponíveis
 #   {overlaid}  Número de chaves de configuração aplicadas
@@ -99,9 +100,9 @@
 #   {priority}  Prioridade de seleção ou apresentação
 #   {provider}  Nome do fornecedor
 #   {providers}  Lista ou número de fornecedores
-#   {radius}  Raio de pesquisa
 #   {ready}  Número de entradas prontas a importar
 #   {reason}  Motivo do erro ou da decisão
+#   {remaining}  Tempo restante até à próxima verificação de idiomas
 #   {resume}  Número de entradas cuja importação pode ser retomada
 #   {revision}  Revisão do documento
 #   {roll}  Ângulo de rotação longitudinal em graus
@@ -125,6 +126,7 @@
 #   {to}  Valor de destino ou fim de um intervalo
 #   {total}  Número total de entradas
 #   {type}  Tipo de valor ou objeto esperado
+#   {updated}  Mensagens alteradas por uma atualização de idioma
 #   {url}  Endereço web
 #   {uuid}  Identificador único do objeto ou jogador
 #   {value}  Valor atual da mensagem ou do parâmetro
@@ -205,8 +207,8 @@ board = "Criar e gerir tabelas de pontuação"
 "board.show" = "Mostrar-te uma tabela de pontuação"
 "board.show.id" = "ID da tabela"
 "board.hide" = "Ocultar a tua tabela de pontuação"
-"board.select" = "Definir a seleção automática da scoreboard"
-"board.select.id" = "ID da scoreboard"
+"board.select" = "Definir a seleção automática da tabela de pontuação"
+"board.select.id" = "ID da tabela"
 "board.select.priority" = "Prioridade de seleção"
 "board.select.when" = "Condição booleana; coloca entre aspas as expressões com espaços"
 "board.list" = "Listar tabelas de pontuação"
@@ -376,7 +378,7 @@ list_empty = "&8[&dGloss&8] &7Ainda não existem hologramas."
 rendered = "&8[&dGloss&8] &aHolograma de texto &f{id}&a criado com escala &f{scale}&a."
 text_empty = "&8[&dGloss&8] &cO texto não pode estar vazio."
 scale_out_of_range = "&8[&dGloss&8] &cA escala {value} está fora do intervalo; deve estar entre &f{minimum}&c e &f{maximum}&c."
-oriented = "&8[&dGloss&8] &a&f{id}&a definido com billboard &f{billboard}&a, yaw &f{yaw}&a, pitch &f{pitch}&a."
+oriented = "&8[&dGloss&8] &aDefinido &f{id}&a com billboard &f{billboard}&a, yaw &f{yaw}&a, pitch &f{pitch}&a."
 billboard_unknown = "&8[&dGloss&8] &cBillboard desconhecido '&f{billboard}&c'. Usa um de &f{options}&c."
 angle_out_of_range = "&8[&dGloss&8] &cO valor {axis} {value} está fora do intervalo; tem de estar entre &f-{limit}&c e &f{limit}&c graus."
 
@@ -401,8 +403,8 @@ line_removed = "&8[&dGloss&8] &aLinha &f{line}&a removida de &f{id}&a."
 line_out_of_range = "&8[&dGloss&8] &cA linha {line} está fora do intervalo; &f{id}&c tem {count} linhas."
 shown = "&8[&dGloss&8] &aA mostrar a tabela &f{id}&a."
 hidden = "&8[&dGloss&8] &aA tua tabela de pontuação está oculta."
-select_set = "&8[&dGloss&8] &aPrioridade de seleção da scoreboard &f{id}&a definida para &f{priority}&a."
-select_invalid = "&8[&dGloss&8] &cCondição da scoreboard inválida: &f{error}&c."
+select_set = "&8[&dGloss&8] &aPrioridade de seleção da tabela &f{id}&a definida para &f{priority}&a."
+select_invalid = "&8[&dGloss&8] &cCondição da tabela inválida: &f{error}&c."
 list_empty = "&8[&dGloss&8] &7Ainda não existem tabelas."
 
 [command.board.list]
@@ -410,7 +412,7 @@ hover = "Clica para veres os detalhes"
 
 [command.board.info]
 header = "&8[&dGloss&8] &d{id} &7com o título &f{title}"
-meta = "&7Prioridade: &f{priority} | Quando: &f{when} | Variantes: &f{variants}"
+meta = "&7Prioridade: &f{priority} &8| &7Quando: &f{when} &8| &7Variantes: &f{variants}"
 line = " &8{line}. &f{text}"
 
 [command.emoji]
@@ -419,8 +421,6 @@ hover = "Clica para inserir no chat"
 
 [command.animations]
 empty = "&8[&dGloss&8] &7Não há animações carregadas."
-header = "&8[&dGloss&8] &fAnimações: &d{count}"
-entry = "&8- &d{name}"
 
 [command.list]
 page = "&7Página &f{page}&7/&f{pages} &8- &7a mostrar &f{from}&7-&f{to} &7de &f{total}"
@@ -431,7 +431,7 @@ holograms = "&7Hologramas: &f{count} &8({temporary} temporários, {entities} ent
 boards = "&7Tabelas de pontuação: &f{count}"
 emoji = "&7Emojis: &f{enabled}&8/&f{total}"
 animations = "&7Animações: &f{count}"
-effects = "&7Balões: &f{bubbles} &8| &7Indicadores: &f{indicators} &8| &7Drops: &f{drops}"
+effects = "&7Balões: &f{bubbles} &8| &7Indicadores: &f{indicators} &8| &7Itens largados: &f{drops}"
 
 visibility = "&7Cópias de entidades visíveis: &f{entities} &8| &7Observadores: &f{viewers} &8| &7Admissões: &f{admissions} &8| &7Recusas: &f{refusals} &8| &7Em espera: &f{waiting} &8| &7Turnos expirados: &f{expired} &8| &7Limpeza pendente: &f{retiring}"
 images = "&7Cache de imagens: &f{entries} &8| &7Pendentes: &f{pending} &8| &7Dados retidos: &f{bytes} &7bytes &8| &7Concluídas: &f{completed} &8| &7Recusas: &f{refusals}"
@@ -508,12 +508,11 @@ web_session_required = "O ID da sessão do editor web não pode estar vazio"
 panel_player_required = "O jogador de destino não pode estar vazio"
 row_icon_type_required = "O tipo de ícone não pode estar vazio"
 row_style_property_required = "A propriedade do estilo não pode estar vazia"
-import_source_required = "A origem da importação antiga não pode estar vazia"
-import_source_unknown = "Origem da importação antiga desconhecida: {source}"
+import_source_required = "A origem da importação legada não pode estar vazia"
+import_source_unknown = "Origem da importação legada desconhecida: {source}"
 
 [gloss.message]
 permission_denied = "&8[&dGloss&8]: &cNão tens a permissão &f{permission}&c."
-unknown_command = "&8[&dGloss&8]: &cComando desconhecido \"&f{command}&c\"."
 
 [gloss.message.hologram]
 created = "&8[&dGloss&8]: &aHolograma &f{hologram}&a criado com o menu raiz &f{menu}&a na tua posição."
@@ -534,11 +533,11 @@ open_failed = "&8[&dGloss&8]: &cNão foi possível abrir o menu \"{menu}\"."
 
 [gloss.message.menu.list]
 header = "Menus"
-entry = "Clique para abrir {menu}."
+entry = "Clica para abrir {menu}."
 
 [gloss.message.menu.content]
 updated = "&8[&dGloss&8]: &aAplicada a operação {operation} ao menu &f{menu}&a, revisão {revision}."
-created = "&8[&dGloss&8]: &aCriado o menu &f{menu}&a, revisão {revision}. Abre-o com /gloss menu open &f{menu}&a ou coloca-o com /gloss panel create &f{menu}&a."
+created = "&8[&dGloss&8]: &aCriado o menu &f{menu}&a, revisão {revision}. Abre-o com /gloss menu open {menu} ou coloca-o com /gloss panel create {menu}."
 copied = "&8[&dGloss&8]: &aCopiado o menu &f{source}&a para &f{menu}&a, revisão {revision}."
 revision_conflict = "&8[&dGloss&8]: &cO menu &f{menu}&c mudou durante a escrita (esperada {expected}, atual {actual}). Repete o comando."
 already_exists = "&8[&dGloss&8]: &cO menu &f{menu}&c já existe."
@@ -552,7 +551,7 @@ player_only = "&8[&dGloss&8]: &cEste comando só está disponível para jogadore
 header = "Editor web"
 open_hover = "Clica para abrir o editor web do Gloss."
 open = "&8[&dGloss&8]: &7Editor web: &f{url}"
-preparing = "&8[&dGloss&8]: &7A preparar uma sessão segura de sincronização para &f{subject}&7..."
+preparing = "&8[&dGloss&8]: &7A preparar uma sessão segura do editor em tempo real para &f{subject}&7..."
 unavailable = "&8[&dGloss&8]: &cA edição web em tempo real está indisponível. Verifica a configuração da sincronização e a ligação ao relay."
 open_failed = "&8[&dGloss&8]: &cNão foi possível abrir &f{kind}={subject}&c no editor web em tempo real: {reason}"
 open_console = "&8[&dGloss&8]: &7Ligação de acesso ao editor para &f{subject}&7: &f{url}"
@@ -563,24 +562,24 @@ revoke_label = "Revogar"
 link_hover = "Abre o editor, copia a ligação de acesso ou revoga a sessão {session}."
 
 [gloss.message.web.sessions]
-list_empty = "&8[&dGloss&8]: &7Não há sessões de sincronização do editor ativas."
-status = "&8[&dGloss&8]: &f&f{session} &7{kind}=&f{subject} expira em=&f{seconds}s publicação=&f{revision} pendente=&f{pending}"
-revoked = "&8[&dGloss&8]: &aRevogada a sessão de sincronização &f{session}&a."
-pulled = "&8[&dGloss&8]: &aConsultada a sessão de sincronização &f{session}&a."
-unknown = "&8[&dGloss&8]: &cSessão de sincronização &f{session}&c desconhecida ou expirada."
-failed = "&8[&dGloss&8]: &cFalhou a operação de sincronização da sessão &f{session}&c: {reason}"
+list_empty = "&8[&dGloss&8]: &7Não há sessões do editor web ativas."
+status = "&8[&dGloss&8]: &f{session} &7{kind}=&f{subject} &7expira em=&f{seconds}s &7publicação=&f{revision} &7pendente=&f{pending}"
+revoked = "&8[&dGloss&8]: &aRevogada a sessão do editor web &f{session}&a."
+pulled = "&8[&dGloss&8]: &aConsultada a sessão do editor web &f{session}&a."
+unknown = "&8[&dGloss&8]: &cSessão do editor web &f{session}&c desconhecida ou expirada."
+failed = "&8[&dGloss&8]: &cFalhou a operação do editor web na sessão &f{session}&c: {reason}"
 
 [gloss.message.import]
 preview_started = "&8[&dGloss&8]: &7A analisar &f{source}&7 para pré-visualizar a migração sem alterar dados..."
 apply_started = "&8[&dGloss&8]: &7A analisar e migrar de &f{source}&7 sem substituir dados..."
 source_missing = "&8[&dGloss&8]: &7Não foi encontrada a origem &f{source}&7 em &f{path}&7."
-preview_summary = "&8[&dGloss&8]: &fPré-visualização de &f{source}&7: &a{ready} prontos, &d{resume} retomáveis, &e{conflicts} conflitos, &c{errors} erros, {warnings} avisos. Origem: &f{path}"
-preview_entry = "&8- &f&f{legacy} -> &f{board} estado=&f{state} avisos=&f{warnings}"
-apply_summary = "&8[&dGloss&8]: &fMigração de &f{source}&7: &a{imported} importados, &e{skipped} ignorados, &c{failed} falhados; a análise encontrou {errors} erros e {warnings} avisos."
-apply_entry = "&8- &f&f{legacy} estado=&f{state} motivo=&f{reason}"
+preview_summary = "&8[&dGloss&8]: &fPré-visualização de {source}&7: &a{ready} prontos&7, &d{resume} retomáveis&7, &e{conflicts} conflitos&7, &c{errors} erros&7, {warnings} avisos. Origem: &f{path}"
+preview_entry = "&8- &f{legacy} &7-> &f{board} &7estado=&f{state} &7avisos=&f{warnings}"
+apply_summary = "&8[&dGloss&8]: &fMigração de {source}&7: &a{imported} importados&7, &e{skipped} ignorados&7, &c{failed} falhados&7; a análise encontrou {errors} erros e {warnings} avisos."
+apply_entry = "&8- &f{legacy} &7estado=&f{state} &7motivo=&f{reason}"
 issue = "&8- &f{legacy} &7{severity}: &f{reason}"
-busy = "&8[&dGloss&8]: &cJá está em curso outra migração de hologramas antigos."
-failed = "&8[&dGloss&8]: &cFalhou a migração de hologramas antigos de &f{source}&c: {reason}"
+busy = "&8[&dGloss&8]: &cJá está em curso outra migração de hologramas legados."
+failed = "&8[&dGloss&8]: &cFalhou a migração de hologramas legados de &f{source}&c: {reason}"
 
 [gloss.message.config]
 reloaded = "&2Configuração \"{name}\" recarregada."
@@ -600,7 +599,7 @@ saved = "&7Tamanho da pré-visualização guardado: &f{percent}%"
 bundle_more = "+{count} outros"
 
 [gloss.message.items]
-disabled = "&8[&dGloss&8]: &7Os itens personalizados estão desativados. Define customItems como true em gloss.toml."
+disabled = "&8[&dGloss&8]: &7Os itens personalizados estão desativados. Define &fcustomItems&7 como true em gloss.toml."
 
 [gloss.message.items.status]
 header = "Itens personalizados"
@@ -633,7 +632,7 @@ none = "&8[&dGloss&8]: &c\"{name}\" não é um documento de pré-visualização 
 
 [gloss.message.previews.dump]
 unknown = "&8[&dGloss&8]: &c\"{name}\" não é um documento de pré-visualização carregado."
-result = "&8[&dGloss&8]: &a&a{name}&7: &f{total}&7 elementos (painéis={panels}, células={cells}, espaços={slots}, etiquetas={labels})."
+result = "&8[&dGloss&8]: &a{name}&7: &f{total}&7 elementos (painéis={panels}, células={cells}, espaços={slots}, etiquetas={labels})."
 no_errors = "&8[&dGloss&8]: &aNão há erros de compilação."
 error_line = "&8[&dGloss&8]: &c{message}"
 error_more = "&8[&dGloss&8]: &7Mais {count} (consulta o registo da consola)."
@@ -648,28 +647,24 @@ teleported = "&8[&dGloss&8]: &aTeletransportado para &f{board}&a."
 unknown = "&8[&dGloss&8]: &cPainel &f{board}&c desconhecido."
 already_exists = "&8[&dGloss&8]: &cO painel &f{board}&c já existe."
 invalid = "&8[&dGloss&8]: &cValor do painel inválido: &f{reason}&c."
-menu_unavailable = "&8[&dGloss&8]: &cO menu principal &f{menu}&c não está carregado."
+menu_unavailable = "&8[&dGloss&8]: &cO menu raiz &f{menu}&c não está carregado."
 player_unavailable = "&8[&dGloss&8]: &cO jogador de destino &f{player}&c não está online."
 world_unavailable = "&8[&dGloss&8]: &cO mundo do painel &f{world}&c não está carregado com o UUID guardado."
 revision_conflict = "&8[&dGloss&8]: &cO painel &f{board}&c mudou durante a edição (esperada {expected}, atual {actual}). Reabre a sessão de edição."
 failed = "&8[&dGloss&8]: &cFalhou a operação no painel &f{board}&c: {reason}"
 
 [gloss.message.panels.list]
-header = "&8[&dGloss&8]: &fPainéis persistentes: &d{count}"
 empty = "&8[&dGloss&8]: &7Não há painéis persistentes carregados."
-entry = "&8- &f&f{board} menu=&f{menu} revisão=&f{revision}"
 
 [gloss.message.panels.near]
-header = "&8[&dGloss&8]: &fPainéis num raio de &d{radius}&f blocos: &d{count}"
 empty = "&8[&dGloss&8]: &7Não há painéis dentro desse raio."
-entry = "&8- &f&f{board} distância=&f{distance} menu=&f{menu}"
 
 [gloss.message.panels.info]
-header = "&8[&dGloss&8]: &fPainel &d{board} ({state})"
-identity = "&7uuid=&f{uuid} revisão=&f{revision} menu=&f{menu}"
-transform = "&7mundo=&f{world} posição=&f{x}, {y}, {z} rotação=&f{yaw}, {pitch}, {roll} escala=&f{scale}"
-visibility = "&7visibilidade=&f{mode} permissão de visualização=&f{viewPermission} permissão de interação=&f{interactPermission} distâncias=&f{viewRange}/{interactionRange}"
-follow = "&7seguimento=&f{mode} jogador=&f{player} rotação=&f{rotation}"
+header = "&8[&dGloss&8]: &fPainel &d{board} &7({state})"
+identity = "&7uuid=&f{uuid} &7revisão=&f{revision} &7menu=&f{menu}"
+transform = "&7mundo=&f{world} &7posição=&f{x}, {y}, {z} &7rotação=&f{yaw}, {pitch}, {roll} &7escala=&f{scale}"
+visibility = "&7visibilidade=&f{mode} &7permissão de visualização=&f{viewPermission} &7permissão de interação=&f{interactPermission} &7distâncias=&f{viewRange}/{interactionRange}"
+follow = "&7seguimento=&f{mode} &7jogador=&f{player} &7rotação=&f{rotation}"
 
 [gloss.message.panels.edit]
 started = "&8[&dGloss&8]: &aA editar &f{board}&a a partir da revisão {revision}. As alterações ficam pendentes até serem guardadas."
@@ -725,8 +720,8 @@ hopper = "&8&lFunil"
 furnace = "&6&lFornalha"
 smoker = "&e&lDefumador"
 blast_furnace = "&b&lAlto-Forno"
-beehive = "&e&lColmeia Artificial"
-bee_nest = "&e&lColmeia"
+beehive = "&e&lColmeia"
+bee_nest = "&e&lNinho de Abelhas"
 cauldron = "&7&lCaldeirão"
 water_cauldron = "&9&lCaldeirão de Água"
 lava_cauldron = "&6&lCaldeirão de Lava"
@@ -734,8 +729,8 @@ powder_snow_cauldron = "&f&lCaldeirão de Neve em Pó"
 jukebox = "&d&lJukebox"
 brewing_stand = "&d&lFermentador"
 chiseled_bookshelf = "&6&lEstante de Livros Esculpida"
-hopper_minecart = "&8&lCarrinho de Mina com Funil"
-chest_minecart = "&6&lCarrinho de Mina com Baú"
+hopper_minecart = "&8&lVagoneta com Funil"
+chest_minecart = "&6&lVagoneta com Baú"
 mobile = "&7&l{name}"
 shulker = "&l{color} Caixa de Shulker"
 copper_chest = "&6&l{name}"
@@ -752,39 +747,48 @@ current = "Atual: {locale}"
 current_with_personal = "Atual: {locale} (O teu: {personal})"
 your_description = "Altera apenas as mensagens que vês."
 reset_description = "Usa o idioma predefinido do servidor."
-server_description = "Altera o idioma predefinido do servidor."
+server_description = "Altera o idioma predefinido do servidor"
 edit_description = "Abre o editor de mensagens de cada idioma."
 select_description = "Clica para selecionar este idioma."
 remove_personal_description = "Remove a tua escolha pessoal de idioma."
 no_controls = "Não tens acesso às opções de idioma."
 command = "Comando: {command}"
 selected = "selecionado"
-all-volmit-plugins = "Todos os plugins Volmit"
+all-volmit-plugins = "todos os plugins Volmit"
 
 [language.error]
 stopping = "A escolha de idioma não está disponível enquanto o plugin está a parar."
-editor-player-only = "Abra o editor de idiomas dentro do jogo."
+editor-player-only = "Abre o editor de idiomas dentro do jogo."
 no-providers = "Não há fornecedores de idiomas Volmit disponíveis."
-numeric-page = "Introduza um número de página."
+numeric-page = "Introduz um número de página."
 personal-player-only = "As preferências do idioma do jogador devem ser selecionadas no jogo."
-personal-permission = "Você não tem permissão para selecionar seu idioma."
-plugin-personal-permission = "Não tem permissão para escolher o seu idioma em {plugin}."
-plugin-server-permission = "Não tem permissão para alterar o idioma do servidor em {plugin}."
-server-locale-required = "Escolha um código como en_US para o idioma predefinido do servidor."
+personal-permission = "Não tens permissão para selecionar o teu idioma."
+plugin-personal-permission = "Não tens permissão para escolher o teu idioma em {plugin}."
+plugin-server-permission = "Não tens permissão para alterar o idioma do servidor em {plugin}."
+server-locale-required = "Escolhe um código como en_US para o idioma predefinido do servidor."
 unavailable-for-all = "O idioma {locale} não está disponível para todos os plugins selecionados."
 
 [language.usage]
-editor = "Uso: /{command} language server edit [locale]"
-selection = "Uso: /{command} language self [locale|reset] or server [locale]"
-volmit-selection = "Uso: /volmit plugins languages [locale]"
+editor = "Utilização: /{command} language server edit [locale]"
+selection = "Utilização: /{command} language self [locale|reset] ou server [locale]"
+volmit-selection = "Utilização: /volmit plugins languages [locale]"
+update = "Utilização: /{command} language update"
 
 [language.selection]
 preparing = "A preparar o idioma {locale} para {target}..."
-save-failed = "{plugin}: não foi possível guardar a escolha de idioma; consulte a consola do servidor."
+save-failed = "{plugin}: não foi possível guardar a escolha de idioma; consulta a consola do servidor."
 english-fallback = "{plugin}: {locale} não está disponível; será usado inglês (en_US)."
-personal-selected = "{plugin}: o seu idioma agora é {locale}."
+personal-selected = "{plugin}: o teu idioma agora é {locale}."
 server-selected = "{plugin}: o idioma do servidor agora é {locale}."
-server-default-selected = "{plugin}: o seu idioma segue agora o idioma predefinido do servidor."
+server-default-selected = "{plugin}: o teu idioma segue agora o idioma predefinido do servidor."
+
+[language.update]
+checking = "{plugin}: a verificar alterações no repositório de idiomas..."
+unchanged = "{plugin}: os idiomas instalados já correspondem ao repositório."
+applied = "{plugin}: {locale} atualizado ({added} adicionados, {updated} alterados, {kept} edições locais mantidas)."
+cooldown = "{plugin}: o repositório de idiomas foi verificado recentemente; tenta novamente dentro de {remaining}."
+locale-failed = "{plugin}: {locale} não foi atualizado: {reason}"
+failed = "{plugin}: a atualização de idiomas falhou: {reason}"
 
 [language.editor]
 title = "{plugin} › {section}"
@@ -792,16 +796,16 @@ loading = "A carregar as mensagens de {locale}..."
 
 [language.editor.section]
 languages = "Idiomas"
-search = "Procurar"
-search-title = "{locale} / Procurar"
+search = "Pesquisa"
+search-title = "{locale} / Pesquisa"
 group-title = "{locale} / {group}"
 
 [language.editor.prompt]
-search = "Pesquise uma chave de mensagem ou texto. Escreva cancel para voltar."
-value = "Escreva um novo valor para {key} no chat."
+search = "Pesquisa uma chave de mensagem ou texto. Escreve cancel para voltar."
+value = "Escreve um novo valor para {key} no chat."
 current = "Valor atual: {value}"
 variables = "Variáveis: {variables}"
-guidance = "Use \\n para mudar de linha, \\\\ para uma barra invertida, ou escreva cancel para voltar."
+guidance = "Usa \\n para mudar de linha, \\\\ para uma barra invertida, ou escreve cancel para voltar."
 
 [language.editor.input]
 expired = "O prazo de introdução de texto no editor de idiomas expirou."
@@ -816,25 +820,25 @@ next-page = "&ePágina seguinte&r"
 
 [language.editor.search]
 messages = "Pesquisar mensagens"
-messages-lore = "Clique para pesquisar todas as mensagens."
+messages-lore = "Clica para pesquisar em todas as mensagens."
 clear = "Limpar a pesquisa"
 
 [language.editor.message]
 current-value = "&7Valor atual:&r"
 variables = "&8{variables}&r"
-edit-plural = "&7Clique para editar uma forma plural.&r"
-edit-lines = "&7Clique para editar linhas individuais.&r"
-edit-chat = "&7Clique para editar no chat.&r"
+edit-plural = "&7Clica para editar uma forma plural.&r"
+edit-lines = "&7Clica para editar linhas individuais.&r"
+edit-chat = "&7Clica para editar no chat.&r"
 
 [language.editor.locale]
-open = "&8Clique para abrir este idioma.&r"
+open = "&8Clica para abrir este idioma.&r"
 
 [language.editor.category]
 message-count = "&7{count} mensagens&r"
-open = "&8Clique para abrir esta categoria.&r"
+open = "&8Clica para abrir esta categoria.&r"
 
 [language.editor.error]
-no-permission = "Não tem permissão para editar os idiomas de {plugin}."
+no-permission = "Não tens permissão para editar os idiomas de {plugin}."
 unable-to-edit = "Não foi possível editar: {reason}"
 
 [language.editor.saved]
@@ -855,7 +859,7 @@ empty = "(vazio)"
 [gloss.message.screen]
 "surfaces.empty" = "&8[&dGloss&8] &7Nenhuma superfície carregada."
 "surfaces.unknown" = "&8[&dGloss&8]: &cNão existe a superfície &f{id}&c."
-"surfaces.tested" = "&8[&dGloss&8]: &a&f{id}&a executada para &f{player}&a."
+"surfaces.tested" = "&8[&dGloss&8]: &aExecutada &f{id}&a para &f{player}&a."
 "nametags.empty" = "&8[&dGloss&8] &7Nenhuma etiqueta carregada."
 "nametags.unknown" = "&8[&dGloss&8]: &cNão existe a etiqueta &f{id}&c."
 "nametags.refreshed" = "&8[&dGloss&8]: &aReaplicados &d{count}&a documentos de etiqueta."
@@ -868,23 +872,23 @@ empty = "(vazio)"
 root = "Superfícies de barra de ação, barra de chefe e título"
 list = "Listar documentos de superfície"
 info = "Mostrar um documento de superfície"
-"info.id" = "Id do documento de superfície"
-reset = "Restaurar as superfícies incluídas"
+"info.id" = "ID do documento de superfície"
+reset = "Repor as superfícies incluídas"
 test = "Executar agora a passagem de superfícies para um jogador"
-"test.id" = "Id do documento de superfície"
+"test.id" = "ID do documento de superfície"
 "test.player" = "Jogador a testar; por omissão tu"
 
 [command.help.nametag]
 root = "Documentos de etiqueta por observador"
 list = "Listar documentos de etiqueta"
 info = "Mostrar um documento de etiqueta"
-"info.id" = "Id do documento de etiqueta"
-reset = "Restaurar as etiquetas incluídas"
-refresh = "Reaplicar já todas as etiquetas"
+"info.id" = "ID do documento de etiqueta"
+reset = "Repor as etiquetas incluídas"
+refresh = "Reaplicar agora todas as etiquetas"
 
 [command.help.hud]
 root = "Inspecionar o compositor de HUD partilhado"
-who = "Mostra que plugin ocupa cada espaço do HUD"
+who = "Mostrar que plugin ocupa cada espaço do HUD de um jogador"
 "who.player" = "Jogador a inspecionar; por omissão tu"
 
 # --- lane:chat ---
@@ -915,28 +919,28 @@ leaderboard_sampled = "&8[&dGloss&8]: &aClassificação &f{id}&a amostrada para 
 
 [command.help.channel]
 root = "Canais de conversa"
-list = "Listar os canais carregados"
+list = "Listar os canais de conversa carregados"
 info = "Mostrar o alcance, o formato e as variantes de um canal"
-"info.id" = "Id do documento de canal"
-reset = "Restaurar os documentos de canal incluídos"
+"info.id" = "ID do documento de canal"
+reset = "Repor os documentos de canal incluídos"
 
 [command.help.strings]
 root = "Textos de conteúdo escritos"
 list = "Listar os idiomas de texto carregados e as suas entradas"
 missing = "Listar chaves que en_US tem e um idioma não"
 "missing.locale" = "Idioma a comparar com en_US"
-reset = "Restaurar os documentos de texto incluídos"
+reset = "Repor os documentos de texto incluídos"
 
 [command.help.leaderboard]
 root = "Classificações calculadas"
 list = "Listar as classificações carregadas e as suas entradas"
 info = "Mostrar a origem, a ordem e as entradas de uma classificação"
-"info.id" = "Id do documento"
+"info.id" = "ID do documento da classificação"
 reset = "Limpar o período ou os totais de uma classificação"
-"reset.id" = "Id do documento"
+"reset.id" = "ID do documento da classificação"
 "reset.period" = "all ou current"
 sample = "Amostrar uma classificação agora para todos os jogadores online"
-"sample.id" = "Id do documento"
+"sample.id" = "ID do documento da classificação"
 
 # --- lane:forms ---
 
@@ -963,29 +967,27 @@ args = "Argumentos chave=valor separados por espaços"
 root = "Inspecionar e abrir menus de baú"
 list = "Listar os menus de baú configurados"
 "list.page" = "Página da lista, a começar em 1"
-info = "Mostrar o tamanho e os slots de um menu de baú"
+info = "Mostrar o tamanho e os espaços de um menu de baú"
 "info.id" = "ID do menu de baú"
 open = "Abrir um menu de baú para um jogador"
 "open.id" = "ID do menu de baú"
 "open.player" = "Jogador para quem abrir; por omissão, tu"
 "open.args" = "Argumentos chave=valor separados por espaços"
-reset = "Restaurar os menus de baú predefinidos incluídos"
-"reset.name" = "Nome a repor, ou * para todos os ficheiros incluídos"
+reset = "Repor os menus de baú predefinidos incluídos"
+"reset.name" = "Nome a repor, ou * para todas as predefinições incluídas"
 
 ["command.help.hologram"]
-page = "Mover um espectador para uma pagina do holograma"
-"page.page" = "Id da pagina, next ou prev"
-"page.player" = "Nome do jogador; vazio usa-te a ti"
-motion = "Reproduzir um clip de movimento num holograma"
-"motion.motion" = "Id do movimento, ou clear para parar"
-actions = "Listar as acoes que um holograma executa ao clicar"
+page = "Mover um espectador para uma página do holograma"
+"page.page" = "ID da página, next ou prev"
+"page.player" = "Nome do espectador; se vazio, és tu"
+actions = "Listar as ações que um holograma executa ao clicar"
 
 [gloss.message.hologram_interaction]
-hologram_page_set = "&8[&dGloss&8] &a{player}&a esta agora na pagina &f{page}&a de &f{id}&a."
-hologram_page_player_missing = "&8[&dGloss&8] &cO jogador &f{player}&c nao esta online."
-hologram_page_unknown = "&8[&dGloss&8] &cO holograma &f{id}&c nao tem a pagina '&f{page}&c'."
-hologram_actions_empty = "&8[&dGloss&8] &7O holograma &f{id}&7 nao declara acoes."
-hologram_actions_header = "&8[&dGloss&8] &7Acoes do holograma &f{id}&7 (&f{count}&7):"
+hologram_page_set = "&8[&dGloss&8] &a{player}&a está agora na página &f{page}&a de &f{id}&a."
+hologram_page_player_missing = "&8[&dGloss&8] &cO jogador &f{player}&c não está online."
+hologram_page_unknown = "&8[&dGloss&8] &cO holograma &f{id}&c não tem a página '&f{page}&c'."
+hologram_actions_empty = "&8[&dGloss&8] &7O holograma &f{id}&7 não declara ações."
+hologram_actions_header = "&8[&dGloss&8] &7Ações do holograma &f{id}&7 (&f{count}&7):"
 hologram_actions_entry = "&8[&dGloss&8] &7  &f{kind}&7 em &f{value}"
 
 # --- lane:world ---
@@ -1023,7 +1025,7 @@ missing = "&cNenhuma placa de nome com o nome &f{id}&c."
 refreshed = "&aPlacas de nome atualizadas."
 
 [gloss.message.world.glow]
-set = "&f{target} &7brilha agora a &f{value}&a."
+set = "&aBrilho de &f{target} &7definido para &f{value}&a."
 cleared = "&7Brilho de &f{target} &7removido."
 missing = "&cNenhum jogador com o nome &f{player} &cestá online."
 
@@ -1052,7 +1054,7 @@ id = "Identificador do documento de ponto de referência"
 
 [command.help.camera]
 root = "Ferramentas de percursos de câmara"
-test = "Voar um percurso de demonstração à tua volta"
+test = "Fazer um percurso de demonstração da câmara à tua volta"
 stop = "Terminar um percurso de câmara mais cedo"
 
 [command.help.camera.arg]
@@ -1063,7 +1065,7 @@ player = "Passageiro a parar; por omissão tu"
 root = "Ferramentas de placas de nome de jogador"
 list = "Listar documentos de placa de nome"
 info = "Mostrar um documento de placa de nome"
-reset = "Restaurar o documento de placa de nome incluído"
+reset = "Repor o documento de placa de nome incluído"
 refresh = "Reconstruir as placas de nome de todos os espectadores"
 
 [command.help.nameplate.arg]
@@ -1085,65 +1087,65 @@ ticks = "Ticks que o brilho dura, ou 0 para o manter"
 [command.help.behavior]
 root = "Inspecionar e disparar documentos de comportamento"
 list = "Listar os documentos de comportamento carregados"
-info = "Mostrar os gatilhos e as condicoes de um documento de comportamento"
+info = "Mostrar os gatilhos e as condições de um documento de comportamento"
 fire = "Executar agora uma entrada de comportamento"
-reset = "Restaurar os comportamentos predefinidos incluidos"
-id = "Id do documento de comportamento"
-entry = "Numero da entrada, a comecar em 1"
-player = "Jogador para quem a entrada corre, ou * para nenhum"
+reset = "Repor os comportamentos predefinidos incluídos"
+id = "ID do documento de comportamento"
+entry = "Número da entrada, a começar em 1"
+player = "Jogador para quem a entrada é executada, ou * para nenhum"
 
 [command.help.state]
-root = "Ler e escrever o estado de comportamento persistido"
+root = "Ler e escrever o estado de comportamento persistente"
 get = "Mostrar um valor de estado"
 set = "Escrever um valor de estado"
 clear = "Repor um valor de estado no seu valor predefinido"
 dump = "Listar cada chave de estado declarada e o seu valor"
 key = "Chave de estado declarada"
-value = "Novo valor; coloque entre aspas para incluir espacos"
-player = "Jogador a quem pertence o valor, ou * para si mesmo"
+value = "Novo valor; usa aspas para incluir espaços"
+player = "Jogador a quem pertence o valor, ou * para ti"
 
 [command.help.do]
 root = "Disparar as entradas de comportamento command com este nome"
 name = "Nome do comando de comportamento"
-args = "Argumentos como pares chave=valor; coloque entre aspas para incluir espacos"
+args = "Argumentos como pares chave=valor; usa aspas para incluir espaços"
 
 [command.help.expr]
-root = "Avaliar uma expressao e mostrar o que lhe respondeu"
-expression = "Expressao a avaliar; coloque entre aspas para incluir espacos"
+root = "Avaliar uma expressão e mostrar o que a resolveu"
+expression = "Expressão a avaliar; usa aspas para incluir espaços"
 
 [command.help.explain]
-root = "Mostrar que condicoes um runtime consultou e qual venceu"
+root = "Mostrar que condições um runtime consultou e qual prevaleceu"
 kind = "Runtime a explicar, por exemplo board ou behavior"
-id = "Id do documento a explicar"
-player = "Jogador para quem explicar, ou * para si mesmo"
+id = "ID do documento a explicar"
+player = "Jogador para quem explicar, ou * para ti"
 
 [gloss.message.behaviors]
-off = "&8[&dGloss&8]: &eOs comportamentos estao desligados em features.behaviors."
-"list.empty" = "&8[&dGloss&8]: &7Nao ha documentos de comportamento carregados."
-missing = "&8[&dGloss&8]: &cNao existe o documento de comportamento \"{id}\"."
-"info.header" = "&8[&dGloss&8]: &d{id} &7revisao &f{revision} &8| &7entradas &f{count} &8| &7ativo &f{enabled}"
-"info.entry" = " &8{line}. &f{name} &7se &f{when} &8| &7permissao &f{permission}"
+off = "&8[&dGloss&8]: &eOs comportamentos estão desativados em features.behaviors."
+"list.empty" = "&8[&dGloss&8]: &7Não há documentos de comportamento carregados."
+missing = "&8[&dGloss&8]: &cNão existe o documento de comportamento \"{id}\"."
+"info.header" = "&8[&dGloss&8]: &d{id} &7revisão &f{revision} &8| &7entradas &f{count} &8| &7ativo &f{enabled}"
+"info.entry" = " &8{line}. &f{name} &7se &f{when} &8| &7permissão &f{permission}"
 fired = "&8[&dGloss&8]: &aEntrada &f{line}&a de &f{id}&a executada."
-"fire.missing" = "&8[&dGloss&8]: &c{id} nao tem a entrada {line}."
+"fire.missing" = "&8[&dGloss&8]: &c{id} não tem a entrada {line}."
 "do.ran" = "&8[&dGloss&8]: &aDisparadas &f{count}&a entradas de comportamento para &f{name}&a."
 "do.none" = "&8[&dGloss&8]: &7Nenhuma entrada de comportamento responde ao comando \"{name}\"."
 "state.value" = " &7{key} &8= &f{value}"
-"state.set" = "&8[&dGloss&8]: &a{key} e agora &f{value}&a."
+"state.set" = "&8[&dGloss&8]: &a{key} é agora &f{value}&a."
 "state.cleared" = "&8[&dGloss&8]: &a{key} voltou ao valor predefinido."
 "state.unknown" = "&8[&dGloss&8]: &cNenhum documento de comportamento declara a chave de estado \"{key}\"."
-"state.invalid" = "&8[&dGloss&8]: &c\"{value}\" nao e um valor {type}."
-"state.empty" = "&8[&dGloss&8]: &7Nenhum documento de comportamento declara estado."
-"state.player" = "&8[&dGloss&8]: &cIndique um jogador: &f{key}&c nao e uma chave global."
-"player.missing" = "&8[&dGloss&8]: &cNao ha nenhum jogador ligado chamado \"{player}\"."
+"state.invalid" = "&8[&dGloss&8]: &c\"{value}\" não é um valor {type}."
+"state.empty" = "&8[&dGloss&8]: &7Nenhum documento de comportamento declara qualquer estado."
+"state.player" = "&8[&dGloss&8]: &cIndica um jogador: &f{key}&c não é uma chave global."
+"player.missing" = "&8[&dGloss&8]: &cNão há nenhum jogador online chamado \"{player}\"."
 "expr.value" = "&8[&dGloss&8]: &f{value} &8({type})"
 "expr.reference" = " &7{name} &8= &f{value} &8via &7{source}"
-"expr.functions" = " &7funcoes &8= &f{value}"
+"expr.functions" = " &7funções &8= &f{value}"
 "expr.failed" = "&8[&dGloss&8]: &c{reason}"
 "explain.header" = "&8[&dGloss&8]: &d{kind} &f{id} &7para &f{player}"
 "explain.line" = " &8{path} &7{when} &8= &f{value}"
 "explain.winner" = " &a> &f{path} &7{when} &8= &f{value}"
-"explain.unknown" = "&8[&dGloss&8]: &cNada explica \"{kind}\"; experimente {options}."
-"explain.missing" = "&8[&dGloss&8]: &cNao existe o {kind} \"{id}\"."
+"explain.unknown" = "&8[&dGloss&8]: &cNada explica \"{kind}\"; experimenta {options}."
+"explain.missing" = "&8[&dGloss&8]: &cNão existe o {kind} \"{id}\"."
 
 # --- lane:authoring ---
 
@@ -1156,13 +1158,13 @@ list = "Listar os pacotes instalados"
 info = "Mostrar que ficheiros pertencem a um pacote"
 arg_source = "Ficheiro de pacote na pasta de dados do Gloss, ou um URL HTTPS"
 arg_dry = "Relatar o que mudaria sem escrever nada"
-arg_id = "Id do pacote instalado"
+arg_id = "ID do pacote instalado"
 
 [command.help.history]
 root = "Listar as versões guardadas de um documento"
 arg_kind = "Pasta do documento, como boards ou menus"
-arg_id = "Id do documento"
-arg_page = "Página da lista a começar em um"
+arg_id = "ID do documento"
+arg_page = "Página da lista, a começar em 1"
 
 [command.help.restore]
 root = "Escrever uma versão guardada por cima do documento ativo"
@@ -1186,16 +1188,16 @@ outcome = "&8[&dGloss&8] &7{state} &f{path}&7 {reason}"
 installed = "&8[&dGloss&8] Pacote &f{id}&7 instalado com &f{count}&7 ficheiro(s)."
 updated = "&8[&dGloss&8] Pacote &f{id}&7 atualizado em &f{count}&7 ficheiro(s)."
 removed = "&8[&dGloss&8] Pacote &f{id}&7 e &f{count}&7 ficheiro(s) removidos."
-unknown = "&8[&dGloss&8] &cNão há nenhum pacote instalado com a id &f{id}&c."
+unknown = "&8[&dGloss&8] &cNão há nenhum pacote instalado com o ID &f{id}&c."
 failed = "&8[&dGloss&8] &cO pacote &f{id}&c falhou: {reason}"
 entry = "&8[&dGloss&8] &f{id} &7{value} &8{count} ficheiro(s)"
 empty = "&8[&dGloss&8] &7Não há pacotes instalados."
-disabled = "&8[&dGloss&8] &cOs pacotes Gloss estão desligados em gloss.toml."
+disabled = "&8[&dGloss&8] &cOs pacotes Gloss estão desativados em gloss.toml."
 
 [gloss.message.authoring.history]
 empty = "&8[&dGloss&8] &7Não há versões guardadas de &f{kind} {id}&7."
 entry = "&8[&dGloss&8] &f{revision} &7{source} &8{count} bytes"
-disabled = "&8[&dGloss&8] &cO histórico de documentos está desligado em gloss.toml."
+disabled = "&8[&dGloss&8] &cO histórico de documentos está desativado em gloss.toml."
 
 [gloss.message.authoring.restore]
 done = "&8[&dGloss&8] &f{kind} {id}&7 reposto na versão &f{revision}&7."
@@ -1205,7 +1207,7 @@ failed = "&8[&dGloss&8] &cA reposição falhou: {reason}"
 [gloss.message.authoring.check]
 clean = "&8[&dGloss&8] &aNada a relatar."
 entry = "&8[&dGloss&8] &7{state} &f{key} &8{kind} {id} {path} &7{message}"
-summary = "&8[&dGloss&8] &f{count}&7 conclusão(ões)."
+summary = "&8[&dGloss&8] &f{count}&7 resultado(s)."
 
 [gloss.message.authoring.export]
 done = "&8[&dGloss&8] &f{count}&7 documento(s) exportado(s) para &f{path}&7."
@@ -1221,7 +1223,7 @@ preview_required = "&8[&dGloss&8] &cExecuta primeiro /gloss import preview {sour
 # --- lane:forge ---
 
 [gloss.message.forge]
-disabled = "&8[&dGloss&8] &cA forja de glifos está desligada. Define features.forge como true em gloss.toml."
+disabled = "&8[&dGloss&8] &cA forja de glifos está desativada. Define features.forge como true em gloss.toml."
 built = "&8[&dGloss&8] &aPacote &f{value}&a criado com {count} glifos."
 build_failed = "&8[&dGloss&8] &cFalhou a criação do pacote; o pacote anterior continua ativo. Vê a consola."
 status = "&7{value}"
@@ -1238,7 +1240,7 @@ export = "Copiar a pasta do pacote combinável para outro local"
 "export.path" = "Pasta de destino do pacote"
 serve = "Iniciar ou parar o servidor de pacote integrado"
 "serve.state" = "on ou off"
-reset = "Restaurar os documentos de glifos incluídos"
+reset = "Repor os documentos de glifos incluídos"
 
 # --- lane:fixes ---
 

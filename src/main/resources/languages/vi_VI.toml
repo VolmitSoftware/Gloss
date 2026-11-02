@@ -25,6 +25,7 @@
 #   {absorbed}  Số mục nhập đã gộp vào dữ liệu hiện có
 #   {active}  Số nhà cung cấp đang hoạt động
 #   {actual}  Phiên bản sửa đổi hiện tại
+#   {added}  Thông báo được thêm bởi bản cập nhật ngôn ngữ
 #   {after}  Giá trị thông báo sau khi sửa
 #   {argument}  Đối số lệnh không mong đợi
 #   {axis}  Trục tọa độ hoặc trục xoay
@@ -32,17 +33,16 @@
 #   {before}  Giá trị thông báo trước khi sửa
 #   {billboard}  Chế độ hướng của phần hiển thị
 #   {blocks}  Số thành phần hiển thị khối
-#   {board}  Mã định danh bảng hoặc bảng điều khiển
+#   {board}  Mã định danh bảng điểm hoặc panel
 #   {bottles}  Số chai trong vật chứa
 #   {bubbles}  Số bong bóng trò chuyện đang hoạt động
-#   {cells}  Số ô trong trình đơn
+#   {cells}  Số ô trong menu
 #   {color}  Màu hiển thị hoặc màu vật phẩm
 #   {command}  Đường dẫn lệnh
 #   {conflicts}  Số xung đột khi nhập
 #   {copied}  Số mục đã sao chép
 #   {count}  Số đối tượng hoặc thông báo khớp
 #   {disc}  Đĩa nhạc trong vật chứa
-#   {distance}  Khoảng cách tới mục tiêu
 #   {drops}  Số vật phẩm rơi đang hiển thị
 #   {enabled}  Trạng thái bật hoặc số mục đã bật
 #   {entities}  Số thực thể
@@ -53,8 +53,8 @@
 #   {failed}  Số thao tác thất bại
 #   {from}  Giá trị nguồn hoặc đầu khoảng
 #   {fuel}  Nhiên liệu còn lại trong vật chứa
-#   {group}  Danh mục của trình sửa ngôn ngữ
-#   {hologram}  Mã định danh ảnh nổi
+#   {group}  Danh mục của trình chỉnh sửa ngôn ngữ
+#   {hologram}  Mã định danh hologram
 #   {honey}  Mức mật ong hiện tại
 #   {id}  Mã định danh đối tượng
 #   {imported}  Số mục đã nhập
@@ -62,6 +62,7 @@
 #   {interactPermission}  Quyền cần để tương tác
 #   {interactionRange}  Khoảng cách tương tác tối đa
 #   {item}  Tên hoặc vật liệu của vật phẩm
+#   {kept}  Chỉnh sửa cục bộ được giữ lại sau bản cập nhật ngôn ngữ
 #   {key}  Khóa thông báo hoặc cấu hình
 #   {kind}  Loại đối tượng hoặc nhà cung cấp
 #   {kinds}  Các loại đối tượng hoặc nhà cung cấp có sẵn
@@ -74,7 +75,7 @@
 #   {maximum}  Giá trị tối đa cho phép
 #   {maximumBees}  Số ong tối đa
 #   {maximumHoney}  Mức mật ong tối đa
-#   {menu}  Mã định danh trình đơn
+#   {menu}  Mã định danh menu
 #   {message}  Thông báo phản hồi hoặc chẩn đoán
 #   {migrated}  Số mục đã chuyển đổi
 #   {minimum}  Giá trị tối thiểu cho phép
@@ -86,7 +87,7 @@
 #   {overlaid}  Số khóa cấu hình đã áp dụng
 #   {page}  Số trang hiện tại
 #   {pages}  Tổng số trang
-#   {panels}  Số bảng điều khiển
+#   {panels}  Số panel
 #   {parameter}  Tên tham số lệnh
 #   {path}  Đường dẫn tệp hoặc thư mục
 #   {pending}  Trạng thái xuất bản đang chờ
@@ -99,9 +100,9 @@
 #   {priority}  Độ ưu tiên lựa chọn hoặc kết xuất
 #   {provider}  Tên nhà cung cấp
 #   {providers}  Danh sách hoặc số nhà cung cấp
-#   {radius}  Bán kính tìm kiếm
 #   {ready}  Số mục sẵn sàng nhập
 #   {reason}  Lý do lỗi hoặc quyết định
+#   {remaining}  Thời gian còn lại đến lần kiểm tra ngôn ngữ tiếp theo
 #   {resume}  Số mục nhập có thể tiếp tục
 #   {revision}  Phiên bản sửa đổi tài liệu
 #   {roll}  Góc nghiêng quanh hướng nhìn tính bằng độ
@@ -125,6 +126,7 @@
 #   {to}  Giá trị đích hoặc cuối khoảng
 #   {total}  Tổng số mục
 #   {type}  Loại giá trị hoặc đối tượng dự kiến
+#   {updated}  Thông báo được thay đổi bởi bản cập nhật ngôn ngữ
 #   {url}  Địa chỉ web
 #   {uuid}  Mã định danh duy nhất của đối tượng hoặc người chơi
 #   {value}  Giá trị thông báo hoặc tham số hiện tại
@@ -410,7 +412,7 @@ hover = "Nhấp để xem chi tiết"
 
 [command.board.info]
 header = "&8[&dGloss&8] &d{id} &7có tiêu đề &f{title}"
-meta = "&7Ưu tiên: &f{priority}&7 | Điều kiện: &f{when}&7 | Biến thể: &f{variants}&7"
+meta = "&7Ưu tiên: &f{priority} &8| &7Điều kiện: &f{when} &8| &7Biến thể: &f{variants}"
 line = " &8{line}. &f{text}"
 
 [command.emoji]
@@ -419,8 +421,6 @@ hover = "Nhấp để chèn vào chat"
 
 [command.animations]
 empty = "&8[&dGloss&8] &7Không có hoạt ảnh nào được nạp."
-header = "&8[&dGloss&8] &fHoạt ảnh: &d{count}"
-entry = "&8- &d{name}"
 
 [command.list]
 page = "&7Trang &f{page}&7/&f{pages} &8- &7hiển thị &f{from}&7-&f{to} &7trên &f{total}"
@@ -502,7 +502,7 @@ execution_failed = "Không thể thực thi lệnh {command}: {reason}"
 [gloss.error]
 menu_name_required = "Tên menu không được để trống"
 hologram_id_required = "ID hologram không được để trống"
-panel_id_required = "ID bảng hiển thị không được để trống"
+panel_id_required = "ID panel không được để trống"
 web_subject_required = "ID tài liệu của trình chỉnh sửa web không được để trống"
 web_session_required = "ID phiên của trình chỉnh sửa web không được để trống"
 panel_player_required = "Người chơi đích không được để trống"
@@ -513,7 +513,6 @@ import_source_unknown = "Nguồn nhập dữ liệu cũ không xác định: {so
 
 [gloss.message]
 permission_denied = "&8[&dGloss&8]: &cBạn không có quyền &f{permission}&c."
-unknown_command = "&8[&dGloss&8]: &cLệnh không xác định \"&f{command}&c\"."
 
 [gloss.message.hologram]
 created = "&8[&dGloss&8]: &aĐã tạo hologram &f{hologram}&a với menu gốc &f{menu}&a tại vị trí của bạn."
@@ -551,11 +550,11 @@ player_only = "&8[&dGloss&8]: &cLệnh này chỉ dành cho người chơi."
 [gloss.message.web]
 header = "Trình chỉnh sửa web"
 open_hover = "Nhấp để mở trình chỉnh sửa web Gloss."
-open = "&8[&dGloss&8]: &7Trình chỉnh sửa web: &f{url}&7"
+open = "&8[&dGloss&8]: &7Trình chỉnh sửa web: &f{url}"
 preparing = "&8[&dGloss&8]: &7Đang chuẩn bị phiên đồng bộ trình chỉnh sửa bảo mật cho &f{subject}&7..."
 unavailable = "&8[&dGloss&8]: &cKhông thể chỉnh sửa trực tiếp qua web. Hãy kiểm tra cấu hình đồng bộ trình chỉnh sửa và kết nối đến máy chủ chuyển tiếp."
-open_failed = "&8[&dGloss&8]: &cKhông thể mở &f{kind}&c=&f{subject}&c trong trình chỉnh sửa web trực tiếp: {reason}"
-open_console = "&8[&dGloss&8]: &7Liên kết cấp quyền chỉnh sửa cho &f{subject}&7: &f{url}&7"
+open_failed = "&8[&dGloss&8]: &cKhông thể mở &f{kind}={subject}&c trong trình chỉnh sửa web trực tiếp: {reason}"
+open_console = "&8[&dGloss&8]: &7Liên kết cấp quyền chỉnh sửa cho &f{subject}&7: &f{url}"
 capability_warning = "&8[&dGloss&8]: &eURL này cho phép đưa thay đổi lên máy chủ cho đến khi bị thu hồi hoặc hết hạn. Hãy giữ bí mật liên kết."
 open_label = "Mở trình chỉnh sửa"
 copy_label = "Sao chép liên kết"
@@ -564,7 +563,7 @@ link_hover = "Mở trình chỉnh sửa, sao chép liên kết cấp quyền ho�
 
 [gloss.message.web.sessions]
 list_empty = "&8[&dGloss&8]: &7Không có phiên đồng bộ trình chỉnh sửa nào đang hoạt động."
-status = "&8[&dGloss&8]: &7&f{session}&7 {kind}=&f{subject}&7 hết hạn sau=&f{seconds}&7giây bản đã phát hành=&f{revision}&7 đang chờ=&f{pending}&7"
+status = "&8[&dGloss&8]: &f{session} &7{kind}=&f{subject} &7hết hạn sau=&f{seconds} giây &7bản đã phát hành=&f{revision} &7đang chờ=&f{pending}"
 revoked = "&8[&dGloss&8]: &aĐã thu hồi phiên đồng bộ trình chỉnh sửa &f{session}&a."
 pulled = "&8[&dGloss&8]: &aĐã kiểm tra cập nhật của phiên đồng bộ trình chỉnh sửa &f{session}&a."
 unknown = "&8[&dGloss&8]: &cPhiên đồng bộ trình chỉnh sửa &f{session}&c không xác định hoặc đã hết hạn."
@@ -574,10 +573,10 @@ failed = "&8[&dGloss&8]: &cThao tác đồng bộ trình chỉnh sửa cho phiê
 preview_started = "&8[&dGloss&8]: &7Đang quét &f{source}&7 để xem trước việc chuyển đổi mà không thay đổi dữ liệu..."
 apply_started = "&8[&dGloss&8]: &7Đang quét và chuyển đổi từ &f{source}&7 mà không ghi đè dữ liệu hiện có..."
 source_missing = "&8[&dGloss&8]: &7Không tìm thấy nguồn &f{source}&7 tại &f{path}&7."
-preview_summary = "&8[&dGloss&8]: &7Xem trước &f{source}&7: &a{ready}&7 sẵn sàng, &d{resume}&7 có thể tiếp tục, &e{conflicts}&7 xung đột, &c{errors}&7 lỗi, {warnings} cảnh báo. Nguồn: &f{path}&7"
-preview_entry = "&8- &7&f{legacy}&7 -> &f{board}&7 trạng thái=&f{state}&7 cảnh báo=&f{warnings}&7"
-apply_summary = "&8[&dGloss&8]: &7Chuyển đổi &f{source}&7: đã nhập &a{imported}&7, bỏ qua &e{skipped}&7, thất bại &c{failed}&7; quá trình quét báo {errors} lỗi và {warnings} cảnh báo."
-apply_entry = "&8- &7&f{legacy}&7 trạng thái=&f{state}&7 lý do=&f{reason}&7"
+preview_summary = "&8[&dGloss&8]: &f{source}&7 (xem trước): &a{ready} sẵn sàng&7, &d{resume} có thể tiếp tục&7, &e{conflicts} xung đột&7, &c{errors} lỗi&7, {warnings} cảnh báo. Nguồn: &f{path}"
+preview_entry = "&8- &f{legacy} &7-> &f{board} &7trạng thái=&f{state} &7cảnh báo=&f{warnings}"
+apply_summary = "&8[&dGloss&8]: &f{source}&7 (chuyển đổi): &a{imported} đã nhập&7, &e{skipped} bỏ qua&7, &c{failed} thất bại&7; quá trình quét báo {errors} lỗi và {warnings} cảnh báo."
+apply_entry = "&8- &f{legacy} &7trạng thái=&f{state} &7lý do=&f{reason}"
 issue = "&8- &f{legacy} &7{severity}: &f{reason}"
 busy = "&8[&dGloss&8]: &cMột quá trình chuyển đổi hologram cũ khác đang chạy."
 failed = "&8[&dGloss&8]: &cChuyển đổi hologram cũ từ &f{source}&c thất bại: {reason}"
@@ -600,7 +599,7 @@ saved = "&7Đã lưu kích thước xem trước: &f{percent}%"
 bundle_more = "+{count} loại nữa"
 
 [gloss.message.items]
-disabled = "&8[&dGloss&8]: &7Vật phẩm tùy chỉnh đang tắt. Đặt customItems thành true trong gloss.toml."
+disabled = "&8[&dGloss&8]: &7Vật phẩm tùy chỉnh đang tắt. Đặt &fcustomItems&7 thành true trong gloss.toml."
 
 [gloss.message.items.status]
 header = "Vật phẩm tùy chỉnh"
@@ -633,49 +632,45 @@ none = "&8[&dGloss&8]: &c\"{name}\" không phải tài liệu xem trước đi k
 
 [gloss.message.previews.dump]
 unknown = "&8[&dGloss&8]: &c\"{name}\" không phải tài liệu xem trước đã tải."
-result = "&8[&dGloss&8]: &7&a{name}&7: &f{total}&7 phần tử (bảng hiển thị={panels}, ô={cells}, ô vật phẩm={slots}, nhãn={labels})."
+result = "&8[&dGloss&8]: &a{name}&7: &f{total}&7 phần tử (panel={panels}, ô={cells}, ô vật phẩm={slots}, nhãn={labels})."
 no_errors = "&8[&dGloss&8]: &aKhông có lỗi dựng tài liệu."
 error_line = "&8[&dGloss&8]: &c{message}"
 error_more = "&8[&dGloss&8]: &7Còn {count} mục nữa (xem nhật ký bảng điều khiển)."
 
 [gloss.message.panels]
-created = "&8[&dGloss&8]: &aĐã tạo bảng hiển thị &f{board}&a ở bản sửa đổi {revision}."
-deleted = "&8[&dGloss&8]: &aĐã xóa bảng hiển thị &f{board}&a."
+created = "&8[&dGloss&8]: &aĐã tạo panel &f{board}&a ở bản sửa đổi {revision}."
+deleted = "&8[&dGloss&8]: &aĐã xóa panel &f{board}&a."
 renamed = "&8[&dGloss&8]: &aĐã đổi tên &f{oldBoard}&a thành &f{board}&a ở bản sửa đổi {revision}."
 copied = "&8[&dGloss&8]: &aĐã sao chép &f{source}&a thành &f{board}&a."
 updated = "&8[&dGloss&8]: &aĐã áp dụng thao tác {operation} cho &f{board}&a ở bản sửa đổi {revision}."
 teleported = "&8[&dGloss&8]: &aĐã dịch chuyển đến &f{board}&a."
-unknown = "&8[&dGloss&8]: &cBảng hiển thị &f{board}&c không xác định."
-already_exists = "&8[&dGloss&8]: &cBảng hiển thị &f{board}&c đã tồn tại."
-invalid = "&8[&dGloss&8]: &cGiá trị bảng hiển thị không hợp lệ: &f{reason}&c."
+unknown = "&8[&dGloss&8]: &cPanel &f{board}&c không xác định."
+already_exists = "&8[&dGloss&8]: &cPanel &f{board}&c đã tồn tại."
+invalid = "&8[&dGloss&8]: &cGiá trị panel không hợp lệ: &f{reason}&c."
 menu_unavailable = "&8[&dGloss&8]: &cChưa tải menu gốc &f{menu}&c."
 player_unavailable = "&8[&dGloss&8]: &cNgười chơi đích &f{player}&c không trực tuyến."
-world_unavailable = "&8[&dGloss&8]: &cChưa tải thế giới &f{world}&c của bảng hiển thị với UUID đã lưu."
-revision_conflict = "&8[&dGloss&8]: &cBảng hiển thị &f{board}&c đã thay đổi trong lúc bạn chỉnh sửa (dự kiến {expected}, hiện tại {actual}). Hãy mở lại phiên chỉnh sửa."
-failed = "&8[&dGloss&8]: &cThao tác với bảng hiển thị &f{board}&c thất bại: {reason}"
+world_unavailable = "&8[&dGloss&8]: &cChưa tải thế giới &f{world}&c của panel với UUID đã lưu."
+revision_conflict = "&8[&dGloss&8]: &cPanel &f{board}&c đã thay đổi trong lúc bạn chỉnh sửa (dự kiến {expected}, hiện tại {actual}). Hãy mở lại phiên chỉnh sửa."
+failed = "&8[&dGloss&8]: &cThao tác với panel &f{board}&c thất bại: {reason}"
 
 [gloss.message.panels.list]
-header = "&8[&dGloss&8]: &fBảng hiển thị được lưu lâu dài: &d{count}&f"
-empty = "&8[&dGloss&8]: &7Chưa tải bảng hiển thị được lưu lâu dài nào."
-entry = "&8- &7&f{board}&7 menu=&f{menu}&7 bản sửa đổi=&f{revision}&7"
+empty = "&8[&dGloss&8]: &7Chưa tải panel cố định nào."
 
 [gloss.message.panels.near]
-header = "&8[&dGloss&8]: &fBảng hiển thị trong bán kính &d{radius}&f khối: &d{count}&f"
-empty = "&8[&dGloss&8]: &7Không có bảng hiển thị nào trong bán kính đó."
-entry = "&8- &7&f{board}&7 khoảng cách=&f{distance}&7 menu=&f{menu}&7"
+empty = "&8[&dGloss&8]: &7Không có panel nào trong bán kính đó."
 
 [gloss.message.panels.info]
-header = "&8[&dGloss&8]: &fBảng hiển thị &d{board}&f (&7{state}&f)"
-identity = "&7UUID=&f{uuid}&7 bản sửa đổi=&f{revision}&7 menu=&f{menu}&7"
-transform = "&7thế giới=&f{world}&7 vị trí=&f{x}&7, &f{y}&7, &f{z}&7 góc xoay=&f{yaw}&7, &f{pitch}&7, &f{roll}&7 tỷ lệ=&f{scale}&7"
-visibility = "&7chế độ hiển thị=&f{mode}&7 quyền xem=&f{viewPermission}&7 quyền tương tác=&f{interactPermission}&7 phạm vi=&f{viewRange}&7/&f{interactionRange}&7"
-follow = "&7bám theo=&f{mode}&7 người chơi=&f{player}&7 góc xoay=&f{rotation}&7"
+header = "&8[&dGloss&8]: &fPanel &d{board} &7({state})"
+identity = "&7uuid=&f{uuid} &7bản sửa đổi=&f{revision} &7menu=&f{menu}"
+transform = "&7thế giới=&f{world} &7vị trí=&f{x}, {y}, {z} &7góc xoay=&f{yaw}, {pitch}, {roll} &7tỷ lệ=&f{scale}"
+visibility = "&7chế độ hiển thị=&f{mode} &7quyền xem=&f{viewPermission} &7quyền tương tác=&f{interactPermission} &7phạm vi=&f{viewRange}/{interactionRange}"
+follow = "&7bám theo=&f{mode} &7người chơi=&f{player} &7góc xoay=&f{rotation}"
 
 [gloss.message.panels.edit]
 started = "&8[&dGloss&8]: &aĐang chỉnh sửa &f{board}&a từ bản sửa đổi {revision}. Thay đổi được giữ tạm cho đến khi lưu."
 already_active = "&8[&dGloss&8]: &cBạn đang chỉnh sửa &f{board}&c. Hãy lưu hoặc hủy trước."
-none = "&8[&dGloss&8]: &cBạn không có bản chỉnh sửa bảng hiển thị đang giữ tạm."
-busy = "&8[&dGloss&8]: &cBảng hiển thị &f{board}&c đang được lưu."
+none = "&8[&dGloss&8]: &cBạn không có bản chỉnh sửa panel đang giữ tạm."
+busy = "&8[&dGloss&8]: &cPanel &f{board}&c đang được lưu."
 staged = "&8[&dGloss&8]: &aĐã giữ tạm thao tác {operation} cho &f{board}&a. Dùng /gloss panel save để lưu."
 saved = "&8[&dGloss&8]: &aĐã lưu &f{board}&a ở bản sửa đổi {revision}."
 cancelled = "&8[&dGloss&8]: &aĐã hủy các chỉnh sửa đang giữ tạm của &f{board}&a."
@@ -721,7 +716,7 @@ ender_chest = "&5&lRương Ender"
 barrel = "&e&lThùng"
 dispenser = "&7&lMáy phân phát"
 dropper = "&8&lMáy thả"
-hopper = "&8&lCái phễu"
+hopper = "&8&lPhễu"
 furnace = "&6&lLò nung"
 smoker = "&e&lLò hun khói"
 blast_furnace = "&b&lLò luyện kim"
@@ -752,18 +747,18 @@ current = "Hiện tại: {locale}"
 current_with_personal = "Hiện tại: {locale} (Của bạn: {personal})"
 your_description = "Chỉ thay đổi những thông báo bạn thấy."
 reset_description = "Dùng ngôn ngữ mặc định của máy chủ."
-server_description = "Thay đổi ngôn ngữ mặc định của máy chủ."
+server_description = "Thay đổi ngôn ngữ mặc định của máy chủ"
 edit_description = "Mở trình chỉnh sửa thông báo cho từng ngôn ngữ."
 select_description = "Nhấp để chọn ngôn ngữ này."
 remove_personal_description = "Xóa lựa chọn ngôn ngữ cá nhân của bạn."
 no_controls = "Bạn không có quyền dùng các tùy chọn ngôn ngữ."
-command = "Câu lệnh: {command}"
-selected = "Đã chọn"
-all-volmit-plugins = "Tất cả plugin Volmit"
+command = "Lệnh: {command}"
+selected = "đã chọn"
+all-volmit-plugins = "tất cả plugin Volmit"
 
 [language.error]
-stopping = "Không có khả năng chọn ngôn ngữ trong khi bổ sung đang dừng."
-editor-player-only = "Mở trình soạn thảo ngôn ngữ trong trò chơi."
+stopping = "Không thể chọn ngôn ngữ trong khi plugin đang dừng."
+editor-player-only = "Hãy mở trình chỉnh sửa ngôn ngữ trong trò chơi."
 no-providers = "Không có nhà cung cấp ngôn ngữ Volmit nào khả dụng."
 numeric-page = "Nhập số trang bằng chữ số."
 personal-player-only = "Bạn phải chọn ngôn ngữ cá nhân trong trò chơi."
@@ -775,8 +770,9 @@ unavailable-for-all = "Ngôn ngữ {locale} không khả dụng cho tất cả p
 
 [language.usage]
 editor = "Cách dùng: /{command} language server edit [locale]"
-selection = "Cách dùng: /{command} language self [locale|reset] or server [locale]"
+selection = "Cách dùng: /{command} language self [locale|reset] hoặc server [locale]"
 volmit-selection = "Cách dùng: /volmit plugins languages [locale]"
+update = "Cách dùng: /{command} language update"
 
 [language.selection]
 preparing = "Đang chuẩn bị ngôn ngữ {locale} cho {target}..."
@@ -786,9 +782,17 @@ personal-selected = "{plugin}: ngôn ngữ của bạn hiện là {locale}."
 server-selected = "{plugin}: ngôn ngữ máy chủ hiện là {locale}."
 server-default-selected = "{plugin}: ngôn ngữ của bạn hiện theo ngôn ngữ mặc định của máy chủ."
 
+[language.update]
+checking = "{plugin}: đang kiểm tra thay đổi trong kho ngôn ngữ..."
+unchanged = "{plugin}: các ngôn ngữ đã cài đặt đã khớp với kho."
+applied = "{plugin}: đã cập nhật {locale} (thêm {added}, thay đổi {updated}, giữ lại {kept} chỉnh sửa cục bộ)."
+cooldown = "{plugin}: kho ngôn ngữ vừa được kiểm tra; hãy thử lại sau {remaining}."
+locale-failed = "{plugin}: {locale} chưa được cập nhật: {reason}"
+failed = "{plugin}: cập nhật ngôn ngữ thất bại: {reason}"
+
 [language.editor]
 title = "{plugin} › {section}"
-loading = "Đang tải tin nhắn cho {locale}..."
+loading = "Đang tải thông báo cho {locale}..."
 
 [language.editor.section]
 languages = "Ngôn ngữ"
@@ -797,7 +801,7 @@ search-title = "{locale} / Tìm kiếm"
 group-title = "{locale} / {group}"
 
 [language.editor.prompt]
-search = "Tìm khóa hoặc nội dung tin nhắn. Nhập cancel để quay lại."
+search = "Tìm khóa hoặc nội dung thông báo. Nhập cancel để quay lại."
 value = "Nhập giá trị mới cho {key} trong trò chuyện."
 current = "Giá trị hiện tại: {value}"
 variables = "Biến: {variables}"
@@ -812,26 +816,26 @@ unable-to-save = "Không thể lưu: {reason}"
 back = "&eQuay lại&r"
 close = "&cĐóng&r"
 previous-page = "&eTrang trước&r"
-next-page = "&eTrang kế&r"
+next-page = "&eTrang sau&r"
 
 [language.editor.search]
-messages = "Tìm tin nhắn"
-messages-lore = "Nhấn vào để tìm kiếm mọi tin nhắn."
+messages = "Tìm thông báo"
+messages-lore = "Nhấp để tìm kiếm mọi thông báo."
 clear = "Xóa tìm kiếm"
 
 [language.editor.message]
-current-value = "&7Giá trị hiện có:&r"
+current-value = "&7Giá trị hiện tại:&r"
 variables = "&8{variables}&r"
 edit-plural = "&7Nhấp để chỉnh sửa một dạng số nhiều.&r"
 edit-lines = "&7Nhấp để chỉnh sửa từng dòng.&r"
 edit-chat = "&7Nhấp để chỉnh sửa trong trò chuyện.&r"
 
 [language.editor.locale]
-open = "&8Nhấn vào để mở ngôn ngữ này.&r"
+open = "&8Nhấp để mở ngôn ngữ này.&r"
 
 [language.editor.category]
-message-count = "&7{count} tin nhắn&r"
-open = "&8Nhấn vào để mở phân loại này.&r"
+message-count = "&7{count} thông báo&r"
+open = "&8Nhấp để mở danh mục này.&r"
 
 [language.editor.error]
 no-permission = "Bạn không có quyền chỉnh sửa ngôn ngữ của {plugin}."
@@ -868,17 +872,17 @@ empty = "(trống)"
 root = "Bề mặt thanh hành động, thanh boss và tiêu đề"
 list = "Liệt kê tài liệu bề mặt"
 info = "Hiển thị một tài liệu bề mặt"
-"info.id" = "Mã tài liệu bề mặt"
+"info.id" = "ID tài liệu bề mặt"
 reset = "Khôi phục các bề mặt đi kèm"
 test = "Chạy lượt bề mặt cho một người chơi ngay"
-"test.id" = "Mã tài liệu bề mặt"
+"test.id" = "ID tài liệu bề mặt"
 "test.player" = "Người chơi để thử; mặc định là bạn"
 
 [command.help.nametag]
 root = "Tài liệu thẻ tên theo từng người xem"
 list = "Liệt kê tài liệu thẻ tên"
 info = "Hiển thị một tài liệu thẻ tên"
-"info.id" = "Mã tài liệu thẻ tên"
+"info.id" = "ID tài liệu thẻ tên"
 reset = "Khôi phục các thẻ tên đi kèm"
 refresh = "Áp dụng lại toàn bộ thẻ tên ngay"
 
@@ -917,7 +921,7 @@ leaderboard_sampled = "&8[&dGloss&8]: &aĐã lấy mẫu bảng xếp hạng &f{
 root = "Kênh trò chuyện"
 list = "Liệt kê các kênh đã nạp"
 info = "Hiển thị phạm vi, định dạng và biến thể của một kênh"
-"info.id" = "Id tài liệu kênh"
+"info.id" = "ID tài liệu kênh"
 reset = "Khôi phục các tài liệu kênh đi kèm"
 
 [command.help.strings]
@@ -931,23 +935,23 @@ reset = "Khôi phục các tài liệu văn bản đi kèm"
 root = "Bảng xếp hạng được tính"
 list = "Liệt kê các bảng xếp hạng đã nạp và số mục"
 info = "Hiển thị nguồn, thứ tự và các mục của một bảng xếp hạng"
-"info.id" = "Id tài liệu"
+"info.id" = "ID tài liệu bảng xếp hạng"
 reset = "Xóa giá trị theo kỳ hoặc toàn thời gian của bảng xếp hạng"
-"reset.id" = "Id tài liệu"
+"reset.id" = "ID tài liệu bảng xếp hạng"
 "reset.period" = "all hoặc current"
 sample = "Lấy mẫu bảng xếp hạng ngay cho mọi người chơi trực tuyến"
-"sample.id" = "Id tài liệu"
+"sample.id" = "ID tài liệu bảng xếp hạng"
 
 # --- lane:forms ---
 
 [gloss.message.forms]
 icon_unsupported = "&7Không thể vẽ trong ô rương ({kind})"
-no_inventories = "&8[&dGloss&8]: &7Chưa cấu hình menu rương nào."
-inventory_list_header = "&dMenu rương"
-inventory_list_entry = "&7Mở menu rương &f{id}"
+no_inventories = "&8[&dGloss&8]: &7Chưa cấu hình menu túi đồ nào."
+inventory_list_header = "&dMenu túi đồ"
+inventory_list_entry = "&7Mở menu túi đồ &f{id}"
 inventory_info = "&8[&dGloss&8]: &d{id} &8- &7kích thước &f{kind}&7, ô &f{count}"
-unknown_inventory = "&8[&dGloss&8]: &cKhông có menu rương nào tên {id}."
-inventory_opened = "&8[&dGloss&8]: &aĐã mở menu rương {id} cho {player}."
+unknown_inventory = "&8[&dGloss&8]: &cKhông có menu túi đồ nào tên {id}."
+inventory_opened = "&8[&dGloss&8]: &aĐã mở menu túi đồ {id} cho {player}."
 bad_args = "&8[&dGloss&8]: &cĐối số phải là các cặp key=value: {value}"
 prompt_timeout = "&8[&dGloss&8]: &7Đã hết thời gian nhập."
 prompt_busy = "&8[&dGloss&8]: &cBạn đã có một yêu cầu nhập đang chờ."
@@ -960,33 +964,31 @@ give_dropped = "&8[&dGloss&8]: &7Túi đồ của bạn đã đầy nên vật p
 args = "Đối số key=value cách nhau bằng dấu cách"
 
 [command.help.inventory]
-root = "Xem và mở menu rương"
-list = "Liệt kê các menu rương đã cấu hình"
+root = "Xem và mở menu túi đồ"
+list = "Liệt kê các menu túi đồ đã cấu hình"
 "list.page" = "Trang danh sách, bắt đầu từ 1"
-info = "Hiển thị kích thước và ô của menu rương"
-"info.id" = "ID menu rương"
-open = "Mở menu rương cho một người chơi"
-"open.id" = "ID menu rương"
+info = "Hiển thị kích thước và ô của menu túi đồ"
+"info.id" = "ID menu túi đồ"
+open = "Mở menu túi đồ cho một người chơi"
+"open.id" = "ID menu túi đồ"
 "open.player" = "Người chơi để mở; mặc định là bạn"
 "open.args" = "Đối số key=value cách nhau bằng dấu cách"
-reset = "Khôi phục các menu rương mặc định đi kèm"
+reset = "Khôi phục các menu túi đồ mặc định đi kèm"
 "reset.name" = "Tên cần đặt lại, hoặc * cho mọi tệp đi kèm"
 
 ["command.help.hologram"]
-page = "Chuyen nguoi xem sang trang cua hologram"
-"page.page" = "Ma trang, next hoac prev"
-"page.player" = "Ten nguoi choi; de trong la ban"
-motion = "Phat mot clip chuyen dong tren hologram"
-"motion.motion" = "Ma chuyen dong, hoac clear de dung"
-actions = "Liet ke cac hanh dong hologram chay khi nhap chuot"
+page = "Chuyển người xem sang trang của hologram"
+"page.page" = "ID trang, next hoặc prev"
+"page.player" = "Tên người chơi; để trống là bạn"
+actions = "Liệt kê các hành động hologram chạy khi nhấp chuột"
 
 [gloss.message.hologram_interaction]
-hologram_page_set = "&8[&dGloss&8] &a{player}&a hien o trang &f{page}&a cua &f{id}&a."
-hologram_page_player_missing = "&8[&dGloss&8] &cNguoi choi &f{player}&c khong truc tuyen."
-hologram_page_unknown = "&8[&dGloss&8] &cHologram &f{id}&c khong co trang '&f{page}&c'."
-hologram_actions_empty = "&8[&dGloss&8] &7Hologram &f{id}&7 khong khai bao hanh dong."
-hologram_actions_header = "&8[&dGloss&8] &7Hanh dong cua hologram &f{id}&7 (&f{count}&7):"
-hologram_actions_entry = "&8[&dGloss&8] &7  &f{kind}&7 tren &f{value}"
+hologram_page_set = "&8[&dGloss&8] &a{player}&a hiện ở trang &f{page}&a của &f{id}&a."
+hologram_page_player_missing = "&8[&dGloss&8] &cNgười chơi &f{player}&c không trực tuyến."
+hologram_page_unknown = "&8[&dGloss&8] &cHologram &f{id}&c không có trang '&f{page}&c'."
+hologram_actions_empty = "&8[&dGloss&8] &7Hologram &f{id}&7 không khai báo hành động nào."
+hologram_actions_header = "&8[&dGloss&8] &7Hành động của hologram &f{id}&7 (&f{count}&7):"
+hologram_actions_entry = "&8[&dGloss&8] &7  &f{kind}&7 trên &f{value}"
 
 # --- lane:world ---
 
@@ -1023,7 +1025,7 @@ missing = "&cKhông có bảng tên tên &f{id}&c."
 refreshed = "&aĐã làm mới bảng tên."
 
 [gloss.message.world.glow]
-set = "&f{target} &7giờ phát sáng màu &f{value}&a."
+set = "&aĐang phát sáng &f{target} &7màu &f{value}&a."
 cleared = "&7Đã xóa phát sáng của &f{target}&7."
 missing = "&cKhông có người chơi tên &f{player} &cđang trực tuyến."
 
@@ -1083,67 +1085,67 @@ ticks = "Số tick phát sáng, hoặc 0 để giữ lại"
 # --- lane:behaviors ---
 
 [command.help.behavior]
-root = "Xem va kich hoat cac tai lieu hanh vi"
-list = "Liet ke cac tai lieu hanh vi da nap"
-info = "Hien thi cac trigger va dieu kien cua mot tai lieu hanh vi"
-fire = "Chay ngay mot muc hanh vi"
-reset = "Khoi phuc cac hanh vi mac dinh di kem"
-id = "Id cua tai lieu hanh vi"
-entry = "So thu tu muc, bat dau tu 1"
-player = "Nguoi choi de chay muc, hoac * de khong chon ai"
+root = "Xem và kích hoạt các tài liệu hành vi"
+list = "Liệt kê các tài liệu hành vi đã nạp"
+info = "Hiển thị các trigger và điều kiện của một tài liệu hành vi"
+fire = "Chạy ngay một mục hành vi"
+reset = "Khôi phục các hành vi mặc định đi kèm"
+id = "ID của tài liệu hành vi"
+entry = "Số thứ tự mục, bắt đầu từ 1"
+player = "Người chơi để chạy mục, hoặc * để không chọn ai"
 
 [command.help.state]
-root = "Doc va ghi trang thai hanh vi duoc luu"
-get = "Hien thi mot gia tri trang thai"
-set = "Ghi mot gia tri trang thai"
-clear = "Dua mot gia tri trang thai ve mac dinh"
-dump = "Liet ke moi khoa trang thai da khai bao va gia tri cua no"
-key = "Khoa trang thai da khai bao"
-value = "Gia tri moi; dat trong dau nhay de co khoang trang"
-player = "Nguoi choi so huu gia tri, hoac * cho chinh ban"
+root = "Đọc và ghi trạng thái hành vi được lưu"
+get = "Hiển thị một giá trị trạng thái"
+set = "Ghi một giá trị trạng thái"
+clear = "Đưa một giá trị trạng thái về mặc định"
+dump = "Liệt kê mọi khóa trạng thái đã khai báo và giá trị của nó"
+key = "Khóa trạng thái đã khai báo"
+value = "Giá trị mới; đặt trong dấu ngoặc kép để chứa khoảng trắng"
+player = "Người chơi sở hữu giá trị, hoặc * cho chính bạn"
 
 [command.help.do]
-root = "Kich hoat cac muc hanh vi command co ten nay"
-name = "Ten lenh hanh vi"
-args = "Tham so dang khoa=gia tri; dat trong dau nhay de co khoang trang"
+root = "Kích hoạt các mục hành vi command có tên này"
+name = "Tên lệnh hành vi"
+args = "Đối số dạng cặp key=value; đặt trong dấu ngoặc kép để chứa khoảng trắng"
 
 [command.help.expr]
-root = "Tinh mot bieu thuc va cho biet cai gi da tra loi no"
-expression = "Bieu thuc can tinh; dat trong dau nhay de co khoang trang"
+root = "Tính một biểu thức và cho biết nguồn nào đã cung cấp giá trị"
+expression = "Biểu thức cần tính; đặt trong dấu ngoặc kép để chứa khoảng trắng"
 
 [command.help.explain]
-root = "Cho biet runtime da xet nhung dieu kien nao va dieu kien nao thang"
-kind = "Runtime can giai thich, vi du board hoac behavior"
-id = "Id tai lieu can giai thich"
-player = "Nguoi choi de giai thich, hoac * cho chinh ban"
+root = "Cho biết runtime đã xét những điều kiện nào và điều kiện nào được chọn"
+kind = "Runtime cần giải thích, ví dụ board hoặc behavior"
+id = "ID tài liệu cần giải thích"
+player = "Người chơi để giải thích, hoặc * cho chính bạn"
 
 [gloss.message.behaviors]
-off = "&8[&dGloss&8]: &eHanh vi dang tat trong features.behaviors."
-"list.empty" = "&8[&dGloss&8]: &7Khong co tai lieu hanh vi nao duoc nap."
-missing = "&8[&dGloss&8]: &cKhong co tai lieu hanh vi ten \"{id}\"."
-"info.header" = "&8[&dGloss&8]: &d{id} &7ban &f{revision} &8| &7muc &f{count} &8| &7bat &f{enabled}"
-"info.entry" = " &8{line}. &f{name} &7khi &f{when} &8| &7quyen &f{permission}"
-fired = "&8[&dGloss&8]: &aDa chay muc &f{line}&a cua &f{id}&a."
-"fire.missing" = "&8[&dGloss&8]: &c{id} khong co muc {line}."
-"do.ran" = "&8[&dGloss&8]: &aDa kich hoat &f{count}&a muc hanh vi cho &f{name}&a."
-"do.none" = "&8[&dGloss&8]: &7Khong co muc hanh vi nao tra loi lenh \"{name}\"."
+off = "&8[&dGloss&8]: &eHành vi đang tắt trong features.behaviors."
+"list.empty" = "&8[&dGloss&8]: &7Không có tài liệu hành vi nào được nạp."
+missing = "&8[&dGloss&8]: &cKhông có tài liệu hành vi tên \"{id}\"."
+"info.header" = "&8[&dGloss&8]: &d{id} &7bản sửa đổi &f{revision} &8| &7mục &f{count} &8| &7bật &f{enabled}"
+"info.entry" = " &8{line}. &f{name} &7khi &f{when} &8| &7quyền &f{permission}"
+fired = "&8[&dGloss&8]: &aĐã chạy mục &f{line}&a của &f{id}&a."
+"fire.missing" = "&8[&dGloss&8]: &c{id} không có mục {line}."
+"do.ran" = "&8[&dGloss&8]: &aĐã kích hoạt &f{count}&a mục hành vi cho &f{name}&a."
+"do.none" = "&8[&dGloss&8]: &7Không có mục hành vi nào trả lời lệnh \"{name}\"."
 "state.value" = " &7{key} &8= &f{value}"
-"state.set" = "&8[&dGloss&8]: &a{key} bay gio la &f{value}&a."
-"state.cleared" = "&8[&dGloss&8]: &a{key} da tro ve gia tri mac dinh."
-"state.unknown" = "&8[&dGloss&8]: &cKhong tai lieu hanh vi nao khai bao khoa trang thai \"{key}\"."
-"state.invalid" = "&8[&dGloss&8]: &c\"{value}\" khong phai gia tri {type}."
-"state.empty" = "&8[&dGloss&8]: &7Khong tai lieu hanh vi nao khai bao trang thai."
-"state.player" = "&8[&dGloss&8]: &cHay chi dinh nguoi choi: &f{key}&c khong phai khoa toan cuc."
-"player.missing" = "&8[&dGloss&8]: &cKhong co nguoi choi ten \"{player}\" dang online."
+"state.set" = "&8[&dGloss&8]: &a{key} bây giờ là &f{value}&a."
+"state.cleared" = "&8[&dGloss&8]: &a{key} đã trở về giá trị mặc định."
+"state.unknown" = "&8[&dGloss&8]: &cKhông tài liệu hành vi nào khai báo khóa trạng thái \"{key}\"."
+"state.invalid" = "&8[&dGloss&8]: &c\"{value}\" không phải giá trị {type}."
+"state.empty" = "&8[&dGloss&8]: &7Không tài liệu hành vi nào khai báo trạng thái."
+"state.player" = "&8[&dGloss&8]: &cHãy chỉ định người chơi: &f{key}&c không phải khóa toàn cục."
+"player.missing" = "&8[&dGloss&8]: &cKhông có người chơi tên \"{player}\" đang trực tuyến."
 "expr.value" = "&8[&dGloss&8]: &f{value} &8({type})"
 "expr.reference" = " &7{name} &8= &f{value} &8qua &7{source}"
-"expr.functions" = " &7ham &8= &f{value}"
+"expr.functions" = " &7hàm &8= &f{value}"
 "expr.failed" = "&8[&dGloss&8]: &c{reason}"
 "explain.header" = "&8[&dGloss&8]: &d{kind} &f{id} &7cho &f{player}"
 "explain.line" = " &8{path} &7{when} &8= &f{value}"
 "explain.winner" = " &a> &f{path} &7{when} &8= &f{value}"
-"explain.unknown" = "&8[&dGloss&8]: &cKhong co gi giai thich \"{kind}\"; hay thu {options}."
-"explain.missing" = "&8[&dGloss&8]: &cKhong co {kind} ten \"{id}\"."
+"explain.unknown" = "&8[&dGloss&8]: &cKhông có trình giải thích cho \"{kind}\"; hãy thử {options}."
+"explain.missing" = "&8[&dGloss&8]: &cKhông có {kind} tên \"{id}\"."
 
 # --- lane:authoring ---
 
@@ -1156,13 +1158,13 @@ list = "Liệt kê các gói đã cài"
 info = "Xem gói sở hữu những tệp nào"
 arg_source = "Tệp gói trong thư mục dữ liệu Gloss, hoặc một địa chỉ HTTPS"
 arg_dry = "Báo cáo những gì sẽ thay đổi mà không ghi gì cả"
-arg_id = "Id của gói đã cài"
+arg_id = "ID của gói đã cài"
 
 [command.help.history]
 root = "Liệt kê các phiên bản đã lưu của một tài liệu"
 arg_kind = "Thư mục tài liệu, ví dụ boards hoặc menus"
-arg_id = "Id tài liệu"
-arg_page = "Trang danh sách tính từ một"
+arg_id = "ID tài liệu"
+arg_page = "Trang danh sách, bắt đầu từ 1"
 
 [command.help.restore]
 root = "Ghi một phiên bản đã lưu đè lên tài liệu đang dùng"
@@ -1175,7 +1177,7 @@ arg_id = "Giới hạn việc kiểm tra trong một tài liệu"
 
 [command.help.export]
 root = "Sao chép tài liệu ra dưới dạng JSON thuần"
-bundle = "Ghi toàn bộ không gian làm việc thành gói của trình biên tập"
+bundle = "Ghi toàn bộ không gian làm việc thành gói của trình chỉnh sửa"
 arg_kind = "Giới hạn việc xuất trong một thư mục tài liệu"
 arg_id = "Giới hạn việc xuất trong một tài liệu"
 arg_dir = "Thư mục đích bên trong thư mục dữ liệu Gloss"

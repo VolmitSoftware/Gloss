@@ -24,7 +24,8 @@
 #   {completed}  Завершено
 #   {absorbed}  Число импортированных записей, объединённых с существующими
 #   {active}  Число активных поставщиков
-#   {actual}  Текущая редакция
+#   {actual}  Текущая ревизия
+#   {added}  число сообщений, добавленных обновлением языка
 #   {after}  Значение сообщения после изменения
 #   {argument}  Неожиданный аргумент команды
 #   {axis}  Ось координат или вращения
@@ -32,7 +33,7 @@
 #   {before}  Значение сообщения до изменения
 #   {billboard}  Режим ориентации отображения
 #   {blocks}  Число элементов отображения блоков
-#   {board}  Идентификатор доски или панели
+#   {board}  Идентификатор скорборда или панели
 #   {bottles}  Число бутылок в контейнере
 #   {bubbles}  Число активных облачков чата
 #   {cells}  Число ячеек меню
@@ -42,13 +43,12 @@
 #   {copied}  Число скопированных записей
 #   {count}  Число подходящих объектов или сообщений
 #   {disc}  Музыкальная пластинка в контейнере
-#   {distance}  Расстояние до цели
 #   {drops}  Число отображаемых выпавших предметов
 #   {enabled}  Состояние включения или число включённых записей
 #   {entities}  Число сущностей
 #   {error}  Ошибка проверки или операции
 #   {errors}  Число ошибок
-#   {expected}  Ожидаемая редакция при сохранении
+#   {expected}  Ожидаемая ревизия при сохранении
 #   {experience}  Количество полученного опыта
 #   {failed}  Число неудачных операций
 #   {from}  Исходное значение или начало диапазона
@@ -62,6 +62,7 @@
 #   {interactPermission}  Разрешение для взаимодействия
 #   {interactionRange}  Максимальная дальность взаимодействия
 #   {item}  Название или материал предмета
+#   {kept}  локальные правки, сохранённые при обновлении языка
 #   {key}  Ключ сообщения или настройки
 #   {kind}  Тип объекта или поставщика
 #   {kinds}  Доступные типы объектов или поставщиков
@@ -80,7 +81,7 @@
 #   {minimum}  Минимально допустимое значение
 #   {mode}  Выбранный режим работы или отображения
 #   {name}  Название объекта
-#   {oldBoard}  Идентификатор прежней доски
+#   {oldBoard}  Прежний идентификатор панели
 #   {operation}  Название операции
 #   {options}  Доступные параметры команды
 #   {overlaid}  Число применённых ключей настройки
@@ -99,11 +100,11 @@
 #   {priority}  Приоритет выбора или отрисовки
 #   {provider}  Название поставщика
 #   {providers}  Список или число поставщиков
-#   {radius}  Радиус поиска
 #   {ready}  Число записей, готовых к импорту
 #   {reason}  Причина ошибки или решения
+#   {remaining}  время до следующей разрешённой проверки языков
 #   {resume}  Число записей с возобновляемым импортом
-#   {revision}  Редакция документа
+#   {revision}  Ревизия документа
 #   {roll}  Угол крена в градусах
 #   {rotation}  Вращение отображения
 #   {scale}  Масштаб отображения или предпросмотра
@@ -125,6 +126,7 @@
 #   {to}  Конечное значение или конец диапазона
 #   {total}  Общее число записей
 #   {type}  Ожидаемый тип значения или объекта
+#   {updated}  число сообщений, изменённых обновлением языка
 #   {url}  Веб-адрес
 #   {uuid}  Уникальный идентификатор объекта или игрока
 #   {value}  Текущее значение сообщения или параметра
@@ -205,8 +207,8 @@ board = "Создание скорбордов и управление ими"
 "board.show" = "Показать себе скорборд"
 "board.show.id" = "ID скорборда"
 "board.hide" = "Скрыть свой скорборд"
-"board.select" = "Настроить автоматический выбор табло"
-"board.select.id" = "Идентификатор табло"
+"board.select" = "Настроить автоматический выбор скорборда"
+"board.select.id" = "ID скорборда"
 "board.select.priority" = "Приоритет выбора"
 "board.select.when" = "Логическое условие; выражения с пробелами заключайте в кавычки"
 "board.list" = "Список скорбордов"
@@ -401,8 +403,8 @@ line_removed = "&8[&dGloss&8] &aУдалена строка &f{line}&a из &f{i
 line_out_of_range = "&8[&dGloss&8] &cСтрока {line} вне диапазона; строк в &f{id}&c: {count}."
 shown = "&8[&dGloss&8] &aПоказан скорборд &f{id}&a."
 hidden = "&8[&dGloss&8] &aВаш скорборд скрыт."
-select_set = "&8[&dGloss&8] &aДля табло &f{id}&a установлен приоритет выбора &f{priority}&a."
-select_invalid = "&8[&dGloss&8] &cНедопустимое условие табло: &f{error}&c."
+select_set = "&8[&dGloss&8] &aДля скорборда &f{id}&a установлен приоритет выбора &f{priority}&a."
+select_invalid = "&8[&dGloss&8] &cНедопустимое условие скорборда: &f{error}&c."
 list_empty = "&8[&dGloss&8] &7Скорбордов пока нет."
 
 [command.board.list]
@@ -410,7 +412,7 @@ hover = "Нажмите для подробностей"
 
 [command.board.info]
 header = "&8[&dGloss&8] &d{id} &7с заголовком &f{title}"
-meta = "&7Приоритет: &f{priority}&7 | Условие: &f{when}&7 | Варианты: &f{variants}&7"
+meta = "&7Приоритет: &f{priority} &8| &7Условие: &f{when} &8| &7Варианты: &f{variants}"
 line = " &8{line}. &f{text}"
 
 [command.emoji]
@@ -419,8 +421,6 @@ hover = "Нажмите, чтобы вставить в чат"
 
 [command.animations]
 empty = "&8[&dGloss&8] &7Анимации не загружены."
-header = "&8[&dGloss&8] &fАнимации: &d{count}"
-entry = "&8- &d{name}"
 
 [command.list]
 page = "&7Страница &f{page}&7/&f{pages} &8- &7показаны &f{from}&7-&f{to} &7из &f{total}"
@@ -431,7 +431,7 @@ holograms = "&7Голограммы: &f{count} &8(временных: {temporary
 boards = "&7Скорборды: &f{count}"
 emoji = "&7Эмодзи: &f{enabled}&8/&f{total}"
 animations = "&7Анимации: &f{count}"
-effects = "&7Облачка: &f{bubbles} &8| &7Индикаторы: &f{indicators} &8| &7Дропы: &f{drops}"
+effects = "&7Облачка: &f{bubbles} &8| &7Индикаторы: &f{indicators} &8| &7Выпавшие предметы: &f{drops}"
 
 visibility = "&7Видимые копии сущностей: &f{entities} &8| &7Наблюдатели: &f{viewers} &8| &7Допуски: &f{admissions} &8| &7Отказы: &f{refusals} &8| &7Ожидающие: &f{waiting} &8| &7Истёкшие очереди: &f{expired} &8| &7Ожидающая очистка: &f{retiring}"
 images = "&7Кэш изображений: &f{entries} &8| &7Ожидающие: &f{pending} &8| &7Сохранённые данные: &f{bytes} &7байт &8| &7Завершено: &f{completed} &8| &7Отказы: &f{refusals}"
@@ -506,14 +506,13 @@ panel_id_required = "Идентификатор панели не может б�
 web_subject_required = "Идентификатор документа веб-редактора не может быть пустым"
 web_session_required = "Идентификатор сеанса веб-редактора не может быть пустым"
 panel_player_required = "Необходимо указать целевого игрока"
-row_icon_type_required = "Необходимо указать тип значка"
+row_icon_type_required = "Необходимо указать тип иконки"
 row_style_property_required = "Необходимо указать свойство стиля"
-import_source_required = "Необходимо указать источник импорта старых данных"
-import_source_unknown = "Неизвестный источник импорта старых данных: {source}"
+import_source_required = "Необходимо указать источник импорта устаревших данных"
+import_source_unknown = "Неизвестный источник импорта устаревших данных: {source}"
 
 [gloss.message]
 permission_denied = "&8[&dGloss&8]: &cУ вас нет разрешения &f{permission}&c."
-unknown_command = "&8[&dGloss&8]: &cНеизвестная команда \"&f{command}&c\"."
 
 [gloss.message.hologram]
 created = "&8[&dGloss&8]: &aВ вашей позиции создана голограмма &f{hologram}&a с корневым меню &f{menu}&a."
@@ -551,11 +550,11 @@ player_only = "&8[&dGloss&8]: &cЭта команда доступна толь�
 [gloss.message.web]
 header = "Веб-редактор"
 open_hover = "Нажмите, чтобы открыть веб-редактор Gloss."
-open = "&8[&dGloss&8]: &7Веб-редактор: &f{url}&7"
+open = "&8[&dGloss&8]: &7Веб-редактор: &f{url}"
 preparing = "&8[&dGloss&8]: &7Подготовка защищённого сеанса синхронизации редактора для &f{subject}&7..."
-unavailable = "&8[&dGloss&8]: &cРедактирование сервера через веб недоступно. Проверьте настройки синхронизации редактора и соединение с ретранслятором."
-open_failed = "&8[&dGloss&8]: &cНе удалось открыть &f{kind}&c=&f{subject}&c в веб-редакторе с синхронизацией: {reason}"
-open_console = "&8[&dGloss&8]: &7Ссылка с правом редактирования &f{subject}&7: &f{url}&7"
+unavailable = "&8[&dGloss&8]: &cВеб-редактирование с синхронизацией недоступно. Проверьте настройки синхронизации редактора и соединение с ретранслятором."
+open_failed = "&8[&dGloss&8]: &cНе удалось открыть &f{kind}={subject}&c в веб-редакторе с синхронизацией: {reason}"
+open_console = "&8[&dGloss&8]: &7Ссылка с правом редактирования для &f{subject}&7: &f{url}"
 capability_warning = "&8[&dGloss&8]: &eЭтот URL позволяет публиковать изменения на сервере до отзыва доступа или истечения срока действия. Храните его в секрете."
 open_label = "Открыть редактор"
 copy_label = "Копировать ссылку"
@@ -563,24 +562,24 @@ revoke_label = "Отозвать доступ"
 link_hover = "Откройте редактор, скопируйте ссылку с правом редактирования или отзовите доступ к сеансу {session}."
 
 [gloss.message.web.sessions]
-list_empty = "&8[&dGloss&8]: &7Нет активных сеансов синхронизации редактора."
-status = "&8[&dGloss&8]: &7&f{session}&7 {kind}=&f{subject}&7 истекает через=&f{seconds}&7с опубликованная ревизия=&f{revision}&7 ожидает=&f{pending}&7"
-revoked = "&8[&dGloss&8]: &aДоступ к сеансу синхронизации редактора &f{session}&a отозван."
-pulled = "&8[&dGloss&8]: &aВыполнен опрос сеанса синхронизации редактора &f{session}&a."
-unknown = "&8[&dGloss&8]: &cСеанс синхронизации редактора &f{session}&c неизвестен или истёк."
-failed = "&8[&dGloss&8]: &cОшибка синхронизации редактора для сеанса &f{session}&c: {reason}"
+list_empty = "&8[&dGloss&8]: &7Нет активных сеансов веб-редактора."
+status = "&8[&dGloss&8]: &f{session} &7{kind}=&f{subject} &7истекает=&f{seconds} с &7публикация=&f{revision} &7ожидает=&f{pending}"
+revoked = "&8[&dGloss&8]: &aСеанс веб-редактора &f{session}&a отозван."
+pulled = "&8[&dGloss&8]: &aВыполнен опрос сеанса веб-редактора &f{session}&a."
+unknown = "&8[&dGloss&8]: &cСеанс веб-редактора &f{session}&c неизвестен или истёк."
+failed = "&8[&dGloss&8]: &cОшибка операции веб-редактора для сеанса &f{session}&c: {reason}"
 
 [gloss.message.import]
 preview_started = "&8[&dGloss&8]: &7Сканирование &f{source}&7 для предварительного просмотра переноса без изменения данных..."
 apply_started = "&8[&dGloss&8]: &7Сканирование и перенос из &f{source}&7 без перезаписи существующих данных..."
 source_missing = "&8[&dGloss&8]: &7Источник &f{source}&7 не найден по пути &f{path}&7."
-preview_summary = "&8[&dGloss&8]: &7Предпросмотр &f{source}&7: готово &a{ready}&7, можно возобновить &d{resume}&7, конфликтов &e{conflicts}&7, ошибок &c{errors}&7, предупреждений {warnings}. Источник: &f{path}&7"
-preview_entry = "&8- &7&f{legacy}&7 -> &f{board}&7 состояние=&f{state}&7 предупреждений=&f{warnings}&7"
-apply_summary = "&8[&dGloss&8]: &7Перенос &f{source}&7: импортировано &a{imported}&7, пропущено &e{skipped}&7, не удалось &c{failed}&7; при сканировании обнаружено ошибок: {errors}, предупреждений: {warnings}."
-apply_entry = "&8- &7&f{legacy}&7 состояние=&f{state}&7 причина=&f{reason}&7"
+preview_summary = "&8[&dGloss&8]: &f{source}&7, предпросмотр: &aготово {ready}&7, &dможно возобновить {resume}&7, &eконфликтов {conflicts}&7, &cошибок {errors}&7, предупреждений {warnings}. Источник: &f{path}"
+preview_entry = "&8- &f{legacy} &7-> &f{board} &7состояние=&f{state} &7предупреждения=&f{warnings}"
+apply_summary = "&8[&dGloss&8]: &f{source}&7, перенос: &aимпортировано {imported}&7, &eпропущено {skipped}&7, &cне удалось {failed}&7; при сканировании обнаружено ошибок: {errors}, предупреждений: {warnings}."
+apply_entry = "&8- &f{legacy} &7состояние=&f{state} &7причина=&f{reason}"
 issue = "&8- &f{legacy} &7{severity}: &f{reason}"
-busy = "&8[&dGloss&8]: &cУже выполняется другой перенос старых голограмм."
-failed = "&8[&dGloss&8]: &cНе удалось перенести старые голограммы из &f{source}&c: {reason}"
+busy = "&8[&dGloss&8]: &cУже выполняется другой перенос устаревших голограмм."
+failed = "&8[&dGloss&8]: &cНе удалось перенести устаревшие голограммы из &f{source}&c: {reason}"
 
 [gloss.message.config]
 reloaded = "&2Конфигурация \"{name}\" перезагружена."
@@ -600,7 +599,7 @@ saved = "&7Размер предпросмотра сохранён: &f{percent}
 bundle_more = "+{count} ещё"
 
 [gloss.message.items]
-disabled = "&8[&dGloss&8]: &7Пользовательские предметы отключены. Установите customItems в true в gloss.toml."
+disabled = "&8[&dGloss&8]: &7Пользовательские предметы отключены. Установите &fcustomItems&7 в true в gloss.toml."
 
 [gloss.message.items.status]
 header = "Пользовательские предметы"
@@ -628,12 +627,12 @@ entry = "блоки={blocks} сущности={entities} особые элеме
 
 [gloss.message.previews.reset]
 started = "&8[&dGloss&8]: &7Сброс документов предпросмотра «&f{name}&7»..."
-done = "&8[&dGloss&8]: &aВосстановлено встроенных документов предпросмотра: {count}. Дополнительные пользовательские документы, перекрывающие их, не удалены."
-none = "&8[&dGloss&8]: &c«{name}» не является встроенным документом предпросмотра; ничего не сброшено."
+done = "&8[&dGloss&8]: &aВосстановлено стандартных документов предпросмотра: {count}. Дополнительные пользовательские документы, перекрывающие их, не удалены."
+none = "&8[&dGloss&8]: &c«{name}» не является стандартным документом предпросмотра; ничего не сброшено."
 
 [gloss.message.previews.dump]
 unknown = "&8[&dGloss&8]: &cДокумент предпросмотра «{name}» не загружен."
-result = "&8[&dGloss&8]: &7&a{name}&7: элементов — &f{total}&7 (панели={panels}, ячейки={cells}, слоты={slots}, подписи={labels})."
+result = "&8[&dGloss&8]: &a{name}&7: &f{total}&7 элемент(ов) (панели={panels}, ячейки={cells}, слоты={slots}, подписи={labels})."
 no_errors = "&8[&dGloss&8]: &aОшибок сборки нет."
 error_line = "&8[&dGloss&8]: &c{message}"
 error_more = "&8[&dGloss&8]: &7Ещё {count} (см. журнал консоли)."
@@ -641,8 +640,8 @@ error_more = "&8[&dGloss&8]: &7Ещё {count} (см. журнал консоли
 [gloss.message.panels]
 created = "&8[&dGloss&8]: &aСоздана панель &f{board}&a, ревизия {revision}."
 deleted = "&8[&dGloss&8]: &aПанель &f{board}&a удалена."
-renamed = "&8[&dGloss&8]: &a&f{oldBoard}&a переименована в &f{board}&a, ревизия {revision}."
-copied = "&8[&dGloss&8]: &a&f{source}&a скопирована в &f{board}&a."
+renamed = "&8[&dGloss&8]: &aПанель &f{oldBoard}&a переименована в &f{board}&a, ревизия {revision}."
+copied = "&8[&dGloss&8]: &aПанель &f{source}&a скопирована в &f{board}&a."
 updated = "&8[&dGloss&8]: &aОперация {operation} применена к &f{board}&a, ревизия {revision}."
 teleported = "&8[&dGloss&8]: &aВы телепортированы к &f{board}&a."
 unknown = "&8[&dGloss&8]: &cНеизвестная панель &f{board}&c."
@@ -655,21 +654,17 @@ revision_conflict = "&8[&dGloss&8]: &cПанель &f{board}&c изменила�
 failed = "&8[&dGloss&8]: &cОшибка операции с панелью &f{board}&c: {reason}"
 
 [gloss.message.panels.list]
-header = "&8[&dGloss&8]: &fПостоянные панели: &d{count}&f"
 empty = "&8[&dGloss&8]: &7Нет загруженных постоянных панелей."
-entry = "&8- &7&f{board}&7 меню=&f{menu}&7 ревизия=&f{revision}&7"
 
 [gloss.message.panels.near]
-header = "&8[&dGloss&8]: &fПанели в радиусе &d{radius}&f блоков: &d{count}&f"
 empty = "&8[&dGloss&8]: &7В этом радиусе нет панелей."
-entry = "&8- &7&f{board}&7 расстояние=&f{distance}&7 меню=&f{menu}&7"
 
 [gloss.message.panels.info]
-header = "&8[&dGloss&8]: &fПанель &d{board}&f (&7{state}&f)"
-identity = "&7UUID=&f{uuid}&7 ревизия=&f{revision}&7 меню=&f{menu}&7"
-transform = "&7мир=&f{world}&7 позиция=&f{x}&7, &f{y}&7, &f{z}&7 поворот=&f{yaw}&7, &f{pitch}&7, &f{roll}&7 масштаб=&f{scale}&7"
-visibility = "&7видимость=&f{mode}&7 право просмотра=&f{viewPermission}&7 право взаимодействия=&f{interactPermission}&7 дальность=&f{viewRange}&7/&f{interactionRange}&7"
-follow = "&7следование=&f{mode}&7 игрок=&f{player}&7 поворот=&f{rotation}&7"
+header = "&8[&dGloss&8]: &fПанель &d{board} &7({state})"
+identity = "&7uuid=&f{uuid} &7ревизия=&f{revision} &7меню=&f{menu}"
+transform = "&7мир=&f{world} &7позиция=&f{x}, {y}, {z} &7поворот=&f{yaw}, {pitch}, {roll} &7масштаб=&f{scale}"
+visibility = "&7видимость=&f{mode} &7право просмотра=&f{viewPermission} &7право взаимодействия=&f{interactPermission} &7дальность=&f{viewRange}/{interactionRange}"
+follow = "&7следование=&f{mode} &7игрок=&f{player} &7поворот=&f{rotation}"
 
 [gloss.message.panels.edit]
 started = "&8[&dGloss&8]: &aРедактирование &f{board}&a начиная с ревизии {revision}. Изменения остаются черновыми до сохранения."
@@ -677,7 +672,7 @@ already_active = "&8[&dGloss&8]: &cВы уже редактируете &f{board
 none = "&8[&dGloss&8]: &cУ вас нет черновика изменений панели."
 busy = "&8[&dGloss&8]: &cПанель &f{board}&c сейчас сохраняется."
 staged = "&8[&dGloss&8]: &aОперация {operation} добавлена в черновик для &f{board}&a. Сохраните изменения командой /gloss panel save."
-saved = "&8[&dGloss&8]: &a&f{board}&a сохранена, ревизия {revision}."
+saved = "&8[&dGloss&8]: &aПанель &f{board}&a сохранена, ревизия {revision}."
 cancelled = "&8[&dGloss&8]: &aЧерновые изменения &f{board}&a отменены."
 identity_blocked = "&8[&dGloss&8]: &cСохраните или отмените черновик изменений &f{board}&c перед переименованием или удалением."
 
@@ -697,7 +692,7 @@ smoking = "Копчение {percent}%"
 heating = "Нагрев"
 needs_fuel = "Нужно топливо"
 no_input = "Нет входного предмета"
-surge_suffix = "  +{seconds}s"
+surge_suffix = "  +{seconds} с"
 disc_playing = "Воспроизводится: {disc}"
 disc_loaded = "Загружено: {disc}"
 no_disc = "Нет пластинки"
@@ -706,7 +701,7 @@ no_disc = "Нет пластинки"
 fuel_level = "Топливо {fuel}/{maximum}"
 no_fuel = "Нет топлива"
 bottles = "Бутылки {bottles}/{maximum}"
-fuel_seconds = "Топливо {seconds}s"
+fuel_seconds = "Топливо {seconds} с"
 fuel_ready = "Топливо готово"
 xp_gain = "XP +{experience}"
 xp_zero = "XP 0"
@@ -717,7 +712,7 @@ cauldron_level = "Уровень {level}/{maximum}"
 [gloss.preview.theme.title]
 chest = "&6&lСундук"
 trapped_chest = "&c&lСундук-ловушка"
-ender_chest = "&5&lЭндер-сундук"
+ender_chest = "&5&lСундук Края"
 barrel = "&e&lБочка"
 dispenser = "&7&lРаздатчик"
 dropper = "&8&lВыбрасыватель"
@@ -732,10 +727,10 @@ water_cauldron = "&9&lКотёл с водой"
 lava_cauldron = "&6&lКотёл с лавой"
 powder_snow_cauldron = "&f&lКотёл с рыхлым снегом"
 jukebox = "&d&lПроигрыватель"
-brewing_stand = "&d&lЗельеварка"
+brewing_stand = "&d&lВарочная стойка"
 chiseled_bookshelf = "&6&lРезная книжная полка"
-hopper_minecart = "&8&lЗагрузочная вагонетка"
-chest_minecart = "&6&lГрузовая вагонетка"
+hopper_minecart = "&8&lВагонетка с воронкой"
+chest_minecart = "&6&lВагонетка с сундуком"
 mobile = "&7&l{name}"
 shulker = "&l{color} Шалкеровый ящик"
 copper_chest = "&6&l{name}"
@@ -758,13 +753,13 @@ select_description = "Нажмите, чтобы выбрать этот язы�
 remove_personal_description = "Удалить ваш личный выбор языка."
 no_controls = "У вас нет доступа к настройкам языка."
 command = "Команда: {command}"
-selected = "выбранный"
-all-volmit-plugins = "Все плагины Volmit"
+selected = "выбран"
+all-volmit-plugins = "всех плагинов Volmit"
 
 [language.error]
 stopping = "Выбор языка недоступен, пока плагин останавливается."
 editor-player-only = "Откройте редактор языка в игре."
-no-providers = "Нет доступных языковых провайдеров Volmit."
+no-providers = "Нет доступных поставщиков языков Volmit."
 numeric-page = "Введите номер страницы числом."
 personal-player-only = "Личный язык игрока нужно выбрать в игре."
 personal-permission = "У вас нет разрешения на выбор языка."
@@ -775,16 +770,25 @@ unavailable-for-all = "Язык {locale} доступен не для всех �
 
 [language.usage]
 editor = "Использование: /{command} language server edit [locale]"
-selection = "Использование: /{command} language self [locale|reset] or server [locale]"
+selection = "Использование: /{command} language self [locale|reset] или server [locale]"
 volmit-selection = "Использование: /volmit plugins languages [locale]"
+update = "Использование: /{command} language update"
 
 [language.selection]
 preparing = "Подготовка языка {locale} для {target}..."
 save-failed = "{plugin}: не удалось сохранить выбор языка; проверьте консоль сервера."
 english-fallback = "{plugin}: {locale} недоступен; используется английский (en_US)."
-personal-selected = "{plugin}: Ваш язык сейчас {locale}."
-server-selected = "{plugin}: Язык сервера теперь {locale}."
+personal-selected = "{plugin}: ваш язык теперь {locale}."
+server-selected = "{plugin}: язык сервера теперь {locale}."
 server-default-selected = "{plugin}: теперь ваш язык соответствует языку сервера по умолчанию."
+
+[language.update]
+checking = "{plugin}: проверка изменений в репозитории языков..."
+unchanged = "{plugin}: установленные языки уже соответствуют репозиторию."
+applied = "{plugin}: язык {locale} обновлён (добавлено: {added}, изменено: {updated}, сохранено локальных правок: {kept})."
+cooldown = "{plugin}: репозиторий языков проверялся недавно; повторите попытку через {remaining}."
+locale-failed = "{plugin}: язык {locale} не обновлён: {reason}"
+failed = "{plugin}: не удалось обновить языки: {reason}"
 
 [language.editor]
 title = "{plugin} › {section}"
@@ -816,7 +820,7 @@ next-page = "&eСледующая страница&r"
 
 [language.editor.search]
 messages = "Поиск сообщений"
-messages-lore = "Нажмите для поиска среди всех сообщений."
+messages-lore = "Нажмите, чтобы искать во всех сообщениях."
 clear = "Сбросить поиск"
 
 [language.editor.message]
@@ -830,7 +834,7 @@ edit-chat = "&7Нажмите, чтобы изменить текст в чат�
 open = "&8Нажмите, чтобы открыть этот язык.&r"
 
 [language.editor.category]
-message-count = "&7{count} сообщения&r"
+message-count = "&7Сообщений: {count}&r"
 open = "&8Нажмите, чтобы открыть эту категорию.&r"
 
 [language.editor.error]
@@ -855,7 +859,7 @@ empty = "(пусто)"
 [gloss.message.screen]
 "surfaces.empty" = "&8[&dGloss&8] &7Поверхности не загружены."
 "surfaces.unknown" = "&8[&dGloss&8]: &cПоверхности &f{id}&c не существует."
-"surfaces.tested" = "&8[&dGloss&8]: &a&f{id}&a выполнена для &f{player}&a."
+"surfaces.tested" = "&8[&dGloss&8]: &aПоверхность &f{id}&a выполнена для &f{player}&a."
 "nametags.empty" = "&8[&dGloss&8] &7Таблички имён не загружены."
 "nametags.unknown" = "&8[&dGloss&8]: &cТаблички имени &f{id}&c не существует."
 "nametags.refreshed" = "&8[&dGloss&8]: &aПовторно применено документов табличек: &d{count}&a."
@@ -869,7 +873,7 @@ root = "Поверхности панели действий, полосы бо�
 list = "Список документов поверхностей"
 info = "Показать документ поверхности"
 "info.id" = "Идентификатор документа поверхности"
-reset = "Восстановить поставляемые поверхности"
+reset = "Восстановить стандартные поверхности"
 test = "Выполнить проход поверхностей для игрока сейчас"
 "test.id" = "Идентификатор документа поверхности"
 "test.player" = "Игрок для проверки; по умолчанию вы"
@@ -879,12 +883,12 @@ root = "Документы табличек имён для каждого зр�
 list = "Список документов табличек имён"
 info = "Показать документ таблички имени"
 "info.id" = "Идентификатор документа таблички имени"
-reset = "Восстановить поставляемые таблички имён"
+reset = "Восстановить стандартные таблички имён"
 refresh = "Повторно применить все таблички имён сейчас"
 
 [command.help.hud]
 root = "Просмотреть общий компоновщик HUD"
-who = "Показывает, какой плагин занимает каждый слот HUD"
+who = "Показать, какой плагин занимает каждый слот HUD у игрока"
 "who.player" = "Игрок для просмотра; по умолчанию вы"
 
 # --- lane:chat ---
@@ -892,7 +896,7 @@ who = "Показывает, какой плагин занимает кажды
 [gloss.message.chat]
 filtered = "&8[&dGloss&8]: &cФильтр чата заблокировал ваше сообщение."
 too_fast = "&8[&dGloss&8]: &eПодождите немного перед следующим сообщением."
-repeat = "&8[&dGloss&8]: &eВы только что это уже написали."
+repeat = "&8[&dGloss&8]: &eВы уже это написали."
 channel_set = "&8[&dGloss&8]: &aТеперь вы пишете в канале &d{name}&a."
 channel_unknown = "&8[&dGloss&8]: &cКанала с именем &d{name}&c не существует."
 channel_list = "&8[&dGloss&8]: &7Каналы: &f{value}"
@@ -918,14 +922,14 @@ root = "Каналы чата"
 list = "Показать загруженные каналы чата"
 info = "Показать область, формат и варианты канала"
 "info.id" = "Идентификатор документа канала"
-reset = "Восстановить поставляемые документы каналов"
+reset = "Восстановить стандартные документы каналов"
 
 [command.help.strings]
-root = "Написанные тексты содержимого"
+root = "Авторские строки содержимого"
 list = "Показать загруженные локали текстов и число записей"
 missing = "Показать ключи, которые есть в en_US и отсутствуют в локали"
 "missing.locale" = "Локаль для сравнения с en_US"
-reset = "Восстановить поставляемые текстовые документы"
+reset = "Восстановить стандартные текстовые документы"
 
 [command.help.leaderboard]
 root = "Вычисляемые таблицы лидеров"
@@ -942,12 +946,12 @@ sample = "Собрать таблицу лидеров сейчас по все�
 
 [gloss.message.forms]
 icon_unsupported = "&7Нельзя отобразить в ячейке сундука ({kind})"
-no_inventories = "&8[&dGloss&8]: &7Меню-сундуки не настроены."
-inventory_list_header = "&dМеню-сундуки"
-inventory_list_entry = "&7Открыть меню-сундук &f{id}"
+no_inventories = "&8[&dGloss&8]: &7Меню инвентаря не настроены."
+inventory_list_header = "&dМеню инвентаря"
+inventory_list_entry = "&7Открыть меню инвентаря &f{id}"
 inventory_info = "&8[&dGloss&8]: &d{id} &8- &7размер &f{kind}&7, ячейки &f{count}"
-unknown_inventory = "&8[&dGloss&8]: &cМеню-сундук с именем {id} не найден."
-inventory_opened = "&8[&dGloss&8]: &aМеню-сундук {id} открыт для {player}."
+unknown_inventory = "&8[&dGloss&8]: &cМеню инвентаря с именем {id} не найдено."
+inventory_opened = "&8[&dGloss&8]: &aМеню инвентаря {id} открыто для {player}."
 bad_args = "&8[&dGloss&8]: &cАргументы должны быть парами ключ=значение: {value}"
 prompt_timeout = "&8[&dGloss&8]: &7Время ввода истекло."
 prompt_busy = "&8[&dGloss&8]: &cУ вас уже есть ожидающий ввод."
@@ -960,24 +964,22 @@ give_dropped = "&8[&dGloss&8]: &7Инвентарь был полон, поэт�
 args = "Аргументы ключ=значение через пробел"
 
 [command.help.inventory]
-root = "Просмотр и открытие меню-сундуков"
-list = "Показать настроенные меню-сундуки"
+root = "Просмотр и открытие меню инвентаря"
+list = "Показать настроенные меню инвентаря"
 "list.page" = "Страница списка, начиная с 1"
-info = "Показать размер и ячейки меню-сундука"
-"info.id" = "Идентификатор меню-сундука"
-open = "Открыть меню-сундук для игрока"
-"open.id" = "Идентификатор меню-сундука"
+info = "Показать размер и ячейки меню инвентаря"
+"info.id" = "Идентификатор меню инвентаря"
+open = "Открыть меню инвентаря для игрока"
+"open.id" = "Идентификатор меню инвентаря"
 "open.player" = "Игрок, которому открыть; по умолчанию вы"
 "open.args" = "Аргументы ключ=значение через пробел"
-reset = "Восстановить поставляемые меню-сундуки по умолчанию"
-"reset.name" = "Имя для сброса или * для всех поставляемых файлов"
+reset = "Восстановить стандартные меню инвентаря"
+"reset.name" = "Имя для сброса или * для всех стандартных значений"
 
 ["command.help.hologram"]
 page = "Перевести зрителя на страницу голограммы"
 "page.page" = "Идентификатор страницы, next или prev"
-"page.player" = "Имя игрока; пусто означает вас"
-motion = "Проиграть клип движения на голограмме"
-"motion.motion" = "Идентификатор движения или clear для остановки"
+"page.player" = "Имя зрителя; если не указано, используетесь вы"
 actions = "Показать действия, которые голограмма выполняет по клику"
 
 [gloss.message.hologram_interaction]
@@ -1008,7 +1010,7 @@ removed = "&aПутевая точка &f{name} &aудалена."
 missing = "&cНет путевой точки с именем &f{name}&c."
 list = "&7Путевые точки &8({count})&7: &f{value}"
 info = "&7Путевая точка &f{id} &7в &f{world} {x} {y} {z}"
-full = "&cУ вас уже максимум в {count} путевых точек."
+full = "&cУ вас уже максимальное число путевых точек: {count}."
 
 [gloss.message.world.camera]
 started = "&7Полёт камеры начат."
@@ -1023,7 +1025,7 @@ missing = "&cНет таблички с именем &f{id}&c."
 refreshed = "&aТаблички имён обновлены."
 
 [gloss.message.world.glow]
-set = "&f{target} &7теперь светится цветом &f{value}&a."
+set = "&aСвечение &f{target} &7цветом &f{value}&a."
 cleared = "&7Свечение &f{target} &7снято."
 missing = "&cИгрок с именем &f{player} &cне в сети."
 
@@ -1063,7 +1065,7 @@ player = "Кого остановить; по умолчанию вы"
 root = "Инструменты табличек имён игроков"
 list = "Показать список документов табличек"
 info = "Показать один документ таблички"
-reset = "Восстановить поставляемый документ таблички"
+reset = "Восстановить стандартный документ таблички"
 refresh = "Перестроить таблички для всех зрителей"
 
 [command.help.nameplate.arg]
@@ -1078,7 +1080,7 @@ clear = "Снять свечение игрока для вас"
 player = "Игрок для подсветки"
 cleared = "Игрок, с которого снимается подсветка"
 color = "Именованный цвет текста"
-ticks = "Тики длительности свечения или 0, чтобы сохранить"
+ticks = "Длительность свечения в тиках или 0, чтобы оставить его бессрочно"
 
 # --- lane:behaviors ---
 
@@ -1087,10 +1089,10 @@ root = "Просмотр и запуск документов поведения
 list = "Показать загруженные документы поведения"
 info = "Показать триггеры и условия документа поведения"
 fire = "Выполнить одну запись поведения сейчас"
-reset = "Восстановить поставляемые настройки поведения"
+reset = "Восстановить стандартные настройки поведения"
 id = "Идентификатор документа поведения"
 entry = "Номер записи, начиная с 1"
-player = "Игрок, для которого выполняется запись, или * для никого"
+player = "Игрок, для которого выполняется запись, или *, если игрок не нужен"
 
 [command.help.state]
 root = "Чтение и запись сохранённого состояния поведения"
@@ -1099,17 +1101,17 @@ set = "Записать одно значение состояния"
 clear = "Вернуть одно значение состояния к значению по умолчанию"
 dump = "Показать все объявленные ключи состояния и их значения"
 key = "Объявленный ключ состояния"
-value = "Новое значение; возьмите в кавычки, чтобы включить пробелы"
+value = "Новое значение; заключите в кавычки, чтобы использовать пробелы"
 player = "Игрок, которому принадлежит значение, или * для себя"
 
 [command.help.do]
 root = "Запустить записи поведения command с этим именем"
 name = "Имя команды поведения"
-args = "Аргументы в виде пар ключ=значение; возьмите в кавычки, чтобы включить пробелы"
+args = "Аргументы в виде пар ключ=значение; заключите в кавычки, чтобы использовать пробелы"
 
 [command.help.expr]
 root = "Вычислить выражение и показать, что на него ответило"
-expression = "Вычисляемое выражение; возьмите в кавычки, чтобы включить пробелы"
+expression = "Вычисляемое выражение; заключите в кавычки, чтобы использовать пробелы"
 
 [command.help.explain]
 root = "Показать, какие условия проверил рантайм и какое победило"
@@ -1162,7 +1164,7 @@ arg_id = "Идентификатор установленного пакета"
 root = "Показать сохранённые версии документа"
 arg_kind = "Папка документа, например boards или menus"
 arg_id = "Идентификатор документа"
-arg_page = "Страница списка, считая с единицы"
+arg_page = "Страница списка, начиная с 1"
 
 [command.help.restore]
 root = "Записать сохранённую версию поверх действующего документа"
@@ -1198,7 +1200,7 @@ entry = "&8[&dGloss&8] &f{revision} &7{source} &8{count} байт"
 disabled = "&8[&dGloss&8] &cИстория документов выключена в gloss.toml."
 
 [gloss.message.authoring.restore]
-done = "&8[&dGloss&8] &f{kind} {id}&7 восстановлен до версии &f{revision}&7."
+done = "&8[&dGloss&8] Восстановлено: &f{kind} {id}&7 до версии &f{revision}&7."
 unknown = "&8[&dGloss&8] &cНет версии &f{revision}&c для &f{kind} {id}&c."
 failed = "&8[&dGloss&8] &cВосстановление не удалось: {reason}"
 
@@ -1208,13 +1210,13 @@ entry = "&8[&dGloss&8] &7{state} &f{key} &8{kind} {id} {path} &7{message}"
 summary = "&8[&dGloss&8] &f{count}&7 замечание(й)."
 
 [gloss.message.authoring.export]
-done = "&8[&dGloss&8] &f{count}&7 документ(ов) выгружено в &f{path}&7."
+done = "&8[&dGloss&8] Выгружено документов: &f{count}&7 в &f{path}&7."
 failed = "&8[&dGloss&8] &cВыгрузка не удалась: {reason}"
 
 [gloss.message.authoring.import]
 preview = "&8[&dGloss&8] &f{source}&7 запишет &f{count}&7 документ(ов)."
 entry = "&8[&dGloss&8] &7{state} &f{path}&7 {reason}"
-applied = "&8[&dGloss&8] &f{count}&7 документ(ов) импортировано из &f{source}&7."
+applied = "&8[&dGloss&8] Импортировано документов: &f{count}&7 из &f{source}&7."
 absent = "&8[&dGloss&8] &7По пути &f{path}&7 нет данных &f{source}&7."
 preview_required = "&8[&dGloss&8] &cСначала выполните /gloss import preview {source}. Предпросмотр действует в течение настроенного срока."
 
@@ -1238,14 +1240,14 @@ export = "Скопировать объединяемую папку пакет�
 "export.path" = "Папка назначения для пакета"
 serve = "Запустить или остановить встроенную раздачу пакета"
 "serve.state" = "on или off"
-reset = "Восстановить поставляемые документы глифов"
+reset = "Восстановить стандартные документы глифов"
 
 # --- lane:fixes ---
 
 [gloss.message.fixes]
 status_bedrock = "&7bedrock: &f{name}&7, &f{count}&7 в сети"
-status_textimage_oversize = "&7textimage-слишком-большой: &f{count}"
+status_textimage_oversize = "&7textimage сверх размера: &f{count}"
 hotload_skipped = " &7({count} пропущено, неверная schemaVersion)"
-status_schema_skipped = "&7schema-пропущено: &f{count}"
+status_schema_skipped = "&7пропущено по schema: &f{count}"
 bedrock_menu_unavailable = "&8[&dGloss&8]: &cЭто меню не отображается на Bedrock."
 

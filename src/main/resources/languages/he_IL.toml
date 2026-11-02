@@ -25,6 +25,7 @@
 #   {absorbed}  רשומות שיובאו ומוזגו בנתונים קיימים
 #   {active}  מספר הספקים הפעילים
 #   {actual}  הגרסה הנוכחית
+#   {added}  הודעות שנוספו בעדכון שפה
 #   {after}  ערך ההודעה לאחר העריכה
 #   {argument}  ארגומנט פקודה לא צפוי
 #   {axis}  ציר קואורדינטות או סיבוב
@@ -42,7 +43,6 @@
 #   {copied}  מספר הרשומות שהועתקו
 #   {count}  מספר העצמים או ההודעות התואמים
 #   {disc}  תקליט המוזיקה במכל
-#   {distance}  המרחק ליעד
 #   {drops}  מספר תצוגות הפריטים שנפלו
 #   {enabled}  מצב ההפעלה או מספר הרשומות הפעילות
 #   {entities}  מספר הישויות
@@ -62,6 +62,7 @@
 #   {interactPermission}  ההרשאה הנדרשת לאינטראקציה
 #   {interactionRange}  המרחק המרבי לאינטראקציה
 #   {item}  שם הפריט או החומר
+#   {kept}  עריכות מקומיות שנשמרו בעדכון שפה
 #   {key}  מפתח הודעה או הגדרה
 #   {kind}  סוג העצם או הספק
 #   {kinds}  סוגי העצמים או הספקים הזמינים
@@ -80,7 +81,7 @@
 #   {minimum}  הערך המזערי המותר
 #   {mode}  מצב הפעולה או התצוגה הנבחר
 #   {name}  שם העצם
-#   {oldBoard}  מזהה הלוח הקודם
+#   {oldBoard}  מזהה הפאנל הקודם
 #   {operation}  שם הפעולה
 #   {options}  אפשרויות הפקודה הזמינות
 #   {overlaid}  מספר מפתחות ההגדרה שהוחלו
@@ -99,9 +100,9 @@
 #   {priority}  עדיפות בחירה או ציור
 #   {provider}  שם הספק
 #   {providers}  רשימת הספקים או מספרם
-#   {radius}  רדיוס החיפוש
 #   {ready}  מספר הרשומות המוכנות לייבוא
 #   {reason}  הסיבה לשגיאה או להחלטה
+#   {remaining}  הזמן שנותר עד שתותר בדיקת השפות הבאה
 #   {resume}  מספר רשומות הייבוא שניתן לחדש
 #   {revision}  גרסת המסמך
 #   {roll}  זווית גלגול במעלות
@@ -125,6 +126,7 @@
 #   {to}  ערך היעד או סוף הטווח
 #   {total}  מספר הרשומות הכולל
 #   {type}  סוג הערך או העצם הצפוי
+#   {updated}  הודעות ששונו בעדכון שפה
 #   {url}  כתובת האינטרנט
 #   {uuid}  מזהה ייחודי של עצם או שחקן
 #   {value}  ערך ההודעה או הפרמטר הנוכחי
@@ -410,7 +412,7 @@ hover = "לחצו לפרטים"
 
 [command.board.info]
 header = "&8[&dGloss&8] &d{id} &7עם הכותרת &f{title}"
-meta = "&7עדיפות: &f{priority}&7 | תנאי: &f{when}&7 | גרסאות: &f{variants}&7"
+meta = "&7עדיפות: &f{priority} &8| &7תנאי: &f{when} &8| &7וריאציות: &f{variants}"
 line = " &8{line}. &f{text}"
 
 [command.emoji]
@@ -419,8 +421,6 @@ hover = "לחצו כדי להוסיף לצ'אט"
 
 [command.animations]
 empty = "&8[&dGloss&8] &7אין אנימציות טעונות."
-header = "&8[&dGloss&8] &fאנימציות: &d{count}"
-entry = "&8- &d{name}"
 
 [command.list]
 page = "&7עמוד &f{page}&7/&f{pages} &8- &7מציג &f{from}&7-&f{to} &7מתוך &f{total}"
@@ -431,7 +431,7 @@ holograms = "&7הולוגרמות: &f{count} &8({temporary} זמניות, {entit
 boards = "&7לוחות: &f{count}"
 emoji = "&7אימוג'ים: &f{enabled}&8/&f{total}"
 animations = "&7אנימציות: &f{count}"
-effects = "&7בועות: &f{bubbles} &8| &7מחוונים: &f{indicators} &8| &7דרופים: &f{drops}"
+effects = "&7בועות: &f{bubbles} &8| &7מחוונים: &f{indicators} &8| &7פריטים מושלכים: &f{drops}"
 
 visibility = "&7עותקי ישויות גלויים: &f{entities} &8| &7צופים: &f{viewers} &8| &7אישורים: &f{admissions} &8| &7סירובים: &f{refusals} &8| &7ממתינים: &f{waiting} &8| &7תורים שפג תוקפם: &f{expired} &8| &7ניקוי ממתין: &f{retiring}"
 images = "&7מטמון תמונות: &f{entries} &8| &7ממתינים: &f{pending} &8| &7נתונים שמורים: &f{bytes} &7בתים &8| &7הושלמו: &f{completed} &8| &7סירובים: &f{refusals}"
@@ -502,7 +502,7 @@ execution_failed = "הפעלת הפקודה {command} נכשלה: {reason}"
 [gloss.error]
 menu_name_required = "שם התפריט לא יכול להיות ריק"
 hologram_id_required = "מזהה ההולוגרמה אינו יכול להיות ריק"
-panel_id_required = "מזהה הלוח אינו יכול להיות ריק"
+panel_id_required = "מזהה הפאנל אינו יכול להיות ריק"
 web_subject_required = "מזהה המסמך בעורך האינטרנט אינו יכול להיות ריק"
 web_session_required = "מזהה ההפעלה של עורך האינטרנט אינו יכול להיות ריק"
 panel_player_required = "יש לציין שחקן יעד"
@@ -513,7 +513,6 @@ import_source_unknown = "מקור לא מוכר לייבוא נתונים ישנ
 
 [gloss.message]
 permission_denied = "&8[&dGloss&8]: &cאין לך את ההרשאה &f{permission}&c."
-unknown_command = "&8[&dGloss&8]: &cפקודה לא ידועה \"&f{command}&c\"."
 
 [gloss.message.hologram]
 created = "&8[&dGloss&8]: &aההולוגרמה &f{hologram}&a נוצרה במיקום שלך עם תפריט השורש &f{menu}&a."
@@ -551,11 +550,11 @@ player_only = "&8[&dGloss&8]: &cפקודה זו זמינה רק לשחקנים."
 [gloss.message.web]
 header = "עורך אינטרנט"
 open_hover = "לחצו כדי לפתוח את עורך האינטרנט של Gloss."
-open = "&8[&dGloss&8]: &7עורך האינטרנט: &f{url}&7"
+open = "&8[&dGloss&8]: &7עורך האינטרנט: &f{url}"
 preparing = "&8[&dGloss&8]: &7מתבצעת הכנה של הפעלת סנכרון מאובטחת לעורך עבור &f{subject}&7..."
 unavailable = "&8[&dGloss&8]: &cעריכה חיה באינטרנט אינה זמינה. יש לבדוק את הגדרות סנכרון העורך ואת החיבור לשרת הממסר."
-open_failed = "&8[&dGloss&8]: &cלא ניתן לפתוח את &f{kind}&c=&f{subject}&c בעורך האינטרנט החי: {reason}"
-open_console = "&8[&dGloss&8]: &7קישור עם הרשאת עריכה עבור &f{subject}&7: &f{url}&7"
+open_failed = "&8[&dGloss&8]: &cלא ניתן לפתוח את &f{kind}={subject}&c בעורך האינטרנט החי: {reason}"
+open_console = "&8[&dGloss&8]: &7קישור עם הרשאת עריכה עבור &f{subject}&7: &f{url}"
 capability_warning = "&8[&dGloss&8]: &eכתובת זו מאפשרת לפרסם שינויים בשרת עד לביטול ההרשאה או לתפוגתה. יש לשמור אותה בסוד."
 open_label = "פתיחת העורך"
 copy_label = "העתקת קישור"
@@ -564,7 +563,7 @@ link_hover = "פתחו את העורך, העתיקו את קישור ההרשא�
 
 [gloss.message.web.sessions]
 list_empty = "&8[&dGloss&8]: &7אין הפעלות סנכרון פעילות של העורך."
-status = "&8[&dGloss&8]: &7&f{session}&7 {kind}=&f{subject}&7 תפוגה בעוד=&f{seconds}&7 שניות גרסה שפורסמה=&f{revision}&7 בהמתנה=&f{pending}&7"
+status = "&8[&dGloss&8]: &f{session} &7{kind}=&f{subject} &7תפוגה=&f{seconds} שניות &7גרסה שפורסמה=&f{revision} &7בהמתנה=&f{pending}"
 revoked = "&8[&dGloss&8]: &aבוטלה הרשאת הפעלת סנכרון העורך &f{session}&a."
 pulled = "&8[&dGloss&8]: &aבוצעה בדיקת עדכונים עבור הפעלת סנכרון העורך &f{session}&a."
 unknown = "&8[&dGloss&8]: &cהפעלת סנכרון העורך &f{session}&c אינה מוכרת או שפג תוקפה."
@@ -574,10 +573,10 @@ failed = "&8[&dGloss&8]: &cפעולת סנכרון העורך עבור &f{sessio
 preview_started = "&8[&dGloss&8]: &7מתבצעת סריקה של &f{source}&7 לתצוגה מקדימה של ההעברה ללא שינוי הנתונים..."
 apply_started = "&8[&dGloss&8]: &7מתבצעות סריקה והעברה מ־&f{source}&7 ללא דריסת נתונים קיימים..."
 source_missing = "&8[&dGloss&8]: &7לא נמצא מקור &f{source}&7 בנתיב &f{path}&7."
-preview_summary = "&8[&dGloss&8]: &7תצוגה מקדימה של &f{source}&7: מוכנים &a{ready}&7, ניתנים להמשך &d{resume}&7, התנגשויות &e{conflicts}&7, שגיאות &c{errors}&7, אזהרות {warnings}. מקור: &f{path}&7"
-preview_entry = "&8- &7&f{legacy}&7 -> &f{board}&7 מצב=&f{state}&7 אזהרות=&f{warnings}&7"
-apply_summary = "&8[&dGloss&8]: &7העברה מ־&f{source}&7: יובאו &a{imported}&7, דולגו &e{skipped}&7, נכשלו &c{failed}&7; הסריקה דיווחה על {errors} שגיאות ועל {warnings} אזהרות."
-apply_entry = "&8- &7&f{legacy}&7 מצב=&f{state}&7 סיבה=&f{reason}&7"
+preview_summary = "&8[&dGloss&8]: &f{source}&7 – תצוגה מקדימה: &a{ready} מוכנים&7, &d{resume} ניתנים להמשך&7, &e{conflicts} התנגשויות&7, &c{errors} שגיאות&7, {warnings} אזהרות. מקור: &f{path}"
+preview_entry = "&8- &f{legacy} &7-> &f{board} &7מצב=&f{state} &7אזהרות=&f{warnings}"
+apply_summary = "&8[&dGloss&8]: &f{source}&7 – העברה: &a{imported} יובאו&7, &e{skipped} דולגו&7, &c{failed} נכשלו&7; הסריקה דיווחה על {errors} שגיאות ועל {warnings} אזהרות."
+apply_entry = "&8- &f{legacy} &7מצב=&f{state} &7סיבה=&f{reason}"
 issue = "&8- &f{legacy} &7{severity}: &f{reason}"
 busy = "&8[&dGloss&8]: &cהעברה אחרת של הולוגרמות ישנות כבר מתבצעת."
 failed = "&8[&dGloss&8]: &cהעברת ההולוגרמות הישנות מ־&f{source}&c נכשלה: {reason}"
@@ -600,7 +599,7 @@ saved = "&7גודל התצוגה המקדימה נשמר: &f{percent}%"
 bundle_more = "+{count} נוספים"
 
 [gloss.message.items]
-disabled = "&8[&dGloss&8]: &7פריטים מותאמים אישית מושבתים. יש להגדיר customItems לערך true בקובץ gloss.toml."
+disabled = "&8[&dGloss&8]: &7פריטים מותאמים אישית מושבתים. יש להגדיר את &fcustomItems&7 לערך true בקובץ gloss.toml."
 
 [gloss.message.items.status]
 header = "פריטים מותאמים אישית"
@@ -628,56 +627,52 @@ entry = "בלוקים={blocks} ישויות={entities} רכיבים מיוחדי
 
 [gloss.message.previews.reset]
 started = "&8[&dGloss&8]: &7מתבצע איפוס של מסמכי התצוגה המקדימה \"&f{name}&7\"..."
-done = "&8[&dGloss&8]: &aשוחזרו {count} מסמכי תצוגה מקדימה המצורפים לתוסף. מסמכי משתמש נוספים שמחליפים אותם בתצוגה לא הוסרו."
-none = "&8[&dGloss&8]: &c\"{name}\" אינו מסמך תצוגה מקדימה המצורף לתוסף; דבר לא אופס."
+done = "&8[&dGloss&8]: &aשוחזרו {count} מסמכי תצוגה מקדימה מובנים. מסמכי משתמש נוספים שמחליפים אותם בתצוגה לא הוסרו."
+none = "&8[&dGloss&8]: &c\"{name}\" אינו מסמך תצוגה מקדימה מובנה; דבר לא אופס."
 
 [gloss.message.previews.dump]
 unknown = "&8[&dGloss&8]: &c\"{name}\" אינו מסמך תצוגה מקדימה שנטען."
-result = "&8[&dGloss&8]: &7&a{name}&7: &f{total}&7 רכיבים (לוחות={panels}, תאים={cells}, משבצות={slots}, תוויות={labels})."
+result = "&8[&dGloss&8]: &a{name}&7: &f{total}&7 רכיבים (פאנלים={panels}, תאים={cells}, משבצות={slots}, תוויות={labels})."
 no_errors = "&8[&dGloss&8]: &aאין שגיאות בנייה."
 error_line = "&8[&dGloss&8]: &c{message}"
 error_more = "&8[&dGloss&8]: &7ועוד {count} (ראו ביומן המסוף)."
 
 [gloss.message.panels]
-created = "&8[&dGloss&8]: &aהלוח &f{board}&a נוצר בגרסה {revision}."
-deleted = "&8[&dGloss&8]: &aהלוח &f{board}&a נמחק."
+created = "&8[&dGloss&8]: &aהפאנל &f{board}&a נוצר בגרסה {revision}."
+deleted = "&8[&dGloss&8]: &aהפאנל &f{board}&a נמחק."
 renamed = "&8[&dGloss&8]: &aהשם &f{oldBoard}&a שונה ל־&f{board}&a בגרסה {revision}."
-copied = "&8[&dGloss&8]: &a&f{source}&a הועתק אל &f{board}&a."
+copied = "&8[&dGloss&8]: &aהפאנל &f{source}&a הועתק אל &f{board}&a."
 updated = "&8[&dGloss&8]: &aהפעולה {operation} הוחלה על &f{board}&a בגרסה {revision}."
-teleported = "&8[&dGloss&8]: &aבוצע שיגור אל &f{board}&a."
-unknown = "&8[&dGloss&8]: &cלוח לא מוכר: &f{board}&c."
-already_exists = "&8[&dGloss&8]: &cהלוח &f{board}&c כבר קיים."
-invalid = "&8[&dGloss&8]: &cערך לא תקין בלוח: &f{reason}&c."
+teleported = "&8[&dGloss&8]: &aהשתגרת אל &f{board}&a."
+unknown = "&8[&dGloss&8]: &cפאנל לא מוכר: &f{board}&c."
+already_exists = "&8[&dGloss&8]: &cהפאנל &f{board}&c כבר קיים."
+invalid = "&8[&dGloss&8]: &cערך לא תקין בפאנל: &f{reason}&c."
 menu_unavailable = "&8[&dGloss&8]: &cתפריט השורש &f{menu}&c לא נטען."
 player_unavailable = "&8[&dGloss&8]: &cשחקן היעד &f{player}&c אינו מחובר."
-world_unavailable = "&8[&dGloss&8]: &cהעולם &f{world}&c של הלוח לא נטען עם ה־UUID השמור."
-revision_conflict = "&8[&dGloss&8]: &cהלוח &f{board}&c השתנה בזמן העריכה (הגרסה הצפויה: {expected}, הנוכחית: {actual}). יש לפתוח מחדש את הפעלת העריכה."
-failed = "&8[&dGloss&8]: &cהפעולה בלוח &f{board}&c נכשלה: {reason}"
+world_unavailable = "&8[&dGloss&8]: &cהעולם &f{world}&c של הפאנל לא נטען עם ה־UUID השמור."
+revision_conflict = "&8[&dGloss&8]: &cהפאנל &f{board}&c השתנה בזמן העריכה (הגרסה הצפויה: {expected}, הנוכחית: {actual}). יש לפתוח מחדש את הפעלת העריכה."
+failed = "&8[&dGloss&8]: &cהפעולה בפאנל &f{board}&c נכשלה: {reason}"
 
 [gloss.message.panels.list]
-header = "&8[&dGloss&8]: &fלוחות הנשמרים בקביעות: &d{count}&f"
-empty = "&8[&dGloss&8]: &7לא נטענו לוחות הנשמרים בקביעות."
-entry = "&8- &7&f{board}&7 תפריט=&f{menu}&7 גרסה=&f{revision}&7"
+empty = "&8[&dGloss&8]: &7לא נטענו פאנלים קבועים."
 
 [gloss.message.panels.near]
-header = "&8[&dGloss&8]: &fלוחות ברדיוס של &d{radius}&f בלוקים: &d{count}&f"
-empty = "&8[&dGloss&8]: &7אין לוחות ברדיוס הזה."
-entry = "&8- &7&f{board}&7 מרחק=&f{distance}&7 תפריט=&f{menu}&7"
+empty = "&8[&dGloss&8]: &7אין פאנלים ברדיוס הזה."
 
 [gloss.message.panels.info]
-header = "&8[&dGloss&8]: &fלוח &d{board}&f (&7{state}&f)"
-identity = "&7UUID=&f{uuid}&7 גרסה=&f{revision}&7 תפריט=&f{menu}&7"
-transform = "&7עולם=&f{world}&7 מיקום=&f{x}&7, &f{y}&7, &f{z}&7 סיבוב=&f{yaw}&7, &f{pitch}&7, &f{roll}&7 קנה מידה=&f{scale}&7"
-visibility = "&7נראות=&f{mode}&7 הרשאת צפייה=&f{viewPermission}&7 הרשאת אינטראקציה=&f{interactPermission}&7 טווחים=&f{viewRange}&7/&f{interactionRange}&7"
-follow = "&7מעקב=&f{mode}&7 שחקן=&f{player}&7 סיבוב=&f{rotation}&7"
+header = "&8[&dGloss&8]: &fפאנל &d{board} &7({state})"
+identity = "&7uuid=&f{uuid} &7גרסה=&f{revision} &7תפריט=&f{menu}"
+transform = "&7עולם=&f{world} &7מיקום=&f{x}, {y}, {z} &7סיבוב=&f{yaw}, {pitch}, {roll} &7קנה מידה=&f{scale}"
+visibility = "&7נראות=&f{mode} &7הרשאת צפייה=&f{viewPermission} &7הרשאת אינטראקציה=&f{interactPermission} &7טווחים=&f{viewRange}/{interactionRange}"
+follow = "&7מעקב=&f{mode} &7שחקן=&f{player} &7סיבוב=&f{rotation}"
 
 [gloss.message.panels.edit]
 started = "&8[&dGloss&8]: &aהתחילה עריכה של &f{board}&a מגרסה {revision}. השינויים מוחזקים זמנית עד לשמירה."
 already_active = "&8[&dGloss&8]: &cכבר מתבצעת עריכה של &f{board}&c. יש לשמור או לבטל תחילה."
-none = "&8[&dGloss&8]: &cאין לך עריכת לוח המוחזקת זמנית."
-busy = "&8[&dGloss&8]: &cהלוח &f{board}&c נשמר כעת."
+none = "&8[&dGloss&8]: &cאין לך עריכת פאנל ממתינה."
+busy = "&8[&dGloss&8]: &cהפאנל &f{board}&c נשמר כעת."
 staged = "&8[&dGloss&8]: &aהפעולה {operation} עבור &f{board}&a הוחזקה זמנית. לשמירה קבועה יש להשתמש ב־/gloss panel save."
-saved = "&8[&dGloss&8]: &a&f{board}&a נשמר בגרסה {revision}."
+saved = "&8[&dGloss&8]: &aהפאנל &f{board}&a נשמר בגרסה {revision}."
 cancelled = "&8[&dGloss&8]: &aבוטלו השינויים הזמניים של &f{board}&a."
 identity_blocked = "&8[&dGloss&8]: &cיש לשמור או לבטל את העריכה הזמנית של &f{board}&c לפני שינוי שמו או מחיקתו."
 
@@ -730,14 +725,14 @@ bee_nest = "&e&lקן דבורים"
 cauldron = "&7&lקדרה"
 water_cauldron = "&9&lקדרת מים"
 lava_cauldron = "&6&lקדרת לבה"
-powder_snow_cauldron = "&f&lקדירת אבקת שלג"
+powder_snow_cauldron = "&f&lקדרת אבקת שלג"
 jukebox = "&d&lתיבת נגינה"
 brewing_stand = "&d&lעמדת רקיחה"
 chiseled_bookshelf = "&6&lמדף ספרים מפוסל"
 hopper_minecart = "&8&lקרונית עם משפך"
 chest_minecart = "&6&lקרונית עם תיבה"
 mobile = "&7&l{name}"
-shulker = "&l{color} תיבת שולקר"
+shulker = "&lתיבת שולקר {color}"
 copper_chest = "&6&l{name}"
 shelf = "&6&l{name}"
 container = "&6&lמכל"
@@ -750,24 +745,24 @@ edit_messages = "עריכת הודעות השפה"
 use_server_default = "שימוש בברירת המחדל של השרת"
 current = "נוכחית: {locale}"
 current_with_personal = "נוכחית: {locale} (שלך: {personal})"
-your_description = "שנה רק את ההודעות שאתה רואה."
-reset_description = "השתמש בשפת ברירת המחדל של השרת."
-server_description = "שנה את שפת ברירת המחדל של השרת."
-edit_description = "פתח את עורך ההודעות לכל שפה."
-select_description = "לחץ כדי לבחור בשפה זו."
-remove_personal_description = "הסר את בחירת השפה האישית שלך."
+your_description = "שינוי ההודעות שמוצגות לך בלבד."
+reset_description = "שימוש בשפת ברירת המחדל של השרת."
+server_description = "שינוי שפת ברירת המחדל של השרת"
+edit_description = "פתיחת עורך ההודעות לכל שפה."
+select_description = "לחצו כדי לבחור בשפה זו."
+remove_personal_description = "הסרת בחירת השפה האישית שלך."
 no_controls = "אין לך גישה להגדרות שפה."
 command = "פקודה: {command}"
 selected = "נבחר"
 all-volmit-plugins = "כל תוספי Volmit"
 
 [language.error]
-stopping = "בחירת שפה אינה זמינה בזמן שהתוסף מפסיק."
-editor-player-only = "פתח את עורך השפה במשחק."
+stopping = "בחירת שפה אינה זמינה בזמן שהתוסף נעצר."
+editor-player-only = "יש לפתוח את עורך השפה במשחק."
 no-providers = "אין ספקי שפה זמינים של Volmit."
 numeric-page = "יש להזין מספר עמוד."
 personal-player-only = "יש לבחור העדפות שפה של שחקן במשחק."
-personal-permission = "אין לך רשות לבחור את השפה שלך."
+personal-permission = "אין לך הרשאה לבחור את השפה שלך."
 plugin-personal-permission = "אין לך הרשאה לבחור שפה אישית עבור {plugin}."
 plugin-server-permission = "אין לך הרשאה לשנות את שפת השרת עבור {plugin}."
 server-locale-required = "יש לבחור קוד שפה כגון en_US כשפת ברירת המחדל של השרת."
@@ -775,16 +770,25 @@ unavailable-for-all = "השפה {locale} אינה זמינה לכל התוספי
 
 [language.usage]
 editor = "שימוש: /{command} language server edit [locale]"
-selection = "שימוש: /{command} language self [locale|reset] or server [locale]"
+selection = "שימוש: /{command} language self [locale|reset] או server [locale]"
 volmit-selection = "שימוש: /volmit plugins languages [locale]"
+update = "שימוש: /{command} language update"
 
 [language.selection]
-preparing = "מכין את השפה {locale} עבור {target}..."
+preparing = "מתבצעת הכנת השפה {locale} עבור {target}..."
 save-failed = "{plugin}: לא ניתן לשמור את בחירת השפה; יש לבדוק את מסוף השרת."
 english-fallback = "{plugin}: השפה {locale} אינה זמינה; נעשה שימוש באנגלית (en_US)."
-personal-selected = "{plugin}: השפה שלך עכשיו {locale}."
-server-selected = "{plugin}: שפת השרת עכשיו {locale}."
+personal-selected = "{plugin}: השפה שלך היא כעת {locale}."
+server-selected = "{plugin}: שפת השרת היא כעת {locale}."
 server-default-selected = "{plugin}: השפה שלך תואמת כעת לשפת ברירת המחדל של השרת."
+
+[language.update]
+checking = "{plugin}: מתבצעת בדיקת שינויים במאגר השפות..."
+unchanged = "{plugin}: השפות המותקנות כבר תואמות למאגר."
+applied = "{plugin}: השפה {locale} עודכנה ({added} נוספו, {updated} שונו, {kept} עריכות מקומיות נשמרו)."
+cooldown = "{plugin}: מאגר השפות נבדק לאחרונה; נסו שוב בעוד {remaining}."
+locale-failed = "{plugin}: השפה {locale} לא עודכנה: {reason}"
+failed = "{plugin}: עדכון השפות נכשל: {reason}"
 
 [language.editor]
 title = "{plugin} › {section}"
@@ -810,35 +814,35 @@ unable-to-save = "לא ניתן לשמור: {reason}"
 
 [language.editor.navigation]
 back = "&eחזרה&r"
-close = "&cסגור&r"
+close = "&cסגירה&r"
 previous-page = "&eהעמוד הקודם&r"
-next-page = "&eדף הבא&r"
+next-page = "&eהעמוד הבא&r"
 
 [language.editor.search]
 messages = "חיפוש הודעות"
-messages-lore = "לחיצה לחיפוש בכל ההודעות."
+messages-lore = "לחצו כדי לחפש בכל ההודעות."
 clear = "ניקוי החיפוש"
 
 [language.editor.message]
 current-value = "&7ערך נוכחי:&r"
 variables = "&8{variables}&r"
-edit-plural = "&7לחיצה לעריכת צורת רבים.&r"
-edit-lines = "&7לחיצה לעריכת שורות בודדות.&r"
-edit-chat = "&7לחיצה לעריכה בצ׳אט.&r"
+edit-plural = "&7לחצו כדי לערוך צורת רבים.&r"
+edit-lines = "&7לחצו כדי לערוך שורות בודדות.&r"
+edit-chat = "&7לחצו כדי לערוך בצ׳אט.&r"
 
 [language.editor.locale]
-open = "&8לחץ לפתוח את השפה.&r"
+open = "&8לחצו כדי לפתוח שפה זו.&r"
 
 [language.editor.category]
-message-count = "&7{count} הודעות&r"
-open = "&8לחץ לפתוח קטגוריה זו.&r"
+message-count = "&7הודעות: {count}&r"
+open = "&8לחצו כדי לפתוח קטגוריה זו.&r"
 
 [language.editor.error]
 no-permission = "אין לך הרשאה לערוך את השפות של {plugin}."
 unable-to-edit = "לא ניתן לערוך: {reason}"
 
 [language.editor.saved]
-summary = "{locale} נשמרה. בחירות השפה לא השתנו."
+summary = "השפה {locale} נשמרה. בחירות השפה לא השתנו."
 change = "{key}: הערך ״{before}״ הוחלף ב־״{after}״."
 
 [language.editor.part]
@@ -855,10 +859,10 @@ empty = "(ריק)"
 [gloss.message.screen]
 "surfaces.empty" = "&8[&dGloss&8] &7לא נטענו משטחים."
 "surfaces.unknown" = "&8[&dGloss&8]: &cאין משטח בשם &f{id}&c."
-"surfaces.tested" = "&8[&dGloss&8]: &a&f{id}&a הורץ עבור &f{player}&a."
+"surfaces.tested" = "&8[&dGloss&8]: &aהמשטח &f{id}&a הורץ עבור &f{player}&a."
 "nametags.empty" = "&8[&dGloss&8] &7לא נטענו תגיות שם."
 "nametags.unknown" = "&8[&dGloss&8]: &cאין תגית שם בשם &f{id}&c."
-"nametags.refreshed" = "&8[&dGloss&8]: &a&d{count}&a מסמכי תגיות שם הוחלו מחדש."
+"nametags.refreshed" = "&8[&dGloss&8]: &aהוחלו מחדש &d{count}&a מסמכי תגיות שם."
 "hud.header" = "&8[&dGloss&8] &7תפיסות HUD עבור &f{player}&7: &d{count}"
 "hud.empty" = "&8[&dGloss&8] &7אף תוסף אינו תופס משבצת HUD עבור &f{player}&7."
 "hud.line" = "&8- &f{kind} &7{source} &8| &7{value} &8| &7{count} &8| &7{state}"
@@ -869,23 +873,23 @@ root = "משטחי סרגל פעולה, סרגל בוס וכותרת"
 list = "הצגת רשימת מסמכי משטח"
 info = "הצגת מסמך משטח"
 "info.id" = "מזהה מסמך המשטח"
-reset = "שחזור המשטחים המצורפים"
-test = "הרצת מעבר המשטחים עבור שחקן עכשיו"
+reset = "שחזור ברירות המחדל המובנות של המשטחים"
+test = "הרצת מעבר המשטחים עבור שחקן אחד עכשיו"
 "test.id" = "מזהה מסמך המשטח"
-"test.player" = "השחקן לבדיקה; ברירת המחדל היא אתה"
+"test.player" = "שחקן מחובר לבדיקה; ברירת המחדל היא אתה"
 
 [command.help.nametag]
 root = "מסמכי תגיות שם לכל צופה"
 list = "הצגת רשימת מסמכי תגיות שם"
 info = "הצגת מסמך תגית שם"
 "info.id" = "מזהה מסמך תגית השם"
-reset = "שחזור תגיות השם המצורפות"
+reset = "שחזור ברירות המחדל המובנות של תגיות השם"
 refresh = "החלה מחדש של כל תגיות השם עכשיו"
 
 [command.help.hud]
 root = "בדיקת מרכיב ה-HUD המשותף"
-who = "מציג איזה תוסף תופס כל משבצת HUD"
-"who.player" = "השחקן לבדיקה; ברירת המחדל היא אתה"
+who = "הצגת התוסף שתופס כל משבצת HUD עבור שחקן"
+"who.player" = "שחקן מחובר לבדיקה; ברירת המחדל היא אתה"
 
 # --- lane:chat ---
 
@@ -915,39 +919,39 @@ leaderboard_sampled = "&8[&dGloss&8]: &aטבלת המובילים &f{id}&a נד�
 
 [command.help.channel]
 root = "ערוצי צ'אט"
-list = "הצגת הערוצים שנטענו"
+list = "הצגת ערוצי הצ'אט שנטענו"
 info = "הצגת ההיקף, התבנית והווריאציות של ערוץ"
 "info.id" = "מזהה מסמך הערוץ"
-reset = "שחזור מסמכי הערוץ המצורפים"
+reset = "שחזור מסמכי הערוצים המובנים"
 
 [command.help.strings]
 root = "טקסטי תוכן שנכתבו"
 list = "הצגת שפות הטקסט שנטענו ומספר הערכים בהן"
 missing = "הצגת מפתחות שקיימים ב-en_US וחסרים בשפה"
 "missing.locale" = "השפה להשוואה מול en_US"
-reset = "שחזור מסמכי הטקסט המצורפים"
+reset = "שחזור מסמכי הטקסט המובנים"
 
 [command.help.leaderboard]
 root = "טבלאות מובילים מחושבות"
 list = "הצגת טבלאות המובילים שנטענו ומספר הערכים בהן"
 info = "הצגת המקור, הסדר והערכים של טבלת מובילים"
-"info.id" = "מזהה המסמך"
+"info.id" = "מזהה מסמך טבלת המובילים"
 reset = "ניקוי התקופה או הערכים הכוללים של טבלת מובילים"
-"reset.id" = "מזהה המסמך"
+"reset.id" = "מזהה מסמך טבלת המובילים"
 "reset.period" = "all או current"
-sample = "דגימת טבלת מובילים כעת עבור כל המחוברים"
-"sample.id" = "מזהה המסמך"
+sample = "דגימת טבלת מובילים כעת עבור כל השחקנים המחוברים"
+"sample.id" = "מזהה מסמך טבלת המובילים"
 
 # --- lane:forms ---
 
 [gloss.message.forms]
 icon_unsupported = "&7לא ניתן להצגה במשבצת תיבה ({kind})"
-no_inventories = "&8[&dGloss&8]: &7לא הוגדרו תפריטי תיבה."
-inventory_list_header = "&dתפריטי תיבה"
-inventory_list_entry = "&7פתח את תפריט התיבה &f{id}"
+no_inventories = "&8[&dGloss&8]: &7לא הוגדרו תפריטי מלאי."
+inventory_list_header = "&dתפריטי מלאי"
+inventory_list_entry = "&7פתיחת תפריט המלאי &f{id}"
 inventory_info = "&8[&dGloss&8]: &d{id} &8- &7גודל &f{kind}&7, משבצות &f{count}"
-unknown_inventory = "&8[&dGloss&8]: &cאין תפריט תיבה בשם {id}."
-inventory_opened = "&8[&dGloss&8]: &aתפריט התיבה {id} נפתח עבור {player}."
+unknown_inventory = "&8[&dGloss&8]: &cאין תפריט מלאי בשם {id}."
+inventory_opened = "&8[&dGloss&8]: &aתפריט המלאי {id} נפתח עבור {player}."
 bad_args = "&8[&dGloss&8]: &cהארגומנטים חייבים להיות זוגות מפתח=ערך: {value}"
 prompt_timeout = "&8[&dGloss&8]: &7זמן הקלט פג."
 prompt_busy = "&8[&dGloss&8]: &cכבר יש לך קלט ממתין."
@@ -960,24 +964,22 @@ give_dropped = "&8[&dGloss&8]: &7המלאי שלך היה מלא, לכן הפר�
 args = "ארגומנטים מסוג מפתח=ערך מופרדים ברווחים"
 
 [command.help.inventory]
-root = "בדיקה ופתיחה של תפריטי תיבה"
-list = "הצגת רשימת תפריטי התיבה המוגדרים"
+root = "בדיקה ופתיחה של תפריטי מלאי"
+list = "הצגת רשימת תפריטי המלאי המוגדרים"
 "list.page" = "עמוד ברשימה, החל מ-1"
-info = "הצגת הגודל והמשבצות של תפריט תיבה"
-"info.id" = "מזהה תפריט התיבה"
-open = "פתיחת תפריט תיבה עבור שחקן"
-"open.id" = "מזהה תפריט התיבה"
+info = "הצגת הגודל והמשבצות של תפריט מלאי"
+"info.id" = "מזהה תפריט המלאי"
+open = "פתיחת תפריט מלאי עבור שחקן"
+"open.id" = "מזהה תפריט המלאי"
 "open.player" = "השחקן שעבורו לפתוח; ברירת המחדל היא אתה"
 "open.args" = "ארגומנטים מסוג מפתח=ערך מופרדים ברווחים"
-reset = "שחזור ברירות המחדל המצורפות של תפריטי התיבה"
-"reset.name" = "השם לאיפוס, או * עבור כל ברירות המחדל המצורפות"
+reset = "שחזור ברירות המחדל המובנות של תפריטי המלאי"
+"reset.name" = "השם לאיפוס, או * לכל ברירות המחדל המובנות"
 
 ["command.help.hologram"]
 page = "העברת צופה לעמוד של ההולוגרמה"
 "page.page" = "מזהה עמוד, next או prev"
 "page.player" = "שם שחקן; ריק מתייחס אליך"
-motion = "הפעלת קליפ תנועה על הולוגרמה"
-"motion.motion" = "מזהה תנועה, או clear כדי לעצור"
 actions = "הצגת הפעולות שההולוגרמה מריצה בלחיצה"
 
 [gloss.message.hologram_interaction]
@@ -1023,17 +1025,17 @@ missing = "&cאין תג שם בשם &f{id}&c."
 refreshed = "&aתגי השם רועננו."
 
 [gloss.message.world.glow]
-set = "&f{target} &7זוהר כעת ב-&f{value}&a."
+set = "&aהזוהר הופעל על &f{target} &7בצבע &f{value}&a."
 cleared = "&7הזוהר של &f{target} &7הוסר."
 missing = "&cאין שחקן בשם &f{player} &cמחובר."
 
 [command.help.marker]
 root = "כלי סמני עולם"
-list = "רשימת מסמכי סמנים"
-info = "הצג סמן אחד"
-create = "כתוב מסמך סמן במיקומך"
-remove = "מחק מסמך סמן"
-here = "הדפס את מיקומך כקואורדינטות עוגן"
+list = "הצגת רשימת מסמכי הסמנים"
+info = "הצגת סמן אחד"
+create = "כתיבת מסמך סמן במיקום שלך"
+remove = "מחיקת מסמך סמן"
+here = "הדפסת המיקום שלך כקואורדינטות עוגן של סמן"
 
 [command.help.marker.arg]
 id = "מזהה מסמך הסמן"
@@ -1041,10 +1043,10 @@ label = "תווית המוצגת מעל הסמן"
 
 [command.help.waypoint]
 root = "כלי נקודות דרך בסרגל האיתור"
-set = "שמור את מיקומך כנקודת דרך אישית"
-remove = "מחק אחת מנקודות הדרך האישיות שלך"
-list = "רשימת נקודות הדרך האישיות שלך"
-info = "הצג מסמך נקודת דרך אחד"
+set = "שמירת המיקום שלך כנקודת דרך אישית"
+remove = "מחיקת אחת מנקודות הדרך האישיות שלך"
+list = "הצגת רשימת נקודות הדרך האישיות שלך"
+info = "הצגת מסמך נקודת דרך אחד"
 
 [command.help.waypoint.arg]
 name = "שם נקודת הדרך"
@@ -1052,33 +1054,33 @@ id = "מזהה מסמך נקודת הדרך"
 
 [command.help.camera]
 root = "כלי מסלולי מצלמה"
-test = "טוס מסלול הדגמה סביב עצמך"
-stop = "סיים מסלול מצלמה מוקדם"
+test = "הרצת מסלול הדגמה סביבך"
+stop = "סיום מוקדם של מסלול מצלמה"
 
 [command.help.camera.arg]
 seconds = "אורך המסלול בשניות"
-player = "את מי לעצור; ברירת המחדל היא אתה"
+player = "השחקן שהמסלול שלו ייעצר; ברירת המחדל היא אתה"
 
 [command.help.nameplate]
 root = "כלי תגי שם לשחקנים"
-list = "רשימת מסמכי תגי שם"
-info = "הצג מסמך תג שם אחד"
-reset = "שחזר את מסמך תג השם המצורף"
-refresh = "בנה מחדש את תגי השם לכל הצופים"
+list = "הצגת רשימת מסמכי תגי השם"
+info = "הצגת מסמך תג שם אחד"
+reset = "שחזור מסמך תג השם המובנה"
+refresh = "בנייה מחדש של תגי השם עבור כל הצופים"
 
 [command.help.nameplate.arg]
 id = "מזהה מסמך תג השם"
 
 [command.help.glow]
 root = "כלי זוהר ישויות"
-set = "גרום לשחקן לזהור עבורך"
-clear = "נקה את הזוהר של שחקן עבורך"
+set = "הפעלת זוהר על שחקן, גלוי רק לך"
+clear = "הסרת הזוהר של שחקן, שגלוי רק לך"
 
 [command.help.glow.arg]
 player = "השחקן שיקבל מתאר"
 cleared = "השחקן שהמתאר שלו יוסר"
-color = "צבע טקסט בשם"
-ticks = "טיקים שהזוהר נמשך, או 0 לשמירה"
+color = "שם של צבע טקסט"
+ticks = "משך הזוהר בטיקים, או 0 כדי להשאיר אותו"
 
 # --- lane:behaviors ---
 
@@ -1087,7 +1089,7 @@ root = "בדיקה והפעלה של מסמכי התנהגות"
 list = "הצגת מסמכי ההתנהגות הטעונים"
 info = "הצגת הטריגרים והתנאים של מסמך התנהגות"
 fire = "הרצת רשומת התנהגות אחת עכשיו"
-reset = "שחזור ברירות המחדל המצורפות להתנהגות"
+reset = "שחזור ברירות המחדל המובנות של ההתנהגויות"
 id = "מזהה מסמך ההתנהגות"
 entry = "מספר הרשומה, החל מ-1"
 player = "השחקן שעבורו תרוץ הרשומה, או * לאף אחד"
@@ -1099,17 +1101,17 @@ set = "כתיבת ערך מצב אחד"
 clear = "החזרת ערך מצב לברירת המחדל שלו"
 dump = "הצגת כל מפתחות המצב המוצהרים והערכים שלהם"
 key = "מפתח מצב מוצהר"
-value = "ערך חדש; הקף במרכאות כדי לכלול רווחים"
+value = "ערך חדש; יש לעטוף במירכאות כדי לכלול רווחים"
 player = "השחקן שאליו שייך הערך, או * עבור עצמך"
 
 [command.help.do]
 root = "הפעלת רשומות ההתנהגות מסוג command בשם הזה"
 name = "שם פקודת ההתנהגות"
-args = "ארגומנטים כזוגות מפתח=ערך; הקף במרכאות כדי לכלול רווחים"
+args = "ארגומנטים כזוגות מפתח=ערך; יש לעטוף במירכאות כדי לכלול רווחים"
 
 [command.help.expr]
 root = "הערכת ביטוי והצגת מי שענה עליו"
-expression = "הביטוי להערכה; הקף במרכאות כדי לכלול רווחים"
+expression = "הביטוי להערכה; יש לעטוף במירכאות כדי לכלול רווחים"
 
 [command.help.explain]
 root = "הצגת התנאים שזמן הריצה בדק ומי מהם ניצח"
@@ -1162,7 +1164,7 @@ arg_id = "מזהה של חבילה מותקנת"
 root = "הצגת הגרסאות השמורות של מסמך"
 arg_kind = "תיקיית המסמך, למשל boards או menus"
 arg_id = "מזהה המסמך"
-arg_page = "עמוד רשימה החל מאחד"
+arg_page = "עמוד הרשימה, החל מ-1"
 
 [command.help.restore]
 root = "כתיבת גרסה שמורה מעל המסמך הפעיל"
@@ -1198,7 +1200,7 @@ entry = "&8[&dGloss&8] &f{revision} &7{source} &8{count} בתים"
 disabled = "&8[&dGloss&8] &cהיסטוריית המסמכים כבויה בקובץ gloss.toml."
 
 [gloss.message.authoring.restore]
-done = "&8[&dGloss&8] &f{kind} {id}&7 שוחזר לגרסה &f{revision}&7."
+done = "&8[&dGloss&8] המסמך &f{kind} {id}&7 שוחזר לגרסה &f{revision}&7."
 unknown = "&8[&dGloss&8] &cאין גרסה &f{revision}&c עבור &f{kind} {id}&c."
 failed = "&8[&dGloss&8] &cהשחזור נכשל: {reason}"
 
@@ -1208,13 +1210,13 @@ entry = "&8[&dGloss&8] &7{state} &f{key} &8{kind} {id} {path} &7{message}"
 summary = "&8[&dGloss&8] &f{count}&7 ממצאים."
 
 [gloss.message.authoring.export]
-done = "&8[&dGloss&8] &f{count}&7 מסמכים יוצאו אל &f{path}&7."
+done = "&8[&dGloss&8] יוצאו &f{count}&7 מסמכים אל &f{path}&7."
 failed = "&8[&dGloss&8] &cהייצוא נכשל: {reason}"
 
 [gloss.message.authoring.import]
 preview = "&8[&dGloss&8] &f{source}&7 יכתוב &f{count}&7 מסמכים."
 entry = "&8[&dGloss&8] &7{state} &f{path}&7 {reason}"
-applied = "&8[&dGloss&8] &f{count}&7 מסמכים יובאו מ-&f{source}&7."
+applied = "&8[&dGloss&8] יובאו &f{count}&7 מסמכים מ-&f{source}&7."
 absent = "&8[&dGloss&8] &7אין נתוני &f{source}&7 בנתיב &f{path}&7."
 preview_required = "&8[&dGloss&8] &cיש להריץ תחילה /gloss import preview {source}. התצוגות המקדימות משתמשות במשך התוקף שהוגדר."
 
@@ -1232,20 +1234,20 @@ serve_unchanged = "&8[&dGloss&8] &7שרת החבילה כבר {state}."
 
 [command.help.forge]
 root = "כלי חבילת הגליפים"
-build = "בנה מחדש את חבילת משאבי הגליפים עכשיו"
-status = "הצג מוני חבילה, גליפים ומסירה"
-export = "העתק את תיקיית החבילה הניתנת למיזוג"
+build = "בנייה מחדש של חבילת המשאבים של הגליפים עכשיו"
+status = "הצגת מוני החבילה, הגליפים והמסירה"
+export = "העתקת תיקיית החבילה הניתנת למיזוג למיקום אחר"
 "export.path" = "תיקיית היעד של החבילה"
-serve = "הפעל או עצור את שרת החבילה המובנה"
+serve = "הפעלה או עצירה של שרת החבילה המובנה"
 "serve.state" = "on או off"
-reset = "שחזר את מסמכי הגליפים המצורפים"
+reset = "שחזור מסמכי הגליפים המובנים"
 
 # --- lane:fixes ---
 
 [gloss.message.fixes]
 status_bedrock = "&7bedrock: &f{name}&7, &f{count}&7 מחוברים"
-status_textimage_oversize = "&7textimage-גדול מדי: &f{count}"
-hotload_skipped = " &7({count} התעלמות, schemaVersion שגוי)"
-status_schema_skipped = "&7schema-דילוג: &f{count}"
+status_textimage_oversize = "&7textimage גדול מדי: &f{count}"
+hotload_skipped = " &7({count} הושמטו, schemaVersion שגוי)"
+status_schema_skipped = "&7דילוג על schema: &f{count}"
 bedrock_menu_unavailable = "&8[&dGloss&8]: &cהתפריט הזה אינו מוצג ב-Bedrock."
 

@@ -3,6 +3,14 @@ package art.arcane.gloss.locale;
 import art.arcane.gloss.Gloss;
 import art.arcane.gloss.doc.DocumentHashes;
 import art.arcane.volmlib.util.director.DirectorTextResolver;
+import art.arcane.volmlib.util.localization.BukkitLanguageSwitcher;
+import art.arcane.volmlib.util.localization.GitHubLanguageSource;
+import art.arcane.volmlib.util.localization.LanguageCatalogMerge;
+import art.arcane.volmlib.util.localization.LanguageDirectory;
+import art.arcane.volmlib.util.localization.LanguageMeta;
+import art.arcane.volmlib.util.localization.LanguageSourceManifest;
+import art.arcane.volmlib.util.localization.LanguageUpstreamStore;
+import art.arcane.volmlib.util.localization.LanguageUpstreamSync;
 import art.arcane.volmlib.util.localization.PluginLanguageService;
 import art.arcane.volmlib.util.localization.PluginLanguageEditor;
 import art.arcane.volmlib.util.localization.LanguageFileEditor;
@@ -11,7 +19,6 @@ import art.arcane.volmlib.util.localization.TomlLanguageEditor;
 import art.arcane.volmlib.util.localization.TomlLanguageParser;
 import art.arcane.volmlib.util.localization.MessageValue;
 import art.arcane.volmlib.util.localization.LanguageAudience;
-import art.arcane.volmlib.util.localization.RemoteLanguageCatalog;
 import art.arcane.volmlib.util.format.ColorFormatter;
 import art.arcane.volmlib.util.io.FileWatcher;
 import art.arcane.volmlib.util.io.FolderWatcher;
@@ -44,29 +51,40 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.function.LongSupplier;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public final class GlossLocalization implements AutoCloseable {
-  private static final long MAX_LANGUAGE_BYTES = 2L * 1024L * 1024L;
+  private static final String MANIFEST_RESOURCE = "gloss-language-source.properties";
+  private static final long MAX_LANGUAGE_BYTES = LanguageDirectory.MAXIMUM_BYTES;
   private static final long CONTENT_RECONCILIATION_NANOS = TimeUnit.SECONDS.toNanos(9L);
+  private static final int MAXIMUM_BASE_DEPTH = 4;
   private static final MessageCatalog CATALOG = GlossMessages.catalog();
 
   private volatile File languageFile;
   private final File dataFolder;
+  private final LanguageDirectory directory;
+  private final LanguageSourceManifest manifest;
+  private final LanguageUpstreamSync sync;
+  private final Throwable sourceFailure;
   private volatile PluginLanguageService languages;
   private final Logger logger;
   private final LocalizationManager manager;
@@ -79,20 +97,51 @@ public final class GlossLocalization implements AutoCloseable {
   private final Set<String> installedLocales = new HashSet<>();
   private final Set<String> pendingDeletedLocales = new HashSet<>();
   private volatile long nextContentReconciliationNanos;
+  private volatile List<String> availableLocales = List.of(VolmitLocales.ENGLISH);
+  private volatile Map<String, LanguageMeta> metas = Map.of();
+  private volatile String englishReference;
 
   public GlossLocalization(File dataFolder, Logger logger, String configuredLocale) {
-    this(dataFolder, logger, configuredLocale, System::nanoTime);
+    this(dataFolder, logger, configuredLocale, System::nanoTime, Source.github());
   }
 
   GlossLocalization(File dataFolder, Logger logger, String configuredLocale, LongSupplier clock) {
+    this(dataFolder, logger, configuredLocale, clock, Source.github());
+  }
+
+  GlossLocalization(File dataFolder, Logger logger, String configuredLocale, LongSupplier clock, Source source) {
     this.dataFolder = dataFolder;
     this.logger = logger;
     this.clock = Objects.requireNonNull(clock, "clock");
+    this.directory = new LanguageDirectory(new File(dataFolder, "languages"));
     this.manager = new LocalizationManager(LocalizationCandidate.english(CATALOG, PluralSelector.oneOther()));
     this.configuredLocale = normalizeLocale(configuredLocale);
     this.languageFile = localePath(this.configuredLocale).toFile();
     this.activeLocale = CATALOG.englishLocale();
-    ensureEnglishFile();
+    LanguageSourceManifest loadedManifest = null;
+    LanguageUpstreamSync loadedSync = null;
+    Throwable failure = null;
+    try {
+      loadedManifest = LanguageSourceManifest.load(GlossLocalization.class.getClassLoader(), MANIFEST_RESOURCE);
+      loadedSync = new LanguageUpstreamSync(new LanguageUpstreamSync.Options(
+          "Gloss",
+          CATALOG,
+          directory,
+          loadedManifest,
+          new GitHubLanguageSource(loadedManifest, "Gloss", source.apiRoot(), source.rawRoot()),
+          new LanguageUpstreamStore(directory, loadedManifest),
+          this::englishReference,
+          this::validateContent,
+          this::commitUpstream,
+          this::noteUpstreamWrite,
+          this::applyUpstream,
+          logger), source.minimumCheckInterval());
+    } catch (RuntimeException exception) {
+      failure = exception;
+    }
+    this.manifest = loadedManifest;
+    this.sync = loadedSync;
+    this.sourceFailure = failure;
     reload();
     if (this.watcher == null) {
       this.watcher = new FolderWatcher(languageFile.getParentFile());
@@ -117,7 +166,7 @@ public final class GlossLocalization implements AutoCloseable {
   public PluginLanguageService enableLanguages(Gloss plugin) {
     languages = new PluginLanguageService(new PluginLanguageService.Options(
         dataFolder.toPath().resolve("languages/language-preferences.properties"),
-        VolmitLocales::all,
+        this::availableLocales,
         () -> configuredLocale,
         manager::snapshot,
         this::loadSelectedSnapshot,
@@ -134,6 +183,80 @@ public final class GlossLocalization implements AutoCloseable {
         return null;
       });
     }
+  }
+
+  public List<String> availableLocales() {
+    return availableLocales;
+  }
+
+  public BukkitLanguageSwitcher.LanguageUpdateAction updateAction() {
+    return this::startUpstreamCheck;
+  }
+
+  public BukkitLanguageSwitcher.LocaleDisplayNames displayNames() {
+    return this::localeDisplayName;
+  }
+
+  public String localeDisplayName(String locale) {
+    String normalized = normalizeLocale(locale);
+    return metas.getOrDefault(normalized, LanguageMeta.empty()).name()
+        .or(() -> VolmitLocales.displayName(normalized))
+        .orElse(normalized);
+  }
+
+  public CompletableFuture<LanguageUpstreamSync.SyncReport> startUpstreamCheck() {
+    if (sync == null) {
+      return CompletableFuture.completedFuture(LanguageUpstreamSync.SyncReport.failed(
+          sourceDescription(), System.currentTimeMillis()));
+    }
+    return sync.checkAsync().thenApply(this::logUpstreamReport);
+  }
+
+  public boolean needsInstall(String locale) {
+    String normalized = normalizeLocale(locale);
+    return isRepositoryLocale(normalized) && !localePath(normalized).toFile().isFile();
+  }
+
+  public CompletableFuture<String> requestInstall(String locale) {
+    String normalized = normalizeLocale(locale);
+    if (sync == null || !isRepositoryLocale(normalized)) {
+      return CompletableFuture.failedFuture(new IOException("Language " + normalized
+          + " is not available from " + sourceDescription()));
+    }
+    logger.info("Installing Gloss language " + normalized + " from " + sourceDescription() + "...");
+    return sync.installAsync(manifest.canonical(normalized));
+  }
+
+  public Optional<Throwable> sourceFailure() {
+    return Optional.ofNullable(sourceFailure);
+  }
+
+  public String sourceDescription() {
+    return manifest == null ? "unavailable" : manifest.repository() + "@" + manifest.branch();
+  }
+
+  public Map<String, Object> diagnostics() {
+    Map<String, Object> values = new LinkedHashMap<>();
+    values.put("source", sourceDescription());
+    values.put("path", manifest == null ? "unavailable" : manifest.path());
+    values.put("activeLocale", activeLocale);
+    values.put("availableLocales", availableLocales);
+    if (sourceFailure != null) {
+      values.put("sourceFailure", String.valueOf(sourceFailure.getMessage()));
+    }
+    if (sync != null) {
+      LanguageUpstreamSync.Status status = sync.status();
+      values.put("revision", status.revision().orElse("none"));
+      values.put("checkedMillis", status.checkedMillis());
+      values.put("lastCheckMillis", status.lastCheckMillis());
+      values.put("lastError", status.lastError().orElse("none"));
+      values.put("checking", status.checking());
+    }
+    return values;
+  }
+
+  public boolean isRepositoryLocale(String locale) {
+    return manifest != null && manifest.contains(locale);
   }
 
   public synchronized void install(String locale, LocalizationSnapshot snapshot) {
@@ -175,6 +298,7 @@ public final class GlossLocalization implements AutoCloseable {
     if (!watcherChanged && pendingAutomaticSnapshots.isEmpty() && pendingDeletedLocales.isEmpty() && !reconciliationDue) {
       return false;
     }
+    refreshAvailableLocales();
     boolean applied = false;
     Set<String> presentLocales = new HashSet<>();
     try (DirectoryStream<Path> paths = Files.newDirectoryStream(languageFile.toPath().getParent(), "*.toml")) {
@@ -245,9 +369,14 @@ public final class GlossLocalization implements AutoCloseable {
       installedLocales.clear();
       pendingDeletedLocales.clear();
     }
+    if (sync != null) {
+      sync.close();
+    }
   }
 
   public boolean reload() {
+    ensureEnglishFile();
+    refreshAvailableLocales();
     PluginLanguageService service = languages;
     try {
       return service == null ? reloadDefault() : service.commitUpdate(this::reloadDefault);
@@ -258,10 +387,12 @@ public final class GlossLocalization implements AutoCloseable {
   }
 
   private synchronized boolean reloadDefault() {
-    ensureEnglishFile();
     if (!languageFile.exists()) {
+      if (isRepositoryLocale(configuredLocale)) {
+        return false;
+      }
       try {
-        install(configuredLocale, loadSelectedSnapshot(configuredLocale));
+        install(configuredLocale, prepareSnapshot(configuredLocale));
         return true;
       } catch (Exception failure) {
         logger.log(Level.SEVERE, "Language reload failed for " + configuredLocale, failure);
@@ -284,6 +415,8 @@ public final class GlossLocalization implements AutoCloseable {
   }
 
   public boolean selectLocale(String locale) {
+    ensureEnglishFile();
+    refreshAvailableLocales();
     PluginLanguageService service = languages;
     try {
       return service == null ? reloadSelectedLocale(locale) : service.commitUpdate(() -> reloadSelectedLocale(locale));
@@ -304,9 +437,7 @@ public final class GlossLocalization implements AutoCloseable {
     observedHashes.put(locale, snapshot.sha256());
     LocalizationSnapshot prepared;
     try {
-      prepared = LocalizationSnapshot.create(new LocalizationCandidate(CATALOG,
-          List.of(parseLanguageOverlay(snapshot.rawContent(), localePath(locale).toString(), locale)),
-          PluralSelector.oneOther()));
+      prepared = snapshotFromContent(snapshot.rawContent(), localePath(locale).toString(), locale);
     } catch (IOException | RuntimeException failure) {
       logger.log(Level.SEVERE, "Rejected Gloss language reload for " + locale + "; keeping its last valid messages.", failure);
       return false;
@@ -482,15 +613,13 @@ public final class GlossLocalization implements AutoCloseable {
     LocalizationSnapshot.create(new LocalizationCandidate(CATALOG, List.of(proposed), PluralSelector.oneOther()));
     Path path = localePath(edit.locale());
     LocalizationSnapshot prepared = LanguageFileEditor.update(path, raw -> {
-      LocalizationSnapshot current = LocalizationSnapshot.create(new LocalizationCandidate(CATALOG,
-          List.of(parseLanguageOverlay(raw, path.toString(), edit.locale())), PluralSelector.oneOther()));
+      LocalizationSnapshot current = snapshotFromContent(raw, path.toString(), edit.locale());
       MessageKey key = CATALOG.key(edit.key());
       if (key == null || !current.value(key).equals(edit.expected())) {
         throw new IOException("Language message changed while it was being edited: " + edit.key());
       }
       String updatedContent = TomlLanguageEditor.upsert(raw, edit.key(), edit.value()).content();
-      LocalizationSnapshot updated = LocalizationSnapshot.create(new LocalizationCandidate(CATALOG,
-          List.of(parseLanguageOverlay(updatedContent, path.toString(), edit.locale())), PluralSelector.oneOther()));
+      LocalizationSnapshot updated = snapshotFromContent(updatedContent, path.toString(), edit.locale());
       return new LanguageFileEditor.Prepared<>(updatedContent, updated);
     });
     if (configuredLocale.equals(edit.locale())) {
@@ -506,45 +635,185 @@ public final class GlossLocalization implements AutoCloseable {
     return dataFolder.toPath().resolve("languages").resolve(locale + ".toml");
   }
 
-  private LocaleOverlay loadLanguageOverlay(String locale) throws Exception {
-    if (!locale.matches("[A-Za-z0-9_-]{2,32}")) {
-      throw new IllegalArgumentException("Invalid language locale: " + locale);
-    }
-    Path file = dataFolder.toPath().resolve("languages").resolve(locale + ".toml");
-    if (!Files.isRegularFile(file) && VolmitLocales.isBundled(locale)) {
+  private LocalizationSnapshot prepareSnapshot(String locale) throws Exception {
+    Path file = localePath(locale);
+    if (!Files.isRegularFile(file) && isRepositoryLocale(locale)) {
       throw new IOException("Language file is not installed: " + locale);
     }
     if (!Files.isRegularFile(file)) {
-      return null;
+      return LocalizationSnapshot.create(LocalizationCandidate.english(CATALOG, PluralSelector.oneOther()));
     }
     if (Files.size(file) > MAX_LANGUAGE_BYTES) {
       logger.warning("Using English for language file exceeding the size limit: " + file);
-      return null;
+      return LocalizationSnapshot.create(LocalizationCandidate.english(CATALOG, PluralSelector.oneOther()));
     }
-    return parseRuntimeLanguageOverlay(Files.readString(file), file.toString(), locale);
+    String content = Files.readString(file);
+    List<LocaleOverlay> overlays = new ArrayList<>();
+    overlays.add(parseRuntimeLanguageOverlay(content, file.toString(), locale));
+    overlays.addAll(baseOverlays(locale, content));
+    return LocalizationSnapshot.create(new LocalizationCandidate(CATALOG, overlays, PluralSelector.oneOther()));
   }
 
   LocalizationSnapshot loadSelectedSnapshot(String locale) throws Exception {
-    Path file = dataFolder.toPath().resolve("languages").resolve(locale + ".toml");
-    if (!VolmitLocales.ENGLISH.equals(locale) && !Files.isRegularFile(file) && VolmitLocales.isBundled(locale)) {
-      try (RemoteLanguageCatalog remote = RemoteLanguageCatalog.load(new RemoteLanguageCatalog.Options(
-          "Gloss",
-          URI.create("https://raw.githubusercontent.com/VolmitSoftware/Gloss/"),
-          "src/main/resources/languages", ".toml", "gloss-language-source.properties",
-          GlossLocalization.class.getClassLoader()))) {
-        remote.readOrInstall(locale, file, (selected, content) ->
-            LocalizationSnapshot.create(new LocalizationCandidate(CATALOG,
-                List.of(parseRuntimeLanguageOverlay(content, file.toString(), selected)), PluralSelector.oneOther())));
-      }
-    }
     ensureEnglishFile();
-    LocaleOverlay overlay = loadLanguageOverlay(locale);
-    LocalizationSnapshot prepared = LocalizationSnapshot.create(new LocalizationCandidate(CATALOG,
-        overlay == null ? List.of() : List.of(overlay), PluralSelector.oneOther()));
+    if (needsInstall(locale)) {
+      if (sync == null) {
+        throw new IOException("Language " + locale + " is not installed and the language source is "
+            + sourceDescription());
+      }
+      logger.info("Installing Gloss language " + locale + " from " + sourceDescription() + "...");
+      sync.install(manifest.canonical(locale));
+      logger.info("Installed Gloss language " + locale + " to " + localePath(locale).toAbsolutePath().normalize() + ".");
+    }
+    LocalizationSnapshot prepared = prepareSnapshot(locale);
     synchronized (this) {
       installedLocales.add(locale);
     }
+    refreshAvailableLocales();
     return prepared;
+  }
+
+  private LocalizationSnapshot snapshotFromContent(String content, String source, String locale) throws IOException {
+    List<LocaleOverlay> overlays = new ArrayList<>();
+    overlays.add(parseLanguageOverlay(content, source, locale));
+    overlays.addAll(baseOverlays(locale, content));
+    return LocalizationSnapshot.create(new LocalizationCandidate(CATALOG, overlays, PluralSelector.oneOther()));
+  }
+
+  private List<LocaleOverlay> baseOverlays(String locale, String content) throws IOException {
+    List<LocaleOverlay> overlays = new ArrayList<>();
+    Set<String> visited = new HashSet<>();
+    visited.add(locale.replace('-', '_').toLowerCase(Locale.ROOT));
+    LanguageMeta meta = metaFromContent(locale, content);
+    int depth = 0;
+    while (meta.base().isPresent() && depth < MAXIMUM_BASE_DEPTH) {
+      String base = meta.base().get();
+      if (!LanguageDirectory.LOCALE_PATTERN.matcher(base).matches()) {
+        break;
+      }
+      String canonicalBase = isRepositoryLocale(base) ? manifest.canonical(base) : base;
+      if (!visited.add(canonicalBase.replace('-', '_').toLowerCase(Locale.ROOT))
+          || LanguageDirectory.sameLocale(canonicalBase, CATALOG.englishLocale())) {
+        break;
+      }
+      Path baseFile = localePath(canonicalBase);
+      if (!Files.isRegularFile(baseFile, LinkOption.NOFOLLOW_LINKS)) {
+        break;
+      }
+      String baseContent = LanguageDirectory.readContent(baseFile);
+      overlays.add(parseRuntimeLanguageOverlay(baseContent, baseFile.toString(), canonicalBase));
+      meta = metaFromContent(canonicalBase, baseContent);
+      depth++;
+    }
+    return overlays;
+  }
+
+  private LanguageMeta metaFromContent(String locale, String content) {
+    try {
+      return LanguageMeta.parse(content).withoutSelfBase(locale);
+    } catch (IOException exception) {
+      return LanguageMeta.empty();
+    }
+  }
+
+  private void refreshAvailableLocales() {
+    Set<String> choices = new LinkedHashSet<>();
+    choices.add(CATALOG.englishLocale());
+    if (manifest != null) {
+      choices.addAll(manifest.locales());
+    }
+    List<String> installed;
+    try {
+      installed = directory.scan();
+    } catch (IOException failure) {
+      logger.log(Level.WARNING, "Could not list Gloss language files in " + directory.root(), failure);
+      return;
+    }
+    choices.addAll(installed);
+    Map<String, LanguageMeta> discovered = new LinkedHashMap<>();
+    for (String locale : installed) {
+      try {
+        LanguageMeta meta = directory.meta(locale);
+        if (!meta.isEmpty()) {
+          discovered.put(locale, meta);
+        }
+      } catch (IOException failure) {
+        logger.log(Level.FINE, "Could not read language metadata for " + locale, failure);
+      }
+    }
+    List<String> sorted = new ArrayList<>(choices);
+    sorted.sort(String.CASE_INSENSITIVE_ORDER);
+    metas = Map.copyOf(discovered);
+    availableLocales = List.copyOf(sorted);
+  }
+
+  private void validateContent(String locale, String content) throws IOException {
+    if (content.getBytes(StandardCharsets.UTF_8).length > MAX_LANGUAGE_BYTES) {
+      throw new IOException("Language file exceeds the 2 MiB safety limit: " + locale);
+    }
+    try {
+      LocalizationSnapshot.create(new LocalizationCandidate(CATALOG,
+          List.of(parseLanguageOverlay(content, "upstream:" + locale, locale)), PluralSelector.oneOther()));
+    } catch (RuntimeException failure) {
+      throw new IOException("Language content is invalid: " + locale, failure);
+    }
+  }
+
+  private <T> T commitUpstream(LanguageUpstreamSync.CommitAction<T> action) throws IOException {
+    PluginLanguageService service = languages;
+    return service == null ? action.apply() : service.commitUpdate(action::apply);
+  }
+
+  private void noteUpstreamWrite(Path file, String content) {
+    Optional<String> locale = directory.locale(file);
+    if (locale.isEmpty()) {
+      return;
+    }
+    synchronized (this) {
+      markObserved(locale.get(), content);
+    }
+    refreshAvailableLocales();
+  }
+
+  private void applyUpstream(String locale, String content, LanguageCatalogMerge.MergeResult result) throws IOException {
+    LocalizationSnapshot prepared = snapshotFromContent(content, localePath(locale).toString(), locale);
+    synchronized (this) {
+      markObserved(locale, content);
+      if (locale.equals(configuredLocale)) {
+        manager.install(prepared);
+        activeLocale = locale;
+      }
+    }
+    PluginLanguageService service = languages;
+    if (service != null) {
+      service.cache(locale, prepared);
+    }
+    refreshAvailableLocales();
+  }
+
+  private void markObserved(String locale, String content) {
+    installedLocales.add(locale);
+    observedHashes.put(locale, DocumentHashes.sha256(content));
+    pendingAutomaticSnapshots.remove(locale);
+    pendingDeletedLocales.remove(locale);
+  }
+
+  private LanguageUpstreamSync.SyncReport logUpstreamReport(LanguageUpstreamSync.SyncReport report) {
+    String revision = report.revision().map(sha -> sha.substring(0, Math.min(7, sha.length()))).orElse("unknown");
+    for (String locale : report.changedLocales()) {
+      LanguageCatalogMerge.MergeResult result = report.merged().get(locale);
+      String source = locale.equals(CATALOG.englishLocale())
+          ? "the built-in catalog" : sourceDescription() + " (" + revision + ")";
+      logger.info("Updated Gloss language " + locale + " from " + source + ": " + result.summary() + ".");
+    }
+    if (report.coolingDown()) {
+      logger.info("Gloss language source " + sourceDescription()
+          + " was checked recently; the next check is allowed in " + report.cooldownRemaining() + ".");
+    } else if (report.failure().isEmpty() && report.changedLocales().isEmpty() && report.failures().isEmpty()
+        && report.revision().isPresent()) {
+      logger.info("Gloss languages match " + sourceDescription() + " (" + revision + ").");
+    }
+    return report;
   }
 
   private LocaleOverlay parseRuntimeLanguageOverlay(String content, String source, String locale) {
@@ -565,16 +834,38 @@ public final class GlossLocalization implements AutoCloseable {
   }
 
   private void ensureEnglishFile() {
+    if (sync != null) {
+      try {
+        sync.mergeEnglish().ifPresent(result -> {
+          if (result.changed()) {
+            logger.info("Updated Gloss language " + CATALOG.englishLocale() + " from the built-in catalog: "
+                + result.summary() + ".");
+          }
+        });
+      } catch (Exception failure) {
+        logger.log(Level.SEVERE, "Unable to refresh the English language file", failure);
+      }
+      return;
+    }
     Path path = localePath(VolmitLocales.ENGLISH);
     if (Files.exists(path)) {
       return;
     }
     try {
       Files.createDirectories(path.getParent());
-      AtomicFileIO.writeString(path, LanguageReferenceRenderer.render(CATALOG, GlossLanguageReference.header()));
+      AtomicFileIO.writeString(path, englishReference());
     } catch (IOException failure) {
       logger.log(Level.SEVERE, "Unable to create the English language file", failure);
     }
+  }
+
+  private String englishReference() {
+    String rendered = englishReference;
+    if (rendered == null) {
+      rendered = LanguageReferenceRenderer.render(CATALOG, GlossLanguageReference.header());
+      englishReference = rendered;
+    }
+    return rendered;
   }
 
   private void watchLocale(String locale) {
@@ -724,5 +1015,12 @@ public final class GlossLocalization implements AutoCloseable {
   }
 
   private record LanguageSnapshot(String rawContent, String sha256) {
+  }
+
+  record Source(URI apiRoot, URI rawRoot, Duration minimumCheckInterval) {
+    static Source github() {
+      return new Source(GitHubLanguageSource.API_ROOT, GitHubLanguageSource.RAW_ROOT,
+          LanguageUpstreamSync.MINIMUM_CHECK_INTERVAL);
+    }
   }
 }

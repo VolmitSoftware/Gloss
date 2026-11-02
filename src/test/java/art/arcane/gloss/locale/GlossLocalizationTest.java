@@ -4,6 +4,7 @@ import art.arcane.gloss.GlossConfig;
 import art.arcane.gloss.config.GlossConfigFile;
 import art.arcane.volmlib.util.director.help.DirectorHelpMessages;
 import art.arcane.volmlib.util.director.runtime.DirectorRuntimeMessages;
+import art.arcane.volmlib.util.localization.LanguageUpstreamSync;
 import art.arcane.volmlib.util.localization.LocalizationSnapshot;
 import art.arcane.volmlib.util.localization.PluginLanguageEditor;
 import art.arcane.volmlib.util.localization.PluginLanguageService;
@@ -14,8 +15,11 @@ import art.arcane.volmlib.util.localization.MessageKey;
 import art.arcane.volmlib.util.localization.VolmitLocales;
 import art.arcane.volmlib.util.plugin.ComponentText;
 import org.bukkit.ChatColor;
+import art.arcane.volmlib.util.localization.TomlLanguageEditor;
 import art.arcane.volmlib.util.localization.TomlLanguageParser;
 import art.arcane.volmlib.util.localization.TomlLanguageWriter;
+import com.sun.net.httpserver.HttpExchange;
+import com.sun.net.httpserver.HttpServer;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
@@ -24,17 +28,23 @@ import org.junit.rules.TemporaryFolder;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Handler;
 import java.util.logging.LogRecord;
 import java.util.logging.Logger;
@@ -208,8 +218,7 @@ public class GlossLocalizationTest {
     assertTrue(GlossMessages.PERMISSION_DENIED.english().startsWith("&8[&dGloss&8]: &c"));
     assertTrue(GlossMessages.MENU_CLOSED.english().startsWith("&8[&dGloss&8]: &a"));
     assertTrue(GlossMessages.WEB_CAPABILITY_WARNING.english().startsWith("&8[&dGloss&8]: &e"));
-    assertTrue(GlossMessages.PANELS_NEAR_HEADER.english().contains("&d{radius}"));
-    assertTrue(GlossMessages.PANELS_NEAR_HEADER.english().contains("&d{count}"));
+    assertTrue(GlossMessages.SCREEN_HUD_HEADER.english().contains("&d{count}"));
 
     for (String locale : VolmitLocales.nonEnglish()) {
       String messages = Files.readString(Path.of("src/main/resources/languages", locale + ".toml"));
@@ -661,6 +670,112 @@ public class GlossLocalizationTest {
     assertEquals(GlossMessages.HELP_ROOT.englishValue(), snapshot.value(GlossMessages.HELP_ROOT));
   }
 
+  @Test
+  public void upstreamSyncMergesRepositoryChangesAndKeepsLocalEditsAndCustomFiles() throws Exception {
+    localization.close();
+    LoopbackRepository repository = new LoopbackRepository();
+    try {
+      repository.files.put(LoopbackRepository.REVISION_ONE + "/de_DE",
+          "# de v1\n\n[command.help]\nroot = \"Wurzel v1\"\nstatus = \"Status v1\"\n");
+      AtomicLong clock = new AtomicLong();
+      File dataFolder = temporaryFolder.newFolder("synced-localization");
+      localization = new GlossLocalization(dataFolder, Logger.getAnonymousLogger(), VolmitLocales.ENGLISH,
+          clock::get, repository.source());
+      PluginLanguageService selections = localization.enableLanguages(null);
+      Path languages = dataFolder.toPath().resolve("languages");
+
+      assertTrue(localization.requestInstall("de_DE").get(10L, TimeUnit.SECONDS).contains("Wurzel v1"));
+      assertTrue(Files.isRegularFile(languages.resolve("de_DE.toml")));
+      assertTrue(Files.isRegularFile(languages.resolve(".upstream/de_DE.toml")));
+      assertTrue(Files.isRegularFile(languages.resolve(".upstream/upstream.properties")));
+      UUID player = UUID.randomUUID();
+      selections.selectPlayer(player, "de_DE").get(5L, TimeUnit.SECONDS);
+      PluginLanguageEditor.Options editor = localization.editorOptions();
+      editor.writer().write(new PluginLanguageEditor.Edit("de_DE", GlossMessages.HELP_ROOT.id(),
+          new TextValue("Wurzel v1"), new TextValue("Lokale Wurzel")));
+      Path custom = languages.resolve("pirate.toml");
+      String customContent = "[meta]\nname = \"Pirate Speak\"\nbase = \"de_DE\"\n\n[command.help]\nroot = \"Arr\"\n";
+      Files.writeString(custom, customContent);
+      clock.addAndGet(TimeUnit.SECONDS.toNanos(9L));
+      localization.update();
+      localization.update();
+
+      repository.revision.set(LoopbackRepository.REVISION_TWO);
+      repository.files.put(LoopbackRepository.REVISION_TWO + "/de_DE",
+          "# de v2\n\n[command.help]\nroot = \"Wurzel v2\"\nstatus = \"Status v2\"\n\n"
+              + "[gloss.message.menu]\nclosed = \"Geschlossen v2\"\n");
+      LanguageUpstreamSync.SyncReport report = localization.updateAction().update().get(10L, TimeUnit.SECONDS);
+
+      assertTrue(report.failure().isEmpty());
+      assertEquals(List.of("de_DE"), report.changedLocales());
+      assertEquals(List.of(GlossMessages.HELP_ROOT.id()), report.merged().get("de_DE").kept());
+      assertTrue(report.merged().get("de_DE").added().contains(GlossMessages.MENU_CLOSED.id()));
+      String merged = Files.readString(languages.resolve("de_DE.toml"));
+      assertTrue(merged.startsWith("# de v2\n"));
+      assertTrue(merged.contains("Lokale Wurzel"));
+      assertTrue(merged.contains("Status v2"));
+      assertFalse(merged.contains("Wurzel v2"));
+      assertEquals(new TextValue("Status v2"), selections.snapshot(player).value(GlossMessages.HELP_STATUS));
+      assertEquals(new TextValue("Lokale Wurzel"), selections.snapshot(player).value(GlossMessages.HELP_ROOT));
+      assertEquals(customContent, Files.readString(custom));
+      assertEquals(LoopbackRepository.REVISION_TWO, localization.diagnostics().get("revision"));
+
+      clock.addAndGet(TimeUnit.SECONDS.toNanos(9L));
+      assertFalse(localization.update());
+      assertFalse(localization.update());
+
+      LanguageUpstreamSync.SyncReport unchanged = localization.updateAction().update().get(10L, TimeUnit.SECONDS);
+      assertTrue(unchanged.unchanged());
+      assertTrue(unchanged.changedLocales().isEmpty());
+      assertEquals(merged, Files.readString(languages.resolve("de_DE.toml")));
+    } finally {
+      repository.close();
+    }
+  }
+
+  @Test
+  public void customLocaleMetaNamesItLayersItsBaseAndIsOfferedForSelection() throws Exception {
+    Path languages = localization.languageFile().toPath().getParent();
+    Files.writeString(languages.resolve("de_DE.toml"),
+        "[command.help]\nroot = \"Wurzel\"\nstatus = \"Status\"\n");
+    Files.writeString(languages.resolve("pirate.toml"),
+        "[meta]\nname = \"Pirate Speak\"\nbase = \"de_DE\"\n\n[command.help]\nroot = \"Arr root\"\n");
+    assertTrue(localization.reload());
+    PluginLanguageService selections = localization.enableLanguages(null);
+
+    assertTrue(localization.availableLocales().contains("pirate"));
+    assertEquals("Pirate Speak", localization.displayNames().displayName("pirate"));
+    assertEquals(VolmitLocales.displayName("de_DE").orElseThrow(), localization.localeDisplayName("de_DE"));
+    UUID player = UUID.randomUUID();
+    selections.selectPlayer(player, "pirate").get(5L, TimeUnit.SECONDS);
+
+    assertEquals("pirate", selections.playerLocale(player).orElseThrow());
+    assertEquals(new TextValue("Arr root"), selections.snapshot(player).value(GlossMessages.HELP_ROOT));
+    assertEquals(new TextValue("Status"), selections.snapshot(player).value(GlossMessages.HELP_STATUS));
+    assertEquals(GlossMessages.MENU_CLOSED.englishValue(), selections.snapshot(player).value(GlossMessages.MENU_CLOSED));
+  }
+
+  @Test
+  public void englishReferenceGainsNewCatalogKeysWhileKeepingEdits() throws Exception {
+    localization.close();
+    File dataFolder = temporaryFolder.newFolder("english-merge");
+    new GlossLocalization(dataFolder, Logger.getAnonymousLogger(), VolmitLocales.ENGLISH).close();
+    Path english = dataFolder.toPath().resolve("languages/en_US.toml");
+    Path sidecar = dataFolder.toPath().resolve("languages/.upstream/en_US.toml");
+    String olderReference = TomlLanguageEditor.remove(Files.readString(sidecar), GlossMessages.HELP_STATUS.id()).content();
+    Files.writeString(sidecar, olderReference);
+    Files.writeString(english, TomlLanguageEditor.upsertText(olderReference, GlossMessages.HELP_ROOT.id(),
+        "Local root").content());
+
+    localization = new GlossLocalization(dataFolder, Logger.getAnonymousLogger(), VolmitLocales.ENGLISH);
+    Map<String, String> values = TomlLanguageParser.parseText(Files.readString(english));
+
+    assertTrue(values.containsKey(GlossMessages.HELP_STATUS.id()));
+    assertEquals("Local root", values.get(GlossMessages.HELP_ROOT.id()));
+    assertEquals("Local root", localization.text(GlossMessages.HELP_ROOT));
+    assertFalse(Files.readString(sidecar).equals(olderReference));
+  }
+
   private Map<String, String> loadLanguageFile() throws Exception {
     return TomlLanguageParser.parseText(Files.readString(localization.languageFile().toPath()));
   }
@@ -669,4 +784,56 @@ public class GlossLocalizationTest {
     Files.writeString(file, TomlLanguageWriter.renderText(values, List.of()));
   }
 
+  private static final class LoopbackRepository {
+    private static final String REVISION_ONE = "1111111111111111111111111111111111111111";
+    private static final String REVISION_TWO = "2222222222222222222222222222222222222222";
+
+    private final HttpServer server;
+    private final AtomicReference<String> revision = new AtomicReference<>(REVISION_ONE);
+    private final Map<String, String> files = new ConcurrentHashMap<>();
+
+    private LoopbackRepository() throws IOException {
+      server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+      server.createContext("/api/", this::api);
+      server.createContext("/raw/", this::raw);
+      server.start();
+    }
+
+    private GlossLocalization.Source source() {
+      URI root = URI.create("http://127.0.0.1:" + server.getAddress().getPort() + "/");
+      return new GlossLocalization.Source(root.resolve("api/"), root.resolve("raw/"), Duration.ZERO);
+    }
+
+    private void close() {
+      server.stop(0);
+    }
+
+    private void api(HttpExchange exchange) throws IOException {
+      String etag = "\"" + revision.get() + "\"";
+      if (etag.equals(exchange.getRequestHeaders().getFirst("If-None-Match"))) {
+        exchange.sendResponseHeaders(304, -1);
+        exchange.close();
+        return;
+      }
+      exchange.getResponseHeaders().set("ETag", etag);
+      byte[] response = ("[{\"sha\":\"" + revision.get() + "\"}]").getBytes(StandardCharsets.UTF_8);
+      exchange.sendResponseHeaders(200, response.length);
+      exchange.getResponseBody().write(response);
+      exchange.close();
+    }
+
+    private void raw(HttpExchange exchange) throws IOException {
+      String[] parts = exchange.getRequestURI().getPath().split("/");
+      String content = files.get(parts[4] + "/" + parts[parts.length - 1].replace(".toml", ""));
+      if (content == null) {
+        exchange.sendResponseHeaders(404, -1);
+        exchange.close();
+        return;
+      }
+      byte[] response = content.getBytes(StandardCharsets.UTF_8);
+      exchange.sendResponseHeaders(200, response.length);
+      exchange.getResponseBody().write(response);
+      exchange.close();
+    }
+  }
 }

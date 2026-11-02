@@ -25,6 +25,7 @@
 #   {absorbed}  Mevcut verilerle birleştirilen içe aktarılmış kayıtlar
 #   {active}  Etkin sağlayıcı sayısı
 #   {actual}  Geçerli belge sürümü
+#   {added}  Dil güncellemesiyle eklenen mesajlar
 #   {after}  Düzenlemeden sonraki ileti değeri
 #   {argument}  Beklenmeyen komut argümanı
 #   {axis}  Koordinat veya dönüş ekseni
@@ -32,7 +33,7 @@
 #   {before}  Düzenlemeden önceki ileti değeri
 #   {billboard}  Görüntülenen nesnenin bakış yönü modu
 #   {blocks}  Blok gösterim öğesi sayısı
-#   {board}  Pano veya panel kimliği
+#   {board}  Skor tahtası veya panel kimliği
 #   {bottles}  Kaptaki şişe sayısı
 #   {bubbles}  Etkin sohbet balonu sayısı
 #   {cells}  Menü hücresi sayısı
@@ -42,7 +43,6 @@
 #   {copied}  Kopyalanan kayıt sayısı
 #   {count}  Eşleşen nesne veya ileti sayısı
 #   {disc}  Kaptaki müzik diski
-#   {distance}  Hedefe uzaklık
 #   {drops}  Görüntülenen düşmüş eşya sayısı
 #   {enabled}  Etkinlik durumu veya etkin kayıt sayısı
 #   {entities}  Varlık sayısı
@@ -62,6 +62,7 @@
 #   {interactPermission}  Etkileşim için gereken izin
 #   {interactionRange}  En yüksek etkileşim uzaklığı
 #   {item}  Eşya adı veya malzemesi
+#   {kept}  Dil güncellemesinde korunan yerel düzenlemeler
 #   {key}  İleti veya yapılandırma anahtarı
 #   {kind}  Nesne veya sağlayıcı türü
 #   {kinds}  Kullanılabilir nesne veya sağlayıcı türleri
@@ -80,7 +81,7 @@
 #   {minimum}  İzin verilen en düşük değer
 #   {mode}  Seçilen işlem veya görüntüleme modu
 #   {name}  Nesne adı
-#   {oldBoard}  Önceki pano kimliği
+#   {oldBoard}  Önceki panel kimliği
 #   {operation}  İşlem adı
 #   {options}  Kullanılabilir komut seçenekleri
 #   {overlaid}  Uygulanan yapılandırma anahtarı sayısı
@@ -99,9 +100,9 @@
 #   {priority}  Seçim veya görüntüleme önceliği
 #   {provider}  Sağlayıcı adı
 #   {providers}  Sağlayıcı listesi veya sayısı
-#   {radius}  Arama yarıçapı
 #   {ready}  İçe aktarılmaya hazır kayıt sayısı
 #   {reason}  Hatanın veya kararın nedeni
+#   {remaining}  Bir sonraki dil denetimine kalan süre
 #   {resume}  İçe aktarımı sürdürülebilecek kayıt sayısı
 #   {revision}  Belge sürümü
 #   {roll}  Derece cinsinden yatış açısı
@@ -125,6 +126,7 @@
 #   {to}  Hedef değer veya aralığın sonu
 #   {total}  Toplam kayıt sayısı
 #   {type}  Beklenen değer veya nesne türü
+#   {updated}  Dil güncellemesiyle değiştirilen mesajlar
 #   {url}  Web adresi
 #   {uuid}  Benzersiz nesne veya oyuncu kimliği
 #   {value}  İletinin veya parametrenin geçerli değeri
@@ -205,8 +207,8 @@ board = "Skor tahtası oluştur ve yönet"
 "board.show" = "Bir skor tahtasını kendine göster"
 "board.show.id" = "Skor tahtası ID'si"
 "board.hide" = "Skor tahtanızı gizle"
-"board.select" = "Otomatik skor tablosu seçimini ayarla"
-"board.select.id" = "Skor tablosu kimliği"
+"board.select" = "Otomatik skor tahtası seçimini ayarla"
+"board.select.id" = "Skor tahtası ID'si"
 "board.select.priority" = "Seçim önceliği"
 "board.select.when" = "Mantıksal koşul; boşluk içeren ifadeleri tırnak içine alın"
 "board.list" = "Skor tahtalarını listele"
@@ -245,7 +247,7 @@ menu = "Hologram menüleri oluştur, aç ve düzenle"
 "menu.back" = "Önceki menü oturumunu yeniden aç"
 "menu.close" = "Geçerli menü oturumunu kapat"
 "menu.copy" = "Yüklü bir menüyü yeni bir iç içe ID'ye kopyala"
-"menu.create" = "Mevcut konumunuzda kalıcı bir hologram oluşturun"
+"menu.create" = "Mevcut konumunda kalıcı bir hologram oluştur"
 "menu.image" = "Menü içeriğini ortalanmış tek bir görsel dosyasıyla değiştir"
 "menu.insertrow" = "Araya bir metin süsleme satırı ekle"
 "menu.list" = "Açabileceğiniz tüm yapılandırılmış menüleri listele"
@@ -294,7 +296,7 @@ preview = "Önizleme belgesi araçları"
 "preview.reset" = "Yerleşik önizleme varsayılanlarını geri yükle (onları gölgeleyebilecek ek kullanıcı belgelerini kaldırmaz)"
 web = "Gloss web düzenleyicisini aç ve yönet"
 "web.open" = "Boş, barındırılan bir Gloss düzenleyicisi aç"
-"web.edit" = "Bir canlı Gloss belgesi aç"
+"web.edit" = "Canlı bir Gloss belgesi aç"
 "web.edit.document" = "Bu canlı belgeyi web düzenleyicisinde aç"
 "web.workspace" = "Canlı Gloss çalışma alanının tamamını aç"
 "web.sessions" = "Etkin web düzenleyicisi oturumlarını yönet"
@@ -362,21 +364,21 @@ usage = "&7Kullanım: &f/{command} help"
 [command.hologram]
 exists = "&8[&dGloss&8] &c'&f{id}&c' hologramı zaten var."
 missing = "&8[&dGloss&8] &c'&f{id}&c' adında bir hologram yok."
-created = "&8[&dGloss&8] &a&f{id}&a hologramı oluşturuldu."
-deleted = "&8[&dGloss&8] &a&f{id}&a hologramı silindi."
-line_added = "&8[&dGloss&8] &a&f{id}&a hologramına &f{line}&a numaralı satır eklendi."
-line_set = "&8[&dGloss&8] &a&f{id}&a hologramında &f{line}&a numaralı satır ayarlandı."
-line_removed = "&8[&dGloss&8] &a&f{id}&a hologramından &f{line}&a numaralı satır kaldırıldı."
+created = "&8[&dGloss&8] &aHologram &f{id}&a oluşturuldu."
+deleted = "&8[&dGloss&8] &aHologram &f{id}&a silindi."
+line_added = "&8[&dGloss&8] &aSatır &f{line}&a, &f{id}&a hologramına eklendi."
+line_set = "&8[&dGloss&8] &aSatır &f{line}&a, &f{id}&a hologramında ayarlandı."
+line_removed = "&8[&dGloss&8] &aSatır &f{line}&a, &f{id}&a hologramından kaldırıldı."
 line_out_of_range = "&8[&dGloss&8] &c{line} numaralı satır aralık dışında; &f{id}&c hologramında {count} satır var."
-cleared = "&8[&dGloss&8] &a&f{id}&a hologramındaki tüm satırlar temizlendi."
-moved = "&8[&dGloss&8] &a&f{id}&a hologramı bulunduğunuz konuma taşındı."
-offset = "&8[&dGloss&8] &a&f{id}&a hologramı &f{x}&a, &f{y}&a, &f{z}&a kadar kaydırıldı."
-teleported = "&8[&dGloss&8] &a&f{id}&a hologramına ışınlandınız."
+cleared = "&8[&dGloss&8] &aHologram &f{id}&a üzerindeki tüm satırlar temizlendi."
+moved = "&8[&dGloss&8] &aHologram &f{id}&a bulunduğunuz konuma taşındı."
+offset = "&8[&dGloss&8] &aHologram &f{id}&a, &f{x}&a, &f{y}&a, &f{z}&a kadar kaydırıldı."
+teleported = "&8[&dGloss&8] &aHologram &f{id}&a konumuna ışınlandınız."
 list_empty = "&8[&dGloss&8] &7Henüz hiç hologram yok."
-rendered = "&8[&dGloss&8] &a&f{id}&a metin hologramı &f{scale}&a ölçeğinde oluşturuldu."
+rendered = "&8[&dGloss&8] &aMetin hologramı &f{id}&a, &f{scale}&a ölçeğinde oluşturuldu."
 text_empty = "&8[&dGloss&8] &cMetin boş olamaz."
 scale_out_of_range = "&8[&dGloss&8] &c{value} ölçeği aralık dışında; &f{minimum}&c ile &f{maximum}&c arasında olmalı."
-oriented = "&8[&dGloss&8] &a&f{id}&a için billboard &f{billboard}&a, yaw &f{yaw}&a, pitch &f{pitch}&a olarak ayarlandı."
+oriented = "&8[&dGloss&8] &aHologram &f{id}&a için billboard &f{billboard}&a, yaw &f{yaw}&a, pitch &f{pitch}&a olarak ayarlandı."
 billboard_unknown = "&8[&dGloss&8] &cBilinmeyen billboard '&f{billboard}&c'. Şunlardan birini kullan: &f{options}&c."
 angle_out_of_range = "&8[&dGloss&8] &c{axis} değeri {value} aralık dışında; &f-{limit}&c ile &f{limit}&c derece arasında olmalı."
 
@@ -392,17 +394,17 @@ orientation = " &8ölçek &f{scale} &8billboard &f{billboard} &8yaw &f{yaw} &8pi
 [command.board]
 exists = "&8[&dGloss&8] &c'&f{id}&c' skor tahtası zaten var."
 missing = "&8[&dGloss&8] &c'&f{id}&c' adında bir skor tahtası yok."
-created = "&8[&dGloss&8] &a&f{id}&a skor tahtası oluşturuldu."
-deleted = "&8[&dGloss&8] &a&f{id}&a skor tahtası silindi."
-title_set = "&8[&dGloss&8] &a&f{id}&a skor tahtasının başlığı ayarlandı."
-line_added = "&8[&dGloss&8] &a&f{id}&a skor tahtasına &f{line}&a numaralı satır eklendi."
-line_set = "&8[&dGloss&8] &a&f{id}&a skor tahtasında &f{line}&a numaralı satır ayarlandı."
-line_removed = "&8[&dGloss&8] &a&f{id}&a skor tahtasından &f{line}&a numaralı satır kaldırıldı."
+created = "&8[&dGloss&8] &aSkor tahtası &f{id}&a oluşturuldu."
+deleted = "&8[&dGloss&8] &aSkor tahtası &f{id}&a silindi."
+title_set = "&8[&dGloss&8] &aSkor tahtası &f{id}&a için başlık ayarlandı."
+line_added = "&8[&dGloss&8] &aSatır &f{line}&a, &f{id}&a skor tahtasına eklendi."
+line_set = "&8[&dGloss&8] &aSatır &f{line}&a, &f{id}&a skor tahtasında ayarlandı."
+line_removed = "&8[&dGloss&8] &aSatır &f{line}&a, &f{id}&a skor tahtasından kaldırıldı."
 line_out_of_range = "&8[&dGloss&8] &c{line} numaralı satır aralık dışında; &f{id}&c skor tahtasında {count} satır var."
-shown = "&8[&dGloss&8] &a&f{id}&a skor tahtası gösteriliyor."
+shown = "&8[&dGloss&8] &aSkor tahtası &f{id}&a gösteriliyor."
 hidden = "&8[&dGloss&8] &aSkor tahtanız gizlendi."
-select_set = "&8[&dGloss&8] &a&f{id}&a skor tablosunun seçim önceliği &f{priority}&a olarak ayarlandı."
-select_invalid = "&8[&dGloss&8] &cGeçersiz skor tablosu koşulu: &f{error}&c."
+select_set = "&8[&dGloss&8] &aSkor tahtası &f{id}&a için seçim önceliği &f{priority}&a olarak ayarlandı."
+select_invalid = "&8[&dGloss&8] &cGeçersiz skor tahtası koşulu: &f{error}&c."
 list_empty = "&8[&dGloss&8] &7Henüz hiç skor tahtası yok."
 
 [command.board.list]
@@ -410,7 +412,7 @@ hover = "Ayrıntılar için tıklayın"
 
 [command.board.info]
 header = "&8[&dGloss&8] &d{id} &7başlığı: &f{title}"
-meta = "&7Öncelik: &f{priority} | Koşul: &f{when} | Çeşitler: &f{variants}"
+meta = "&7Öncelik: &f{priority} &8| &7Koşul: &f{when} &8| &7Çeşitler: &f{variants}"
 line = " &8{line}. &f{text}"
 
 [command.emoji]
@@ -419,8 +421,6 @@ hover = "Sohbete eklemek için tıklayın"
 
 [command.animations]
 empty = "&8[&dGloss&8] &7Yüklü animasyon yok."
-header = "&8[&dGloss&8] &fAnimasyonlar: &d{count}"
-entry = "&8- &d{name}"
 
 [command.list]
 page = "&7Sayfa &f{page}&7/&f{pages} &8- &7gösterilen &f{from}&7-&f{to} &7/ &f{total}"
@@ -437,7 +437,7 @@ visibility = "&7Görünür varlık kopyaları: &f{entities} &8| &7İzleyiciler: 
 images = "&7Görüntü önbelleği: &f{entries} &8| &7Bekleyen: &f{pending} &8| &7Saklanan veri: &f{bytes} &7bayt &8| &7Tamamlanan: &f{completed} &8| &7Retler: &f{refusals}"
 
 [command.reset]
-done = "&8[&dGloss&8] &a&f{count}&a yerleşik {kind} varsayılanı geri yüklendi."
+done = "&8[&dGloss&8] &aGeri yüklenen yerleşik {kind} varsayılanı: &f{count}&a."
 none = "&8[&dGloss&8] &c'&f{name}&c' ile eşleşen yerleşik {kind} varsayılanı yok."
 
 [command.bubbles]
@@ -513,13 +513,12 @@ import_source_unknown = "Bilinmeyen eski veri içe aktarma kaynağı: {source}"
 
 [gloss.message]
 permission_denied = "&8[&dGloss&8]: &cŞu izne sahip değilsiniz: &f{permission}&c."
-unknown_command = "&8[&dGloss&8]: &cBilinmeyen komut \"&f{command}&c\"."
 
 [gloss.message.hologram]
-created = "&8[&dGloss&8]: &a&f{hologram}&a hologramı, &f{menu}&a kök menüsüyle mevcut konumunuzda oluşturuldu."
-already_exists = "&8[&dGloss&8]: &c&f{hologram}&c adında bir hologram, panel veya menü zaten var."
-failed = "&8[&dGloss&8]: &c&f{hologram}&c hologramı oluşturulamadı. Hiçbir değişiklik saklanmadı."
-durability_uncertain = "&8[&dGloss&8]: &e&f{hologram}&e hologramının işlemi güvenli bir şekilde tamamlanamadı. İncelemeden veya yeniden denemeden önce Gloss'yi yeniden başlatın."
+created = "&8[&dGloss&8]: &aHologram &f{hologram}&a, &f{menu}&a kök menüsüyle mevcut konumunuzda oluşturuldu."
+already_exists = "&8[&dGloss&8]: &cAdı &f{hologram}&c olan bir hologram, panel veya menü zaten var."
+failed = "&8[&dGloss&8]: &cHologram &f{hologram}&c oluşturulamadı. Hiçbir değişiklik saklanmadı."
+durability_uncertain = "&8[&dGloss&8]: &eHologram &f{hologram}&e için işlem güvenli bir şekilde tamamlanamadı. İncelemeden veya yeniden denemeden önce Gloss'u yeniden başlatın."
 
 [gloss.message.menu]
 none = "&8[&dGloss&8]: &7Kullanılabilir menü yok."
@@ -537,13 +536,13 @@ header = "Menüler"
 entry = "{menu} menüsünü açmak için tıklayın."
 
 [gloss.message.menu.content]
-updated = "&8[&dGloss&8]: &a&f{menu}&a menüsüne {operation} uygulandı, revizyon {revision}."
-created = "&8[&dGloss&8]: &a&f{menu}&a menüsü oluşturuldu, revizyon {revision}. /gloss menu open &f{menu}&a ile açın veya /gloss panel create &f{menu}&a ile yerleştirin."
-copied = "&8[&dGloss&8]: &a&f{source}&a menüsü &f{menu}&a olarak kopyalandı, revizyon {revision}."
-revision_conflict = "&8[&dGloss&8]: &c&f{menu}&c menüsü yazma sırasında değişti (beklenen {expected}, mevcut {actual}). Komutu yeniden çalıştırın."
-already_exists = "&8[&dGloss&8]: &c&f{menu}&c menüsü zaten var."
+updated = "&8[&dGloss&8]: &aMenü &f{menu}&a için {operation} uygulandı, revizyon {revision}."
+created = "&8[&dGloss&8]: &aMenü &f{menu}&a oluşturuldu, revizyon {revision}. /gloss menu open {menu} ile açın veya /gloss panel create {menu} ile yerleştirin."
+copied = "&8[&dGloss&8]: &aMenü &f{source}&a, &f{menu}&a olarak kopyalandı, revizyon {revision}."
+revision_conflict = "&8[&dGloss&8]: &cMenü &f{menu}&c yazma sırasında değişti (beklenen {expected}, mevcut {actual}). Komutu yeniden çalıştırın."
+already_exists = "&8[&dGloss&8]: &cMenü &f{menu}&c zaten var."
 invalid = "&8[&dGloss&8]: &cGeçersiz menü içeriği değeri: &f{reason}&c."
-failed = "&8[&dGloss&8]: &c&f{menu}&c menüsünün içerik işlemi başarısız: {reason}"
+failed = "&8[&dGloss&8]: &cMenü &f{menu}&c için içerik işlemi başarısız: {reason}"
 
 [gloss.message.command]
 player_only = "&8[&dGloss&8]: &cBu komut yalnızca oyuncular tarafından kullanılabilir."
@@ -552,10 +551,10 @@ player_only = "&8[&dGloss&8]: &cBu komut yalnızca oyuncular tarafından kullan�
 header = "Web düzenleyicisi"
 open_hover = "Gloss web düzenleyicisini açmak için tıklayın."
 open = "&8[&dGloss&8]: &7Web düzenleyicisi: &f{url}"
-preparing = "&8[&dGloss&8]: &7&f{subject}&7 için güvenli düzenleyici eşitleme oturumu hazırlanıyor..."
+preparing = "&8[&dGloss&8]: &7Güvenli düzenleyici eşitleme oturumu hazırlanıyor: &f{subject}&7..."
 unavailable = "&8[&dGloss&8]: &cCanlı web düzenlemesi kullanılamıyor. Düzenleyici eşitleme ayarlarını ve aktarma sunucusu bağlantısını kontrol edin."
-open_failed = "&8[&dGloss&8]: &c&f{kind}={subject}&c canlı web düzenleyicisinde açılamadı: {reason}"
-open_console = "&8[&dGloss&8]: &7&f{subject}&7 için düzenleyici erişim bağlantısı: &f{url}"
+open_failed = "&8[&dGloss&8]: &cBelge &f{kind}={subject}&c canlı web düzenleyicisinde açılamadı: {reason}"
+open_console = "&8[&dGloss&8]: &7Düzenleyici erişim bağlantısı (&f{subject}&7): &f{url}"
 capability_warning = "&8[&dGloss&8]: &eBu URL, iptal edilene veya süresi dolana kadar sunucuya değişiklik yayımlayabilir. Gizli tutun."
 open_label = "Düzenleyiciyi aç"
 copy_label = "Bağlantıyı kopyala"
@@ -564,23 +563,23 @@ link_hover = "Düzenleyiciyi açın, erişim bağlantısını kopyalayın veya {
 
 [gloss.message.web.sessions]
 list_empty = "&8[&dGloss&8]: &7Etkin düzenleyici eşitleme oturumu yok."
-status = "&8[&dGloss&8]: &f&f{session} &7{kind}=&f{subject} kalan süre=&f{seconds}s yayın=&f{revision} bekleyen=&f{pending}"
-revoked = "&8[&dGloss&8]: &a&f{session}&a düzenleyici eşitleme oturumu iptal edildi."
-pulled = "&8[&dGloss&8]: &a&f{session}&a düzenleyici eşitleme oturumu sorgulandı."
-unknown = "&8[&dGloss&8]: &c&f{session}&c düzenleyici eşitleme oturumu bilinmiyor veya süresi dolmuş."
-failed = "&8[&dGloss&8]: &c&f{session}&c oturumunun eşitleme işlemi başarısız: {reason}"
+status = "&8[&dGloss&8]: &f{session} &7{kind}=&f{subject} &7kalan süre=&f{seconds}s &7yayın=&f{revision} &7bekleyen=&f{pending}"
+revoked = "&8[&dGloss&8]: &aDüzenleyici eşitleme oturumu &f{session}&a iptal edildi."
+pulled = "&8[&dGloss&8]: &aDüzenleyici eşitleme oturumu &f{session}&a sorgulandı."
+unknown = "&8[&dGloss&8]: &cDüzenleyici eşitleme oturumu &f{session}&c bilinmiyor veya süresi dolmuş."
+failed = "&8[&dGloss&8]: &cOturum &f{session}&c için eşitleme işlemi başarısız: {reason}"
 
 [gloss.message.import]
 preview_started = "&8[&dGloss&8]: &7Verileri değiştirmeden geçiş önizlemesi için &f{source}&7 taranıyor..."
-apply_started = "&8[&dGloss&8]: &7&f{source}&7 taranıyor ve mevcut verilerin üzerine yazılmadan aktarılıyor..."
-source_missing = "&8[&dGloss&8]: &7&f{path}&7 konumunda &f{source}&7 kaynağı bulunamadı."
-preview_summary = "&8[&dGloss&8]: &f&f{source}&7 önizlemesi: &a{ready} hazır, &d{resume} sürdürülebilir, &e{conflicts} çakışma, &c{errors} hata, {warnings} uyarı. Kaynak: &f{path}"
-preview_entry = "&8- &f&f{legacy} -> &f{board} durum=&f{state} uyarılar=&f{warnings}"
-apply_summary = "&8[&dGloss&8]: &f&f{source}&7 geçişi: &a{imported} içe aktarıldı, &e{skipped} atlandı, &c{failed} başarısız; taramada {errors} hata ve {warnings} uyarı bildirildi."
-apply_entry = "&8- &f&f{legacy} durum=&f{state} neden=&f{reason}"
+apply_started = "&8[&dGloss&8]: &7Kaynak &f{source}&7 taranıyor ve mevcut verilerin üzerine yazılmadan aktarılıyor..."
+source_missing = "&8[&dGloss&8]: &7Konum &f{path}&7 içinde &f{source}&7 kaynağı bulunamadı."
+preview_summary = "&8[&dGloss&8]: &f{source}&7 önizlemesi: &a{ready} hazır&7, &d{resume} sürdürülebilir&7, &e{conflicts} çakışma&7, &c{errors} hata&7, {warnings} uyarı. Kaynak: &f{path}"
+preview_entry = "&8- &f{legacy} &7-> &f{board} &7durum=&f{state} &7uyarılar=&f{warnings}"
+apply_summary = "&8[&dGloss&8]: &f{source}&7 geçişi: &a{imported} içe aktarıldı&7, &e{skipped} atlandı&7, &c{failed} başarısız&7; taramada {errors} hata ve {warnings} uyarı bildirildi."
+apply_entry = "&8- &f{legacy} &7durum=&f{state} &7neden=&f{reason}"
 issue = "&8- &f{legacy} &7{severity}: &f{reason}"
 busy = "&8[&dGloss&8]: &cBaşka bir eski hologram geçişi zaten sürüyor."
-failed = "&8[&dGloss&8]: &c&f{source}&c kaynağından eski hologram geçişi başarısız: {reason}"
+failed = "&8[&dGloss&8]: &cKaynak &f{source}&c için eski hologram geçişi başarısız: {reason}"
 
 [gloss.message.config]
 reloaded = "&2\"{name}\" yapılandırması yeniden yüklendi."
@@ -600,7 +599,7 @@ saved = "&7Önizleme boyutu kaydedildi: &f{percent}%"
 bundle_more = "+{count} daha"
 
 [gloss.message.items]
-disabled = "&8[&dGloss&8]: &7Özel eşyalar devre dışı. gloss.toml dosyasında customItems değerini true yapın."
+disabled = "&8[&dGloss&8]: &7Özel eşyalar devre dışı. gloss.toml dosyasında &fcustomItems&7 değerini true yapın."
 
 [gloss.message.items.status]
 header = "Özel eşyalar"
@@ -633,57 +632,53 @@ none = "&8[&dGloss&8]: &c\"{name}\" birlikte gelen bir önizleme belgesi değil;
 
 [gloss.message.previews.dump]
 unknown = "&8[&dGloss&8]: &c\"{name}\" yüklü bir önizleme belgesi değil."
-result = "&8[&dGloss&8]: &a&a{name}&7: &f{total}&7 öğe (paneller={panels}, hücreler={cells}, yuvalar={slots}, etiketler={labels})."
+result = "&8[&dGloss&8]: &a{name}&7: &f{total}&7 öğe (paneller={panels}, hücreler={cells}, yuvalar={slots}, etiketler={labels})."
 no_errors = "&8[&dGloss&8]: &aOluşturma hatası yok."
 error_line = "&8[&dGloss&8]: &c{message}"
 error_more = "&8[&dGloss&8]: &7{count} tane daha (konsol günlüğüne bakın)."
 
 [gloss.message.panels]
-created = "&8[&dGloss&8]: &a&f{board}&a paneli oluşturuldu, revizyon {revision}."
-deleted = "&8[&dGloss&8]: &a&f{board}&a paneli silindi."
-renamed = "&8[&dGloss&8]: &a&f{oldBoard}&a adı &f{board}&a olarak değiştirildi, revizyon {revision}."
-copied = "&8[&dGloss&8]: &a&f{source}&a, &f{board}&a olarak kopyalandı."
-updated = "&8[&dGloss&8]: &a&f{board}&a paneline {operation} uygulandı, revizyon {revision}."
-teleported = "&8[&dGloss&8]: &a&f{board}&a konumuna ışınlanıldı."
+created = "&8[&dGloss&8]: &aPanel &f{board}&a oluşturuldu, revizyon {revision}."
+deleted = "&8[&dGloss&8]: &aPanel &f{board}&a silindi."
+renamed = "&8[&dGloss&8]: &aPanel &f{oldBoard}&a, &f{board}&a olarak yeniden adlandırıldı, revizyon {revision}."
+copied = "&8[&dGloss&8]: &aPanel &f{source}&a, &f{board}&a olarak kopyalandı."
+updated = "&8[&dGloss&8]: &aPanel &f{board}&a için {operation} uygulandı, revizyon {revision}."
+teleported = "&8[&dGloss&8]: &aPanel &f{board}&a konumuna ışınlandınız."
 unknown = "&8[&dGloss&8]: &cBilinmeyen panel &f{board}&c."
-already_exists = "&8[&dGloss&8]: &c&f{board}&c paneli zaten var."
+already_exists = "&8[&dGloss&8]: &cPanel &f{board}&c zaten var."
 invalid = "&8[&dGloss&8]: &cGeçersiz panel değeri: &f{reason}&c."
-menu_unavailable = "&8[&dGloss&8]: &c&f{menu}&c kök menüsü yüklü değil."
+menu_unavailable = "&8[&dGloss&8]: &cKök menü &f{menu}&c yüklü değil."
 player_unavailable = "&8[&dGloss&8]: &cHedef oyuncu &f{player}&c çevrimiçi değil."
 world_unavailable = "&8[&dGloss&8]: &cPanelin &f{world}&c dünyası kayıtlı UUID ile yüklü değil."
-revision_conflict = "&8[&dGloss&8]: &c&f{board}&c paneli düzenleme sırasında değişti (beklenen {expected}, mevcut {actual}). Düzenleme oturumunu yeniden açın."
-failed = "&8[&dGloss&8]: &c&f{board}&c panelinin işlemi başarısız: {reason}"
+revision_conflict = "&8[&dGloss&8]: &cPanel &f{board}&c düzenleme sırasında değişti (beklenen {expected}, mevcut {actual}). Düzenleme oturumunu yeniden açın."
+failed = "&8[&dGloss&8]: &cPanel &f{board}&c için işlem başarısız: {reason}"
 
 [gloss.message.panels.list]
-header = "&8[&dGloss&8]: &fKalıcı paneller: &d{count}"
 empty = "&8[&dGloss&8]: &7Yüklü kalıcı panel yok."
-entry = "&8- &f&f{board} menü=&f{menu} revizyon=&f{revision}"
 
 [gloss.message.panels.near]
-header = "&8[&dGloss&8]: &f&d{radius}&f blok içindeki paneller: &d{count}"
 empty = "&8[&dGloss&8]: &7Bu yarıçap içinde panel yok."
-entry = "&8- &f&f{board} uzaklık=&f{distance} menü=&f{menu}"
 
 [gloss.message.panels.info]
-header = "&8[&dGloss&8]: &fPanel &d{board} ({state})"
-identity = "&7uuid=&f{uuid} revizyon=&f{revision} menü=&f{menu}"
-transform = "&7dünya=&f{world} konum=&f{x}, {y}, {z} dönüş=&f{yaw}, {pitch}, {roll} ölçek=&f{scale}"
-visibility = "&7görünürlük=&f{mode} görüntüleme izni=&f{viewPermission} etkileşim izni=&f{interactPermission} mesafeler=&f{viewRange}/{interactionRange}"
-follow = "&7takip=&f{mode} oyuncu=&f{player} dönüş=&f{rotation}"
+header = "&8[&dGloss&8]: &fPanel &d{board} &7({state})"
+identity = "&7uuid=&f{uuid} &7revizyon=&f{revision} &7menü=&f{menu}"
+transform = "&7dünya=&f{world} &7konum=&f{x}, {y}, {z} &7dönüş=&f{yaw}, {pitch}, {roll} &7ölçek=&f{scale}"
+visibility = "&7görünürlük=&f{mode} &7görüntüleme izni=&f{viewPermission} &7etkileşim izni=&f{interactPermission} &7menziller=&f{viewRange}/{interactionRange}"
+follow = "&7takip=&f{mode} &7oyuncu=&f{player} &7dönüş=&f{rotation}"
 
 [gloss.message.panels.edit]
-started = "&8[&dGloss&8]: &a&f{board}&a, {revision} revizyonundan düzenleniyor. Değişiklikler kaydedilene kadar bekletilir."
-already_active = "&8[&dGloss&8]: &c&f{board}&c panelini zaten düzenliyorsunuz. Önce kaydedin veya iptal edin."
+started = "&8[&dGloss&8]: &aPanel &f{board}&a, {revision} revizyonundan düzenleniyor. Değişiklikler kaydedilene kadar bekletilir."
+already_active = "&8[&dGloss&8]: &cPanel &f{board}&c zaten sizin tarafınızdan düzenleniyor. Önce kaydedin veya iptal edin."
 none = "&8[&dGloss&8]: &cBekleyen panel düzenlemeniz yok."
-busy = "&8[&dGloss&8]: &c&f{board}&c paneli şu anda kaydediliyor."
-staged = "&8[&dGloss&8]: &a&f{board}&a için {operation} hazırlandı. Kalıcı olarak kaydetmek için /gloss panel save kullanın."
-saved = "&8[&dGloss&8]: &a&f{board}&a kaydedildi, revizyon {revision}."
-cancelled = "&8[&dGloss&8]: &a&f{board}&a için bekleyen düzenlemeler iptal edildi."
-identity_blocked = "&8[&dGloss&8]: &c&f{board}&c panelini yeniden adlandırmadan veya silmeden önce bekleyen düzenlemeyi kaydedin ya da iptal edin."
+busy = "&8[&dGloss&8]: &cPanel &f{board}&c şu anda kaydediliyor."
+staged = "&8[&dGloss&8]: &aPanel &f{board}&a için {operation} hazırlandı. Kalıcı olarak kaydetmek için /gloss panel save kullanın."
+saved = "&8[&dGloss&8]: &aPanel &f{board}&a kaydedildi, revizyon {revision}."
+cancelled = "&8[&dGloss&8]: &aPanel &f{board}&a için bekleyen düzenlemeler iptal edildi."
+identity_blocked = "&8[&dGloss&8]: &cPanel &f{board}&c yeniden adlandırılmadan veya silinmeden önce bekleyen düzenlemeyi kaydedin ya da iptal edin."
 
 [gloss.preview.state]
 idle = "Boşta"
-brewing = "Üretiliyor {percent}%"
+brewing = "İksir hazırlanıyor {percent}%"
 needs_blaze_powder = "Blaze tozu gerekli"
 waiting = "Bekliyor"
 no_ingredient = "Malzeme yok"
@@ -718,19 +713,19 @@ cauldron_level = "Seviye {level}/{maximum}"
 chest = "&6&lSandık"
 trapped_chest = "&c&lTuzaklı Sandık"
 ender_chest = "&5&lEnder Sandığı"
-barrel = "&e&lFıçı"
+barrel = "&e&lVaril"
 dispenser = "&7&lFırlatıcı"
 dropper = "&8&lBırakıcı"
 hopper = "&8&lHuni"
 furnace = "&6&lOcak"
-smoker = "&e&lDuman Fırını"
+smoker = "&e&lTütsüleyici"
 blast_furnace = "&b&lMaden Eritme Ocağı"
 beehive = "&e&lArı Kovanı"
 bee_nest = "&e&lArı Yuvası"
 cauldron = "&7&lKazan"
 water_cauldron = "&9&lSu Kazanı"
 lava_cauldron = "&6&lLav Kazanı"
-powder_snow_cauldron = "&f&lTozlaşmış Kar Kazanı"
+powder_snow_cauldron = "&f&lToz Kar Kazanı"
 jukebox = "&d&lMüzik Kutusu"
 brewing_stand = "&d&lİksir Tezgâhı"
 chiseled_bookshelf = "&6&lYontulmuş Kitaplık"
@@ -758,16 +753,16 @@ select_description = "Bu dili seçmek için tıklayın."
 remove_personal_description = "Kişisel dil seçiminizi kaldırın."
 no_controls = "Kullanabileceğiniz dil ayarı yok."
 command = "Komut: {command}"
-selected = "Seçili"
-all-volmit-plugins = "Tüm Volmit eklentileri"
+selected = "seçili"
+all-volmit-plugins = "tüm Volmit eklentileri"
 
 [language.error]
-stopping = "Dil seçimi, eklenti durdurulduğunda kullanılamaz."
-editor-player-only = "Oyundaki dil editörü açın."
+stopping = "Eklenti durdurulurken dil seçimi kullanılamaz."
+editor-player-only = "Dil düzenleyicisini oyun içinde açın."
 no-providers = "Kullanılabilir Volmit dil sağlayıcısı yok."
 numeric-page = "Sayfa numarasını rakamla girin."
-personal-player-only = "Oyuncu dili tercihleri oyunda seçilmelidir."
-personal-permission = "Dilinizi seçmek için izniniz yok."
+personal-player-only = "Oyuncu dili tercihleri oyun içinde seçilmelidir."
+personal-permission = "Dilinizi seçme izniniz yok."
 plugin-personal-permission = "{plugin} için kendi dilinizi seçme izniniz yok."
 plugin-server-permission = "{plugin} için sunucu dilini değiştirme izniniz yok."
 server-locale-required = "Sunucunun varsayılan dili için en_US gibi bir dil kodu seçin."
@@ -775,16 +770,25 @@ unavailable-for-all = "{locale} dili, seçilen eklentilerin tümünde kullanıla
 
 [language.usage]
 editor = "Kullanım: /{command} language server edit [locale]"
-selection = "Kullanım: /{command} language self [locale|reset] or server [locale]"
+selection = "Kullanım: /{command} language self [locale|reset] veya server [locale]"
 volmit-selection = "Kullanım: /volmit plugins languages [locale]"
+update = "Kullanım: /{command} language update"
 
 [language.selection]
 preparing = "{target} için {locale} dili hazırlanıyor..."
 save-failed = "{plugin}: dil seçimi kaydedilemedi; sunucu konsolunu kontrol edin."
 english-fallback = "{plugin}: {locale} kullanılamıyor; İngilizce (en_US) kullanılıyor."
-personal-selected = "{plugin}: Diliniz şimdi {locale}."
-server-selected = "{plugin}: sunucu dili şimdi {locale}."
+personal-selected = "{plugin}: diliniz artık {locale}."
+server-selected = "{plugin}: sunucu dili artık {locale}."
 server-default-selected = "{plugin}: diliniz artık sunucunun varsayılan dilini kullanıyor."
+
+[language.update]
+checking = "{plugin}: dil deposundaki değişiklikler denetleniyor..."
+unchanged = "{plugin}: yüklü diller zaten depoyla eşleşiyor."
+applied = "{plugin}: {locale} güncellendi ({added} eklendi, {updated} değiştirildi, {kept} yerel düzenleme korundu)."
+cooldown = "{plugin}: dil deposu kısa süre önce denetlendi; {remaining} sonra yeniden deneyin."
+locale-failed = "{plugin}: {locale} güncellenmedi: {reason}"
+failed = "{plugin}: dil güncellemesi başarısız oldu: {reason}"
 
 [language.editor]
 title = "{plugin} › {section}"
@@ -811,7 +815,7 @@ unable-to-save = "Kaydedilemedi: {reason}"
 [language.editor.navigation]
 back = "&eGeri&r"
 close = "&cKapat&r"
-previous-page = "&eÖnceki Sayfa&r"
+previous-page = "&eÖnceki sayfa&r"
 next-page = "&eSonraki sayfa&r"
 
 [language.editor.search]
@@ -820,9 +824,9 @@ messages-lore = "Tüm mesajları aramak için tıklayın."
 clear = "Aramayı temizle"
 
 [language.editor.message]
-current-value = "&7Mevcut Değer:&r"
+current-value = "&7Geçerli değer:&r"
 variables = "&8{variables}&r"
-edit-plural = "&7Bir çoğul biçimini düzenlemek için tıklayın.&r"
+edit-plural = "&7Çoğul biçimi düzenlemek için tıklayın.&r"
 edit-lines = "&7Satırları ayrı ayrı düzenlemek için tıklayın.&r"
 edit-chat = "&7Sohbette düzenlemek için tıklayın.&r"
 
@@ -854,22 +858,22 @@ empty = "(boş)"
 
 [gloss.message.screen]
 "surfaces.empty" = "&8[&dGloss&8] &7Yüklü yüzey yok."
-"surfaces.unknown" = "&8[&dGloss&8]: &c&f{id}&c adında bir yüzey yok."
-"surfaces.tested" = "&8[&dGloss&8]: &a&f{player}&a için &f{id}&a çalıştırıldı."
+"surfaces.unknown" = "&8[&dGloss&8]: &cAdı &f{id}&c olan bir yüzey yok."
+"surfaces.tested" = "&8[&dGloss&8]: &aYüzey &f{id}&a, &f{player}&a için çalıştırıldı."
 "nametags.empty" = "&8[&dGloss&8] &7Yüklü isim etiketi yok."
-"nametags.unknown" = "&8[&dGloss&8]: &c&f{id}&c adında bir isim etiketi yok."
-"nametags.refreshed" = "&8[&dGloss&8]: &a&d{count}&a isim etiketi belgesi yeniden uygulandı."
-"hud.header" = "&8[&dGloss&8] &7&f{player}&7 için HUD talepleri: &d{count}"
-"hud.empty" = "&8[&dGloss&8] &7&f{player}&7 için HUD yuvasını tutan eklenti yok."
+"nametags.unknown" = "&8[&dGloss&8]: &cAdı &f{id}&c olan bir isim etiketi yok."
+"nametags.refreshed" = "&8[&dGloss&8]: &aYeniden uygulanan isim etiketi belgesi: &d{count}&a."
+"hud.header" = "&8[&dGloss&8] &7HUD talepleri (&f{player}&7): &d{count}"
+"hud.empty" = "&8[&dGloss&8] &7Oyuncu &f{player}&7 için HUD yuvasını tutan eklenti yok."
 "hud.line" = "&8- &f{kind} &7{source} &8| &7{value} &8| &7{count} &8| &7{state}"
-"player.unknown" = "&8[&dGloss&8]: &c&f{player}&c adında çevrimiçi oyuncu yok."
+"player.unknown" = "&8[&dGloss&8]: &cAdı &f{player}&c olan çevrimiçi oyuncu yok."
 
 [command.help.surface]
 root = "Eylem çubuğu, boss çubuğu ve başlık yüzeyleri"
 list = "Yüzey belgelerini listele"
 info = "Bir yüzey belgesini göster"
 "info.id" = "Yüzey belgesi kimliği"
-reset = "Birlikte gelen yüzeyleri geri yükle"
+reset = "Birlikte gelen yüzey varsayılanlarını geri yükle"
 test = "Bir oyuncu için yüzey geçişini şimdi çalıştır"
 "test.id" = "Yüzey belgesi kimliği"
 "test.player" = "Test edilecek oyuncu; varsayılan sensin"
@@ -879,12 +883,12 @@ root = "İzleyiciye özel isim etiketi belgeleri"
 list = "İsim etiketi belgelerini listele"
 info = "Bir isim etiketi belgesini göster"
 "info.id" = "İsim etiketi belgesi kimliği"
-reset = "Birlikte gelen isim etiketlerini geri yükle"
+reset = "Birlikte gelen isim etiketi varsayılanlarını geri yükle"
 refresh = "Tüm isim etiketlerini şimdi yeniden uygula"
 
 [command.help.hud]
 root = "Ortak HUD birleştiricisini incele"
-who = "Her HUD yuvasını hangi eklentinin tuttuğunu gösterir"
+who = "Her HUD yuvasını hangi eklentinin tuttuğunu göster"
 "who.player" = "İncelenecek oyuncu; varsayılan sensin"
 
 # --- lane:chat ---
@@ -894,7 +898,7 @@ filtered = "&8[&dGloss&8]: &cBir sohbet filtresi mesajını engelledi."
 too_fast = "&8[&dGloss&8]: &eBaşka bir mesaj göndermeden önce biraz bekle."
 repeat = "&8[&dGloss&8]: &eBunu az önce söyledin."
 channel_set = "&8[&dGloss&8]: &aArtık &d{name}&a kanalında konuşuyorsun."
-channel_unknown = "&8[&dGloss&8]: &c&d{name}&c adında bir kanal yok."
+channel_unknown = "&8[&dGloss&8]: &cAdı &d{name}&c olan bir kanal yok."
 channel_list = "&8[&dGloss&8]: &7Kanallar: &f{value}"
 msg_usage = "&8[&dGloss&8]: &eKullanım: &f{command}"
 msg_offline = "&8[&dGloss&8]: &c{player} çevrimiçi değil."
@@ -902,14 +906,14 @@ reply_none = "&8[&dGloss&8]: &cYanıt verecek kimsen yok."
 msg_self = "&8[&dGloss&8]: &cKendine mesaj gönderemezsin."
 channels_header = "&dKanallar &7({count})"
 channels_empty = "&7Yüklü kanal yok."
-channel_missing = "&8[&dGloss&8]: &c&f{id}&c adında bir kanal belgesi yok."
+channel_missing = "&8[&dGloss&8]: &cAdı &f{id}&c olan bir kanal belgesi yok."
 strings_header = "&dMetin dilleri &7({count})"
 strings_empty = "&7Yüklü metin belgesi yok."
 strings_missing = "&d{locale} dilinde eksik &7({count})"
 strings_complete = "&8[&dGloss&8]: &a{locale} her en_US anahtarını kapsıyor."
 leaderboards_header = "&dSıralamalar &7({count})"
 leaderboards_empty = "&7Yüklü sıralama yok."
-leaderboard_missing = "&8[&dGloss&8]: &c&f{id}&c adında bir sıralama belgesi yok."
+leaderboard_missing = "&8[&dGloss&8]: &cAdı &f{id}&c olan bir sıralama belgesi yok."
 leaderboard_reset = "&8[&dGloss&8]: &aSıralama &f{id}&a sıfırlandı ({state})."
 leaderboard_sampled = "&8[&dGloss&8]: &aSıralama &f{id}&a çevrimiçi tüm oyuncular için örneklendi."
 
@@ -931,23 +935,23 @@ reset = "Birlikte gelen metin belgelerini geri yükle"
 root = "Hesaplanan sıralamalar"
 list = "Yüklü sıralamaları ve giriş sayılarını listele"
 info = "Bir sıralamanın kaynağını, düzenini ve girişlerini göster"
-"info.id" = "Belge kimliği"
+"info.id" = "Sıralama belgesi kimliği"
 reset = "Bir sıralamanın dönem veya tüm zaman değerlerini temizle"
-"reset.id" = "Belge kimliği"
+"reset.id" = "Sıralama belgesi kimliği"
 "reset.period" = "all veya current"
 sample = "Bir sıralamayı çevrimiçi tüm oyuncular için şimdi örnekle"
-"sample.id" = "Belge kimliği"
+"sample.id" = "Sıralama belgesi kimliği"
 
 # --- lane:forms ---
 
 [gloss.message.forms]
 icon_unsupported = "&7Sandık yuvasında çizilemez ({kind})"
-no_inventories = "&8[&dGloss&8]: &7Yapılandırılmış sandık menüsü yok."
-inventory_list_header = "&dSandık menüleri"
-inventory_list_entry = "&f{id}&7 sandık menüsünü aç"
+no_inventories = "&8[&dGloss&8]: &7Yapılandırılmış envanter menüsü yok."
+inventory_list_header = "&dEnvanter menüleri"
+inventory_list_entry = "&f{id}&7 envanter menüsünü aç"
 inventory_info = "&8[&dGloss&8]: &d{id} &8- &7boyut &f{kind}&7, yuvalar &f{count}"
-unknown_inventory = "&8[&dGloss&8]: &c{id} adında bir sandık menüsü yok."
-inventory_opened = "&8[&dGloss&8]: &a{id} sandık menüsü {player} için açıldı."
+unknown_inventory = "&8[&dGloss&8]: &c{id} adında bir envanter menüsü yok."
+inventory_opened = "&8[&dGloss&8]: &a{id} envanter menüsü {player} için açıldı."
 bad_args = "&8[&dGloss&8]: &cArgümanlar anahtar=değer çiftleri olmalıdır: {value}"
 prompt_timeout = "&8[&dGloss&8]: &7Giriş süresi doldu."
 prompt_busy = "&8[&dGloss&8]: &cZaten bekleyen bir girişin var."
@@ -960,33 +964,31 @@ give_dropped = "&8[&dGloss&8]: &7Envanterin doluydu, bu yüzden eşyalar ayaklar
 args = "Boşlukla ayrılmış anahtar=değer argümanları"
 
 [command.help.inventory]
-root = "Sandık menülerini incele ve aç"
-list = "Yapılandırılmış sandık menülerini listele"
+root = "Envanter menülerini incele ve aç"
+list = "Yapılandırılmış envanter menülerini listele"
 "list.page" = "1'den başlayan liste sayfası"
-info = "Bir sandık menüsünün boyutunu ve yuvalarını göster"
-"info.id" = "Sandık menüsü kimliği"
-open = "Bir oyuncu için sandık menüsü aç"
-"open.id" = "Sandık menüsü kimliği"
-"open.player" = "Kimin için açılacağı; varsayılan olarak sen"
+info = "Bir envanter menüsünün boyutunu ve yuvalarını göster"
+"info.id" = "Envanter menüsü kimliği"
+open = "Bir oyuncu için envanter menüsü aç"
+"open.id" = "Envanter menüsü kimliği"
+"open.player" = "Menünün açılacağı oyuncu; varsayılan sensin"
 "open.args" = "Boşlukla ayrılmış anahtar=değer argümanları"
-reset = "Birlikte gelen sandık menüsü varsayılanlarını geri yükle"
-"reset.name" = "Sıfırlanacak ad veya tüm varsayılanlar için *"
+reset = "Birlikte gelen envanter menüsü varsayılanlarını geri yükle"
+"reset.name" = "Sıfırlanacak ad veya birlikte gelen tüm varsayılanlar için *"
 
 ["command.help.hologram"]
-page = "Bir izleyiciyi hologram sayfasina tasi"
-"page.page" = "Sayfa kimligi, next veya prev"
-"page.player" = "Oyuncu adi; bos birakirsan sen"
-motion = "Bir hologramda hareket klibi oynat"
-"motion.motion" = "Hareket kimligi veya durdurmak icin clear"
-actions = "Hologramin tiklamada calistirdigi eylemleri listele"
+page = "Bir izleyiciyi hologram sayfasına taşı"
+"page.page" = "Sayfa kimliği, next veya prev"
+"page.player" = "İzleyici adı; boş bırakılırsa sen"
+actions = "Hologramın tıklamada çalıştırdığı eylemleri listele"
 
 [gloss.message.hologram_interaction]
-hologram_page_set = "&8[&dGloss&8] &a{player}&a artik &f{id}&a hologramininin &f{page}&a sayfasinda."
-hologram_page_player_missing = "&8[&dGloss&8] &cOyuncu &f{player}&c cevrimici degil."
-hologram_page_unknown = "&8[&dGloss&8] &cHologram &f{id}&c icinde '&f{page}&c' sayfasi yok."
-hologram_actions_empty = "&8[&dGloss&8] &7Hologram &f{id}&7 eylem tanimlamiyor."
+hologram_page_set = "&8[&dGloss&8] &a{player}&a artık &f{id}&a hologramının &f{page}&a sayfasında."
+hologram_page_player_missing = "&8[&dGloss&8] &cOyuncu &f{player}&c çevrimiçi değil."
+hologram_page_unknown = "&8[&dGloss&8] &cHologram &f{id}&c içinde '&f{page}&c' sayfası yok."
+hologram_actions_empty = "&8[&dGloss&8] &7Hologram &f{id}&7 hiç eylem tanımlamıyor."
 hologram_actions_header = "&8[&dGloss&8] &7Hologram &f{id}&7 eylemleri (&f{count}&7):"
-hologram_actions_entry = "&8[&dGloss&8] &7  &f{kind}&7 uzerinde &f{value}"
+hologram_actions_entry = "&8[&dGloss&8] &7  &f{kind}&7 üzerinde &f{value}"
 
 # --- lane:world ---
 
@@ -999,13 +1001,13 @@ list = "&7İşaretçiler &8({count})&7: &f{value}"
 info = "&7İşaretçi &f{id} &7konumu &f{world} {x} {y} {z}"
 created = "&aİşaretçi &f{id} &aoluşturuldu."
 removed = "&aİşaretçi &f{id} &akaldırıldı."
-missing = "&c&f{id} &cadında bir işaretçi yok."
+missing = "&cAdı &f{id}&c olan bir işaretçi yok."
 here = "&7Şu konumdasın: &f{world} {x} {y} {z}&7."
 
 [gloss.message.world.waypoint]
 saved = "&aYol noktası &f{name} &akaydedildi."
 removed = "&aYol noktası &f{name} &akaldırıldı."
-missing = "&c&f{name} &cadında bir yol noktası yok."
+missing = "&cAdı &f{name}&c olan bir yol noktası yok."
 list = "&7Yol noktaları &8({count})&7: &f{value}"
 info = "&7Yol noktası &f{id} &7konumu &f{world} {x} {y} {z}"
 full = "&cZaten en fazla {count} yol noktasına sahipsin."
@@ -1013,19 +1015,19 @@ full = "&cZaten en fazla {count} yol noktasına sahipsin."
 [gloss.message.world.camera]
 started = "&7Kamera turu başladı."
 refused = "&cKamera turu reddedildi."
-stopped = "&f{player} &7için kamera turu durduruldu."
+stopped = "&7Kamera turu &f{player}&7 için durduruldu."
 idle = "&c{player} bir kamera turunda değil."
 
 [gloss.message.world.nameplate]
 list = "&7İsim levhaları &8({count})&7: &f{value}"
 info = "&7İsim levhası &f{id} &7öncelik &f{value}&7, &f{count} &7satır."
-missing = "&c&f{id} &cadında bir isim levhası yok."
+missing = "&cAdı &f{id}&c olan bir isim levhası yok."
 refreshed = "&aİsim levhaları yenilendi."
 
 [gloss.message.world.glow]
-set = "&f{target} &7artık &f{value} &arenginde parlıyor."
-cleared = "&f{target} &7üzerindeki parlama kaldırıldı."
-missing = "&c&f{player} &cadında çevrimiçi bir oyuncu yok."
+set = "&aParlatılıyor: &f{target}&7, renk &f{value}&a."
+cleared = "&7Parlama kaldırıldı: &f{target}&7."
+missing = "&cAdı &f{player}&c olan çevrimiçi bir oyuncu yok."
 
 [command.help.marker]
 root = "Dünya işaretçisi araçları"
@@ -1033,7 +1035,7 @@ list = "İşaretçi belgelerini listele"
 info = "Bir işaretçiyi göster"
 create = "Konumuna bir işaretçi belgesi yaz"
 remove = "Bir işaretçi belgesini sil"
-here = "Konumunu çapa koordinatları olarak yaz"
+here = "Konumunu işaretçi çapa koordinatları olarak yaz"
 
 [command.help.marker.arg]
 id = "İşaretçi belgesi kimliği"
@@ -1052,7 +1054,7 @@ id = "Yol noktası belgesi kimliği"
 
 [command.help.camera]
 root = "Kamera turu araçları"
-test = "Kendi etrafında bir tanıtım turu uç"
+test = "Kendi etrafında tanıtım amaçlı bir kamera turu uçur"
 stop = "Bir kamera turunu erken bitir"
 
 [command.help.camera.arg]
@@ -1083,58 +1085,58 @@ ticks = "Parlamanın süreceği tick sayısı veya korumak için 0"
 # --- lane:behaviors ---
 
 [command.help.behavior]
-root = "Davranis belgelerini incele ve calistir"
-list = "Yuklenen davranis belgelerini listele"
-info = "Bir davranis belgesinin tetikleyicilerini ve kosullarini goster"
-fire = "Bir davranis girdisini simdi calistir"
-reset = "Birlikte gelen davranis varsayilanlarini geri yukle"
-id = "Davranis belgesi kimligi"
-entry = "Girdi numarasi, 1'den baslar"
-player = "Girdinin calistirilacagi oyuncu veya hicbiri icin *"
+root = "Davranış belgelerini incele ve çalıştır"
+list = "Yüklü davranış belgelerini listele"
+info = "Bir davranış belgesinin tetikleyicilerini ve koşullarını göster"
+fire = "Bir davranış girdisini şimdi çalıştır"
+reset = "Birlikte gelen davranış varsayılanlarını geri yükle"
+id = "Davranış belgesi kimliği"
+entry = "Girdi numarası, 1'den başlar"
+player = "Girdinin çalıştırılacağı oyuncu veya hiçbiri için *"
 
 [command.help.state]
-root = "Kalici davranis durumunu oku ve yaz"
-get = "Bir durum degerini goster"
-set = "Bir durum degerini yaz"
-clear = "Bir durum degerini varsayilanina dondur"
-dump = "Tanimlanmis her durum anahtarini ve degerini listele"
-key = "Tanimlanmis durum anahtari"
-value = "Yeni deger; bosluk icermesi icin tirnak icine alin"
-player = "Degerin ait oldugu oyuncu veya kendiniz icin *"
+root = "Kalıcı davranış durumunu oku ve yaz"
+get = "Bir durum değerini göster"
+set = "Bir durum değerini yaz"
+clear = "Bir durum değerini varsayılanına döndür"
+dump = "Tanımlanmış her durum anahtarını ve değerini listele"
+key = "Tanımlanmış durum anahtarı"
+value = "Yeni değer; boşluk içerecekse tırnak içine al"
+player = "Değerin ait olduğu oyuncu veya kendiniz için *"
 
 [command.help.do]
-root = "Bu ada sahip command davranis girdilerini calistir"
-name = "Davranis komutunun adi"
-args = "anahtar=deger ciftleri olarak argumanlar; bosluk icermesi icin tirnak icine alin"
+root = "Bu ada sahip command davranış girdilerini çalıştır"
+name = "Davranış komutunun adı"
+args = "Anahtar=değer çiftleri halinde argümanlar; boşluk içerecekse tırnak içine al"
 
 [command.help.expr]
-root = "Bir ifadeyi hesapla ve ona neyin cevap verdigini goster"
-expression = "Hesaplanacak ifade; bosluk icermesi icin tirnak icine alin"
+root = "Bir ifadeyi hesapla ve onu neyin yanıtladığını göster"
+expression = "Hesaplanacak ifade; boşluk içerecekse tırnak içine al"
 
 [command.help.explain]
-root = "Bir calisma zamaninin hangi kosullari inceledigini ve hangisinin kazandigini goster"
-kind = "Aciklanacak calisma zamani, ornegin board veya behavior"
-id = "Aciklanacak belgenin kimligi"
-player = "Aciklamanin yapilacagi oyuncu veya kendiniz icin *"
+root = "Bir çalışma zamanının hangi koşullara baktığını ve hangisinin kazandığını göster"
+kind = "Açıklanacak çalışma zamanı, örneğin board veya behavior"
+id = "Açıklanacak belgenin kimliği"
+player = "Açıklamanın yapılacağı oyuncu veya kendiniz için *"
 
 [gloss.message.behaviors]
-off = "&8[&dGloss&8]: &eDavranislar features.behaviors icinde kapali."
-"list.empty" = "&8[&dGloss&8]: &7Yuklenmis davranis belgesi yok."
-missing = "&8[&dGloss&8]: &c\"{id}\" adinda bir davranis belgesi yok."
-"info.header" = "&8[&dGloss&8]: &d{id} &7revizyon &f{revision} &8| &7girdi &f{count} &8| &7acik &f{enabled}"
-"info.entry" = " &8{line}. &f{name} &7kosul &f{when} &8| &7izin &f{permission}"
-fired = "&8[&dGloss&8]: &a{id}&a belgesinin &f{line}&a numarali girdisi calistirildi."
-"fire.missing" = "&8[&dGloss&8]: &c{id} belgesinde {line} numarali girdi yok."
-"do.ran" = "&8[&dGloss&8]: &a{name}&a icin &f{count}&a davranis girdisi calistirildi."
-"do.none" = "&8[&dGloss&8]: &7\"{name}\" komutuna yanit veren bir davranis girdisi yok."
+off = "&8[&dGloss&8]: &eDavranışlar features.behaviors içinde kapalı."
+"list.empty" = "&8[&dGloss&8]: &7Yüklü davranış belgesi yok."
+missing = "&8[&dGloss&8]: &c\"{id}\" adında bir davranış belgesi yok."
+"info.header" = "&8[&dGloss&8]: &d{id} &7revizyon &f{revision} &8| &7girdi &f{count} &8| &7etkin &f{enabled}"
+"info.entry" = " &8{line}. &f{name} &7koşul &f{when} &8| &7izin &f{permission}"
+fired = "&8[&dGloss&8]: &aBelge &f{id}&a içindeki &f{line}&a numaralı girdi çalıştırıldı."
+"fire.missing" = "&8[&dGloss&8]: &c{id} belgesinde {line} numaralı girdi yok."
+"do.ran" = "&8[&dGloss&8]: &aKomut &f{name}&a için &f{count}&a davranış girdisi çalıştırıldı."
+"do.none" = "&8[&dGloss&8]: &7\"{name}\" komutuna yanıt veren bir davranış girdisi yok."
 "state.value" = " &7{key} &8= &f{value}"
-"state.set" = "&8[&dGloss&8]: &a{key} artik &f{value}&a."
-"state.cleared" = "&8[&dGloss&8]: &a{key} varsayilan degerine dondu."
-"state.unknown" = "&8[&dGloss&8]: &cHicbir davranis belgesi \"{key}\" durum anahtarini tanimlamiyor."
-"state.invalid" = "&8[&dGloss&8]: &c\"{value}\" bir {type} degeri degil."
-"state.empty" = "&8[&dGloss&8]: &7Hicbir davranis belgesi durum tanimlamiyor."
-"state.player" = "&8[&dGloss&8]: &cBir oyuncu belirtin: &f{key}&c global bir anahtar degil."
-"player.missing" = "&8[&dGloss&8]: &c\"{player}\" adinda cevrimici bir oyuncu yok."
+"state.set" = "&8[&dGloss&8]: &a{key} artık &f{value}&a."
+"state.cleared" = "&8[&dGloss&8]: &a{key} varsayılan değerine döndü."
+"state.unknown" = "&8[&dGloss&8]: &cHiçbir davranış belgesi \"{key}\" durum anahtarını tanımlamıyor."
+"state.invalid" = "&8[&dGloss&8]: &c\"{value}\" bir {type} değeri değil."
+"state.empty" = "&8[&dGloss&8]: &7Hiçbir davranış belgesi durum tanımlamıyor."
+"state.player" = "&8[&dGloss&8]: &cBir oyuncu belirtin: &f{key}&c global bir anahtar değil."
+"player.missing" = "&8[&dGloss&8]: &c\"{player}\" adında çevrimiçi bir oyuncu yok."
 "expr.value" = "&8[&dGloss&8]: &f{value} &8({type})"
 "expr.reference" = " &7{name} &8= &f{value} &8kaynak &7{source}"
 "expr.functions" = " &7fonksiyonlar &8= &f{value}"
@@ -1142,8 +1144,8 @@ fired = "&8[&dGloss&8]: &a{id}&a belgesinin &f{line}&a numarali girdisi calistir
 "explain.header" = "&8[&dGloss&8]: &d{kind} &f{id} &7oyuncu &f{player}"
 "explain.line" = " &8{path} &7{when} &8= &f{value}"
 "explain.winner" = " &a> &f{path} &7{when} &8= &f{value}"
-"explain.unknown" = "&8[&dGloss&8]: &c\"{kind}\" aciklanamiyor; {options} deneyin."
-"explain.missing" = "&8[&dGloss&8]: &c\"{id}\" adinda bir {kind} yok."
+"explain.unknown" = "&8[&dGloss&8]: &c\"{kind}\" açıklanamıyor; {options} deneyin."
+"explain.missing" = "&8[&dGloss&8]: &c\"{id}\" adında bir {kind} yok."
 
 # --- lane:authoring ---
 
@@ -1162,7 +1164,7 @@ arg_id = "Kurulu paketin kimliği"
 root = "Bir belgenin saklanan sürümlerini listele"
 arg_kind = "boards veya menus gibi belge klasörü"
 arg_id = "Belge kimliği"
-arg_page = "Birden başlayan liste sayfası"
+arg_page = "1'den başlayan liste sayfası"
 
 [command.help.restore]
 root = "Saklanan bir sürümü yürürlükteki belgenin üzerine yaz"
@@ -1181,25 +1183,25 @@ arg_id = "Dışa aktarmayı tek bir belgeyle sınırla"
 arg_dir = "Gloss veri klasörü içindeki hedef klasör"
 
 [gloss.message.authoring.pack]
-preview = "&8[&dGloss&8] &f{id}&7 paketi &f{count}&7 dosyayı değiştirir."
+preview = "&8[&dGloss&8] Paket &f{id}&7, &f{count}&7 dosyayı değiştirecek."
 outcome = "&8[&dGloss&8] &7{state} &f{path}&7 {reason}"
-installed = "&8[&dGloss&8] &f{id}&7 paketi &f{count}&7 dosyayla kuruldu."
-updated = "&8[&dGloss&8] &f{id}&7 paketi &f{count}&7 dosyada güncellendi."
-removed = "&8[&dGloss&8] &f{id}&7 paketi ve &f{count}&7 dosya kaldırıldı."
-unknown = "&8[&dGloss&8] &c&f{id}&c kimliğiyle kurulu paket yok."
-failed = "&8[&dGloss&8] &c&f{id}&c paketi başarısız oldu: {reason}"
+installed = "&8[&dGloss&8] Paket &f{id}&7, &f{count}&7 dosyayla kuruldu."
+updated = "&8[&dGloss&8] Paket &f{id}&7, &f{count}&7 dosyada güncellendi."
+removed = "&8[&dGloss&8] Paket &f{id}&7 ve &f{count}&7 dosya kaldırıldı."
+unknown = "&8[&dGloss&8] &cKimliği &f{id}&c olan kurulu paket yok."
+failed = "&8[&dGloss&8] &cPaket &f{id}&c başarısız oldu: {reason}"
 entry = "&8[&dGloss&8] &f{id} &7{value} &8{count} dosya"
 empty = "&8[&dGloss&8] &7Kurulu paket yok."
 disabled = "&8[&dGloss&8] &cGloss paketleri gloss.toml içinde kapalı."
 
 [gloss.message.authoring.history]
-empty = "&8[&dGloss&8] &7&f{kind} {id}&7 için saklanan sürüm yok."
+empty = "&8[&dGloss&8] &7Belge &f{kind} {id}&7 için saklanan sürüm yok."
 entry = "&8[&dGloss&8] &f{revision} &7{source} &8{count} bayt"
 disabled = "&8[&dGloss&8] &cBelge geçmişi gloss.toml içinde kapalı."
 
 [gloss.message.authoring.restore]
-done = "&8[&dGloss&8] &f{kind} {id}&7 &f{revision}&7 sürümüne geri alındı."
-unknown = "&8[&dGloss&8] &c&f{kind} {id}&c için &f{revision}&c sürümü yok."
+done = "&8[&dGloss&8] Belge &f{kind} {id}&7, &f{revision}&7 sürümüne geri alındı."
+unknown = "&8[&dGloss&8] &cBelge &f{kind} {id}&c için &f{revision}&c sürümü yok."
 failed = "&8[&dGloss&8] &cGeri alma başarısız oldu: {reason}"
 
 [gloss.message.authoring.check]
@@ -1208,24 +1210,24 @@ entry = "&8[&dGloss&8] &7{state} &f{key} &8{kind} {id} {path} &7{message}"
 summary = "&8[&dGloss&8] &f{count}&7 bulgu."
 
 [gloss.message.authoring.export]
-done = "&8[&dGloss&8] &f{count}&7 belge &f{path}&7 konumuna aktarıldı."
+done = "&8[&dGloss&8] Dışa aktarıldı: &f{count}&7 belge, &f{path}&7 konumuna."
 failed = "&8[&dGloss&8] &cDışa aktarma başarısız oldu: {reason}"
 
 [gloss.message.authoring.import]
-preview = "&8[&dGloss&8] &f{source}&7 &f{count}&7 belge yazar."
+preview = "&8[&dGloss&8] &f{source}&7 kaynağı &f{count}&7 belge yazacak."
 entry = "&8[&dGloss&8] &7{state} &f{path}&7 {reason}"
-applied = "&8[&dGloss&8] &f{source}&7 kaynağından &f{count}&7 belge içe aktarıldı."
-absent = "&8[&dGloss&8] &7&f{path}&7 konumunda &f{source}&7 verisi yok."
+applied = "&8[&dGloss&8] İçe aktarıldı: &f{count}&7 belge, &f{source}&7 kaynağından."
+absent = "&8[&dGloss&8] &7Konum &f{path}&7 içinde &f{source}&7 verisi yok."
 preview_required = "&8[&dGloss&8] &cÖnce /gloss import preview {source} komutunu çalıştırın. Önizlemeler yapılandırılan süre boyunca geçerlidir."
 
 # --- lane:forge ---
 
 [gloss.message.forge]
 disabled = "&8[&dGloss&8] &cGlif atölyesi kapalı. gloss.toml içinde features.forge değerini true yapın."
-built = "&8[&dGloss&8] &a&f{value}&a paketi {count} glif ile derlendi."
+built = "&8[&dGloss&8] &aPaket &f{value}&a, {count} glif ile derlendi."
 build_failed = "&8[&dGloss&8] &cPaket derlenemedi; önceki paket etkin kalıyor. Konsola bakın."
 status = "&7{value}"
-exported = "&8[&dGloss&8] &a{count} dosya &f{path}&a konumuna aktarıldı."
+exported = "&8[&dGloss&8] &a{count} dosya &f{path}&a konumuna dışa aktarıldı."
 export_failed = "&8[&dGloss&8] &cDışa aktarma başarısız: &f{reason}&c."
 serve = "&8[&dGloss&8] &aPaket dinleyicisi {state}."
 serve_unchanged = "&8[&dGloss&8] &7Paket dinleyicisi zaten {state}."

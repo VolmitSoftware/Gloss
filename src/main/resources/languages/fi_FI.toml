@@ -25,13 +25,14 @@
 #   {absorbed}  Olemassa oleviin tietoihin yhdistetyt tuontimerkinnät
 #   {active}  Aktiivisten tarjoajien määrä
 #   {actual}  Nykyinen versio
+#   {added}  Kielipäivityksen lisäämät viestit
 #   {after}  Viestin arvo muokkauksen jälkeen
 #   {argument}  Odottamaton komentoargumentti
 #   {axis}  Koordinaatti- tai kiertoakseli
 #   {bees}  Säiliössä olevien mehiläisten määrä
 #   {before}  Viestin arvo ennen muokkausta
 #   {billboard}  Näyttökohteen suuntaustila
-#   {blocks}  Lohkonäyttöelementtien määrä
+#   {blocks}  Kuutionäyttöelementtien määrä
 #   {board}  Taulun tai paneelin tunniste
 #   {bottles}  Säiliössä olevien pullojen määrä
 #   {bubbles}  Aktiivisten puhekuplien määrä
@@ -42,10 +43,9 @@
 #   {copied}  Kopioitujen merkintöjen määrä
 #   {count}  Vastaavien kohteiden tai viestien määrä
 #   {disc}  Säiliössä oleva musiikkilevy
-#   {distance}  Etäisyys kohteeseen
 #   {drops}  Näytettävien pudotettujen esineiden määrä
 #   {enabled}  Käyttötila tai käytössä olevien merkintöjen määrä
-#   {entities}  Entiteettien määrä
+#   {entities}  Olioiden määrä
 #   {error}  Validointi- tai toimintavirhe
 #   {errors}  Virheiden määrä
 #   {expected}  Muokkausta tallennettaessa odotettu versio
@@ -62,6 +62,7 @@
 #   {interactPermission}  Vuorovaikutukseen vaadittu oikeus
 #   {interactionRange}  Suurin vuorovaikutusetäisyys
 #   {item}  Esineen nimi tai materiaali
+#   {kept}  Kielipäivityksessä säilytetyt paikalliset muokkaukset
 #   {key}  Viestin tai asetuksen avain
 #   {kind}  Kohteen tai tarjoajan tyyppi
 #   {kinds}  Saatavilla olevat kohde- tai tarjoajatyypit
@@ -99,11 +100,11 @@
 #   {priority}  Valinnan tai piirtämisen tärkeysjärjestys
 #   {provider}  Tarjoajan nimi
 #   {providers}  Tarjoajien luettelo tai määrä
-#   {radius}  Hakusäde
 #   {ready}  Tuontiin valmiiden merkintöjen määrä
 #   {reason}  Virheen tai päätöksen syy
+#   {remaining}  Aika seuraavaan sallittuun kielitarkistukseen
 #   {resume}  Jatkettavien tuontimerkintöjen määrä
-#   {revision}  Asiakirjan versio
+#   {revision}  Dokumentin versio
 #   {roll}  Kallistuskulma asteina
 #   {rotation}  Näyttökohteen kierto
 #   {scale}  Näyttökohteen tai esikatselun mittakaava
@@ -125,6 +126,7 @@
 #   {to}  Kohdearvo tai alueen loppu
 #   {total}  Merkintöjen kokonaismäärä
 #   {type}  Odotettu arvo- tai kohdetyyppi
+#   {updated}  Kielipäivityksen muuttamat viestit
 #   {url}  Verkko-osoite
 #   {uuid}  Kohteen tai pelaajan yksilöllinen tunniste
 #   {value}  Viestin tai parametrin nykyinen arvo
@@ -238,7 +240,7 @@ import = "Siirrä vanhat hologrammit muokkaamatta lähdetiedostoja"
 "import.legacy" = "Esikatsele tai suorita Gloss-tietojen päivitys yhtenä tapahtumana"
 "import.preview" = "Esikatsele vanhojen hologrammien siirtoa muuttamatta mitään"
 item = "Mukautettujen esineiden tarjoajien työkalut"
-"item.export" = "Vie mukautettujen esineiden katalogi verkkoeditoria varten"
+"item.export" = "Vie mukautettujen esineiden luettelo verkkoeditoria varten"
 "item.status" = "Näytä, mitkä mukautettujen esineiden tarjoajat ovat aktiivisia"
 menu = "Luo, avaa ja muokkaa hologrammivalikkoja"
 "menu.addrow" = "Lisää tekstikoristerivi loppuun"
@@ -294,8 +296,8 @@ preview = "Esikatseludokumenttien työkalut"
 "preview.reset" = "Palauta mukana toimitetut esikatseluoletukset (ei poista ylimääräisiä käyttäjän dokumentteja, jotka voivat peittää ne)"
 web = "Avaa ja hallitse Glossin verkkoeditoria"
 "web.open" = "Avaa tyhjä palvelussa toimiva Gloss-editori"
-"web.edit" = "Avaa yksi reaaliaikainen Gloss-asiakirja"
-"web.edit.document" = "Avaa tämä reaaliaikainen asiakirja verkkoeditorissa"
+"web.edit" = "Avaa yksi reaaliaikainen Gloss-dokumentti"
+"web.edit.document" = "Avaa tämä reaaliaikainen dokumentti verkkoeditorissa"
 "web.workspace" = "Avaa koko reaaliaikainen Gloss-työtila"
 "web.sessions" = "Hallitse verkkoeditorin aktiivisia istuntoja"
 "web.sessions.list" = "Luettele verkkoeditorin aktiiviset istunnot"
@@ -331,7 +333,7 @@ panel_y = "Absoluuttinen tai ~suhteellinen Y"
 panel_yaw = "Absoluuttinen tai ~suhteellinen suuntakulma"
 panel_z = "Absoluuttinen tai ~suhteellinen Z"
 content_menu = "Ladatun valikon tunnus"
-web_subject = "Reaaliaikaisen Gloss-asiakirjan tunnus"
+web_subject = "Reaaliaikaisen Gloss-dokumentin tunnus"
 hologram_id = "Uuden hologrammin ja juurivalikon tunnus"
 hologram_text = "Valinnainen MiniMessage-teksti"
 image_path = "Tiedosto Glossin kuvakansion alla"
@@ -410,7 +412,7 @@ hover = "Näytä tiedot napsauttamalla"
 
 [command.board.info]
 header = "&8[&dGloss&8] &d{id} &7otsikolla &f{title}"
-meta = "&7Prioriteetti: &f{priority} | Ehto: &f{when} | Vaihtoehdot: &f{variants}"
+meta = "&7Prioriteetti: &f{priority} &8| &7Ehto: &f{when} &8| &7Vaihtoehdot: &f{variants}"
 line = " &8{line}. &f{text}"
 
 [command.emoji]
@@ -419,21 +421,19 @@ hover = "Lisää chattiin napsauttamalla"
 
 [command.animations]
 empty = "&8[&dGloss&8] &7Yhtään animaatiota ei ole ladattu."
-header = "&8[&dGloss&8] &fAnimaatiot: &d{count}"
-entry = "&8- &d{name}"
 
 [command.list]
 page = "&7Sivu &f{page}&7/&f{pages} &8- &7näytetään &f{from}&7-&f{to} &7yhteensä &f{total}"
 next = "&7Seuraava sivu: &f{command}"
 
 [command.status]
-holograms = "&7Hologrammit: &f{count} &8({temporary} tilapäistä, {entities} entiteettiä)"
+holograms = "&7Hologrammit: &f{count} &8({temporary} tilapäistä, {entities} oliota)"
 boards = "&7Tulostaulut: &f{count}"
 emoji = "&7Emojit: &f{enabled}&8/&f{total}"
 animations = "&7Animaatiot: &f{count}"
 effects = "&7Kuplat: &f{bubbles} &8| &7Ilmaisimet: &f{indicators} &8| &7Pudotukset: &f{drops}"
 
-visibility = "&7Näkyvät entiteettikopiot: &f{entities} &8| &7Katsojat: &f{viewers} &8| &7Hyväksynnät: &f{admissions} &8| &7Hylkäykset: &f{refusals} &8| &7Odottaa: &f{waiting} &8| &7Vanhentuneet vuorot: &f{expired} &8| &7Siivous odottaa: &f{retiring}"
+visibility = "&7Näkyvät oliokopiot: &f{entities} &8| &7Katsojat: &f{viewers} &8| &7Hyväksynnät: &f{admissions} &8| &7Hylkäykset: &f{refusals} &8| &7Odottaa: &f{waiting} &8| &7Vanhentuneet vuorot: &f{expired} &8| &7Siivous odottaa: &f{retiring}"
 images = "&7Kuvavälimuisti: &f{entries} &8| &7Odottaa: &f{pending} &8| &7Säilytetyt tiedot: &f{bytes} &7tavua &8| &7Valmistuneet: &f{completed} &8| &7Hylkäykset: &f{refusals}"
 
 [command.reset]
@@ -503,7 +503,7 @@ execution_failed = "Komennon {command} suoritus epäonnistui: {reason}"
 menu_name_required = "Valikon nimi ei voi olla tyhjä"
 hologram_id_required = "Hologrammin tunnus ei voi olla tyhjä"
 panel_id_required = "Paneelin tunnus ei voi olla tyhjä"
-web_subject_required = "Verkkoeditorin asiakirjatunnus ei voi olla tyhjä"
+web_subject_required = "Verkkoeditorin dokumenttitunnus ei voi olla tyhjä"
 web_session_required = "Verkkoeditorin istuntotunnus ei voi olla tyhjä"
 panel_player_required = "Kohdepelaaja ei voi olla tyhjä"
 row_icon_type_required = "Kuvakkeen tyyppi ei voi olla tyhjä"
@@ -513,7 +513,6 @@ import_source_unknown = "Tuntematon vanhojen tietojen tuontilähde: {source}"
 
 [gloss.message]
 permission_denied = "&8[&dGloss&8]: &cSinulla ei ole oikeutta &f{permission}&c."
-unknown_command = "&8[&dGloss&8]: &cTuntematon komento \"&f{command}&c\"."
 
 [gloss.message.hologram]
 created = "&8[&dGloss&8]: &aHologrammi &f{hologram}&a ja sen juurivalikko &f{menu}&a luotiin sijaintiisi."
@@ -538,7 +537,7 @@ entry = "Avaa {menu} napsauttamalla."
 
 [gloss.message.menu.content]
 updated = "&8[&dGloss&8]: &aToiminto {operation} kohdistettiin valikkoon &f{menu}&a, versio {revision}."
-created = "&8[&dGloss&8]: &aValikko &f{menu}&a luotiin, versio {revision}. Avaa se komennolla /gloss menu open &f{menu}&a tai sijoita komennolla /gloss panel create &f{menu}&a."
+created = "&8[&dGloss&8]: &aValikko &f{menu}&a luotiin, versio {revision}. Avaa se komennolla /gloss menu open {menu} tai sijoita se komennolla /gloss panel create {menu}."
 copied = "&8[&dGloss&8]: &aValikko &f{source}&a kopioitiin valikoksi &f{menu}&a, versio {revision}."
 revision_conflict = "&8[&dGloss&8]: &cValikko &f{menu}&c muuttui kirjoituksen aikana (odotettu {expected}, nykyinen {actual}). Toista komento."
 already_exists = "&8[&dGloss&8]: &cValikko &f{menu}&c on jo olemassa."
@@ -552,7 +551,7 @@ player_only = "&8[&dGloss&8]: &cTämä komento on vain pelaajien käytettäviss�
 header = "Verkkoeditori"
 open_hover = "Avaa Glossin verkkoeditori napsauttamalla."
 open = "&8[&dGloss&8]: &7Verkkoeditori: &f{url}"
-preparing = "&8[&dGloss&8]: &7Valmistellaan suojattua synkronointi-istuntoa kohteelle &f{subject}&7..."
+preparing = "&8[&dGloss&8]: &7Valmistellaan suojattua reaaliaikaista editori-istuntoa kohteelle &f{subject}&7..."
 unavailable = "&8[&dGloss&8]: &cReaaliaikainen verkkomuokkaus ei ole käytettävissä. Tarkista synkronointiasetukset ja yhteys välityspalvelimeen."
 open_failed = "&8[&dGloss&8]: &cKohdetta &f{kind}={subject}&c ei voitu avata reaaliaikaisessa verkkoeditorissa: {reason}"
 open_console = "&8[&dGloss&8]: &7Editorin käyttölinkki kohteelle &f{subject}&7: &f{url}"
@@ -563,27 +562,27 @@ revoke_label = "Peru käyttöoikeus"
 link_hover = "Avaa editori, kopioi käyttölinkki tai peru istunto {session}."
 
 [gloss.message.web.sessions]
-list_empty = "&8[&dGloss&8]: &7Editorilla ei ole aktiivisia synkronointi-istuntoja."
-status = "&8[&dGloss&8]: &f&f{session} &7{kind}=&f{subject} vanhenee=&f{seconds}s julkaisu=&f{revision} odottavia=&f{pending}"
-revoked = "&8[&dGloss&8]: &aSynkronointi-istunto &f{session}&a peruttiin."
-pulled = "&8[&dGloss&8]: &aSynkronointi-istunto &f{session}&a tarkistettiin."
-unknown = "&8[&dGloss&8]: &cTuntematon tai vanhentunut synkronointi-istunto &f{session}&c."
-failed = "&8[&dGloss&8]: &cIstunnon &f{session}&c synkronointitoiminto epäonnistui: {reason}"
+list_empty = "&8[&dGloss&8]: &7Aktiivisia verkkoeditorin istuntoja ei ole."
+status = "&8[&dGloss&8]: &f{session} &7{kind}=&f{subject} &7vanhenee=&f{seconds}s &7julkaisu=&f{revision} &7odottavia=&f{pending}"
+revoked = "&8[&dGloss&8]: &aVerkkoeditorin istunto &f{session}&a peruttiin."
+pulled = "&8[&dGloss&8]: &aVerkkoeditorin istunto &f{session}&a tarkistettiin."
+unknown = "&8[&dGloss&8]: &cTuntematon tai vanhentunut verkkoeditorin istunto &f{session}&c."
+failed = "&8[&dGloss&8]: &cVerkkoeditorin toiminto epäonnistui istunnolle &f{session}&c: {reason}"
 
 [gloss.message.import]
 preview_started = "&8[&dGloss&8]: &7Tutkitaan lähdettä &f{source}&7 siirron esikatselua varten muuttamatta tietoja..."
 apply_started = "&8[&dGloss&8]: &7Tutkitaan ja siirretään lähteestä &f{source}&7 korvaamatta tietoja..."
 source_missing = "&8[&dGloss&8]: &7Lähdettä &f{source}&7 ei löytynyt polusta &f{path}&7."
-preview_summary = "&8[&dGloss&8]: &fLähteen &f{source}&7 esikatselu: &a{ready} valmista, &d{resume} jatkettavaa, &e{conflicts} ristiriitaa, &c{errors} virhettä, {warnings} varoitusta. Lähde: &f{path}"
-preview_entry = "&8- &f&f{legacy} -> &f{board} tila=&f{state} varoituksia=&f{warnings}"
-apply_summary = "&8[&dGloss&8]: &fLähteen &f{source}&7 siirto: &a{imported} tuotua, &e{skipped} ohitettua, &c{failed} epäonnistunutta; tarkistus havaitsi {errors} virhettä ja {warnings} varoitusta."
-apply_entry = "&8- &f&f{legacy} tila=&f{state} syy=&f{reason}"
+preview_summary = "&8[&dGloss&8]: &f{source}&7 (esikatselu): &a{ready} valmista&7, &d{resume} jatkettavaa&7, &e{conflicts} ristiriitaa&7, &c{errors} virhettä&7, {warnings} varoitusta. Lähde: &f{path}"
+preview_entry = "&8- &f{legacy} &7-> &f{board} &7tila=&f{state} &7varoituksia=&f{warnings}"
+apply_summary = "&8[&dGloss&8]: &f{source}&7 (siirto): &a{imported} tuotua&7, &e{skipped} ohitettua&7, &c{failed} epäonnistunutta&7; tarkistus havaitsi {errors} virhettä ja {warnings} varoitusta."
+apply_entry = "&8- &f{legacy} &7tila=&f{state} &7syy=&f{reason}"
 issue = "&8- &f{legacy} &7{severity}: &f{reason}"
 busy = "&8[&dGloss&8]: &cToinen vanhojen hologrammien siirto on jo käynnissä."
 failed = "&8[&dGloss&8]: &cVanhojen hologrammien siirto lähteestä &f{source}&c epäonnistui: {reason}"
 
 [gloss.message.config]
-reloaded = "&2Asetus \"{name}\" ladattiin uudelleen."
+reloaded = "&2Asetustiedosto \"{name}\" ladattiin uudelleen."
 
 [gloss.message.hotload]
 singular = "&2Pikaladattiin {kinds} ({count} muutos)."
@@ -600,7 +599,7 @@ saved = "&7Esikatselun koko tallennettu: &f{percent}%"
 bundle_more = "+{count} muuta"
 
 [gloss.message.items]
-disabled = "&8[&dGloss&8]: &7Mukautetut esineet on poistettu käytöstä. Aseta customItems arvoksi true tiedostossa gloss.toml."
+disabled = "&8[&dGloss&8]: &7Mukautetut esineet on poistettu käytöstä. Aseta &fcustomItems&7 arvoksi true tiedostossa gloss.toml."
 
 [gloss.message.items.status]
 header = "Mukautetut esineet"
@@ -622,18 +621,18 @@ failed = "&8[&dGloss&8]: &cMukautettujen esineiden luetteloa ei voitu kirjoittaa
 busy = "&8[&dGloss&8]: &cLuettelon vienti on jo käynnissä."
 
 [gloss.message.previews.list]
-header = "Esikatseluasiakirjat"
-empty = "&7Esikatseluasiakirjoja ei ole ladattu."
-entry = "lohkoja={blocks} olioita={entities} erikoisia={special} prioriteetti={priority}"
+header = "Esikatseludokumentit"
+empty = "&7Esikatseludokumentteja ei ole ladattu."
+entry = "kuutioita={blocks} olioita={entities} erikoisia={special} prioriteetti={priority}"
 
 [gloss.message.previews.reset]
-started = "&8[&dGloss&8]: &7Palautetaan esikatseluasiakirjat \"&f{name}&7\"..."
-done = "&8[&dGloss&8]: &aPalautettiin {count} mukana toimitettua esikatseluasiakirjaa. Niitä korvaavia käyttäjän lisäasiakirjoja ei poistettu."
-none = "&8[&dGloss&8]: &c\"{name}\" ei ole mukana toimitettu esikatseluasiakirja; mitään ei palautettu."
+started = "&8[&dGloss&8]: &7Palautetaan esikatseludokumentit \"&f{name}&7\"..."
+done = "&8[&dGloss&8]: &aPalautettiin {count} mukana toimitettua esikatseludokumenttia. Niitä peittäviä käyttäjän lisädokumentteja ei poistettu."
+none = "&8[&dGloss&8]: &c\"{name}\" ei ole mukana toimitettu esikatseludokumentti; mitään ei palautettu."
 
 [gloss.message.previews.dump]
-unknown = "&8[&dGloss&8]: &c\"{name}\" ei ole ladattu esikatseluasiakirja."
-result = "&8[&dGloss&8]: &a&a{name}&7: &f{total}&7 elementtiä (paneeleja={panels}, soluja={cells}, paikkoja={slots}, tekstejä={labels})."
+unknown = "&8[&dGloss&8]: &c\"{name}\" ei ole ladattu esikatseludokumentti."
+result = "&8[&dGloss&8]: &a{name}&7: &f{total}&7 elementtiä (paneeleja={panels}, soluja={cells}, paikkoja={slots}, tekstejä={labels})."
 no_errors = "&8[&dGloss&8]: &aEi koontivirheitä."
 error_line = "&8[&dGloss&8]: &c{message}"
 error_more = "&8[&dGloss&8]: &7Vielä {count} (katso konsolin loki)."
@@ -641,35 +640,31 @@ error_more = "&8[&dGloss&8]: &7Vielä {count} (katso konsolin loki)."
 [gloss.message.panels]
 created = "&8[&dGloss&8]: &aPaneeli &f{board}&a luotiin, versio {revision}."
 deleted = "&8[&dGloss&8]: &aPaneeli &f{board}&a poistettiin."
-renamed = "&8[&dGloss&8]: &a&f{oldBoard}&a nimettiin uudelleen nimelle &f{board}&a, versio {revision}."
-copied = "&8[&dGloss&8]: &a&f{source}&a kopioitiin kohteeksi &f{board}&a."
+renamed = "&8[&dGloss&8]: &aPaneeli &f{oldBoard}&a nimettiin uudelleen nimelle &f{board}&a, versio {revision}."
+copied = "&8[&dGloss&8]: &aPaneeli &f{source}&a kopioitiin kohteeksi &f{board}&a."
 updated = "&8[&dGloss&8]: &aToiminto {operation} kohdistettiin paneeliin &f{board}&a, versio {revision}."
-teleported = "&8[&dGloss&8]: &aSiirryttiin paneeliin &f{board}&a."
+teleported = "&8[&dGloss&8]: &aTeleportattu paneelin &f{board}&a luo."
 unknown = "&8[&dGloss&8]: &cTuntematon paneeli &f{board}&c."
 already_exists = "&8[&dGloss&8]: &cPaneeli &f{board}&c on jo olemassa."
 invalid = "&8[&dGloss&8]: &cVirheellinen paneelin arvo: &f{reason}&c."
-menu_unavailable = "&8[&dGloss&8]: &cPäävalikkoa &f{menu}&c ei ole ladattu."
+menu_unavailable = "&8[&dGloss&8]: &cJuurivalikkoa &f{menu}&c ei ole ladattu."
 player_unavailable = "&8[&dGloss&8]: &cKohdepelaaja &f{player}&c ei ole paikalla."
 world_unavailable = "&8[&dGloss&8]: &cPaneelin maailmaa &f{world}&c ei ole ladattu tallennetulla UUID-tunnuksella."
 revision_conflict = "&8[&dGloss&8]: &cPaneeli &f{board}&c muuttui muokkauksen aikana (odotettu {expected}, nykyinen {actual}). Avaa muokkausistunto uudelleen."
 failed = "&8[&dGloss&8]: &cPaneelin &f{board}&c toiminto epäonnistui: {reason}"
 
 [gloss.message.panels.list]
-header = "&8[&dGloss&8]: &fPysyviä paneeleja: &d{count}"
 empty = "&8[&dGloss&8]: &7Pysyviä paneeleja ei ole ladattu."
-entry = "&8- &f&f{board} valikko=&f{menu} versio=&f{revision}"
 
 [gloss.message.panels.near]
-header = "&8[&dGloss&8]: &fPaneeleja &d{radius}&f lohkon säteellä: &d{count}"
 empty = "&8[&dGloss&8]: &7Tällä säteellä ei ole paneeleja."
-entry = "&8- &f&f{board} etäisyys=&f{distance} valikko=&f{menu}"
 
 [gloss.message.panels.info]
-header = "&8[&dGloss&8]: &fPaneeli &d{board} ({state})"
-identity = "&7uuid=&f{uuid} versio=&f{revision} valikko=&f{menu}"
-transform = "&7maailma=&f{world} sijainti=&f{x}, {y}, {z} kierto=&f{yaw}, {pitch}, {roll} mittakaava=&f{scale}"
-visibility = "&7näkyvyys=&f{mode} katseluoikeus=&f{viewPermission} vuorovaikutusoikeus=&f{interactPermission} etäisyydet=&f{viewRange}/{interactionRange}"
-follow = "&7seuranta=&f{mode} pelaaja=&f{player} kierto=&f{rotation}"
+header = "&8[&dGloss&8]: &fPaneeli &d{board} &7({state})"
+identity = "&7uuid=&f{uuid} &7versio=&f{revision} &7valikko=&f{menu}"
+transform = "&7maailma=&f{world} &7sijainti=&f{x}, {y}, {z} &7kierto=&f{yaw}, {pitch}, {roll} &7mittakaava=&f{scale}"
+visibility = "&7näkyvyys=&f{mode} &7katseluoikeus=&f{viewPermission} &7vuorovaikutusoikeus=&f{interactPermission} &7etäisyydet=&f{viewRange}/{interactionRange}"
+follow = "&7seuranta=&f{mode} &7pelaaja=&f{player} &7kierto=&f{rotation}"
 
 [gloss.message.panels.edit]
 started = "&8[&dGloss&8]: &aMuokataan paneelia &f{board}&a versiosta {revision}. Muutokset odottavat tallennusta."
@@ -677,19 +672,19 @@ already_active = "&8[&dGloss&8]: &cMuokkaat jo paneelia &f{board}&c. Tallenna ta
 none = "&8[&dGloss&8]: &cSinulla ei ole tallennusta odottavaa paneelimuokkausta."
 busy = "&8[&dGloss&8]: &cPaneelia &f{board}&c tallennetaan parhaillaan."
 staged = "&8[&dGloss&8]: &aToiminto {operation} valmisteltiin paneelille &f{board}&a. Tallenna komennolla /gloss panel save."
-saved = "&8[&dGloss&8]: &a&f{board}&a tallennettiin, versio {revision}."
+saved = "&8[&dGloss&8]: &aPaneeli &f{board}&a tallennettiin, versio {revision}."
 cancelled = "&8[&dGloss&8]: &aPaneelin &f{board}&a odottavat muutokset peruttiin."
 identity_blocked = "&8[&dGloss&8]: &cTallenna tai peru paneelin &f{board}&c odottavat muutokset ennen uudelleennimeämistä tai poistamista."
 
 [gloss.preview.state]
 idle = "Toimeton"
-brewing = "Valmistus {percent}%"
+brewing = "Haudutus {percent}%"
 needs_blaze_powder = "Tarvitsee roihujauhetta"
 waiting = "Odottaa"
 no_ingredient = "Ei ainesosaa"
 empty = "Tyhjä"
-smelting_item = "Sulattaa: {item} {percent}%"
-smelting = "Sulattaa {percent}%"
+smelting_item = "Sulatus: {item} {percent}%"
+smelting = "Sulatus {percent}%"
 blasting_item = "Masuunisulatus: {item} {percent}%"
 blasting = "Masuunisulatus {percent}%"
 smoking_item = "Savustus: {item} {percent}%"
@@ -752,22 +747,22 @@ current = "Nykyinen: {locale}"
 current_with_personal = "Nykyinen: {locale} (Omasi: {personal})"
 your_description = "Vaihda vain näkemäsi viestit."
 reset_description = "Käytä palvelimen oletuskieltä."
-server_description = "Vaihda palvelimen oletuskieli."
+server_description = "Vaihda palvelimen oletuskieli"
 edit_description = "Avaa kielikohtainen viestieditori."
-select_description = "Napsauta valitaksesi tämän kielen."
+select_description = "Valitse tämä kieli napsauttamalla."
 remove_personal_description = "Poista henkilökohtainen kielivalintasi."
 no_controls = "Sinulla ei ole käytettävissä kieliasetuksia."
 command = "Komento: {command}"
 selected = "valittu"
-all-volmit-plugins = "Kaikki Volmit-lisäosat"
+all-volmit-plugins = "kaikki Volmit-lisäosat"
 
 [language.error]
-stopping = "Kielivalintaa ei ole saatavilla, kun plugin pysähtyy."
+stopping = "Kielivalinta ei ole käytettävissä, kun lisäosaa pysäytetään."
 editor-player-only = "Avaa kielieditori pelissä."
 no-providers = "Yhtään Volmit-kielipalvelua ei ole saatavilla."
 numeric-page = "Anna sivunumero numerona."
 personal-player-only = "Pelaajan kieliasetukset on valittava pelissä."
-personal-permission = "Sinulla ei ole lupaa valita kieltäsi."
+personal-permission = "Sinulla ei ole oikeutta valita kieltäsi."
 plugin-personal-permission = "Sinulla ei ole oikeutta valita kieltäsi lisäosalle {plugin}."
 plugin-server-permission = "Sinulla ei ole oikeutta muuttaa lisäosan {plugin} palvelinkieltä."
 server-locale-required = "Valitse palvelimen oletuskieleksi kielikoodi, kuten en_US."
@@ -775,16 +770,25 @@ unavailable-for-all = "Kieli {locale} ei ole saatavilla kaikille valituille lis�
 
 [language.usage]
 editor = "Käyttö: /{command} language server edit [locale]"
-selection = "Käyttö: /{command} language self [locale|reset] or server [locale]"
+selection = "Käyttö: /{command} language self [locale|reset] tai server [locale]"
 volmit-selection = "Käyttö: /volmit plugins languages [locale]"
+update = "Käyttö: /{command} language update"
 
 [language.selection]
 preparing = "Valmistellaan kieltä {locale} kohteelle {target}..."
 save-failed = "{plugin}: kielivalintaa ei voitu tallentaa; tarkista palvelinkonsoli."
 english-fallback = "{plugin}: {locale} ei ole saatavilla; käytetään englantia (en_US)."
-personal-selected = "{plugin}: kieli on nyt {locale}."
+personal-selected = "{plugin}: kielesi on nyt {locale}."
 server-selected = "{plugin}: palvelinkieli on nyt {locale}."
 server-default-selected = "{plugin}: kielesi noudattaa nyt palvelimen oletuskieltä."
+
+[language.update]
+checking = "{plugin}: tarkistetaan kielivaraston muutoksia..."
+unchanged = "{plugin}: asennetut kielet vastaavat jo varastoa."
+applied = "{plugin}: {locale} päivitetty ({added} lisätty, {updated} muutettu, {kept} paikallista muokkausta säilytetty)."
+cooldown = "{plugin}: kielivarasto tarkistettiin äskettäin; yritä uudelleen {remaining} kuluttua."
+locale-failed = "{plugin}: {locale} ei päivittynyt: {reason}"
+failed = "{plugin}: kielipäivitys epäonnistui: {reason}"
 
 [language.editor]
 title = "{plugin} › {section}"
@@ -792,8 +796,8 @@ loading = "Ladataan kielen {locale} viestejä..."
 
 [language.editor.section]
 languages = "Kielet"
-search = "Etsi"
-search-title = "{locale} / Etsi"
+search = "Haku"
+search-title = "{locale} / Haku"
 group-title = "{locale} / {group}"
 
 [language.editor.prompt]
@@ -816,7 +820,7 @@ next-page = "&eSeuraava sivu&r"
 
 [language.editor.search]
 messages = "Hae viestejä"
-messages-lore = "Napsauta hakeaksesi kaikista viesteistä."
+messages-lore = "Hae kaikista viesteistä napsauttamalla."
 clear = "Tyhjennä haku"
 
 [language.editor.message]
@@ -830,7 +834,7 @@ edit-chat = "&7Muokkaa chatissa napsauttamalla.&r"
 open = "&8Avaa tämä kieli napsauttamalla.&r"
 
 [language.editor.category]
-message-count = "&7{count} viestiä&r"
+message-count = "&7Viestejä: {count}&r"
 open = "&8Avaa tämä luokka napsauttamalla.&r"
 
 [language.editor.error]
@@ -845,7 +849,7 @@ change = "{key}: ”{before}” muutettiin arvoon ”{after}”."
 line = "Rivi {line}"
 
 [language.editor.value]
-none = "Ei ole"
+none = "Ei mitään"
 empty = "(tyhjä)"
 
 # Lane message tables. Each lane appends its [gloss.message.<lane>] and [command.help.<group>]
@@ -858,7 +862,7 @@ empty = "(tyhjä)"
 "surfaces.tested" = "&8[&dGloss&8]: &aSuoritettiin &f{id}&a pelaajalle &f{player}&a."
 "nametags.empty" = "&8[&dGloss&8] &7Nimikylttejä ei ole ladattu."
 "nametags.unknown" = "&8[&dGloss&8]: &cNimikylttiä &f{id}&c ei ole."
-"nametags.refreshed" = "&8[&dGloss&8]: &aOtettiin uudelleen käyttöön &d{count}&a nimikylttidokumenttia."
+"nametags.refreshed" = "&8[&dGloss&8]: &aPäivitettiin &d{count}&a nimikylttidokumenttia."
 "hud.header" = "&8[&dGloss&8] &7HUD-varaukset pelaajalle &f{player}&7: &d{count}"
 "hud.empty" = "&8[&dGloss&8] &7Mikään lisäosa ei varaa HUD-paikkaa pelaajalle &f{player}&7."
 "hud.line" = "&8- &f{kind} &7{source} &8| &7{value} &8| &7{count} &8| &7{state}"
@@ -869,7 +873,7 @@ root = "Toimintopalkin, pomopalkin ja otsikon pinnat"
 list = "Listaa pintadokumentit"
 info = "Näytä pintadokumentti"
 "info.id" = "Pintadokumentin tunnus"
-reset = "Palauta mukana tulevat pinnat"
+reset = "Palauta mukana toimitetut pintaoletukset"
 test = "Aja pintakierros yhdelle pelaajalle nyt"
 "test.id" = "Pintadokumentin tunnus"
 "test.player" = "Testattava pelaaja; oletuksena sinä"
@@ -879,12 +883,12 @@ root = "Katsojakohtaiset nimikylttidokumentit"
 list = "Listaa nimikylttidokumentit"
 info = "Näytä nimikylttidokumentti"
 "info.id" = "Nimikylttidokumentin tunnus"
-reset = "Palauta mukana tulevat nimikyltit"
-refresh = "Ota kaikki nimikyltit uudelleen käyttöön"
+reset = "Palauta mukana toimitetut nimikylttioletukset"
+refresh = "Päivitä kaikki nimikyltit nyt"
 
 [command.help.hud]
 root = "Tarkastele jaettua HUD-kokoajaa"
-who = "Näyttää, mikä lisäosa varaa kunkin HUD-paikan"
+who = "Näytä, mikä lisäosa varaa kunkin pelaajan HUD-paikan"
 "who.player" = "Tarkasteltava pelaaja; oletuksena sinä"
 
 # --- lane:chat ---
@@ -898,7 +902,7 @@ channel_unknown = "&8[&dGloss&8]: &cKanavaa nimeltä &d{name}&c ei ole."
 channel_list = "&8[&dGloss&8]: &7Kanavat: &f{value}"
 msg_usage = "&8[&dGloss&8]: &eKäyttö: &f{command}"
 msg_offline = "&8[&dGloss&8]: &c{player} ei ole paikalla."
-reply_none = "&8[&dGloss&8]: &cSinulla ei ole ketään kenelle vastata."
+reply_none = "&8[&dGloss&8]: &cSinulla ei ole ketään, jolle vastata."
 msg_self = "&8[&dGloss&8]: &cEt voi lähettää viestiä itsellesi."
 channels_header = "&dKanavat &7({count})"
 channels_empty = "&7Kanavia ei ole ladattu."
@@ -907,47 +911,47 @@ strings_header = "&dTekstikielet &7({count})"
 strings_empty = "&7Tekstidokumentteja ei ole ladattu."
 strings_missing = "&dPuuttuu kielestä {locale} &7({count})"
 strings_complete = "&8[&dGloss&8]: &a{locale} kattaa kaikki en_US-avaimet."
-leaderboards_header = "&dTulostaulut &7({count})"
-leaderboards_empty = "&7Tulostauluja ei ole ladattu."
-leaderboard_missing = "&8[&dGloss&8]: &cTulostaulua nimeltä &f{id}&c ei ole."
-leaderboard_reset = "&8[&dGloss&8]: &aTulostaulu &f{id}&a nollattu ({state})."
-leaderboard_sampled = "&8[&dGloss&8]: &aTulostaulu &f{id}&a näytteistetty kaikille paikalla oleville."
+leaderboards_header = "&dKärkilistat &7({count})"
+leaderboards_empty = "&7Kärkilistoja ei ole ladattu."
+leaderboard_missing = "&8[&dGloss&8]: &cKärkilistadokumenttia nimeltä &f{id}&c ei ole."
+leaderboard_reset = "&8[&dGloss&8]: &aKärkilista &f{id}&a nollattu ({state})."
+leaderboard_sampled = "&8[&dGloss&8]: &aKärkilistaan &f{id}&a otettiin näyte kaikilta paikalla olevilta pelaajilta."
 
 [command.help.channel]
 root = "Chat-kanavat"
 list = "Listaa ladatut chat-kanavat"
 info = "Näytä kanavan laajuus, muoto ja muunnelmat"
 "info.id" = "Kanavadokumentin tunnus"
-reset = "Palauta mukana tulleet kanavadokumentit"
+reset = "Palauta mukana toimitetut kanavadokumentit"
 
 [command.help.strings]
 root = "Kirjoitetut sisältötekstit"
 list = "Listaa ladatut tekstikielet ja niiden merkintämäärät"
 missing = "Listaa avaimet, jotka en_US sisältää mutta kieli ei"
 "missing.locale" = "Kieli, jota verrataan en_US:ään"
-reset = "Palauta mukana tulleet tekstidokumentit"
+reset = "Palauta mukana toimitetut tekstidokumentit"
 
 [command.help.leaderboard]
-root = "Lasketut tulostaulut"
-list = "Listaa ladatut tulostaulut ja niiden merkintämäärät"
-info = "Näytä tulostaulun lähde, järjestys ja merkinnät"
-"info.id" = "Tulostaulun tunnus"
-reset = "Tyhjennä tulostaulun jakso tai kaikkien aikojen arvot"
-"reset.id" = "Tulostaulun tunnus"
+root = "Lasketut kärkilistat"
+list = "Listaa ladatut kärkilistat ja niiden merkintämäärät"
+info = "Näytä kärkilistan lähde, järjestys ja sijoitetut merkinnät"
+"info.id" = "Kärkilistadokumentin tunnus"
+reset = "Tyhjennä kärkilistan jakson tai kaikkien aikojen arvot"
+"reset.id" = "Kärkilistadokumentin tunnus"
 "reset.period" = "all tai current"
-sample = "Näytteistä tulostaulu heti kaikille paikalla oleville"
-"sample.id" = "Tulostaulun tunnus"
+sample = "Ota kärkilistaan näyte heti kaikilta paikalla olevilta pelaajilta"
+"sample.id" = "Kärkilistadokumentin tunnus"
 
 # --- lane:forms ---
 
 [gloss.message.forms]
 icon_unsupported = "&7Ei piirrettävissä arkun ruutuun ({kind})"
-no_inventories = "&8[&dGloss&8]: &7Arkkuvalikkoja ei ole määritetty."
-inventory_list_header = "&dArkkuvalikot"
-inventory_list_entry = "&7Avaa arkkuvalikko &f{id}"
+no_inventories = "&8[&dGloss&8]: &7Tavaraluettelovalikkoja ei ole määritetty."
+inventory_list_header = "&dTavaraluettelovalikot"
+inventory_list_entry = "&7Avaa tavaraluettelovalikko &f{id}"
 inventory_info = "&8[&dGloss&8]: &d{id} &8- &7koko &f{kind}&7, ruudut &f{count}"
-unknown_inventory = "&8[&dGloss&8]: &cArkkuvalikkoa nimeltä {id} ei ole."
-inventory_opened = "&8[&dGloss&8]: &aArkkuvalikko {id} avattiin pelaajalle {player}."
+unknown_inventory = "&8[&dGloss&8]: &cTavaraluettelovalikkoa nimeltä {id} ei ole."
+inventory_opened = "&8[&dGloss&8]: &aTavaraluettelovalikko {id} avattiin pelaajalle {player}."
 bad_args = "&8[&dGloss&8]: &cArgumenttien on oltava avain=arvo -pareja: {value}"
 prompt_timeout = "&8[&dGloss&8]: &7Syöte vanheni."
 prompt_busy = "&8[&dGloss&8]: &cSinulla on jo syöte odottamassa."
@@ -960,25 +964,23 @@ give_dropped = "&8[&dGloss&8]: &7Tavaraluettelosi oli täynnä, joten esineet pu
 args = "Välilyönnein erotetut avain=arvo-argumentit"
 
 [command.help.inventory]
-root = "Tarkastele ja avaa arkkuvalikkoja"
-list = "Listaa määritetyt arkkuvalikot"
+root = "Tarkastele ja avaa tavaraluettelovalikkoja"
+list = "Listaa määritetyt tavaraluettelovalikot"
 "list.page" = "Listan sivu, alkaen ykkösestä"
-info = "Näytä arkkuvalikon koko ja ruudut"
-"info.id" = "Arkkuvalikon tunnus"
-open = "Avaa arkkuvalikko pelaajalle"
-"open.id" = "Arkkuvalikon tunnus"
+info = "Näytä tavaraluettelovalikon koko ja ruudut"
+"info.id" = "Tavaraluettelovalikon tunnus"
+open = "Avaa tavaraluettelovalikko pelaajalle"
+"open.id" = "Tavaraluettelovalikon tunnus"
 "open.player" = "Pelaaja, jolle avataan; oletuksena sinä"
 "open.args" = "Välilyönnein erotetut avain=arvo-argumentit"
-reset = "Palauta mukana toimitetut arkkuvalikkojen oletukset"
+reset = "Palauta mukana toimitetut tavaraluettelovalikkojen oletukset"
 "reset.name" = "Palautettava nimi tai * kaikille mukana toimitetuille oletuksille"
 
 ["command.help.hologram"]
-page = "Siirra katsoja hologrammin sivulle"
+page = "Siirrä katsoja hologrammin sivulle"
 "page.page" = "Sivun tunnus, next tai prev"
-"page.player" = "Pelaajan nimi; tyhja tarkoittaa sinua"
-motion = "Toista liikeklippi hologrammissa"
-"motion.motion" = "Liikkeen tunnus tai clear pysayttaa sen"
-actions = "Listaa toiminnot jotka hologrammi ajaa klikatessa"
+"page.player" = "Katsojan nimi; tyhjä tarkoittaa sinua"
+actions = "Luettele toiminnot, jotka hologrammi suorittaa napsautettaessa"
 
 [gloss.message.hologram_interaction]
 hologram_page_set = "&8[&dGloss&8] &a{player}&a on nyt sivulla &f{page}&a hologrammissa &f{id}&a."
@@ -986,12 +988,12 @@ hologram_page_player_missing = "&8[&dGloss&8] &cPelaaja &f{player}&c ei ole paik
 hologram_page_unknown = "&8[&dGloss&8] &cHologrammilla &f{id}&c ei ole sivua '&f{page}&c'."
 hologram_actions_empty = "&8[&dGloss&8] &7Hologrammilla &f{id}&7 ei ole toimintoja."
 hologram_actions_header = "&8[&dGloss&8] &7Hologrammin &f{id}&7 toiminnot (&f{count}&7):"
-hologram_actions_entry = "&8[&dGloss&8] &7  &f{kind}&7 kohteessa &f{value}"
+hologram_actions_entry = "&8[&dGloss&8] &7  &f{kind}&7 laukaisimella &f{value}"
 
 # --- lane:world ---
 
 [gloss.message.world]
-players_only = "&cTämän komennon täytyy suorittaa pelaaja."
+players_only = "&cVain pelaaja voi suorittaa tämän komennon."
 disabled = "&cTämä ominaisuus on pois päältä gloss.toml-tiedostossa."
 
 [gloss.message.world.marker]
@@ -1017,15 +1019,15 @@ stopped = "&7Kamera-ajo pysäytettiin pelaajalle &f{player}&7."
 idle = "&c{player} ei ole kamera-ajossa."
 
 [gloss.message.world.nameplate]
-list = "&7Nimikyltit &8({count})&7: &f{value}"
-info = "&7Nimikyltti &f{id} &7prioriteetti &f{value}&7, &f{count} &7riviä."
-missing = "&cEi nimikylttiä nimeltä &f{id}&c."
-refreshed = "&aNimikyltit päivitettiin."
+list = "&7Nimikilvet &8({count})&7: &f{value}"
+info = "&7Nimikilpi &f{id} &7prioriteetti &f{value}&7, &f{count} &7riviä."
+missing = "&cEi nimikilpeä nimeltä &f{id}&c."
+refreshed = "&aNimikilvet päivitettiin."
 
 [gloss.message.world.glow]
-set = "&f{target} &7hehkuu nyt värillä &f{value}&a."
-cleared = "&7Hehku kohteelta &f{target} &7poistettiin."
-missing = "&cPelaaja nimeltä &f{player} &cei ole paikalla."
+set = "&aKohde &f{target} &7hehkuu värillä &f{value}&a."
+cleared = "&7Kohteen &f{target} &7hehku poistettiin."
+missing = "&cPaikalla ei ole pelaajaa nimeltä &f{player}&c."
 
 [command.help.marker]
 root = "Maailmamerkkien työkalut"
@@ -1053,97 +1055,97 @@ id = "Reittipistedokumentin tunnus"
 [command.help.camera]
 root = "Kamera-ajojen työkalut"
 test = "Lennä esittelyajo ympärilläsi"
-stop = "Päätä kamera-ajo aikaisin"
+stop = "Päätä kamera-ajo ennenaikaisesti"
 
 [command.help.camera.arg]
 seconds = "Ajon pituus sekunteina"
 player = "Pysäytettävä matkustaja; oletuksena sinä"
 
 [command.help.nameplate]
-root = "Pelaajien nimikylttien työkalut"
-list = "Listaa nimikylttidokumentit"
-info = "Näytä yksi nimikylttidokumentti"
-reset = "Palauta mukana tullut nimikylttidokumentti"
-refresh = "Rakenna nimikyltit uudelleen kaikille katsojille"
+root = "Pelaajien nimikilpien työkalut"
+list = "Listaa nimikilpidokumentit"
+info = "Näytä yksi nimikilpidokumentti"
+reset = "Palauta mukana toimitettu nimikilpidokumentti"
+refresh = "Rakenna nimikilvet uudelleen kaikille katsojille"
 
 [command.help.nameplate.arg]
-id = "Nimikylttidokumentin tunnus"
+id = "Nimikilpidokumentin tunnus"
 
 [command.help.glow]
-root = "Olentojen hehkun työkalut"
+root = "Olioiden hehkun työkalut"
 set = "Saa pelaaja hehkumaan sinulle"
-clear = "Poista pelaajan hehku sinulta"
+clear = "Poista pelaajan hehku näkyvistäsi"
 
 [command.help.glow.arg]
 player = "Korostettava pelaaja"
 cleared = "Pelaaja, jonka korostus poistetaan"
 color = "Nimetty tekstiväri"
-ticks = "Tikit, jotka hehku kestää, tai 0 pitämiseen"
+ticks = "Hehkun kesto tikkeinä, tai 0 pysyvään hehkuun"
 
 # --- lane:behaviors ---
 
 [command.help.behavior]
-root = "Tarkastele ja laukaise kayttaytymisdokumentteja"
-list = "Listaa ladatut kayttaytymisdokumentit"
-info = "Nayta kayttaytymisdokumentin liipaisimet ja ehdot"
-fire = "Suorita yksi kayttaytymismerkinta nyt"
-reset = "Palauta mukana tulleet kayttaytymisoletukset"
-id = "Kayttaytymisdokumentin tunnus"
-entry = "Merkinnan numero, alkaen yhdesta"
-player = "Pelaaja jolle merkinta suoritetaan, tai * ei kenellekaan"
+root = "Tarkastele ja laukaise käyttäytymisdokumentteja"
+list = "Listaa ladatut käyttäytymisdokumentit"
+info = "Näytä käyttäytymisdokumentin liipaisimet ja ehdot"
+fire = "Suorita yksi käyttäytymismerkintä nyt"
+reset = "Palauta mukana toimitetut käyttäytymisoletukset"
+id = "Käyttäytymisdokumentin tunnus"
+entry = "Merkinnän numero, alkaen 1:stä"
+player = "Pelaaja, jolle merkintä suoritetaan, tai * ei kenellekään"
 
 [command.help.state]
-root = "Lue ja kirjoita tallennettua kayttaytymistilaa"
-get = "Nayta yksi tilan arvo"
+root = "Lue ja kirjoita tallennettua käyttäytymistilaa"
+get = "Näytä yksi tilan arvo"
 set = "Kirjoita yksi tilan arvo"
 clear = "Palauta yksi tilan arvo oletukseensa"
-dump = "Listaa jokainen maaritelty tila-avain ja sen arvo"
-key = "Maaritelty tila-avain"
-value = "Uusi arvo; laita lainausmerkkeihin jos siina on valilyonteja"
-player = "Pelaaja jolle arvo kuuluu, tai * itsellesi"
+dump = "Listaa jokainen määritelty tila-avain ja sen arvo"
+key = "Määritelty tila-avain"
+value = "Uusi arvo; käytä lainausmerkkejä, jos siinä on välilyöntejä"
+player = "Pelaaja, jolle arvo kuuluu, tai * itsellesi"
 
 [command.help.do]
-root = "Laukaise taman nimiset command-kayttaytymismerkinnat"
-name = "Kayttaytymiskomennon nimi"
-args = "Argumentit avain=arvo-pareina; laita lainausmerkkeihin jos niissa on valilyonteja"
+root = "Laukaise tämännimiset command-käyttäytymismerkinnät"
+name = "Käyttäytymiskomennon nimi"
+args = "Argumentit avain=arvo-pareina; käytä lainausmerkkejä, jos niissä on välilyöntejä"
 
 [command.help.expr]
-root = "Laske lauseke ja nayta mika siihen vastasi"
-expression = "Laskettava lauseke; laita lainausmerkkeihin jos siina on valilyonteja"
+root = "Laske lauseke ja näytä, mikä siihen vastasi"
+expression = "Laskettava lauseke; käytä lainausmerkkejä, jos siinä on välilyöntejä"
 
 [command.help.explain]
-root = "Nayta mitka ehdot ajonaika tarkisti ja mika voitti"
+root = "Näytä, mitkä ehdot ajonaika tarkisti ja mikä voitti"
 kind = "Selitettava ajonaika, esimerkiksi board tai behavior"
-id = "Selitettavan dokumentin tunnus"
-player = "Pelaaja jolle selitetaan, tai * itsellesi"
+id = "Selitettävän dokumentin tunnus"
+player = "Pelaaja, jolle selitetään, tai * itsellesi"
 
 [gloss.message.behaviors]
-off = "&8[&dGloss&8]: &eKayttaytymiset on kytketty pois features.behaviors-asetuksesta."
-"list.empty" = "&8[&dGloss&8]: &7Yhtaan kayttaytymisdokumenttia ei ole ladattu."
-missing = "&8[&dGloss&8]: &cKayttaytymisdokumenttia \"{id}\" ei ole."
-"info.header" = "&8[&dGloss&8]: &d{id} &7versio &f{revision} &8| &7merkinnat &f{count} &8| &7kaytossa &f{enabled}"
+off = "&8[&dGloss&8]: &eKäyttäytymiset on kytketty pois asetuksella features.behaviors."
+"list.empty" = "&8[&dGloss&8]: &7Yhtään käyttäytymisdokumenttia ei ole ladattu."
+missing = "&8[&dGloss&8]: &cKäyttäytymisdokumenttia \"{id}\" ei ole."
+"info.header" = "&8[&dGloss&8]: &d{id} &7versio &f{revision} &8| &7merkinnät &f{count} &8| &7käytössä &f{enabled}"
 "info.entry" = " &8{line}. &f{name} &7kun &f{when} &8| &7oikeus &f{permission}"
-fired = "&8[&dGloss&8]: &aSuoritettiin merkinta &f{line}&a dokumentista &f{id}&a."
-"fire.missing" = "&8[&dGloss&8]: &c{id} ei sisalla merkintaa {line}."
-"do.ran" = "&8[&dGloss&8]: &aLaukaistiin &f{count}&a kayttaytymismerkintaa nimelle &f{name}&a."
-"do.none" = "&8[&dGloss&8]: &7Yksikaan kayttaytymismerkinta ei vastaa komentoon \"{name}\"."
+fired = "&8[&dGloss&8]: &aSuoritettiin merkintä &f{line}&a dokumentista &f{id}&a."
+"fire.missing" = "&8[&dGloss&8]: &c{id} ei sisällä merkintää {line}."
+"do.ran" = "&8[&dGloss&8]: &aLaukaistiin &f{count}&a käyttäytymismerkintää nimelle &f{name}&a."
+"do.none" = "&8[&dGloss&8]: &7Yksikään käyttäytymismerkintä ei vastaa komentoon \"{name}\"."
 "state.value" = " &7{key} &8= &f{value}"
 "state.set" = "&8[&dGloss&8]: &a{key} on nyt &f{value}&a."
-"state.cleared" = "&8[&dGloss&8]: &a{key} on taas oletuksessaan."
-"state.unknown" = "&8[&dGloss&8]: &cYksikaan kayttaytymisdokumentti ei maarita tila-avainta \"{key}\"."
+"state.cleared" = "&8[&dGloss&8]: &a{key} on palautettu oletusarvoonsa."
+"state.unknown" = "&8[&dGloss&8]: &cYksikään käyttäytymisdokumentti ei määritä tila-avainta \"{key}\"."
 "state.invalid" = "&8[&dGloss&8]: &c\"{value}\" ei ole {type}-arvo."
-"state.empty" = "&8[&dGloss&8]: &7Yksikaan kayttaytymisdokumentti ei maarita tilaa."
-"state.player" = "&8[&dGloss&8]: &cNimea pelaaja: &f{key}&c ei ole globaali avain."
+"state.empty" = "&8[&dGloss&8]: &7Yksikään käyttäytymisdokumentti ei määritä tilaa."
+"state.player" = "&8[&dGloss&8]: &cNimeä pelaaja: &f{key}&c ei ole globaali avain."
 "player.missing" = "&8[&dGloss&8]: &cPelaajaa \"{player}\" ei ole paikalla."
 "expr.value" = "&8[&dGloss&8]: &f{value} &8({type})"
-"expr.reference" = " &7{name} &8= &f{value} &8lahteesta &7{source}"
+"expr.reference" = " &7{name} &8= &f{value} &8lähteestä &7{source}"
 "expr.functions" = " &7funktiot &8= &f{value}"
 "expr.failed" = "&8[&dGloss&8]: &c{reason}"
 "explain.header" = "&8[&dGloss&8]: &d{kind} &f{id} &7pelaajalle &f{player}"
 "explain.line" = " &8{path} &7{when} &8= &f{value}"
 "explain.winner" = " &a> &f{path} &7{when} &8= &f{value}"
-"explain.unknown" = "&8[&dGloss&8]: &cMikaan ei selita kohdetta \"{kind}\"; kokeile {options}."
-"explain.missing" = "&8[&dGloss&8]: &cKohdetta {kind} nimella \"{id}\" ei ole."
+"explain.unknown" = "&8[&dGloss&8]: &cMikään ei selitä kohdetta \"{kind}\"; kokeile {options}."
+"explain.missing" = "&8[&dGloss&8]: &cKohdetta {kind} nimellä \"{id}\" ei ole."
 
 # --- lane:authoring ---
 
@@ -1159,25 +1161,25 @@ arg_dry = "Kerro mikä muuttuisi kirjoittamatta mitään"
 arg_id = "Asennetun paketin tunnus"
 
 [command.help.history]
-root = "Luettele asiakirjan tallennetut versiot"
-arg_kind = "Asiakirjakansio, kuten boards tai menus"
-arg_id = "Asiakirjan tunnus"
+root = "Luettele dokumentin tallennetut versiot"
+arg_kind = "Dokumenttikansio, kuten boards tai menus"
+arg_id = "Dokumentin tunnus"
 arg_page = "Ykkösestä alkava luettelosivu"
 
 [command.help.restore]
-root = "Kirjoita tallennettu versio elävän asiakirjan päälle"
+root = "Kirjoita tallennettu versio käytössä olevan dokumentin päälle"
 arg_version = "Versiotunnus komennosta /gloss history"
 
 [command.help.check]
 root = "Tarkista työtilan rikkinäiset viittaukset"
-arg_kind = "Rajaa tarkistus yhteen asiakirjakansioon"
-arg_id = "Rajaa tarkistus yhteen asiakirjaan"
+arg_kind = "Rajaa tarkistus yhteen dokumenttikansioon"
+arg_id = "Rajaa tarkistus yhteen dokumenttiin"
 
 [command.help.export]
-root = "Kopioi asiakirjat pelkkänä JSON-muotona"
+root = "Kopioi dokumentit ulos pelkkänä JSON-muotona"
 bundle = "Kirjoita koko työtila editorin nippuna"
-arg_kind = "Rajaa vienti yhteen asiakirjakansioon"
-arg_id = "Rajaa vienti yhteen asiakirjaan"
+arg_kind = "Rajaa vienti yhteen dokumenttikansioon"
+arg_id = "Rajaa vienti yhteen dokumenttiin"
 arg_dir = "Kohdekansio Glossin datakansiossa"
 
 [gloss.message.authoring.pack]
@@ -1195,10 +1197,10 @@ disabled = "&8[&dGloss&8] &cGloss-paketit on kytketty pois gloss.toml-tiedostoss
 [gloss.message.authoring.history]
 empty = "&8[&dGloss&8] &7Kohteesta &f{kind} {id}&7 ei ole tallennettuja versioita."
 entry = "&8[&dGloss&8] &f{revision} &7{source} &8{count} tavua"
-disabled = "&8[&dGloss&8] &cAsiakirjahistoria on kytketty pois gloss.toml-tiedostossa."
+disabled = "&8[&dGloss&8] &cDokumenttihistoria on kytketty pois gloss.toml-tiedostossa."
 
 [gloss.message.authoring.restore]
-done = "&8[&dGloss&8] &f{kind} {id}&7 palautettu versioon &f{revision}&7."
+done = "&8[&dGloss&8] Palautettu &f{kind} {id}&7 versioon &f{revision}&7."
 unknown = "&8[&dGloss&8] &cKohteesta &f{kind} {id}&c ei löydy versiota &f{revision}&c."
 failed = "&8[&dGloss&8] &cPalautus epäonnistui: {reason}"
 
@@ -1208,20 +1210,20 @@ entry = "&8[&dGloss&8] &7{state} &f{key} &8{kind} {id} {path} &7{message}"
 summary = "&8[&dGloss&8] &f{count}&7 havaintoa."
 
 [gloss.message.authoring.export]
-done = "&8[&dGloss&8] &f{count}&7 asiakirjaa viety kohteeseen &f{path}&7."
+done = "&8[&dGloss&8] Viety &f{count}&7 dokumenttia kohteeseen &f{path}&7."
 failed = "&8[&dGloss&8] &cVienti epäonnistui: {reason}"
 
 [gloss.message.authoring.import]
-preview = "&8[&dGloss&8] &f{source}&7 kirjoittaisi &f{count}&7 asiakirjaa."
+preview = "&8[&dGloss&8] &f{source}&7 kirjoittaisi &f{count}&7 dokumenttia."
 entry = "&8[&dGloss&8] &7{state} &f{path}&7 {reason}"
-applied = "&8[&dGloss&8] &f{count}&7 asiakirjaa tuotu lähteestä &f{source}&7."
+applied = "&8[&dGloss&8] Tuotu &f{count}&7 dokumenttia lähteestä &f{source}&7."
 absent = "&8[&dGloss&8] &7Polussa &f{path}&7 ei ole &f{source}&7-tietoja."
 preview_required = "&8[&dGloss&8] &cSuorita ensin /gloss import preview {source}. Esikatselut käyttävät määritettyä voimassaoloaikaa."
 
 # --- lane:forge ---
 
 [gloss.message.forge]
-disabled = "&8[&dGloss&8] &cKirjasinpaja on pois päältä. Aseta features.forge arvoon true tiedostossa gloss.toml."
+disabled = "&8[&dGloss&8] &cKuvakepaja on pois päältä. Aseta features.forge arvoon true tiedostossa gloss.toml."
 built = "&8[&dGloss&8] &aPaketti &f{value}&a koottu, {count} kuvaketta."
 build_failed = "&8[&dGloss&8] &cPaketin kokoaminen epäonnistui; edellinen paketti on yhä käytössä. Katso konsoli."
 status = "&7{value}"

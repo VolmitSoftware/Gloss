@@ -38,12 +38,35 @@ String volmLibCoordinate = providers.gradleProperty('volmLibCoordinate')
     .get()
 String authTokenProperty = providers.gradleProperty('authToken').orNull
 String jitpackAuthToken = authTokenProperty ?: providers.gradleProperty('jitpackAuthToken').orNull
-List<String> languageLocales = fileTree('src/main/resources/languages') {
+String languageSourceRepository = 'VolmitSoftware/Gloss'
+String languageSourceBranch = providers.gradleProperty('languageSourceBranch').orElse(providers.provider {
+    try {
+        Process process = new ProcessBuilder('git', 'symbolic-ref', '--short', 'refs/remotes/origin/HEAD')
+            .directory(projectDir)
+            .redirectErrorStream(true)
+            .start()
+        String output = process.inputStream.text.trim()
+        if (process.waitFor() == 0 && output.startsWith('origin/')) {
+            return output.substring('origin/'.length())
+        }
+    } catch (IOException | InterruptedException ignored) {
+    }
+    return 'master'
+}).get()
+if (!(languageSourceBranch ==~ /[A-Za-z0-9][A-Za-z0-9._\/-]{0,127}/) || languageSourceBranch.contains('..')) {
+    throw new GradleException('languageSourceBranch must be a Git branch name')
+}
+String languageSourcePath = 'src/main/resources/languages'
+String languageSourceExtension = '.toml'
+List<String> languageLocales = fileTree(languageSourcePath) {
     include('*.toml')
-}.files.collect { File source -> source.name.substring(0, source.name.length() - 5) }.sort()
+}.files.collect { File source -> source.name.substring(0, source.name.length() - languageSourceExtension.length()) }.sort()
 def languageSourceManifestTask = tasks.register('generateLanguageSourceManifest', WriteProperties) {
     destinationFile.set(layout.buildDirectory.file('generated/language-source/gloss-language-source.properties'))
-    property('revision', 'master')
+    property('repository', languageSourceRepository)
+    property('branch', languageSourceBranch)
+    property('path', languageSourcePath)
+    property('extension', languageSourceExtension)
     property('locales', languageLocales.join(','))
 }
 
@@ -371,6 +394,24 @@ tasks.register('verifyLanguagePackaging') {
             }.collect { java.util.jar.JarEntry entry -> entry.name }
             if (!translations.isEmpty()) {
                 throw new GradleException("Runtime jar contains translation resources: ${translations}")
+            }
+            java.util.jar.JarEntry manifestEntry = archive.getJarEntry('gloss-language-source.properties')
+            if (manifestEntry == null) {
+                throw new GradleException('Runtime jar is missing gloss-language-source.properties')
+            }
+            Properties languageManifest = new Properties()
+            archive.getInputStream(manifestEntry).withCloseable { InputStream input -> languageManifest.load(input) }
+            if (languageManifest.getProperty('repository') != languageSourceRepository
+                || languageManifest.getProperty('branch') != languageSourceBranch
+                || languageManifest.getProperty('path') != languageSourcePath
+                || languageManifest.getProperty('extension') != languageSourceExtension
+                || languageManifest.getProperty('locales') != languageLocales.join(',')) {
+                throw new GradleException('Runtime language source manifest does not match the build source set')
+            }
+            if (languageManifest.stringPropertyNames().any { String key ->
+                key == 'revision' || key == 'mode' || key.startsWith('sha256.')
+            }) {
+                throw new GradleException('Runtime language source manifest must track the repository branch, not a pinned revision')
             }
         }
     }

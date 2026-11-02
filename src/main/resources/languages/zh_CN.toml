@@ -25,6 +25,7 @@
 #   {absorbed}  合并到现有数据的导入条目数
 #   {active}  活动提供程序数量
 #   {actual}  当前修订版本
+#   {added}  语言更新中新增的消息数
 #   {after}  编辑后的消息值
 #   {argument}  意外的命令参数
 #   {axis}  坐标轴或旋转轴
@@ -42,7 +43,6 @@
 #   {copied}  已复制条目数量
 #   {count}  匹配的对象或消息数量
 #   {disc}  容器内音乐唱片
-#   {distance}  距目标的距离
 #   {drops}  显示的掉落物品数量
 #   {enabled}  启用状态或已启用条目数量
 #   {entities}  实体数量
@@ -62,6 +62,7 @@
 #   {interactPermission}  交互所需权限
 #   {interactionRange}  最大交互距离
 #   {item}  物品名称或材质
+#   {kept}  语言更新中保留的本地修改数
 #   {key}  消息或配置键
 #   {kind}  对象或提供程序类型
 #   {kinds}  可用的对象或提供程序类型
@@ -99,9 +100,9 @@
 #   {priority}  选择或渲染优先级
 #   {provider}  提供程序名称
 #   {providers}  提供程序列表或数量
-#   {radius}  搜索半径
 #   {ready}  可导入条目数量
 #   {reason}  错误或决定的原因
+#   {remaining}  距下次语言检查的剩余时间
 #   {resume}  可恢复导入的条目数量
 #   {revision}  文档修订版本
 #   {roll}  滚转角度
@@ -125,6 +126,7 @@
 #   {to}  目标值或范围终点
 #   {total}  条目总数
 #   {type}  预期的值或对象类型
+#   {updated}  语言更新中更改的消息数
 #   {url}  网址
 #   {uuid}  对象或玩家的唯一标识符
 #   {value}  当前消息或参数值
@@ -179,7 +181,7 @@ hologram = "创建和管理全息图"
 "hologram.rendertext.id" = "唯一的全息图 ID"
 "hologram.rendertext.text" = "要显示的文字；包含空格时请加引号"
 "hologram.rendertext.scale" = "TextDisplay 缩放倍数"
-"hologram.orient" = "设置全息图朝向观察者的旋转方式"
+"hologram.orient" = "设置全息图朝向观看者的旋转方式"
 "hologram.orient.id" = "全息图 ID"
 "hologram.orient.billboard" = "CENTER、VERTICAL、HORIZONTAL 或 FIXED"
 "hologram.orient.yaw" = "水平朝向角 (yaw)，-180 到 180 度"
@@ -205,8 +207,8 @@ board = "创建和管理记分板"
 "board.show" = "向自己显示记分板"
 "board.show.id" = "记分板 ID"
 "board.hide" = "隐藏你的记分板"
-"board.select" = "设置自动选择计分板的规则"
-"board.select.id" = "计分板 ID"
+"board.select" = "设置自动选择记分板的规则"
+"board.select.id" = "记分板 ID"
 "board.select.priority" = "选择优先级"
 "board.select.when" = "布尔条件；包含空格的表达式须用引号括起"
 "board.list" = "列出记分板"
@@ -376,7 +378,7 @@ list_empty = "&8[&dGloss&8] &7还没有任何全息图。"
 rendered = "&8[&dGloss&8] &a已创建文字全息图 &f{id}&a，缩放倍数为 &f{scale}&a。"
 text_empty = "&8[&dGloss&8] &c文字不能为空。"
 scale_out_of_range = "&8[&dGloss&8] &c缩放倍数 {value} 超出范围；必须在 &f{minimum}&c 到 &f{maximum}&c 之间。"
-oriented = "&8[&dGloss&8] &a已将 &f{id}&a 设置为广告牌 &f{billboard}&a、yaw &f{yaw}&a、pitch &f{pitch}&a。"
+oriented = "&8[&dGloss&8] &a已将 &f{id}&a 设置为广告牌 &f{billboard}&a、偏航角 &f{yaw}&a、俯仰角 &f{pitch}&a。"
 billboard_unknown = "&8[&dGloss&8] &c未知的广告牌模式 '&f{billboard}&c'。请使用 &f{options}&c 之一。"
 angle_out_of_range = "&8[&dGloss&8] &c{axis} 的值 {value} 超出范围；必须介于 &f-{limit}&c 度和 &f{limit}&c 度之间。"
 
@@ -387,7 +389,7 @@ lines = "{count} 行"
 [command.hologram.info]
 header = "&8[&dGloss&8] &d{id} &7位于 &f{world} {x}, {y}, {z}"
 line = " &8{line}. &f{text}"
-orientation = " &8缩放 &f{scale} &8billboard &f{billboard} &8yaw &f{yaw} &8pitch &f{pitch}"
+orientation = " &8缩放 &f{scale} &8广告牌 &f{billboard} &8偏航角 &f{yaw} &8俯仰角 &f{pitch}"
 
 [command.board]
 exists = "&8[&dGloss&8] &c记分板 '&f{id}&c' 已存在。"
@@ -401,8 +403,8 @@ line_removed = "&8[&dGloss&8] &a已从 &f{id}&a 移除第 &f{line}&a 行。"
 line_out_of_range = "&8[&dGloss&8] &c第 {line} 行超出范围；&f{id}&c 共有 {count} 行。"
 shown = "&8[&dGloss&8] &a正在显示记分板 &f{id}&a。"
 hidden = "&8[&dGloss&8] &a你的记分板已隐藏。"
-select_set = "&8[&dGloss&8] &a已将计分板 &f{id}&a 的选择优先级设为 &f{priority}&a。"
-select_invalid = "&8[&dGloss&8] &c计分板条件无效：&f{error}&c。"
+select_set = "&8[&dGloss&8] &a已将记分板 &f{id}&a 的选择优先级设为 &f{priority}&a。"
+select_invalid = "&8[&dGloss&8] &c记分板条件无效：&f{error}&c。"
 list_empty = "&8[&dGloss&8] &7还没有任何记分板。"
 
 [command.board.list]
@@ -410,7 +412,7 @@ hover = "点击查看详情"
 
 [command.board.info]
 header = "&8[&dGloss&8] &d{id} &7标题为 &f{title}"
-meta = "&7优先级：&f{priority}&7 | 条件：&f{when}&7 | 变体：&f{variants}&7"
+meta = "&7优先级：&f{priority} &8| &7条件：&f{when} &8| &7变体：&f{variants}"
 line = " &8{line}. &f{text}"
 
 [command.emoji]
@@ -419,8 +421,6 @@ hover = "点击插入聊天"
 
 [command.animations]
 empty = "&8[&dGloss&8] &7没有加载任何动画。"
-header = "&8[&dGloss&8] &f动画: &d{count}"
-entry = "&8- &d{name}"
 
 [command.list]
 page = "&7第 &f{page}&7/&f{pages} 页 &8- &7显示 &f{from}&7-&f{to} &7/ 共 &f{total}"
@@ -455,12 +455,12 @@ preview_capacity = "&8[&dGloss&8] &c已审核导入的缓存已满。请应用�
 missing = "&8[&dGloss&8] &c在 Gloss 数据文件夹旁未找到 holoui 数据文件夹。"
 done = "&8[&dGloss&8] &aHoloUi 导入完成: 复制 &f{copied}&a 个，跳过 &f{skipped}&a 个，&f{overlaid}&a 个配置键，&f{errors}&a 个错误。"
 
-preview_required = "&8[&dGloss&8] &c请先运行 /gloss import holoui mode=preview。 预览使用配置的有效期。 添加 overwrite=true 以预览替换现有文件。"
+preview_required = "&8[&dGloss&8] &c请先运行 /gloss import holoui mode=preview。预览使用配置的有效期。添加 overwrite=true 以预览替换现有文件。"
 
 [command.import.legacy]
-done = "&8[&dGloss&8] &a旧版迁移完成: 迁移 &f{migrated}&a 个，吸收 &f{absorbed}&a 个，&f{overlaid}&a 个配置键，&f{errors}&a 个错误。"
+done = "&8[&dGloss&8] &a旧版迁移完成: 迁移 &f{migrated}&a 个，合并 &f{absorbed}&a 个，&f{overlaid}&a 个配置键，&f{errors}&a 个错误。"
 
-preview_required = "&8[&dGloss&8] &c请先运行 /gloss import legacy mode=preview。 预览使用配置的有效期。"
+preview_required = "&8[&dGloss&8] &c请先运行 /gloss import legacy mode=preview。预览使用配置的有效期。"
 
 [director.help]
 no_subcommands = "此页面没有子命令。"
@@ -512,8 +512,7 @@ import_source_required = "旧版数据导入来源不能为空"
 import_source_unknown = "未知的旧版数据导入来源：{source}"
 
 [gloss.message]
-permission_denied = "&8[&dGloss&8]: &c你没有权限 &f{permission}&c."
-unknown_command = "&8[&dGloss&8]: &c未知命令 \"&f{command}&c\"."
+permission_denied = "&8[&dGloss&8]: &c你没有权限 &f{permission}&c。"
 
 [gloss.message.hologram]
 created = "&8[&dGloss&8]: &a已在你的位置创建全息图 &f{hologram}&a，根菜单为 &f{menu}&a。"
@@ -551,11 +550,11 @@ player_only = "&8[&dGloss&8]: &c此命令仅供玩家使用。"
 [gloss.message.web]
 header = "网页编辑器"
 open_hover = "点击打开 Gloss 网页编辑器。"
-open = "&8[&dGloss&8]: &7网页编辑器：&f{url}&7"
+open = "&8[&dGloss&8]: &7网页编辑器：&f{url}"
 preparing = "&8[&dGloss&8]: &7正在为 &f{subject}&7 准备安全的编辑器同步会话..."
 unavailable = "&8[&dGloss&8]: &c实时网页编辑不可用。请检查编辑器同步配置及与中继服务器的连接。"
-open_failed = "&8[&dGloss&8]: &c无法在实时网页编辑器中打开 &f{kind}&c=&f{subject}&c：{reason}"
-open_console = "&8[&dGloss&8]: &7&f{subject}&7 的编辑授权链接：&f{url}&7"
+open_failed = "&8[&dGloss&8]: &c无法在实时网页编辑器中打开 &f{kind}={subject}&c：{reason}"
+open_console = "&8[&dGloss&8]: &7编辑授权链接（&f{subject}&7）：&f{url}"
 capability_warning = "&8[&dGloss&8]: &e此 URL 可在授权被撤销或过期前将更改发布到服务器。请妥善保密。"
 open_label = "打开编辑器"
 copy_label = "复制链接"
@@ -564,7 +563,7 @@ link_hover = "打开编辑器、复制编辑授权链接，或撤销会话 {sess
 
 [gloss.message.web.sessions]
 list_empty = "&8[&dGloss&8]: &7没有活跃的编辑器同步会话。"
-status = "&8[&dGloss&8]: &7&f{session}&7 {kind}=&f{subject}&7 距离过期=&f{seconds}&7秒 已发布修订号=&f{revision}&7 待处理=&f{pending}&7"
+status = "&8[&dGloss&8]: &f{session} &7{kind}=&f{subject} &7距离过期=&f{seconds}秒 &7已发布修订号=&f{revision} &7待处理=&f{pending}"
 revoked = "&8[&dGloss&8]: &a已撤销编辑器同步会话 &f{session}&a。"
 pulled = "&8[&dGloss&8]: &a已查询编辑器同步会话 &f{session}&a 的更新。"
 unknown = "&8[&dGloss&8]: &c编辑器同步会话 &f{session}&c 不存在或已过期。"
@@ -574,20 +573,20 @@ failed = "&8[&dGloss&8]: &c编辑器同步会话 &f{session}&c 的操作失败�
 preview_started = "&8[&dGloss&8]: &7正在扫描 &f{source}&7，以预览迁移结果；不会更改现有数据..."
 apply_started = "&8[&dGloss&8]: &7正在扫描并迁移 &f{source}&7，不会覆盖现有数据..."
 source_missing = "&8[&dGloss&8]: &7在 &f{path}&7 找不到 &f{source}&7 来源。"
-preview_summary = "&8[&dGloss&8]: &7&f{source}&7 预览：&a{ready}&7 项就绪，&d{resume}&7 项可继续，&e{conflicts}&7 项冲突，&c{errors}&7 个错误，{warnings} 条警告。来源：&f{path}&7"
-preview_entry = "&8- &7&f{legacy}&7 -> &f{board}&7 状态=&f{state}&7 警告=&f{warnings}&7"
-apply_summary = "&8[&dGloss&8]: &7&f{source}&7 迁移：已导入 &a{imported}&7 项，已跳过 &e{skipped}&7 项，失败 &c{failed}&7 项；扫描发现 {errors} 个错误和 {warnings} 条警告。"
-apply_entry = "&8- &7&f{legacy}&7 状态=&f{state}&7 原因=&f{reason}&7"
+preview_summary = "&8[&dGloss&8]: &f{source}&7 预览：&a{ready} 项就绪&7，&d{resume} 项可继续&7，&e{conflicts} 项冲突&7，&c{errors} 个错误&7，{warnings} 条警告。来源：&f{path}"
+preview_entry = "&8- &f{legacy} &7-> &f{board} &7状态=&f{state} &7警告=&f{warnings}"
+apply_summary = "&8[&dGloss&8]: &f{source}&7 迁移：&a已导入 {imported} 项&7，&e已跳过 {skipped} 项&7，&c失败 {failed} 项&7；扫描发现 {errors} 个错误和 {warnings} 条警告。"
+apply_entry = "&8- &f{legacy} &7状态=&f{state} &7原因=&f{reason}"
 issue = "&8- &f{legacy} &7{severity}: &f{reason}"
 busy = "&8[&dGloss&8]: &c另一个旧版全息图迁移任务已在运行。"
 failed = "&8[&dGloss&8]: &c从 &f{source}&c 迁移旧版全息图失败：{reason}"
 
 [gloss.message.config]
-reloaded = "&2配置 \"{name}\" 已重新加载."
+reloaded = "&2配置 \"{name}\" 已重新加载。"
 
 [gloss.message.hotload]
-singular = "&2已热重载 {kinds}（{count} 项更改）."
-plural = "&2已热重载 {kinds}（{count} 项更改）."
+singular = "&2已热重载 {kinds}（{count} 项更改）。"
+plural = "&2已热重载 {kinds}（{count} 项更改）。"
 
 [gloss.message.preview_scale]
 adjusting = "&7预览大小：&f{percent}% &8- &7按住潜行并滚动以调整大小；双击潜行以保存"
@@ -600,12 +599,12 @@ saved = "&7预览大小已保存：&f{percent}%"
 bundle_more = "另有 {count} 种"
 
 [gloss.message.items]
-disabled = "&8[&dGloss&8]: &7自定义物品已禁用。请在 gloss.toml 中将 customItems 设为 true。"
+disabled = "&8[&dGloss&8]: &7自定义物品已禁用。请在 gloss.toml 中将 &fcustomItems&7 设为 true。"
 
 [gloss.message.items.status]
 header = "自定义物品"
-summary = "{active}/{total} 个提供方已启用"
-entry = "插件 {plugin} 的提供方 {provider}。"
+summary = "{active}/{total} 个提供者已启用"
+entry = "插件 {plugin} 的提供者 {provider}。"
 hint = "点击导出供网页编辑器使用的目录。"
 
 [gloss.message.items.state]
@@ -616,7 +615,7 @@ missing = "未安装"
 
 [gloss.message.items.export]
 started = "&8[&dGloss&8]: &7正在导出自定义物品目录..."
-done = "&8[&dGloss&8]: &a已将 {providers} 个提供方的 {count} 个物品写入 &f{path}&a。"
+done = "&8[&dGloss&8]: &a已将 {providers} 个提供者的 {count} 个物品写入 &f{path}&a。"
 empty = "&8[&dGloss&8]: &7未找到自定义物品。已将空目录写入 &f{path}&7。"
 failed = "&8[&dGloss&8]: &c无法写入自定义物品目录。请查看日志。"
 busy = "&8[&dGloss&8]: &c目录导出任务已在运行。"
@@ -633,7 +632,7 @@ none = "&8[&dGloss&8]: &c“{name}”不是内置预览文档；未重置任何�
 
 [gloss.message.previews.dump]
 unknown = "&8[&dGloss&8]: &c“{name}”不是已加载的预览文档。"
-result = "&8[&dGloss&8]: &7&a{name}&7：共 &f{total}&7 个元素（面板={panels}，单元格={cells}，槽位={slots}，标签={labels}）。"
+result = "&8[&dGloss&8]: &a{name}&7：共 &f{total}&7 个元素（面板={panels}，单元格={cells}，槽位={slots}，标签={labels}）。"
 no_errors = "&8[&dGloss&8]: &a没有构建错误。"
 error_line = "&8[&dGloss&8]: &c{message}"
 error_more = "&8[&dGloss&8]: &7另有 {count} 项（请查看控制台日志）。"
@@ -655,21 +654,17 @@ revision_conflict = "&8[&dGloss&8]: &c面板 &f{board}&c 在编辑期间发生�
 failed = "&8[&dGloss&8]: &c面板 &f{board}&c 的操作失败：{reason}"
 
 [gloss.message.panels.list]
-header = "&8[&dGloss&8]: &f持久保存的面板：&d{count}&f"
 empty = "&8[&dGloss&8]: &7未加载任何持久保存的面板。"
-entry = "&8- &7&f{board}&7 菜单=&f{menu}&7 修订号=&f{revision}&7"
 
 [gloss.message.panels.near]
-header = "&8[&dGloss&8]: &f&d{radius}&f 格范围内的面板：&d{count}&f"
 empty = "&8[&dGloss&8]: &7该范围内没有面板。"
-entry = "&8- &7&f{board}&7 距离=&f{distance}&7 菜单=&f{menu}&7"
 
 [gloss.message.panels.info]
-header = "&8[&dGloss&8]: &f面板 &d{board}&f（&7{state}&f）"
-identity = "&7UUID=&f{uuid}&7 修订号=&f{revision}&7 菜单=&f{menu}&7"
-transform = "&7世界=&f{world}&7 位置=&f{x}&7, &f{y}&7, &f{z}&7 旋转=&f{yaw}&7, &f{pitch}&7, &f{roll}&7 缩放=&f{scale}&7"
-visibility = "&7可见性=&f{mode}&7 查看权限=&f{viewPermission}&7 交互权限=&f{interactPermission}&7 范围=&f{viewRange}&7/&f{interactionRange}&7"
-follow = "&7跟随=&f{mode}&7 玩家=&f{player}&7 旋转=&f{rotation}&7"
+header = "&8[&dGloss&8]: &f面板 &d{board} &7（{state}）"
+identity = "&7UUID=&f{uuid} &7修订号=&f{revision} &7菜单=&f{menu}"
+transform = "&7世界=&f{world} &7位置=&f{x}, {y}, {z} &7旋转=&f{yaw}, {pitch}, {roll} &7缩放=&f{scale}"
+visibility = "&7可见性=&f{mode} &7查看权限=&f{viewPermission} &7交互权限=&f{interactPermission} &7范围=&f{viewRange}/{interactionRange}"
+follow = "&7跟随=&f{mode} &7玩家=&f{player} &7旋转=&f{rotation}"
 
 [gloss.message.panels.edit]
 started = "&8[&dGloss&8]: &a正在从修订号 {revision} 编辑 &f{board}&a。更改将在保存前暂存。"
@@ -748,8 +743,8 @@ reset_your_language = "重置你的语言"
 server_default = "服务器默认语言"
 edit_messages = "编辑语言消息"
 use_server_default = "使用服务器默认语言"
-current = "当前：{locale}"
-current_with_personal = "当前：{locale}（你的：{personal}）"
+current = "当前: {locale}"
+current_with_personal = "当前: {locale} (你的: {personal})"
 your_description = "仅更改你看到的消息。"
 reset_description = "使用服务器默认语言。"
 server_description = "更改服务器默认语言。"
@@ -758,7 +753,7 @@ select_description = "点击以选择此语言。"
 remove_personal_description = "移除你的个人语言选择。"
 no_controls = "你无权使用语言设置。"
 command = "命令: {command}"
-selected = "选中"
+selected = "已选中"
 all-volmit-plugins = "所有 Volmit 插件"
 
 [language.error]
@@ -775,16 +770,25 @@ unavailable-for-all = "语言 {locale} 并非适用于所有选中的插件。"
 
 [language.usage]
 editor = "用法: /{command} language server edit [locale]"
-selection = "用法: /{command} language self [locale|reset] or server [locale]"
+selection = "用法: /{command} language self [locale|reset] 或 server [locale]"
 volmit-selection = "用法: /volmit plugins languages [locale]"
+update = "用法: /{command} language update"
 
 [language.selection]
 preparing = "正在为 {target} 准备语言 {locale}..."
-save-failed = "{plugin}：无法保存语言选择；请检查服务器控制台。"
-english-fallback = "{plugin}：{locale} 不可用；将使用英语（en_US）。"
-personal-selected = "{plugin}：你的语言现在是 {locale}。"
-server-selected = "{plugin}：服务器语言现在是 {locale}。"
-server-default-selected = "{plugin}：你的语言现在跟随服务器默认语言。"
+save-failed = "{plugin}: 无法保存语言选择；请检查服务器控制台。"
+english-fallback = "{plugin}: {locale} 不可用；将使用英语（en_US）。"
+personal-selected = "{plugin}: 你的语言现在是 {locale}。"
+server-selected = "{plugin}: 服务器语言现在是 {locale}。"
+server-default-selected = "{plugin}: 你的语言现在跟随服务器默认语言。"
+
+[language.update]
+checking = "{plugin}: 正在检查语言仓库中的更改..."
+unchanged = "{plugin}: 已安装的语言与仓库一致。"
+applied = "{plugin}: 已更新 {locale}（新增 {added}，更改 {updated}，保留本地修改 {kept}）。"
+cooldown = "{plugin}: 最近已检查过语言仓库，请在 {remaining} 后重试。"
+locale-failed = "{plugin}: {locale} 未更新：{reason}"
+failed = "{plugin}: 语言更新失败：{reason}"
 
 [language.editor]
 title = "{plugin} › {section}"
@@ -799,7 +803,7 @@ group-title = "{locale} / {group}"
 [language.editor.prompt]
 search = "搜索消息键或内容。输入 cancel 返回。"
 value = "请在聊天中输入 {key} 的新值。"
-current = "当前值： {value}"
+current = "当前值: {value}"
 variables = "变量: {variables}"
 guidance = "使用 \\n 表示换行，\\\\ 表示反斜杠，或输入 cancel 返回。"
 
@@ -831,7 +835,7 @@ open = "&8点击打开此语言。&r"
 
 [language.editor.category]
 message-count = "&7{count} 条消息&r"
-open = "&8点击打开此分类。&r"
+open = "&8点击打开此类别。&r"
 
 [language.editor.error]
 no-permission = "你没有权限编辑 {plugin} 的语言。"
@@ -839,7 +843,7 @@ unable-to-edit = "无法编辑：{reason}"
 
 [language.editor.saved]
 summary = "已保存 {locale}。语言选择保持不变。"
-change = "{key}：已将“{before}”改为“{after}”。"
+change = "{key}: 已将“{before}”改为“{after}”。"
 
 [language.editor.part]
 line = "第 {line} 行"
@@ -859,27 +863,27 @@ empty = "(空)"
 "nametags.empty" = "&8[&dGloss&8] &7未加载任何名牌文档。"
 "nametags.unknown" = "&8[&dGloss&8]: &c没有名为 &f{id}&c 的名牌文档。"
 "nametags.refreshed" = "&8[&dGloss&8]: &a已重新应用 &d{count}&a 个名牌文档。"
-"hud.header" = "&8[&dGloss&8] &7&f{player}&7 的 HUD 占用：&d{count}"
+"hud.header" = "&8[&dGloss&8] &7HUD 占用（&f{player}&7）：&d{count}"
 "hud.empty" = "&8[&dGloss&8] &7没有插件占用 &f{player}&7 的 HUD 槽位。"
 "hud.line" = "&8- &f{kind} &7{source} &8| &7{value} &8| &7{count} &8| &7{state}"
 "player.unknown" = "&8[&dGloss&8]: &c没有名为 &f{player}&c 的在线玩家。"
 
 [command.help.surface]
-root = "快捷栏、Boss 栏与标题界面"
+root = "动作栏、Boss 栏与标题界面"
 list = "列出界面文档"
 info = "显示一个界面文档"
 "info.id" = "界面文档 ID"
-reset = "还原随附的界面文档"
+reset = "还原内置的界面文档"
 test = "立即为某位玩家运行界面处理"
 "test.id" = "界面文档 ID"
 "test.player" = "要测试的玩家，默认是你自己"
 
 [command.help.nametag]
-root = "按观察者生效的名牌文档"
+root = "按观看者生效的名牌文档"
 list = "列出名牌文档"
 info = "显示一个名牌文档"
 "info.id" = "名牌文档 ID"
-reset = "还原随附的名牌文档"
+reset = "还原内置的名牌文档"
 refresh = "立即重新应用所有名牌"
 
 [command.help.hud]
@@ -918,14 +922,14 @@ root = "聊天频道"
 list = "列出已加载的聊天频道"
 info = "显示频道的范围、格式与变体"
 "info.id" = "频道文档 ID"
-reset = "还原随附的频道文档"
+reset = "还原内置的频道文档"
 
 [command.help.strings]
 root = "编写的内容文本"
 list = "列出已加载的文本语言及其条目数"
 missing = "列出 en_US 拥有而该语言缺少的键"
 "missing.locale" = "与 en_US 比较的语言"
-reset = "还原随附的文本文档"
+reset = "还原内置的文本文档"
 
 [command.help.leaderboard]
 root = "计算得出的排行榜"
@@ -942,42 +946,40 @@ sample = "立即为所有在线玩家采样排行榜"
 
 [gloss.message.forms]
 icon_unsupported = "&7无法在箱子格中显示 ({kind})"
-no_inventories = "&8[&dGloss&8]: &7尚未配置任何箱子菜单。"
-inventory_list_header = "&d箱子菜单"
-inventory_list_entry = "&7打开箱子菜单 &f{id}"
+no_inventories = "&8[&dGloss&8]: &7尚未配置任何物品栏菜单。"
+inventory_list_header = "&d物品栏菜单"
+inventory_list_entry = "&7打开物品栏菜单 &f{id}"
 inventory_info = "&8[&dGloss&8]: &d{id} &8- &7大小 &f{kind}&7，格子 &f{count}"
-unknown_inventory = "&8[&dGloss&8]: &c没有名为 {id} 的箱子菜单。"
-inventory_opened = "&8[&dGloss&8]: &a已为 {player} 打开箱子菜单 {id}。"
+unknown_inventory = "&8[&dGloss&8]: &c没有名为 {id} 的物品栏菜单。"
+inventory_opened = "&8[&dGloss&8]: &a已为 {player} 打开物品栏菜单 {id}。"
 bad_args = "&8[&dGloss&8]: &c参数必须是 key=value 形式：{value}"
 prompt_timeout = "&8[&dGloss&8]: &7输入已超时。"
 prompt_busy = "&8[&dGloss&8]: &c你已经有一个等待中的输入。"
 take_missing = "&8[&dGloss&8]: &c你没有所需的物品。"
 economy_denied = "&8[&dGloss&8]: &c你的余额不足。"
 economy_unavailable = "&8[&dGloss&8]: &c没有可用的经济插件。"
-give_dropped = "&8[&dGloss&8]: &7你的背包已满，物品掉落在你脚下。"
+give_dropped = "&8[&dGloss&8]: &7你的物品栏已满，物品掉落在你脚下。"
 
 ["command.help.menu.open"]
 args = "以空格分隔的 key=value 参数"
 
 [command.help.inventory]
-root = "查看并打开箱子菜单"
-list = "列出已配置的箱子菜单"
+root = "查看并打开物品栏菜单"
+list = "列出已配置的物品栏菜单"
 "list.page" = "列表页码，从 1 开始"
-info = "显示箱子菜单的大小和格子"
-"info.id" = "箱子菜单 ID"
-open = "为玩家打开箱子菜单"
-"open.id" = "箱子菜单 ID"
+info = "显示物品栏菜单的大小和格子"
+"info.id" = "物品栏菜单 ID"
+open = "为玩家打开物品栏菜单"
+"open.id" = "物品栏菜单 ID"
 "open.player" = "为哪位玩家打开；默认是你自己"
 "open.args" = "以空格分隔的 key=value 参数"
-reset = "恢复随附的箱子菜单默认文件"
-"reset.name" = "要重置的名称，或用 * 重置全部随附文件"
+reset = "恢复内置的物品栏菜单默认文件"
+"reset.name" = "要重置的名称，或用 * 重置全部内置文件"
 
 ["command.help.hologram"]
 page = "将观看者切换到全息图的某一页"
 "page.page" = "页面 ID、next 或 prev"
 "page.player" = "玩家名称，留空表示你自己"
-motion = "在全息图上播放运动片段"
-"motion.motion" = "运动 ID，或用 clear 停止"
 actions = "列出全息图点击时执行的动作"
 
 [gloss.message.hologram_interaction]
@@ -1023,7 +1025,7 @@ missing = "&c没有名为 &f{id} &c的名牌。"
 refreshed = "&a名牌已刷新。"
 
 [gloss.message.world.glow]
-set = "&f{target} &7现在以 &f{value} &a发光。"
+set = "&a已让 &f{target} &7以 &f{value}&a 发光。"
 cleared = "&7已清除 &f{target} &7的发光。"
 missing = "&c没有名为 &f{player} &c的在线玩家。"
 
@@ -1063,8 +1065,8 @@ player = "要停止的乘客；默认为你"
 root = "玩家名牌工具"
 list = "列出名牌文档"
 info = "显示一个名牌文档"
-reset = "还原随附的名牌文档"
-refresh = "为所有观察者重建名牌"
+reset = "还原内置的名牌文档"
+refresh = "为所有观看者重建名牌"
 
 [command.help.nameplate.arg]
 id = "名牌文档 ID"
@@ -1139,10 +1141,10 @@ fired = "&8[&dGloss&8]: &a已运行 &f{id}&a 的条目 &f{line}&a。"
 "expr.reference" = " &7{name} &8= &f{value} &8来自 &7{source}"
 "expr.functions" = " &7函数 &8= &f{value}"
 "expr.failed" = "&8[&dGloss&8]: &c{reason}"
-"explain.header" = "&8[&dGloss&8]: &d{kind} &f{id} &7对象 &f{player}"
+"explain.header" = "&8[&dGloss&8]: &d{kind} &f{id} &7针对 &f{player}"
 "explain.line" = " &8{path} &7{when} &8= &f{value}"
 "explain.winner" = " &a> &f{path} &7{when} &8= &f{value}"
-"explain.unknown" = "&8[&dGloss&8]: &c没有东西能解释 \"{kind}\"；请试试 {options}。"
+"explain.unknown" = "&8[&dGloss&8]: &c无法解释 \"{kind}\"；请尝试 {options}。"
 "explain.missing" = "&8[&dGloss&8]: &c没有名为 \"{id}\" 的 {kind}。"
 
 # --- lane:authoring ---
@@ -1193,13 +1195,13 @@ empty = "&8[&dGloss&8] &7没有已安装的包。"
 disabled = "&8[&dGloss&8] &cGloss 包在 gloss.toml 中已关闭。"
 
 [gloss.message.authoring.history]
-empty = "&8[&dGloss&8] &7&f{kind} {id}&7 没有保存的版本。"
+empty = "&8[&dGloss&8] &7没有保存的版本：&f{kind} {id}&7。"
 entry = "&8[&dGloss&8] &f{revision} &7{source} &8{count} 字节"
 disabled = "&8[&dGloss&8] &c文档历史在 gloss.toml 中已关闭。"
 
 [gloss.message.authoring.restore]
 done = "&8[&dGloss&8] 已把 &f{kind} {id}&7 还原到版本 &f{revision}&7。"
-unknown = "&8[&dGloss&8] &c&f{kind} {id}&c 没有版本 &f{revision}&c。"
+unknown = "&8[&dGloss&8] &c找不到 &f{kind} {id}&c 的版本 &f{revision}&c。"
 failed = "&8[&dGloss&8] &c还原失败：{reason}"
 
 [gloss.message.authoring.check]
@@ -1215,8 +1217,8 @@ failed = "&8[&dGloss&8] &c导出失败：{reason}"
 preview = "&8[&dGloss&8] &f{source}&7 将写入 &f{count}&7 个文档。"
 entry = "&8[&dGloss&8] &7{state} &f{path}&7 {reason}"
 applied = "&8[&dGloss&8] 已从 &f{source}&7 导入 &f{count}&7 个文档。"
-absent = "&8[&dGloss&8] &7&f{path}&7 没有 &f{source}&7 数据。"
-preview_required = "&8[&dGloss&8] &c请先运行 /gloss import preview {source}。 预览使用配置的有效期。"
+absent = "&8[&dGloss&8] &7在 &f{path}&7 没有 &f{source}&7 数据。"
+preview_required = "&8[&dGloss&8] &c请先运行 /gloss import preview {source}。预览使用配置的有效期。"
 
 # --- lane:forge ---
 
@@ -1238,7 +1240,7 @@ export = "把可合并的资源包目录复制到别处"
 "export.path" = "资源包的目标目录"
 serve = "启动或停止内置资源包监听器"
 "serve.state" = "on 或 off"
-reset = "恢复随附的字形文档"
+reset = "恢复内置的字形文档"
 
 # --- lane:fixes ---
 

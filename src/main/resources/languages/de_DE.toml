@@ -25,6 +25,7 @@
 #   {absorbed}  Übernommene Einträge
 #   {active}  Aktive Anbieter
 #   {actual}  Aktuelle Revision
+#   {added}  Durch eine Sprachaktualisierung hinzugefügte Nachrichten
 #   {after}  Wert nach der Änderung
 #   {argument}  Befehlsargument
 #   {axis}  Drehachse
@@ -42,7 +43,6 @@
 #   {copied}  Kopierte Einträge
 #   {count}  Anzahl der Einträge
 #   {disc}  Eingelegte Schallplatte
-#   {distance}  Entfernung in Blöcken
 #   {drops}  Anzahl der Anzeigen fallengelassener Gegenstände
 #   {enabled}  Anzahl aktivierter Einträge
 #   {entities}  Anzahl der Entitäten
@@ -62,6 +62,7 @@
 #   {interactPermission}  Interaktionsberechtigung
 #   {interactionRange}  Maximale Interaktionsentfernung
 #   {item}  Verarbeiteter Gegenstand
+#   {kept}  Bei einer Sprachaktualisierung behaltene lokale Änderungen
 #   {key}  Nachrichten- oder Parameterschlüssel
 #   {kind}  Dokument- oder Standardwerttyp
 #   {kinds}  Geänderte Dateitypen
@@ -99,9 +100,9 @@
 #   {priority}  Auswahlpriorität
 #   {provider}  Name des Gegenstandsanbieters
 #   {providers}  Anzahl der Anbieter
-#   {radius}  Suchradius in Blöcken
 #   {ready}  Importbereite Einträge
 #   {reason}  Ergebnis- oder Fehlergrund
+#   {remaining}  Verbleibende Wartezeit bis zur nächsten Sprachprüfung
 #   {resume}  Fortsetzbare Migrationseinträge
 #   {revision}  Dokumentrevision
 #   {roll}  Drehung um die Blickachse
@@ -125,6 +126,7 @@
 #   {to}  Letzter angezeigter Eintrag
 #   {total}  Gesamtzahl der Einträge
 #   {type}  Parametertyp
+#   {updated}  Durch eine Sprachaktualisierung geänderte Nachrichten
 #   {url}  Webadresse
 #   {uuid}  Vollständige UUID
 #   {value}  Aktueller, voreingestellter oder eingegebener Wert
@@ -175,7 +177,7 @@ hologram = "Hologramme erstellen und verwalten"
 "hologram.list" = "Hologramme auflisten; zum Teleportieren eines anklicken"
 "hologram.info" = "Position und Zeilen eines Hologramms anzeigen"
 "hologram.info.id" = "Hologramm-ID"
-"hologram.rendertext" = "Erstelle ein TextDisplay-Hologramm mit nativer Skalierung"
+"hologram.rendertext" = "Ein Text-Hologramm mit nativer Skalierung erstellen"
 "hologram.rendertext.id" = "Eindeutige Hologramm-ID"
 "hologram.rendertext.text" = "Anzuzeigender Text; für Leerzeichen in Anführungszeichen setzen"
 "hologram.rendertext.scale" = "TextDisplay-Skalierungsfaktor"
@@ -227,8 +229,8 @@ tablist = "Tablisten-Werkzeuge"
 "tablist.reset" = "Das mitgelieferte Tablisten-Dokument wiederherstellen"
 motd = "MOTD-Werkzeuge"
 "motd.reset" = "Das mitgelieferte MOTD-Dokument wiederherstellen"
-drops = "Werkzeuge für die Darstellung fallengelassener Items"
-"drops.reset" = "Das mitgelieferte Dokument für Item-Drop-Einstellungen wiederherstellen"
+drops = "Werkzeuge für die Darstellung fallengelassener Gegenstände"
+"drops.reset" = "Das mitgelieferte Dokument für die Einstellungen fallengelassener Gegenstände wiederherstellen"
 indicators = "Werkzeuge für Schadens- und Heilungsanzeigen"
 "indicators.reset" = "Das mitgelieferte Dokument für Schadensanzeigen wiederherstellen"
 status = "Knappe Laufzeitzähler anzeigen"
@@ -237,9 +239,9 @@ import = "Legacy-Hologramme migrieren, ohne Quelldateien zu verändern"
 "import.holoui" = "Vorschau oder Anwendung eines transaktionalen HoloUi-Imports"
 "import.legacy" = "Vorschau oder Anwendung einer transaktionalen Gloss-Datenaktualisierung"
 "import.preview" = "Eine zerstörungsfreie Legacy-Hologramm-Migration als Vorschau anzeigen"
-item = "Werkzeuge für Custom-Item-Provider"
-"item.export" = "Den Custom-Item-Katalog für den Web-Editor exportieren"
-"item.status" = "Anzeigen, welche Custom-Item-Provider aktiv sind"
+item = "Werkzeuge für Anbieter benutzerdefinierter Gegenstände"
+"item.export" = "Den Katalog benutzerdefinierter Gegenstände für den Webeditor exportieren"
+"item.status" = "Anzeigen, welche Anbieter benutzerdefinierter Gegenstände aktiv sind"
 menu = "Hologramm-Menüs erstellen, öffnen und bearbeiten"
 "menu.addrow" = "Eine Textdekorationszeile anhängen"
 "menu.back" = "Vorherige Menüsitzung erneut öffnen"
@@ -419,19 +421,17 @@ hover = "Zum Einfügen in den Chat klicken"
 
 [command.animations]
 empty = "&8[&dGloss&8] &7Es sind keine Animationen geladen."
-header = "&8[&dGloss&8] &fAnimationen: &d{count}"
-entry = "&8- &d{name}"
 
 [command.list]
 page = "&7Seite &f{page}&7/&f{pages} &8- &7zeigt &f{from}&7-&f{to} &7von &f{total}"
 next = "&7Nächste Seite: &f{command}"
 
 [command.status]
-holograms = "&7Hologramme: &f{count} &8({temporary} temporär, {entities} Entities)"
+holograms = "&7Hologramme: &f{count} &8({temporary} temporär, {entities} Entitäten)"
 boards = "&7Scoreboards: &f{count}"
 emoji = "&7Emojis: &f{enabled}&8/&f{total}"
 animations = "&7Animationen: &f{count}"
-effects = "&7Sprechblasen: &f{bubbles} &8| &7Indikatoren: &f{indicators} &8| &7Drops: &f{drops}"
+effects = "&7Sprechblasen: &f{bubbles} &8| &7Schadensanzeigen: &f{indicators} &8| &7Drops: &f{drops}"
 
 visibility = "&7Sichtbare Entitätskopien: &f{entities} &8| &7Betrachter: &f{viewers} &8| &7Zulassungen: &f{admissions} &8| &7Ablehnungen: &f{refusals} &8| &7Wartend: &f{waiting} &8| &7Abgelaufene Runden: &f{expired} &8| &7Ausstehende Bereinigung: &f{retiring}"
 images = "&7Bildcache: &f{entries} &8| &7Ausstehend: &f{pending} &8| &7Gespeicherte Daten: &f{bytes} &7Bytes &8| &7Abgeschlossen: &f{completed} &8| &7Ablehnungen: &f{refusals}"
@@ -506,14 +506,13 @@ panel_id_required = "Die Panel-ID darf nicht leer sein"
 web_subject_required = "Die Dokument-ID des Webeditors darf nicht leer sein"
 web_session_required = "Die Sitzungs-ID des Webeditors darf nicht leer sein"
 panel_player_required = "Der Zielspieler darf nicht leer sein"
-row_icon_type_required = "Der Symboltyp darf nicht leer sein"
+row_icon_type_required = "Der Icon-Typ darf nicht leer sein"
 row_style_property_required = "Die Stileigenschaft darf nicht leer sein"
 import_source_required = "Die Importquelle für das alte Format darf nicht leer sein"
 import_source_unknown = "Unbekannte Importquelle für das alte Format: {source}"
 
 [gloss.message]
 permission_denied = "&8[&dGloss&8]: &cDir fehlt die Berechtigung &f{permission}&c."
-unknown_command = "&8[&dGloss&8]: &cUnbekannter Befehl \"&f{command}&c\"."
 
 [gloss.message.hologram]
 created = "&8[&dGloss&8]: &aHologramm &f{hologram}&a mit Hauptmenü &f{menu}&a an deiner Position erstellt."
@@ -571,12 +570,12 @@ unknown = "&8[&dGloss&8]: &cUnbekannte oder abgelaufene Editorsynchronisierungss
 failed = "&8[&dGloss&8]: &cEditorsynchronisierung für &f{session}&c fehlgeschlagen: {reason}"
 
 [gloss.message.import]
-preview_started = "&8[&dGloss&8]: &7&f{source}&7 wird für eine unverändernde Migrationsvorschau geprüft..."
+preview_started = "&8[&dGloss&8]: &7&f{source}&7 wird für eine zerstörungsfreie Migrationsvorschau geprüft..."
 apply_started = "&8[&dGloss&8]: &7&f{source}&7 wird geprüft und ohne Überschreiben migriert..."
 source_missing = "&8[&dGloss&8]: &7Keine Quelle &f{source}&7 unter &f{path}&7 gefunden."
-preview_summary = "&8[&dGloss&8]: &fVorschau für {source}&7: &a{ready} bereit&7, &d{resume} fortsetzbar&7, &e{conflicts} Konflikte&7, &c{errors} Fehler&7, {warnings} Warnungen. Quelle: &f{path}"
+preview_summary = "&8[&dGloss&8]: &f{source}&7-Vorschau: &a{ready} bereit&7, &d{resume} fortsetzbar&7, &e{conflicts} Konflikte&7, &c{errors} Fehler&7, {warnings} Warnungen. Quelle: &f{path}"
 preview_entry = "&8- &f{legacy} &7-> &f{board} &7Status=&f{state} &7Warnungen=&f{warnings}"
-apply_summary = "&8[&dGloss&8]: &fMigration von {source}&7: &a{imported} importiert&7, &e{skipped} übersprungen&7, &c{failed} fehlgeschlagen&7; die Prüfung meldete {errors} Fehler und {warnings} Warnungen."
+apply_summary = "&8[&dGloss&8]: &f{source}&7-Migration: &a{imported} importiert&7, &e{skipped} übersprungen&7, &c{failed} fehlgeschlagen&7; die Prüfung meldete {errors} Fehler und {warnings} Warnungen."
 apply_entry = "&8- &f{legacy} &7Status=&f{state} &7Grund=&f{reason}"
 issue = "&8- &f{legacy} &7{severity}: &f{reason}"
 busy = "&8[&dGloss&8]: &cEine andere Migration alter Hologramme läuft bereits."
@@ -633,7 +632,7 @@ none = "&8[&dGloss&8]: &c„{name}“ ist kein mitgeliefertes Vorschaudokument; 
 
 [gloss.message.previews.dump]
 unknown = "&8[&dGloss&8]: &c„{name}“ ist kein geladenes Vorschaudokument."
-result = "&8[&dGloss&8]: &a{name}&7: &f{total}&7 Elemente (Panels={panels}, Zellen={cells}, Plätze={slots}, Beschriftungen={labels})."
+result = "&8[&dGloss&8]: &a{name}&7: &f{total}&7 Elemente (Panels={panels}, Zellen={cells}, Slots={slots}, Beschriftungen={labels})."
 no_errors = "&8[&dGloss&8]: &aKeine Aufbaufehler."
 error_line = "&8[&dGloss&8]: &c{message}"
 error_more = "&8[&dGloss&8]: &7+{count} weitere (siehe Konsolenprotokoll)."
@@ -655,14 +654,10 @@ revision_conflict = "&8[&dGloss&8]: &cPanel &f{board}&c wurde während der Bearb
 failed = "&8[&dGloss&8]: &cPanelvorgang für &f{board}&c fehlgeschlagen: {reason}"
 
 [gloss.message.panels.list]
-header = "&8[&dGloss&8]: &fDauerhafte Panels: &d{count}"
 empty = "&8[&dGloss&8]: &7Keine dauerhaften Panels geladen."
-entry = "&8- &f{board} &7Menü=&f{menu} &7Revision=&f{revision}"
 
 [gloss.message.panels.near]
-header = "&8[&dGloss&8]: &fPanels im Umkreis von &d{radius}&f Blöcken: &d{count}"
 empty = "&8[&dGloss&8]: &7Keine Panels in diesem Umkreis."
-entry = "&8- &f{board} &7Entfernung=&f{distance} &7Menü=&f{menu}"
 
 [gloss.message.panels.info]
 header = "&8[&dGloss&8]: &fPanel &d{board} &7({state})"
@@ -743,48 +738,57 @@ shelf = "&6&l{name}"
 container = "&6&lBehälter"
 
 [language.menu]
-your_language = "Ihre Sprache"
+your_language = "Deine Sprache"
 reset_your_language = "Eigene Sprachauswahl zurücksetzen"
 server_default = "Serverstandard"
 edit_messages = "Sprachnachrichten bearbeiten"
 use_server_default = "Serverstandard verwenden"
 current = "Aktuell: {locale}"
-current_with_personal = "Aktuell: {locale} (Ihre: {personal})"
-your_description = "Ändern Sie nur die Nachrichten, die Sie sehen."
-reset_description = "Verwenden Sie die Standardsprache des Servers."
-server_description = "Ändern Sie die Standardsprache des Servers."
-edit_description = "Öffnen Sie den Nachrichteneditor für jede Sprache."
-select_description = "Klicken Sie, um diese Sprache auszuwählen."
-remove_personal_description = "Entfernen Sie Ihre persönliche Sprachauswahl."
-no_controls = "Für Sie sind keine Spracheinstellungen verfügbar."
+current_with_personal = "Aktuell: {locale} (Deine: {personal})"
+your_description = "Nur die Nachrichten ändern, die du siehst."
+reset_description = "Die Standardsprache des Servers verwenden."
+server_description = "Die Standardsprache des Servers ändern"
+edit_description = "Den Nachrichteneditor für die einzelnen Sprachen öffnen."
+select_description = "Klicken, um diese Sprache auszuwählen."
+remove_personal_description = "Deine persönliche Sprachauswahl entfernen."
+no_controls = "Für dich sind keine Spracheinstellungen verfügbar."
 command = "Befehl: {command}"
 selected = "ausgewählt"
-all-volmit-plugins = "Alle Volmit-Plugins"
+all-volmit-plugins = "alle Volmit-Plugins"
 
 [language.error]
-stopping = "Sprachauswahl ist nicht verfügbar, während das Plugin stoppt."
-editor-player-only = "Öffnen Sie den Spracheditor im Spiel."
+stopping = "Die Sprachauswahl ist nicht verfügbar, während das Plugin beendet wird."
+editor-player-only = "Öffne den Spracheditor im Spiel."
 no-providers = "Es sind keine Volmit-Sprachanbieter verfügbar."
 numeric-page = "Gib die Seitennummer als Zahl ein."
 personal-player-only = "Die Spracheinstellungen der Spieler müssen im Spiel ausgewählt werden."
-personal-permission = "Sie haben keine Berechtigung, Ihre Sprache auszuwählen."
-plugin-personal-permission = "Du darfst deine Sprache für {plugin} nicht ändern."
-plugin-server-permission = "Du darfst die Serversprache für {plugin} nicht ändern."
+personal-permission = "Du hast keine Berechtigung, deine Sprache auszuwählen."
+plugin-personal-permission = "Du hast keine Berechtigung, deine Sprache für {plugin} auszuwählen."
+plugin-server-permission = "Du hast keine Berechtigung, die Serversprache für {plugin} zu ändern."
 server-locale-required = "Wähle einen Sprachcode wie en_US als Serverstandard."
 unavailable-for-all = "Die Sprache {locale} ist nicht für alle ausgewählten Plugins verfügbar."
 
 [language.usage]
-editor = "Syntax: /{command} language server edit [locale]"
-selection = "Syntax: /{command} language self [locale|reset] or server [locale]"
-volmit-selection = "Syntax: /volmit plugins languages [locale]"
+editor = "Verwendung: /{command} language server edit [locale]"
+selection = "Verwendung: /{command} language self [locale|reset] oder server [locale]"
+volmit-selection = "Verwendung: /volmit plugins languages [locale]"
+update = "Verwendung: /{command} language update"
 
 [language.selection]
 preparing = "Sprache {locale} wird für {target} vorbereitet..."
 save-failed = "{plugin}: Die Sprachauswahl konnte nicht gespeichert werden; prüfe die Serverkonsole."
 english-fallback = "{plugin}: {locale} ist nicht verfügbar; Englisch (en_US) wird verwendet."
 personal-selected = "{plugin}: Deine Sprache ist jetzt {locale}."
-server-selected = "{plugin}: Serversprache ist jetzt {locale}."
+server-selected = "{plugin}: Die Serversprache ist jetzt {locale}."
 server-default-selected = "{plugin}: Deine Sprache folgt jetzt dem Serverstandard."
+
+[language.update]
+checking = "{plugin}: Das Sprach-Repository wird auf Änderungen geprüft..."
+unchanged = "{plugin}: Die installierten Sprachen entsprechen bereits dem Repository."
+applied = "{plugin}: {locale} aktualisiert ({added} neu, {updated} geändert, {kept} lokale Änderungen behalten)."
+cooldown = "{plugin}: Das Sprach-Repository wurde kürzlich geprüft; versuche es in {remaining} erneut."
+locale-failed = "{plugin}: {locale} wurde nicht aktualisiert: {reason}"
+failed = "{plugin}: Sprachaktualisierung fehlgeschlagen: {reason}"
 
 [language.editor]
 title = "{plugin} › {section}"
@@ -797,7 +801,7 @@ search-title = "{locale} / Suche"
 group-title = "{locale} / {group}"
 
 [language.editor.prompt]
-search = "Suche nach Nachrichtenschlüssel oder Text. Gib cancel ein, um zurückzukehren."
+search = "Suche nach Nachrichtenschlüsseln oder Text. Gib cancel ein, um zurückzukehren."
 value = "Gib im Chat einen neuen Wert für {key} ein."
 current = "Aktueller Wert: {value}"
 variables = "Variablen: {variables}"
@@ -834,7 +838,7 @@ message-count = "&7{count} Nachrichten&r"
 open = "&8Klicken, um diese Kategorie zu öffnen.&r"
 
 [language.editor.error]
-no-permission = "Du darfst die Sprachdateien von {plugin} nicht bearbeiten."
+no-permission = "Du hast keine Berechtigung, die Sprachen von {plugin} zu bearbeiten."
 unable-to-edit = "Bearbeiten fehlgeschlagen: {reason}"
 
 [language.editor.saved]
@@ -884,7 +888,7 @@ refresh = "Alle Namensschilder jetzt neu anwenden"
 
 [command.help.hud]
 root = "Den gemeinsamen HUD-Compositor untersuchen"
-who = "Zeigt, welches Plugin welches HUD-Feld belegt"
+who = "Anzeigen, welches Plugin welches HUD-Feld eines Spielers belegt"
 "who.player" = "Zu untersuchender Spieler; Standard bist du"
 
 # --- lane:chat ---
@@ -942,12 +946,12 @@ sample = "Eine Bestenliste jetzt für alle Online-Spieler erfassen"
 
 [gloss.message.forms]
 icon_unsupported = "&7In einem Truhenslot nicht darstellbar ({kind})"
-no_inventories = "&8[&dGloss&8]: &7Es sind keine Truhenmenüs konfiguriert."
-inventory_list_header = "&dTruhenmenüs"
-inventory_list_entry = "&7Truhenmenü &f{id}&7 öffnen"
+no_inventories = "&8[&dGloss&8]: &7Es sind keine Inventarmenüs konfiguriert."
+inventory_list_header = "&dInventarmenüs"
+inventory_list_entry = "&7Inventarmenü öffnen: &f{id}"
 inventory_info = "&8[&dGloss&8]: &d{id} &8- &7Größe &f{kind}&7, Slots &f{count}"
-unknown_inventory = "&8[&dGloss&8]: &cKein Truhenmenü mit dem Namen {id}."
-inventory_opened = "&8[&dGloss&8]: &aTruhenmenü {id} für {player} geöffnet."
+unknown_inventory = "&8[&dGloss&8]: &cKein Inventarmenü mit dem Namen {id}."
+inventory_opened = "&8[&dGloss&8]: &aInventarmenü {id} für {player} geöffnet."
 bad_args = "&8[&dGloss&8]: &cArgumente müssen Paare aus key=value sein: {value}"
 prompt_timeout = "&8[&dGloss&8]: &7Die Eingabe ist abgelaufen."
 prompt_busy = "&8[&dGloss&8]: &cDu hast bereits eine Eingabe offen."
@@ -960,24 +964,22 @@ give_dropped = "&8[&dGloss&8]: &7Dein Inventar war voll, die Gegenstände liegen
 args = "Argumente als key=value, durch Leerzeichen getrennt"
 
 [command.help.inventory]
-root = "Truhenmenüs ansehen und öffnen"
-list = "Konfigurierte Truhenmenüs auflisten"
+root = "Inventarmenüs ansehen und öffnen"
+list = "Konfigurierte Inventarmenüs auflisten"
 "list.page" = "Listenseite, beginnend bei 1"
-info = "Größe und Slots eines Truhenmenüs anzeigen"
-"info.id" = "Truhenmenü-ID"
-open = "Ein Truhenmenü für einen Spieler öffnen"
-"open.id" = "Truhenmenü-ID"
+info = "Größe und Slots eines Inventarmenüs anzeigen"
+"info.id" = "Inventarmenü-ID"
+open = "Ein Inventarmenü für einen Spieler öffnen"
+"open.id" = "Inventarmenü-ID"
 "open.player" = "Spieler, für den geöffnet wird; standardmäßig du selbst"
 "open.args" = "Argumente als key=value, durch Leerzeichen getrennt"
-reset = "Mitgelieferte Truhenmenü-Standards wiederherstellen"
+reset = "Mitgelieferte Inventarmenü-Standards wiederherstellen"
 "reset.name" = "Name zum Zurücksetzen oder * für alle mitgelieferten Standards"
 
 ["command.help.hologram"]
 page = "Einen Betrachter auf eine Hologrammseite schalten"
 "page.page" = "Seiten-ID, next oder prev"
-"page.player" = "Spielername; leer bedeutet du selbst"
-motion = "Einen Motion-Clip auf einem Hologramm abspielen"
-"motion.motion" = "Motion-ID oder clear zum Stoppen"
+"page.player" = "Spielername; leer steht für dich selbst"
 actions = "Die Aktionen eines Hologramms beim Klick auflisten"
 
 [gloss.message.hologram_interaction]
@@ -1023,7 +1025,7 @@ missing = "&cKein Namensschild namens &f{id}&c."
 refreshed = "&aNamensschilder aktualisiert."
 
 [gloss.message.world.glow]
-set = "&f{target} &7leuchtet nun in &f{value}&a."
+set = "&f{target} &aleuchtet nun &7in &f{value}&a."
 cleared = "&7Leuchten von &f{target} &7entfernt."
 missing = "&cKein Spieler namens &f{player} &cist online."
 
@@ -1112,8 +1114,8 @@ root = "Einen Ausdruck auswerten und anzeigen, was ihn beantwortet hat"
 expression = "Auszuwertender Ausdruck; in Anführungszeichen setzen, um Leerzeichen einzuschließen"
 
 [command.help.explain]
-root = "Zeigen, welche Bedingungen eine Laufzeit geprüft hat und welche gewonnen hat"
-kind = "Zu erklärende Laufzeit, etwa board oder behavior"
+root = "Zeigen, welche Bedingungen ein Laufzeitsystem geprüft hat und welche gewonnen hat"
+kind = "Zu erklärendes Laufzeitsystem, etwa board oder behavior"
 id = "Zu erklärende Dokument-ID"
 player = "Spieler, für den erklärt wird, oder * für dich selbst"
 
@@ -1122,7 +1124,7 @@ off = "&8[&dGloss&8]: &eVerhalten ist in features.behaviors abgeschaltet."
 "list.empty" = "&8[&dGloss&8]: &7Es sind keine Verhaltensdokumente geladen."
 missing = "&8[&dGloss&8]: &cKein Verhaltensdokument namens \"{id}\"."
 "info.header" = "&8[&dGloss&8]: &d{id} &7Revision &f{revision} &8| &7Einträge &f{count} &8| &7aktiv &f{enabled}"
-"info.entry" = " &8{line}. &f{name} &7wenn &f{when} &8| &7Recht &f{permission}"
+"info.entry" = " &8{line}. &f{name} &7wenn &f{when} &8| &7Berechtigung &f{permission}"
 fired = "&8[&dGloss&8]: &aEintrag &f{line}&a von &f{id}&a ausgeführt."
 "fire.missing" = "&8[&dGloss&8]: &c{id} hat keinen Eintrag {line}."
 "do.ran" = "&8[&dGloss&8]: &a&f{count}&a Verhaltenseinträge für &f{name}&a ausgelöst."
@@ -1156,13 +1158,13 @@ list = "Installierte Pakete auflisten"
 info = "Zeigen, welche Dateien ein Paket besitzt"
 arg_source = "Paketdatei im Gloss-Datenordner oder eine HTTPS-URL"
 arg_dry = "Nur melden, was sich ändern würde, ohne zu schreiben"
-arg_id = "Id eines installierten Pakets"
+arg_id = "ID eines installierten Pakets"
 
 [command.help.history]
 root = "Gespeicherte Versionen eines Dokuments auflisten"
 arg_kind = "Dokumentordner, etwa boards oder menus"
-arg_id = "Dokument-Id"
-arg_page = "Eins-basierte Listenseite"
+arg_id = "Dokument-ID"
+arg_page = "Listenseite, beginnend bei 1"
 
 [command.help.restore]
 root = "Eine gespeicherte Version über das aktive Dokument schreiben"
@@ -1186,7 +1188,7 @@ outcome = "&8[&dGloss&8] &7{state} &f{path}&7 {reason}"
 installed = "&8[&dGloss&8] Paket &f{id}&7 mit &f{count}&7 Datei(en) installiert."
 updated = "&8[&dGloss&8] Paket &f{id}&7 über &f{count}&7 Datei(en) aktualisiert."
 removed = "&8[&dGloss&8] Paket &f{id}&7 und &f{count}&7 Datei(en) entfernt."
-unknown = "&8[&dGloss&8] &cKein Paket mit der Id &f{id}&c ist installiert."
+unknown = "&8[&dGloss&8] &cKein Paket mit der ID &f{id}&c ist installiert."
 failed = "&8[&dGloss&8] &cPaket &f{id}&c fehlgeschlagen: {reason}"
 entry = "&8[&dGloss&8] &f{id} &7{value} &8{count} Datei(en)"
 empty = "&8[&dGloss&8] &7Es sind keine Pakete installiert."
