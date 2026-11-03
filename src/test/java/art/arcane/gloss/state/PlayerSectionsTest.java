@@ -11,6 +11,7 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Stream;
 
 class PlayerSectionsTest {
     @TempDir
@@ -40,6 +41,32 @@ class PlayerSectionsTest {
     }
 
     @Test
+    void persistedPlayerStateSurvivesASectionReadAndWrite() throws IOException {
+        UUID player = UUID.randomUUID();
+        Path stateRoot = dataFolder.resolve("state");
+        StateStore store = new StateStore(stateRoot, Runnable::run, (owner, task) -> task.run());
+        store.declare(StateTestSupport.declarationsByDocument());
+        store.beginLoad(player);
+        store.set(StateScope.PLAYER, player, "visits", 3);
+        store.flush();
+        PlayerSections sections = new PlayerSections(dataFolder);
+
+        Assertions.assertEquals(Map.of(), sections.read(player, "sky"));
+        sections.write(player, "sky", Map.of("purpose", "arena"));
+        store.set(StateScope.PLAYER, player, "visits", 4);
+        store.flush();
+
+        StateStore reloaded = new StateStore(stateRoot, Runnable::run, (owner, task) -> task.run());
+        reloaded.declare(StateTestSupport.declarationsByDocument());
+        reloaded.beginLoad(player);
+        Assertions.assertEquals(4.0D, reloaded.get(StateScope.PLAYER, player, "visits"));
+        Assertions.assertEquals(Map.of("purpose", "arena"), new PlayerSections(dataFolder).read(player, "sky"));
+        try (Stream<Path> files = Files.list(stateRoot.resolve("players"))) {
+            Assertions.assertEquals(1L, files.count());
+        }
+    }
+
+    @Test
     void returnsAnEmptyMapForAnAbsentPlayer() {
         Assertions.assertEquals(Map.of(), new PlayerSections(dataFolder).read(UUID.randomUUID(), "markers"));
     }
@@ -49,7 +76,7 @@ class PlayerSectionsTest {
         UUID player = UUID.randomUUID();
         PlayerSections sections = new PlayerSections(dataFolder);
         sections.writeChecked(player, "camera", Map.of("world", "world"));
-        Path file = dataFolder.resolve("state").resolve("players").resolve(player + ".json");
+        Path file = dataFolder.resolve("state").resolve("sections").resolve(player + ".json");
         Files.delete(file);
         Files.createDirectory(file);
         Files.writeString(file.resolve("occupied"), "occupied");
@@ -88,7 +115,7 @@ class PlayerSectionsTest {
     @Test
     void quarantinesACorruptFileAndReadsEmpty() throws IOException {
         UUID player = UUID.randomUUID();
-        Path file = dataFolder.resolve("state").resolve("players").resolve(player + ".json");
+        Path file = dataFolder.resolve("state").resolve("sections").resolve(player + ".json");
         Files.createDirectories(file.getParent());
         Files.writeString(file, "{ this is not json", StandardCharsets.UTF_8);
         PlayerSections sections = new PlayerSections(dataFolder);
@@ -119,7 +146,7 @@ class PlayerSectionsTest {
         UUID player = UUID.randomUUID();
         sections.write(player, "preferences", Map.of("arena", Boolean.TRUE));
         Assertions.assertEquals(Map.of("arena", Boolean.TRUE), sections.read(player, "preferences"));
-        Files.delete(dataFolder.resolve("state").resolve("players").resolve(player + ".json"));
+        Files.delete(dataFolder.resolve("state").resolve("sections").resolve(player + ".json"));
 
         Assertions.assertEquals(Map.of("arena", Boolean.TRUE), sections.read(player, "preferences"),
             "the render path must not re-read and re-parse the player file on every call");
@@ -130,7 +157,7 @@ class PlayerSectionsTest {
         PlayerSections sections = new PlayerSections(dataFolder);
         UUID player = UUID.randomUUID();
         sections.write(player, "preferences", Map.of("arena", Boolean.TRUE));
-        Path file = dataFolder.resolve("state").resolve("players").resolve(player + ".json");
+        Path file = dataFolder.resolve("state").resolve("sections").resolve(player + ".json");
         Files.writeString(file, "{ this is not json", StandardCharsets.UTF_8);
 
         sections.write(player, "sky", Map.of("purpose", "arena"));
@@ -144,7 +171,7 @@ class PlayerSectionsTest {
         PlayerSections sections = new PlayerSections(dataFolder);
         UUID player = UUID.randomUUID();
         sections.write(player, "sky", Map.of("purpose", "arena"));
-        Path file = dataFolder.resolve("state").resolve("players").resolve(player + ".json");
+        Path file = dataFolder.resolve("state").resolve("sections").resolve(player + ".json");
         Files.delete(file);
 
         sections.write(player, "sky", Map.of("purpose", "arena"));
@@ -161,7 +188,7 @@ class PlayerSectionsTest {
         sections.write(player, "camera", Map.of());
 
         Assertions.assertFalse(Files.exists(
-            dataFolder.resolve("state").resolve("players").resolve(player + ".json")));
+            dataFolder.resolve("state").resolve("sections").resolve(player + ".json")));
     }
 
     @Test
@@ -173,7 +200,7 @@ class PlayerSectionsTest {
         sections.evict(player);
 
         Assertions.assertTrue(Files.exists(
-            dataFolder.resolve("state").resolve("players").resolve(player + ".json")));
+            dataFolder.resolve("state").resolve("sections").resolve(player + ".json")));
         Assertions.assertEquals(Map.of("home", "a"), sections.read(player, "markers"));
     }
 }

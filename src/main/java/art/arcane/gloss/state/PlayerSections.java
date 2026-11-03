@@ -21,7 +21,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
 /**
- * Per-player persisted sections in {@code state/players/<uuid>.json}. One file per player, one
+ * Per-player persisted sections in {@code state/sections/<uuid>.json}. One file per player, one
  * top-level object per section, so features that own different sections never overwrite each
  * other. Writes replace the whole file atomically; a file that will not parse is renamed aside and
  * read as empty so one bad save never blocks a login.
@@ -41,7 +41,7 @@ public final class PlayerSections {
     private final ConcurrentMap<UUID, Map<String, Map<String, Object>>> cached = new ConcurrentHashMap<>();
 
     public PlayerSections(Path dataFolder) {
-        this.root = Objects.requireNonNull(dataFolder, "dataFolder").resolve("state").resolve("players");
+        this.root = Objects.requireNonNull(dataFolder, "dataFolder").resolve("state").resolve("sections");
     }
 
     public Map<String, Object> read(UUID player, String section) {
@@ -57,7 +57,7 @@ public final class PlayerSections {
         try {
             writeChecked(player, section, values);
         } catch (IOException failure) {
-            Gloss.logExceptionStack(false, failure, "state/players/%s.json could not be written.", player);
+            Gloss.logExceptionStack(false, failure, "state/sections/%s.json could not be written.", player);
         }
     }
 
@@ -102,7 +102,7 @@ public final class PlayerSections {
             try {
                 Files.deleteIfExists(file(player));
             } catch (IOException failure) {
-                Gloss.logExceptionStack(false, failure, "state/players/%s.json could not be deleted.", player);
+                Gloss.logExceptionStack(false, failure, "state/sections/%s.json could not be deleted.", player);
             }
         }
     }

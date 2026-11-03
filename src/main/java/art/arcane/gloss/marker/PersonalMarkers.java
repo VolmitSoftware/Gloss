@@ -13,7 +13,7 @@ import java.util.UUID;
 
 /**
  * A player's own saved positions, stored in the {@code markers} section of
- * {@code state/players/&lt;uuid&gt;.json}. Names are matched case insensitively; the authored
+ * {@code state/sections/&lt;uuid&gt;.json}. Names are matched case insensitively; the authored
  * casing is kept as the marker's label.
  */
 public final class PersonalMarkers {
