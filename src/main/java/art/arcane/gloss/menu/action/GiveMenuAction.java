@@ -2,6 +2,7 @@ package art.arcane.gloss.menu.action;
 
 import art.arcane.gloss.Gloss;
 import art.arcane.gloss.config.action.GiveActionData;
+import art.arcane.gloss.expr.ExprScope;
 import art.arcane.gloss.locale.GlossMessages;
 import art.arcane.gloss.menu.icon.IconItems;
 import art.arcane.gloss.text.TextPipeline;
@@ -54,8 +55,8 @@ public final class GiveMenuAction extends MenuAction<GiveActionData> {
   }
 
   /** An authored deny message, rendered for the viewer and delivered through the component path. */
-  static void deliver(Player viewer, String raw) {
+  static void deliver(Player viewer, String raw, ExprScope scope) {
     ComponentMessenger.send(viewer, ComponentText.component(
-        TextUtils.parse(TextPipeline.menuText(viewer, raw))));
+        TextUtils.parse(TextPipeline.menuText(viewer, raw, scope))));
   }
 }

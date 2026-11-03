@@ -146,6 +146,11 @@ public final class TextPipeline implements TextRenderer {
         return pipeline == null ? raw : pipeline.renderMenuText(viewer, raw);
     }
 
+    public static String menuText(Player viewer, String raw, ExprScope scope) {
+        TextPipeline pipeline = active();
+        return pipeline == null ? raw : pipeline.renderScoped(viewer, raw, scope, UnaryOperator.identity());
+    }
+
     public ExprScope expressionScope(Player viewer) {
         return expressions.scope(viewer);
     }

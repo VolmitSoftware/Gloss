@@ -3,12 +3,15 @@ package art.arcane.gloss.menu.icon;
 import art.arcane.gloss.Gloss;
 import art.arcane.gloss.GlossConfig;
 import art.arcane.gloss.config.icon.PlayerHeadIconData;
+import art.arcane.gloss.expr.ExprScope;
+import art.arcane.gloss.expr.RepeatScope;
 import art.arcane.gloss.menu.CharacterizationSupport;
 import art.arcane.gloss.profile.PlayerHeadItems;
 import art.arcane.gloss.profile.PlayerHeadLookup;
 import art.arcane.gloss.profile.PlayerHeadProfile;
 import art.arcane.gloss.profile.PlayerHeadResolver;
 import art.arcane.gloss.profile.PlayerHeadService;
+import art.arcane.gloss.text.TextPipeline;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.Server;
@@ -19,6 +22,7 @@ import org.junit.Test;
 
 import java.lang.reflect.Proxy;
 import java.time.Duration;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -86,6 +90,24 @@ public class PlayerHeadMenuIconTest {
   @Test
   public void aLiteralNameIsLeftExactlyAsAuthoredOnceTrimmed() {
     assertEquals("Notch", PlayerHeadMenuIcon.viewerName(player("Someone"), "  Notch  "));
+  }
+
+  @Test
+  public void aListEntryNamesTheHeadThroughItsLoopVariable() throws ReflectiveOperationException {
+    CharacterizationSupport.setField(gloss, "text", new TextPipeline(gloss));
+    ExprScope entry = new RepeatScope(new ExprScope() {
+      @Override
+      public Object variable(String dottedName) {
+        return null;
+      }
+
+      @Override
+      public Object call(String name, List<Object> args) {
+        return null;
+      }
+    }, "pal", "SwiftSwamp");
+
+    assertEquals("SwiftSwamp", PlayerHeadMenuIcon.viewerName(player("Notch"), "{{pal}}", entry));
   }
 
   @Test

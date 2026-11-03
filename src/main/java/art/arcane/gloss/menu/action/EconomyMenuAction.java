@@ -1,6 +1,7 @@
 package art.arcane.gloss.menu.action;
 
 import art.arcane.gloss.config.action.EconomyActionData;
+import art.arcane.gloss.expr.ExprScope;
 import art.arcane.gloss.integration.VaultEconomyHook;
 import art.arcane.gloss.locale.GlossMessages;
 import org.bukkit.entity.Player;
@@ -44,15 +45,15 @@ public final class EconomyMenuAction extends MenuAction<EconomyActionData> {
     if (succeeded || continuesOnFailure(data.op())) {
       return ActionOutcome.CONTINUE;
     }
-    deny(viewer);
+    deny(viewer, context.conditionScope());
     return ActionOutcome.STOP;
   }
 
-  private void deny(Player viewer) {
+  private void deny(Player viewer, ExprScope scope) {
     if (data.denyMessage() == null) {
       GiveMenuAction.send(viewer, GlossMessages.FORMS_ECONOMY_DENIED);
       return;
     }
-    GiveMenuAction.deliver(viewer, data.denyMessage());
+    GiveMenuAction.deliver(viewer, data.denyMessage(), scope);
   }
 }

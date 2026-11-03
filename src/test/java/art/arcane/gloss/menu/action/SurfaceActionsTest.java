@@ -1,5 +1,6 @@
 package art.arcane.gloss.menu.action;
 
+import art.arcane.gloss.Gloss;
 import art.arcane.gloss.api.HoloClickTrigger;
 import art.arcane.gloss.config.action.ActionBarActionData;
 import art.arcane.gloss.config.action.BossBarActionData;
@@ -8,9 +9,13 @@ import art.arcane.gloss.config.action.TitleActionData;
 import art.arcane.gloss.doc.DocumentParsers;
 import art.arcane.gloss.enums.MenuActionType;
 import art.arcane.gloss.expr.ExprScope;
+import art.arcane.gloss.expr.RepeatScope;
+import art.arcane.gloss.menu.CharacterizationSupport;
 import art.arcane.gloss.surface.SurfaceDelivery;
+import art.arcane.gloss.text.TextPipeline;
 import art.arcane.volmlib.util.hud.HudPriority;
 import art.arcane.volmlib.util.hud.HudSlot;
+import org.bukkit.Server;
 import org.bukkit.boss.BarColor;
 import org.bukkit.boss.BarStyle;
 import org.bukkit.entity.Player;
@@ -19,6 +24,7 @@ import org.junit.jupiter.api.Test;
 import java.lang.reflect.Proxy;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -103,6 +109,35 @@ class SurfaceActionsTest {
     }
 
     @Test
+    void surfaceTextReadsTheListEntryOfTheClickedComponent() throws ReflectiveOperationException {
+        Server server = CharacterizationSupport.server(Map.of());
+        Object previousServer = CharacterizationSupport.installServer(server);
+        Gloss gloss = CharacterizationSupport.bareGloss(server);
+        CharacterizationSupport.setField(gloss, "text", new TextPipeline(gloss));
+        Gloss previousGloss = CharacterizationSupport.installGloss(gloss);
+        try {
+            RecordingDelivery delivery = new RecordingDelivery();
+            ActionContext context = entryContext(player(), "SwiftSwamp");
+
+            new TitleMenuAction((TitleActionData) action(
+                "{\"type\":\"title\",\"title\":\"{{pal}}\",\"subtitle\":\"{{pal}}\"}"), delivery).execute(context);
+            new ActionBarMenuAction((ActionBarActionData) action(
+                "{\"type\":\"actionbar\",\"text\":\"Waved at {{pal}}\"}"), delivery).execute(context);
+            new BossBarMenuAction((BossBarActionData) action(
+                "{\"type\":\"bossbar\",\"id\":\"quest\",\"title\":\"{{pal}}\"}"), delivery).execute(context);
+
+            assertEquals(List.of(
+                "title gloss:action:shop/buy " + HudPriority.NOTICE + " SwiftSwamp SwiftSwamp 10 40 10",
+                "actionBar gloss:action:shop/buy " + HudPriority.NOTICE + " 3000 [CENTER] Waved at SwiftSwamp",
+                "bossBar gloss:action:shop/buy/quest " + HudPriority.NOTICE + " SwiftSwamp 1.0 WHITE SOLID 5000"),
+                delivery.calls);
+        } finally {
+            CharacterizationSupport.restoreGloss(previousGloss);
+            CharacterizationSupport.restoreServer(previousServer);
+        }
+    }
+
+    @Test
     void aBossBarActionWithZeroTicksHidesTheLaneInstead() {
         RecordingDelivery delivery = new RecordingDelivery();
         BossBarActionData data = (BossBarActionData) action(
@@ -114,6 +149,42 @@ class SurfaceActionsTest {
 
     private static MenuActionData action(String json) {
         return DocumentParsers.GSON.fromJson(json, MenuActionData.class);
+    }
+
+    private static ActionContext entryContext(Player player, String entry) {
+        ActionContext base = context(player);
+        ExprScope scope = new RepeatScope(base.conditionScope(), "pal", entry);
+        return new ActionContext() {
+            @Override
+            public Player player() {
+                return player;
+            }
+
+            @Override
+            public String menuId() {
+                return base.menuId();
+            }
+
+            @Override
+            public String componentId() {
+                return base.componentId();
+            }
+
+            @Override
+            public HoloClickTrigger trigger() {
+                return base.trigger();
+            }
+
+            @Override
+            public NavigationResult navigate(NavigationRequest request) {
+                return base.navigate(request);
+            }
+
+            @Override
+            public ExprScope conditionScope() {
+                return scope;
+            }
+        };
     }
 
     private static ActionContext context(Player player) {

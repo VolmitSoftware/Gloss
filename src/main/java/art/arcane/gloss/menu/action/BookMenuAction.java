@@ -2,6 +2,7 @@ package art.arcane.gloss.menu.action;
 
 import art.arcane.gloss.Gloss;
 import art.arcane.gloss.config.action.BookActionData;
+import art.arcane.gloss.expr.ExprScope;
 import art.arcane.gloss.service.PaperBridges;
 import art.arcane.gloss.text.TextPipeline;
 import art.arcane.gloss.util.common.PacketUtils;
@@ -38,7 +39,7 @@ public final class BookMenuAction extends MenuAction<BookActionData> {
   @Override
   public ActionOutcome execute(ActionContext context) {
     Player viewer = context.player();
-    ItemStack book = build(viewer);
+    ItemStack book = build(viewer, context.conditionScope());
     if (book == null) {
       return ActionOutcome.CONTINUE;
     }
@@ -50,18 +51,18 @@ public final class BookMenuAction extends MenuAction<BookActionData> {
     return ActionOutcome.CONTINUE;
   }
 
-  private ItemStack build(Player viewer) {
+  private ItemStack build(Player viewer, ExprScope scope) {
     try {
       ItemStack book = new ItemStack(Material.WRITTEN_BOOK);
       List<String> pages = new ArrayList<>(data.pages().size());
       for (String page : data.pages()) {
-        pages.add(TextPipeline.menuText(viewer, page));
+        pages.add(TextPipeline.menuText(viewer, page, scope));
       }
       if (!(book.getItemMeta() instanceof BookMeta meta)) {
         return null;
       }
-      meta.setTitle(TextPipeline.menuText(viewer, data.title()));
-      meta.setAuthor(TextPipeline.menuText(viewer, data.author()));
+      meta.setTitle(TextPipeline.menuText(viewer, data.title(), scope));
+      meta.setAuthor(TextPipeline.menuText(viewer, data.author(), scope));
       meta.setPages(pages);
       book.setItemMeta(meta);
       return book;

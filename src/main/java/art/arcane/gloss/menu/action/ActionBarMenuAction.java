@@ -28,7 +28,7 @@ public final class ActionBarMenuAction extends MenuAction<ActionBarActionData> {
         Player player = context.player();
         delivery.actionBar(player, SurfaceActionDelivery.purpose(context), data.priorityValue(),
             data.ticksOrDefault() * TICK_MILLIS, data.hudSlots(),
-            TextPipeline.menuText(player, data.text()));
+            TextPipeline.menuText(player, data.text(), context.conditionScope()));
         return ActionOutcome.CONTINUE;
     }
 }

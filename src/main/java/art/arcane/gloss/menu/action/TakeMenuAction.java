@@ -1,6 +1,7 @@
 package art.arcane.gloss.menu.action;
 
 import art.arcane.gloss.config.action.TakeActionData;
+import art.arcane.gloss.expr.ExprScope;
 import art.arcane.gloss.locale.GlossMessages;
 import art.arcane.gloss.menu.icon.IconItems;
 import org.bukkit.entity.Player;
@@ -26,18 +27,18 @@ public final class TakeMenuAction extends MenuAction<TakeActionData> {
     int amount = ShopAmounts.resolve(data.amount(), context.conditionScope());
     stack.setAmount(amount);
     if (!viewer.getInventory().containsAtLeast(stack, amount)) {
-      deny(viewer);
+      deny(viewer, context.conditionScope());
       return ActionOutcome.STOP;
     }
     viewer.getInventory().removeItem(stack);
     return ActionOutcome.CONTINUE;
   }
 
-  private void deny(Player viewer) {
+  private void deny(Player viewer, ExprScope scope) {
     if (data.denyMessage() == null) {
       GiveMenuAction.send(viewer, GlossMessages.FORMS_TAKE_MISSING);
       return;
     }
-    GiveMenuAction.deliver(viewer, data.denyMessage());
+    GiveMenuAction.deliver(viewer, data.denyMessage(), scope);
   }
 }

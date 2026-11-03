@@ -3,6 +3,7 @@ package art.arcane.gloss.menu.icon;
 import art.arcane.gloss.GlossConfig;
 import art.arcane.gloss.config.icon.PlayerHeadIconData;
 import art.arcane.gloss.exceptions.MenuIconException;
+import art.arcane.gloss.expr.ExprScope;
 import art.arcane.gloss.menu.MenuSession;
 import art.arcane.gloss.profile.PlayerHeadItems;
 import art.arcane.gloss.profile.PlayerHeadLookup;
@@ -43,20 +44,23 @@ public final class PlayerHeadMenuIcon extends ItemMenuIcon {
   private final PlayerHeadIconData head;
   private final int refreshInterval;
   private final boolean dynamicSource;
+  private final ExprScope expressionScope;
 
   private String renderedName;
   private PlayerHeadLookup.State renderedState;
   private PlayerHeadProfile renderedProfile;
   private int refreshCountdown;
 
-  public PlayerHeadMenuIcon(MenuSession session, Location loc, PlayerHeadIconData data) throws MenuIconException {
-    this(session, loc, data, render(session.getPlayer(), data));
+  public PlayerHeadMenuIcon(MenuSession session, Location loc, PlayerHeadIconData data, ExprScope expressionScope)
+      throws MenuIconException {
+    this(session, loc, data, expressionScope, render(session.getPlayer(), data, expressionScope));
   }
 
-  private PlayerHeadMenuIcon(MenuSession session, Location loc, PlayerHeadIconData data, Render render)
-      throws MenuIconException {
+  private PlayerHeadMenuIcon(MenuSession session, Location loc, PlayerHeadIconData data, ExprScope expressionScope,
+                             Render render) throws MenuIconException {
     super(session, loc, data, render.stack());
     this.head = data;
+    this.expressionScope = expressionScope;
     this.renderedName = render.name();
     this.renderedState = render.state();
     this.renderedProfile = render.profile();
@@ -76,6 +80,10 @@ public final class PlayerHeadMenuIcon extends ItemMenuIcon {
    *         without spending a request
    */
   public static String viewerName(Player viewer, String source) {
+    return viewerName(viewer, source, null);
+  }
+
+  public static String viewerName(Player viewer, String source, ExprScope scope) {
     if (source == null) {
       return null;
     }
@@ -83,7 +91,7 @@ public final class PlayerHeadMenuIcon extends ItemMenuIcon {
     if (viewer != null && isViewerToken(trimmed)) {
       return viewer.getName();
     }
-    String piped = TextPipeline.menuText(viewer, trimmed);
+    String piped = TextPipeline.menuText(viewer, trimmed, scope);
     return piped == null ? trimmed : piped.trim();
   }
 
@@ -113,7 +121,7 @@ public final class PlayerHeadMenuIcon extends ItemMenuIcon {
   }
 
   private void refresh() {
-    String name = viewerName(session.getPlayer(), head.player());
+    String name = viewerName(session.getPlayer(), head.player(), expressionScope);
     PlayerHeadLookup lookup = lookupFor(name);
     if (Objects.equals(name, renderedName)
         && lookup.state() == renderedState
@@ -136,8 +144,8 @@ public final class PlayerHeadMenuIcon extends ItemMenuIcon {
     return renderedState;
   }
 
-  private static Render render(Player viewer, PlayerHeadIconData data) throws MenuIconException {
-    String name = viewerName(viewer, data.requirePlayer());
+  private static Render render(Player viewer, PlayerHeadIconData data, ExprScope scope) throws MenuIconException {
+    String name = viewerName(viewer, data.requirePlayer(), scope);
     PlayerHeadLookup lookup = lookupFor(name);
     return new Render(name, lookup.state(), lookup.profile(), stackFor(lookup));
   }

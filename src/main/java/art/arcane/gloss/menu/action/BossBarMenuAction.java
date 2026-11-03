@@ -32,7 +32,7 @@ public final class BossBarMenuAction extends MenuAction<BossBarActionData> {
             return ActionOutcome.CONTINUE;
         }
         delivery.bossBar(player, laneId, data.priorityValue(),
-            TextPipeline.menuText(player, data.title()), data.progressValue(), data.barColor(), data.barStyle(),
+            TextPipeline.menuText(player, data.title(), context.conditionScope()), data.progressValue(), data.barColor(), data.barStyle(),
             data.ticksOrDefault() * TICK_MILLIS);
         return ActionOutcome.CONTINUE;
     }

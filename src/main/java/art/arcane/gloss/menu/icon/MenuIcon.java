@@ -72,7 +72,7 @@ public abstract class MenuIcon<D extends MenuIconData> {
       else if (data instanceof EntityIconData d)
         return new EntityMenuIcon(session, loc, d);
       else if (data instanceof PlayerHeadIconData d)
-        return new PlayerHeadMenuIcon(session, loc, d);
+        return new PlayerHeadMenuIcon(session, loc, d, session.componentScope(component == null ? "" : component.getId()));
       return new TextImageMenuIcon(session, loc);
     } catch (MenuIconException | RuntimeException e) {
       Gloss.logExceptionStack(false, e, "An error occurred while creating a Menu Icon for the component \"%s\":", component.getId());
