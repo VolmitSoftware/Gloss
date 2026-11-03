@@ -81,7 +81,7 @@
       "id": "blocks",
       "offset": [
         0,
-        -0.15,
+        -0.6,
         0
       ],
       "show": "session.category == 'blocks'",
