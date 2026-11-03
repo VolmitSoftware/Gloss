@@ -4,6 +4,7 @@ import art.arcane.gloss.config.components.ButtonComponentData;
 import art.arcane.gloss.config.icon.TextIconData;
 import art.arcane.gloss.menu.MenuSession;
 import art.arcane.gloss.menu.icon.MenuIcon;
+import art.arcane.gloss.util.common.math.CollisionPlane;
 import org.bukkit.Location;
 import org.bukkit.util.Vector;
 
@@ -17,8 +18,8 @@ import java.util.List;
 public final class TooltipPane {
     /** How far in front of the button the pane sits, in menu-local units. */
     public static final double FORWARD_OFFSET = 0.05D;
-    /** How far above the button the pane sits, so it does not cover what is being hovered. */
-    public static final double VERTICAL_OFFSET = 0.35D;
+    /** The space between the top of the button's icon and the pane, so it does not cover what is being hovered. */
+    public static final double ICON_GAP = 0.08D;
 
     private final MenuSession session;
     private final MenuComponent<?> owner;
@@ -59,12 +60,23 @@ public final class TooltipPane {
     }
 
     private void show(Location anchor) {
-        Location at = session.getTransform().localPosition(anchor,
-            new Vector(0D, VERTICAL_OFFSET, FORWARD_OFFSET));
+        Location at = session.getTransform().localPosition(anchor, new Vector(0D, 0D, FORWARD_OFFSET));
         icon = MenuIcon.createIcon(session, at, new TextIconData(text(data.lines()), data.style(), null, data.box()), owner);
-        if (icon != null) {
-            icon.spawn();
+        if (icon == null) {
+            return;
         }
+        if (owner.currentIcon != null) {
+            icon.move(aboveIcon(owner.currentIcon.createBoundingBox(anchor), icon.createBoundingBox(at),
+                ICON_GAP * session.getTransform().scale()));
+        }
+        icon.spawn();
+    }
+
+    static Vector aboveIcon(CollisionPlane ownerIcon, CollisionPlane pane, double gap) {
+        Vector up = pane.getUp();
+        double iconTop = ownerIcon.getCenter().dot(up) + ownerIcon.getHeight() / 2D;
+        double paneBottom = pane.getCenter().dot(up) - pane.getHeight() / 2D;
+        return up.clone().multiply(iconTop + gap - paneBottom);
     }
 
     private static String text(List<String> lines) {
