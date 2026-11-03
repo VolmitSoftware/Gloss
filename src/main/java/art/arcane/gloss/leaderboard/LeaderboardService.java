@@ -52,6 +52,7 @@ public final class LeaderboardService implements GlossService {
     private volatile Map<String, Loaded> boards = Map.of();
     private volatile Map<String, LeaderboardView> views = Map.of();
     private volatile boolean started;
+    private volatile boolean samplesLanded;
     private long nextSweepMs;
     private int taskId = NO_TASK;
 
@@ -173,7 +174,6 @@ public final class LeaderboardService implements GlossService {
         for (Player player : plugin.getServer().getOnlinePlayers()) {
             FoliaScheduler.runEntity(plugin, player, () -> sample(loaded, player));
         }
-        republish();
         return true;
     }
 
@@ -183,6 +183,7 @@ public final class LeaderboardService implements GlossService {
         }
         long now = System.currentTimeMillis();
         if (sweep.isEmpty()) {
+            publishLandedSamples();
             startSweepIfDue(now);
             return;
         }
@@ -194,10 +195,16 @@ public final class LeaderboardService implements GlossService {
                 FoliaScheduler.runEntity(plugin, player, () -> sampleAll(player));
             }
         }
-        if (sweep.isEmpty()) {
-            persistAll();
-            republish();
+    }
+
+    /** Samples run on each player's own scheduler, so rows are rebuilt once they have landed rather than when they were asked for. */
+    private void publishLandedSamples() {
+        if (!samplesLanded) {
+            return;
         }
+        samplesLanded = false;
+        persistAll();
+        republish();
     }
 
     private void startSweepIfDue(long now) {
@@ -249,6 +256,7 @@ public final class LeaderboardService implements GlossService {
         snapshots.compute(loaded.id(), (id, current) ->
             (current == null ? store.load(id) : current)
                 .sampled(player.getUniqueId(), player.getName(), value, now));
+        samplesLanded = true;
     }
 
     private void rollDuePeriods(long now) {
