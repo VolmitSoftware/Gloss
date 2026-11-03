@@ -14,6 +14,7 @@ import art.arcane.gloss.menu.DisplayEntityManager;
 import art.arcane.gloss.menu.MenuSessionOptions;
 import art.arcane.gloss.menu.MenuTransform;
 import art.arcane.gloss.menu.action.NavigationResult;
+import art.arcane.gloss.text.TextPipeline;
 import art.arcane.gloss.util.common.DisplayEntity;
 import com.github.retrooper.packetevents.util.Vector3f;
 import org.bukkit.Bukkit;
@@ -254,10 +255,14 @@ public final class MarkerRenderer {
         }
         if (render.edge == null) {
             render.edge = create("gloss-marker-edge:" + candidate.id(), edgePoint(indicator));
-            render.edge.setRenderedLines(List.of(edge.arrow()));
+            render.edge.setRenderedLines(List.of(edgeText(plugin.text(), viewer, edge.arrow())));
         }
         render.edge.bindPosition(viewer, () -> edgePoint(latest(candidate)));
         render.edge.bindPresentation(viewer, () -> edgePresentation(latest(candidate).bearing()));
+    }
+
+    static String edgeText(TextPipeline text, Player viewer, String arrow) {
+        return text.render(viewer, arrow);
     }
 
     static HologramPresentation edgePresentation(EdgeIndicatorMath.Bearing bearing) {
