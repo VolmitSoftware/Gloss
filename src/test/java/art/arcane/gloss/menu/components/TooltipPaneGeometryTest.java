@@ -1,12 +1,23 @@
 package art.arcane.gloss.menu.components;
 
+import art.arcane.gloss.menu.MenuTransform;
 import art.arcane.gloss.util.common.math.CollisionPlane;
+import org.bukkit.Location;
 import org.bukkit.util.Vector;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
 
 public class TooltipPaneGeometryTest {
+
+    @Test
+    public void thePaneSitsBetweenTheViewerAndItsButton() {
+        MenuTransform transform = new MenuTransform(new Location(null, 0D, 0D, 0D), new Vector(), 0F, 0F, 0F, 1F);
+
+        Location pane = transform.localPosition(new Location(null, 0D, 0D, 3D), TooltipPane.forward());
+
+        assertEquals(3D - TooltipPane.FORWARD_OFFSET, pane.getZ(), 0.000001D);
+    }
 
     @Test
     public void thePaneBottomSitsAGapAboveTheIconTop() {

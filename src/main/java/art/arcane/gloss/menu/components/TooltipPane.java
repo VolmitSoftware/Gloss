@@ -60,7 +60,7 @@ public final class TooltipPane {
     }
 
     private void show(Location anchor) {
-        Location at = session.getTransform().localPosition(anchor, new Vector(0D, 0D, FORWARD_OFFSET));
+        Location at = session.getTransform().localPosition(anchor, forward());
         icon = MenuIcon.createIcon(session, at, new TextIconData(text(data.lines()), data.style(), null, data.box()), owner);
         if (icon == null) {
             return;
@@ -70,6 +70,11 @@ public final class TooltipPane {
                 ICON_GAP * session.getTransform().scale()));
         }
         icon.spawn();
+    }
+
+    /** Menu-local z grows away from the viewer, so a pane in front of its button has a negative z. */
+    static Vector forward() {
+        return new Vector(0D, 0D, -FORWARD_OFFSET);
     }
 
     static Vector aboveIcon(CollisionPlane ownerIcon, CollisionPlane pane, double gap) {
