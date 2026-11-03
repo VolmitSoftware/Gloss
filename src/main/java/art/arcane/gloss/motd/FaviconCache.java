@@ -12,6 +12,7 @@ import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.lang.ref.WeakReference;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiConsumer;
@@ -31,7 +32,7 @@ public final class FaviconCache {
     private final Map<String, Entry> cache = new ConcurrentHashMap<>();
 
     public FaviconCache(ImageAssets assets) {
-        this.assets = assets;
+        this.assets = Objects.requireNonNull(assets, "assets");
         this.images = null;
         this.encoder = FaviconCache::encode;
         this.onRefused = FaviconCache::logRefusal;
@@ -74,6 +75,7 @@ public final class FaviconCache {
             }
             prepared = ready.get();
         } catch (IOException failure) {
+            onRefused.accept(path, failure.getMessage());
             return null;
         }
         Entry cached = cache.get(path);

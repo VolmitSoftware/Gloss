@@ -1,5 +1,6 @@
 package art.arcane.gloss.motd;
 
+import art.arcane.gloss.image.ImageAssets;
 import org.apache.commons.imaging.ImageFormat;
 import org.apache.commons.imaging.ImageFormats;
 import org.apache.commons.lang3.tuple.Pair;
@@ -17,6 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -94,6 +96,11 @@ class FaviconCacheTest {
 
         assertNull(cache.iconFor("icons/gone.png", 1L));
         assertEquals(List.of("icons/gone.png"), refusals);
+    }
+
+    @Test
+    void theServerCacheRefusesToBuildWithoutItsImageAssets() {
+        assertThrows(NullPointerException.class, () -> new FaviconCache((ImageAssets) null));
     }
 
     @Test

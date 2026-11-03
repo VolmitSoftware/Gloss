@@ -348,6 +348,7 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
             boards = new BoardService(this);
             groups = new GroupService(this);
             tablist = new TablistService(this);
+            imageAssets = new ImageAssets(getDataFolder(), () -> cfg().images());
             motd = new MotdService(this);
             proxyOwnership = new BackendProxyOwnership(this);
             chat = new ChatService(this);
@@ -404,7 +405,6 @@ public final class Gloss extends JavaPlugin implements ReloadAware {
                 updateService = null;
             });
             menuCatalog = new MenuCatalog(getDataFolder());
-            imageAssets = new ImageAssets(getDataFolder(), () -> cfg().images());
             panelService = new PanelService(this);
             enableService("panels", this::startPanelService, this::stopPanelService);
             startPreviewRegistry();

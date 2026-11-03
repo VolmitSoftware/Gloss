@@ -4,6 +4,7 @@ import art.arcane.gloss.Gloss;
 import art.arcane.gloss.GlossConfig;
 import art.arcane.gloss.config.GlossConfigFile;
 import art.arcane.gloss.doc.DocumentRegistry;
+import art.arcane.gloss.image.ImageAssets;
 import art.arcane.gloss.proxy.BackendProxyOwnership;
 import art.arcane.gloss.proxy.OwnershipProtocol;
 import art.arcane.gloss.text.TextPipeline;
@@ -78,6 +79,7 @@ class MotdProxyLinksTest {
         set(ownership, BackendProxyOwnership.class, "enabled", true);
         set(ownership, BackendProxyOwnership.class, "key", KEY);
         set(plugin, Gloss.class, "proxyOwnership", ownership);
+        set(plugin, Gloss.class, "imageAssets", new ImageAssets(folder, () -> plugin.cfg().images()));
         Files.writeString(new File(folder, "motd.json").toPath(), """
             {"schemaVersion":1,"revision":4,"entries":[{"lines":["&dA glossy server"]}],
              "links":[{"type":"website","url":"https://example.org"},
