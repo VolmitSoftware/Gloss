@@ -37,6 +37,7 @@
     { "expr": "'n=' + 3.5", "expect": "n=3.5" },
     { "expr": "'flag:' + true", "expect": "flag:true" },
     { "expr": "name + '!'", "vars": { "name": "Bob" }, "expect": "Bob!" },
+    { "expr": "board.1.name + '!'", "vars": { "board.1.name": "Ada" }, "expect": "Ada!" },
     { "expr": "flag && true", "vars": { "flag": true }, "expect": true },
 
     { "expr": "str(54.0)", "expect": "54" },

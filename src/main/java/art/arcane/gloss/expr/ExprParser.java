@@ -486,7 +486,7 @@ public final class ExprParser {
       i++;
     }
     while (i < n && source.charAt(i) == '.' && i + 1 < n
-        && (Character.isLetter(source.charAt(i + 1)) || source.charAt(i + 1) == '_')) {
+        && (Character.isLetterOrDigit(source.charAt(i + 1)) || source.charAt(i + 1) == '_')) {
       i++;
       i++;
       while (i < n && (Character.isLetterOrDigit(source.charAt(i)) || source.charAt(i) == '_')) {
