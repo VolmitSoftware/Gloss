@@ -88,9 +88,9 @@ public final class CompositorDelivery implements SurfaceDelivery {
     }
 
     /**
-     * Hands the title slot back. A claim is only stood down by releasing it: bidding again at the
-     * same priority loses to the live claim, because the compositor breaks that tie in favour of
-     * whoever asked first.
+     * Hands the title slot back and wipes what the claim drew. A claim is only stood down by
+     * dismissing it: bidding again at the same priority loses to the live claim, because the
+     * compositor breaks that tie in favour of whoever asked first.
      */
     @Override
     public void clearTitle(Player viewer, String purpose) {
@@ -101,7 +101,7 @@ public final class CompositorDelivery implements SurfaceDelivery {
         HudTitleClaim held = titleClaims.get(viewer.getUniqueId());
         if (held != null && held.purpose().equals(purpose)
             && titleClaims.remove(viewer.getUniqueId(), held)) {
-            held.release();
+            held.dismiss();
             presented.remove(viewer.getUniqueId());
         }
         if (queue != null) {

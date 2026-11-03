@@ -76,6 +76,23 @@ class CompositorTitleSlotTest {
     }
 
     @Test
+    void endingTheRideWipesTheBarsFromTheClient() {
+        SurfaceLetterbox.apply(delivery, viewer.player, true, MAX_RIDE_SECONDS);
+        assertEquals(0, viewer.resets);
+
+        SurfaceLetterbox.apply(delivery, viewer.player, false, MAX_RIDE_SECONDS);
+
+        assertEquals(1, viewer.resets, "the bars must not stay until their stay window ends");
+    }
+
+    @Test
+    void endingARideThatNeverDrewLeavesTheClientAlone() {
+        SurfaceLetterbox.apply(delivery, viewer.player, false, MAX_RIDE_SECONDS);
+
+        assertEquals(0, viewer.resets);
+    }
+
+    @Test
     void aSurfaceTitleAtTheSamePriorityDrawsOnceTheRideEnds() {
         SurfaceLetterbox.apply(delivery, viewer.player, true, MAX_RIDE_SECONDS);
         SurfaceLetterbox.apply(delivery, viewer.player, false, MAX_RIDE_SECONDS);
@@ -111,6 +128,7 @@ class CompositorTitleSlotTest {
         private final Map<String, Map<Plugin, MetadataValue>> metadata = new LinkedHashMap<>();
         private final List<String> titles = new ArrayList<>();
         private final Player player;
+        private int resets;
 
         private FakeViewer() {
             player = (Player) Proxy.newProxyInstance(Player.class.getClassLoader(),
@@ -124,6 +142,10 @@ class CompositorTitleSlotTest {
                 case "isOnline" -> true;
                 case "sendTitle" -> {
                     titles.add((String) args[0]);
+                    yield null;
+                }
+                case "resetTitle" -> {
+                    resets++;
                     yield null;
                 }
                 case "setMetadata" -> {
