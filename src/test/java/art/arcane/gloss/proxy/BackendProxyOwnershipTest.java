@@ -5,6 +5,7 @@ import art.arcane.gloss.GlossConfig;
 import art.arcane.gloss.board.BoardService;
 import art.arcane.gloss.board.GlossBoardMeta;
 import art.arcane.gloss.config.GlossConfigFile;
+import art.arcane.gloss.image.ImageAssets;
 import art.arcane.gloss.motd.MotdService;
 import art.arcane.gloss.tab.TablistDoc;
 import art.arcane.gloss.tab.TablistService;
@@ -81,6 +82,7 @@ class BackendProxyOwnershipTest {
         config.text.placeholders = false;
         config.normalize();
         set(plugin, Gloss.class, "config", GlossConfig.from(config));
+        set(plugin, Gloss.class, "imageAssets", new ImageAssets(folder, () -> plugin.cfg().images()));
         set(plugin, Gloss.class, "text", new TextPipeline(plugin));
         set(plugin, Gloss.class, "scheduler", new SchedulerRuntime(() -> plugin, Runnable::run,
             ignored -> {}, ignored -> {}, failure -> { throw new AssertionError(failure); }));
