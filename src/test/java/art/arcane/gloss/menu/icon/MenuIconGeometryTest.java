@@ -47,12 +47,12 @@ public class MenuIconGeometryTest {
     assertEquals(BlockMenuIcon.VERTICAL_OFFSET, ItemMenuIcon.itemOffset(1).getY(), 0.000001D);
     assertEquals(0D, ItemMenuIcon.itemOffset(1).getZ(), 0D);
     assertEquals(BlockMenuIcon.VERTICAL_OFFSET, ItemMenuIcon.blockOffset().getY(), 0.000001D);
+    assertEquals(0D, ItemMenuIcon.blockOffset().getZ(), 0D);
   }
 
   @Test
-  public void aStackLiftsAFlatItemAndABlockSitsForward() {
+  public void aStackLiftsAFlatItem() {
     assertEquals(BlockMenuIcon.VERTICAL_OFFSET + ItemMenuIcon.COUNT_LIFT, ItemMenuIcon.itemOffset(2).getY(), 0.000001D);
-    assertEquals(ItemMenuIcon.BLOCK_DEPTH, ItemMenuIcon.blockOffset().getZ(), 0.000001D);
   }
 
   private static MenuTransform transform(float scale) {

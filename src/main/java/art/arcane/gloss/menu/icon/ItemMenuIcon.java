@@ -26,7 +26,6 @@ import java.util.UUID;
 
 public class ItemMenuIcon extends MenuIcon<MenuIconData> {
 
-  static final float BLOCK_DEPTH = .3F;
   static final float COUNT_LIFT = .09F;
   private static final Material GRASS = grassMaterial();
   private static final List<Material> BLOCK_BLACKLIST = blacklist(
@@ -135,9 +134,8 @@ public class ItemMenuIcon extends MenuIcon<MenuIconData> {
   /**
    * Swaps the rendered stack without respawning the display, so an icon whose item is only known
    * later — a player head waiting on a profile lookup — resolves in place. Crossing the
-   * item/block boundary is the one case that cannot be done in place: a block sits
-   * {@link #BLOCK_DEPTH} forward and ignores {@link #COUNT_LIFT}, so the display is rebuilt rather
-   * than left at the wrong position.
+   * item/block boundary is the one case that cannot be done in place: a block ignores
+   * {@link #COUNT_LIFT}, so the display is rebuilt rather than left at the wrong position.
    */
   protected void replaceItem(ItemStack replacement) {
     if (replacement == null) {
@@ -226,7 +224,7 @@ public class ItemMenuIcon extends MenuIcon<MenuIconData> {
   }
 
   static Vector blockOffset() {
-    return new Vector(0F, BlockMenuIcon.VERTICAL_OFFSET, BLOCK_DEPTH);
+    return new Vector(0F, BlockMenuIcon.VERTICAL_OFFSET, 0F);
   }
 
   private Component countText(int count) {
