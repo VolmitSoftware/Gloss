@@ -437,6 +437,7 @@ public final class DocumentRegistry<T> implements AutoCloseable {
      */
     private Sweep<T> readSweep(SweepPlan plan) {
         List<PreparedLoad<T>> reconciled = new ArrayList<>();
+        List<String> missing = new ArrayList<>();
         int index = plan.index();
         if (plan.active()) {
             long startedAt = HotloadReconciliationBudget.nanoTime();
@@ -459,12 +460,14 @@ public final class DocumentRegistry<T> implements AutoCloseable {
                 files++;
                 bytes += Math.min(size, MAX_DOCUMENT_BYTES);
                 String id = idOf(file);
-                if (file.isFile() && !plan.failed().contains(id)) {
+                if (!file.isFile()) {
+                    missing.add(id);
+                } else if (!plan.failed().contains(id)) {
                     reconciled.add(readCandidate(id, file));
                 }
             }
         }
-        return new Sweep<>(List.copyOf(reconciled), index,
+        return new Sweep<>(List.copyOf(reconciled), List.copyOf(missing), index,
             readRetries(plan.retryIds()), readRetries(plan.failureRetryIds()));
     }
 
@@ -512,6 +515,9 @@ public final class DocumentRegistry<T> implements AutoCloseable {
         List<String> sliceLoaded = new ArrayList<>();
         for (PreparedLoad<T> prepared : sweep.reconciled()) {
             acceptPrepared(prepared, sliceLoaded);
+        }
+        for (String id : sweep.missing()) {
+            markDeleted(id);
         }
         reconciliationIndex = sweep.nextIndex();
         reconciliationLoaded.addAll(sliceLoaded);
@@ -1223,7 +1229,7 @@ public final class DocumentRegistry<T> implements AutoCloseable {
                              List<String> retryIds, List<String> failureRetryIds) {
     }
 
-    private record Sweep<V>(List<PreparedLoad<V>> reconciled, int nextIndex,
+    private record Sweep<V>(List<PreparedLoad<V>> reconciled, List<String> missing, int nextIndex,
                             List<PreparedLoad<V>> retries, List<PreparedLoad<V>> failureRetries) {
     }
 

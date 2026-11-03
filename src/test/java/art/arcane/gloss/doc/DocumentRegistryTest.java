@@ -24,6 +24,7 @@ import java.util.logging.Logger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -190,6 +191,28 @@ class DocumentRegistryTest {
         } finally {
             logger.removeHandler(handler);
         }
+    }
+
+    @Test
+    void reconciliationRemovesADocumentWhoseDeleteTheWatcherNeverReported() throws Exception {
+        write("alpha.json", "one");
+        write("beta.json", "two");
+        DocumentRegistry<String> registry = registry();
+        registry.reload();
+        registry.replaceFolderWatcher(new ClockAdvancingFolderWatcher(folder, new AtomicLong()));
+        assertTrue(new File(folder, "beta.json").delete());
+
+        clock.addAndGet(DocumentRegistry.CONTENT_RECONCILIATION_WINDOW_NANOS);
+        assertTrue(registry.poll().isEmpty());
+        assertNotNull(registry.get("beta"));
+
+        clock.addAndGet(TimeUnit.SECONDS.toNanos(3L));
+        DocumentDelta delta = registry.poll();
+
+        assertEquals(Set.of("beta"), Set.copyOf(delta.removed()));
+        assertTrue(registry.acknowledge(delta));
+        assertNull(registry.get("beta"));
+        assertEquals("one", registry.get("alpha").value());
     }
 
     @Test

@@ -232,8 +232,12 @@ public final class BehaviorService implements GlossService, Explainable {
     }
 
     private void rebuild() {
+        rebuild(registry.snapshot());
+    }
+
+    private void rebuild(Map<String, GlossDocument<BehaviorDoc>> loaded) {
         Map<String, BehaviorDoc> documents = new LinkedHashMap<>();
-        for (Map.Entry<String, GlossDocument<BehaviorDoc>> document : registry.snapshot().entrySet()) {
+        for (Map.Entry<String, GlossDocument<BehaviorDoc>> document : loaded.entrySet()) {
             documents.put(document.getKey(), document.getValue().value());
         }
         for (Map.Entry<String, Map<String, BehaviorDoc>> owner : derivedDocuments.entrySet()) {
@@ -286,10 +290,18 @@ public final class BehaviorService implements GlossService, Explainable {
         if (delta.isEmpty()) {
             return;
         }
-        if (!registry.dispatch(delta, task -> SchedulerUtils.runGlobal(plugin, task), this::rebuild)) {
+        if (!registry.dispatch(delta, task -> SchedulerUtils.runGlobal(plugin, task), hotload(delta))) {
             Gloss.warnThrottled("behavior-hotload-scheduling",
                 "Behavior hot reload could not reach the server thread; the change will be retried.");
         }
+    }
+
+    Runnable hotload(DocumentDelta delta) {
+        return () -> rebuild(registry.snapshot(delta));
+    }
+
+    DocumentRegistry<BehaviorDoc> registry() {
+        return registry;
     }
 
     private GlossConfig.Behaviors config() {

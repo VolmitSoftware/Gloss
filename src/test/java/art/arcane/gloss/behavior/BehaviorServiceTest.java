@@ -1,5 +1,9 @@
 package art.arcane.gloss.behavior;
 
+import art.arcane.gloss.Gloss;
+import art.arcane.gloss.doc.DocumentDelta;
+import art.arcane.gloss.doc.DocumentRegistry;
+import art.arcane.gloss.menu.CharacterizationSupport;
 import art.arcane.gloss.state.StateSchema;
 import art.arcane.gloss.state.StateScope;
 import art.arcane.gloss.state.StateStore;
@@ -12,6 +16,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -48,6 +53,33 @@ class BehaviorServiceTest {
     @AfterEach
     void cleanUp() {
         StateStores.install(null);
+    }
+
+    @Test
+    void aHotLoadedDocumentReachesSubscriptionsBeforeItCommits() throws Exception {
+        Gloss plugin = CharacterizationSupport.bareGloss(CharacterizationSupport.server(Map.of()));
+        CharacterizationSupport.setField(plugin, "dataFolder", folder.toFile());
+        BehaviorService service = new BehaviorService(plugin);
+        DocumentRegistry<BehaviorDoc> registry = service.registry();
+        try {
+            registry.reload();
+            Path file = folder.resolve("behaviors").resolve("greet.json");
+            Files.createDirectories(file.getParent());
+            Files.writeString(file, HEAD + "\"on\":[{\"trigger\":\"join\",\"do\":[" + ADD + "]}]}");
+
+            DocumentDelta delta = DocumentDelta.EMPTY;
+            for (int attempt = 0; attempt < 400 && delta.isEmpty(); attempt++) {
+                delta = registry.poll();
+                Thread.sleep(25L);
+            }
+            assertFalse(delta.isEmpty());
+
+            service.hotload(delta).run();
+
+            assertTrue(service.subscriptions().hasAny(BehaviorTrigger.JOIN));
+        } finally {
+            registry.close();
+        }
     }
 
     private static BehaviorDoc doc(String body) {
