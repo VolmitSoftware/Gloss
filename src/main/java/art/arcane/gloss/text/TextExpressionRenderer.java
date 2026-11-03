@@ -1,6 +1,7 @@
 package art.arcane.gloss.text;
 
 import art.arcane.gloss.Gloss;
+import art.arcane.gloss.condition.GlossConditionScope;
 import art.arcane.gloss.condition.RoleSnapshotPendingException;
 import art.arcane.gloss.expr.Expr;
 import art.arcane.gloss.expr.ExprEvaluator;
@@ -166,7 +167,9 @@ public final class TextExpressionRenderer {
 
     private static boolean dependsOnViewer(Expr expression) {
         if (expression instanceof Expr.Var variable) {
-            return variable.name().startsWith("player.");
+            String name = variable.name();
+            return name.startsWith("player.") || name.startsWith("viewer.")
+                || ExprVariableNamespaces.global().viewerDependent(name);
         }
         if (expression instanceof Expr.ListLiteral list) {
             return containsViewerDependency(list.items());
@@ -183,7 +186,7 @@ public final class TextExpressionRenderer {
                 || dependsOnViewer(ternary.ifFalse());
         }
         if (expression instanceof Expr.Call call) {
-            return call.name().equals("papi") || call.name().equals("papiNumber")
+            return !call.name().equals("metric") && !ExprFunctions.isBuiltIn(call.name())
                 || containsViewerDependency(call.args());
         }
         return false;
@@ -265,6 +268,9 @@ public final class TextExpressionRenderer {
                 case "player.level" -> viewer == null ? null : (double) viewer.getLevel();
                 case "player.bedrock" -> viewer == null ? null : BedrockService.isBedrockPlayer(viewer.getUniqueId());
                 default -> {
+                    if (viewer != null && plugin != null && (name.startsWith("viewer.") || name.startsWith("player."))) {
+                        yield GlossConditionScope.viewer(plugin, viewer).variable(name);
+                    }
                     Object namespaced = ExprVariableNamespaces.global().resolve(name, variableContext());
                     yield namespaced != null ? namespaced : metric(name);
                 }

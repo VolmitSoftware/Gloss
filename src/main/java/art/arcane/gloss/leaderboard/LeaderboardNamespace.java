@@ -28,6 +28,11 @@ public final class LeaderboardNamespace implements ExprVariableNamespace {
     }
 
     @Override
+    public boolean viewerDependent(String suffix) {
+        return suffix.contains('.' + ME + '.');
+    }
+
+    @Override
     public Object resolve(String suffix, ExprVariableContext context) {
         int firstDot = suffix.indexOf('.');
         if (firstDot <= 0) {

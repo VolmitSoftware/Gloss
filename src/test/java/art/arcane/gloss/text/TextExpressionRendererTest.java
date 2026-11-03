@@ -1,8 +1,10 @@
 package art.arcane.gloss.text;
 
+import art.arcane.gloss.Gloss;
 import org.junit.jupiter.api.Test;
 import org.bukkit.entity.Player;
 
+import java.lang.reflect.Field;
 import java.lang.reflect.Proxy;
 import java.util.List;
 
@@ -88,6 +90,28 @@ class TextExpressionRendererTest {
             assertFalse(rendered.contains("%"));
             assertFalse(rendered.contains("GlossONLINE"));
         }
+    }
+
+    @Test
+    void viewerRoleAndPlayerPropertiesResolveForTheViewer() throws Exception {
+        Gloss plugin = allocated();
+        Field text = Gloss.class.getDeclaredField("text");
+        text.setAccessible(true);
+        text.set(plugin, new TextPipeline(plugin));
+        TextExpressionRenderer rendered = new TextExpressionRenderer(plugin,
+            new TextExpressionRenderer.RuntimeValues(() -> 1, () -> 20, () -> 20.0D));
+        Player viewer = player("Ada", 42, 15.0D, 7);
+
+        assertEquals("7", rendered.render(viewer, "{{ viewer.level }}"));
+        assertEquals("15", rendered.render(viewer, "{{ viewer.health }}"));
+        assertEquals("0", rendered.render(viewer, "{{ player.food }}"));
+        assertEquals("", rendered.render(null, "{{ viewer.level }}"));
+    }
+
+    private static Gloss allocated() throws Exception {
+        Field unsafe = Class.forName("sun.misc.Unsafe").getDeclaredField("theUnsafe");
+        unsafe.setAccessible(true);
+        return (Gloss) unsafe.getType().getMethod("allocateInstance", Class.class).invoke(unsafe.get(null), Gloss.class);
     }
 
     private Player player(String name, int ping, double health, int level) {

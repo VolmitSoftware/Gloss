@@ -9,4 +9,8 @@ public interface ExprVariableNamespace {
     String prefix();
 
     Object resolve(String suffix, ExprVariableContext context);
+
+    default boolean viewerDependent(String suffix) {
+        return true;
+    }
 }

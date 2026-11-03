@@ -1,5 +1,9 @@
 package art.arcane.gloss.text;
 
+import art.arcane.gloss.expr.ExprVariableContext;
+import art.arcane.gloss.expr.ExprVariableNamespace;
+import art.arcane.gloss.expr.ExprVariableNamespaces;
+import art.arcane.gloss.leaderboard.LeaderboardNamespace;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -45,5 +49,42 @@ public class TextAnimationDemandTest {
         assertTrue(TextPipeline.viewerSpecific("|custom.player.function|"));
         assertTrue(TextPipeline.viewerSpecific("{{ player.name }}"));
         assertTrue(TextPipeline.viewerSpecific("{{ papi('vault_prefix', '') }}"));
+    }
+
+    @Test
+    public void viewerRolesAndRegisteredFunctionsRenderPerViewer() {
+        assertTrue(TextPipeline.viewerSpecific("{{ viewer.name }}"));
+        assertTrue(TextPipeline.viewerSpecific("{{ viewer.health > 5 ? 'ok' : 'low' }}"));
+        assertTrue(TextPipeline.viewerSpecific("{{ lang('showcase.title') }}"));
+        assertTrue(TextPipeline.viewerSpecific("{{ upper(str(lang('showcase.title'))) }}"));
+        assertFalse(TextPipeline.viewerSpecific("{{ subject.health }}"));
+        assertFalse(TextPipeline.viewerSpecific("{{ metric('react.tps', 0) }}"));
+    }
+
+    @Test
+    public void namespacesDecideWhichOfTheirVariablesRenderPerViewer() {
+        ExprVariableNamespaces namespaces = ExprVariableNamespaces.global();
+        namespaces.register(new ProbeNamespace());
+        namespaces.register(new LeaderboardNamespace(id -> null));
+        try {
+            assertTrue(TextPipeline.viewerSpecific("{{ probe.loaded }}"));
+            assertTrue(TextPipeline.viewerSpecific("{{ leaderboard.playtime.me.rank }}"));
+            assertFalse(TextPipeline.viewerSpecific("{{ leaderboard.playtime.size }}"));
+        } finally {
+            namespaces.unregister("probe");
+            namespaces.unregister(LeaderboardNamespace.PREFIX);
+        }
+    }
+
+    private static final class ProbeNamespace implements ExprVariableNamespace {
+        @Override
+        public String prefix() {
+            return "probe";
+        }
+
+        @Override
+        public Object resolve(String suffix, ExprVariableContext context) {
+            return null;
+        }
     }
 }

@@ -66,6 +66,15 @@ public final class ExprVariableNamespaces {
         return namespace.resolve(dottedName.substring(dot + 1), context == null ? ExprVariableContext.empty() : context);
     }
 
+    public boolean viewerDependent(String dottedName) {
+        int dot = dottedName.indexOf('.');
+        if (dot <= 0) {
+            return false;
+        }
+        ExprVariableNamespace namespace = namespaces.get(dottedName.substring(0, dot));
+        return namespace != null && namespace.viewerDependent(dottedName.substring(dot + 1));
+    }
+
     public void clear() {
         namespaces.clear();
     }
