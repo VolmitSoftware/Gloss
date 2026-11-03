@@ -42,6 +42,19 @@ public class MenuIconGeometryTest {
     assertEquals(-0.05F, BlockMenuIcon.VERTICAL_OFFSET, 0F);
   }
 
+  @Test
+  public void itemsDrawOnTheirCollisionPlaneCenter() {
+    assertEquals(BlockMenuIcon.VERTICAL_OFFSET, ItemMenuIcon.itemOffset(1).getY(), 0.000001D);
+    assertEquals(0D, ItemMenuIcon.itemOffset(1).getZ(), 0D);
+    assertEquals(BlockMenuIcon.VERTICAL_OFFSET, ItemMenuIcon.blockOffset().getY(), 0.000001D);
+  }
+
+  @Test
+  public void aStackLiftsAFlatItemAndABlockSitsForward() {
+    assertEquals(BlockMenuIcon.VERTICAL_OFFSET + ItemMenuIcon.COUNT_LIFT, ItemMenuIcon.itemOffset(2).getY(), 0.000001D);
+    assertEquals(ItemMenuIcon.BLOCK_DEPTH, ItemMenuIcon.blockOffset().getZ(), 0.000001D);
+  }
+
   private static MenuTransform transform(float scale) {
     return new MenuTransform(new Location(null, 0D, 0D, 0D), new Vector(), 0F, 0F, 0F, scale);
   }

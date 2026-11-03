@@ -26,8 +26,8 @@ import java.util.UUID;
 
 public class ItemMenuIcon extends MenuIcon<MenuIconData> {
 
-  private static final float ITEM_OFFSET = 1F;
-  private static final float BLOCK_OFFSET = -.95F;
+  static final float BLOCK_DEPTH = .3F;
+  static final float COUNT_LIFT = .09F;
   private static final Material GRASS = grassMaterial();
   private static final List<Material> BLOCK_BLACKLIST = blacklist(
       Material.BARRIER, Material.LIGHT, Material.HOPPER, Material.TURTLE_EGG, GRASS, Material.TALL_GRASS,
@@ -101,7 +101,7 @@ public class ItemMenuIcon extends MenuIcon<MenuIconData> {
 
   public CollisionPlane createBoundingBox(Location anchor) {
     float scale = uiScale();
-    Vector center = session.getTransform().localPosition(anchor, new Vector(0F, -0.05F, 0F)).toVector();
+    Vector center = session.getTransform().localPosition(anchor, new Vector(0F, BlockMenuIcon.VERTICAL_OFFSET, 0F)).toVector();
     return session.getTransform().createPlane(
         center,
         .75F * scale * style.scaleX(),
@@ -112,13 +112,12 @@ public class ItemMenuIcon extends MenuIcon<MenuIconData> {
   protected List<UUID> createDisplayEntities(Location loc) {
     appliedBlockTransform = null;
     List<UUID> uuids = Lists.newArrayList();
-    float countOffset = item.getAmount() > 1 ? 0F : .09F;
     MenuTransform transform = session.getTransform();
     Location location;
     if (isBlock()) {
       location = blockLocation(transform);
     } else {
-      location = transform.localPosition(loc, new Vector(0F, -(ITEM_OFFSET + countOffset), 0F));
+      location = transform.localPosition(position, itemOffset(item.getAmount()));
     }
     uuids.add(DisplayEntityManager.add(session.displayGroup(), itemDisplay(item, location)));
     if (item.getAmount() > 1) {
@@ -136,9 +135,9 @@ public class ItemMenuIcon extends MenuIcon<MenuIconData> {
   /**
    * Swaps the rendered stack without respawning the display, so an icon whose item is only known
    * later — a player head waiting on a profile lookup — resolves in place. Crossing the
-   * item/block boundary is the one case that cannot be done in place: the two use different
-   * vertical offsets ({@link #ITEM_OFFSET} against {@link #BLOCK_OFFSET}), so the display is
-   * rebuilt rather than left hanging at the wrong height.
+   * item/block boundary is the one case that cannot be done in place: a block sits
+   * {@link #BLOCK_DEPTH} forward and ignores {@link #COUNT_LIFT}, so the display is rebuilt rather
+   * than left at the wrong position.
    */
   protected void replaceItem(ItemStack replacement) {
     if (replacement == null) {
@@ -165,13 +164,13 @@ public class ItemMenuIcon extends MenuIcon<MenuIconData> {
     // re-asserted even though applyOrientation's inputs are unchanged.
     appliedBlockTransform = null;
     if (displayEntities.size() == 1 && count > 1) {
-      DisplayEntityManager.move(displayEntities.get(0), session.getTransform().localVector(new Vector(0F, .09F, 0F)));
+      DisplayEntityManager.move(displayEntities.get(0), session.getTransform().localVector(new Vector(0F, COUNT_LIFT, 0F)));
       UUID displayEntity = DisplayEntityManager.add(session.displayGroup(), textDisplay(countText(count), countLocation()));
       displayEntities.add(displayEntity);
       applyOrientation();
       DisplayEntityManager.spawn(displayEntity, session.getPlayer());
     } else if (displayEntities.size() == 2 && count < 2) {
-      DisplayEntityManager.move(displayEntities.get(0), session.getTransform().localVector(new Vector(0F, -.09F, 0F)));
+      DisplayEntityManager.move(displayEntities.get(0), session.getTransform().localVector(new Vector(0F, -COUNT_LIFT, 0F)));
       DisplayEntityManager.delete(displayEntities.get(1), session.getPlayer());
       displayEntities.remove(1);
     } else {
@@ -219,7 +218,15 @@ public class ItemMenuIcon extends MenuIcon<MenuIconData> {
   }
 
   private Location blockLocation(MenuTransform transform) {
-    return transform.localPosition(position, new Vector(0F, BLOCK_OFFSET, .3F));
+    return transform.localPosition(position, blockOffset());
+  }
+
+  static Vector itemOffset(int amount) {
+    return new Vector(0F, BlockMenuIcon.VERTICAL_OFFSET + (amount > 1 ? COUNT_LIFT : 0F), 0F);
+  }
+
+  static Vector blockOffset() {
+    return new Vector(0F, BlockMenuIcon.VERTICAL_OFFSET, BLOCK_DEPTH);
   }
 
   private Component countText(int count) {
