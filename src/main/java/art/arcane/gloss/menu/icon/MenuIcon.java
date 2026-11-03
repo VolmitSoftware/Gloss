@@ -102,6 +102,11 @@ public abstract class MenuIcon<D extends MenuIconData> {
 
   public abstract CollisionPlane createBoundingBox(Location anchor);
 
+  /** How far this icon's drawn frame reaches past its bounding box, in blocks. */
+  public double frameMargin() {
+    return 0D;
+  }
+
   public void orientHitbox(CollisionPlane plane, Vector viewerPosition) {
     orientBillboardPlane(plane, style.billboard(), viewerPosition);
   }

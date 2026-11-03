@@ -148,6 +148,15 @@ public class TextMenuIcon extends MenuIcon<TextIconData> {
   }
 
   @Override
+  public double frameMargin() {
+    return boxMargin(data.box(), uiScale() * style.scaleY());
+  }
+
+  static double boxMargin(HologramBox box, float scale) {
+    return box.enabled() ? (box.padding() + box.borderWidth()) * 0.025F * scale : 0D;
+  }
+
+  @Override
   public CollisionPlane createBoundingBox(Location anchor) {
     float lineHeight = scaledLineHeight();
     float characterWidth = scaledCharacterWidth();

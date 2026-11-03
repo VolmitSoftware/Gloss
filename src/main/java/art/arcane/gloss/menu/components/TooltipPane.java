@@ -67,7 +67,7 @@ public final class TooltipPane {
         }
         if (owner.currentIcon != null) {
             icon.move(aboveIcon(owner.currentIcon.createBoundingBox(anchor), icon.createBoundingBox(at),
-                ICON_GAP * session.getTransform().scale()));
+                ICON_GAP * session.getTransform().scale() + owner.currentIcon.frameMargin() + icon.frameMargin()));
         }
         icon.spawn();
     }

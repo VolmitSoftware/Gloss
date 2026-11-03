@@ -1,6 +1,7 @@
 package art.arcane.gloss.menu.icon;
 
 import java.util.Map;
+import art.arcane.gloss.api.HologramBox;
 import art.arcane.gloss.condition.ShowCondition;
 import art.arcane.gloss.config.MenuDefinitionData;
 import art.arcane.gloss.config.icon.TextIconData;
@@ -48,6 +49,16 @@ class TextMenuIconRefreshTest {
         TextMenuIcon icon = icon(10);
         assertTrue(icon.matchesAppearance(null, null, 10));
         assertFalse(icon.matchesAppearance(null, null, null));
+    }
+
+    @Test
+    void aBoxReachesPastTheTextByItsPaddingAndBorder() {
+        assertEquals(0.25D, TextMenuIcon.boxMargin(new HologramBox(true, 4, 1, null, null), 2F), 0.000001D);
+    }
+
+    @Test
+    void aDisabledBoxAddsNoMargin() {
+        assertEquals(0D, TextMenuIcon.boxMargin(new HologramBox(false, 4, 1, null, null), 2F), 0.000001D);
     }
 
     private static TextMenuIcon icon(Integer refreshTicks) throws MenuIconException {
