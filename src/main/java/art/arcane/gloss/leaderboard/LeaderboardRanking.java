@@ -17,15 +17,20 @@ public final class LeaderboardRanking {
     private LeaderboardRanking() {
     }
 
-    /** The top {@code size} entries by period value, ties broken on name so the order is stable. */
+    /** The top {@code size} entries by ranked value, ties broken on name so the order is stable. */
     public static List<LeaderboardSnapshot.Entry> rank(LeaderboardSnapshot snapshot, int size,
-                                                       LeaderboardDoc.Order order) {
+                                                       LeaderboardDoc.Order order, LeaderboardDoc.Reset reset) {
         Comparator<LeaderboardSnapshot.Entry> byValue = Comparator
-            .comparingDouble(LeaderboardSnapshot.Entry::period);
+            .comparingDouble(entry -> value(entry, reset));
         List<LeaderboardSnapshot.Entry> ranked = new ArrayList<>(snapshot.entries());
         ranked.sort((order == LeaderboardDoc.Order.ASC ? byValue : byValue.reversed())
             .thenComparing(LeaderboardSnapshot.Entry::name));
         return List.copyOf(ranked.subList(0, Math.min(size, ranked.size())));
+    }
+
+    /** A board that never resets ranks the running total; every other board ranks the gain this period. */
+    public static double value(LeaderboardSnapshot.Entry entry, LeaderboardDoc.Reset reset) {
+        return reset == LeaderboardDoc.Reset.NEVER ? entry.allTime() : entry.period();
     }
 
     /** The same snapshot when the period still holds, otherwise one with its buckets reset. */

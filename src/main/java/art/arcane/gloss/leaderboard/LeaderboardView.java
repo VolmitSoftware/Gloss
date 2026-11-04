@@ -31,13 +31,14 @@ public record LeaderboardView(String id, int size, long resetAt, List<Row> rows)
     public static LeaderboardView of(String id, LeaderboardDoc doc, int size, LeaderboardSnapshot snapshot,
                                      long nowMs, Collection<UUID> online, RowFormatter formatter) {
         LeaderboardSnapshot visible = doc.includeOffline() ? snapshot : onlyOnline(snapshot, online);
-        List<LeaderboardSnapshot.Entry> ranked = LeaderboardRanking.rank(visible, size, doc.order());
+        List<LeaderboardSnapshot.Entry> ranked = LeaderboardRanking.rank(visible, size, doc.order(), doc.reset());
         List<Row> rows = new ArrayList<>(ranked.size());
         for (LeaderboardSnapshot.Entry entry : ranked) {
+            double value = LeaderboardRanking.value(entry, doc.reset());
             rows.add(new Row(entry.uuid(),
-                formatter.format(doc.format().name(), entry.name(), entry.period()),
-                entry.period(),
-                formatter.format(doc.format().value(), entry.name(), entry.period())));
+                formatter.format(doc.format().name(), entry.name(), value),
+                value,
+                formatter.format(doc.format().value(), entry.name(), value)));
         }
         return new LeaderboardView(id, rows.size(), LeaderboardRanking.nextReset(doc.reset(), nowMs), rows);
     }

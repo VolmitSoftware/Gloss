@@ -22,7 +22,7 @@ class LeaderboardRankingTest {
         LeaderboardSnapshot snapshot = snapshot(
             entry(ALPHA, "Alpha", 10.0D), entry(BRAVO, "Bravo", 30.0D), entry(CHARLIE, "Charlie", 20.0D));
 
-        List<LeaderboardSnapshot.Entry> ranked = LeaderboardRanking.rank(snapshot, 2, LeaderboardDoc.Order.DESC);
+        List<LeaderboardSnapshot.Entry> ranked = LeaderboardRanking.rank(snapshot, 2, LeaderboardDoc.Order.DESC, LeaderboardDoc.Reset.HOURLY);
 
         assertEquals(List.of("Bravo", "Charlie"), names(ranked));
     }
@@ -33,7 +33,7 @@ class LeaderboardRankingTest {
             entry(ALPHA, "Alpha", 10.0D), entry(BRAVO, "Bravo", 30.0D), entry(CHARLIE, "Charlie", 20.0D));
 
         assertEquals(List.of("Alpha", "Charlie", "Bravo"),
-            names(LeaderboardRanking.rank(snapshot, 10, LeaderboardDoc.Order.ASC)));
+            names(LeaderboardRanking.rank(snapshot, 10, LeaderboardDoc.Order.ASC, LeaderboardDoc.Reset.HOURLY)));
     }
 
     @Test
@@ -42,7 +42,7 @@ class LeaderboardRankingTest {
             entry(CHARLIE, "Charlie", 10.0D), entry(ALPHA, "Alpha", 10.0D), entry(BRAVO, "Bravo", 10.0D));
 
         assertEquals(List.of("Alpha", "Bravo", "Charlie"),
-            names(LeaderboardRanking.rank(snapshot, 10, LeaderboardDoc.Order.DESC)));
+            names(LeaderboardRanking.rank(snapshot, 10, LeaderboardDoc.Order.DESC, LeaderboardDoc.Reset.HOURLY)));
     }
 
     @Test

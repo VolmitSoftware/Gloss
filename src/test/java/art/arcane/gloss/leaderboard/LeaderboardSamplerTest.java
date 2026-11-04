@@ -107,6 +107,24 @@ class LeaderboardSamplerTest {
     }
 
     @Test
+    void aBoardThatNeverResetsRanksAndShowsTheFullTotalFromTheFirstSample() {
+        LeaderboardDoc doc = LeaderboardDoc.parse("playtime.json",
+            "{\"schemaVersion\":1,\"revision\":1,\"source\":{\"type\":\"papi\",\"placeholder\":\"x\"},"
+                + "\"reset\":\"never\",\"format\":{\"value\":\"V:{{ value }}\"}}");
+        LeaderboardSnapshot snapshot = LeaderboardSnapshot.empty("playtime")
+            .sampled(ALPHA, "Alpha", 40.0D, 0L)
+            .sampled(BRAVO, "Bravo", 30.0D, 0L);
+
+        LeaderboardView view = LeaderboardView.of("playtime", doc, doc.size(), snapshot, 0L, List.of(),
+            LeaderboardSamplerTest::format);
+
+        assertEquals("Alpha", view.row(1).name());
+        assertEquals(40.0D, view.row(1).value());
+        assertEquals("V:40.0", view.row(1).formatted());
+        assertEquals(30.0D, view.row(2).value());
+    }
+
+    @Test
     void theServerWideCapLimitsTheRowsBelowTheDocumentSize() {
         LeaderboardDoc doc = LeaderboardDoc.parse("playtime.json",
             "{\"schemaVersion\":1,\"revision\":1,\"source\":{\"type\":\"papi\",\"placeholder\":\"x\"},"
