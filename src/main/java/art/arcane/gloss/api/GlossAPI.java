@@ -67,6 +67,8 @@ public interface GlossAPI {
 
     void clearBoard(Player player);
 
+    void releaseBoard(Player player);
+
     void setTab(Player player, String header, String footer);
 
     void resetTab(Player player);

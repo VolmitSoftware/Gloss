@@ -170,6 +170,11 @@ public final class GlossAPIImpl implements GlossAPI {
     }
 
     @Override
+    public void releaseBoard(Player player) {
+        plugin.boards().releaseBoard(player);
+    }
+
+    @Override
     public void setTab(Player player, String header, String footer) {
         plugin.tablist().setTab(player, header, footer);
     }

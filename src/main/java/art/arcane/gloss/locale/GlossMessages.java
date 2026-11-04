@@ -82,6 +82,7 @@ public final class GlossMessages {
     public static final TextKey HELP_BOARD_SHOW = text("command.help.board.show", "Show a scoreboard to yourself");
     public static final TextKey HELP_BOARD_SHOW_ID = text("command.help.board.show.id", "Board id");
     public static final TextKey HELP_BOARD_HIDE = text("command.help.board.hide", "Hide your scoreboard");
+    public static final TextKey HELP_BOARD_AUTO = text("command.help.board.auto", "Return to automatic scoreboard selection");
     public static final TextKey HELP_BOARD_SELECT = text("command.help.board.select", "Set automatic scoreboard selection");
     public static final TextKey HELP_BOARD_SELECT_ID = text("command.help.board.select.id", "Board id");
     public static final TextKey HELP_BOARD_SELECT_PRIORITY = text("command.help.board.select.priority", "Selection priority");
@@ -270,6 +271,7 @@ public final class GlossMessages {
     public static final TextKey BOARD_LINE_OUT_OF_RANGE = text("command.board.line_out_of_range", PREFIX + "&cLine {line} is out of range; &f{id}&c has {count} lines.");
     public static final TextKey BOARD_SHOWN = text("command.board.shown", PREFIX + "&aShowing board &f{id}&a.");
     public static final TextKey BOARD_HIDDEN = text("command.board.hidden", PREFIX + "&aYour scoreboard is hidden.");
+    public static final TextKey BOARD_AUTOMATIC = text("command.board.automatic", PREFIX + "&aYour scoreboard follows automatic selection.");
     public static final TextKey BOARD_SELECT_SET = text("command.board.select_set", PREFIX + "&aBoard &f{id}&a selection priority set to &f{priority}&a.");
     public static final TextKey BOARD_SELECT_INVALID = text("command.board.select_invalid", PREFIX + "&cInvalid board condition: &f{error}&c.");
     public static final TextKey BOARD_LIST_EMPTY = text("command.board.list_empty", PREFIX + "&7No boards exist yet.");

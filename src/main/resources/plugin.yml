@@ -150,6 +150,7 @@ permissions:
       gloss.boards.delete: true
       gloss.boards.show: true
       gloss.boards.hide: true
+      gloss.boards.auto: true
   gloss.boards.create:
     description: Allows creating scoreboards.
     default: op
@@ -164,6 +165,9 @@ permissions:
     default: op
   gloss.boards.hide:
     description: Allows hiding your scoreboard.
+    default: op
+  gloss.boards.auto:
+    description: Allows returning your scoreboard to automatic selection.
     default: op
   gloss.menus:
     description: Gives access to all Gloss hologram-menu permissions.

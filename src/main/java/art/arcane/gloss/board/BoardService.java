@@ -323,6 +323,12 @@ public final class BoardService implements Listener, Explainable, RegistryOwner 
         syncManager(player);
     }
 
+    /** Drops a {@link #setBoard} or {@link #clearBoard} pin so the player follows automatic selection again. */
+    public void releaseBoard(Player player) {
+        sticky.remove(player.getUniqueId());
+        selectAutomatically(player);
+    }
+
     public void refreshProxyOwnership(Player player) {
         Runnable refresh = () -> {
             if (!player.isOnline() || suppressForProxy(player)) {

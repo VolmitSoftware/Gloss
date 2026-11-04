@@ -166,6 +166,16 @@ public class CommandGlossBoard {
         GlossCommandMessages.send(player, GlossMessages.BOARD_HIDDEN);
     }
 
+    @Director(name = "auto", sync = true, origin = DirectorOrigin.PLAYER, descriptionKey = "command.help.board.auto", description = "Return to automatic scoreboard selection")
+    public void auto(@Param(name = "player", contextual = true) Player player) {
+        if (GlossCommandMessages.denied(player, "gloss.boards.auto")) {
+            return;
+        }
+
+        plugin.boards().releaseBoard(player);
+        GlossCommandMessages.send(player, GlossMessages.BOARD_AUTOMATIC);
+    }
+
     @Director(name = "select", sync = true, descriptionKey = "command.help.board.select", description = "Set automatic scoreboard selection")
     public void select(@Param(name = "sender", contextual = true) CommandSender sender,
                        @Param(name = "id", descriptionKey = "command.help.board.select.id", description = "Board id") String id,

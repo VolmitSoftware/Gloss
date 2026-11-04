@@ -46,6 +46,7 @@ class GlossCommandTreeTest {
             List.of("board", "removeline"),
             List.of("board", "show"),
             List.of("board", "hide"),
+            List.of("board", "auto"),
             List.of("board", "select"),
             List.of("board", "list"),
             List.of("board", "info"),
