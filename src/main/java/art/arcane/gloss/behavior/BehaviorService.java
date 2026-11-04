@@ -9,6 +9,9 @@ import art.arcane.gloss.doc.DocumentRegistry;
 import art.arcane.gloss.doc.GlossDocument;
 import art.arcane.gloss.doc.ShippedDefaults;
 import art.arcane.gloss.doc.ShippedDocumentCatalog;
+import art.arcane.gloss.menu.MenuSessionManager;
+import art.arcane.gloss.menu.action.NavigationRequest;
+import art.arcane.gloss.menu.action.NavigationResult;
 import art.arcane.gloss.service.GlossService;
 import art.arcane.gloss.state.StateStore;
 import art.arcane.volmlib.util.scheduling.FoliaScheduler;
@@ -52,7 +55,7 @@ public final class BehaviorService implements GlossService, Explainable {
         File folder = new File(plugin.getDataFolder(), BehaviorDoc.KIND);
         this.defaults = new ShippedDefaults(BehaviorDoc.KIND, folder, ShippedDocumentCatalog.BEHAVIORS_ENTRY.names());
         this.registry = DocumentRegistry.folder(BehaviorDoc.KIND, folder, BehaviorDoc::parse, BehaviorDoc::revision);
-        this.contexts = (runtime, entry, event) -> new BehaviorActionContext(plugin, runtime, entry, event);
+        this.contexts = (runtime, entry, event) -> new BehaviorActionContext(plugin, runtime, entry, event, this::navigate);
         this.intervals = new IntervalScheduler(Bukkit::getOnlinePlayers, this::dispatchToPlayer, this::runEntry);
         this.regions = new RegionTracker(ConditionWorldGuard::regionsAt, this::fire);
         this.triggers = new BehaviorTriggers(plugin, this);
@@ -225,6 +228,11 @@ public final class BehaviorService implements GlossService, Explainable {
 
     void forgetRegions(UUID player) {
         regions.forget(player);
+    }
+
+    private NavigationResult navigate(Player viewer, NavigationRequest request) {
+        MenuSessionManager sessions = plugin.getSessionManager();
+        return sessions == null ? NavigationResult.DENIED : sessions.navigateSession(viewer, request);
     }
 
     private void runEntry(BehaviorSubscriptions.Subscription subscription, TriggerEvent event) {

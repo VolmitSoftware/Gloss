@@ -13,6 +13,7 @@ import org.bukkit.entity.Player;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.BiFunction;
 
 /**
  * The action context of one entry firing: the trigger's roles become the condition scope's
@@ -24,14 +25,16 @@ public final class BehaviorActionContext implements ActionContext, ArgsView.Sour
     private final BehaviorRuntime runtime;
     private final BehaviorRuntime.CompiledEntry entry;
     private final TriggerEvent event;
+    private final BiFunction<Player, NavigationRequest, NavigationResult> navigator;
     private ExprScope scope;
 
     public BehaviorActionContext(Gloss plugin, BehaviorRuntime runtime, BehaviorRuntime.CompiledEntry entry,
-                                 TriggerEvent event) {
+                                 TriggerEvent event, BiFunction<Player, NavigationRequest, NavigationResult> navigator) {
         this.plugin = Objects.requireNonNull(plugin, "plugin");
         this.runtime = Objects.requireNonNull(runtime, "runtime");
         this.entry = Objects.requireNonNull(entry, "entry");
         this.event = Objects.requireNonNull(event, "event");
+        this.navigator = Objects.requireNonNull(navigator, "navigator");
     }
 
     @Override
@@ -56,7 +59,8 @@ public final class BehaviorActionContext implements ActionContext, ArgsView.Sour
 
     @Override
     public NavigationResult navigate(NavigationRequest request) {
-        return NavigationResult.DENIED;
+        Player viewer = event.viewer();
+        return viewer == null ? NavigationResult.DENIED : navigator.apply(viewer, request);
     }
 
     @Override
