@@ -79,7 +79,7 @@ class LeaderboardSamplerTest {
             .sampled(ALPHA, "Alpha", 0.0D, 0L).sampled(ALPHA, "Alpha", 10.0D, 0L)
             .sampled(BRAVO, "Bravo", 0.0D, 0L).sampled(BRAVO, "Bravo", 30.0D, 0L);
 
-        LeaderboardView view = LeaderboardView.of("playtime", doc, snapshot, 0L, List.of(),
+        LeaderboardView view = LeaderboardView.of("playtime", doc, doc.size(), snapshot, 0L, List.of(),
             LeaderboardSamplerTest::format);
 
         assertEquals(2, view.size());
@@ -98,12 +98,29 @@ class LeaderboardSamplerTest {
             .sampled(ALPHA, "Alpha", 0.0D, 0L).sampled(ALPHA, "Alpha", 10.0D, 0L)
             .sampled(BRAVO, "Bravo", 0.0D, 0L).sampled(BRAVO, "Bravo", 30.0D, 0L);
 
-        LeaderboardView view = LeaderboardView.of("playtime", doc, snapshot, 0L, List.of(ALPHA),
+        LeaderboardView view = LeaderboardView.of("playtime", doc, doc.size(), snapshot, 0L, List.of(ALPHA),
             LeaderboardSamplerTest::format);
 
         assertEquals(1, view.rows().size());
         assertEquals("Alpha", view.row(1).name());
         assertEquals(0, view.rankOf(BRAVO));
+    }
+
+    @Test
+    void theServerWideCapLimitsTheRowsBelowTheDocumentSize() {
+        LeaderboardDoc doc = LeaderboardDoc.parse("playtime.json",
+            "{\"schemaVersion\":1,\"revision\":1,\"source\":{\"type\":\"papi\",\"placeholder\":\"x\"},"
+                + "\"size\":10,\"reset\":\"hourly\"}");
+        LeaderboardSnapshot snapshot = LeaderboardSnapshot.empty("playtime")
+            .sampled(ALPHA, "Alpha", 0.0D, 0L).sampled(ALPHA, "Alpha", 10.0D, 0L)
+            .sampled(BRAVO, "Bravo", 0.0D, 0L).sampled(BRAVO, "Bravo", 30.0D, 0L);
+
+        LeaderboardView view = LeaderboardView.of("playtime", doc, 1, snapshot, 0L, List.of(),
+            LeaderboardSamplerTest::format);
+
+        assertEquals(1, view.size());
+        assertEquals("Bravo", view.row(1).name());
+        assertEquals(null, view.row(2));
     }
 
     @Test

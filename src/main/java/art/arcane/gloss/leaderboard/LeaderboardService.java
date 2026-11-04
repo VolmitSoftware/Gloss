@@ -272,7 +272,7 @@ public final class LeaderboardService implements GlossService {
         Map<String, LeaderboardView> next = new LinkedHashMap<>(boards.size());
         for (Loaded loaded : boards.values()) {
             LeaderboardSnapshot snapshot = snapshots.computeIfAbsent(loaded.id(), store::load);
-            next.put(loaded.id(), LeaderboardView.of(loaded.id(), loaded.doc(), snapshot, now, online,
+            next.put(loaded.id(), LeaderboardView.of(loaded.id(), loaded.doc(), loaded.size(), snapshot, now, online,
                 this::render));
         }
         views = Map.copyOf(next);

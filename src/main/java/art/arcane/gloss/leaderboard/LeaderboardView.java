@@ -28,10 +28,10 @@ public record LeaderboardView(String id, int size, long resetAt, List<Row> rows)
         return new LeaderboardView(id, 0, 0L, List.of());
     }
 
-    public static LeaderboardView of(String id, LeaderboardDoc doc, LeaderboardSnapshot snapshot,
+    public static LeaderboardView of(String id, LeaderboardDoc doc, int size, LeaderboardSnapshot snapshot,
                                      long nowMs, Collection<UUID> online, RowFormatter formatter) {
         LeaderboardSnapshot visible = doc.includeOffline() ? snapshot : onlyOnline(snapshot, online);
-        List<LeaderboardSnapshot.Entry> ranked = LeaderboardRanking.rank(visible, doc.size(), doc.order());
+        List<LeaderboardSnapshot.Entry> ranked = LeaderboardRanking.rank(visible, size, doc.order());
         List<Row> rows = new ArrayList<>(ranked.size());
         for (LeaderboardSnapshot.Entry entry : ranked) {
             rows.add(new Row(entry.uuid(),
