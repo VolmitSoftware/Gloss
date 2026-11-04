@@ -6,6 +6,7 @@ import art.arcane.gloss.leaderboard.LeaderboardService;
 import art.arcane.gloss.leaderboard.LeaderboardView;
 import art.arcane.gloss.locale.GlossLocalization;
 import art.arcane.gloss.locale.GlossMessages;
+import art.arcane.gloss.util.common.TextUtils;
 import art.arcane.volmlib.util.collection.KList;
 import art.arcane.volmlib.util.director.DirectorParameterHandler;
 import art.arcane.volmlib.util.director.annotations.Director;
@@ -81,13 +82,12 @@ public class CommandGlossLeaderboard {
         DirectorMiniMenu.Theme theme = GlossCommandService.menuTheme();
         List<String> lines = new ArrayList<>();
         lines.add(DirectorMiniMenu.banner(id, theme));
-        lines.add("&7source &f" + doc.source().type().name().toLowerCase(Locale.ROOT)
+        lines.add(TextUtils.toMiniMessage("&7source &f" + doc.source().type().name().toLowerCase(Locale.ROOT)
             + " &7order &f" + doc.order().name().toLowerCase(Locale.ROOT)
-            + " &7reset &f" + doc.reset().name().toLowerCase(Locale.ROOT));
+            + " &7reset &f" + doc.reset().name().toLowerCase(Locale.ROOT)));
         if (view != null) {
             for (int rank = 1; rank <= view.size(); rank++) {
-                LeaderboardView.Row row = view.row(rank);
-                lines.add("&7" + rank + ". &f" + row.name() + " &7" + row.formatted());
+                lines.add(rowLine(rank, view.row(rank)));
             }
         }
         lines.add(DirectorMiniMenu.bar(theme));
@@ -135,6 +135,10 @@ public class CommandGlossLeaderboard {
         }
         GlossLocalization.sendGlobal(sender, GlossMessages.LEADERBOARD_SAMPLED,
             GlossLocalization.args(MessageArgument.untrusted("id", id)));
+    }
+
+    static String rowLine(int rank, LeaderboardView.Row row) {
+        return TextUtils.toMiniMessage("&7" + rank + ". &f" + row.name() + " &7" + row.formatted());
     }
 
     public static final class LeaderboardIdHandler implements DirectorParameterHandler<String> {
