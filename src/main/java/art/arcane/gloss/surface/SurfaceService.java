@@ -2,7 +2,6 @@ package art.arcane.gloss.surface;
 
 import art.arcane.gloss.Gloss;
 import art.arcane.gloss.GlossConfig;
-import art.arcane.gloss.bedrock.BedrockService;
 import art.arcane.gloss.behavior.BehaviorDoc;
 import art.arcane.gloss.behavior.BehaviorEntry;
 import art.arcane.gloss.behavior.BehaviorService;
@@ -10,7 +9,6 @@ import art.arcane.gloss.behavior.BehaviorTrigger;
 import art.arcane.gloss.config.action.DelayActionData;
 import art.arcane.gloss.config.action.MenuActionData;
 import art.arcane.gloss.config.action.SurfaceActionData;
-import art.arcane.gloss.camera.TitleProvider;
 import art.arcane.gloss.condition.BoundedConditionErrorCallback;
 import art.arcane.gloss.condition.GlossConditionScope;
 import art.arcane.gloss.doc.DocumentDelta;
@@ -45,7 +43,7 @@ import java.util.logging.Level;
  * Owns {@code surfaces/} documents and the striped driver that keeps every viewer's action bar,
  * boss bar and title in sync with them.
  */
-public final class SurfaceService implements GlossService, Listener, TitleProvider {
+public final class SurfaceService implements GlossService, Listener {
     private static final int STRIPE_PERIOD_TICKS = 1;
     private static final long BOSS_BAR_SWEEP_TICKS = 40L;
 
@@ -163,22 +161,6 @@ public final class SurfaceService implements GlossService, Listener, TitleProvid
 
     public SurfaceDelivery delivery() {
         return delivery;
-    }
-
-    /**
-     * The camera lane's letterbox seam: the bars ride the title slot through the same compositor
-     * every other surface uses, so a scene's own title cue takes the slot from them.
-     */
-    @Override
-    public void letterbox(Player viewer, boolean visible) {
-        if (viewer == null) {
-            return;
-        }
-        BedrockService bedrock = plugin.bedrock();
-        if (bedrock != null && bedrock.isBedrock(viewer)) {
-            return;
-        }
-        SurfaceLetterbox.apply(delivery, viewer, visible, plugin.cfg().modules().camera().maxRideSeconds());
     }
 
     public List<String> resetToDefault(String nameOrStar) {

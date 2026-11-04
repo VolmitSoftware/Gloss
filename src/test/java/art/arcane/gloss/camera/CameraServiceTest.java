@@ -23,6 +23,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.ArrayDeque;
 import java.util.Queue;
@@ -139,7 +140,20 @@ class CameraServiceTest {
         CharacterizationSupport.setField(plugin, "laneServices", List.of());
         previousPlugin = CharacterizationSupport.installGloss(plugin);
         sections = new PlayerSections(dataFolder);
-        camera = new CameraService(new CameraService.Dependencies(plugin, sections, transport));
+        camera = new CameraService(new CameraService.Dependencies(plugin, sections, transport, (viewer, carrier) -> {
+            calls.add("letterbox:show");
+            return new CameraService.Letterbox() {
+                @Override
+                public void refresh() {
+                    calls.add("letterbox:refresh");
+                }
+
+                @Override
+                public void remove() {
+                    calls.add("letterbox:remove");
+                }
+            };
+        }));
     }
 
     @AfterEach
@@ -155,6 +169,46 @@ class CameraServiceTest {
         Assertions.assertTrue(calls.contains("setGameMode:SPECTATOR"), calls.toString());
         Assertions.assertTrue(calls.contains("setSpectatorTarget:carrier"), calls.toString());
         Assertions.assertTrue(camera.riding(RIDER));
+    }
+
+    @Test
+    void aLetterboxRideShowsTheBarsOnTheCarrierAndRemovesThemWhenItEnds() {
+        camera.ride(rider, PATH, new CameraService.Options(true, true));
+
+        Assertions.assertEquals(1, Collections.frequency(calls, "letterbox:show"), calls.toString());
+        Assertions.assertFalse(calls.contains("letterbox:remove"), calls.toString());
+
+        camera.stop(rider, CameraService.EndReason.SKIP);
+
+        Assertions.assertEquals(1, Collections.frequency(calls, "letterbox:remove"), calls.toString());
+    }
+
+    @Test
+    void aRideWithoutALetterboxDrawsNoBars() {
+        camera.ride(rider, PATH, options(true));
+        camera.stop(rider, CameraService.EndReason.SKIP);
+
+        Assertions.assertFalse(calls.contains("letterbox:show"), calls.toString());
+        Assertions.assertFalse(calls.contains("letterbox:remove"), calls.toString());
+    }
+
+    @Test
+    void theBarsAreRemountedWhileTheRideRuns() {
+        camera.ride(rider, PATH, new CameraService.Options(true, true));
+
+        for (int tick = 0; tick < CameraService.LETTERBOX_REFRESH_TICKS; tick++) {
+            camera.tick();
+        }
+
+        Assertions.assertEquals(1, Collections.frequency(calls, "letterbox:refresh"), calls.toString());
+    }
+
+    @Test
+    void aQuittingRiderStillHasTheirBarsRemoved() {
+        camera.ride(rider, PATH, new CameraService.Options(true, true));
+        camera.stop(rider, CameraService.EndReason.QUIT);
+
+        Assertions.assertEquals(1, Collections.frequency(calls, "letterbox:remove"), calls.toString());
     }
 
     @Test

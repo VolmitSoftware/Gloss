@@ -3,6 +3,7 @@ package art.arcane.gloss.camera;
 import art.arcane.gloss.Gloss;
 import art.arcane.gloss.GlossConfig;
 import art.arcane.gloss.api.GlossCameraRideEvent;
+import art.arcane.gloss.bedrock.BedrockService;
 import art.arcane.gloss.service.GlossService;
 import art.arcane.gloss.state.PlayerSections;
 import art.arcane.volmlib.util.scheduling.FoliaScheduler;
@@ -33,6 +34,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.BiFunction;
 
 /**
  * Spectator camera rides along a spline. The player watches a real, invisible carrier entity
@@ -42,6 +44,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public final class CameraService implements GlossService, Listener {
     public static final String NAME = "camera";
     static final int DRIVE_INTERVAL_TICKS = 1;
+    static final int LETTERBOX_REFRESH_TICKS = 5;
 
     public enum EndReason {
         END,
@@ -55,7 +58,7 @@ public final class CameraService implements GlossService, Listener {
 
     /**
      * @param skippable whether sneaking ends the ride early
-     * @param letterbox whether black bars are asked for; ignored when no lane provides titles
+     * @param letterbox whether black bars are drawn over the ride; Bedrock viewers never get them
      */
     public record Options(boolean skippable, boolean letterbox) {
     }
@@ -67,16 +70,20 @@ public final class CameraService implements GlossService, Listener {
     private final ConcurrentMap<UUID, CameraRide> rides = new ConcurrentHashMap<>();
     private final ConcurrentMap<UUID, UUID> restoring = new ConcurrentHashMap<>();
     private final ConcurrentMap<Entity, AtomicBoolean> retiringCarriers = new ConcurrentHashMap<>();
+    private final ConcurrentMap<UUID, Letterbox> letterboxes = new ConcurrentHashMap<>();
+    private final BiFunction<Player, Entity, Letterbox> letterboxFactory;
+    private long driverTicks;
     private int driverTaskId = -1;
 
     public CameraService(Gloss plugin, PlayerSections sections) {
-        this(new Dependencies(plugin, sections, new EntityTransport(plugin)));
+        this(new Dependencies(plugin, sections, new EntityTransport(plugin), CameraLetterbox::show));
     }
 
     CameraService(Dependencies dependencies) {
         this.plugin = Objects.requireNonNull(dependencies.plugin(), "plugin");
         this.sections = Objects.requireNonNull(dependencies.sections(), "sections");
         this.transport = Objects.requireNonNull(dependencies.transport(), "transport");
+        this.letterboxFactory = Objects.requireNonNull(dependencies.letterboxFactory(), "letterboxFactory");
         this.journal = new CameraJournal(this.sections);
     }
 
@@ -228,6 +235,9 @@ public final class CameraService implements GlossService, Listener {
     /** One driver pass: advance every ride and end the ones that ran out. */
     void tick() {
         retiringCarriers.forEach(this::scheduleCarrierRemoval);
+        if (++driverTicks % LETTERBOX_REFRESH_TICKS == 0L) {
+            letterboxes.values().forEach(Letterbox::refresh);
+        }
         for (UUID riderId : List.copyOf(rides.keySet())) {
             CameraRide ride = rides.get(riderId);
             if (ride == null) {
@@ -335,7 +345,7 @@ public final class CameraService implements GlossService, Listener {
                     }
                     try {
                         player.setSpectatorTarget(ride.carrier());
-                        letterbox(player, options.letterbox(), true);
+                        showLetterbox(ride, options);
                         ride.attached();
                         if (ride.ended()) {
                             finishEnd(ride);
@@ -372,6 +382,7 @@ public final class CameraService implements GlossService, Listener {
         if (!ride.finalizeEnd()) {
             return;
         }
+        removeLetterbox(ride.player());
         removeCarrier(ride);
         if (ride.restoreOnEnd()) {
             restoreJournalled(ride.player());
@@ -417,7 +428,6 @@ public final class CameraService implements GlossService, Listener {
             return;
         }
         try {
-            letterbox(player, true, false);
             player.setSpectatorTarget(null);
             player.setGameMode(gameMode(entry.gameMode()));
             Location destination = new Location(world, entry.x(), entry.y(), entry.z(), entry.yaw(), entry.pitch());
@@ -473,16 +483,23 @@ public final class CameraService implements GlossService, Listener {
         Gloss.logExceptionStack(false, failure, "Camera ride for %s failed while %s.", id, operation);
     }
 
-    /** The bars are only asked for when some lane published a title provider. */
-    private void letterbox(Player player, boolean wanted, boolean visible) {
-        if (!wanted) {
+    private void showLetterbox(CameraRide ride, Options options) {
+        Player player = ride.player();
+        BedrockService bedrock = plugin.bedrock();
+        if (!options.letterbox() || (bedrock != null && bedrock.isBedrock(player))) {
             return;
         }
-        for (GlossService service : plugin.laneServices()) {
-            if (service instanceof TitleProvider provider) {
-                provider.letterbox(player, visible);
-                return;
-            }
+        letterboxes.put(player.getUniqueId(), letterboxFactory.apply(player, ride.carrier()));
+    }
+
+    private void removeLetterbox(Player player) {
+        Letterbox letterbox = letterboxes.remove(player.getUniqueId());
+        if (letterbox == null) {
+            return;
+        }
+        Runnable removal = letterbox::remove;
+        if (!transport.execute(player, removal, removal)) {
+            removal.run();
         }
     }
 
@@ -494,7 +511,14 @@ public final class CameraService implements GlossService, Listener {
         }
     }
 
-    record Dependencies(Gloss plugin, PlayerSections sections, Transport transport) {
+    record Dependencies(Gloss plugin, PlayerSections sections, Transport transport,
+                        BiFunction<Player, Entity, Letterbox> letterboxFactory) {
+    }
+
+    interface Letterbox {
+        void refresh();
+
+        void remove();
     }
 
     interface Transport {

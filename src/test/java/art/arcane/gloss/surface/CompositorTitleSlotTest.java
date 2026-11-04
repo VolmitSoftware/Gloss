@@ -30,11 +30,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * The title slot is shared with every other VolmLib plugin, and a claim is only stood down by
  * releasing it: bidding again at the same priority loses to the live claim. These drive the real
- * compositor, so a letterbox that only publishes an empty title fails them the way it fails a
- * viewer whose ride ended early.
+ * compositor, so a surface that only publishes an empty title fails them the way it fails a viewer
+ * whose title ended early.
  */
 class CompositorTitleSlotTest {
-    private static final int MAX_RIDE_SECONDS = 30;
+    private static final String PURPOSE = "gloss:surface:held";
 
     private Object previousServer;
     private Gloss previousGloss;
@@ -63,39 +63,39 @@ class CompositorTitleSlotTest {
     }
 
     @Test
-    void theRideHoldsTheSlotAndEndingItHandsTheSlotBack() throws ReflectiveOperationException {
+    void aHeldTitleKeepsTheSlotAndReleasingItHandsTheSlotBack() throws ReflectiveOperationException {
         HudTitleService otherPlugin = new HudTitleService(foreignPlugin());
 
-        SurfaceLetterbox.apply(delivery, viewer.player, true, MAX_RIDE_SECONDS);
+        claim();
         assertEquals(1, viewer.titles.size());
-        assertFalse(claimBy(otherPlugin), "the bars hold the slot while the ride runs");
+        assertFalse(claimBy(otherPlugin), "the held title keeps the slot");
 
-        SurfaceLetterbox.apply(delivery, viewer.player, false, MAX_RIDE_SECONDS);
+        release();
 
-        assertTrue(claimBy(otherPlugin), "the ride ended, so another plugin may take the slot");
+        assertTrue(claimBy(otherPlugin), "the title ended, so another plugin may take the slot");
     }
 
     @Test
     void endingTheRideWipesTheBarsFromTheClient() {
-        SurfaceLetterbox.apply(delivery, viewer.player, true, MAX_RIDE_SECONDS);
+        claim();
         assertEquals(0, viewer.resets);
 
-        SurfaceLetterbox.apply(delivery, viewer.player, false, MAX_RIDE_SECONDS);
+        release();
 
         assertEquals(1, viewer.resets, "the bars must not stay until their stay window ends");
     }
 
     @Test
-    void endingARideThatNeverDrewLeavesTheClientAlone() {
-        SurfaceLetterbox.apply(delivery, viewer.player, false, MAX_RIDE_SECONDS);
+    void releasingATitleThatNeverDrewLeavesTheClientAlone() {
+        release();
 
         assertEquals(0, viewer.resets);
     }
 
     @Test
-    void aSurfaceTitleAtTheSamePriorityDrawsOnceTheRideEnds() {
-        SurfaceLetterbox.apply(delivery, viewer.player, true, MAX_RIDE_SECONDS);
-        SurfaceLetterbox.apply(delivery, viewer.player, false, MAX_RIDE_SECONDS);
+    void aSurfaceTitleAtTheSamePriorityDrawsOnceTheHeldTitleEnds() {
+        claim();
+        release();
 
         delivery.title(viewer.player, "gloss:surface:welcome", HudPriority.AMBIENT, "welcome", "", 10, 40, 10);
 
@@ -165,5 +165,13 @@ class CompositorTitleSlotTest {
                 default -> throw new UnsupportedOperationException(method.getName());
             };
         }
+    }
+
+    private void claim() {
+        delivery.title(viewer.player, PURPOSE, HudPriority.AMBIENT, "held", "", 10, 600, 10);
+    }
+
+    private void release() {
+        delivery.clearTitle(viewer.player, PURPOSE);
     }
 }
