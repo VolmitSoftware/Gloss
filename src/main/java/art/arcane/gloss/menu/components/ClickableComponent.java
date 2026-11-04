@@ -10,15 +10,19 @@ import art.arcane.gloss.menu.MenuSession;
 import art.arcane.gloss.menu.MenuTransform;
 import art.arcane.gloss.util.common.ParticleUtils;
 import art.arcane.gloss.util.common.math.CollisionPlane;
-import art.arcane.volmlib.util.math.MathHelper;
 import org.bukkit.Color;
 import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.util.Vector;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.OptionalDouble;
 
 public abstract class ClickableComponent<T extends ComponentData> extends MenuComponent<T> {
+  private static final double DEBUG_OUTLINE_SPACING = 0.25D;
+  private static final double DEBUG_NORMAL_SPACING = 0.2D;
+  private static final int DEBUG_NORMAL_POINTS = 3;
 
   private final float highlightMod;
   private final HitboxData hitbox;
@@ -126,21 +130,42 @@ public abstract class ClickableComponent<T extends ComponentData> extends MenuCo
   public void highlightHitbox(World w) {
     if (!isInteractable() || plane == null)
       return;
-    Vector downRight = plane.getCenter().clone().subtract(plane.getUp().clone().multiply(plane.getHeight() / 2)).add(plane.getRight().clone().multiply(plane.getWidth() / 2));
-    Vector downLeft = plane.getCenter().clone().subtract(plane.getUp().clone().multiply(plane.getHeight() / 2)).subtract(plane.getRight().clone().multiply(plane.getWidth() / 2));
-    Vector upRight = plane.getCenter().clone().add(plane.getUp().clone().multiply(plane.getHeight() / 2)).add(plane.getRight().clone().multiply(plane.getWidth() / 2));
-    Vector upLeft = plane.getCenter().clone().add(plane.getUp().clone().multiply(plane.getHeight() / 2)).subtract(plane.getRight().clone().multiply(plane.getWidth() / 2));
-    for (float d = .1F; d <= 1; d += .1F) {
-      ParticleUtils.playParticle(w, MathHelper.interpolate(downRight, upRight, d), Color.BLUE);
-      ParticleUtils.playParticle(w, MathHelper.interpolate(downLeft, upLeft, d), Color.BLUE);
-      ParticleUtils.playParticle(w, MathHelper.interpolate(downLeft, downRight, d), Color.BLUE);
-      ParticleUtils.playParticle(w, MathHelper.interpolate(upLeft, upRight, d), Color.BLUE);
-      ParticleUtils.playParticle(w, MathHelper.interpolate(plane.getCenter(), plane.getCenter().clone().add(plane.getNormal().clone().multiply(2)), d), Color.RED);
+    outlinePoints(plane.getCenter(), plane.getUp(), plane.getRight(), plane.getWidth(), plane.getHeight())
+        .forEach(point -> ParticleUtils.playParticle(w, point, Color.BLUE));
+    normalPoints(plane.getCenter(), plane.getNormal())
+        .forEach(point -> ParticleUtils.playParticle(w, point, Color.RED));
+  }
+
+  static List<Vector> outlinePoints(Vector center, Vector up, Vector right, float width, float height) {
+    Vector halfUp = up.clone().multiply(height / 2D);
+    Vector halfRight = right.clone().multiply(width / 2D);
+    Vector downLeft = center.clone().subtract(halfUp).subtract(halfRight);
+    Vector downRight = center.clone().subtract(halfUp).add(halfRight);
+    Vector upRight = center.clone().add(halfUp).add(halfRight);
+    Vector upLeft = center.clone().add(halfUp).subtract(halfRight);
+    List<Vector> points = new ArrayList<>();
+    addEdge(points, downLeft, downRight);
+    addEdge(points, downRight, upRight);
+    addEdge(points, upRight, upLeft);
+    addEdge(points, upLeft, downLeft);
+    return points;
+  }
+
+  static List<Vector> normalPoints(Vector center, Vector normal) {
+    List<Vector> points = new ArrayList<>(DEBUG_NORMAL_POINTS);
+    for (int index = 1; index <= DEBUG_NORMAL_POINTS; index++) {
+      points.add(center.clone().add(normal.clone().multiply(index * DEBUG_NORMAL_SPACING)));
     }
-    ParticleUtils.playParticle(w, downRight, Color.BLUE);
-    ParticleUtils.playParticle(w, downLeft, Color.BLUE);
-    ParticleUtils.playParticle(w, upRight, Color.BLUE);
-    ParticleUtils.playParticle(w, upLeft, Color.BLUE);
+    return points;
+  }
+
+  private static void addEdge(List<Vector> points, Vector from, Vector to) {
+    Vector step = to.clone().subtract(from);
+    int steps = Math.max(1, (int) Math.ceil(step.length() / DEBUG_OUTLINE_SPACING));
+    step.multiply(1D / steps);
+    for (int index = 0; index < steps; index++) {
+      points.add(from.clone().add(step.clone().multiply(index)));
+    }
   }
 
   protected CollisionPlane createHitbox() {

@@ -752,7 +752,7 @@ public final class MenuSessionManager {
 
   public void controlHitboxDebug(boolean hitbox) {
     if (hitbox && (debugHitbox == null || debugHitbox.isCancelled())) {
-      debugHitbox = SchedulerUtils.scheduleSyncTask(Gloss.instance, 2L, () -> holders.values().forEach(holder -> {
+      debugHitbox = SchedulerUtils.scheduleSyncTask(Gloss.instance, 5L, () -> holders.values().forEach(holder -> {
         Player player = holder.player();
         Runnable debugTask = () -> holder.onSession(session -> {
           if (session == null) return;
@@ -771,7 +771,7 @@ public final class MenuSessionManager {
   //TODO Fix anchor particle
   public void controlPositionDebug(boolean positionDebug) {
     if (positionDebug && (debugPos == null || debugPos.isCancelled())) {
-      debugPos = SchedulerUtils.scheduleSyncTask(Gloss.instance, 2L, () -> holders.values().forEach(holder -> {
+      debugPos = SchedulerUtils.scheduleSyncTask(Gloss.instance, 5L, () -> holders.values().forEach(holder -> {
         Player player = holder.player();
         Runnable debugTask = () -> {
           World world = player.getWorld();
