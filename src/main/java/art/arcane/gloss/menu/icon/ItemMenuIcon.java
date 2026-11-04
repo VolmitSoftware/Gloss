@@ -27,6 +27,8 @@ import java.util.UUID;
 public class ItemMenuIcon extends MenuIcon<MenuIconData> {
 
   static final float COUNT_LIFT = .09F;
+  static final byte CONTEXT_NONE = 0;
+  static final byte CONTEXT_GUI = 6;
   private static final Material GRASS = grassMaterial();
   private static final List<Material> BLOCK_BLACKLIST = blacklist(
       Material.BARRIER, Material.LIGHT, Material.HOPPER, Material.TURTLE_EGG, GRASS, Material.TALL_GRASS,
@@ -118,7 +120,7 @@ public class ItemMenuIcon extends MenuIcon<MenuIconData> {
     } else {
       location = transform.localPosition(position, itemOffset(item.getAmount()));
     }
-    uuids.add(DisplayEntityManager.add(session.displayGroup(), itemDisplay(item, location)));
+    uuids.add(DisplayEntityManager.add(session.displayGroup(), itemDisplay(item, location).itemDisplayType(displayContext(isBlock()))));
     if (item.getAmount() > 1) {
       Component count = countText(item.getAmount());
       uuids.add(DisplayEntityManager.add(session.displayGroup(), textDisplay(count, countLocation())));
@@ -205,6 +207,10 @@ public class ItemMenuIcon extends MenuIcon<MenuIconData> {
     appliedBlockYaw = position.getYaw();
     appliedBlockPitch = position.getPitch();
     DisplayEntityManager.goTo(displayEntities.getFirst(), blockLocation(transform));
+  }
+
+  static byte displayContext(boolean block) {
+    return block ? CONTEXT_NONE : CONTEXT_GUI;
   }
 
   private boolean isBlock() {
