@@ -94,6 +94,8 @@ public final class PacketTextDecoration {
                 int alpha = (int) Math.round((part.color() >>> 24) * opacity);
                 display.backgroundColor(alpha << 24 | part.color() & 0xFFFFFF);
                 display.lineWidth(16384);
+                display.teleportDuration(update.motionTicks());
+                display.interpolationDuration(update.motionTicks());
                 display.scale(new Vector3f(scale.getX(), scale.getY(), scale.getZ()));
                 display.translation(positioned);
                 UUID id = DisplayEntityManager.add(group, display);
@@ -103,6 +105,9 @@ public final class PacketTextDecoration {
                 DisplayEntityManager.spawn(id, viewer);
             } else {
                 UUID id = displays.get(index);
+                if (last.motionTicks() != update.motionTicks()) {
+                    packets = collect(packets, parts.size(), DisplayEntityManager.changeEasingPacket(id, update.motionTicks()));
+                }
                 if (moved) {
                     packets = collect(packets, parts.size(), DisplayEntityManager.goToPacket(id, update.anchor()));
                 }
@@ -164,10 +169,10 @@ public final class PacketTextDecoration {
     }
 
     public record Update(Location anchor, String text, IconDisplayStyle style, HologramBox box,
-                         HologramPresentation presentation, Vector3f translation) {
+                         HologramPresentation presentation, Vector3f translation, int motionTicks) {
         public static Update atAnchor(Location anchor, String text, IconDisplayStyle style,
                                       HologramBox box, HologramPresentation presentation) {
-            return new Update(anchor, text, style, box, presentation, new Vector3f(0F, 0F, 0F));
+            return new Update(anchor, text, style, box, presentation, new Vector3f(0F, 0F, 0F), 0);
         }
 
         public Update {

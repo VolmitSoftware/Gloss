@@ -36,7 +36,7 @@ class SliderWidthTest {
             MenuSessionOptions.positioned(transform, request -> NavigationResult.DENIED, 2F));
         SliderComponentData data = new SliderComponentData("volume", 0F, 100F, 1F, 3F, "Volume", null);
         SliderComponent slider = new SliderComponent(session,
-            new MenuComponentData("volume", new Vector(), data, null));
+            new MenuComponentData("volume", new Vector(), data, null, null));
         slider.currentIcon = new LabelIcon(session, anchor);
 
         CollisionPlane hitbox = slider.createHitbox();

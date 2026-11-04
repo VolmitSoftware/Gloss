@@ -369,8 +369,60 @@
         "show": {
           "description": "Boolean or expression controlling visibility of this component.",
           "$ref": "#/$defs/show"
+        },
+        "motion": {
+          "description": "Moves and resizes this component's existing displays without respawning them.",
+          "$ref": "#/$defs/componentMotion"
         }
       }
+    },
+    "componentMotion": {
+      "title": "Component Motion Object",
+      "description": "Numbers or expressions re-read every tick while the component is open. The viewer's client eases each change over ticks.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "x": {
+          "description": "Added to the offset on this axis, in menu blocks before uiScale.",
+          "$ref": "#/$defs/motionValue"
+        },
+        "y": {
+          "description": "Added to the offset on this axis, in menu blocks before uiScale.",
+          "$ref": "#/$defs/motionValue"
+        },
+        "z": {
+          "description": "Added to the offset on this axis, in menu blocks before uiScale.",
+          "$ref": "#/$defs/motionValue"
+        },
+        "scale": {
+          "description": "Multiplies the icon's size and hitbox. Values below 0.001 use 0.001. Entity icons keep their size.",
+          "$ref": "#/$defs/motionValue"
+        },
+        "ticks": {
+          "description": "How long the client takes to ease to a new value. 0 jumps there at once. Accepted range: 0 through 59.",
+          "oneOf": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 59
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "default": 3
+        }
+      }
+    },
+    "motionValue": {
+      "oneOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "string"
+        }
+      ]
     },
     "componentData": {
       "title": "Component Data Object",

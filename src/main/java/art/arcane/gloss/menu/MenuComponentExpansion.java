@@ -46,7 +46,7 @@ public final class MenuComponentExpansion {
         for (int index = 0; index < tabs.tabs().size(); index++) {
             Vector offset = component.offset().clone().add(new Vector(index * tabs.spacing() - span, 0D, 0D));
             expanded.add(new ExpandedMenuComponent(new MenuComponentData(TabsComponent.tabId(component.id(), index), offset, tabs,
-                component.show()), scope));
+                component.show(), component.motion()), scope));
         }
         return expanded;
     }

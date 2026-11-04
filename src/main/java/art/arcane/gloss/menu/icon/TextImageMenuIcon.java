@@ -61,13 +61,13 @@ public class TextImageMenuIcon extends MenuIcon<TextImageIconData> {
   @Override
   protected List<UUID> createDisplayEntities(Location loc) {
     List<UUID> uuids = Lists.newArrayList();
-    Location lineLocation = session.getTransform().localPosition(
+    Location lineLocation = transform().localPosition(
         loc,
         new Vector(0F, ((components.size() - 1) / 2F * localLineHeight()) - localLineHeight(), 0F)
     );
     components.forEach(c -> {
       uuids.add(DisplayEntityManager.add(session.displayGroup(), textDisplay(c, lineLocation)));
-      lineLocation.add(session.getTransform().localVector(new Vector(0F, -localLineHeight(), 0F)));
+      lineLocation.add(transform().localVector(new Vector(0F, -localLineHeight(), 0F)));
     });
     return uuids;
   }
@@ -79,7 +79,7 @@ public class TextImageMenuIcon extends MenuIcon<TextImageIconData> {
     float width = 0;
     for (Component component : components)
       width = Math.max(width, TextUtils.content(component).length() * characterWidth / 2F);
-    return session.getTransform().createPlane(textBoundingBoxCenter(anchor), width, planeLines * lineHeight);
+    return transform().createPlane(textBoundingBoxCenter(anchor), width, planeLines * lineHeight);
   }
 
   /** The glyph string as the single line a pack viewer sees. */

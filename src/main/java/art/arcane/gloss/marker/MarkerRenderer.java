@@ -198,7 +198,7 @@ public final class MarkerRenderer {
         if (render.icon == null) {
             MenuDefinitionData definition = new MenuDefinitionData(new Vector(), false, false, null,
                 false, false, List.of(new MenuComponentData("icon", new Vector(),
-                    new DecoComponentData(icon), null)), List.of(), null, Map.of(), List.of());
+                    new DecoComponentData(icon), null, null)), List.of(), null, Map.of(), List.of());
             definition.setId("marker:" + candidate.id());
             MenuTransform transform = new MenuTransform(position, new Vector(), position.getYaw(),
                 0F, 0F, (float) scale);

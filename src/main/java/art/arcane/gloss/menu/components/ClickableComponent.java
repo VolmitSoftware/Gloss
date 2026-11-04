@@ -178,7 +178,7 @@ public abstract class ClickableComponent<T extends ComponentData> extends MenuCo
     CollisionPlane next = createHitbox();
     this.planeOrigin = next.getCenter().clone();
     if (hitbox != null && hitbox.hasCustomSize()) {
-      float scale = session.getTransform().scale();
+      float scale = motionUiScale();
       next.resize(hitbox.scaledWidth(scale), hitbox.scaledHeight(scale));
     }
     this.plane = next;
@@ -198,7 +198,7 @@ public abstract class ClickableComponent<T extends ComponentData> extends MenuCo
     }
     double distance = hoverDistance(
         highlightMod,
-        session.getTransform().scale(),
+        motionUiScale(),
         hoverProgress,
         hoverEasing
     );

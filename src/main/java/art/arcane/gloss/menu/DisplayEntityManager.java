@@ -640,7 +640,7 @@ public class DisplayEntityManager {
       display.scale(new Vector3f(scale.getX() * ratio, scale.getY() * ratio, scale.getZ() * ratio));
       display.translation(new Vector3f(translation.getX() * ratio, translation.getY() * ratio,
           translation.getZ() * ratio));
-      packets.add(display.metadataPacket(MetadataIndex.TRANSLATION, MetadataIndex.SCALE));
+      packets.add(transformPacket(display));
     }
     if (player != null) {
       PacketUtils.send(player, packets);
@@ -676,7 +676,35 @@ public class DisplayEntityManager {
       return null;
     displayEntity.scale(new Vector3f(x, y, z));
     displayEntity.translation(translation == null ? new Vector3f(0, 0, 0) : translation);
-    return player == null ? null : displayEntity.metadataPacket(MetadataIndex.TRANSLATION, MetadataIndex.SCALE);
+    return player == null ? null : transformPacket(displayEntity);
+  }
+
+  public static void changeEasing(UUID uuid, int ticks) {
+    PacketWrapper<?> packet = changeEasingPacket(uuid, ticks);
+    if (packet != null)
+      PacketUtils.sendOne(playerVisibility.get(uuid), packet);
+  }
+
+  /** The packet {@link #changeEasing} would have sent, state advanced, nothing sent. */
+  public static PacketWrapper<?> changeEasingPacket(UUID uuid, int ticks) {
+    if (unsupportedVersion())
+      return null;
+    DisplayEntity displayEntity = displayEntities.get(uuid);
+    Player player = playerVisibility.get(uuid);
+    if (displayEntity == null || displayEntity.isRawEntity())
+      return null;
+    displayEntity.teleportDuration(ticks).interpolationDuration(ticks);
+    return player == null ? null
+        : displayEntity.metadataPacket(MetadataIndex.INTERPOLATION_DURATION, MetadataIndex.TELEPORT_DURATION);
+  }
+
+  /** Restarting the client's easing needs the delay slot resent even though its value never changes. */
+  private static PacketWrapper<?> transformPacket(DisplayEntity display) {
+    if (display.interpolationDuration() > 0) {
+      return display.metadataPacket(MetadataIndex.INTERPOLATION_DELAY, MetadataIndex.INTERPOLATION_DURATION,
+          MetadataIndex.TRANSLATION, MetadataIndex.SCALE);
+    }
+    return display.metadataPacket(MetadataIndex.TRANSLATION, MetadataIndex.SCALE);
   }
 
   public static void changeItem(UUID uuid, ItemStack itemStack) {

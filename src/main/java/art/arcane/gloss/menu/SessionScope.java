@@ -48,6 +48,12 @@ public final class SessionScope implements ExprScope {
         return scope == null ? null : scope.call(name, args);
     }
 
+    /** The viewer scope reads the clock when it is made, so each session tick starts a new one. */
+    void refresh() {
+        delegateResolved = false;
+        delegate = null;
+    }
+
     private ExprScope delegate() {
         if (!delegateResolved) {
             delegateResolved = true;

@@ -75,13 +75,13 @@ public class TextMenuIcon extends MenuIcon<TextIconData> {
   @Override
   protected List<UUID> createDisplayEntities(Location loc) {
     List<UUID> uuids = new ArrayList<>(components.size());
-    Location lineLocation = session.getTransform().localPosition(
+    Location lineLocation = transform().localPosition(
         loc,
         new Vector(0F, ((components.size() - 1) / 2F * localLineHeight()) - localLineHeight(), 0F)
     );
     components.forEach(c -> {
       uuids.add(DisplayEntityManager.add(session.displayGroup(), textDisplay(c, lineLocation)));
-      lineLocation.add(session.getTransform().localVector(new Vector(0F, -localLineHeight(), 0F)));
+      lineLocation.add(transform().localVector(new Vector(0F, -localLineHeight(), 0F)));
     });
     return uuids;
   }
@@ -126,7 +126,7 @@ public class TextMenuIcon extends MenuIcon<TextIconData> {
       lines.add(LegacyComponentSerializer.legacySection().serialize(component));
     }
     String text = String.join("\n", lines);
-    MenuTransform transform = session.getTransform();
+    MenuTransform transform = transform();
     Vector center = textBoundingBoxCenter(position);
     if (transform == decorationTransform && text.equals(decorationText)
         && center.getX() == decorationX && center.getY() == decorationY && center.getZ() == decorationZ) {
@@ -146,7 +146,7 @@ public class TextMenuIcon extends MenuIcon<TextIconData> {
     float offsetY = -layout.textHeight() / 2F * 0.025F * scale * style.scaleY();
     decoration.update(new PacketTextDecoration.Update(anchor, text, style, data.box(),
         new HologramPresentation(scale, scale, scale, 0D, 0D, transform.roll(), 1D),
-        new Vector3f(0F, offsetY, 0F)));
+        new Vector3f(0F, offsetY, 0F), motionTicks()));
   }
 
   @Override
@@ -164,7 +164,7 @@ public class TextMenuIcon extends MenuIcon<TextIconData> {
       measuredPixels = measurePixels(components, style.lineWidth(), data.box());
     }
     float width = measuredPixels * TextDisplayLayout.PIXEL_SIZE * uiScale() * style.scaleX();
-    return session.getTransform().createPlane(textBoundingBoxCenter(anchor), width, components.size() * scaledLineHeight());
+    return transform().createPlane(textBoundingBoxCenter(anchor), width, components.size() * scaledLineHeight());
   }
 
   static int measurePixels(List<Component> lines, int lineWidth, HologramBox box) {

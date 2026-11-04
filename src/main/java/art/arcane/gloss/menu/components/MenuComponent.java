@@ -4,8 +4,10 @@ import art.arcane.gloss.api.HoloIcon;
 import art.arcane.gloss.Gloss;
 import art.arcane.gloss.condition.ShowCondition;
 import art.arcane.gloss.api.internal.ApiMenuTranslator;
+import art.arcane.gloss.config.ComponentMotion;
 import art.arcane.gloss.config.MenuComponentData;
 import art.arcane.gloss.config.components.ComponentData;
+import art.arcane.gloss.expr.ExprScope;
 import art.arcane.gloss.menu.MenuSession;
 import art.arcane.gloss.menu.icon.MenuIcon;
 import art.arcane.gloss.menu.icon.TextMenuIcon;
@@ -29,6 +31,11 @@ public abstract class MenuComponent<T extends ComponentData> {
   private long showEpoch;
   private boolean showMemo;
   private HoloIcon pendingIcon;
+  private final ComponentMotion motion;
+  private final Vector motionOffset = new Vector();
+  private float motionScale = 1F;
+  private int motionTicks;
+  private boolean motionFailureLogged;
 
   protected boolean open = false;
 
@@ -39,6 +46,7 @@ public abstract class MenuComponent<T extends ComponentData> {
     this.offset = data.offset().clone();
     this.data = (T) data.data();
     this.show = data.show();
+    this.motion = data.motion();
 
     this.location = session.getTransform().componentPosition(offset);
   }
@@ -112,6 +120,11 @@ public abstract class MenuComponent<T extends ComponentData> {
   public void tick(Vector eyeOrigin, Vector eyeDirection) {
     if (!open) return;
     if (currentIcon != null) {
+      if (refreshMotion()) {
+        currentIcon.applyMotion(motionScale, motionTicks);
+        applyTransform();
+        observedGeometryRevision = currentIcon.geometryRevision();
+      }
       currentIcon.tick();
       refreshDynamicGeometry();
     }
@@ -130,6 +143,7 @@ public abstract class MenuComponent<T extends ComponentData> {
     if (open || !session.isShown() || !shown()) {
       return;
     }
+    refreshMotion();
     applyTransform();
     if (pendingIcon != null) {
       this.currentIcon = MenuIcon.createIcon(session, location, ApiMenuTranslator.iconData(pendingIcon), this);
@@ -137,6 +151,7 @@ public abstract class MenuComponent<T extends ComponentData> {
     } else if (currentIcon == null) {
       this.currentIcon = createIcon();
     }
+    this.currentIcon.applyMotion(motionScale, motionTicks);
     this.currentIcon.spawn();
     this.observedGeometryRevision = currentIcon.geometryRevision();
     onOpen();
@@ -179,6 +194,7 @@ public abstract class MenuComponent<T extends ComponentData> {
   protected void swapIcon(MenuIcon<?> icon) {
     this.currentIcon.remove();
     this.currentIcon = icon;
+    this.currentIcon.applyMotion(motionScale, motionTicks);
     this.currentIcon.applyTransform(location);
     this.observedGeometryRevision = currentIcon.geometryRevision();
     onIconChanged();
@@ -189,9 +205,15 @@ public abstract class MenuComponent<T extends ComponentData> {
   }
 
   public void applyTransform() {
-    this.location = session.getTransform().componentPosition(offset);
+    this.location = session.getTransform().componentPosition(
+        motion.isActive() ? offset.clone().add(motionOffset) : offset);
     if (this.currentIcon != null)
       this.currentIcon.applyTransform(location);
+  }
+
+  /** The menu's scale at this component's current motion scale. */
+  protected float motionUiScale() {
+    return session.getTransform().scale() * motionScale;
   }
 
   private void hide() {
@@ -200,6 +222,43 @@ public abstract class MenuComponent<T extends ComponentData> {
       currentIcon.remove();
     }
     onClose();
+  }
+
+  /** Reads the motion expressions; true when the component now belongs somewhere else. */
+  private boolean refreshMotion() {
+    if (!motion.isActive()) {
+      return false;
+    }
+    ExprScope scope = session.componentScope(id);
+    double x;
+    double y;
+    double z;
+    float scale;
+    int ticks;
+    try {
+      x = motion.x(scope);
+      y = motion.y(scope);
+      z = motion.z(scope);
+      scale = motion.scale(scope);
+      ticks = motion.ticks(scope);
+    } catch (RuntimeException failure) {
+      if (!motionFailureLogged) {
+        motionFailureLogged = true;
+        Gloss.logExceptionStack(false, failure,
+            "Motion of component %s in menu %s failed; it stays where it is until the expressions recover.",
+            id, session.getId());
+      }
+      return false;
+    }
+    motionFailureLogged = false;
+    if (x == motionOffset.getX() && y == motionOffset.getY() && z == motionOffset.getZ()
+        && scale == motionScale && ticks == motionTicks) {
+      return false;
+    }
+    motionOffset.setX(x).setY(y).setZ(z);
+    motionScale = scale;
+    motionTicks = ticks;
+    return true;
   }
 
   private void refreshDynamicGeometry() {

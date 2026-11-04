@@ -59,7 +59,7 @@ public final class SliderComponent extends ClickableComponent<SliderComponentDat
   @Override
   protected CollisionPlane createHitbox() {
     CollisionPlane hitbox = super.createHitbox();
-    hitbox.resize(data.width() * session.getTransform().scale(), hitbox.getHeight());
+    hitbox.resize(data.width() * motionUiScale(), hitbox.getHeight());
     return hitbox;
   }
 

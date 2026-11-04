@@ -57,6 +57,24 @@ public class GlossSchemaContractTest {
   }
 
   @Test
+  public void componentSchemaIncludesTheMotionContract() throws IOException {
+    JsonObject definitions = schema().getAsJsonObject("$defs");
+    JsonObject motion = definitions.getAsJsonObject("componentMotion");
+    JsonObject properties = motion.getAsJsonObject("properties");
+    JsonArray ticks = properties.getAsJsonObject("ticks").getAsJsonArray("oneOf");
+
+    assertEquals("#/$defs/componentMotion",
+        definitions.getAsJsonObject("component").getAsJsonObject("properties").getAsJsonObject("motion").get("$ref").getAsString());
+    assertFalse(motion.get("additionalProperties").getAsBoolean());
+    for (String axis : List.of("x", "y", "z", "scale")) {
+      assertEquals("#/$defs/motionValue", properties.getAsJsonObject(axis).get("$ref").getAsString());
+    }
+    assertEquals(ComponentMotion.DEFAULT_TICKS, properties.getAsJsonObject("ticks").get("default").getAsInt());
+    assertEquals(ComponentMotion.MAX_TICKS, ticks.get(0).getAsJsonObject().get("maximum").getAsInt());
+    assertEquals("string", ticks.get(1).getAsJsonObject().get("type").getAsString());
+  }
+
+  @Test
   public void iconSchemaIncludesThePacketEntityContract() throws IOException {
     JsonObject definitions = schema().getAsJsonObject("$defs");
     JsonObject icon = definitions.getAsJsonObject("icon");

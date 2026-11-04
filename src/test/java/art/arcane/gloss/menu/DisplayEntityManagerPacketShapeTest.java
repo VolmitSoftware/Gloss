@@ -321,6 +321,29 @@ public class DisplayEntityManagerPacketShapeTest {
   }
 
   @Test
+  public void anEasedRescaleRestartsTheClientInterpolation() {
+    Player viewer = viewer();
+    DisplayEntity display = textDisplay();
+    display.location(new Vector3d(0D, 2D, 0D));
+    display.scale(new Vector3f(1F, 1F, 1F));
+    display.interpolationDuration(3);
+    UUID key = DisplayEntityManager.add(display);
+    DisplayEntityManager.spawn(key, viewer);
+    SENT.clear();
+
+    DisplayEntityManager.rescale(key, new Location(null, 0D, 0D, 0D), 2F);
+
+    WrapperPlayServerEntityMetadata metadata = SENT.stream()
+        .filter(WrapperPlayServerEntityMetadata.class::isInstance)
+        .map(WrapperPlayServerEntityMetadata.class::cast)
+        .findFirst().orElseThrow();
+    assertEquals(List.of(MetadataIndex.INTERPOLATION_DELAY.index(), MetadataIndex.INTERPOLATION_DURATION.index(),
+        TRANSLATION, SCALE), metadata.getEntityMetadata().stream().map(EntityData::getIndex).toList());
+    assertEquals(3, metadata.getEntityMetadata().get(1).getValue());
+    DisplayEntityManager.delete(key, viewer);
+  }
+
+  @Test
   public void orientingNeverSendsAHeadLookAndRollTravelsAsOneMetadataEntry() {
     Player viewer = viewer();
     UUID key = DisplayEntityManager.add(textDisplay());

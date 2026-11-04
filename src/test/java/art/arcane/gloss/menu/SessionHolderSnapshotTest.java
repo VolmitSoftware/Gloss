@@ -380,7 +380,7 @@ public class SessionHolderSnapshotTest {
   }
 
   private static MenuDefinitionData menu(String id, Supplier<MenuComponent<?>> onCreate) {
-    MenuComponentData component = new MenuComponentData("probe", new Vector(0, 0, 0), new ProbeComponentData(onCreate), ShowCondition.ALWAYS);
+    MenuComponentData component = new MenuComponentData("probe", new Vector(0, 0, 0), new ProbeComponentData(onCreate), ShowCondition.ALWAYS, null);
     MenuDefinitionData data = new MenuDefinitionData(new Vector(0, 0, 0), false, false, 8.0D, false, false,
         List.of(component), List.of(), ShowCondition.ALWAYS, Map.of(), List.of());
     data.setId(id);
@@ -388,7 +388,7 @@ public class SessionHolderSnapshotTest {
   }
 
   private static MenuDefinitionData failingOpenMenu(String id, AtomicInteger closeCalls) {
-    MenuComponentData component = new MenuComponentData("probe", new Vector(), new OpeningFailureData(closeCalls), ShowCondition.ALWAYS);
+    MenuComponentData component = new MenuComponentData("probe", new Vector(), new OpeningFailureData(closeCalls), ShowCondition.ALWAYS, null);
     MenuDefinitionData data = new MenuDefinitionData(new Vector(), false, false, 8.0D, false, false,
         List.of(component), List.of(), ShowCondition.ALWAYS, Map.of(), List.of());
     data.setId(id);

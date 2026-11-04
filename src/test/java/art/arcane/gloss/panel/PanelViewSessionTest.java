@@ -306,7 +306,7 @@ public class PanelViewSessionTest {
         8D,
         false,
         false,
-        List.of(new MenuComponentData("probe", new Vector(), componentData, ShowCondition.ALWAYS)),
+        List.of(new MenuComponentData("probe", new Vector(), componentData, ShowCondition.ALWAYS, null)),
         List.of(), ShowCondition.ALWAYS
     , Map.of(), List.of());
     menu.setId(id);

@@ -1034,7 +1034,7 @@ public final class ContainerPreview {
     rendered.decoration.update(new PacketTextDecoration.Update(at(rendered.backgroundPx),
         LegacyComponentSerializer.legacySection().serialize(rendered.appliedText), style, label.box(),
         new HologramPresentation(scale, scale, 1D, 0D, 0D, 0D, 1D),
-        textCenteringTranslation(scale * style.scaleX(), scale * style.scaleY())));
+        textCenteringTranslation(scale * style.scaleX(), scale * style.scaleY()), 0));
   }
 
   private void despawn(UUID uuid) {

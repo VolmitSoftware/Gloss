@@ -36,7 +36,7 @@ public final class BlockMenuIcon extends MenuIcon<BlockIconData> {
 
   @Override
   protected List<UUID> createDisplayEntities(Location loc) {
-    Location center = session.getTransform().localPosition(
+    Location center = transform().localPosition(
         position,
         new Vector(0F, VERTICAL_OFFSET, 0F)
     );
@@ -53,11 +53,11 @@ public final class BlockMenuIcon extends MenuIcon<BlockIconData> {
   @Override
   public CollisionPlane createBoundingBox(Location anchor) {
     float scale = uiScale();
-    Vector center = session.getTransform().localPosition(
+    Vector center = transform().localPosition(
         anchor,
         new Vector(0F, VERTICAL_OFFSET, 0F)
     ).toVector();
-    return session.getTransform().createPlane(
+    return transform().createPlane(
         center,
         DISPLAY_SIZE * scale * style.scaleX(),
         DISPLAY_SIZE * scale * style.scaleY()

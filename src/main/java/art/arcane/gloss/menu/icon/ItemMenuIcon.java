@@ -102,8 +102,8 @@ public class ItemMenuIcon extends MenuIcon<MenuIconData> {
 
   public CollisionPlane createBoundingBox(Location anchor) {
     float scale = uiScale();
-    Vector center = session.getTransform().localPosition(anchor, new Vector(0F, BlockMenuIcon.VERTICAL_OFFSET, 0F)).toVector();
-    return session.getTransform().createPlane(
+    Vector center = transform().localPosition(anchor, new Vector(0F, BlockMenuIcon.VERTICAL_OFFSET, 0F)).toVector();
+    return transform().createPlane(
         center,
         .75F * scale * style.scaleX(),
         .75F * scale * style.scaleY()
@@ -113,7 +113,7 @@ public class ItemMenuIcon extends MenuIcon<MenuIconData> {
   protected List<UUID> createDisplayEntities(Location loc) {
     appliedBlockTransform = null;
     List<UUID> uuids = Lists.newArrayList();
-    MenuTransform transform = session.getTransform();
+    MenuTransform transform = transform();
     Location location;
     if (isBlock()) {
       location = blockLocation(transform);
@@ -164,13 +164,13 @@ public class ItemMenuIcon extends MenuIcon<MenuIconData> {
     // re-asserted even though applyOrientation's inputs are unchanged.
     appliedBlockTransform = null;
     if (displayEntities.size() == 1 && count > 1) {
-      DisplayEntityManager.move(displayEntities.get(0), session.getTransform().localVector(new Vector(0F, COUNT_LIFT, 0F)));
+      DisplayEntityManager.move(displayEntities.get(0), transform().localVector(new Vector(0F, COUNT_LIFT, 0F)));
       UUID displayEntity = DisplayEntityManager.add(session.displayGroup(), textDisplay(countText(count), countLocation()));
       displayEntities.add(displayEntity);
       applyOrientation();
       DisplayEntityManager.spawn(displayEntity, session.getPlayer());
     } else if (displayEntities.size() == 2 && count < 2) {
-      DisplayEntityManager.move(displayEntities.get(0), session.getTransform().localVector(new Vector(0F, -COUNT_LIFT, 0F)));
+      DisplayEntityManager.move(displayEntities.get(0), transform().localVector(new Vector(0F, -COUNT_LIFT, 0F)));
       DisplayEntityManager.delete(displayEntities.get(1), session.getPlayer());
       displayEntities.remove(1);
     } else {
@@ -191,7 +191,7 @@ public class ItemMenuIcon extends MenuIcon<MenuIconData> {
     if (!isBlock() || displayEntities == null || displayEntities.isEmpty()) {
       return;
     }
-    MenuTransform transform = session.getTransform();
+    MenuTransform transform = transform();
     if (transform == appliedBlockTransform
         && position.getX() == appliedBlockX
         && position.getY() == appliedBlockY
@@ -218,7 +218,7 @@ public class ItemMenuIcon extends MenuIcon<MenuIconData> {
   }
 
   private Location countLocation() {
-    return session.getTransform().localPosition(position, new Vector(0F, -localLineHeight() - .37F, 0F));
+    return transform().localPosition(position, new Vector(0F, -localLineHeight() - .37F, 0F));
   }
 
   private Location blockLocation(MenuTransform transform) {

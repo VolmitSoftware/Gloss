@@ -52,7 +52,7 @@ public final class ListComponent extends MenuComponent<ListComponentData> {
     for (int index = from; index < to; index++) {
       int position = index - from;
       expanded.add(new ExpandedMenuComponent(new MenuComponentData(data.id() + "[" + index + "]",
-          offset(data.offset(), flow, position), list.template(), data.show()),
+          offset(data.offset(), flow, position), list.template(), data.show(), data.motion()),
           new RepeatScope(scope, list.variable(), entries.get(index))));
     }
     return List.copyOf(expanded);

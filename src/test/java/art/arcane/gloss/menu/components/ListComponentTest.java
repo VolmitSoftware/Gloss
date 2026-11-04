@@ -104,7 +104,7 @@ class ListComponentTest {
     }
 
     private static MenuComponentData component(ListComponentData data) {
-        return new MenuComponentData("items", new Vector(), data, null);
+        return new MenuComponentData("items", new Vector(), data, null, null);
     }
 
     private static ExprScope scopeOf(Object entries) {

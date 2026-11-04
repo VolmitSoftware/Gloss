@@ -35,7 +35,7 @@ public final class ApiMenuTranslator {
     for (HoloComponent component : menu.components()) {
       components.add(new MenuComponentData(component.id(),
           new Vector(component.offsetX(), component.offsetY(), component.offsetZ()),
-          componentData(component), ShowCondition.ALWAYS));
+          componentData(component), ShowCondition.ALWAYS, null));
     }
 
     MenuDefinitionData definition = new MenuDefinitionData(

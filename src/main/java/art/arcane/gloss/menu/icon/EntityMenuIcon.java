@@ -48,7 +48,7 @@ public final class EntityMenuIcon extends MenuIcon<EntityIconData> {
 
   @Override
   public CollisionPlane createBoundingBox(Location anchor) {
-    float scale = uiScale();
+    float scale = session.getTransform().scale();
     Vector center = session.getTransform().localPosition(
         anchor,
         new Vector(0F, height / 2F, 0F)

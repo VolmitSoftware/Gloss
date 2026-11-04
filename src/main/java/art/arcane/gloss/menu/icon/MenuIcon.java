@@ -45,10 +45,14 @@ public abstract class MenuIcon<D extends MenuIconData> {
   protected Location position;
   private long geometryRevision;
   private float renderedScale;
+  private float motionScale = 1F;
+  private int motionTicks;
+  private MenuTransform motionBase;
+  private MenuTransform motionTransform;
 
   public MenuIcon(MenuSession session, Location loc, D data) throws MenuIconException {
     this.session = session;
-    this.position = session.getTransform().orient(loc);
+    this.position = transform().orient(loc);
     this.data = data;
     this.style = IconDisplayStyle.resolve(data == null ? null : data.style());
   }
@@ -169,8 +173,40 @@ public abstract class MenuIcon<D extends MenuIconData> {
     geometryRevision++;
   }
 
+  /** The next {@link #applyTransform} eases to this size over these ticks; new displays start at both. */
+  public void applyMotion(float scale, int ticks) {
+    if (scale != motionScale) {
+      motionScale = scale;
+      motionBase = null;
+    }
+    if (ticks == motionTicks) {
+      return;
+    }
+    motionTicks = ticks;
+    if (displayEntities != null) {
+      displayEntities.forEach(entity -> DisplayEntityManager.changeEasing(entity, ticks));
+    }
+  }
+
+  protected int motionTicks() {
+    return motionTicks;
+  }
+
+  /** The session transform at this icon's motion scale, so geometry and hitbox resize together. */
+  protected final MenuTransform transform() {
+    MenuTransform base = session.getTransform();
+    if (motionScale == 1F) {
+      return base;
+    }
+    if (base != motionBase) {
+      motionBase = base;
+      motionTransform = base.withScale(base.scale() * motionScale);
+    }
+    return motionTransform;
+  }
+
   protected float uiScale() {
-    return session.getTransform().scale();
+    return transform().scale();
   }
 
   protected byte billboardMode() {
@@ -198,7 +234,7 @@ public abstract class MenuIcon<D extends MenuIconData> {
   }
 
   protected Vector textBoundingBoxCenter(Location anchor) {
-    return textBoundingBoxCenter(session.getTransform(), anchor, style.scaleY());
+    return textBoundingBoxCenter(transform(), anchor, style.scaleY());
   }
 
   static Vector textBoundingBoxCenter(MenuTransform transform, Location anchor) {
@@ -240,6 +276,8 @@ public abstract class MenuIcon<D extends MenuIconData> {
     displayEntity.width(style.cullingWidth());
     displayEntity.height(style.cullingHeight());
     displayEntity.glowColorOverride(style.glowColorOverride());
+    displayEntity.teleportDuration(motionTicks);
+    displayEntity.interpolationDuration(motionTicks);
     displayEntity.scale(new Vector3f(
         scale * style.scaleX(),
         scale * style.scaleY(),
@@ -250,7 +288,7 @@ public abstract class MenuIcon<D extends MenuIconData> {
 
   public void spawn() {
     remove();
-    Location spawnLocation = session.getTransform().localPosition(position, new Vector(0F, -localLineHeight(), 0F));
+    Location spawnLocation = transform().localPosition(position, new Vector(0F, -localLineHeight(), 0F));
     displayEntities = createDisplayEntities(spawnLocation);
     renderedScale = uiScale();
     applyOrientation();
@@ -286,7 +324,7 @@ public abstract class MenuIcon<D extends MenuIconData> {
   }
 
   public void applyVisualOffset(Location loc, Vector worldOffset) {
-    Location target = session.getTransform().orient(loc);
+    Location target = transform().orient(loc);
     target.add(worldOffset);
     teleport(target);
     applyOrientation();
@@ -306,7 +344,7 @@ public abstract class MenuIcon<D extends MenuIconData> {
     if (billboardMode() != 0 || displayEntities == null || displayEntities.isEmpty()) {
       return;
     }
-    MenuTransform transform = session.getTransform();
+    MenuTransform transform = transform();
     displayEntities.forEach(entity -> DisplayEntityManager.orient(
         entity,
         transform.displayYaw(),

@@ -67,7 +67,7 @@ public class MenuSessionComponentDeduplicationTest {
   }
 
   private static MenuComponentData component(String id, String marker) {
-    return new MenuComponentData(id, new Vector(), new ProbeData(marker), ShowCondition.ALWAYS);
+    return new MenuComponentData(id, new Vector(), new ProbeData(marker), ShowCondition.ALWAYS, null);
   }
 
   private static Player player() {

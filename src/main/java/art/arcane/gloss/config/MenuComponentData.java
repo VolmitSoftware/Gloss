@@ -6,9 +6,10 @@ import art.arcane.gloss.menu.MenuSession;
 import art.arcane.gloss.menu.components.MenuComponent;
 import org.bukkit.util.Vector;
 
-public record MenuComponentData(String id, Vector offset, ComponentData data, ShowCondition show) {
+public record MenuComponentData(String id, Vector offset, ComponentData data, ShowCondition show, ComponentMotion motion) {
   public MenuComponentData {
     show = show == null ? ShowCondition.ALWAYS : show;
+    motion = motion == null ? ComponentMotion.NONE : motion;
   }
 
   public MenuComponent<?> createComponent(MenuSession session) {

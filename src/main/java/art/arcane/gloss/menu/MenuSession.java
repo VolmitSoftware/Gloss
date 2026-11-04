@@ -49,6 +49,7 @@ public class MenuSession {
 
   private Map<String, MenuComponent<?>> componentsById;
   private Map<String, ExprScope> componentScopes = Map.of();
+  private SessionScope componentRootScope;
 
   private final ApiMenuHandle apiHandle;
   private final MenuSessionOptions options;
@@ -100,8 +101,8 @@ public class MenuSession {
   }
 
   private void rebuildComponents(List<MenuComponentData> declaredComponents, List<ParticleLayer> layers) {
-    List<ExpandedMenuComponent> declared = MenuComponentExpansion.expand(declaredComponents,
-        new SessionScope(player, variables));
+    this.componentRootScope = new SessionScope(player, variables);
+    List<ExpandedMenuComponent> declared = MenuComponentExpansion.expand(declaredComponents, componentRootScope);
     Map<String, MenuComponent<?>> uniqueComponents = new LinkedHashMap<>(declared.size());
     Map<String, ExprScope> scopes = new LinkedHashMap<>(declared.size());
     for (ExpandedMenuComponent expanded : declared) {
@@ -318,6 +319,7 @@ public class MenuSession {
       return;
     }
     conditionEpoch = ++conditionSequence;
+    componentRootScope.refresh();
     displayGroup.begin();
     try {
       tickPass();

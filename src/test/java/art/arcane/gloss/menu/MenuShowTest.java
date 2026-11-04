@@ -215,7 +215,7 @@ public class MenuShowTest {
           default -> throw new UnsupportedOperationException(method.getName());
         });
     MenuDefinitionData definition = new MenuDefinitionData(new Vector(), true, false, 8D,
-        false, false, List.of(new MenuComponentData("probe", new Vector(), new ProbeData(), componentShow)),
+        false, false, List.of(new MenuComponentData("probe", new Vector(), new ProbeData(), componentShow, null)),
         List.of(), show, Map.of(), List.of());
     definition.setId("show-test");
     MenuTransform transform = new MenuTransform(player.getLocation(), new Vector(), 0F, 0F, 0F, 1F);
