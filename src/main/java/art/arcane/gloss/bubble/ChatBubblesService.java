@@ -249,12 +249,18 @@ public final class ChatBubblesService implements Listener, RegistryOwner {
         if (!style.show().isDynamic() && !style.show().isAlwaysVisible()) {
             return;
         }
-        ParticleText.Rendered particleText = renderParticleTextBlock(style.prefix(), style.format(), message,
+        String body = bubbleMessage(sender, message);
+        ParticleText.Rendered particleText = renderParticleTextBlock(style.prefix(), style.format(), body,
             style.wordWrapChars(), prefix -> plugin.text().render(sender, prefix));
         List<String> lines = List.of(particleText.text().split("\n", -1));
         if (!lines.isEmpty()) {
-            spawn(sender, resolved, message, lines, particleText);
+            spawn(sender, resolved, body, lines, particleText);
         }
+    }
+
+    /** The channel engine hands hooks the raw line, so the bubble applies what the sender may use itself. */
+    String bubbleMessage(Player sender, String message) {
+        return plugin.text().chat(sender, message);
     }
 
     private ResolvedStyle resolveStyle(Player sender) {
