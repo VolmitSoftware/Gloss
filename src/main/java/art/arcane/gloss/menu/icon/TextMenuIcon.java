@@ -13,6 +13,7 @@ import art.arcane.gloss.exceptions.MenuIconException;
 import art.arcane.gloss.menu.DisplayEntityManager;
 import art.arcane.gloss.menu.MenuSession;
 import art.arcane.gloss.menu.MenuTransform;
+import art.arcane.gloss.text.TextDisplayLayout;
 import art.arcane.gloss.text.TextPipeline;
 import art.arcane.gloss.particle.ParticleText;
 import art.arcane.gloss.util.common.TextUtils;
@@ -57,6 +58,7 @@ public class TextMenuIcon extends MenuIcon<TextIconData> {
   private double decorationX;
   private double decorationY;
   private double decorationZ;
+  private int measuredPixels = -1;
 
   public TextMenuIcon(MenuSession session, Location loc, TextIconData data, ExprScope expressionScope) throws MenuIconException {
     super(session, loc, data);
@@ -158,12 +160,20 @@ public class TextMenuIcon extends MenuIcon<TextIconData> {
 
   @Override
   public CollisionPlane createBoundingBox(Location anchor) {
-    float lineHeight = scaledLineHeight();
-    float characterWidth = scaledCharacterWidth();
-    float width = 0;
-    for (Component component : components)
-      width = Math.max(width, TextUtils.content(component).length() * characterWidth / 2F);
-    return session.getTransform().createPlane(textBoundingBoxCenter(anchor), width, components.size() * lineHeight);
+    if (measuredPixels < 0) {
+      measuredPixels = measurePixels(components, style.lineWidth(), data.box());
+    }
+    float width = measuredPixels * TextDisplayLayout.PIXEL_SIZE * uiScale() * style.scaleX();
+    return session.getTransform().createPlane(textBoundingBoxCenter(anchor), width, components.size() * scaledLineHeight());
+  }
+
+  static int measurePixels(List<Component> lines, int lineWidth, HologramBox box) {
+    int widest = 0;
+    for (Component line : lines) {
+      String legacy = LegacyComponentSerializer.legacySection().serialize(line);
+      widest = Math.max(widest, HologramBoxLayout.measure(legacy, lineWidth, box).textWidth());
+    }
+    return widest;
   }
 
   @Override
@@ -193,6 +203,7 @@ public class TextMenuIcon extends MenuIcon<TextIconData> {
     if (index >= components.size())
       return;
     components.set(index, c);
+    measuredPixels = -1;
     DisplayEntityManager.changeName(this.displayEntities.get(index), c);
   }
 
@@ -224,6 +235,7 @@ public class TextMenuIcon extends MenuIcon<TextIconData> {
       remove();
       components.clear();
       components.addAll(replacement);
+      measuredPixels = -1;
       spawn();
       markGeometryChanged();
       return true;
