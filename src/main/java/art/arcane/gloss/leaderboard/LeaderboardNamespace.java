@@ -62,16 +62,16 @@ public final class LeaderboardNamespace implements ExprVariableNamespace {
 
     private static Object ranked(LeaderboardView view, String selector, String field) {
         int rank = rank(selector);
-        LeaderboardView.Row row = rank == 0 ? null : view.row(rank);
-        if (row == null) {
+        if (rank == 0) {
             return null;
         }
+        LeaderboardView.Row row = view.row(rank);
         return switch (field) {
-            case "name" -> row.name();
-            case "value" -> row.value();
-            case "formatted" -> row.formatted();
-            case "uuid" -> row.uuid().toString();
-            case "rank" -> (double) rank;
+            case "name" -> row == null ? "" : row.name();
+            case "value" -> row == null ? 0.0D : row.value();
+            case "formatted" -> row == null ? "" : row.formatted();
+            case "uuid" -> row == null ? "" : row.uuid().toString();
+            case "rank" -> row == null ? 0.0D : (double) rank;
             default -> null;
         };
     }

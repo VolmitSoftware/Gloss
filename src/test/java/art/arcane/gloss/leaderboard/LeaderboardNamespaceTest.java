@@ -60,9 +60,18 @@ class LeaderboardNamespaceTest {
     }
 
     @Test
-    void anUnknownBoardRankOrFieldResolvesToNull() {
+    void aRankPastTheEndReadsAsEmptyOrZero() {
+        assertEquals("", resolve("kills.9.name"));
+        assertEquals("", resolve("kills.9.formatted"));
+        assertEquals("", resolve("kills.9.uuid"));
+        assertEquals(0.0D, resolve("kills.9.value"));
+        assertEquals(0.0D, resolve("kills.9.rank"));
+    }
+
+    @Test
+    void anUnknownBoardOrFieldResolvesToNull() {
         assertNull(resolve("missing.1.name"));
-        assertNull(resolve("kills.9.name"));
+        assertNull(resolve("kills.9.nope"));
         assertNull(resolve("kills.1.nope"));
         assertNull(resolve("kills"));
         assertNull(resolve("kills.me.nope", ALPHA));

@@ -6,7 +6,11 @@ import org.bukkit.entity.Player;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Proxy;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.logging.Handler;
+import java.util.logging.LogRecord;
+import java.util.logging.Logger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -44,6 +48,38 @@ class TextExpressionRendererTest {
         assertEquals("AB", renderer.render(null, "A{{ }}B"));
         assertEquals("AB", renderer.render(null, "A{{ " + "x".repeat(1025) + " }}B"));
         assertEquals("A {{ 1 + 2", renderer.render(null, "A {{ 1 + 2"));
+    }
+
+    @Test
+    void aViewerValueReadsEmptyWithoutAViewerAndWarnsOnlyForAnUnknownName() {
+        List<LogRecord> records = new ArrayList<>();
+        Handler handler = new Handler() {
+            @Override
+            public void publish(LogRecord record) {
+                records.add(record);
+            }
+
+            @Override
+            public void flush() {
+            }
+
+            @Override
+            public void close() {
+            }
+        };
+        Logger logger = Logger.getLogger("Gloss");
+        logger.addHandler(handler);
+        try {
+            assertEquals("A  B", renderer.render(null, "A {{ player.locale }} B"));
+            assertEquals("", renderer.render(null, "{{ viewer.name }}"));
+            assertEquals("", renderer.render(null, "{{ player.name + '!' }}"));
+            assertTrue(records.isEmpty());
+
+            assertEquals("", renderer.render(null, "{{ time.hour }}"));
+            assertEquals(1, records.size());
+        } finally {
+            logger.removeHandler(handler);
+        }
     }
 
     @Test

@@ -218,12 +218,16 @@ public final class TextExpressionRenderer {
         if (source.isEmpty() || source.length() > SOURCE_LIMIT) {
             return "";
         }
+        Expr expression = null;
         try {
-            Expr expression = cached(source);
+            expression = cached(source);
             return ExprEvaluator.string(expression, scope);
         } catch (RoleSnapshotPendingException pending) {
             throw pending;
         } catch (RuntimeException failure) {
+            if (expression != null && scope.variableContext().viewer() == null && dependsOnViewer(expression)) {
+                return "";
+            }
             if (failed.add(source)) {
                 Gloss.logExceptionStack(false, failure, "Text expression {{ %s }} failed.", source);
             }
