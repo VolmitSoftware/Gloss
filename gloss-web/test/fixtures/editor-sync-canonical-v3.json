@@ -1,0 +1,47 @@
+{
+  "project": {
+    "format": "gloss-sync-project",
+    "version": 3,
+    "kind": "workspace",
+    "subjectId": "workspace",
+    "constraints": {
+      "subjectId": "workspace",
+      "documentKinds": [
+        "animation",
+        "bubble-style",
+        "container-preview",
+        "damage-indicators",
+        "emoji",
+        "entity-overlays",
+        "hologram",
+        "menu",
+        "motd",
+        "panel",
+        "real-drops",
+        "scoreboard",
+        "tablist"
+      ],
+      "createDocumentKinds": [
+        "animation",
+        "bubble-style",
+        "container-preview",
+        "damage-indicators",
+        "emoji",
+        "entity-overlays",
+        "hologram",
+        "menu",
+        "motd",
+        "panel",
+        "real-drops",
+        "scoreboard",
+        "tablist"
+      ],
+      "allowDeletes": true
+    },
+    "documents": [],
+    "images": [],
+    "warnings": [],
+    "baseRevision": "sha256:611bfbce886249bc61d11fb1498d85df972cc05277feacb0e1a0aebb61807071"
+  },
+  "canonicalWithoutBaseRevision": "{\"constraints\":{\"allowDeletes\":true,\"createDocumentKinds\":[\"animation\",\"bubble-style\",\"container-preview\",\"damage-indicators\",\"emoji\",\"entity-overlays\",\"hologram\",\"menu\",\"motd\",\"panel\",\"real-drops\",\"scoreboard\",\"tablist\"],\"documentKinds\":[\"animation\",\"bubble-style\",\"container-preview\",\"damage-indicators\",\"emoji\",\"entity-overlays\",\"hologram\",\"menu\",\"motd\",\"panel\",\"real-drops\",\"scoreboard\",\"tablist\"],\"subjectId\":\"workspace\"},\"documents\":[],\"format\":\"gloss-sync-project\",\"images\":[],\"kind\":\"workspace\",\"subjectId\":\"workspace\",\"version\":3,\"warnings\":[]}"
+}

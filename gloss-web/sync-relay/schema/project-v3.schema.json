@@ -1,0 +1,236 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sync.gloss.volmitsoftware.com/schema/project-v3.schema.json",
+  "title": "Gloss editor sync project v3",
+  "description": "Kinds are OPEN slugs: the relay and this transport schema validate only the slug grammar and size bounds. Per-kind document semantics (subject scoping, menu/panel identities, canonical panel text, document sorting by kind then id) are enforced by the plugin and the editor codecs, never by the relay. A new document kind requires no schema or relay change.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "version",
+    "kind",
+    "subjectId",
+    "baseRevision",
+    "documents",
+    "images",
+    "constraints",
+    "warnings"
+  ],
+  "properties": {
+    "format": {
+      "const": "gloss-sync-project"
+    },
+    "version": {
+      "const": 3
+    },
+    "kind": {
+      "$ref": "#/$defs/kindSlug"
+    },
+    "subjectId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "baseRevision": {
+      "$ref": "#/$defs/revision"
+    },
+    "documents": {
+      "type": "array",
+      "minItems": 0,
+      "maxItems": 512,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "id",
+          "json"
+        ],
+        "properties": {
+          "kind": {
+            "$ref": "#/$defs/kindSlug"
+          },
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "json": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2097152
+          },
+          "baseRevision": {
+            "$ref": "#/$defs/revision"
+          }
+        }
+      }
+    },
+    "images": {
+      "type": "array",
+      "maxItems": 512,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "path",
+          "data"
+        ],
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "data": {
+            "type": "string",
+            "maxLength": 699100,
+            "pattern": "^data:image/(png|jpeg|gif|webp|bmp);base64,[A-Za-z0-9+/]*={0,2}$"
+          }
+        }
+      }
+    },
+    "constraints": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "subjectId",
+        "documentKinds",
+        "createDocumentKinds",
+        "allowDeletes"
+      ],
+      "properties": {
+        "subjectId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "documentKinds": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/kindSlug"
+          }
+        },
+        "createDocumentKinds": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/kindSlug"
+          }
+        },
+        "newMenuPrefix": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 256
+        },
+        "newImagePrefix": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 256
+        },
+        "allowDeletes": {
+          "type": "boolean"
+        }
+      }
+    },
+    "warnings": {
+      "type": "array",
+      "maxItems": 256,
+      "items": {
+        "type": "string",
+        "maxLength": 512
+      }
+    },
+    "history": {
+      "type": "array",
+      "maxItems": 2000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "id",
+          "version",
+          "source",
+          "bytes"
+        ],
+        "properties": {
+          "kind": {
+            "$ref": "#/$defs/kindSlug"
+          },
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "source": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "bytes": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        }
+      }
+    },
+    "schemas": {
+      "type": "object",
+      "description": "JSON Schema per wire kind, so an editor with no stage for a kind can still render an inspector for it.",
+      "additionalProperties": {
+        "type": "object"
+      }
+    },
+    "defaults": {
+      "type": "object",
+      "description": "The shipped default documents per wire kind, used as templates for a kind the editor has no template of its own for.",
+      "additionalProperties": {
+        "type": "array",
+        "maxItems": 64,
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "json"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "json": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2097152
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "revision": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "kindSlug": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{0,31}$"
+    }
+  }
+}

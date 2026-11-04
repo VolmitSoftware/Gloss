@@ -1,0 +1,354 @@
+/// GlossHologramDoc: byte-faithful round-trips, unknown-key preservation,
+/// the schemaVersion hard-reject and the lenient-everything-else contract.
+library;
+
+import 'dart:convert';
+
+import 'package:gloss_editor/model/model.dart';
+import 'package:test/test.dart';
+
+const String _baseline = '''
+{
+  "schemaVersion": 3,
+  "revision": 7,
+  "anchor": {
+    "world": "world_nether",
+    "position": [10.5, 64, -3.25]
+  },
+  "lines": [
+    "&dTop",
+    "&7Bottom"
+  ],
+  "particleLayers": []
+}
+''';
+
+void main() {
+  group('decode', () {
+    test('reads the full document', () {
+      final GlossHologramDoc doc = decodeGlossHologramDoc(_baseline);
+      expect(doc.schemaVersion, 3);
+      expect(doc.revision, 7);
+      expect(doc.anchor.world, 'world_nether');
+      expect(doc.anchor.position, <double>[10.5, 64, -3.25]);
+      expect(doc.anchor.positionIsValidTriple, isTrue);
+      expect(doc.lines, <String>['&dTop', '&7Bottom']);
+      expect(doc.style.seeThrough, isTrue);
+    });
+
+    test('rejects a wrong schemaVersion like DocumentEnvelope does', () {
+      expect(
+        () => decodeGlossHologramDoc('{"schemaVersion": 1, "revision": 1}'),
+        throwsA(isA<HuiFormatException>()),
+      );
+    });
+
+    test('rejects a missing schemaVersion — Gson reads 0 and 0 != 1', () {
+      expect(
+        () => decodeGlossHologramDoc('{"revision": 1, "lines": []}'),
+        throwsA(isA<HuiFormatException>()),
+      );
+    });
+
+    test('rejects malformed JSON', () {
+      expect(
+        () => decodeGlossHologramDoc('{nope'),
+        throwsA(isA<HuiFormatException>()),
+      );
+    });
+
+    test('is lenient about everything validation owns', () {
+      final GlossHologramDoc doc = decodeGlossHologramDoc(
+        '{"schemaVersion": 3, "revision": 0, '
+        '"anchor": {"world": "", "position": [1, 2]}, "lines": []}',
+      );
+      expect(doc.revision, 0);
+      expect(doc.anchor.world, isEmpty);
+      expect(doc.anchor.positionIsValidTriple, isFalse);
+      expect(doc.anchor.position, <double>[1, 2, 0]);
+    });
+
+    test('a missing anchor is flagged, not defaulted away', () {
+      final GlossHologramDoc doc = decodeGlossHologramDoc(
+        '{"schemaVersion": 3, "revision": 1, "lines": ["a"]}',
+      );
+      expect(doc.anchorPresent, isFalse);
+      expect(jsonDecode(encodeGlossHologramDoc(doc)), <String, dynamic>{
+        'schemaVersion': 3,
+        'revision': 1,
+        'lines': <String>['a'],
+      });
+    });
+
+    test(
+      'a scalar lines value reads as a one-element list '
+      '(SingleCollectionTypeFactory) and null entries become empty strings',
+      () {
+        expect(
+          decodeGlossHologramDoc(
+            '{"schemaVersion": 3, "revision": 1, "lines": "solo"}',
+          ).lines,
+          <String>['solo'],
+        );
+        expect(
+          decodeGlossHologramDoc(
+            '{"schemaVersion": 3, "revision": 1, "lines": ["a", null, "b"]}',
+          ).lines,
+          <String>['a', '', 'b'],
+        );
+      },
+    );
+  });
+
+  group('round-trip', () {
+    test('mixed object lines survive editing cloning and saving', () {
+      final List<Object?> lines = <Object?>[
+        '&fWelcome',
+        <String, Object?>{
+          'text': '&aConditional',
+          'show': 'player.online',
+          'scale': 1.5,
+        },
+        <String, Object?>{
+          'item': <String, Object?>{
+            'type': 'item',
+            'material': 'minecraft:diamond_sword',
+            'customModelValue': 3,
+          },
+          'scale': 0.5,
+        },
+        <String, Object?>{'head': 'Alex', 'scale': 0.75},
+        <String, Object?>{'block': 'minecraft:oak_log'},
+        <String, Object?>{'entity': 'minecraft:zombie'},
+      ];
+      final Map<String, Object?> source =
+          jsonDecode(_baseline) as Map<String, Object?>;
+      source['lines'] = lines;
+      final GlossHologramDoc doc = decodeGlossHologramDoc(jsonEncode(source));
+      doc.anchor.world = 'world';
+      doc.lines[0] = '&eEdited';
+      final GlossHologramDoc copied = doc.copy();
+      final GlossHologramDoc cloned = cloneGlossHologramDoc(doc);
+      for (final GlossHologramDoc result in <GlossHologramDoc>[
+        doc,
+        copied,
+        cloned,
+      ]) {
+        final Map<String, Object?> output =
+            jsonDecode(encodeGlossHologramDoc(result)) as Map<String, Object?>;
+        expect((output['lines']! as List<Object?>).skip(1), lines.skip(1));
+        expect(result.textLines, <String>[
+          '&eEdited',
+          '&aConditional',
+          '',
+          '',
+          '',
+          '',
+        ]);
+      }
+      final Map<String, Object?> copiedItem =
+          copied.lines[2]! as Map<String, Object?>;
+      (copiedItem['item']! as Map<String, Object?>)['material'] =
+          'minecraft:stone';
+      expect(
+        ((doc.lines[2]! as Map<String, Object?>)['item']!
+            as Map<String, Object?>)['material'],
+        'minecraft:diamond_sword',
+      );
+    });
+
+    test('decode-encode is stable on the canonical shape', () {
+      final GlossHologramDoc doc = decodeGlossHologramDoc(_baseline);
+      final String encoded = encodeGlossHologramDoc(doc);
+      expect(encodeGlossHologramDoc(decodeGlossHologramDoc(encoded)), encoded);
+      expect(jsonDecode(encoded), jsonDecode(_baseline));
+    });
+
+    test('an explicit occluded hologram remains occluded', () {
+      final GlossHologramDoc doc = decodeGlossHologramDoc(
+        _baseline.replaceFirst(
+          '"lines": [',
+          '"style": {"seeThrough": false},\n  "lines": [',
+        ),
+      );
+
+      expect(doc.style.seeThrough, isFalse);
+      expect(
+        jsonDecode(encodeGlossHologramDoc(doc))['style']['seeThrough'],
+        isFalse,
+      );
+    });
+
+    test('unknown keys survive at both levels, after the known ones', () {
+      const String withExtras = '''
+{
+  "schemaVersion": 3,
+  "revision": 3,
+  "future": {"nested": [1, 2, 3]},
+  "anchor": {
+    "world": "world",
+    "position": [0, 0, 0],
+    "pitch": 45.0
+  },
+  "lines": ["x"]
+}
+''';
+      final GlossHologramDoc doc = decodeGlossHologramDoc(withExtras);
+      final Map<String, dynamic> out =
+          jsonDecode(encodeGlossHologramDoc(doc)) as Map<String, dynamic>;
+      expect(out['future'], <String, dynamic>{
+        'nested': <int>[1, 2, 3],
+      });
+      expect((out['anchor'] as Map<String, dynamic>)['pitch'], 45.0);
+      // Still preserved through an edit to a known field.
+      doc.anchor.world = 'world_the_end';
+      final Map<String, dynamic> edited =
+          jsonDecode(encodeGlossHologramDoc(doc)) as Map<String, dynamic>;
+      expect((edited['anchor'] as Map<String, dynamic>)['pitch'], 45.0);
+      expect(
+        (edited['anchor'] as Map<String, dynamic>)['world'],
+        'world_the_end',
+      );
+    });
+
+    test('an invalid position shape is re-emitted verbatim', () {
+      const String badVector =
+          '{"schemaVersion": 3, "revision": 1, '
+          '"anchor": {"world": "world", "position": [1, 2]}, "lines": []}';
+      final GlossHologramDoc doc = decodeGlossHologramDoc(badVector);
+      final Map<String, dynamic> out =
+          jsonDecode(encodeGlossHologramDoc(doc)) as Map<String, dynamic>;
+      expect((out['anchor'] as Map<String, dynamic>)['position'], <int>[1, 2]);
+    });
+
+    test('setPosition writes the canonical triple', () {
+      final GlossHologramDoc doc = decodeGlossHologramDoc(_baseline);
+      doc.anchor.setPosition(1, 2.5, 3);
+      final Map<String, dynamic> out =
+          jsonDecode(encodeGlossHologramDoc(doc)) as Map<String, dynamic>;
+      expect((out['anchor'] as Map<String, dynamic>)['position'], <num>[
+        1,
+        2.5,
+        3,
+      ]);
+    });
+  });
+
+  group('orientation', () {
+    test('defaults to the pre-billboard pose when the keys are absent', () {
+      final GlossHologramDoc doc = decodeGlossHologramDoc(_baseline);
+      expect(doc.style.billboard, 'center');
+      expect(doc.yaw, 0);
+      expect(doc.pitch, 0);
+    });
+
+    test('a document without the keys re-encodes byte for byte', () {
+      final GlossHologramDoc doc = decodeGlossHologramDoc(_baseline);
+      final String encoded = encodeGlossHologramDoc(doc);
+      expect(encoded.contains('billboard'), isFalse);
+      expect(encoded.contains('yaw'), isFalse);
+      expect(encoded.contains('pitch'), isFalse);
+      expect(encodeGlossHologramDoc(decodeGlossHologramDoc(encoded)), encoded);
+    });
+
+    test('reads and re-emits an authored pose, uppercasing the mode', () {
+      final GlossHologramDoc doc = decodeGlossHologramDoc(
+        _baseline.replaceFirst(
+          '"lines": [',
+          '"style": {"billboard": "fixed"},\n  "yaw": -135.5,\n  "pitch": 12.25,\n  "lines": [',
+        ),
+      );
+      expect(doc.style.billboard, 'fixed');
+      expect(doc.yaw, -135.5);
+      expect(doc.pitch, 12.25);
+      final Map<String, dynamic> out =
+          jsonDecode(encodeGlossHologramDoc(doc)) as Map<String, dynamic>;
+      expect(out['style']['billboard'], 'fixed');
+      expect(out['yaw'], -135.5);
+      expect(out['pitch'], 12.25);
+    });
+
+    test('an explicit default is kept, never tidied away', () {
+      final GlossHologramDoc doc = decodeGlossHologramDoc(
+        _baseline.replaceFirst(
+          '"lines": [',
+          '"style": {"billboard": "center"},\n  "yaw": 0,\n  "pitch": 0,\n  "lines": [',
+        ),
+      );
+      final Map<String, dynamic> out =
+          jsonDecode(encodeGlossHologramDoc(doc)) as Map<String, dynamic>;
+      expect((out['style'] as Map).containsKey('billboard'), isTrue);
+      expect(out.containsKey('yaw'), isTrue);
+      expect(out.containsKey('pitch'), isTrue);
+    });
+
+    test('a non-default value written into an absent key still emits', () {
+      final GlossHologramDoc doc = decodeGlossHologramDoc(_baseline);
+      doc.style.billboard = 'vertical';
+      doc.pitch = -20;
+      final Map<String, dynamic> out =
+          jsonDecode(encodeGlossHologramDoc(doc)) as Map<String, dynamic>;
+      expect(out['style']['billboard'], 'vertical');
+      expect(out['pitch'], -20);
+      expect(out.containsKey('yaw'), isFalse, reason: 'still absent and 0');
+    });
+
+    test('an out-of-range angle survives the round-trip for validation', () {
+      final GlossHologramDoc doc = decodeGlossHologramDoc(
+        _baseline.replaceFirst('"lines": [', '"pitch": 240,\n  "lines": ['),
+      );
+      expect(doc.pitch, 240);
+      expect(
+        (jsonDecode(encodeGlossHologramDoc(doc))
+            as Map<String, dynamic>)['pitch'],
+        240,
+      );
+    });
+  });
+
+  group('copy', () {
+    test('carries the orientation', () {
+      final GlossHologramDoc doc = decodeGlossHologramDoc(_baseline);
+      doc.style.billboard = 'horizontal';
+      doc.yaw = 45;
+      doc.pitch = -10;
+      final GlossHologramDoc copied = doc.copy();
+      expect(copied.style.billboard, 'horizontal');
+      expect(copied.yaw, 45);
+      expect(copied.pitch, -10);
+    });
+
+    test('is deep: neither lines nor anchor nor extras are shared', () {
+      final GlossHologramDoc doc = decodeGlossHologramDoc(_baseline);
+      final GlossHologramDoc copied = doc.copy();
+      copied.lines.add('added');
+      copied.anchor.world = 'other';
+      copied.anchor.setPosition(9, 9, 9);
+      copied.style.seeThrough = false;
+      expect(doc.lines, hasLength(2));
+      expect(doc.anchor.world, 'world_nether');
+      expect(doc.anchor.position, <double>[10.5, 64, -3.25]);
+      expect(doc.style.seeThrough, isTrue);
+    });
+  });
+
+  group('looksLikeHologramDoc', () {
+    test('needs the envelope plus an anchor', () {
+      expect(looksLikeHologramDoc(jsonDecode(_baseline)), isTrue);
+      expect(
+        looksLikeHologramDoc(<String, dynamic>{'anchor': <String, dynamic>{}}),
+        isFalse,
+        reason: 'no schemaVersion means it is not a Gloss document',
+      );
+      expect(
+        looksLikeHologramDoc(<String, dynamic>{
+          'schemaVersion': 3,
+          'lines': <String>[],
+        }),
+        isFalse,
+        reason: 'no anchor',
+      );
+      expect(looksLikeHologramDoc(<Object>[]), isFalse);
+    });
+  });
+}

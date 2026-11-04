@@ -1,0 +1,202 @@
+/// Image library grid with inline upload, used by the `textImage` editor and by
+/// the animated frame list.
+///
+/// Paths are exactly what Gloss reads from `plugins/Gloss/images/`, so the
+/// grid shows the path, not a friendly name.
+library;
+
+import 'package:arcane_jaspr/arcane_jaspr.dart';
+import 'package:jaspr/dom.dart' as dom;
+import 'package:jaspr/jaspr.dart' show Component, EventCallback;
+
+import '../../services/image_library.dart';
+import '../common/common.dart';
+import 'dom_bridge.dart';
+import 'inspector_widgets.dart';
+import 'package:gloss_editor/l10n/hui_localizations.dart';
+
+/// A `<label>`-wrapped file input: clicking the label opens the picker without
+/// any JavaScript, which a `Button` cannot do.
+class ImageUploadButton extends StatefulWidget {
+  const ImageUploadButton({
+    required this.images,
+    required this.inputId,
+    this.label,
+    this.onAdded,
+    this.upload,
+    this.multiple = true,
+    super.key,
+  });
+
+  final ImageLibrary images;
+
+  /// Must be unique in the document: the change handler reads the files back
+  /// out of the DOM by id.
+  final String inputId;
+  final String? label;
+
+  /// Called with the paths that were stored, so the caller can select one.
+  final void Function(List<String> paths)? onAdded;
+
+  /// How picked files enter the library. Null takes the text-image path,
+  /// which fits every upload into the 16x16 glyph budget; the MOTD favicon
+  /// fields pass `addFaviconsFromFiles`, which keeps 64x64 bytes intact.
+  final Future<ImageAddOutcome> Function(List<Object> files)? upload;
+
+  /// False for a field that names exactly one file, such as a server icon.
+  final bool multiple;
+
+  @override
+  State<ImageUploadButton> createState() => _ImageUploadButtonState();
+}
+
+class _ImageUploadButtonState extends State<ImageUploadButton> {
+  bool _busy = false;
+  ImageLocalizedMessage? _message;
+
+  /// A refusal is not a caveat on a stored file: it reads as danger so an
+  /// upload that produced nothing cannot be mistaken for one that worked.
+  bool _refused = false;
+
+  Future<void> _handleFiles() async {
+    final List<Object> files = readInputFiles(component.inputId);
+    resetFileInput(component.inputId);
+    if (files.isEmpty) return;
+    setState(() {
+      _busy = true;
+      _message = null;
+    });
+    final Future<ImageAddOutcome> Function(List<Object> files) upload =
+        component.upload ?? component.images.addFromFiles;
+    final ImageAddOutcome outcome = await upload(files);
+    final List<String> paths = outcome.added
+        .map((StoredImage image) => image.path)
+        .toList();
+    if (paths.isNotEmpty) component.onAdded?.call(paths);
+    setState(() {
+      _busy = false;
+      _refused = outcome.hasErrors;
+      _message = outcome.hasErrors
+          ? outcome.errorMessages.first
+          : (outcome.hasWarnings ? outcome.warningMessages.first : null);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final String label = component.label ?? huiText('Upload images');
+    return dom.div(classes: 'hui-image-upload', <Widget>[
+      dom.label(
+        classes: classNames(<String?>[
+          'hui-image-upload-button',
+          _busy ? 'is-busy' : null,
+        ]),
+        attributes: <String, String>{'for': component.inputId},
+        <Widget>[
+          ArcaneIcon.upload(size: IconSize.sm),
+          dom.span(<Widget>[Text(_busy ? huiText('Storing...') : label)]),
+        ],
+      ),
+      Component.element(
+        tag: 'input',
+        id: component.inputId,
+        classes: 'hui-visually-hidden-input',
+        attributes: <String, String>{
+          'type': 'file',
+          'accept': 'image/*',
+          if (component.multiple) 'multiple': 'multiple',
+        },
+        styles: const dom.Styles(
+          raw: <String, String>{
+            'position': 'absolute',
+            'width': '1px',
+            'height': '1px',
+            'opacity': '0',
+            'pointer-events': 'none',
+          },
+        ),
+        events: <String, EventCallback>{'change': (_) => _handleFiles()},
+      ),
+      if (_message != null)
+        HuiNote(
+          _message!(),
+          tone: _refused ? HuiNoteTone.danger : HuiNoteTone.warning,
+        ),
+    ]);
+  }
+}
+
+/// Selectable grid of stored images. [selected] highlights the current path.
+class ImagePickerGrid extends StatelessWidget {
+  const ImagePickerGrid({
+    required this.images,
+    required this.onPicked,
+    this.selected,
+    this.emptyMessage,
+    super.key,
+  });
+
+  final ImageLibrary images;
+  final String? selected;
+  final void Function(String path) onPicked;
+  final String? emptyMessage;
+
+  @override
+  Widget build(BuildContext context) {
+    final List<StoredImage> stored = images.images;
+    if (stored.isEmpty) {
+      return HuiNote(
+        emptyMessage ??
+            huiText(
+              'No images stored yet. Upload PNGs sized like the pixels you want: '
+              'Gloss draws one character per pixel, so image icons are limited '
+              'to compact pixel art up to 16x16.',
+            ),
+      );
+    }
+    return dom.div(classes: 'hui-image-grid', <Widget>[
+      for (final StoredImage image in stored) _tile(image),
+    ]);
+  }
+
+  Widget _tile(StoredImage image) {
+    final bool isSelected = image.path == selected;
+    return dom.button(
+      classes: classNames(<String?>[
+        'hui-image-tile',
+        isSelected ? 'is-selected' : null,
+      ]),
+      attributes: <String, String>{
+        'type': 'button',
+        'aria-label': huiText("{path} ({width}x{height})", <String, Object?>{
+          'path': image.path,
+          'width': image.width,
+          'height': image.height,
+        }),
+        if (isSelected) 'aria-current': 'true',
+      },
+      events: <String, EventCallback>{'click': (_) => onPicked(image.path)},
+      <Widget>[
+        dom.span(classes: 'hui-image-tile-frame', <Widget>[
+          dom.img(
+            src: image.dataUri,
+            alt: '',
+            classes: 'hui-image-tile-img',
+            styles: const dom.Styles(
+              raw: <String, String>{'image-rendering': 'pixelated'},
+            ),
+          ),
+        ]),
+        dom.span(classes: 'hui-image-tile-path', <Widget>[Text(image.path)]),
+        dom.span(classes: 'hui-image-tile-size', <Widget>[
+          Text(
+            huiText("{width}x{height}", <String, Object?>{
+              'width': image.width,
+              'height': image.height,
+            }),
+          ),
+        ]),
+      ],
+    );
+  }
+}

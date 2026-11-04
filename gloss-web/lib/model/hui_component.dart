@@ -1,0 +1,619 @@
+import 'hui_actions.dart';
+import 'hui_icons.dart';
+import 'json_codec.dart';
+import 'vec3.dart';
+
+/// Every `MenuComponentType` Gloss declares, in declaration order,
+/// case-sensitive.
+///
+/// All types can be authored and rendered on the canvas and local preview.
+const List<String> huiComponentTypes = <String>[
+  'button',
+  'decoration',
+  'toggle',
+  'list',
+  'slider',
+  'field',
+  'tabs',
+];
+
+/// The component types with dedicated authoring controls and local simulation.
+const List<String> huiEditorComponentTypes = <String>[
+  'button',
+  'decoration',
+  'toggle',
+  'list',
+  'slider',
+  'field',
+  'tabs',
+];
+
+sealed class HuiComponentData {
+  Map<String, dynamic> extras = <String, dynamic>{};
+
+  String get type;
+
+  Map<String, dynamic> toJson();
+
+  HuiComponentData copy();
+
+  static HuiComponentData fromJson(Object? raw, {String path = 'data'}) {
+    final Map<String, dynamic> map = huiReadObject(raw, path);
+    final String type = huiReadTypeTag(map, path);
+    switch (type) {
+      case 'button':
+        return HuiButtonData.fromMap(map, path);
+      case 'decoration':
+        return HuiDecorationData.fromMap(map, path);
+      case 'toggle':
+        return HuiToggleData.fromMap(map, path);
+      case 'list':
+        return HuiListData.fromMap(map, path);
+      case 'slider':
+        return HuiSliderData.fromMap(map, path);
+      case 'field':
+        return HuiFieldData.fromMap(map, path);
+      case 'tabs':
+        return HuiTabsData.fromMap(map, path);
+
+      default:
+        huiUnknownType(type, path);
+    }
+  }
+}
+
+enum HuiHitboxAnchor { button, menu }
+
+enum HuiHoverEasing {
+  linear('linear', 'Linear'),
+  easeOutCubic('ease_out_cubic', 'Ease out cubic'),
+  easeInOutCubic('ease_in_out_cubic', 'Ease in/out cubic'),
+  backOut('back_out', 'Back out');
+
+  const HuiHoverEasing(this.jsonValue, this.label);
+
+  final String jsonValue;
+  final String label;
+
+  static HuiHoverEasing fromJson(String value) {
+    for (final HuiHoverEasing easing in values) {
+      if (easing.jsonValue == value) return easing;
+    }
+    return HuiHoverEasing.easeOutCubic;
+  }
+}
+
+const int huiRuntimeDefaultHoverDurationTicks = 4;
+const HuiHoverEasing huiRuntimeDefaultHoverEasing = HuiHoverEasing.easeOutCubic;
+
+class HuiHitbox {
+  double? width;
+  double? height;
+  Vec3 offset;
+  HuiHitboxAnchor anchor;
+  Map<String, dynamic> extras = <String, dynamic>{};
+
+  HuiHitbox([
+    this.width,
+    this.height,
+    Vec3? offset,
+    this.anchor = HuiHitboxAnchor.button,
+  ]) : offset = offset ?? Vec3.zero();
+
+  bool get hasCustomSize => width != null && height != null;
+
+  bool get isDefault =>
+      !hasCustomSize &&
+      offset == Vec3.zero() &&
+      anchor == HuiHitboxAnchor.button;
+
+  Map<String, dynamic> toJson() => huiMergeExtras(<String, dynamic>{
+    if (width != null) 'width': width,
+    if (height != null) 'height': height,
+    if (offset != Vec3.zero()) 'offset': offset.toJson(),
+    if (anchor != HuiHitboxAnchor.button) 'anchor': anchor.name,
+  }, extras);
+
+  HuiHitbox copy() =>
+      HuiHitbox(width, height, offset.copy(), anchor)
+        ..extras = huiDeepCopyMap(extras);
+
+  static const Set<String> _known = <String>{
+    'width',
+    'height',
+    'offset',
+    'anchor',
+  };
+
+  static HuiHitbox? fromJsonOrNull(Object? raw, {required String path}) {
+    if (raw == null) return null;
+    final Map<String, dynamic> map = huiReadObject(raw, path);
+    final String anchor = huiReadString(map, 'anchor', fallback: 'button');
+    return HuiHitbox(
+      huiReadDoubleOrNull(map, 'width'),
+      huiReadDoubleOrNull(map, 'height'),
+      Vec3.fromJson(map['offset'], path: '$path.offset'),
+      anchor == 'menu' ? HuiHitboxAnchor.menu : HuiHitboxAnchor.button,
+    )..extras = huiCollectExtras(map, _known);
+  }
+}
+
+class HuiButtonData extends HuiComponentData {
+  /// Blocks the icon leans toward the player while highlighted. Unclamped in
+  /// JSON; the Java API clamps to 0..1.
+  double highlightModifier;
+  List<HuiAction> actions;
+  HuiIcon? icon;
+  HuiHitbox? hitbox;
+  int hoverDurationTicks;
+  HuiHoverEasing hoverEasing;
+
+  HuiButtonData([
+    this.highlightModifier = 0.05,
+    List<HuiAction>? actions,
+    this.icon,
+    this.hitbox,
+    this.hoverDurationTicks = huiRuntimeDefaultHoverDurationTicks,
+    this.hoverEasing = huiRuntimeDefaultHoverEasing,
+  ]) : actions = actions ?? <HuiAction>[];
+
+  @override
+  String get type => 'button';
+
+  @override
+  Map<String, dynamic> toJson() => huiMergeExtras(<String, dynamic>{
+    'type': 'button',
+    'highlightModifier': highlightModifier,
+    if (hitbox != null) 'hitbox': hitbox!.toJson(),
+    if (hoverDurationTicks != huiRuntimeDefaultHoverDurationTicks)
+      'hoverDurationTicks': hoverDurationTicks,
+    if (hoverEasing != huiRuntimeDefaultHoverEasing)
+      'hoverEasing': hoverEasing.jsonValue,
+    'icon': icon?.toJson(),
+    'actions': HuiAction.listToJson(actions),
+  }, extras);
+
+  @override
+  HuiButtonData copy() => HuiButtonData(
+    highlightModifier,
+    actions.map((HuiAction a) => a.copy()).toList(),
+    icon?.copy(),
+    hitbox?.copy(),
+    hoverDurationTicks,
+    hoverEasing,
+  )..extras = huiDeepCopyMap(extras);
+
+  static const Set<String> _known = <String>{
+    'type',
+    'highlightModifier',
+    'hitbox',
+    'hoverDurationTicks',
+    'hoverEasing',
+    'icon',
+    'actions',
+  };
+
+  static HuiButtonData fromMap(Map<String, dynamic> map, String path) =>
+      HuiButtonData(
+        huiReadDouble(map, 'highlightModifier'),
+        HuiAction.listFromJson(map['actions'], '$path.actions'),
+        HuiIcon.fromJsonOrNull(map['icon'], path: '$path.icon'),
+        HuiHitbox.fromJsonOrNull(map['hitbox'], path: '$path.hitbox'),
+        huiReadInt(
+          map,
+          'hoverDurationTicks',
+          fallback: huiRuntimeDefaultHoverDurationTicks,
+        ),
+        HuiHoverEasing.fromJson(
+          huiReadString(
+            map,
+            'hoverEasing',
+            fallback: huiRuntimeDefaultHoverEasing.jsonValue,
+          ),
+        ),
+      )..extras = huiCollectExtras(map, _known);
+}
+
+class HuiDecorationData extends HuiComponentData {
+  HuiIcon? icon;
+
+  HuiDecorationData([this.icon]);
+
+  @override
+  String get type => 'decoration';
+
+  @override
+  Map<String, dynamic> toJson() => huiMergeExtras(<String, dynamic>{
+    'type': 'decoration',
+    'icon': icon?.toJson(),
+  }, extras);
+
+  @override
+  HuiDecorationData copy() =>
+      HuiDecorationData(icon?.copy())..extras = huiDeepCopyMap(extras);
+
+  static const Set<String> _known = <String>{'type', 'icon'};
+
+  static HuiDecorationData fromMap(Map<String, dynamic> map, String path) =>
+      HuiDecorationData(HuiIcon.fromJsonOrNull(map['icon'], path: '$path.icon'))
+        ..extras = huiCollectExtras(map, _known);
+}
+
+class HuiToggleData extends HuiComponentData {
+  double highlightModifier;
+
+  /// PlaceholderAPI-expanded once at menu open, then compared
+  /// `equalsIgnoreCase` against [expectedValue]. Never re-evaluated.
+  String condition;
+  String expectedValue;
+  List<HuiAction> trueActions;
+  List<HuiAction> falseActions;
+  HuiIcon? trueIcon;
+  HuiIcon? falseIcon;
+  HuiHitbox? hitbox;
+  int hoverDurationTicks;
+  HuiHoverEasing hoverEasing;
+
+  HuiToggleData([
+    this.highlightModifier = 0.05,
+    this.condition = '',
+    this.expectedValue = '',
+    List<HuiAction>? trueActions,
+    List<HuiAction>? falseActions,
+    this.trueIcon,
+    this.falseIcon,
+    this.hitbox,
+    this.hoverDurationTicks = huiRuntimeDefaultHoverDurationTicks,
+    this.hoverEasing = huiRuntimeDefaultHoverEasing,
+  ]) : trueActions = trueActions ?? <HuiAction>[],
+       falseActions = falseActions ?? <HuiAction>[];
+
+  @override
+  String get type => 'toggle';
+
+  @override
+  Map<String, dynamic> toJson() => huiMergeExtras(<String, dynamic>{
+    'type': 'toggle',
+    'highlightModifier': highlightModifier,
+    'condition': condition,
+    'expectedValue': expectedValue,
+    if (hitbox != null) 'hitbox': hitbox!.toJson(),
+    if (hoverDurationTicks != huiRuntimeDefaultHoverDurationTicks)
+      'hoverDurationTicks': hoverDurationTicks,
+    if (hoverEasing != huiRuntimeDefaultHoverEasing)
+      'hoverEasing': hoverEasing.jsonValue,
+    'trueIcon': trueIcon?.toJson(),
+    'falseIcon': falseIcon?.toJson(),
+    'trueActions': HuiAction.listToJson(trueActions),
+    'falseActions': HuiAction.listToJson(falseActions),
+  }, extras);
+
+  @override
+  HuiToggleData copy() => HuiToggleData(
+    highlightModifier,
+    condition,
+    expectedValue,
+    trueActions.map((HuiAction a) => a.copy()).toList(),
+    falseActions.map((HuiAction a) => a.copy()).toList(),
+    trueIcon?.copy(),
+    falseIcon?.copy(),
+    hitbox?.copy(),
+    hoverDurationTicks,
+    hoverEasing,
+  )..extras = huiDeepCopyMap(extras);
+
+  static const Set<String> _known = <String>{
+    'type',
+    'highlightModifier',
+    'condition',
+    'expectedValue',
+    'hitbox',
+    'hoverDurationTicks',
+    'hoverEasing',
+    'trueIcon',
+    'falseIcon',
+    'trueActions',
+    'falseActions',
+  };
+
+  static HuiToggleData fromMap(Map<String, dynamic> map, String path) =>
+      HuiToggleData(
+        huiReadDouble(map, 'highlightModifier'),
+        huiReadString(map, 'condition'),
+        huiReadString(map, 'expectedValue'),
+        HuiAction.listFromJson(map['trueActions'], '$path.trueActions'),
+        HuiAction.listFromJson(map['falseActions'], '$path.falseActions'),
+        HuiIcon.fromJsonOrNull(map['trueIcon'], path: '$path.trueIcon'),
+        HuiIcon.fromJsonOrNull(map['falseIcon'], path: '$path.falseIcon'),
+        HuiHitbox.fromJsonOrNull(map['hitbox'], path: '$path.hitbox'),
+        huiReadInt(
+          map,
+          'hoverDurationTicks',
+          fallback: huiRuntimeDefaultHoverDurationTicks,
+        ),
+        HuiHoverEasing.fromJson(
+          huiReadString(
+            map,
+            'hoverEasing',
+            fallback: huiRuntimeDefaultHoverEasing.jsonValue,
+          ),
+        ),
+      )..extras = huiCollectExtras(map, _known);
+}
+
+class HuiComponent {
+  /// Addresses the component in the Java API. The first duplicate id wins;
+  /// later duplicates do not render, tick or click.
+  String id;
+
+  /// Relative to the menu centre, multiplied by the server's `uiScale`.
+  Vec3 offset;
+  HuiComponentData data;
+  Map<String, dynamic> extras = <String, dynamic>{};
+
+  /// Hard-required keys that were absent from the decoded JSON and had to be
+  /// defaulted; see [HuiMenu.absentKeys]. Never serialized.
+  Set<String> absentKeys = <String>{};
+
+  HuiComponent(this.id, this.offset, this.data);
+
+  HuiComponent copy() =>
+      HuiComponent(id, offset.copy(), data.copy())
+        ..extras = huiDeepCopyMap(extras);
+
+  Map<String, dynamic> toJson() => huiMergeExtras(<String, dynamic>{
+    'id': id,
+    'offset': offset.toJson(),
+    'data': data.toJson(),
+  }, extras);
+
+  static const Set<String> _known = <String>{'id', 'offset', 'data'};
+
+  static HuiComponent fromJson(Object? raw, {String path = 'component'}) {
+    final Map<String, dynamic> map = huiReadObject(raw, path);
+    return HuiComponent(
+        huiReadString(map, 'id'),
+        Vec3.fromJson(map['offset'], path: '$path.offset'),
+        HuiComponentData.fromJson(map['data'], path: '$path.data'),
+      )
+      ..extras = huiCollectExtras(map, _known)
+      ..absentKeys = <String>{if (map['offset'] == null) 'offset'};
+  }
+}
+
+sealed class HuiRuntimeComponentData extends HuiComponentData {}
+
+final class HuiListData extends HuiRuntimeComponentData {
+  HuiListData({
+    this.variable,
+    this.source,
+    this.pageSize,
+    this.flow,
+    this.template,
+  });
+
+  String? variable;
+  String? source;
+  int? pageSize;
+  Map<String, Object?>? flow;
+  HuiComponentData? template;
+
+  @override
+  String get type => 'list';
+
+  @override
+  Map<String, dynamic> toJson() => huiMergeExtras(<String, dynamic>{
+    'type': type,
+    if (variable != null) 'var': variable,
+    if (source != null) 'source': source,
+    if (pageSize != null) 'pageSize': pageSize,
+    if (flow != null) 'flow': huiDeepCopy(flow),
+    if (template != null) 'template': template!.toJson(),
+  }, extras);
+
+  @override
+  HuiListData copy() => HuiListData.fromMap(toJson(), 'data');
+
+  static HuiListData fromMap(Map<String, dynamic> map, String path) =>
+      HuiListData(
+          variable: map['var'] == null ? null : huiReadString(map, 'var'),
+          source: map['source'] == null ? null : huiReadString(map, 'source'),
+          pageSize: map['pageSize'] == null
+              ? null
+              : huiReadInt(map, 'pageSize'),
+          flow: map['flow'] == null
+              ? null
+              : huiDeepCopyMap(huiReadObject(map['flow'], '$path.flow')),
+          template: map['template'] == null
+              ? null
+              : HuiComponentData.fromJson(
+                  map['template'],
+                  path: '$path.template',
+                ),
+        )
+        ..extras = huiCollectExtras(map, const <String>{
+          'type',
+          'var',
+          'source',
+          'pageSize',
+          'flow',
+          'template',
+        });
+}
+
+final class HuiSliderData extends HuiRuntimeComponentData {
+  HuiSliderData({
+    this.variable,
+    this.min,
+    this.max,
+    this.step,
+    this.width,
+    this.label,
+    this.style,
+  });
+
+  String? variable;
+  double? min;
+  double? max;
+  double? step;
+  double? width;
+  String? label;
+  HuiIconStyle? style;
+
+  @override
+  String get type => 'slider';
+
+  @override
+  Map<String, dynamic> toJson() => huiMergeExtras(<String, dynamic>{
+    'type': type,
+    if (variable != null) 'var': variable,
+    if (min != null) 'min': min,
+    if (max != null) 'max': max,
+    if (step != null) 'step': step,
+    if (width != null) 'width': width,
+    if (label != null) 'label': label,
+    if (style != null) 'style': style!.toJson(),
+  }, extras);
+
+  @override
+  HuiSliderData copy() => HuiSliderData.fromMap(toJson(), 'data');
+
+  static HuiSliderData fromMap(Map<String, dynamic> map, String path) =>
+      HuiSliderData(
+          variable: map['var'] == null ? null : huiReadString(map, 'var'),
+          min: huiReadDoubleOrNull(map, 'min'),
+          max: huiReadDoubleOrNull(map, 'max'),
+          step: huiReadDoubleOrNull(map, 'step'),
+          width: huiReadDoubleOrNull(map, 'width'),
+          label: map['label'] == null ? null : huiReadString(map, 'label'),
+          style: HuiIconStyle.fromJsonOrNull(map['style']),
+        )
+        ..extras = huiCollectExtras(map, const <String>{
+          'type',
+          'var',
+          'min',
+          'max',
+          'step',
+          'width',
+          'label',
+          'style',
+        });
+}
+
+final class HuiFieldData extends HuiRuntimeComponentData {
+  HuiFieldData({
+    this.variable,
+    this.prompt,
+    this.label,
+    this.initial,
+    this.style,
+  });
+
+  String? variable;
+  String? prompt;
+  String? label;
+  String? initial;
+  HuiIconStyle? style;
+
+  @override
+  String get type => 'field';
+
+  @override
+  Map<String, dynamic> toJson() => huiMergeExtras(<String, dynamic>{
+    'type': type,
+    if (variable != null) 'var': variable,
+    if (prompt != null) 'prompt': prompt,
+    if (label != null) 'label': label,
+    if (initial != null) 'initial': initial,
+    if (style != null) 'style': style!.toJson(),
+  }, extras);
+
+  @override
+  HuiFieldData copy() => HuiFieldData.fromMap(toJson(), 'data');
+
+  static HuiFieldData fromMap(Map<String, dynamic> map, String path) =>
+      HuiFieldData(
+          variable: map['var'] == null ? null : huiReadString(map, 'var'),
+          prompt: map['prompt'] == null ? null : huiReadString(map, 'prompt'),
+          label: map['label'] == null ? null : huiReadString(map, 'label'),
+          initial: map['initial'] == null
+              ? null
+              : huiReadString(map, 'initial'),
+          style: HuiIconStyle.fromJsonOrNull(map['style']),
+        )
+        ..extras = huiCollectExtras(map, const <String>{
+          'type',
+          'var',
+          'prompt',
+          'label',
+          'initial',
+          'style',
+        });
+}
+
+final class HuiTabsData extends HuiRuntimeComponentData {
+  HuiTabsData({this.variable, this.tabs, this.spacing, this.style});
+
+  String? variable;
+  List<HuiTab>? tabs;
+  double? spacing;
+  HuiIconStyle? style;
+
+  @override
+  String get type => 'tabs';
+
+  @override
+  Map<String, dynamic> toJson() => huiMergeExtras(<String, dynamic>{
+    'type': type,
+    if (variable != null) 'var': variable,
+    if (tabs != null) 'tabs': tabs!.map((HuiTab tab) => tab.toJson()).toList(),
+    if (spacing != null) 'spacing': spacing,
+    if (style != null) 'style': style!.toJson(),
+  }, extras);
+
+  @override
+  HuiTabsData copy() => HuiTabsData.fromMap(toJson(), 'data');
+
+  static HuiTabsData fromMap(Map<String, dynamic> map, String path) =>
+      HuiTabsData(
+          variable: map['var'] == null ? null : huiReadString(map, 'var'),
+          tabs: map['tabs'] == null
+              ? null
+              : huiReadList(map['tabs'])
+                    .map((Object? raw) => HuiTab.fromJson(raw, '$path.tabs'))
+                    .toList(),
+          spacing: huiReadDoubleOrNull(map, 'spacing'),
+          style: HuiIconStyle.fromJsonOrNull(map['style']),
+        )
+        ..extras = huiCollectExtras(map, const <String>{
+          'type',
+          'var',
+          'tabs',
+          'spacing',
+          'style',
+        });
+}
+
+final class HuiTab {
+  HuiTab({required this.id, this.label, Map<String, Object?>? extras})
+    : extras = extras ?? <String, Object?>{};
+
+  String id;
+  String? label;
+  Map<String, Object?> extras;
+
+  Map<String, Object?> toJson() => <String, Object?>{
+    ...extras,
+    'id': id,
+    if (label != null) 'label': label,
+  };
+
+  static HuiTab fromJson(Object? raw, String path) {
+    final Map<String, Object?> map = huiReadObject(raw, path);
+    return HuiTab(
+      id: huiReadString(map, 'id'),
+      label: map['label'] == null ? null : huiReadString(map, 'label'),
+      extras: huiCollectExtras(map, const <String>{'id', 'label'}),
+    );
+  }
+}

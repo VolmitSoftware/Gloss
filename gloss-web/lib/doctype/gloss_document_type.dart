@@ -1,0 +1,262 @@
+/// Shared behavior of the Gloss document kinds (hologram, animation,
+/// scoreboard).
+///
+/// The three kinds are structurally alike — a versioned envelope document
+/// with a runtime id, canonical-text JSON, snapshot-driven undo and no
+/// source preservation — so everything [EditorStore] needs from them funnels
+/// through this base and its four codec primitives. A concrete kind adds its
+/// model, its validation, its surface and its templates.
+library;
+
+import '../config/defaults.dart' show sanitizeMenuId;
+import '../l10n/hui_localizations.dart';
+import '../model/model.dart';
+import '../state/editor_store.dart';
+import '../state/workspace.dart';
+import 'document_type.dart';
+
+/// Base adapter for the Gloss kinds. The store's generic code paths
+/// (`applyCode`, import routing, creation) type-test against this instead of
+/// enumerating kinds.
+abstract class GlossDocumentTypeAdapter extends DocumentTypeAdapter {
+  const GlossDocumentTypeAdapter();
+
+  /// Decodes runtime JSON into this kind's model. Throws [HuiFormatException]
+  /// for malformed JSON or an unsupported `schemaVersion`; everything else is
+  /// lenient and left to [validate].
+  GlossDoc decodeDoc(String json);
+
+  /// The model re-encoded in the editor's canonical text style.
+  String encodeDoc(GlossDoc doc);
+
+  /// A fresh default document — the kind's blank template.
+  GlossDoc newBlank();
+
+  /// Routing check for import auto-detection and the code editor's shape
+  /// refusal: does decoded JSON look like this kind?
+  bool looksLike(Object? decoded);
+
+  /// The code-view message when pasted JSON is not this kind's shape.
+  String get codeShapeError;
+
+  /// Title/runtime id a fresh document starts under.
+  String get defaultDocumentName;
+
+  @override
+  bool get hasRuntimeId => true;
+
+  @override
+  bool get transferable => true;
+
+  @override
+  bool get undoable => true;
+
+  @override
+  bool get sourcePreserving => false;
+
+  @override
+  void createNew(EditorStore store, {String? folderId, String? runtimeId}) =>
+      store.newGlossDocument(
+        this,
+        name: runtimeId ?? defaultDocumentName,
+        folderId: folderId,
+      );
+
+  @override
+  AdoptedDocument adopt(WorkspaceDoc doc) {
+    final String editorId = sanitizeMenuId(doc.runtimeId!);
+    try {
+      return AdoptedDocument(editorId: editorId, model: decodeDoc(doc.json));
+    } on HuiFormatException catch (e) {
+      return AdoptedDocument(
+        editorId: editorId,
+        model: newBlank(),
+        failureResolver: _unreadableFailure(doc.title, () => e.message),
+      );
+    } catch (_) {
+      return AdoptedDocument(
+        editorId: editorId,
+        model: newBlank(),
+        failureResolver: _unreadableFailure(doc.title, null),
+      );
+    }
+  }
+
+  @override
+  Object decodeSnapshot(String snapshot) => decodeDoc(snapshot);
+
+  @override
+  String snapshot(DocumentStateView state) => encodeDoc(state.glossDoc!);
+
+  @override
+  String exportJson(DocumentStateView state) => snapshot(state);
+
+  @override
+  String formattedJson(DocumentStateView state) => snapshot(state);
+
+  @override
+  MenuRenameRewrite rewriteForMenuRename(
+    WorkspaceDoc doc,
+    String previous,
+    String next,
+  ) => MenuRenameRewrite.none;
+
+  String Function() _unreadableFailure(
+    String title,
+    String Function()? error,
+  ) => () {
+    final String? resolvedError = error?.call();
+    final Map<String, Object?> arguments = <String, Object?>{
+      'title': title,
+      'error': ?resolvedError,
+    };
+    if (resolvedError != null) {
+      return switch (kind) {
+        WorkspaceDocKind.hologram => huiText(
+          'The saved document "{title}" was unreadable ({error}) and was replaced with a blank hologram.',
+          arguments,
+        ),
+        WorkspaceDocKind.animation => huiText(
+          'The saved document "{title}" was unreadable ({error}) and was replaced with a blank animation.',
+          arguments,
+        ),
+        WorkspaceDocKind.scoreboard => huiText(
+          'The saved document "{title}" was unreadable ({error}) and was replaced with a blank scoreboard.',
+          arguments,
+        ),
+        WorkspaceDocKind.surface => huiText(
+          'The saved document "{title}" was unreadable ({error}) and was replaced with a blank surface.',
+          arguments,
+        ),
+        WorkspaceDocKind.motd => huiText(
+          'The saved document "{title}" was unreadable ({error}) and was replaced with a blank MOTD.',
+          arguments,
+        ),
+        WorkspaceDocKind.channel => huiText('The saved chat channel "{title}" was unreadable ({error}) and was replaced with a blank channel.', arguments),
+        WorkspaceDocKind.connections => huiText(
+          'The saved document "{title}" was unreadable ({error}) and was replaced with blank connection messages.',
+          arguments,
+        ),
+        WorkspaceDocKind.emoji => huiText(
+          'The saved document "{title}" was unreadable ({error}) and was replaced with a blank emoji.',
+          arguments,
+        ),
+        WorkspaceDocKind.bubbleStyle => huiText(
+          'The saved document "{title}" was unreadable ({error}) and was replaced with a blank bubble style.',
+          arguments,
+        ),
+        WorkspaceDocKind.damageIndicators => huiText(
+          'The saved document "{title}" was unreadable ({error}) and was replaced with default damage-indicator settings.',
+          arguments,
+        ),
+        WorkspaceDocKind.entityOverlays => huiText(
+          'The saved document "{title}" was unreadable ({error}) and was replaced with default entity-overlay settings.',
+          arguments,
+        ),
+        WorkspaceDocKind.tablist => huiText(
+          'The saved document "{title}" was unreadable ({error}) and was replaced with a blank tablist.',
+          arguments,
+        ),
+        WorkspaceDocKind.realDrops => huiText(
+          'The saved document "{title}" was unreadable ({error}) and was replaced with blank real-drop settings.',
+          arguments,
+        ),
+        WorkspaceDocKind.inventory => huiText(
+          'The saved document "{title}" was unreadable ({error}) and was replaced with a blank inventory.',
+          arguments,
+        ),
+        WorkspaceDocKind.nameplate => huiText(
+          'The saved document "{title}" was unreadable ({error}) and was replaced with a blank nameplate.',
+          arguments,
+        ),
+        WorkspaceDocKind.nametag => huiText(
+          'The saved document "{title}" was unreadable ({error}) and was replaced with a blank nametag.',
+          arguments,
+        ),
+        WorkspaceDocKind.marker => huiText(
+          'The saved document "{title}" was unreadable ({error}) and was replaced with a blank marker.',
+          arguments,
+        ),
+        WorkspaceDocKind.presets || WorkspaceDocKind.names || WorkspaceDocKind.strings || WorkspaceDocKind.waypoint || WorkspaceDocKind.glyph || WorkspaceDocKind.behavior => '$noun: $title ($resolvedError)',
+        WorkspaceDocKind.menu ||
+        WorkspaceDocKind.containerPreview ||
+        WorkspaceDocKind.panel => throw StateError(
+          huiText('Unsupported Gloss document kind.'),
+        ),
+      };
+    }
+    return switch (kind) {
+      WorkspaceDocKind.hologram => huiText(
+        'The saved document "{title}" was unreadable and was replaced with a blank hologram.',
+        arguments,
+      ),
+      WorkspaceDocKind.animation => huiText(
+        'The saved document "{title}" was unreadable and was replaced with a blank animation.',
+        arguments,
+      ),
+      WorkspaceDocKind.scoreboard => huiText(
+        'The saved document "{title}" was unreadable and was replaced with a blank scoreboard.',
+        arguments,
+      ),
+      WorkspaceDocKind.surface => huiText(
+        'The saved document "{title}" was unreadable and was replaced with a blank surface.',
+        arguments,
+      ),
+      WorkspaceDocKind.motd => huiText(
+        'The saved document "{title}" was unreadable and was replaced with a blank MOTD.',
+        arguments,
+      ),
+      WorkspaceDocKind.channel => huiText('The saved chat channel "{title}" was unreadable and was replaced with a blank channel.', arguments),
+      WorkspaceDocKind.connections => huiText(
+        'The saved document "{title}" was unreadable and was replaced with blank connection messages.',
+        arguments,
+      ),
+      WorkspaceDocKind.emoji => huiText(
+        'The saved document "{title}" was unreadable and was replaced with a blank emoji.',
+        arguments,
+      ),
+      WorkspaceDocKind.bubbleStyle => huiText(
+        'The saved document "{title}" was unreadable and was replaced with a blank bubble style.',
+        arguments,
+      ),
+      WorkspaceDocKind.damageIndicators => huiText(
+        'The saved document "{title}" was unreadable and was replaced with default damage-indicator settings.',
+        arguments,
+      ),
+      WorkspaceDocKind.entityOverlays => huiText(
+        'The saved document "{title}" was unreadable and was replaced with default entity-overlay settings.',
+        arguments,
+      ),
+      WorkspaceDocKind.tablist => huiText(
+        'The saved document "{title}" was unreadable and was replaced with a blank tablist.',
+        arguments,
+      ),
+      WorkspaceDocKind.realDrops => huiText(
+        'The saved document "{title}" was unreadable and was replaced with blank real-drop settings.',
+        arguments,
+      ),
+      WorkspaceDocKind.inventory => huiText(
+        'The saved document "{title}" was unreadable and was replaced with a blank inventory.',
+        arguments,
+      ),
+      WorkspaceDocKind.nameplate => huiText(
+        'The saved document "{title}" was unreadable and was replaced with a blank nameplate.',
+        arguments,
+      ),
+      WorkspaceDocKind.nametag => huiText(
+        'The saved document "{title}" was unreadable and was replaced with a blank nametag.',
+        arguments,
+      ),
+      WorkspaceDocKind.marker => huiText(
+        'The saved document "{title}" was unreadable and was replaced with a blank marker.',
+        arguments,
+      ),
+      WorkspaceDocKind.presets || WorkspaceDocKind.names || WorkspaceDocKind.strings || WorkspaceDocKind.waypoint || WorkspaceDocKind.glyph || WorkspaceDocKind.behavior => '$noun: $title',
+      WorkspaceDocKind.menu ||
+      WorkspaceDocKind.containerPreview ||
+      WorkspaceDocKind.panel => throw StateError(
+        huiText('Unsupported Gloss document kind.'),
+      ),
+    };
+  };
+}

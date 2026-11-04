@@ -1,0 +1,180 @@
+name: Validate and deploy Gloss Web
+
+on:
+  pull_request:
+    branches:
+      - master
+    paths:
+      - gloss-web/**
+      - .github/workflows/gloss-web-firebase-hosting.yml
+      - src/main/**
+      - src/test/resources/**
+      - schema/**
+  push:
+    branches:
+      - master
+    paths:
+      - gloss-web/**
+      - .github/workflows/gloss-web-firebase-hosting.yml
+      - src/main/**
+      - src/test/resources/**
+      - schema/**
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  ARCANE_JASPR_REF: 172347ba773d0eddc31ff77d6385ccd4cc36e967
+  DART_VERSION: 3.13.5
+  FIREBASE_PROJECT_ID: gloss-editor
+  FIREBASE_TOOLS_VERSION: 15.25.1
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  NODE_VERSION: 22.23.1
+
+concurrency:
+  group: gloss-web-firebase-hosting-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+defaults:
+  run:
+    shell: bash
+    working-directory: gloss-web
+
+jobs:
+  validate:
+    name: Analyze, test, and build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Cache pinned Arcane Jaspr
+        id: cache-arcane-jaspr
+        uses: actions/cache@v5
+        with:
+          path: gloss-web/.deps/arcane_jaspr
+          key: gloss-web-arcane-jaspr-${{ env.ARCANE_JASPR_REF }}
+
+      - name: Checkout pinned Arcane Jaspr
+        if: steps.cache-arcane-jaspr.outputs.cache-hit != 'true'
+        uses: actions/checkout@v6
+        with:
+          repository: ArcaneArts/arcane_jaspr
+          ref: ${{ env.ARCANE_JASPR_REF }}
+          path: gloss-web/.deps/arcane_jaspr
+
+      - name: Setup Dart
+        uses: dart-lang/setup-dart@v1
+        with:
+          sdk: ${{ env.DART_VERSION }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Get editor dependencies
+        run: dart pub get --enforce-lockfile
+
+      - name: Analyze editor
+        run: dart analyze
+
+      - name: Test editor and plugin contracts
+        run: dart test
+
+      - name: Test channel filter engine
+        run: node --test test/channel_filters_engine_test.cjs
+
+      - name: Get relay dependencies
+        working-directory: gloss-web/sync-relay
+        run: dart pub get --enforce-lockfile
+
+      - name: Analyze relay
+        working-directory: gloss-web/sync-relay
+        run: dart analyze
+
+      - name: Test relay
+        working-directory: gloss-web/sync-relay
+        run: dart test
+
+      - name: Build editor
+        run: |
+          GLOSS_VERSION="$(sed -n 's/^version: //p' pubspec.yaml)"
+          dart run jaspr_cli:jaspr build \
+            --dart-define=GLOSS_VERSION="$GLOSS_VERSION" \
+            --dart-define=GLOSS_COMMIT="${GITHUB_SHA:0:7}"
+
+      - name: Retain verified Hosting build
+        if: github.ref == 'refs/heads/master' && github.event_name != 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: gloss-web-hosting
+          path: gloss-web/build/jaspr/
+          if-no-files-found: error
+          retention-days: 7
+
+  deploy:
+    name: Deploy verified build
+    needs: validate
+    if: github.ref == 'refs/heads/master' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://gloss.volmitsoftware.com
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Download verified Hosting build
+        uses: actions/download-artifact@v4
+        with:
+          name: gloss-web-hosting
+          path: gloss-web/build/jaspr
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Check deployment credential
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_GLOSS_EDITOR }}
+        run: |
+          if [[ -z "$FIREBASE_SERVICE_ACCOUNT" ]]; then
+            echo "::error::Set FIREBASE_SERVICE_ACCOUNT_GLOSS_EDITOR in Gloss repository secrets or the production environment."
+            exit 1
+          fi
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v3
+        with:
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_GLOSS_EDITOR }}
+
+      - name: Deploy Firebase Hosting
+        run: |
+          set -euo pipefail
+          unset FIREBASE_TOKEN
+          npx --yes "firebase-tools@$FIREBASE_TOOLS_VERSION" deploy \
+            --only hosting \
+            --project "$FIREBASE_PROJECT_ID" \
+            --non-interactive
+
+      - name: Verify deployed bundle
+        run: |
+          set -euo pipefail
+          expected_sha="$(sha256sum build/jaspr/main.client.dart.js | awk '{print $1}')"
+          actual_sha=""
+          for attempt in {1..12}; do
+            if actual_sha="$(curl -fsS --max-time 30 \
+                "https://gloss.volmitsoftware.com/main.client.dart.js?release=$GITHUB_SHA" \
+                | sha256sum | awk '{print $1}')" \
+                && [[ "$actual_sha" == "$expected_sha" ]]; then
+              echo "Firebase is serving the client bundle built from $GITHUB_SHA."
+              exit 0
+            fi
+            echo "Waiting for Firebase Hosting to converge (attempt $attempt/12)."
+            sleep 5
+          done
+          echo "::error title=Stale Firebase client bundle::Expected $expected_sha but received $actual_sha."
+          exit 1

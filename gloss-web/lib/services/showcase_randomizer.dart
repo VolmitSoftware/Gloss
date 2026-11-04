@@ -1,0 +1,5372 @@
+/// "Randomize" for every runtime document kind.
+///
+/// Each builder writes a complete, valid, teaching document rather than
+/// jittering the numbers already in the file: pressing the button twice gives
+/// two different servers, not the same server nudged. The words, colours and
+/// sample stacks come from `config/showcase_flavor.dart`; the motion comes
+/// from `showcase_effects.dart`.
+///
+/// Everything a builder emits has to survive its kind's validation;
+/// `showcase_randomizer_test` replays several hundred seeds across them.
+library;
+
+import 'dart:math' as math;
+
+import '../config/gloss_templates.dart';
+import '../config/defaults.dart';
+import '../config/showcase_flavor.dart';
+import '../doctype/doctype.dart';
+import '../logic/canvas_scene.dart' show CanvasItem, CanvasScene, McTextCache, buildCanvasScene, spriteExtentFor, huiIsBlockLikeMaterial;
+import '../logic/hui_geometry.dart' show HuiRect;
+import '../logic/real_drop_labels.dart';
+import '../logic/real_drop_model.dart';
+import '../model/model.dart';
+import '../model/runtime_panel_definition.dart';
+import '../state/editor_store.dart';
+import '../state/workspace.dart' show WorkspaceDoc;
+import '../state/workspace_panel.dart';
+import 'catalogs.dart';
+import 'showcase_effects.dart';
+import 'showcase_features.dart';
+
+bool canRandomizeShowcase(
+  DocumentTypeAdapter type, {
+  bool linkedPanel = false,
+}) =>
+    type is PanelDocumentType ? linkedPanel : type.hasRuntimePreview;
+
+bool randomizeShowcaseDocument(
+  EditorStore store,
+  String documentId, {
+  math.Random? random,
+}) {
+  if (store.workspace.byId(documentId) == null) return false;
+  if (!store.openDocument(documentId)) return false;
+  if (!canRandomizeShowcase(
+    store.docType,
+    linkedPanel: store.activePanel?.data.runtimeBoard != null,
+  )) {
+    return false;
+  }
+  final math.Random source = random ?? math.Random();
+  switch (store.docType) {
+    case MenuDocumentType():
+      store.replaceMenu(
+        'Randomize menu',
+        buildRandomMenuShowcase(store, source),
+      );
+    case ContainerPreviewDocumentType():
+      store.replacePreviewDoc(
+        'Randomize container preview',
+        buildRandomPreviewShowcase(source),
+      );
+    case HologramDocumentType():
+      store.replaceGlossDoc(
+        'Randomize hologram',
+        buildRandomHologramShowcase(store.hologramDoc!, source),
+      );
+    case AnimationDocumentType():
+      store.replaceGlossDoc(
+        'Randomize animation',
+        buildRandomAnimationShowcase(store.animationDoc!, source),
+      );
+    case ScoreboardDocumentType():
+      store.replaceGlossDoc(
+        'Randomize scoreboard',
+        buildRandomScoreboardShowcase(store.scoreboardDoc!, source),
+      );
+    case MotdDocumentType():
+      store.replaceGlossDoc(
+        'Randomize MOTD',
+        buildRandomMotdShowcase(store.motdDoc!, source),
+      );
+    case ChannelDocumentType():
+      final GlossChannelDoc doc = GlossChannelDoc.fromJson(
+        store.glossDoc!.toJson(),
+      );
+      final List<String> colors = <String>[
+        'yellow',
+        'green',
+        'aqua',
+        'light_purple',
+        'gold',
+      ];
+      final String color = colors[source.nextInt(colors.length)];
+      doc.mentions.enabled = true;
+      doc.mentions.render = '<$color><bold>@{{ mention.name }}</bold></$color>';
+      doc.mentions.messageFormat =
+          '<$color>[Mention] {{ sender.name }}: {{ message }}</$color>';
+      doc.mentions.sound = <String>[
+        'minecraft:block.note_block.bell',
+        'minecraft:entity.experience_orb.pickup',
+        'minecraft:block.note_block.chime',
+      ][source.nextInt(3)];
+      store.replaceGlossDoc('Randomize chat channel', doc);
+    case ConnectionsDocumentType():
+      store.replaceGlossDoc(
+        'Randomize connection messages',
+        buildRandomConnectionsShowcase(store.connectionsDoc!, source),
+      );
+    case SurfaceDocumentType():
+      store.replaceGlossDoc(
+        'Randomize surface',
+        buildRandomSurfaceShowcase(store.surfaceDoc!, source),
+      );
+    case EmojiDocumentType():
+      store.replaceGlossDoc(
+        'Randomize emoji',
+        buildRandomEmojiShowcase(store.emojiDoc!, source),
+      );
+    case BubbleStyleDocumentType():
+      store.replaceGlossDoc(
+        'Randomize bubble style',
+        buildRandomBubbleShowcase(store.bubbleStyleDoc!, source),
+      );
+    case TablistDocumentType():
+      store.replaceGlossDoc(
+        'Randomize tablist',
+        buildRandomTablistShowcase(store.tablistDoc!, source),
+      );
+    case RealDropDocumentType():
+      store.replaceGlossDoc(
+        'Randomize real drops',
+        buildRandomRealDropShowcase(store.realDropSettingsDoc!, source),
+      );
+    case DamageIndicatorsDocumentType():
+      store.replaceGlossDoc(
+        'Randomize damage indicators',
+        buildRandomDamageIndicatorsShowcase(store.damageIndicatorsDoc!, source),
+      );
+    case EntityOverlaysDocumentType():
+      store.replaceGlossDoc(
+        'Randomize entity overlays',
+        buildRandomEntityOverlayShowcase(store.entityOverlaysDoc!, source),
+      );
+    case InventoryDocumentType():
+      store.replaceGlossDoc(
+        'Randomize inventory',
+        buildRandomInventoryShowcase(store.inventoryDoc!, source),
+      );
+    case NameplateDocumentType():
+      store.replaceGlossDoc(
+        'Randomize nameplate',
+        buildRandomNameplateShowcase(store.nameplateDoc!, source),
+      );
+    case NametagDocumentType():
+      store.replaceGlossDoc(
+        'Randomize nametag',
+        buildRandomNametagShowcase(store.nametagDoc!, source),
+      );
+    case MarkerDocumentType():
+      store.replaceGlossDoc(
+        'Randomize marker',
+        buildRandomMarkerShowcase(store.markerDoc!, source),
+      );
+    case PanelDocumentType():
+      final WorkspacePanelData? panel = store.activePanel?.data;
+      final Map<String, dynamic>? board = panel?.runtimeBoard;
+      if (panel == null || board == null) return false;
+      return store.updatePanel(
+        panel.copyWith(
+          runtimeBoard: buildRandomRuntimePanelShowcase(
+            RuntimePanelDefinition.fromJson(board),
+            source,
+          ).toJson(),
+        ),
+        coalesce: false,
+      );
+  }
+  store.requestCanvasFit();
+  return true;
+}
+
+bool randomizeMenuComponent(
+  EditorStore store,
+  String componentId, {
+  math.Random? random,
+}) {
+  final HuiComponent? component = store.menu.componentById(componentId);
+  if (component == null || !store.isMenuDoc) return false;
+  final math.Random source = random ?? math.Random();
+  store.editComponent(componentId, 'Randomize component', (HuiComponent item) {
+    item.data = switch (item.data) {
+      HuiRuntimeComponentData() => item.data,
+      HuiButtonData() => _randomButtonData(
+        store,
+        source,
+        componentOffset: item.offset,
+      ),
+      HuiDecorationData() => HuiDecorationData(_randomIcon(store, source)),
+      HuiToggleData() => _randomToggleData(store, source),
+    };
+  });
+  return true;
+}
+
+bool randomizePreviewElement(
+  EditorStore store,
+  int index, {
+  math.Random? random,
+}) {
+  final HuiPreviewDoc? document = store.previewDoc;
+  if (document == null || index < 0 || index >= document.elements.length) {
+    return false;
+  }
+  final math.Random source = random ?? math.Random.secure();
+  final String type = document.elements[index].type;
+  final HuiPreviewElement replacement = _randomPreviewElement(type, source);
+  store.mutatePreview('Randomize $type', (HuiPreviewDoc edited) {
+    if (index < edited.elements.length && edited.elements[index].type == type) {
+      edited.elements[index] = replacement;
+    }
+  });
+  return true;
+}
+
+HuiPreviewElement _randomPreviewElement(String type, math.Random random) {
+  final int red = 72 + random.nextInt(160);
+  final int green = 72 + random.nextInt(160);
+  final int blue = 72 + random.nextInt(160);
+  final String pulse = '(sin(time / ${3 + random.nextInt(7)}) + 1) / 2';
+  final String color =
+      'argb(220, round(lerp(32, $red, $pulse)), '
+      'round(lerp(32, $green, $pulse)), '
+      'round(lerp(32, $blue, $pulse)))';
+  final String visible = random.nextBool()
+      ? 'true'
+      : 'mod(floor(time / ${8 + random.nextInt(9)}), 2) == 0';
+  return switch (type) {
+    'panel' => HuiPreviewElement(
+      'panel',
+      x: random.nextInt(25) - 12,
+      y: random.nextInt(25) - 12,
+      z: 1 + random.nextInt(3),
+      width: 72 + random.nextInt(65),
+      height: 48 + random.nextInt(57),
+      color: color,
+      visible: visible,
+    ),
+    'slot' => HuiPreviewElement(
+      'slot',
+      x: 'slot * ${20 + random.nextInt(9)} - ${20 + random.nextInt(13)}',
+      y: random.nextInt(17) - 8,
+      z: 5 + random.nextInt(3),
+      size: 16 + random.nextInt(7),
+      wellColor: color,
+      index: 'slot',
+      visible: visible,
+      repeat: HuiPreviewRepeat(count: 2 + random.nextInt(3), varName: 'slot'),
+    ),
+    'label' => HuiPreviewElement(
+      'label',
+      x: random.nextInt(17) - 8,
+      y: random.nextInt(41) - 20,
+      z: 7 + random.nextInt(3),
+      background: color,
+      text: showcaseAlignmentExpression(
+        random,
+        "select(['&fLIVE', '&aREADY', '&bSYNC'], "
+        'mod(floor(time / ${6 + random.nextInt(7)}), 3))',
+        10 + random.nextInt(9),
+      ),
+      visible: visible,
+    ),
+    _ => HuiPreviewElement(
+      'cell',
+      x: 'cell * ${12 + random.nextInt(9)} - ${12 + random.nextInt(13)}',
+      y: random.nextInt(17) - 8,
+      z: 3 + random.nextInt(3),
+      size: '6 + round(4 * $pulse)',
+      color: color,
+      visible: visible,
+      repeat: HuiPreviewRepeat(count: 2 + random.nextInt(4), varName: 'cell'),
+    ),
+  };
+}
+
+enum MenuShowcaseArchetype { networkHub, wayfinder, playerTools, menuNavigator }
+
+final class _MenuShowcaseContext {
+  _MenuShowcaseContext({
+    required this.store,
+    required this.random,
+    required this.mood,
+    required this.server,
+    required this.glyph,
+    required this.backgroundArgb,
+    required this.soundPitch,
+  });
+
+  final EditorStore store;
+  final math.Random random;
+  final ShowcaseMood mood;
+  final String server;
+  final String glyph;
+  final String backgroundArgb;
+  final double soundPitch;
+}
+
+final class _MenuDestination {
+  const _MenuDestination({
+    required this.id,
+    required this.label,
+    required this.detail,
+    required this.world,
+    required this.x,
+    required this.y,
+    required this.z,
+  });
+
+  final String id;
+  final String label;
+  final String detail;
+  final String world;
+  final double x;
+  final double y;
+  final double z;
+}
+
+final class _MenuStatusRecipe {
+  const _MenuStatusRecipe({
+    required this.id,
+    required this.condition,
+    required this.expectedValue,
+    required this.trueLabel,
+    required this.falseLabel,
+    required this.trueMessage,
+    required this.falseMessage,
+  });
+
+  final String id;
+  final String condition;
+  final String expectedValue;
+  final String trueLabel;
+  final String falseLabel;
+  final String trueMessage;
+  final String falseMessage;
+}
+
+const List<_MenuDestination> _menuDestinations = <_MenuDestination>[
+  _MenuDestination(
+    id: 'spawn',
+    label: 'Spawn',
+    detail: 'Overworld plaza',
+    world: 'minecraft:overworld',
+    x: 0,
+    y: 80,
+    z: 0,
+  ),
+  _MenuDestination(
+    id: 'ghostwood',
+    label: 'Ghostwood',
+    detail: 'Forest outpost',
+    world: 'minecraft:overworld',
+    x: 128,
+    y: 72,
+    z: -96,
+  ),
+  _MenuDestination(
+    id: 'nether-hub',
+    label: 'Nether Hub',
+    detail: 'Nether concourse',
+    world: 'minecraft:the_nether',
+    x: 0,
+    y: 80,
+    z: 0,
+  ),
+  _MenuDestination(
+    id: 'end-gateway',
+    label: 'End Gateway',
+    detail: 'Outer-island route',
+    world: 'minecraft:the_end',
+    x: 100,
+    y: 64,
+    z: 100,
+  ),
+];
+
+const List<_MenuStatusRecipe> _menuStatusRecipes = <_MenuStatusRecipe>[
+  _MenuStatusRecipe(
+    id: 'staff-access',
+    condition: '%player_is_op%',
+    expectedValue: 'yes',
+    trueLabel: 'Staff access',
+    falseLabel: 'Player access',
+    trueMessage: '<green>Staff tools are available.</green>',
+    falseMessage: '<gray>Standard player tools are available.</gray>',
+  ),
+  _MenuStatusRecipe(
+    id: 'world-status',
+    condition: '%player_world%',
+    expectedValue: 'world',
+    trueLabel: 'Overworld',
+    falseLabel: 'Other world',
+    trueMessage: '<green>You opened this in the Overworld.</green>',
+    falseMessage: '<gray>You opened this outside the Overworld.</gray>',
+  ),
+  _MenuStatusRecipe(
+    id: 'vip-access',
+    condition: '%player_has_permission_gloss.vip%',
+    expectedValue: 'true',
+    trueLabel: 'VIP access',
+    falseLabel: 'Standard access',
+    trueMessage: '<gold>VIP access is active.</gold>',
+    falseMessage: '<gray>Standard access is active.</gray>',
+  ),
+];
+
+HuiMenu buildRandomMenuShowcase(
+  EditorStore store,
+  math.Random random, {
+  MenuShowcaseArchetype? archetype,
+}) {
+  if (archetype == null) {
+    return _withMenuForms(_buildComposedMenu(store, random), store);
+  }
+  final MenuShowcaseArchetype selectedArchetype = archetype;
+  final ShowcaseMood mood = showcasePick(random, showcaseMoods);
+  final _MenuShowcaseContext context = _MenuShowcaseContext(
+    store: store,
+    random: random,
+    mood: mood,
+    server: showcasePick(random, showcaseServerNames),
+    glyph: showcasePick(random, mood.glyphs),
+    backgroundArgb: random.nextBool()
+        ? '#B3000000'
+        : '#66${mood.primary.substring(1)}',
+    soundPitch: _round2(0.9 + random.nextDouble() * 0.2),
+  );
+  return _withMenuForms(switch (selectedArchetype) {
+    MenuShowcaseArchetype.networkHub => _buildNetworkHubMenu(context),
+    MenuShowcaseArchetype.wayfinder => _buildWayfinderMenu(context),
+    MenuShowcaseArchetype.playerTools => _buildPlayerToolsMenu(context),
+    MenuShowcaseArchetype.menuNavigator => _buildMenuNavigator(context),
+  }, store);
+}
+
+Map<String, HuiRect> _menuShowcaseBounds(HuiMenu menu, EditorStore store) {
+  final HuiMenu measured = HuiMenu.fromJson(menu.toJson())..offset = Vec3.zero();
+  measured.extras.remove('show');
+  measured.variants.clear();
+  for (final HuiComponent component in measured.components) {
+    component.extras.remove('show');
+  }
+  final Map<String, HuiRect> bounds = <String, HuiRect>{};
+  for (final bool toggled in <bool>[false, true]) {
+    final CanvasScene scene = buildCanvasScene(
+      menu: measured, uiScale: 1, trueRender: true,
+      togglePreview: (String id) => toggled, textCache: McTextCache(),
+      images: store.images, catalogs: store.catalogs,
+    );
+    for (final CanvasItem item in scene.items) {
+      final HuiRect rect = spriteExtentFor(item, uiScale: 1, trueRender: true).translate(item.anchor.x, item.anchor.y);
+      final HuiRect? existing = bounds[item.selectionId];
+      bounds[item.selectionId] = existing == null ? rect : existing.union(rect);
+    }
+  }
+  return bounds;
+}
+
+HuiMenu _withMenuForms(HuiMenu menu, EditorStore store) {
+  double bottom = _menuShowcaseBounds(menu, store).values.fold<double>(
+    0, (double edge, HuiRect rect) => math.min(edge, rect.bottom),
+  ) - 0.4;
+  for (int index = 0; index < 4; index++) {
+    final String type = <String>['list', 'slider', 'field', 'tabs'][index];
+    final HuiComponent component = HuiComponent(
+      'form-$type', Vec3.zero(), createDefaultComponentData(type),
+    );
+    menu.components.add(component);
+    final HuiRect rect = _menuShowcaseBounds(menu, store)[component.id]!;
+    component.offset.x = -rect.x;
+    component.offset.y = bottom - rect.top;
+    bottom -= rect.h + 0.4;
+  }
+  return menu;
+}
+
+void _spaceComposedMenu(HuiMenu menu, EditorStore store, int columns) {
+  final Map<String, HuiRect> bounds = _menuShowcaseBounds(menu, store);
+  final List<HuiComponent> features = menu.components.skip(1).toList();
+  final int rows = (features.length / columns).ceil();
+  final List<double> widths = List<double>.filled(columns, 0);
+  final List<double> heights = List<double>.filled(rows, 0);
+  for (int index = 0; index < features.length; index++) {
+    final HuiRect rect = bounds[features[index].id]!;
+    widths[index % columns] = math.max(widths[index % columns], rect.w);
+    heights[index ~/ columns] = math.max(heights[index ~/ columns], rect.h);
+  }
+  final double totalWidth = widths.fold<double>(0, (double sum, double width) => sum + width) + (columns - 1) * 0.5;
+  final double totalHeight = heights.fold<double>(0, (double sum, double height) => sum + height) + (rows - 1) * 0.5;
+  double rowTop = totalHeight / 2;
+  for (int row = 0; row < rows; row++) {
+    double left = -totalWidth / 2;
+    for (int column = 0; column < columns; column++) {
+      final int index = row * columns + column;
+      if (index >= features.length) break;
+      final HuiComponent component = features[index];
+      final HuiRect rect = bounds[component.id]!;
+      component.offset.x += left + widths[column] / 2 - rect.x;
+      component.offset.y += rowTop - heights[row] / 2 - rect.y;
+      left += widths[column] + 0.5;
+    }
+    rowTop -= heights[row] + 0.5;
+  }
+  final HuiComponent title = menu.components.first;
+  final HuiRect titleBounds = bounds[title.id]!;
+  title.offset.x -= titleBounds.x;
+  title.offset.y += totalHeight / 2 + 0.5 - titleBounds.bottom;
+}
+
+HuiMenu _buildComposedMenu(EditorStore store, math.Random random) {
+  final ShowcaseMood mood = showcasePick(random, showcaseMoods);
+  final int columns = 2 + random.nextInt(3);
+  final int rows = 2 + random.nextInt(3);
+  final double spacingX = _band(random, (0.8, 1.6), 2);
+  final double spacingY = _band(random, (0.65, 1.1), 2);
+  final bool stagger = random.nextBool();
+  final bool curved = random.nextBool();
+  final List<HuiComponent> components = <HuiComponent>[
+    HuiComponent(
+      'showcase-title',
+      Vec3(0, (rows + 1) * spacingY / 2, 0),
+      HuiDecorationData(
+        HuiTextIcon(
+          showcaseRichText(
+            random,
+            mood,
+            showcasePick(random, showcaseServerNames),
+          ),
+          showcaseDisplayStyle(random, mood),
+          1 + random.nextInt(20),
+        )..box = showcaseBox(random, mood),
+      ),
+    ),
+  ];
+  final List<String> types = <String>[
+    'text',
+    'item',
+    'block',
+    'playerHead',
+    'entity',
+    ..._availableAssetIconTypes(store),
+  ]..shuffle(random);
+  for (int index = 0; index < columns * rows; index++) {
+    final int row = index ~/ columns;
+    final int column = index % columns;
+    final double x =
+        (column - (columns - 1) / 2) * spacingX +
+        (stagger && row.isOdd ? spacingX / 3 : 0);
+    final Vec3 offset = Vec3(
+      x,
+      ((rows - 1) / 2 - row) * spacingY,
+      curved ? _round2(x * x * 0.12) : _band(random, (-0.1, 0.1), 2),
+    );
+    final HuiComponentData data = switch (index % 3) {
+      0 => _randomButtonData(store, random, componentOffset: offset),
+      1 => _randomToggleData(store, random),
+      _ => HuiDecorationData(
+        _randomIconOfType(store, random, mood, types[index % types.length]),
+      ),
+    };
+    if (data is HuiButtonData) {
+      data.icon = _randomIconOfType(
+        store,
+        random,
+        mood,
+        types[index % types.length],
+      );
+    }
+    components.add(
+      HuiComponent('feature-${index + 1}', offset, data)
+        ..extras['show'] = showcaseShow(random, allowHidden: true),
+    );
+  }
+  final HuiMenu menu = HuiMenu(
+    offset: Vec3(
+      _band(random, (-0.3, 0.3), 2),
+      _band(random, (1.2, 2.2), 2),
+      _band(random, (2.5, 5), 2),
+    ),
+    lockPosition: random.nextBool(),
+    followPlayer: random.nextBool(),
+    maxDistance: random.nextBool() ? null : _band(random, (8, 48), 1),
+    closeOnDeath: random.nextBool(),
+    closeOnTeleport: random.nextBool(),
+    components: components,
+    particleLayers: showcaseParticleLayers(
+      random,
+      mood,
+      scopes: <String>[
+        'projection',
+        'component',
+        'text',
+        'line',
+        'span',
+        'local',
+      ],
+      componentId: 'showcase-title',
+    ),
+  )..extras['show'] = showcaseShow(random, viewerAware: true);
+  _spaceComposedMenu(menu, store, columns);
+  return menu;
+}
+
+HuiMenu _buildNetworkHubMenu(_MenuShowcaseContext context) {
+  const List<(String, String, String)> realms = <(String, String, String)>[
+    ('lobby', 'Lobby', 'Network welcome'),
+    ('survival-1', 'Survival', 'Main survival realm'),
+    ('creative', 'Creative', 'Creative plots'),
+    ('events', 'Events', 'Live event server'),
+  ];
+  final List<HuiComponent> components = <HuiComponent>[
+    _menuTitle(context, context.server, 'Choose a server'),
+    _menuOrnament(context, Vec3(-2.15, 1.35, 0)),
+    _menuStatus(
+      context,
+      'network-status',
+      Vec3(2.15, 1.35, 0),
+      '&a● &fNETWORK ONLINE',
+    ),
+  ];
+  for (int index = 0; index < realms.length; index++) {
+    final (String, String, String) realm = realms[index];
+    components.add(
+      _menuButton(
+        context,
+        id: 'connect-${realm.$1}',
+        offset: _menuGridOffset(index, realms.length),
+        label: realm.$2,
+        detail: realm.$3,
+        actions: <HuiAction>[HuiConnectAction(realm.$1)],
+      ),
+    );
+  }
+  components.add(
+    _menuNavigationButton(
+      context,
+      id: 'close-menu',
+      offset: Vec3(0, -1.15, 0),
+      label: 'Close',
+      detail: 'Return to the game',
+      mode: 'close',
+    ),
+  );
+  return _menuDocument(context, components, maxDistance: 24);
+}
+
+HuiMenu _buildWayfinderMenu(_MenuShowcaseContext context) {
+  final List<HuiComponent> components = <HuiComponent>[
+    _menuTitle(context, '${context.server} Wayfinder', 'Choose a destination'),
+    _menuOrnament(context, Vec3(-2.15, 1.35, 0)),
+    _menuStatus(
+      context,
+      'route-count',
+      Vec3(2.15, 1.35, 0),
+      '&f${_menuDestinations.length} &7DESTINATIONS',
+    ),
+  ];
+  for (int index = 0; index < _menuDestinations.length; index++) {
+    final _MenuDestination destination = _menuDestinations[index];
+    components.add(
+      _menuButton(
+        context,
+        id: 'travel-${destination.id}',
+        offset: _menuGridOffset(index, _menuDestinations.length),
+        label: destination.label,
+        detail: destination.detail,
+        actions: <HuiAction>[
+          HuiTeleportAction(
+            destination.world,
+            destination.x,
+            destination.y,
+            destination.z,
+            0,
+            0,
+          ),
+        ],
+      ),
+    );
+  }
+  components.add(
+    _menuNavigationButton(
+      context,
+      id: 'back-menu',
+      offset: Vec3(0, -1.15, 0),
+      label: 'Back',
+      detail: 'Previous menu',
+      mode: 'back',
+    ),
+  );
+  return _menuDocument(context, components, maxDistance: 24);
+}
+
+HuiMenu _buildPlayerToolsMenu(_MenuShowcaseContext context) {
+  final _MenuStatusRecipe status = showcasePick(
+    context.random,
+    _menuStatusRecipes,
+  );
+  return _menuDocument(context, <HuiComponent>[
+    _menuTitle(context, '${context.server} Tools', 'Player utilities'),
+    HuiComponent(
+      'viewer-head',
+      Vec3(-2.15, 1.35, 0),
+      HuiDecorationData(
+        HuiPlayerHeadIcon(
+          '%player_name%',
+          _menuIconStyle(context, ornament: true),
+          20,
+        ),
+      ),
+    ),
+    _menuOrnament(context, Vec3(2.15, 1.35, 0)),
+    _menuButton(
+      context,
+      id: 'command-spawn',
+      offset: Vec3(-1.15, 0.5, 0),
+      label: 'Spawn',
+      detail: 'Run /spawn',
+      actions: <HuiAction>[HuiCommandAction('/spawn', 'player')],
+    ),
+    _menuButton(
+      context,
+      id: 'command-help',
+      offset: Vec3(1.15, 0.5, 0),
+      label: 'Help',
+      detail: 'Run /help',
+      actions: <HuiAction>[HuiCommandAction('/help', 'player')],
+    ),
+    _menuButton(
+      context,
+      id: 'command-daylight',
+      offset: Vec3(-1.15, -0.3, 0),
+      label: 'Daylight',
+      detail: 'Query server time',
+      actions: <HuiAction>[
+        HuiMessageAction('<gray>Checking the server daylight time.</gray>'),
+        HuiCommandAction('time query daytime', 'server'),
+      ],
+    ),
+    HuiComponent(
+      status.id,
+      Vec3(1.15, -0.3, 0),
+      _menuStatusToggle(context, status),
+    ),
+    _menuNavigationButton(
+      context,
+      id: 'close-menu',
+      offset: Vec3(0, -1.15, 0),
+      label: 'Close',
+      detail: 'Return to the game',
+      mode: 'close',
+    ),
+  ], maxDistance: 16);
+}
+
+HuiMenu _buildMenuNavigator(_MenuShowcaseContext context) {
+  final List<String> targets = <String>[
+    for (final WorkspaceDoc document in context.store.workspace.docs)
+      if (DocumentTypeRegistry.of(document.kind) is MenuDocumentType &&
+          document.runtimeId != null &&
+          document.id != context.store.workspace.activeId)
+        document.runtimeId!,
+  ]..sort();
+  final List<
+    ({String id, String label, String detail, HuiNavigateAction action})
+  >
+  routes =
+      <({String id, String label, String detail, HuiNavigateAction action})>[
+        for (final (int, String) entry in targets.take(4).indexed)
+          (
+            id: 'open-${entry.$1 + 1}-${_menuComponentSlug(entry.$2)}',
+            label: _menuTargetLabel(entry.$2),
+            detail: entry.$2,
+            action: HuiNavigateAction(entry.$2, 'push'),
+          ),
+      ];
+  if (routes.isEmpty) {
+    routes.addAll(
+      <({String id, String label, String detail, HuiNavigateAction action})>[
+        (
+          id: 'home-menu',
+          label: 'Home',
+          detail: 'Root menu',
+          action: HuiNavigateAction('', 'home'),
+        ),
+        (
+          id: 'back-menu',
+          label: 'Back',
+          detail: 'Previous menu',
+          action: HuiNavigateAction('', 'back'),
+        ),
+        (
+          id: 'close-menu',
+          label: 'Close',
+          detail: 'Return to the game',
+          action: HuiNavigateAction('', 'close'),
+        ),
+      ],
+    );
+  } else {
+    routes.add((
+      id: 'back-menu',
+      label: 'Back',
+      detail: 'Previous menu',
+      action: HuiNavigateAction('', 'back'),
+    ));
+  }
+  final List<HuiComponent> components = <HuiComponent>[
+    _menuTitle(context, '${context.server} Menus', 'Choose a page'),
+    _menuOrnament(context, Vec3(-2.15, 1.35, 0)),
+    _menuStatus(
+      context,
+      'route-count',
+      Vec3(2.15, 1.35, 0),
+      '&f${routes.length} &7ROUTES',
+    ),
+  ];
+  for (int index = 0; index < routes.length; index++) {
+    final ({String id, String label, String detail, HuiNavigateAction action})
+    route = routes[index];
+    components.add(
+      _menuButton(
+        context,
+        id: route.id,
+        offset: _menuGridOffset(index, routes.length),
+        label: route.label,
+        detail: route.detail,
+        actions: <HuiAction>[route.action],
+      ),
+    );
+  }
+  return _menuDocument(context, components, maxDistance: 16);
+}
+
+HuiMenu _menuDocument(
+  _MenuShowcaseContext context,
+  List<HuiComponent> components, {
+  required double maxDistance,
+}) => HuiMenu(
+  offset: Vec3(
+    0,
+    _round2(1.6 + context.random.nextDouble() * 0.2),
+    _round2(2.5 + context.random.nextDouble() * 0.3),
+  ),
+  lockPosition: false,
+  followPlayer: true,
+  maxDistance: maxDistance,
+  closeOnDeath: true,
+  closeOnTeleport: true,
+  components: components,
+);
+
+HuiComponent _menuTitle(
+  _MenuShowcaseContext context,
+  String title,
+  String subtitle,
+) => HuiComponent(
+  'showcase-title',
+  Vec3(0, 1.45, 0),
+  HuiDecorationData(
+    HuiTextIcon(
+      '${context.mood.legacy}&l${showcaseAlignment(context.random, title).text}\n&7$subtitle',
+      _menuIconStyle(context, title: true),
+      10,
+    ),
+  ),
+);
+
+HuiComponent _menuStatus(
+  _MenuShowcaseContext context,
+  String id,
+  Vec3 offset,
+  String text,
+) => HuiComponent(
+  id,
+  offset,
+  HuiDecorationData(HuiTextIcon(text, _menuIconStyle(context, ornament: true))),
+);
+
+HuiComponent _menuOrnament(_MenuShowcaseContext context, Vec3 offset) =>
+    HuiComponent(
+      'brand-ornament',
+      offset,
+      HuiDecorationData(_menuOrnamentIcon(context)),
+    );
+
+HuiIcon _menuOrnamentIcon(_MenuShowcaseContext context) {
+  final List<String> images =
+      context.store.images?.paths.toList() ?? <String>[];
+  images.sort();
+  final List<CustomItemEntry> customItems =
+      context.store.catalogs.customItems.items;
+  final List<String> available = <String>[
+    if (images.isNotEmpty) 'textImage',
+    if (images.length >= 2) 'animatedTextImage',
+    if (customItems.isNotEmpty) 'customItem',
+  ];
+  if (available.isEmpty) {
+    return HuiTextIcon(
+      '${context.mood.legacy}&l${context.glyph}',
+      _menuIconStyle(context, ornament: true),
+    );
+  }
+  return switch (showcasePick(context.random, available)) {
+    'textImage' => HuiTextImageIcon(
+      showcasePick(context.random, images),
+      _menuIconStyle(context, ornament: true),
+    ),
+    'animatedTextImage' => HuiAnimatedImageIcon(
+      images.take(math.min(4, images.length)).toList(),
+      6,
+      _menuIconStyle(context, ornament: true),
+    ),
+    _ => _menuCustomItemIcon(context, customItems),
+  };
+}
+
+HuiCustomItemIcon _menuCustomItemIcon(
+  _MenuShowcaseContext context,
+  List<CustomItemEntry> customItems,
+) {
+  final CustomItemEntry item = showcasePick(context.random, customItems);
+  return HuiCustomItemIcon(
+    item.provider,
+    item.id,
+    1,
+    _menuIconStyle(context, ornament: true),
+  );
+}
+
+HuiComponent _menuButton(
+  _MenuShowcaseContext context, {
+  required String id,
+  required Vec3 offset,
+  required String label,
+  required String detail,
+  required List<HuiAction> actions,
+}) => HuiComponent(
+  id,
+  offset,
+  HuiButtonData(
+    0.08,
+    <HuiAction>[_menuFeedback(context), ...actions],
+    HuiTextIcon(
+      '${context.mood.legacy}&l$label\n&7$detail',
+      _menuIconStyle(context),
+    ),
+    HuiHitbox(0.95, 0.32, Vec3(0, 0, 0.02), HuiHitboxAnchor.button),
+    huiRuntimeDefaultHoverDurationTicks,
+    HuiHoverEasing.easeOutCubic,
+  ),
+);
+
+HuiComponent _menuNavigationButton(
+  _MenuShowcaseContext context, {
+  required String id,
+  required Vec3 offset,
+  required String label,
+  required String detail,
+  required String mode,
+}) => _menuButton(
+  context,
+  id: id,
+  offset: offset,
+  label: label,
+  detail: detail,
+  actions: <HuiAction>[HuiNavigateAction('', mode)],
+);
+
+HuiToggleData _menuStatusToggle(
+  _MenuShowcaseContext context,
+  _MenuStatusRecipe status,
+) => HuiToggleData(
+  0.08,
+  status.condition,
+  status.expectedValue,
+  <HuiAction>[_menuFeedback(context), HuiMessageAction(status.trueMessage)],
+  <HuiAction>[_menuFeedback(context), HuiMessageAction(status.falseMessage)],
+  HuiTextIcon(
+    '&a&l${status.trueLabel}\n&7Detected at open',
+    _menuIconStyle(context),
+  ),
+  HuiTextIcon(
+    '&7&l${status.falseLabel}\n&fDetected at open',
+    _menuIconStyle(context),
+  ),
+  HuiHitbox(0.95, 0.32, Vec3(0, 0, 0.02), HuiHitboxAnchor.button),
+  huiRuntimeDefaultHoverDurationTicks,
+  HuiHoverEasing.easeOutCubic,
+);
+
+HuiSoundAction _menuFeedback(_MenuShowcaseContext context) =>
+    HuiSoundAction('ui.button.click', 'player', 0.8, context.soundPitch);
+
+Vec3 _menuGridOffset(int index, int count) {
+  final int row = index ~/ 2;
+  final bool centered = count.isOdd && index == count - 1;
+  return Vec3(centered ? 0 : (index.isEven ? -1.15 : 1.15), 0.5 - row * 0.8, 0);
+}
+
+String _menuTargetLabel(String target) {
+  final String leaf = target.split('/').last;
+  final List<String> words = leaf
+      .replaceAll(RegExp('[-_]+'), ' ')
+      .split(' ')
+      .where((String word) => word.isNotEmpty)
+      .toList();
+  if (words.isEmpty) return 'Menu';
+  return words
+      .map(
+        (String word) =>
+            '${word.substring(0, 1).toUpperCase()}${word.substring(1)}',
+      )
+      .join(' ');
+}
+
+String _menuComponentSlug(String target) => target
+    .toLowerCase()
+    .replaceAll(RegExp('[^a-z0-9]+'), '-')
+    .replaceAll(RegExp(r'^-+|-+$'), '');
+
+HuiIconStyle _menuIconStyle(
+  _MenuShowcaseContext context, {
+  bool title = false,
+  bool ornament = false,
+}) {
+  final double scale = title ? 0.72 : (ornament ? 0.76 : 0.82);
+  return HuiIconStyle(
+    billboard: 'fixed',
+    shadow: true,
+    seeThrough: false,
+    textAlignment: 'center',
+    backgroundArgb: context.backgroundArgb,
+    textOpacity: 255,
+    lineWidth: title ? 260 : 180,
+    blockLight: 15,
+    skyLight: 15,
+    viewRange: 1.5,
+    shadowRadius: 0.18,
+    shadowStrength: 0.7,
+    cullingWidth: title ? 5 : 3,
+    cullingHeight: title ? 1.5 : 1,
+    glowColor: title ? '#FF${context.mood.primary.substring(1)}' : null,
+    scaleX: scale,
+    scaleY: scale,
+    scaleZ: scale,
+  );
+}
+
+enum PreviewShowcaseArchetype {
+  beehive,
+  brewingStand,
+  cauldron,
+  chest,
+  chiseledBookshelf,
+  dispenser,
+  enderChest,
+  furnace,
+  furnaceMinecart,
+  hopper,
+  jukebox,
+  locked,
+  minecart,
+  shelf,
+}
+
+HuiPreviewDoc buildRandomPreviewShowcase(
+  math.Random random, {
+  PreviewShowcaseArchetype? archetype,
+}) {
+  final PreviewShowcaseArchetype selectedArchetype =
+      archetype ??
+      PreviewShowcaseArchetype.values[random.nextInt(
+        PreviewShowcaseArchetype.values.length,
+      )];
+  final _PreviewFurnaceTheme theme = showcasePick(
+    random,
+    _previewFurnaceThemes,
+  );
+  final HuiPreviewDoc doc = switch (selectedArchetype) {
+    PreviewShowcaseArchetype.beehive => _buildRandomBeehivePreview(
+      random,
+      theme,
+    ),
+    PreviewShowcaseArchetype.brewingStand => _buildRandomBrewingPreview(
+      random,
+      theme,
+    ),
+    PreviewShowcaseArchetype.cauldron => _buildRandomCauldronPreview(
+      random,
+      theme,
+    ),
+    PreviewShowcaseArchetype.chest => _buildRandomStoragePreview(random, theme),
+    PreviewShowcaseArchetype.chiseledBookshelf =>
+      _buildRandomChiseledBookshelfPreview(random, theme),
+    PreviewShowcaseArchetype.dispenser => _buildRandomDispenserPreview(
+      random,
+      theme,
+    ),
+    PreviewShowcaseArchetype.enderChest => _buildRandomEnderPreview(
+      random,
+      theme,
+    ),
+    PreviewShowcaseArchetype.furnace => _buildRandomPreviewFurnaceLab(
+      random,
+      theme,
+    ),
+    PreviewShowcaseArchetype.furnaceMinecart =>
+      _buildRandomPoweredMinecartPreview(random, theme),
+    PreviewShowcaseArchetype.hopper => _buildRandomHopperPreview(random, theme),
+    PreviewShowcaseArchetype.jukebox => _buildRandomJukeboxPreview(
+      random,
+      theme,
+    ),
+    PreviewShowcaseArchetype.locked => _buildRandomLockedPreview(random, theme),
+    PreviewShowcaseArchetype.minecart => _buildRandomMobilePreview(
+      random,
+      theme,
+    ),
+    PreviewShowcaseArchetype.shelf => _buildRandomShelfPreview(random, theme),
+  };
+  final ShowcaseMood mood = showcasePick(random, showcaseMoods);
+  doc.textStyle = showcaseDisplayStyle(random, mood);
+  doc.itemStyle = showcaseDisplayStyle(random, mood);
+  final HuiPreviewCard? card = doc.card;
+  if (card != null) {
+    card.padding = random.nextInt(17);
+    card.borderWidth = random.nextInt(9);
+    card.trayPadding = random.nextInt(11);
+    card.titleHeight = 10 + random.nextInt(23);
+    card.titleGap = random.nextInt(11);
+    card.backgroundArgb = showcasePick(random, <String>[
+      '#00000000',
+      '#F21B1B22',
+      '#99${mood.primary.substring(1)}',
+    ]);
+    card.trayArgb = showcasePick(random, <String>[
+      '#00000000',
+      '#FF33333E',
+      '#66${mood.secondary.substring(1)}',
+    ]);
+    card.borderArgb = '#CC${mood.primary.substring(1)}';
+    card.titleArgb = '#E6${mood.secondary.substring(1)}';
+  }
+  doc.match.priority = 8 + random.nextInt(7);
+  doc.show = _showcasePreviewShow(random);
+  doc.card?.show = _showcasePreviewShow(random);
+  for (final HuiPreviewElement element in doc.elements) {
+    element.show = _showcasePreviewShow(random);
+    element.style = random.nextBool()
+        ? showcaseDisplayStyle(random, mood)
+        : null;
+    if (element.type == 'label') {
+      element.box = showcaseBox(random, mood);
+    }
+  }
+  final String? cardTitle = doc.card?.title;
+  if (cardTitle != null) {
+    doc.card!.title = showcaseAlignmentExpression(
+      random,
+      '($cardTitle)',
+      24 + random.nextInt(17),
+    );
+  }
+  doc.particleLayers = showcaseParticleLayers(
+    random,
+    showcasePick(random, showcaseMoods),
+    scopes: <String>['projection', 'label', 'text', 'line', 'local'],
+  );
+  return doc;
+}
+
+Object _showcasePreviewShow(math.Random random) =>
+    showcasePick(random, <Object>[
+      true,
+      'time.seconds >= 0',
+      'server.online >= 0',
+      'player.health > 0',
+    ]);
+
+HuiPreviewDoc buildRandomPreviewFurnaceLab(math.Random random) =>
+    _buildRandomPreviewFurnaceLab(
+      random,
+      showcasePick(random, _previewFurnaceThemes),
+    );
+
+HuiPreviewDoc _buildRandomPreviewFurnaceLab(
+  math.Random random,
+  _PreviewFurnaceTheme selected,
+) {
+  final int segments = 7 + random.nextInt(6);
+  final int segmentGap = 6 + random.nextInt(3);
+  final int segmentSize = 4 + random.nextInt(3);
+  final int pulseRate = 3 + random.nextInt(6);
+  return HuiPreviewDoc(
+    match: HuiPreviewMatch(
+      blocks: <String>['FURNACE', 'BLAST_FURNACE', 'SMOKER'],
+      priority: 10,
+      vars: <String, dynamic>{
+        'style': 'furnace',
+        'segments': segments,
+        'segmentGap': segmentGap,
+        'segmentSize': segmentSize,
+        'pulseRate': pulseRate,
+        'panelWidth': 156 + random.nextInt(29),
+        'panelHeight': 104 + random.nextInt(21),
+        'panelColor': selected.panelColor,
+        'wellColor': selected.wellColor,
+        'fill': selected.fill,
+        'pulse': selected.pulse,
+        'chase': selected.chase,
+        'idle': selected.idle,
+        'flame0': selected.flame0,
+        'flame1': selected.flame1,
+        'flame2': selected.flame2,
+        'smoke0': '#FF5E5E66',
+        'smoke1': '#FF8A8A92',
+        'smoke2': '#FFB8B8C0',
+        'activeItemKey': 'gloss.preview.state.smelting_item',
+        'activeKey': 'gloss.preview.state.smelting',
+        'stateColor': selected.stateColor,
+        'surgeColor': selected.surgeColor,
+        'titleKey': 'gloss.preview.theme.title.furnace',
+        'accent': selected.accent,
+      },
+    ),
+    variants: <HuiPreviewVariant>[
+      HuiPreviewVariant(
+        blocks: <String>['BLAST_FURNACE'],
+        vars: <String, dynamic>{
+          'style': 'blast',
+          'fill': '#FF6FB8E8',
+          'pulse': '#FFE8F7FF',
+          'chase': '#FF4FA8D8',
+          'idle': '#FF23262E',
+          'flame0': '#FF4FA8E8',
+          'flame1': '#FF8ED4FF',
+          'flame2': '#FFE8F7FF',
+          'activeItemKey': 'gloss.preview.state.blasting_item',
+          'activeKey': 'gloss.preview.state.blasting',
+          'stateColor': '<#6FB8E8>',
+          'surgeColor': '<#E8F7FF>',
+          'titleKey': 'gloss.preview.theme.title.blast_furnace',
+          'accent': '#6FEAEA',
+        },
+      ),
+      HuiPreviewVariant(
+        blocks: <String>['SMOKER'],
+        vars: <String, dynamic>{
+          'style': 'smoker',
+          'fill': '#FFC8893A',
+          'pulse': '#FFF2C878',
+          'chase': '#FF8A6234',
+          'idle': '#FF2A2A33',
+          'flame0': '#FFE25822',
+          'flame1': '#FFF2A535',
+          'flame2': '#FFC23B22',
+          'activeItemKey': 'gloss.preview.state.smoking_item',
+          'activeKey': 'gloss.preview.state.smoking',
+          'stateColor': '<#C8893A>',
+          'surgeColor': '<#F2C878>',
+          'titleKey': 'gloss.preview.theme.title.smoker',
+          'accent': '#F2D451',
+        },
+      ),
+    ],
+    card: HuiPreviewCard(
+      title:
+          "'&f&l' + (customName != '' ? customName : "
+          'plain(lang(vars.titleKey)))',
+      accent: 'vars.accent',
+      minHalfWidth: 92,
+    ),
+    elements: <HuiPreviewElement>[
+      HuiPreviewElement(
+        'panel',
+        x: 0,
+        y: -8,
+        width: 'vars.panelWidth',
+        height: 'vars.panelHeight',
+        color: 'vars.panelColor',
+      ),
+      HuiPreviewElement(
+        'slot',
+        x: -43,
+        y: 14,
+        size: 20,
+        index: 0,
+        wellColor: 'vars.wellColor',
+      ),
+      HuiPreviewElement(
+        'slot',
+        x: -43,
+        y: -10,
+        size: 20,
+        index: 1,
+        wellColor: 'vars.wellColor',
+      ),
+      HuiPreviewElement(
+        'slot',
+        x: 43,
+        y: 14,
+        size: 20,
+        index: 2,
+        wellColor: 'vars.wellColor',
+      ),
+      HuiPreviewElement(
+        'cell',
+        repeat: HuiPreviewRepeat(count: 'vars.segments', varName: 'i'),
+        x: 'round((i - (vars.segments - 1) / 2) * vars.segmentGap)',
+        y: 14,
+        size: 'vars.segmentSize',
+        color:
+            'cookTime > 0 && cookTimeTotal > 0 '
+            '? (i < ceil(cookTime / cookTimeTotal * vars.segments) '
+            '? mix(vars.fill, vars.pulse, '
+            '(sin(time / vars.pulseRate + i) + 1) / 2) '
+            ': vars.wellColor) '
+            ': (burnTime > 0 && '
+            'i == mod(floor(time / vars.pulseRate), vars.segments) '
+            '? vars.chase : vars.wellColor)',
+      ),
+      HuiPreviewElement(
+        'cell',
+        visible: "vars.style != 'blast'",
+        x: -20,
+        y: -10,
+        size: 12,
+        color:
+            'burnTime > 0 '
+            '? palette([vars.flame0, vars.flame1, vars.flame2], '
+            'floor(time / vars.pulseRate)) '
+            ': vars.idle',
+      ),
+      HuiPreviewElement(
+        'cell',
+        visible: "vars.style == 'blast'",
+        repeat: HuiPreviewRepeat(count: 3, varName: 'vent'),
+        x: '-28 + vent * 8',
+        y: -10,
+        size: 6,
+        color:
+            'burnTime > 0 '
+            '? palette([vars.flame0, vars.flame1, vars.flame2], '
+            'floor(time / vars.pulseRate) + vent) '
+            ': vars.idle',
+      ),
+      HuiPreviewElement(
+        'cell',
+        visible: "vars.style == 'smoker'",
+        repeat: HuiPreviewRepeat(count: 3, varName: 'wisp'),
+        x: '-12 + wisp * 10',
+        y: '-9 + mod(wisp, 2) * 6',
+        size: '8 - wisp',
+        color:
+            'burnTime > 0 '
+            '? alpha(palette([vars.smoke0, vars.smoke1, vars.smoke2], '
+            'floor(time / vars.pulseRate) + wisp), 210 - wisp * 45) '
+            ': vars.idle',
+      ),
+      HuiPreviewElement(
+        'label',
+        x: 0,
+        y: -32,
+        text:
+            "cookTime > 0 && cookTimeTotal > 0 "
+            "? vars.stateColor + (occupied(0) "
+            "? lang(vars.activeItemKey, readable(item(0)), "
+            "round(cookTime * 100 / cookTimeTotal)) "
+            ": lang(vars.activeKey, "
+            "round(cookTime * 100 / cookTimeTotal))) "
+            "+ ' &8' + bar(cookTime, cookTimeTotal, 12, '■', '□') "
+            ": (occupied(0) && !occupied(1) "
+            "? '&c' + lang('gloss.preview.state.needs_fuel') "
+            ": (!occupied(0) ? '&7' + lang('gloss.preview.state.no_input') "
+            ": '&7' + lang('gloss.preview.state.waiting')))",
+      ),
+      HuiPreviewElement(
+        'label',
+        x: 0,
+        y: -46,
+        text:
+            "(occupied(0) ? '&f' + readable(item(0)) + ' &8×&f' "
+            "+ str(count(0)) : '&8Empty input') "
+            "+ ' &8• &7Fuel &f' + str(fuelSeconds) + 's' "
+            "+ ' &8• &7XP &a' + fixed(max(bankedXp, 0), 1)",
+      ),
+      HuiPreviewElement(
+        'label',
+        x: 0,
+        y: -59,
+        text:
+            "(surge.active "
+            "? vars.surgeColor + '&lSURGE ×' + fixed(surge.gain, 1) "
+            ": select(['&8IDLE', '&7READY', '&fMONITORING'], "
+            "floor(time / 10))) + ' &8• &7Slots &f' "
+            "+ str(inventory.occupied) + '/' + str(inventory.size)",
+      ),
+    ],
+  );
+}
+
+HuiPreviewDoc _buildRandomStoragePreview(
+  math.Random random,
+  _PreviewFurnaceTheme theme,
+) {
+  final int columns = 5 + random.nextInt(3);
+  final int rows = 2 + random.nextInt(2);
+  final int slots = columns * rows;
+  final int pulseRate = 3 + random.nextInt(7);
+  return HuiPreviewDoc(
+    match: HuiPreviewMatch(
+      blocks: <String>['CHEST', 'TRAPPED_CHEST', 'BARREL'],
+      priority: 10,
+      vars: <String, dynamic>{
+        ..._previewThemeVars(theme),
+        'title': showcasePick(random, <String>[
+          'Ghostwood Storehouse',
+          'Packard Mill Inventory',
+          'Bookhouse Supply Cache',
+        ]),
+        'columns': columns,
+        'rows': rows,
+        'slots': slots,
+        'pulseRate': pulseRate,
+        'panelWidth': columns * 22 + 34,
+        'panelHeight': rows * 22 + 58,
+      },
+    ),
+    variants: <HuiPreviewVariant>[
+      HuiPreviewVariant(
+        blocks: <String>['TRAPPED_CHEST'],
+        vars: <String, dynamic>{
+          'title': 'Palmer House Lockbox',
+          'accent': '#FF5577',
+          'fill': '#FFFF3355',
+          'pulse': '#FFFFB3C4',
+        },
+      ),
+      HuiPreviewVariant(
+        blocks: <String>['BARREL'],
+        vars: <String, dynamic>{
+          'title': 'Roadhouse Barrel',
+          'accent': '#F2D451',
+        },
+      ),
+    ],
+    card: _previewCard(82 + columns * 4),
+    elements: <HuiPreviewElement>[
+      _previewPanel(),
+      HuiPreviewElement(
+        'cell',
+        repeat: HuiPreviewRepeat(count: 'vars.columns', varName: 'scan'),
+        x: 'round((scan - (vars.columns - 1) / 2) * 22)',
+        y: 'round(vars.rows * 11 + 11)',
+        size: 5,
+        color:
+            'scan == mod(floor(time / vars.pulseRate), vars.columns) '
+            '? vars.pulse : mix(vars.idle, vars.fill, '
+            '(sin(time / vars.pulseRate + scan) + 1) / 5)',
+      ),
+      HuiPreviewElement(
+        'slot',
+        repeat: HuiPreviewRepeat(count: 'vars.slots', varName: 'i'),
+        x: 'round((mod(i, vars.columns) - (vars.columns - 1) / 2) * 22)',
+        y: 'round(((vars.rows - 1) / 2 - floor(i / vars.columns)) * 22)',
+        size: 18,
+        index: 'i',
+        wellColor: 'vars.wellColor',
+      ),
+      HuiPreviewElement(
+        'label',
+        x: 0,
+        y: '-round(vars.rows * 11 + 14)',
+        text:
+            "'&7Loaded &f' + str(inventory.occupied) + '&8/' + "
+            "str(inventory.size) + ' &8• &7Capacity &f' + "
+            'round(inventory.occupied * 100 / max(inventory.size, 1)) + "%"',
+      ),
+    ],
+  );
+}
+
+HuiPreviewDoc _buildRandomChiseledBookshelfPreview(
+  math.Random random,
+  _PreviewFurnaceTheme theme,
+) {
+  final int pulseRate = 4 + random.nextInt(6);
+  return HuiPreviewDoc(
+    match: HuiPreviewMatch(
+      blocks: <String>['CHISELED_BOOKSHELF'],
+      priority: 10,
+      vars: <String, dynamic>{
+        ..._previewThemeVars(theme),
+        'title': showcasePick(random, <String>[
+          'Bookhouse Archive',
+          'Ghostwood Reading Room',
+          'Owl Cave Records',
+        ]),
+        'columns': 3,
+        'rows': 2,
+        'slots': 6,
+        'pulseRate': pulseRate,
+        'panelWidth': 136,
+        'panelHeight': 102,
+      },
+    ),
+    card: _previewCard(76),
+    elements: <HuiPreviewElement>[
+      _previewPanel(),
+      HuiPreviewElement(
+        'cell',
+        z: '2 + smoothstep(0, 1, (sin(time / vars.pulseRate) + 1) / 2)',
+        repeat: HuiPreviewRepeat(count: 'vars.slots', varName: 'shelf'),
+        x: 'round((mod(shelf, vars.columns) - 1) * 30)',
+        y: 'round((0.5 - floor(shelf / vars.columns)) * 26)',
+        size: '16 + abs(cos(time / vars.pulseRate + shelf)) * 2',
+        color:
+            'mix(rgb(80, 48, 24), argb(255, 228, 184, 92), '
+            'smoothstep(0, 1, (sin(time / vars.pulseRate + shelf) + 1) / 2))',
+      ),
+      HuiPreviewElement(
+        'slot',
+        z: 5,
+        repeat: HuiPreviewRepeat(count: 'vars.slots', varName: 'book'),
+        x: 'round((mod(book, vars.columns) - 1) * 30)',
+        y: 'round((0.5 - floor(book / vars.columns)) * 26)',
+        size: 18,
+        index: 'book',
+        wellColor: 'alpha(vars.wellColor, 210)',
+      ),
+      HuiPreviewElement(
+        'label',
+        z: 7,
+        x: 0,
+        y: -36,
+        background: 'alpha(vars.panelColor, 180)',
+        text:
+            "'&7Volumes &f' + str(inventory.occupied) + '&8/' + "
+            "str(min(inventory.size, vars.slots)) + ' &8• &7Ink ' + "
+            'hex(vars.fill)',
+      ),
+    ],
+  );
+}
+
+HuiPreviewDoc _buildRandomDispenserPreview(
+  math.Random random,
+  _PreviewFurnaceTheme theme,
+) {
+  final int pulseRate = 3 + random.nextInt(5);
+  return HuiPreviewDoc(
+    match: HuiPreviewMatch(
+      blocks: <String>['DISPENSER', 'DROPPER'],
+      priority: 10,
+      vars: <String, dynamic>{
+        ..._previewThemeVars(theme),
+        'title': 'Ghostwood Dispenser',
+        'slots': 9,
+        'pulseRate': pulseRate,
+        'panelWidth': 142,
+        'panelHeight': 126,
+      },
+    ),
+    variants: <HuiPreviewVariant>[
+      HuiPreviewVariant(
+        blocks: <String>['DROPPER'],
+        vars: <String, dynamic>{
+          'title': 'Packard Dropper',
+          'accent': theme.accent,
+        },
+      ),
+    ],
+    card: _previewCard(78),
+    elements: <HuiPreviewElement>[
+      _previewPanel(),
+      HuiPreviewElement(
+        'slot',
+        repeat: HuiPreviewRepeat(count: 'vars.slots', varName: 'slot'),
+        x: 'round((mod(slot, 3) - 1) * 24)',
+        y: 'round((1 - floor(slot / 3)) * 24)',
+        size: 18,
+        index: 'slot',
+        wellColor: 'vars.wellColor',
+      ),
+      HuiPreviewElement(
+        'cell',
+        z: '3 + mod(floor(time.ticks / vars.pulseRate), 2)',
+        repeat: HuiPreviewRepeat(count: 8, varName: 'port'),
+        x: 'round(cos(port * 0.785398) * 50)',
+        y: 'round(sin(port * 0.785398) * 38)',
+        size: '4 + abs(cos(time / vars.pulseRate + port)) * 3',
+        color:
+            'port == mod(floor(time / vars.pulseRate), 8) '
+            '? vars.pulse : vars.idle',
+      ),
+      HuiPreviewElement(
+        'label',
+        x: 0,
+        y: -48,
+        background: 'alpha(vars.panelColor, 192)',
+        text:
+            "'&7Payload &f' + str(inventory.occupied) + '&8/' + "
+            "str(inventory.size) + ' &8• &7Cycle &f' + "
+            'str(mod(floor(time.seconds), 8) + 1)',
+      ),
+    ],
+  );
+}
+
+HuiPreviewDoc _buildRandomHopperPreview(
+  math.Random random,
+  _PreviewFurnaceTheme theme,
+) {
+  final int pulseRate = 3 + random.nextInt(7);
+  return HuiPreviewDoc(
+    match: HuiPreviewMatch(
+      blocks: <String>['HOPPER'],
+      priority: 10,
+      vars: <String, dynamic>{
+        ..._previewThemeVars(theme),
+        'title': 'Packard Transfer Hopper',
+        'slots': 5,
+        'pulseRate': pulseRate,
+        'panelWidth': 154,
+        'panelHeight': 88,
+      },
+    ),
+    card: _previewCard(84),
+    elements: <HuiPreviewElement>[
+      _previewPanel(),
+      HuiPreviewElement(
+        'cell',
+        repeat: HuiPreviewRepeat(count: 'vars.slots', varName: 'flow'),
+        x: 'round(lerp(-48, 48, flow / max(vars.slots - 1, 1)))',
+        y: 20,
+        size: '5 + smoothstep(-1, 1, sin(time / vars.pulseRate + flow)) * 3',
+        color:
+            'flow <= mod(floor(time / vars.pulseRate), vars.slots) '
+            '? vars.fill : vars.idle',
+      ),
+      HuiPreviewElement(
+        'slot',
+        repeat: HuiPreviewRepeat(count: 'vars.slots', varName: 'slot'),
+        x: 'round(lerp(-48, 48, slot / max(vars.slots - 1, 1)))',
+        y: -4,
+        size: 18,
+        index: 'slot',
+        wellColor: 'vars.wellColor',
+      ),
+      HuiPreviewElement(
+        'label',
+        x: 0,
+        y: -28,
+        background: 'alpha(vars.panelColor, 176)',
+        text:
+            "'&7Transfer load &f' + str(inventory.occupied) + '&8/' + "
+            'str(min(inventory.size, vars.slots))',
+      ),
+    ],
+  );
+}
+
+HuiPreviewDoc _buildRandomShelfPreview(
+  math.Random random,
+  _PreviewFurnaceTheme theme,
+) {
+  final int slots = 4 + random.nextInt(5);
+  return HuiPreviewDoc(
+    match: HuiPreviewMatch(
+      blocks: <String>['*_SHELF'],
+      priority: 10,
+      vars: <String, dynamic>{
+        ..._previewThemeVars(theme),
+        'title': 'Great Northern Shelf',
+        'slots': slots,
+        'panelWidth': slots * 23 + 34,
+        'panelHeight': 88,
+      },
+    ),
+    card: _previewCard(82),
+    elements: <HuiPreviewElement>[
+      _previewPanel(),
+      HuiPreviewElement(
+        'cell',
+        repeat: HuiPreviewRepeat(count: 'vars.slots', varName: 'grain'),
+        x: 'round((grain - (vars.slots - 1) / 2) * 23)',
+        y: 18,
+        size: '4 + pow((sin(time / 7 + grain) + 1) / 2, 2) * 4',
+        color:
+            'mix(vars.idle, vars.fill, '
+            'smoothstep(0, 1, (cos(time / 7 + grain) + 1) / 2))',
+      ),
+      HuiPreviewElement(
+        'slot',
+        repeat: HuiPreviewRepeat(count: 'vars.slots', varName: 'slot'),
+        x: 'round((slot - (vars.slots - 1) / 2) * 23)',
+        y: -4,
+        size: 18,
+        index: 'slot',
+        wellColor: 'vars.wellColor',
+      ),
+      HuiPreviewElement(
+        'label',
+        x: 0,
+        y: -30,
+        background: 'alpha(vars.panelColor, 180)',
+        text:
+            "'&7Shelf &f' + str(inventory.occupied) + '&8/' + "
+            "str(vars.slots) + ' &8• &7Level &f' + str(player.level)",
+      ),
+    ],
+  );
+}
+
+HuiPreviewDoc _buildRandomLockedPreview(
+  math.Random random,
+  _PreviewFurnaceTheme theme,
+) {
+  final bool animatedFrame = random.nextBool();
+  return HuiPreviewDoc(
+    match: HuiPreviewMatch(
+      special: 'locked',
+      priority: 20,
+      vars: <String, dynamic>{
+        ..._previewThemeVars(theme),
+        'title': 'Restricted',
+        'cells': 4,
+        'panelWidth': 132,
+        'panelHeight': 86,
+      },
+    ),
+    card: HuiPreviewCard(
+      framed: animatedFrame ? 'mod(floor(time.seconds), 2) == 0' : false,
+      title: "'&c&l' + vars.title",
+      accent: 'vars.accent',
+      minHalfWidth: 72,
+    ),
+    elements: <HuiPreviewElement>[
+      _previewPanel(),
+      HuiPreviewElement(
+        'cell',
+        visible: 'player.health > 0',
+        repeat: HuiPreviewRepeat(count: 'vars.cells', varName: 'lock'),
+        x: 'round((lock - 1.5) * 22)',
+        y: 4,
+        size: '12 + abs(sin(time.ms / 500 + lock)) * 4',
+        color:
+            'mix(vars.idle, vars.pulse, '
+            'smoothstep(0, 1, (sin(time / 5 + lock) + 1) / 2))',
+      ),
+      HuiPreviewElement(
+        'label',
+        x: 0,
+        y: -24,
+        background: 'alpha(argb(220, 24, 12, 18), 210)',
+        text:
+            "'&cAccess denied &8• &7' + "
+            "papi('player_name', player.name) + ' &8• &7' + "
+            "fixed(metric('react.tick-ms', 50), 1) + 'ms &8• &7' + "
+            "str(number('42') + papiNumber('player_level', player.level))",
+      ),
+    ],
+  );
+}
+
+HuiPreviewDoc _buildRandomBrewingPreview(
+  math.Random random,
+  _PreviewFurnaceTheme theme,
+) {
+  final int segments = 7 + random.nextInt(5);
+  final int bubbles = 4 + random.nextInt(4);
+  final int pulseRate = 2 + random.nextInt(6);
+  return HuiPreviewDoc(
+    match: HuiPreviewMatch(
+      blocks: <String>['BREWING_STAND'],
+      priority: 10,
+      vars: <String, dynamic>{
+        ..._previewThemeVars(theme),
+        'title': showcasePick(random, <String>[
+          'Jacoby Formula',
+          'Blue Rose Distillery',
+          'Black Lodge Elixir',
+        ]),
+        'segments': segments,
+        'bubbles': bubbles,
+        'pulseRate': pulseRate,
+        'panelWidth': 176,
+        'panelHeight': 124,
+      },
+    ),
+    card: random.nextInt(4) == 0 ? null : _previewCard(94),
+    elements: <HuiPreviewElement>[
+      _previewPanel(),
+      HuiPreviewElement('slot', x: 0, y: 24, size: 20, index: 3),
+      HuiPreviewElement('slot', x: -54, y: 24, size: 20, index: 4),
+      HuiPreviewElement(
+        'slot',
+        repeat: HuiPreviewRepeat(count: 3, varName: 'bottle'),
+        x: '(bottle - 1) * 28',
+        y: -14,
+        size: 20,
+        index: 'bottle',
+      ),
+      HuiPreviewElement(
+        'cell',
+        repeat: HuiPreviewRepeat(count: 'vars.segments', varName: 'i'),
+        x: 56,
+        y: '28 - i * 7',
+        size: 5,
+        color:
+            'i < floor(clamp(1 - brewTime / max(brewTotal, 1), 0, 1) '
+            '* vars.segments) ? mix(vars.fill, vars.pulse, '
+            '(sin(time / vars.pulseRate + i) + 1) / 2) : vars.wellColor',
+      ),
+      HuiPreviewElement(
+        'cell',
+        repeat: HuiPreviewRepeat(count: 'vars.bubbles', varName: 'bubble'),
+        x: '-24 + bubble * 8',
+        y: '10 + mod(bubble, 3) * 7',
+        size: '4 + mod(bubble, 3)',
+        color:
+            'brewTime > 0 ? palette([vars.fill, vars.pulse, vars.chase], '
+            'floor(time / vars.pulseRate) + bubble) : vars.idle',
+      ),
+      HuiPreviewElement(
+        'label',
+        x: 0,
+        y: -40,
+        text:
+            "brewTime > 0 ? vars.stateColor + '&lBREWING &f' + "
+            'round(clamp(1 - brewTime / max(brewTotal, 1), 0, 1) * 100) '
+            "+ '%' : '&7Waiting for a complete recipe'",
+      ),
+      HuiPreviewElement(
+        'label',
+        x: 0,
+        y: -54,
+        text:
+            "'&7Fuel &e' + str(fuelLevel) + '&8/' + str(maxFuel) + "
+            "' &8• &7Bottles &d' + str((occupied(0) ? 1 : 0) + "
+            '(occupied(1) ? 1 : 0) + (occupied(2) ? 1 : 0))',
+      ),
+    ],
+  );
+}
+
+HuiPreviewDoc _buildRandomBeehivePreview(
+  math.Random random,
+  _PreviewFurnaceTheme theme,
+) {
+  final int columns = 3 + random.nextInt(3);
+  final int rows = 2 + random.nextInt(2);
+  return HuiPreviewDoc(
+    match: HuiPreviewMatch(
+      blocks: <String>['BEEHIVE', 'BEE_NEST'],
+      priority: 10,
+      vars: <String, dynamic>{
+        ..._previewThemeVars(theme),
+        'title': showcasePick(random, <String>[
+          'Ghostwood Apiary',
+          'Pearl Lakes Honey',
+          'Glastonbury Hive',
+        ]),
+        'columns': columns,
+        'rows': rows,
+        'cells': columns * rows,
+        'panelWidth': columns * 24 + 52,
+        'panelHeight': rows * 22 + 62,
+      },
+    ),
+    variants: <HuiPreviewVariant>[
+      HuiPreviewVariant(
+        blocks: <String>['BEE_NEST'],
+        vars: <String, dynamic>{'title': 'Ghostwood Wild Hive'},
+      ),
+    ],
+    card: _previewCard(82),
+    elements: <HuiPreviewElement>[
+      _previewPanel(),
+      HuiPreviewElement(
+        'cell',
+        repeat: HuiPreviewRepeat(count: 'vars.cells', varName: 'cell'),
+        x: 'round((mod(cell, vars.columns) - (vars.columns - 1) / 2) * 23)',
+        y: 'round(((vars.rows - 1) / 2 - floor(cell / vars.columns)) * 21)',
+        size: '14 + mod(cell, 2) * 2',
+        color:
+            'cell < round(honey / max(maxHoney, 1) * vars.cells) '
+            '? mix(vars.fill, vars.pulse, (sin(time / 9 + cell) + 1) / 2) '
+            ': vars.wellColor',
+      ),
+      HuiPreviewElement(
+        'cell',
+        repeat: HuiPreviewRepeat(count: 3, varName: 'bee'),
+        x: '-24 + bee * 24',
+        y: 'round(vars.rows * 11 + 9)',
+        size: 'bee < bees ? 7 : 4',
+        color:
+            'bee < bees ? palette([vars.chase, vars.fill, vars.pulse], '
+            'floor(time / 6) + bee) : vars.idle',
+      ),
+      HuiPreviewElement(
+        'label',
+        x: 0,
+        y: '-round(vars.rows * 11 + 17)',
+        text:
+            "vars.stateColor + str(bees) + '&7/' + str(maxBees) + "
+            "' bees &8• ' + vars.stateColor + str(honey) + '&7/' + "
+            "str(maxHoney) + ' honey'",
+      ),
+    ],
+  );
+}
+
+HuiPreviewDoc _buildRandomCauldronPreview(
+  math.Random random,
+  _PreviewFurnaceTheme theme,
+) {
+  final int rings = 4 + random.nextInt(4);
+  return HuiPreviewDoc(
+    match: HuiPreviewMatch(
+      blocks: <String>[
+        'CAULDRON',
+        'WATER_CAULDRON',
+        'LAVA_CAULDRON',
+        'POWDER_SNOW_CAULDRON',
+      ],
+      priority: 10,
+      vars: <String, dynamic>{
+        ..._previewThemeVars(theme),
+        'title': 'Sycamore Cauldron',
+        'rings': rings,
+        'fluidColor': theme.fill,
+        'fluidPulse': theme.pulse,
+        'panelWidth': 154,
+        'panelHeight': 112,
+      },
+    ),
+    variants: <HuiPreviewVariant>[
+      HuiPreviewVariant(
+        blocks: <String>['WATER_CAULDRON'],
+        vars: <String, dynamic>{
+          'title': 'Pearl Lakes Water',
+          'fluidColor': '#FF3F9DFF',
+          'fluidPulse': '#FFB8EDFF',
+          'accent': '#5E82FF',
+        },
+      ),
+      HuiPreviewVariant(
+        blocks: <String>['LAVA_CAULDRON'],
+        vars: <String, dynamic>{
+          'title': 'Fire Walk Crucible',
+          'fluidColor': '#FFFF6A1A',
+          'fluidPulse': '#FFFFE05A',
+          'accent': '#FF8A35',
+        },
+      ),
+      HuiPreviewVariant(
+        blocks: <String>['POWDER_SNOW_CAULDRON'],
+        vars: <String, dynamic>{
+          'title': 'Twin Peaks Snow',
+          'fluidColor': '#FFCDEBFF',
+          'fluidPulse': '#FFFFFFFF',
+          'accent': '#CFE6FF',
+        },
+      ),
+    ],
+    card: _previewCard(84),
+    elements: <HuiPreviewElement>[
+      _previewPanel(),
+      HuiPreviewElement(
+        'cell',
+        repeat: HuiPreviewRepeat(count: 'vars.rings', varName: 'ring'),
+        x: 'round((ring - (vars.rings - 1) / 2) * 18)',
+        y: 6,
+        size: '12 + mod(ring, 2) * 4',
+        color:
+            'ring < ceil(level / max(maxLevel, 1) * vars.rings) '
+            '? mix(vars.fluidColor, vars.fluidPulse, '
+            '(sin(time / 8 + ring * 1.7) + 1) / 2) : vars.wellColor',
+      ),
+      HuiPreviewElement(
+        'cell',
+        repeat: HuiPreviewRepeat(count: 'vars.rings', varName: 'ripple'),
+        x: 'round((ripple - (vars.rings - 1) / 2) * 18)',
+        y: -14,
+        size: 4,
+        color:
+            'ripple == mod(floor(time / 5), vars.rings) '
+            '? vars.fluidPulse : vars.idle',
+      ),
+      HuiPreviewElement(
+        'label',
+        x: 0,
+        y: -35,
+        text:
+            "level > 0 ? vars.stateColor + readable(fluid) + ' &f' + "
+            "str(level) + '&7/' + str(maxLevel) : '&8Empty vessel'",
+      ),
+    ],
+  );
+}
+
+HuiPreviewDoc _buildRandomJukeboxPreview(
+  math.Random random,
+  _PreviewFurnaceTheme theme,
+) {
+  final int bars = 7 + random.nextInt(6);
+  final int pulseRate = 2 + random.nextInt(5);
+  return HuiPreviewDoc(
+    match: HuiPreviewMatch(
+      blocks: <String>['JUKEBOX'],
+      priority: 10,
+      vars: <String, dynamic>{
+        ..._previewThemeVars(theme),
+        'title': showcasePick(random, <String>[
+          'Roadhouse Now Playing',
+          'Double R Hi-Fi',
+          'Black Lodge Broadcast',
+        ]),
+        'bars': bars,
+        'pulseRate': pulseRate,
+        'panelWidth': 172,
+        'panelHeight': 116,
+      },
+    ),
+    card: _previewCard(92),
+    elements: <HuiPreviewElement>[
+      _previewPanel(),
+      HuiPreviewElement('slot', x: -62, y: 4, size: 24, index: 0),
+      HuiPreviewElement(
+        'cell',
+        repeat: HuiPreviewRepeat(count: 'vars.bars', varName: 'bar'),
+        x: '-38 + bar * 8',
+        y: 8,
+        size: '4 + mod(bar + floor(time / vars.pulseRate), 4) * 2',
+        color:
+            'playing ? palette([vars.fill, vars.pulse, vars.chase], '
+            'floor(time / vars.pulseRate) + bar) : vars.idle',
+      ),
+      HuiPreviewElement(
+        'cell',
+        repeat: HuiPreviewRepeat(count: 'vars.bars', varName: 'beat'),
+        x: '-38 + beat * 8',
+        y: -8,
+        size: 4,
+        color:
+            'playing && beat == mod(floor(time / vars.pulseRate), vars.bars) '
+            '? vars.pulse : vars.wellColor',
+      ),
+      HuiPreviewElement(
+        'label',
+        x: 0,
+        y: -32,
+        text:
+            "record != '' ? (playing ? vars.stateColor + '&lPLAYING &f' + "
+            "readable(record) : '&7Loaded &f' + readable(record)) "
+            ": '&8No disc loaded'",
+      ),
+      HuiPreviewElement(
+        'label',
+        x: 0,
+        y: -46,
+        text:
+            "playing ? select(['&d♪', '&5♫', '&f◆', '&d♫'], "
+            "floor(time / vars.pulseRate)) + ' &7Live from the Roadhouse' "
+            ": '&8Player standing by'",
+      ),
+    ],
+  );
+}
+
+HuiPreviewDoc _buildRandomEnderPreview(
+  math.Random random,
+  _PreviewFurnaceTheme theme,
+) {
+  final int columns = 6 + random.nextInt(3);
+  final int rows = 2 + random.nextInt(2);
+  return HuiPreviewDoc(
+    match: HuiPreviewMatch(
+      blocks: <String>['ENDER_CHEST'],
+      special: 'enderChest',
+      priority: 10,
+      vars: <String, dynamic>{
+        ..._previewThemeVars(theme),
+        'title': showcasePick(random, <String>[
+          'Owl Cave Vault',
+          'Between Two Worlds',
+          'Black Lodge Storage',
+        ]),
+        'columns': columns,
+        'rows': rows,
+        'slots': columns * rows,
+        'panelWidth': columns * 21 + 38,
+        'panelHeight': rows * 21 + 62,
+        'portal0': '#FF512A7A',
+        'portal1': '#FFB152DA',
+        'portal2': '#FF6FEAEA',
+      },
+    ),
+    card: _previewCard(94),
+    elements: <HuiPreviewElement>[
+      _previewPanel(),
+      HuiPreviewElement(
+        'cell',
+        repeat: HuiPreviewRepeat(count: 12, varName: 'star'),
+        x: 'round((mod(star, 6) - 2.5) * 25)',
+        y: 'round((floor(star / 6) * 2 - 1) * (vars.rows * 11 + 8))',
+        size: '3 + mod(star, 3)',
+        color:
+            'palette([vars.portal0, vars.portal1, vars.portal2], '
+            'floor(time / 5) + star)',
+      ),
+      HuiPreviewElement(
+        'slot',
+        repeat: HuiPreviewRepeat(count: 'vars.slots', varName: 'i'),
+        x: 'round((mod(i, vars.columns) - (vars.columns - 1) / 2) * 21)',
+        y: 'round(((vars.rows - 1) / 2 - floor(i / vars.columns)) * 21)',
+        size: 18,
+        index: 'i',
+        wellColor: 'vars.wellColor',
+      ),
+      HuiPreviewElement(
+        'label',
+        x: 0,
+        y: '-round(vars.rows * 11 + 19)',
+        text:
+            "vars.stateColor + str(inventory.occupied) + '&7/' + "
+            "str(inventory.size) + ' echoes stored between worlds'",
+      ),
+    ],
+  );
+}
+
+HuiPreviewDoc _buildRandomMobilePreview(
+  math.Random random,
+  _PreviewFurnaceTheme theme,
+) {
+  final int slots = 5 + random.nextInt(4);
+  final int trail = 8 + random.nextInt(5);
+  return HuiPreviewDoc(
+    match: HuiPreviewMatch(
+      entities: <String>[
+        'CHEST_MINECART',
+        'HOPPER_MINECART',
+        '*_CHEST_BOAT',
+        '*_CHEST_RAFT',
+      ],
+      special: 'anyInventoryHolder',
+      priority: 10,
+      vars: <String, dynamic>{
+        ..._previewThemeVars(theme),
+        'title': showcasePick(random, <String>[
+          'Packard Mill Freight',
+          'Ghostwood Night Train',
+          'Pearl Lakes Cargo',
+        ]),
+        'slots': slots,
+        'trail': trail,
+        'panelWidth': slots * 22 + 44,
+        'panelHeight': 106,
+      },
+    ),
+    variants: <HuiPreviewVariant>[
+      HuiPreviewVariant(
+        entities: <String>['HOPPER_MINECART'],
+        vars: <String, dynamic>{'title': 'Packard Transfer Line'},
+      ),
+    ],
+    card: _previewCard(94),
+    elements: <HuiPreviewElement>[
+      _previewPanel(),
+      HuiPreviewElement(
+        'cell',
+        repeat: HuiPreviewRepeat(count: 'vars.trail', varName: 'rail'),
+        x: 'round((rail - (vars.trail - 1) / 2) * 12)',
+        y: 26,
+        size: 5,
+        color:
+            'rail == mod(floor(time / 4), vars.trail) ? vars.pulse '
+            ': (rail < mod(floor(time / 4), vars.trail) '
+            '? vars.fill : vars.idle)',
+      ),
+      HuiPreviewElement(
+        'slot',
+        repeat: HuiPreviewRepeat(count: 'vars.slots', varName: 'i'),
+        x: 'round((i - (vars.slots - 1) / 2) * 22)',
+        y: 0,
+        size: 18,
+        index: 'i',
+        wellColor: 'vars.wellColor',
+      ),
+      HuiPreviewElement(
+        'label',
+        x: 0,
+        y: -28,
+        text:
+            "vars.stateColor + '&lIN TRANSIT &8• &7Cargo &f' + "
+            "str(inventory.occupied) + '&8/' + str(inventory.size)",
+      ),
+      HuiPreviewElement(
+        'label',
+        x: 0,
+        y: -42,
+        text:
+            "select(['&8Departed', '&7Crossing Ghostwood', '&fApproaching', "
+            "vars.stateColor + 'Arrived'], floor(time / 20))",
+      ),
+    ],
+  );
+}
+
+HuiPreviewDoc _buildRandomPoweredMinecartPreview(
+  math.Random random,
+  _PreviewFurnaceTheme theme,
+) {
+  final int cells = 6 + random.nextInt(4);
+  return HuiPreviewDoc(
+    match: HuiPreviewMatch(
+      entities: <String>['FURNACE_MINECART'],
+      priority: 10,
+      vars: <String, dynamic>{
+        ..._previewThemeVars(theme),
+        'title': showcasePick(random, <String>[
+          'Ghostwood Furnace Cart',
+          'Packard Rail Heater',
+          'Blue Pine Engine',
+        ]),
+        'cells': cells,
+        'panelWidth': cells * 13 + 42,
+        'panelHeight': 88,
+      },
+    ),
+    card: _previewCard(88),
+    elements: <HuiPreviewElement>[
+      _previewPanel(),
+      HuiPreviewElement(
+        'cell',
+        repeat: HuiPreviewRepeat(count: 'vars.cells', varName: 'i'),
+        x: 'round((i - (vars.cells - 1) / 2) * 13)',
+        y: 4,
+        size: 9,
+        color:
+            'powered ? (i == mod(floor(time / 2), vars.cells) '
+            '? vars.pulse : vars.fill) : vars.wellColor',
+      ),
+      HuiPreviewElement(
+        'label',
+        x: 0,
+        y: -22,
+        text:
+            "powered ? vars.stateColor + '&lPOWERED &8• &7Fuel &f' + "
+            "str(fuelSeconds) + 's' : '&8Out of fuel'",
+      ),
+    ],
+  );
+}
+
+Map<String, dynamic> _previewThemeVars(_PreviewFurnaceTheme theme) =>
+    <String, dynamic>{
+      'panelColor': theme.panelColor,
+      'wellColor': theme.wellColor,
+      'fill': theme.fill,
+      'pulse': theme.pulse,
+      'chase': theme.chase,
+      'idle': theme.idle,
+      'stateColor': theme.stateColor,
+      'accent': theme.accent,
+    };
+
+HuiPreviewCard _previewCard(int minHalfWidth) => HuiPreviewCard(
+  title: "'&f&l' + vars.title",
+  accent: 'vars.accent',
+  minHalfWidth: minHalfWidth,
+);
+
+HuiPreviewElement _previewPanel() => HuiPreviewElement(
+  'panel',
+  x: 0,
+  y: -4,
+  z: 1,
+  width: 'vars.panelWidth',
+  height: 'vars.panelHeight',
+  color: 'vars.panelColor',
+);
+
+GlossHologramDoc buildRandomHologramShowcase(
+  GlossHologramDoc current,
+  math.Random random,
+) {
+  final ShowcaseMood mood = showcasePick(random, showcaseMoods);
+  final String server = showcasePick(random, showcaseServerNames);
+  final ShowcaseEffect color = showcaseColorEffect(random, mood);
+  final List<String> lines = <String>[
+    '${color.text}&l$server',
+    '&7Hello, &f{{ player.name }}&7!',
+    "&7Health {{ player.health < 7 ? '&c' : '&a' }}"
+        "{{ bar(player.health, 20, 10, '■', '□') }}",
+    '&7TPS &a{{ fixed(server.tps, 1) }} &8• &7'
+        '${showcasePick(random, showcaseEvents)}',
+    '${mood.legacy}${showcasePick(random, mood.glyphs)} '
+        '&7${showcasePick(random, showcaseHologramNotes)}',
+    showcaseEasterEgg(random),
+  ];
+  switch (random.nextInt(4)) {
+    case 0:
+      lines.insert(
+        2,
+        '${showcaseScanline(random, mood).text} &f'
+        '${showcasePick(random, showcaseHeadlines)}',
+      );
+    case 1:
+      lines.insert(
+        2,
+        '&f${showcaseTypewriter(random, showcasePick(random, showcaseHeadlines)).text}',
+      );
+    case 2:
+      lines.insert(
+        2,
+        showcaseWave(random, showcasePick(random, showcaseAnimationWords)).text,
+      );
+    case 3:
+      lines.insert(
+        2,
+        '${mood.legacy}${showcaseAlignment(random, showcasePick(random, showcaseHeadlines)).text}',
+      );
+  }
+  lines[0] = showcaseRichText(random, mood, lines[0]);
+  final HuiIconStyle style = showcaseDisplayStyle(random, mood);
+  final double yaw =
+      style.billboard == 'fixed' || style.billboard == 'horizontal'
+      ? _round2(-180 + random.nextDouble() * 360)
+      : 0;
+  final double pitch =
+      style.billboard == 'fixed' || style.billboard == 'vertical'
+      ? _round2(-45 + random.nextDouble() * 90)
+      : 0;
+  return GlossHologramDoc(
+    schemaVersion: current.schemaVersion,
+    revision: current.revision,
+    anchor: GlossHologramAnchor(
+      world: showcasePick(random, showcaseWorlds),
+      positionRaw: <num>[
+        random.nextInt(401) - 200,
+        64 + random.nextInt(48),
+        random.nextInt(401) - 200,
+      ],
+    ),
+    lines: lines,
+    style: style,
+    box: showcaseBox(random, mood),
+    yaw: yaw,
+    pitch: pitch,
+    particleLayers: showcaseParticleLayers(
+      random,
+      mood,
+      scopes: <String>['projection', 'text', 'line', 'span', 'local'],
+      lineCount: lines.length,
+    ),
+  )..extras['show'] = showcaseShow(random, viewerAware: true);
+}
+
+GlossAnimationDoc buildRandomAnimationShowcase(
+  GlossAnimationDoc current,
+  math.Random random,
+) {
+  final ShowcaseMood mood = showcasePick(random, showcaseMoods);
+  final String word = showcasePick(random, showcaseAnimationWords);
+  final ({String mode, int intervalMs, List<String> frames}) built =
+      showcaseAnimationFrames(random, mood, word);
+  return GlossAnimationDoc(
+    schemaVersion: current.schemaVersion,
+    revision: current.revision,
+    mode: built.mode,
+    frameIntervalMs: built.intervalMs,
+    frames: built.frames,
+  )..extras['show'] = showcaseShow(random, viewerAware: true);
+}
+
+GlossScoreboardDoc buildRandomScoreboardShowcase(
+  GlossScoreboardDoc current,
+  math.Random random,
+) {
+  final ShowcaseMood mood = showcasePick(random, showcaseMoods);
+  final String server = showcasePick(random, showcaseServerNames);
+  final String rank = showcasePick(random, showcaseRanks);
+  final List<String> lines = <String>[
+    '&7Player &f{{ player.name }}',
+    "&7Rank {{ papi('vault_prefix', '${mood.legacy}$rank') }}",
+    '',
+    "&7Ping {{ player.ping < 80 ? '&a' : "
+        "player.ping < 160 ? '&e' : '&c' }}{{ player.ping }}ms",
+    "&7Health &a{{ bar(player.health, 20, 8, '■', '□') }}",
+    '&7Online &a{{ server.online }}&8/&a{{ server.maxPlayers }}',
+    '&7TPS &a{{ fixed(server.tps, 1) }}',
+    "&7Tick &f{{ fixed(metric('react.tick-ms', 1000 / server.tps), 1) }}ms",
+    '',
+    '${showcaseTickPrefix(random, mood, framesPerSecond: 1.0).text}&l'
+        '${showcasePick(random, showcaseStatusWords)}',
+    '&7${showcaseAlignment(random, showcasePick(random, showcaseEvents)).text}',
+    showcaseBoardEasterEgg(random),
+    '&8${showcasePick(random, showcaseDomains)}',
+  ];
+  if (random.nextBool()) {
+    lines.insert(
+      8,
+      "&7Balance &6\$"
+      "{{ fixed(papiNumber('vault_eco_balance', 0), 2) }}",
+    );
+  }
+  final String titlePrefix = showcasePick(random, <String>[
+    '${mood.legacy}&l',
+    '${mood.legacy}&o',
+    '&f&l',
+    '&7&n',
+  ]);
+  return GlossScoreboardDoc(
+    schemaVersion: current.schemaVersion,
+    revision: current.revision,
+    select: GlossScoreboardSelect(
+      priority: random.nextInt(31),
+      when: showcasePick(random, <String>[
+        'true',
+        "viewer.world == 'world'",
+        "hasPermission('viewer', 'gloss.board.vip')",
+        "inGroup('viewer', 'vip')",
+      ]),
+    ),
+    presentation: GlossScoreboardPresentation(
+      title: '$titlePrefix${server.toUpperCase()}',
+      lines: glossScoreboardLines(lines),
+      hideNumbers: random.nextInt(4) != 0,
+    ),
+    variants: <GlossScoreboardVariant>[
+      GlossScoreboardVariant(
+        id: 'critical-health',
+        priority: 100,
+        when: 'viewer.healthPercent <= 25',
+        presentation: GlossScoreboardPresentation(
+          title: '&c&lLOW HEALTH',
+          lines: glossScoreboardLines(<String>[
+            '&cYou are in danger',
+            '&7Health &f{{ fixed(player.health, 1) }}',
+            '&7Find somewhere safe',
+          ]),
+          hideNumbers: true,
+        ),
+      ),
+      for (int index = 0; index < 1 + random.nextInt(4); index++)
+        GlossScoreboardVariant(
+          id: 'context-$index',
+          priority: 20 + index * 10,
+          when: showcasePick(random, <String>[
+            'viewer.ping >= 120',
+            "viewer.world == 'world_nether'",
+            "hasPermission('viewer', 'gloss.board.staff')",
+            'server.online >= 20',
+          ]),
+          presentation: GlossScoreboardPresentation(
+            title: '${mood.legacy}${showcasePick(random, showcaseStatusWords)}',
+            lines: glossScoreboardLines(<String>[
+              '&f{{ player.name }}',
+              '&7${showcasePick(random, showcaseEvents)}',
+              for (final String line in (List<String>.of(
+                lines,
+              )..shuffle(random)).take(3 + random.nextInt(7)))
+                line,
+            ]),
+            hideNumbers: random.nextBool(),
+          ),
+        ),
+    ],
+  )..extras['show'] = showcaseShow(random, viewerAware: true);
+}
+
+GlossMotdDoc buildRandomMotdShowcase(GlossMotdDoc current, math.Random random) {
+  final ShowcaseMood mood = showcasePick(random, showcaseMoods);
+  final int count = 3 + random.nextInt(4);
+  final String server = showcasePick(random, showcaseServerNames);
+  final int easterIndex = random.nextInt(count);
+  final List<GlossMotdEntry> entries = <GlossMotdEntry>[];
+  for (int index = 0; index < count; index++) {
+    final List<String> lines = <String>[
+      '${showcaseColorEffect(random, mood).text}&l$server &8• &7'
+          '${showcasePick(random, showcaseEvents)}',
+    ];
+    if (index != count - 1) {
+      lines.add(
+        index == easterIndex
+            ? showcaseEasterEgg(random)
+            : index.isEven
+            ? '&8${showcaseAlignment(random, showcasePick(random, showcaseHeadlines)).text}'
+            : "&7Online &a{{ server.online }}&8/&a{{ server.maxPlayers }} "
+                  '&8• &7${showcasePick(random, showcaseDomains)}',
+      );
+    }
+    entries.add(
+      GlossMotdEntry(
+        lines: lines,
+        sample: _motdSample(random, index == 0),
+        online: random.nextBool() ? '{{ server.online }}' : null,
+        max: random.nextInt(3) == 0 ? '${64 + random.nextInt(4) * 64}' : null,
+        version: random.nextInt(3) == 0
+            ? '${showcaseColorEffect(random, mood).text}'
+                  '${showcasePick(random, showcaseStatusWords)}'
+            : null,
+      ),
+    );
+  }
+  return GlossMotdDoc(
+    schemaVersion: current.schemaVersion,
+    revision: current.revision,
+    entries: entries,
+    links: _motdLinks(random, mood),
+  )..extras['show'] = showcaseShow(random, viewerAware: false);
+}
+
+/// The hover list under the player count: the worlds a server runs, read as a
+/// list because that is what the vanilla list it replaces looks like. The
+/// first entry always carries one, so a generated document always teaches the
+/// field; `MotdDoc.MAX_SAMPLE_LINES` caps it well above what is generated.
+List<String> _motdSample(math.Random random, bool always) {
+  if (!always && random.nextInt(3) != 0) return <String>[];
+  final List<String> worlds = List<String>.of(showcaseWorlds)..shuffle(random);
+  return <String>[
+    '&8Now open',
+    for (final String world in worlds.take(2 + random.nextInt(4)))
+      '&7 • &f$world',
+  ];
+}
+
+/// Pause-menu links: one client-labelled entry per kind the pool offers, plus
+/// an authored label often enough to teach that both forms exist. Every url is
+/// an https address with a host, because anything else refuses the file.
+List<GlossMotdLink> _motdLinks(math.Random random, ShowcaseMood mood) {
+  if (random.nextInt(4) == 0) return <GlossMotdLink>[];
+  final List<String> domains = List<String>.of(showcaseDomains)
+    ..shuffle(random);
+  final List<String> types = List<String>.of(glossMotdLinkTypes)
+    ..shuffle(random);
+  final int count = 1 + random.nextInt(3);
+  final List<GlossMotdLink> links = <GlossMotdLink>[
+    for (int index = 0; index < count; index++)
+      GlossMotdLink(
+        type: types[index],
+        url: 'https://${domains[index % domains.length]}',
+      ),
+  ];
+  if (random.nextBool()) {
+    links.add(
+      GlossMotdLink(
+        label:
+            '${showcaseColorEffect(random, mood).text}'
+            '${showcasePick(random, showcaseStatusWords)}',
+        url: 'https://${domains[count % domains.length]}/news',
+      ),
+    );
+  }
+  return links;
+}
+
+/// A join and a leave line in one mood, each with a staff variant often
+/// enough to teach that variants are per reader. Both blocks are always
+/// present: an absent block is a silent document, which reads as a bug in a
+/// randomized sample rather than as a feature.
+GlossConnectionsDoc buildRandomConnectionsShowcase(
+  GlossConnectionsDoc current,
+  math.Random random,
+) {
+  final ShowcaseMood mood = showcasePick(random, showcaseMoods);
+  final String server = showcasePick(random, showcaseServerNames);
+  GlossConnectionsSection build(String glyph, String verb, bool counts) {
+    final String accent = showcaseColorEffect(random, mood).text;
+    return GlossConnectionsSection(
+      audience: random.nextInt(4) == 0
+          ? glossConnectionsAudienceServer
+          : glossConnectionsAudienceNetwork,
+      presentation: GlossConnectionsPresentation(
+        text: counts
+            ? '$accent$glyph &f{{ subject.name }} &7$verb &8• &7'
+                  '{{ server.online }}&8/&7{{ server.max }}'
+            : '$accent$glyph &f{{ subject.name }} &7$verb',
+      ),
+      variants: <GlossConnectionsVariant>[
+        if (random.nextBool())
+          GlossConnectionsVariant(
+            priority: 10,
+            when: "inGroup('subject', 'staff')",
+            presentation: GlossConnectionsPresentation(
+              text:
+                  '$accent$glyph &e&l{{ subject.name }} &7$verb &8• &7'
+                  '$server staff',
+            ),
+          ),
+      ],
+    )..extras['show'] = showcaseShow(random, viewerAware: true);
+  }
+
+  return GlossConnectionsDoc(
+    schemaVersion: current.schemaVersion,
+    revision: current.revision,
+    join: build('+', showcasePick(random, _connectionsJoinVerbs), true),
+    leave: build('-', showcasePick(random, _connectionsLeaveVerbs), false),
+  )..extras['show'] = showcaseShow(random, viewerAware: true);
+}
+
+const List<String> _connectionsJoinVerbs = <String>[
+  'joined',
+  'is here',
+  'walked in',
+  'came online',
+];
+
+const List<String> _connectionsLeaveVerbs = <String>[
+  'left',
+  'logged off',
+  'headed out',
+  'went dark',
+];
+
+/// One complete HUD line in one mood, on one of the three client surfaces,
+/// always with the condition that actually selects it. A randomized surface
+/// that kept the shipped `select.when` of false would render an empty stage,
+/// which reads as a broken sample rather than as a document.
+GlossSurfaceDoc buildRandomSurfaceShowcase(
+  GlossSurfaceDoc current,
+  math.Random random,
+) {
+  final ShowcaseMood mood = showcasePick(random, showcaseMoods);
+  final String kind = showcasePick(random, glossSurfaceKinds);
+  final String accent = showcaseColorEffect(random, mood).text;
+  final String server = showcasePick(random, showcaseServerNames);
+  final List<String> slots = kind == glossSurfaceKindActionbar
+      ? showcasePick(random, const <List<String>>[
+          <String>['center'],
+          <String>['left'],
+          <String>['right'],
+          <String>['left', 'right'],
+        ])
+      : const <String>['center'];
+
+  GlossSurfacePresentation present({required bool alternate}) => switch (kind) {
+    glossSurfaceKindBossbar => GlossSurfacePresentation(
+      title: alternate
+          ? '$accent&l${server.toUpperCase()} &8┃ &fpush'
+          : '$accent&l${server.toUpperCase()} &8┃ '
+                '&f{{ viewer.name }}',
+      progress: showcasePick(random, const <String>[
+        '{{ clamp(viewer.health / viewer.maxHealth, 0, 1) }}',
+        '{{ clamp(server.online / server.max, 0, 1) }}',
+        '{{ clamp(viewer.level / 30, 0, 1) }}',
+      ]),
+      color: showcasePick(random, glossSurfaceColors),
+      style: showcasePick(random, glossSurfaceStyles),
+      slots: slots,
+      priority: alternate ? 'modal' : 'progress',
+      ttlTicks: 40 + random.nextInt(400),
+    ),
+    glossSurfaceKindTitle => GlossSurfacePresentation(
+      title: alternate
+          ? '&c&lWATCH YOUR STEP'
+          : '$accent&l${server.toUpperCase()}',
+      subtitle: alternate
+          ? '&7{{ viewer.world }}'
+          : '&7{{ viewer.name }} &8· &7level &f{{ viewer.level }}',
+      slots: slots,
+      priority: alternate ? 'modal' : 'notice',
+      fadeInTicks: 4 + random.nextInt(20),
+      stayTicks: 30 + random.nextInt(90),
+      fadeOutTicks: 4 + random.nextInt(20),
+      trigger: showcasePick(random, glossSurfaceTriggers),
+      repeatTicks: 100 + random.nextInt(600),
+      ttlTicks: 60 + random.nextInt(300),
+    ),
+    _ => GlossSurfacePresentation(
+      text: alternate
+          ? '&c&l! &fLOW HEALTH &8┃ '
+                '&c{{ fixed(viewer.health, 1) }}'
+          : '$accent┃ &7tps &f{{ fixed(server.tps, 1) }} '
+                '&8┃ &7online &f{{ server.online }}&8/&7'
+                '{{ server.max }}',
+      slots: slots,
+      priority: alternate ? 'modal' : 'status',
+      ttlTicks: 20 + random.nextInt(200),
+    ),
+  };
+
+  return GlossSurfaceDoc(
+    schemaVersion: current.schemaVersion,
+    revision: current.revision,
+    surface: kind,
+    select: GlossSurfaceSelect(
+      priority: random.nextInt(40),
+      when: showcasePick(random, const <String>[
+        'viewer.health > 0',
+        "viewer.world != 'hidden_world'",
+        'server.online >= 0',
+        "inGroup('viewer', 'default')",
+      ]),
+    ),
+    presentation: present(alternate: false),
+    variants: <GlossSurfaceVariant>[
+      if (random.nextBool())
+        GlossSurfaceVariant(
+          id: 'critical',
+          priority: 40,
+          when: 'viewer.healthPercent <= 25',
+          presentation: present(alternate: true),
+        ),
+    ],
+  )..extras['show'] = showcaseShow(random, viewerAware: true);
+}
+
+GlossEmojiDoc buildRandomEmojiShowcase(
+  GlossEmojiDoc current,
+  math.Random random,
+) {
+  final (String, String) choice = showcasePick(random, _emojiChoices);
+  final int shape = random.nextInt(3);
+  final String emoji = switch (shape) {
+    0 => choice.$2,
+    1 => glossParseUnicodeText(choice.$2),
+    _ => showcasePick(random, _emojiCompounds),
+  };
+  return GlossEmojiDoc(
+    schemaVersion: current.schemaVersion,
+    revision: current.revision,
+    trigger: random.nextInt(5) == 0 ? '' : choice.$1,
+    emoji: emoji,
+    enabled: random.nextInt(5) != 0,
+  )..extras['show'] = showcaseShow(random, viewerAware: true);
+}
+
+/// Chat shorthands a town like this one would actually register.
+const List<(String, String)> _emojiChoices = <(String, String)>[
+  ('<3', 'U+2764;'),
+  (':)', 'U+1F60A;'),
+  ('*', 'U+2728;'),
+  ('gg', 'U+1F3C6;'),
+  (':coffee:', 'U+2615;'),
+  (':pie:', 'U+1F967;'),
+  (':cherry:', 'U+1F352;'),
+  (':owl:', 'U+1F989;'),
+  (':log:', 'U+1FAB5;'),
+  (':fire:', 'U+1F525;'),
+  (':ring:', 'U+1F48D;'),
+  (':curtain:', 'U+1F3AD;'),
+  (':pine:', 'U+1F332;'),
+  (':moon:', 'U+1F319;'),
+  (':record:', 'U+1F4BF;'),
+  (':phone:', 'U+260E;'),
+  (':key:', 'U+1F511;'),
+  (':donut:', 'U+1F369;'),
+  (':fish:', 'U+1F41F;'),
+  (':star:', 'U+2B50;'),
+];
+
+const List<String> _emojiCompounds = <String>[
+  'U+1F3F3;U+FE0F;U+200D;U+1F308;',
+  'U+1F441;U+FE0F;U+200D;U+1F5E8;U+FE0F;',
+  'U+2601;U+FE0F;U+200D;U+1F525;',
+  'U+1F43F;U+FE0F;U+200D;U+2B1B;',
+];
+
+GlossBubbleStyleDoc buildRandomBubbleShowcase(
+  GlossBubbleStyleDoc current,
+  math.Random random,
+) {
+  final ShowcaseMood mood = showcasePick(random, showcaseMoods);
+  final int selectShape = random.nextInt(4);
+  return GlossBubbleStyleDoc(
+    schemaVersion: current.schemaVersion,
+    revision: current.revision,
+    prefix: random.nextBool()
+        ? '${showcaseRichText(random, mood, showcasePick(random, mood.glyphs))} '
+              '${showcaseColorEffect(random, mood).text}'
+              '${showcasePick(random, _formatCodes)}'
+        : '${showcaseRichText(random, mood, showcasePick(random, mood.glyphs))} '
+              '${showcaseColorEffect(random, mood).text}'
+              '${showcaseAlignment(random, showcasePick(random, mood.glyphs)).text}',
+    offsetRaw: <num>[
+      _round((random.nextDouble() - 0.5) * 1.2),
+      _round(1.2 + random.nextDouble() * 1.4),
+      _round((random.nextDouble() - 0.5) * 0.8),
+    ],
+    wordWrapChars: 36 + random.nextInt(73),
+    maxAliveMs: 4000 + ((random.nextInt(8001) + 4000) % 8001),
+    motion: _randomBubbleMotion(random),
+    shimmer: _randomBubbleShimmer(random, mood),
+    followPlayer: random.nextBool(),
+    hideOwn: random.nextBool(),
+    style: showcaseDisplayStyle(random, mood),
+    box: showcaseBox(random, mood),
+    particleLayers: showcaseParticleLayers(
+      random,
+      mood,
+      scopes: <String>['projection', 'text', 'line', 'span', 'local'],
+    ),
+    select: switch (selectShape) {
+      0 => null,
+      1 => GlossBubbleSelect(
+        priority: 10 + random.nextInt(41),
+        when: "matchesGlob(viewer.world, 'world*')",
+      ),
+      2 => GlossBubbleSelect(
+        priority: 10 + random.nextInt(41),
+        when:
+            "oneOf(viewer.gameMode, ['SURVIVAL', 'ADVENTURE']) && viewer.healthPercent <= 50",
+      ),
+      _ => GlossBubbleSelect(
+        priority: 10 + random.nextInt(41),
+        when: "matchesGlob(viewer.world, 'world*') && inGroup('viewer', 'vip')",
+      ),
+    },
+  )..extras['show'] = showcaseShow(random, viewerAware: true);
+}
+
+GlossBubbleShimmer _randomBubbleShimmer(math.Random random, ShowcaseMood mood) {
+  final int durationMs = 450 + random.nextInt(1051);
+  final int passShape = (random.nextInt(4) + 1) % 4;
+  return GlossBubbleShimmer(
+    spawn: passShape != 1,
+    flyAway: passShape != 2,
+    color: showcasePick(random, <String>[
+      '#ffffff',
+      mood.primary.toLowerCase(),
+      mood.secondary.toLowerCase(),
+    ]),
+    width: 2 + random.nextInt(6),
+    durationMs: durationMs,
+    spawnDelayMs: random.nextInt(251),
+    flyAwayLeadMs: durationMs + random.nextInt(501),
+  );
+}
+
+GlossBubbleMotion _randomBubbleMotion(math.Random random) {
+  final double travel = _round(0.25 + random.nextDouble() * 0.95);
+  final double lift = _round(0.4 + random.nextDouble() * 1.2);
+  final double fall = _round(0.2 + random.nextDouble());
+  final double spin = _round(10 + random.nextDouble() * 110);
+  final double shrink = _round(0.2 + random.nextDouble() * 0.35);
+  final int mode = random.nextInt(4);
+  return switch (mode) {
+    0 => GlossBubbleMotion(
+      translation: GlossBubbleMotionVector(
+        x: '$travel * t',
+        y: '$lift * sin(pi * t) - $fall * t',
+        z: '${_round(travel / 2)} * sin(pi * 2 * t + seed * pi)',
+      ),
+      scale: GlossBubbleMotionVector(
+        x: '1 - $shrink * smoothstep(0.5, 1, t)',
+        y: '1 - $shrink * smoothstep(0.5, 1, t)',
+        z: '1 - $shrink * smoothstep(0.5, 1, t)',
+      ),
+      rotation: GlossBubbleMotionVector(
+        x: '${_round(spin / 4)} * t',
+        y: '${_round(spin / 2)} * t',
+        z: '$spin * t',
+      ),
+      opacity: '1 - smoothstep(0.72, 1, t)',
+    ),
+    1 => GlossBubbleMotion(
+      translation: GlossBubbleMotionVector(
+        x: '0.12 * (lineCount - 1) * sin(pi * 2 * t + seed * pi)',
+        y: '$lift * smoothstep(0, 1, t)',
+        z: '${_round(travel / 3)} * sin(pi * t)',
+      ),
+      scale: GlossBubbleMotionVector.scaleDefaults(),
+      rotation: GlossBubbleMotionVector(
+        x: '0',
+        y: '${_round(spin / 3)} * t',
+        z: '${_round(spin / 8)} * sin(pi * 2 * t)',
+      ),
+      opacity: '1 - smoothstep(0.6, 1, t)',
+    ),
+    2 => GlossBubbleMotion(
+      translation: GlossBubbleMotionVector(
+        x: '${_round(travel / 2)} * sin(pi * 2 * t + seed * pi * 2)',
+        y: '${_round(lift / 2)} * t + 0.08 * stackY',
+        z: '${_round(travel / 2)} * cos(pi * 2 * t + seed * pi * 2)',
+      ),
+      scale: GlossBubbleMotionVector(
+        x: '1 - $shrink * smoothstep(0.35, 1, t)',
+        y: '1 - $shrink * smoothstep(0.35, 1, t)',
+        z: '1 - $shrink * smoothstep(0.35, 1, t)',
+      ),
+      rotation: GlossBubbleMotionVector(
+        x: '$spin * t',
+        y: '${_round(spin / 2)} * t',
+        z: '${_round(0 - spin)} * t',
+      ),
+      opacity: '1',
+    ),
+    _ => GlossBubbleMotion(
+      translation: GlossBubbleMotionVector(
+        x: '$travel * (t - smoothstep(0.55, 1, t))',
+        y: '$lift * sin(pi * t) - $fall * pow(t, 3)',
+        z: '${_round(travel / 4)} * sin(pi * 4 * t + stackIndex)',
+      ),
+      scale: GlossBubbleMotionVector(
+        x: '1 + 0.18 * sin(pi * 4 * t)',
+        y: '1 - 0.25 * t',
+        z: '1 + 0.18 * cos(pi * 4 * t)',
+      ),
+      rotation: GlossBubbleMotionVector(
+        x: '${_round(spin / 5)} * sin(pi * 2 * t)',
+        y: '$spin * t',
+        z: '${_round(spin / 3)} * t',
+      ),
+      opacity: 'smoothstep(0, 0.08, t) * (1 - smoothstep(0.82, 1, t))',
+    ),
+  };
+}
+
+enum TablistShowcaseArchetype {
+  compact,
+  welcome,
+  status,
+  event,
+  community,
+  staff,
+}
+
+final class _TablistProfile {
+  const _TablistProfile({
+    required this.archetype,
+    required this.headerLines,
+    required this.footerLines,
+    required this.formats,
+  });
+
+  final TablistShowcaseArchetype archetype;
+  final (int, int) headerLines;
+  final (int, int) footerLines;
+  final (int, int) formats;
+}
+
+const List<_TablistProfile> _tablistProfiles = <_TablistProfile>[
+  _TablistProfile(
+    archetype: TablistShowcaseArchetype.compact,
+    headerLines: (1, 2),
+    footerLines: (1, 2),
+    formats: (1, 2),
+  ),
+  _TablistProfile(
+    archetype: TablistShowcaseArchetype.welcome,
+    headerLines: (2, 4),
+    footerLines: (2, 4),
+    formats: (2, 4),
+  ),
+  _TablistProfile(
+    archetype: TablistShowcaseArchetype.status,
+    headerLines: (4, 5),
+    footerLines: (2, 4),
+    formats: (2, 4),
+  ),
+  _TablistProfile(
+    archetype: TablistShowcaseArchetype.event,
+    headerLines: (2, 4),
+    footerLines: (4, 5),
+    formats: (2, 5),
+  ),
+  _TablistProfile(
+    archetype: TablistShowcaseArchetype.community,
+    headerLines: (3, 5),
+    footerLines: (3, 5),
+    formats: (4, 6),
+  ),
+  _TablistProfile(
+    archetype: TablistShowcaseArchetype.staff,
+    headerLines: (3, 5),
+    footerLines: (2, 5),
+    formats: (7, 7),
+  ),
+];
+
+GlossTablistDoc buildRandomTablistShowcase(
+  GlossTablistDoc current,
+  math.Random random, {
+  TablistShowcaseArchetype? archetype,
+}) {
+  final ShowcaseMood mood = showcasePick(random, showcaseMoods);
+  final String server = showcasePick(random, showcaseServerNames);
+  final _TablistProfile profile = archetype == null
+      ? showcasePick(random, _tablistProfiles)
+      : _tablistProfiles.firstWhere(
+          (_TablistProfile candidate) => candidate.archetype == archetype,
+        );
+  final ShowcaseEffect brand = showcaseColorEffect(random, mood);
+  final ShowcaseEffect animation = showcaseTablistAnimation(random, mood);
+  final ShowcaseEffect scanline = showcaseScanline(
+    random,
+    mood,
+    cells: 4 + random.nextInt(4),
+  );
+  final String event = showcasePick(random, showcaseEvents);
+  final String headline = showcasePick(random, showcaseHeadlines);
+  final List<String> headerCandidates = switch (profile.archetype) {
+    TablistShowcaseArchetype.compact => <String>[
+      '&7Online &a{{ server.online }}&8/&a{{ server.maxPlayers }}',
+      '&7$event',
+    ],
+    TablistShowcaseArchetype.welcome => <String>[
+      '&7Welcome &f{{ player.name }}',
+      "&7Rank {{ papi('vault_prefix', '&7Member') }} &8• "
+          "{{ player.ping < 100 ? '&a' : '&e' }}{{ player.ping }}ms",
+      '&7$headline',
+      '&7Level &f{{ player.level }} &8• &7Health &c'
+          '{{ fixed(player.health, 1) }}',
+    ],
+    TablistShowcaseArchetype.status => <String>[
+      '&7Online &a{{ server.online }}&8/&a{{ server.maxPlayers }} '
+          '&8• &7TPS &a{{ fixed(server.tps, 1) }}',
+      '&7Ping {{ player.ping < 80 ? \'&a\' : player.ping < 160 ? \'&e\' : \'&c\' }}'
+          '{{ player.ping }}ms',
+      '&7Level &f{{ player.level }} &8• &7Health &c'
+          '{{ fixed(player.health, 1) }}',
+      '&7Tick &f{{ fixed(metric(\'react.tick-ms\', '
+          '1000 / server.tps), 1) }}ms',
+      '${scanline.text} ${mood.legacy}${mood.name}',
+    ],
+    TablistShowcaseArchetype.event => <String>[
+      '&f$event',
+      '&7$headline',
+      '&7Online now &a{{ server.online }}',
+      '${scanline.text} &f${showcasePick(random, showcaseStatusWords)}',
+    ],
+    TablistShowcaseArchetype.community => <String>[
+      '&7Welcome back, &f{{ player.name }}',
+      "&7Rank {{ papi('vault_prefix', '&7Member') }} &8• "
+          '&7Level &f{{ player.level }}',
+      '&7$event',
+      '&7Population &a{{ server.online }}&8/&a{{ server.maxPlayers }}',
+      '${scanline.text} &f${mood.name}',
+    ],
+    TablistShowcaseArchetype.staff => <String>[
+      '&7Staff channel &8• &f{{ player.name }}',
+      '&7Online &a{{ server.online }}&8/&a{{ server.maxPlayers }} '
+          '&8• &7TPS &a{{ fixed(server.tps, 1) }}',
+      '&7Ping &f{{ player.ping }}ms &8• &7Level &f{{ player.level }}',
+      "&7Prefix {{ papi('vault_prefix', '&7Staff') }}",
+      '${scanline.text} &fSystems nominal',
+    ],
+  };
+  final List<String> footerCandidates = <String>[
+    showcaseEasterEgg(random),
+    '&8$headline',
+    '${mood.legacy}$event',
+    '&b${showcasePick(random, showcaseDomains)}',
+    '${scanline.text} &7${mood.name}',
+    '&7Players &f{{ server.online }} &8• &7TPS &f'
+        '{{ fixed(server.tps, 1) }}',
+  ];
+  final List<String> headerLines = _randomTablistLines(
+    random,
+    '${brand.text}&l$server',
+    headerCandidates,
+    _randomTablistCount(random, profile.headerLines),
+  );
+  final List<String> footerLines = _randomTablistLines(
+    random,
+    animation.text,
+    footerCandidates,
+    _randomTablistCount(random, profile.footerLines),
+    shuffle: true,
+  );
+  final Map<String, String> nameFormats = _randomTablistNameFormats(
+    random,
+    mood,
+    _randomTablistCount(random, profile.formats),
+  );
+  final GlossTablistDoc generated = GlossTablistDoc(
+    schemaVersion: current.schemaVersion,
+    revision: current.revision,
+    headerFooter: GlossTablistHeaderFooter(
+      enabled: true,
+      presentation: GlossTablistHeaderFooterPresentation(
+        header: headerLines.join('\n'),
+        footer: footerLines.join('\n'),
+      ),
+      variants: <GlossTablistHeaderFooterVariant>[
+        for (int index = 0; index < 1 + random.nextInt(4); index++)
+          GlossTablistHeaderFooterVariant(
+            id: 'audience-$index',
+            priority: 10 + index * 10,
+            when: showcasePick(random, <String>[
+              'viewer.ping >= 100',
+              "viewer.world == 'world_nether'",
+              "inGroup('viewer', 'vip')",
+              'viewer.healthPercent < 40',
+            ]),
+            presentation: GlossTablistHeaderFooterPresentation(
+              header:
+                  '${mood.legacy}${showcasePick(random, showcaseHeadlines)}\n${headerLines.first}',
+              footer: (List<String>.of(
+                footerLines,
+              )..shuffle(random)).join('\n'),
+            ),
+          ),
+      ],
+    ),
+    listNames: GlossTablistListNames(
+      enabled: true,
+      presentation: GlossTablistListNamePresentation(
+        format: nameFormats['default'] ?? glossTablistFallbackFormat,
+      ),
+      variants: <GlossTablistListNameVariant>[
+        for (final MapEntry<String, String> entry in nameFormats.entries)
+          if (entry.key != 'default')
+            GlossTablistListNameVariant(
+              id: entry.key == '_op' ? 'operator' : entry.key,
+              priority: entry.key == '_op' ? 100 : 50,
+              when: entry.key == '_op'
+                  ? 'subject.op'
+                  : "inGroup('subject', '${entry.key}')",
+              presentation: GlossTablistListNamePresentation(
+                format: entry.value,
+              ),
+            ),
+      ],
+    ),
+  );
+  generated.extras['show'] = showcaseShow(random);
+  generated.headerFooter.extras['show'] = showcaseShow(random);
+  generated.listNames.extras['show'] = showcaseShow(random);
+  return generated;
+}
+
+int _randomTablistCount(math.Random random, (int, int) range) =>
+    range.$1 + random.nextInt(range.$2 - range.$1 + 1);
+
+List<String> _randomTablistLines(
+  math.Random random,
+  String required,
+  List<String> candidates,
+  int count, {
+  bool shuffle = false,
+}) {
+  final List<String> available = List<String>.of(candidates)..shuffle(random);
+  final List<String> lines = <String>[required, ...available.take(count - 1)];
+  if (shuffle) lines.shuffle(random);
+  return lines;
+}
+
+Map<String, String> _randomTablistNameFormats(
+  math.Random random,
+  ShowcaseMood mood,
+  int count,
+) {
+  const List<({String key, String color, List<String> labels})> roles =
+      <({String key, String color, List<String> labels})>[
+        (
+          key: '_op',
+          color: '&6',
+          labels: <String>['Founder', 'Keeper', 'Fireman'],
+        ),
+        (
+          key: 'owner',
+          color: '&c',
+          labels: <String>['Owner', 'Lodge Keeper', 'Mayor'],
+        ),
+        (
+          key: 'developer',
+          color: '&b',
+          labels: <String>['Engineer', 'Bookhouse', 'Architect'],
+        ),
+        (
+          key: 'moderator',
+          color: '&a',
+          labels: <String>['Deputy', 'Ranger', 'Sheriff'],
+        ),
+        (
+          key: 'vip',
+          color: '&d',
+          labels: <String>['VIP', 'Blue Rose', 'Roadhouse'],
+        ),
+        (
+          key: 'builder',
+          color: '&e',
+          labels: <String>['Builder', 'Mill Crew', 'Dreamer'],
+        ),
+      ];
+  final List<({String key, String color, List<String> labels})> shuffled =
+      List<({String key, String color, List<String> labels})>.of(roles)
+        ..shuffle(random);
+  final Map<String, String> formats = <String, String>{
+    'default': _randomTablistNameFormat(random, mood, '&7', const <String>[
+      'Townsfolk',
+      'Guest',
+      'Resident',
+      'Traveler',
+    ], allowGroup: true),
+  };
+  for (final ({String key, String color, List<String> labels}) role
+      in shuffled.take(count - 1)) {
+    formats[role.key] = _randomTablistNameFormat(
+      random,
+      mood,
+      role.color,
+      role.labels,
+      allowGroup: role.key == 'vip',
+    );
+  }
+  return formats;
+}
+
+String _randomTablistNameFormat(
+  math.Random random,
+  ShowcaseMood mood,
+  String color,
+  List<String> labels, {
+  required bool allowGroup,
+}) {
+  final String label = showcasePick(random, labels);
+  return switch (random.nextInt(6)) {
+    0 => '$color[$label] &f\$player',
+    1 => '&f\$player $color[$label]',
+    2 =>
+      '${mood.legacy}${showcasePick(random, mood.glyphs)} '
+          '&f\$player &8• $color$label',
+    3 => '${showcaseColorEffect(random, mood).text}&l$label &f\$player',
+    4 when allowGroup => '${mood.legacy}[\$group] &f\$player',
+    4 => '|animation.rainbow|$label &f\$player',
+    _ =>
+      "{{ player.ping < 100 ? '&a' : player.ping < 180 ? '&e' : '&c' }}"
+          '● &f\$player',
+  };
+}
+
+/// A coherent character for the drop settings, so one press gives a look
+/// rather than five sliders of noise. Every band stays inside the ranges
+/// `real_drop_validation.dart` reports on.
+enum RealDropShowcaseArchetype {
+  ricochet,
+  groundRoll,
+  buoyant,
+  hoverRelease,
+  materialReactive,
+}
+
+final class _DropProfile {
+  const _DropProfile({
+    required this.archetype,
+    required this.tumble,
+    required this.speed,
+    required this.rate,
+    required this.landing,
+    required this.tilt,
+    required this.scale,
+    required this.labels,
+    required this.spread,
+  });
+
+  final RealDropShowcaseArchetype archetype;
+  final bool tumble;
+
+  /// `motion.speedMultiplier` band.
+  final (double, double) speed;
+
+  /// Band each `motion.degreesPerSecond*` is drawn from.
+  final (double, double) rate;
+
+  final String landing;
+
+  /// `landing.tiltDegrees` band.
+  final (double, double) tilt;
+
+  /// `scale.defaultScale` band; the other two families follow it.
+  final (double, double) scale;
+
+  /// Label display scale band, or null for a stage with no labels at all.
+  final (double, double)? labels;
+
+  final (double, double) spread;
+}
+
+const List<_DropProfile> _dropProfiles = <_DropProfile>[
+  // Slow, upright, oversized labels: loot you are meant to read from across
+  // the room.
+  _DropProfile(
+    archetype: RealDropShowcaseArchetype.hoverRelease,
+    tumble: true,
+    speed: (0.3, 0.8),
+    rate: (30, 90),
+    landing: 'UPRIGHT',
+    tilt: (0, 6),
+    scale: (0.45, 0.7),
+    labels: (1.0, 1.6),
+    spread: (0.2, 0.45),
+  ),
+  // Fast and chaotic, the way a mined stack scatters.
+  _DropProfile(
+    archetype: RealDropShowcaseArchetype.ricochet,
+    tumble: true,
+    speed: (1.6, 3.2),
+    rate: (200, 520),
+    landing: 'NATURAL',
+    tilt: (12, 32),
+    scale: (0.3, 0.5),
+    labels: (0.6, 0.9),
+    spread: (0.35, 0.85),
+  ),
+  // Everything lies flat and close: a tidy counter of items.
+  _DropProfile(
+    archetype: RealDropShowcaseArchetype.materialReactive,
+    tumble: false,
+    speed: (0.5, 1.2),
+    rate: (0, 40),
+    landing: 'FLAT',
+    tilt: (0, 4),
+    scale: (0.5, 0.9),
+    labels: (0.7, 1.0),
+    spread: (0.05, 0.2),
+  ),
+  // No labels, small models, quiet ground clutter.
+  _DropProfile(
+    archetype: RealDropShowcaseArchetype.buoyant,
+    tumble: true,
+    speed: (0.6, 1.4),
+    rate: (60, 200),
+    landing: 'NATURAL',
+    tilt: (4, 14),
+    scale: (0.18, 0.32),
+    labels: null,
+    spread: (0.1, 0.3),
+  ),
+  // The shipped feel, widened: fast tumble, natural landing, readable labels.
+  _DropProfile(
+    archetype: RealDropShowcaseArchetype.groundRoll,
+    tumble: true,
+    speed: (1.0, 1.9),
+    rate: (90, 260),
+    landing: 'NATURAL',
+    tilt: (6, 18),
+    scale: (0.35, 0.55),
+    labels: (0.75, 1.1),
+    spread: (0.12, 0.4),
+  ),
+];
+
+GlossRealDropSettingsDoc buildRandomRealDropShowcase(
+  GlossRealDropSettingsDoc current,
+  math.Random random, {
+  RealDropShowcaseArchetype? archetype,
+}) {
+  final ShowcaseMood mood = showcasePick(random, showcaseMoods);
+  final _DropProfile profile = archetype == null
+      ? showcasePick(random, _dropProfiles)
+      : _dropProfiles.firstWhere(
+          (_DropProfile candidate) => candidate.archetype == archetype,
+        );
+  final GlossRealDropSettingsDoc doc = GlossRealDropSettingsDoc(
+    revision: current.revision,
+  );
+  doc.show = showcaseShow(random);
+  final GlossRealDropPresentation presentation = doc.presentation;
+
+  presentation.limits
+    ..updateIntervalTicks = 1 + random.nextInt(4)
+    ..settledPollIntervalTicks = 10 + random.nextInt(51)
+    ..maxVisualsPerStack = 1 + random.nextInt(glossRealDropOffsets.length)
+    ..maxVisualsPerChunk = 32 + random.nextInt(225)
+    ..viewRange = _band(random, (16, 64), 0)
+    ..spread = _band(random, profile.spread, 2);
+
+  final double base = _band(random, profile.scale, 2);
+  presentation.scale
+    ..defaultScale = base
+    ..flatItems = _round2(
+      (base * (1.3 + random.nextDouble() * 0.6)).clamp(0.05, 2),
+    )
+    ..thinBlocks = _round2(
+      (base * (0.8 + random.nextDouble() * 0.5)).clamp(0.05, 2),
+    );
+
+  presentation.motion
+    ..tumble = profile.tumble
+    ..speedMultiplier = _band(random, profile.speed, 2)
+    ..degreesPerSecondX = _band(random, profile.rate, 0)
+    ..degreesPerSecondY = _band(random, profile.rate, 0)
+    ..degreesPerSecondZ = _band(random, profile.rate, 0)
+    ..variance = _round2(random.nextDouble() * 0.8)
+    ..changeOnBounce = random.nextBool();
+
+  presentation.landing
+    ..mode = profile.landing
+    ..tiltDegrees = _band(random, profile.tilt, 0)
+    ..randomYaw = random.nextBool()
+    ..transitionTicks = random.nextInt(13);
+
+  final (double, double)? labelScale = profile.labels;
+  final HuiIconStyle labelStyle = showcaseDisplayStyle(random, mood);
+  final double size = labelScale == null ? 0.85 : _band(random, labelScale, 2);
+  labelStyle.scaleX = size;
+  labelStyle.scaleY = size * _band(random, (0.7, 1.3), 2);
+  labelStyle.scaleZ = size;
+  presentation.labels
+    ..enabled = labelScale != null
+    ..yOffset = _round2(0.2 + random.nextDouble() * 1.1)
+    ..style = labelStyle
+    ..box = showcaseBox(random, mood);
+  _randomizeDropLabelText(presentation.labels, random, mood);
+
+  presentation.filters
+    ..onlyPlayerDrops = random.nextInt(4) == 0
+    ..disabledWorlds = random.nextBool()
+        ? <String>[]
+        : <String>[showcasePick(random, showcaseWorlds)]
+    ..materialBlacklist = showcasePick(random, const <List<String>>[
+      <String>['BEDROCK', 'BARRIER'],
+      <String>['BEDROCK', 'BARRIER', 'LIGHT', 'STRUCTURE_VOID'],
+      <String>['BEDROCK', 'BARRIER', 'COBBLESTONE', 'DIRT'],
+      <String>['BEDROCK'],
+    ]);
+
+  _applyDropArchetype(doc, profile.archetype, random);
+  presentation.physics = _buildDropPhysics(
+    archetype ?? showcasePick(random, RealDropShowcaseArchetype.values),
+    random,
+  );
+  presentation.script = _buildDropScript(
+    archetype ?? showcasePick(random, RealDropShowcaseArchetype.values),
+    mood,
+    random,
+  );
+  presentation.animation = _buildDropAnimation(
+    archetype ?? showcasePick(random, RealDropShowcaseArchetype.values),
+    mood,
+    random,
+  );
+  if (archetype == null) {
+    _extendDropAnimation(presentation.animation!, random);
+    doc.audience.when = showcasePick(random, <String>[
+      'true',
+      "viewer.world != 'quiet_world'",
+      "hasPermission('viewer', 'gloss.drops.view')",
+    ]);
+    final int variantCount = 1 + random.nextInt(4);
+    for (int index = 0; index < variantCount; index++) {
+      final GlossRealDropPresentation variant = presentation.copy();
+      variant.animation = random.nextBool()
+          ? null
+          : GlossRealDropAnimation(
+              enabled: true,
+              profiles: <GlossRealDropAnimationProfile>[
+                GlossRealDropAnimationProfile(
+                  id: 'variant-$index',
+                  clips: <GlossRealDropAnimationClip>[_spawnRevealClip(random)],
+                ),
+              ],
+            );
+      variant.labels.style = showcaseDisplayStyle(random, mood);
+      variant.labels.box = showcaseBox(random, mood);
+      _randomizeDropLabelText(variant.labels, random, mood);
+      variant.scale.defaultScale = _band(random, (0.1, 1.8), 2);
+      variant.physics = _buildDropPhysics(
+        showcasePick(random, RealDropShowcaseArchetype.values),
+        random,
+      );
+      variant.particleLayers = showcaseParticleLayers(
+        random,
+        mood,
+        scopes: <String>['projection', 'model', 'label', 'local'],
+      );
+      doc.variants.add(
+        GlossRealDropVariant(
+          id: 'audience-$index',
+          priority: 10 + index * 10,
+          when: showcasePick(random, <String>[
+            "viewer.world == 'world_nether'",
+            'viewer.healthPercent < 40',
+            "inGroup('viewer', 'vip')",
+            "hasPermission('viewer', 'gloss.drops.special')",
+          ]),
+          presentation: variant,
+        ),
+      );
+    }
+  }
+  presentation.particleLayers = showcaseParticleLayers(
+    random,
+    mood,
+    scopes: <String>['projection', 'model', 'label', 'local'],
+  );
+
+  return doc;
+}
+
+/// Label wording for one presentation. Layout, colour, per-material names and
+/// bundle lines are drawn from the same mood so a press reads as one voice.
+void _randomizeDropLabelText(
+  GlossRealDropLabels labels,
+  math.Random random,
+  ShowcaseMood mood,
+) {
+  labels
+    ..format = _randomDropLabelFormat(random, mood)
+    ..useItemDisplayNames = random.nextInt(3) == 0
+    ..names = _randomDropLabelNames(random, mood)
+    ..bundle = _randomDropLabelBundle(random, mood);
+}
+
+String _randomDropLabelFormat(math.Random random, ShowcaseMood mood) {
+  final String glyph = showcasePick(random, mood.glyphs);
+  return switch (random.nextInt(9)) {
+    0 => glossRealDropLabelFormatDefault,
+    1 => '&f{type} &8x{count}',
+    2 => '${mood.legacy}{type} &8({count})',
+    3 => '${mood.legacy}$glyph &f{type} &7x{count}',
+    4 =>
+      '<gradient:${mood.primary}:${mood.secondary}>{type}</gradient> &7x{count}',
+    5 => '&f{count} &7{type}',
+    6 => '${showcaseColorEffect(random, mood).text}{type} &8· &7{count}',
+    7 => '<bold><${mood.primary}>{count}</${mood.primary}></bold> &f{type}',
+    _ => '${mood.legacy}&l{type}&r &7x{count}',
+  };
+}
+
+Map<String, String> _randomDropLabelNames(
+  math.Random random,
+  ShowcaseMood mood,
+) {
+  final List<ShowcaseDrop> drops = List<ShowcaseDrop>.of(showcaseDrops)
+    ..shuffle(random);
+  return <String, String>{
+    for (final ShowcaseDrop drop in drops.take(random.nextInt(4)))
+      drop.registryName: switch (random.nextInt(3)) {
+        0 => drop.displayName,
+        1 => '${mood.legacy}${drop.displayName}',
+        _ =>
+          '${mood.legacy}${showcasePick(random, mood.glyphs)} '
+              '&f${glossDropMaterialName(drop.registryName)}',
+      },
+  };
+}
+
+GlossRealDropLabelBundle _randomDropLabelBundle(
+  math.Random random,
+  ShowcaseMood mood,
+) {
+  final String glyph = showcasePick(random, mood.glyphs);
+  return GlossRealDropLabelBundle(
+    format: showcasePick(random, <String>[
+      glossRealDropBundleFormatDefault,
+      '${mood.legacy}Bundle &8[&7{total}&8] &7{contents}',
+      '&f{total} items&8: &7{contents}',
+    ]),
+    entryLimit: 1 + random.nextInt(5),
+    vertical: random.nextInt(4) != 0,
+    headerFormat: showcasePick(random, <String>[
+      glossRealDropBundleHeaderFormatDefault,
+      '${mood.legacy}&lBundle &7· {total}',
+      '${mood.legacy}$glyph &f{total} items',
+    ]),
+    entryFormat: showcasePick(random, <String>[
+      glossRealDropBundleEntryFormatDefault,
+      '&8› &f{type} &7x{count}',
+      '${mood.legacy}{count} &f{type}',
+    ]),
+    moreFormat: showcasePick(random, <String>[
+      glossRealDropBundleMoreFormatDefault,
+      '&8…and {remaining} more',
+      '&7+{remaining}',
+    ]),
+  );
+}
+
+void _extendDropAnimation(
+  GlossRealDropAnimation animation,
+  math.Random random,
+) {
+  for (final GlossRealDropAnimationProfile profile in animation.profiles.take(
+    1,
+  )) {
+    final int count = 1 + random.nextInt(2);
+    for (int index = 0; index < count; index++) {
+      final List<GlossRealDropAnimationTarget> targets =
+          List<GlossRealDropAnimationTarget>.of(
+            GlossRealDropAnimationTarget.values,
+          )..shuffle(random);
+      final double duration = (8 + random.nextInt(73)).toDouble();
+      profile.clips.add(
+        GlossRealDropAnimationClip(
+          trigger: showcasePick(random, GlossRealDropAnimationTrigger.values),
+          durationTicks: duration,
+          loop: random.nextBool(),
+          tracks: <GlossRealDropAnimationTrack>[
+            for (final GlossRealDropAnimationTarget target in targets.take(
+              2 + random.nextInt(3),
+            ))
+              _randomDropTrack(target, duration, random),
+          ],
+        ),
+      );
+    }
+  }
+}
+
+GlossRealDropAnimationTrack _randomDropTrack(
+  GlossRealDropAnimationTarget target,
+  double duration,
+  math.Random random,
+) {
+  final bool absolute = <GlossRealDropAnimationTarget>[
+    GlossRealDropAnimationTarget.visible,
+    GlossRealDropAnimationTarget.physics,
+    GlossRealDropAnimationTarget.glow,
+    GlossRealDropAnimationTarget.lightLevel,
+  ].contains(target);
+  final bool scale = <GlossRealDropAnimationTarget>[
+    GlossRealDropAnimationTarget.scaleX,
+    GlossRealDropAnimationTarget.scaleY,
+    GlossRealDropAnimationTarget.scaleZ,
+  ].contains(target);
+  final double resting =
+      scale ||
+          target == GlossRealDropAnimationTarget.visible ||
+          target == GlossRealDropAnimationTarget.physics
+      ? 1
+      : 0;
+  final double peak = switch (target) {
+    GlossRealDropAnimationTarget.visible ||
+    GlossRealDropAnimationTarget.physics => 0,
+    GlossRealDropAnimationTarget.glow => _argb(
+      showcasePick(random, showcaseMoods).primary,
+    ),
+    GlossRealDropAnimationTarget.lightLevel =>
+      (1 + random.nextInt(15)).toDouble(),
+    GlossRealDropAnimationTarget.scaleX ||
+    GlossRealDropAnimationTarget.scaleY ||
+    GlossRealDropAnimationTarget.scaleZ => _band(random, (0.2, 2.4), 2),
+    GlossRealDropAnimationTarget.rotationX ||
+    GlossRealDropAnimationTarget.rotationY ||
+    GlossRealDropAnimationTarget.rotationZ => _band(random, (-1080, 1080), 0),
+    _ => _band(random, (-0.75, 0.75), 2),
+  };
+  return _track(
+    target,
+    absolute
+        ? GlossRealDropAnimationBlend.replace
+        : showcasePick(random, <GlossRealDropAnimationBlend>[
+            GlossRealDropAnimationBlend.replace,
+            scale
+                ? GlossRealDropAnimationBlend.multiply
+                : GlossRealDropAnimationBlend.add,
+          ]),
+    <GlossRealDropAnimationKeyframe>[
+      _key(0, resting),
+      _key(
+        duration / 2,
+        peak,
+        easing: showcasePick(random, GlossRealDropAnimationEasing.values),
+      ),
+      _key(
+        duration,
+        resting,
+        easing: showcasePick(random, GlossRealDropAnimationEasing.values),
+      ),
+    ],
+  );
+}
+
+GlossDamageIndicatorsDoc buildRandomDamageIndicatorsShowcase(
+  GlossDamageIndicatorsDoc current,
+  math.Random random,
+) {
+  return GlossDamageIndicatorsDoc(
+    schemaVersion: glossDamageIndicatorsCurrentSchemaVersion,
+    revision: current.revision,
+    limits: GlossDamageIndicatorLimits(
+      maxPerSecond: 16 + random.nextInt(105),
+      lifetimeMs: 750 + random.nextInt(76) * 50,
+      minimumDelta: showcasePick(random, const <double>[
+        0,
+        0.001,
+        0.005,
+        0.01,
+        0.05,
+        0.1,
+        0.25,
+        0.5,
+        1,
+      ]),
+      decimals: random.nextInt(5),
+    ),
+    damage: _randomDamageIndicatorStyle(random, healing: false),
+    healing: _randomDamageIndicatorStyle(random, healing: true),
+    audience: GlossDamageIndicatorAudience(
+      when: showcasePick(random, <String>[
+        'true',
+        "viewer.world == 'world'",
+        "viewer.world != '${showcasePick(random, const <String>['world_nether', 'world_the_end'])}'",
+        "hasPermission('viewer', 'gloss.indicators.show')",
+      ]),
+    ),
+  )..extras['show'] = showcaseShow(random, viewerAware: true);
+}
+
+GlossDamageIndicatorStyle _randomDamageIndicatorStyle(
+  math.Random random, {
+  required bool healing,
+}) {
+  final double startScale = _band(random, (0.65, 1.8), 2);
+  final double endScaleFactor = _band(random, (0.62, 1.38), 2);
+  final GlossDamageIndicatorPresentation presentation =
+      GlossDamageIndicatorPresentation(
+        format: showcasePick(
+          random,
+          healing
+              ? const <String>[
+                  '&a&lRESTORED',
+                  '&a&l+{amount}',
+                  '&2&l{amount}',
+                  '&b+{amount} &aHP',
+                  '&a[{amount}]',
+                  '&e&l+{amount}',
+                  '&f{amount} &aHEAL',
+                  '&a{{ align(\'{amount}\', 8, \'center\') }}',
+                  '&e{{ align(\'{amount}\', 8, \'right\') }}',
+                ]
+              : const <String>[
+                  '&c&lOUCH!',
+                  '&c&l{amount}',
+                  '&4&l-{amount}',
+                  '&6{amount} &cDMG',
+                  '&c[{amount}]',
+                  '&5&l{amount}&d!',
+                  '&e-{amount} &6HP',
+                  '&c{{ align(\'{amount}\', 8, \'center\') }}',
+                  '&6{{ align(\'{amount}\', 8, \'right\') }}',
+                ],
+        ),
+        offset: Vec3(
+          _band(random, (-0.45, 0.45), 2),
+          _band(random, healing ? (-0.25, 0.9) : (0.35, 1.4), 2),
+          _band(random, (-0.45, 0.45), 2),
+        ),
+        motion: GlossDamageIndicatorMotion(
+          horizontalSpeed: _band(
+            random,
+            healing ? (0.15, 1.8) : (0.35, 2.4),
+            2,
+          ),
+          verticalSpeed: _band(random, healing ? (0.25, 2.4) : (0.7, 3.4), 2),
+          verticalAcceleration: _band(
+            random,
+            healing ? (-1.5, 1.0) : (-4.0, -0.25),
+            2,
+          ),
+          spinDegreesPerSecond: _band(random, (-360, 360), 0),
+        ),
+        transform: GlossDamageIndicatorTransform(
+          startScale: startScale,
+          endScale: _round2(startScale * endScaleFactor),
+          fadeStartFraction: _band(random, (0.42, 0.86), 2),
+        ),
+      );
+  final ShowcaseMood mood = showcasePick(random, showcaseMoods);
+  presentation.format = showcaseRichText(random, mood, presentation.format);
+  presentation.style = showcaseDisplayStyle(random, mood);
+  presentation.box = showcaseBox(random, mood);
+  presentation.particleLayers = showcaseParticleLayers(
+    random,
+    mood,
+    scopes: <String>['projection', 'text', 'line', 'span', 'local'],
+  );
+  return GlossDamageIndicatorStyle(
+    when: healing ? 'event.healing' : 'event.damage',
+    presentation: presentation,
+    variants: <GlossDamageIndicatorVariant>[
+      for (int index = 0; index < 1 + random.nextInt(4); index++)
+        GlossDamageIndicatorVariant(
+          id: 'context-$index',
+          priority: 10 + index * 10,
+          when: showcasePick(random, <String>[
+            'event.amount < 2',
+            'event.amount >= 12',
+            "viewer.world == 'world_nether'",
+            'viewer.healthPercent < 40',
+          ]),
+          presentation: _randomDamageIndicatorVariantPresentation(
+            presentation,
+            random,
+            healing: healing,
+          ),
+        ),
+      GlossDamageIndicatorVariant(
+        id: healing ? 'large-heal' : 'critical-hit',
+        priority: healing ? 60 : 100,
+        when: healing
+            ? 'event.amount >= 8'
+            : 'event.criticalKnown && event.critical',
+        presentation: _randomDamageIndicatorVariantPresentation(
+          presentation,
+          random,
+          healing: healing,
+          critical: true,
+        ),
+      ),
+    ],
+  );
+}
+
+GlossDamageIndicatorPresentation _randomDamageIndicatorVariantPresentation(
+  GlossDamageIndicatorPresentation base,
+  math.Random random, {
+  required bool healing,
+  bool critical = false,
+}) {
+  final GlossDamageIndicatorPresentation presentation = base.copy();
+  final ShowcaseMood mood = showcasePick(random, showcaseMoods);
+  presentation.style = showcaseDisplayStyle(random, mood);
+  presentation.box = showcaseBox(random, mood);
+  presentation.particleLayers = showcaseParticleLayers(
+    random,
+    mood,
+    scopes: <String>['projection', 'text', 'line', 'span', 'local'],
+  );
+  presentation.format = healing
+      ? showcasePick(random, const <String>[
+          '&a&l+{amount} &2BURST',
+          '&b&l+{amount} &3HEAL',
+          '&f&l{amount} &aRESTORED',
+        ])
+      : critical
+      ? showcasePick(random, const <String>[
+          '&6&lCRIT &e-{amount}',
+          '&e&l-{amount} &6CRITICAL',
+          '&f&l{amount} &6CRIT',
+        ])
+      : showcasePick(random, const <String>[
+          '&c&l-{amount} &4HIT',
+          '&e-{amount}',
+          '&6&l{amount} &cDAMAGE',
+        ]);
+  presentation.format = showcaseRichText(random, mood, presentation.format);
+  presentation.offset.y = _round2(base.offset.y + 0.12);
+  presentation.motion.horizontalSpeed = _round2(
+    math.min(3.2, base.motion.horizontalSpeed * 1.2),
+  );
+  presentation.motion.verticalSpeed = _round2(
+    math.min(4.0, base.motion.verticalSpeed * 1.15),
+  );
+  presentation.motion.spinDegreesPerSecond = showcasePick(
+    random,
+    const <double>[-360, -240, 240, 360],
+  );
+  presentation.transform.startScale = _round2(
+    math.min(2.4, base.transform.startScale * 1.25),
+  );
+  presentation.transform.endScale = _round2(
+    math.min(2.8, base.transform.endScale * 1.15),
+  );
+  presentation.transform.fadeStartFraction = math.max(
+    0.5,
+    base.transform.fadeStartFraction,
+  );
+  return presentation;
+}
+
+void _applyDropArchetype(
+  GlossRealDropSettingsDoc doc,
+  RealDropShowcaseArchetype archetype,
+  math.Random random,
+) {
+  final GlossRealDropPresentation presentation = doc.presentation;
+  switch (archetype) {
+    case RealDropShowcaseArchetype.ricochet:
+      presentation.motion
+        ..velocityInfluence = _band(random, (1.1, 2.4), 2)
+        ..submergedSpinMultiplier = _band(random, (0.2, 0.5), 2)
+        ..groundRollMultiplier = _band(random, (1.2, 2.4), 2);
+      presentation.landing
+        ..faceAttraction = _band(random, (0.35, 0.6), 2)
+        ..movingFaceAttraction = _band(random, (0.05, 0.2), 2)
+        ..alignmentDegrees = _band(random, (0.25, 0.8), 2)
+        ..settleDelayTicks = 3 + random.nextInt(6);
+    case RealDropShowcaseArchetype.groundRoll:
+      presentation.motion
+        ..velocityInfluence = _band(random, (0.7, 1.6), 2)
+        ..submergedSpinMultiplier = _band(random, (0.2, 0.45), 2)
+        ..groundRollMultiplier = _band(random, (1.4, 3.2), 2);
+      presentation.landing
+        ..faceAttraction = _band(random, (0.45, 0.75), 2)
+        ..movingFaceAttraction = _band(random, (0.04, 0.18), 2)
+        ..alignmentDegrees = _band(random, (0.2, 0.65), 2)
+        ..settleDelayTicks = 4 + random.nextInt(7);
+    case RealDropShowcaseArchetype.buoyant:
+      presentation.motion
+        ..velocityInfluence = _band(random, (0.3, 0.9), 2)
+        ..submergedSpinMultiplier = _band(random, (0.08, 0.3), 2)
+        ..groundRollMultiplier = _band(random, (0.6, 1.3), 2);
+      presentation.landing
+        ..faceAttraction = _band(random, (0.45, 0.7), 2)
+        ..movingFaceAttraction = _band(random, (0.08, 0.22), 2)
+        ..alignmentDegrees = _band(random, (0.35, 1.0), 2)
+        ..settleDelayTicks = 3 + random.nextInt(6);
+    case RealDropShowcaseArchetype.hoverRelease:
+      presentation.motion
+        ..velocityInfluence = _band(random, (0.5, 1.2), 2)
+        ..submergedSpinMultiplier = _band(random, (0.15, 0.4), 2)
+        ..groundRollMultiplier = _band(random, (0.7, 1.5), 2);
+      presentation.landing
+        ..faceAttraction = _band(random, (0.55, 0.82), 2)
+        ..movingFaceAttraction = _band(random, (0.08, 0.24), 2)
+        ..alignmentDegrees = _band(random, (0.2, 0.7), 2)
+        ..settleDelayTicks = 3 + random.nextInt(5);
+    case RealDropShowcaseArchetype.materialReactive:
+      presentation.motion
+        ..velocityInfluence = _band(random, (0.2, 0.8), 2)
+        ..submergedSpinMultiplier = _band(random, (0.1, 0.35), 2)
+        ..groundRollMultiplier = _band(random, (0.4, 1.0), 2);
+      presentation.landing
+        ..faceAttraction = _band(random, (0.6, 0.88), 2)
+        ..movingFaceAttraction = _band(random, (0.12, 0.3), 2)
+        ..alignmentDegrees = _band(random, (0.15, 0.55), 2)
+        ..settleDelayTicks = 2 + random.nextInt(5);
+  }
+}
+
+GlossRealDropPhysics _buildDropPhysics(
+  RealDropShowcaseArchetype archetype,
+  math.Random random,
+) => switch (archetype) {
+  RealDropShowcaseArchetype.ricochet => GlossRealDropPhysics(
+    enabled: true,
+    gravityMultiplier: _band(random, (0.8, 1.35), 2),
+    bounce: _band(random, (0.5, 0.82), 2),
+    waterBuoyancy: _band(random, (0, 0.12), 2),
+    waterDrag: _band(random, (0.05, 0.25), 2),
+  ),
+  RealDropShowcaseArchetype.groundRoll => GlossRealDropPhysics(
+    enabled: true,
+    gravityMultiplier: _band(random, (0.9, 1.45), 2),
+    bounce: _band(random, (0.04, 0.18), 2),
+    waterBuoyancy: _band(random, (0, 0.1), 2),
+    waterDrag: _band(random, (0.1, 0.35), 2),
+  ),
+  RealDropShowcaseArchetype.buoyant => GlossRealDropPhysics(
+    enabled: true,
+    gravityMultiplier: _band(random, (0.55, 0.95), 2),
+    bounce: _band(random, (0.08, 0.25), 2),
+    waterBuoyancy: _band(random, (0.18, 0.48), 2),
+    waterDrag: _band(random, (0.35, 0.78), 2),
+  ),
+  RealDropShowcaseArchetype.hoverRelease => GlossRealDropPhysics(
+    enabled: true,
+    gravityMultiplier: _band(random, (0.8, 1.15), 2),
+    bounce: _band(random, (0.12, 0.34), 2),
+    waterBuoyancy: _band(random, (0.05, 0.2), 2),
+    waterDrag: _band(random, (0.18, 0.45), 2),
+  ),
+  RealDropShowcaseArchetype.materialReactive => GlossRealDropPhysics(
+    enabled: true,
+    gravityMultiplier: _band(random, (0.85, 1.25), 2),
+    bounce: _band(random, (0.08, 0.3), 2),
+    waterBuoyancy: _band(random, (0, 0.15), 2),
+    waterDrag: _band(random, (0.1, 0.4), 2),
+  ),
+};
+
+GlossRealDropScript _buildDropScript(
+  RealDropShowcaseArchetype archetype,
+  ShowcaseMood mood,
+  math.Random random,
+) {
+  final double rate = _band(random, (1.6, 4.8), 2);
+  final double amplitude = _band(random, (0.04, 0.18), 2);
+  final String glow = mood.primary;
+  switch (archetype) {
+    case RealDropShowcaseArchetype.ricochet:
+      return GlossRealDropScript(
+        enabled: true,
+        vars: <GlossRealDropScriptVar>[
+          GlossRealDropScriptVar(
+            name: 'energy',
+            expression: 'min(1, impactSpeed * ${_band(random, (1.4, 2.8), 2)})',
+          ),
+          GlossRealDropScriptVar(
+            name: 'wobble',
+            expression: 'sin(t * $rate + index * 0.8)',
+          ),
+        ],
+        offset: GlossRealDropScriptAxis(
+          neutral: '0',
+          y: 'onGround ? energy * (wobble + 1) * $amplitude : 0',
+        ),
+        rotation: GlossRealDropScriptAxis(
+          neutral: '0',
+          z: 'wobble * ${_band(random, (8, 24), 1)}',
+        ),
+        scale: GlossRealDropScriptAxis(
+          neutral: '1',
+          x: '1 + energy * $amplitude',
+          y: '1 - energy * $amplitude',
+          z: '1 + energy * $amplitude',
+        ),
+        glow: "materialMatches('*_PICKAXE') ? $glow : 0",
+      );
+    case RealDropShowcaseArchetype.groundRoll:
+      return GlossRealDropScript(
+        enabled: true,
+        vars: <GlossRealDropScriptVar>[
+          GlossRealDropScriptVar(
+            name: 'spacing',
+            expression: 'index - (count - 1) / 2',
+          ),
+          GlossRealDropScriptVar(
+            name: 'rollPulse',
+            expression: 'sin(stateTime * $rate + index)',
+          ),
+        ],
+        offset: GlossRealDropScriptAxis(
+          neutral: '0',
+          x: 'settled ? spacing * $amplitude : 0',
+          y: 'onGround ? (rollPulse + 1) * ${_round2(amplitude / 3)} : 0',
+        ),
+        rotation: GlossRealDropScriptAxis(
+          neutral: '0',
+          y: 'settled ? spacing * ${_band(random, (4, 14), 1)} : 0',
+        ),
+        scale: GlossRealDropScriptAxis(neutral: '1'),
+      );
+    case RealDropShowcaseArchetype.buoyant:
+      return GlossRealDropScript(
+        enabled: true,
+        vars: <GlossRealDropScriptVar>[
+          GlossRealDropScriptVar(
+            name: 'drift',
+            expression: 't * $rate + index * 1.7',
+          ),
+          GlossRealDropScriptVar(name: 'bob', expression: 'sin(drift)'),
+        ],
+        offset: GlossRealDropScriptAxis(
+          neutral: '0',
+          x: 'inWater ? cos(drift) * $amplitude : 0',
+          y: 'inWater ? bob * ${_round2(amplitude * 1.5)} : 0',
+          z: 'inWater ? sin(drift * 0.7) * $amplitude : 0',
+        ),
+        rotation: GlossRealDropScriptAxis(
+          neutral: '0',
+          y: 'inWater ? bob * ${_band(random, (10, 28), 1)} : 0',
+        ),
+        scale: GlossRealDropScriptAxis(
+          neutral: '1',
+          x: 'inWater ? 1 + bob * ${_round2(amplitude / 2)} : 1',
+          z: 'inWater ? 1 - bob * ${_round2(amplitude / 2)} : 1',
+        ),
+        glow: "materialMatches('*_LANTERN') ? $glow : 0",
+      );
+    case RealDropShowcaseArchetype.hoverRelease:
+      return GlossRealDropScript(
+        enabled: true,
+        vars: <GlossRealDropScriptVar>[
+          GlossRealDropScriptVar(
+            name: 'orbit',
+            expression: 't * $rate + index * 2.1',
+          ),
+          GlossRealDropScriptVar(
+            name: 'lift',
+            expression: '(sin(orbit) + 1) * $amplitude',
+          ),
+        ],
+        offset: GlossRealDropScriptAxis(
+          neutral: '0',
+          x: 'cos(orbit) * $amplitude',
+          y: 'lift',
+          z: 'sin(orbit) * $amplitude',
+        ),
+        rotation: GlossRealDropScriptAxis(
+          neutral: '0',
+          y: 't * ${_band(random, (45, 120), 0)}',
+        ),
+        scale: GlossRealDropScriptAxis(
+          neutral: '1',
+          x: '1 + sin(orbit) * ${_round2(amplitude / 2)}',
+          z: '1 - sin(orbit) * ${_round2(amplitude / 2)}',
+        ),
+        glow: "materialMatches('DIAMOND*') ? $glow : 0",
+      );
+    case RealDropShowcaseArchetype.materialReactive:
+      return GlossRealDropScript(
+        enabled: true,
+        vars: <GlossRealDropScriptVar>[
+          GlossRealDropScriptVar(
+            name: 'rarity',
+            expression:
+                "materialMatches('DIAMOND*') ? 1 : "
+                "(materialMatches('*_LANTERN') ? 0.7 : 0.25)",
+          ),
+          GlossRealDropScriptVar(
+            name: 'pulse',
+            expression: '(sin(t * $rate + index) + 1) / 2',
+          ),
+        ],
+        offset: GlossRealDropScriptAxis(
+          neutral: '0',
+          y: 'settled ? pulse * rarity * $amplitude : 0',
+        ),
+        rotation: GlossRealDropScriptAxis(
+          neutral: '0',
+          y: 'settled ? pulse * rarity * ${_band(random, (8, 22), 1)} : 0',
+        ),
+        scale: GlossRealDropScriptAxis(
+          neutral: '1',
+          x: '1 + pulse * rarity * ${_round2(amplitude / 2)}',
+          y: '1 + pulse * rarity * ${_round2(amplitude / 2)}',
+          z: '1 + pulse * rarity * ${_round2(amplitude / 2)}',
+        ),
+        glow: 'rarity > 0.6 ? $glow : 0',
+        visible: "materialIs('BARRIER') == false",
+      );
+  }
+}
+
+GlossRealDropAnimation _buildDropAnimation(
+  RealDropShowcaseArchetype archetype,
+  ShowcaseMood mood,
+  math.Random random,
+) {
+  const String radianceMap = 'radiance';
+  const String treasureMap = 'treasure';
+  final Map<String, Map<String, GlossRealDropMaterialProperties>> maps =
+      <String, Map<String, GlossRealDropMaterialProperties>>{
+        radianceMap: <String, GlossRealDropMaterialProperties>{
+          'SEA_LANTERN': GlossRealDropMaterialProperties(
+            glow: _argb('#CFE6FF'),
+            lightLevel: 15,
+          ),
+          '*_LANTERN': GlossRealDropMaterialProperties(
+            glow: _argb(mood.secondary),
+            lightLevel: 14,
+          ),
+          '*_CANDLE': GlossRealDropMaterialProperties(
+            glow: _argb(mood.primary),
+            lightLevel: 11,
+          ),
+          '*': GlossRealDropMaterialProperties(),
+        },
+      };
+  if (archetype == RealDropShowcaseArchetype.materialReactive ||
+      archetype == RealDropShowcaseArchetype.hoverRelease) {
+    maps[treasureMap] = <String, GlossRealDropMaterialProperties>{
+      'DIAMOND*': GlossRealDropMaterialProperties(
+        glow: _argb(mood.secondary),
+        lightLevel: 9,
+      ),
+      '*_PICKAXE': GlossRealDropMaterialProperties(
+        glow: _argb(mood.primary),
+        lightLevel: 6,
+      ),
+      'TRIDENT': GlossRealDropMaterialProperties(
+        glow: _argb('#55FFFF'),
+        lightLevel: 8,
+      ),
+      '*': GlossRealDropMaterialProperties(),
+    };
+  }
+
+  final List<GlossRealDropAnimationClip> base = _dropAnimationClips(
+    archetype,
+    random,
+  );
+  final List<GlossRealDropAnimationProfile> profiles =
+      <GlossRealDropAnimationProfile>[];
+  switch (archetype) {
+    case RealDropShowcaseArchetype.ricochet:
+      profiles.add(
+        GlossRealDropAnimationProfile(
+          id: 'ricochet',
+          materials: <String>['*'],
+          clips: <GlossRealDropAnimationClip>[
+            ...base,
+            _materialPulseClip(
+              GlossRealDropAnimationTrigger.bounce,
+              radianceMap,
+              random,
+            ),
+          ],
+        ),
+      );
+    case RealDropShowcaseArchetype.groundRoll:
+      profiles
+        ..add(
+          GlossRealDropAnimationProfile(
+            id: 'rolling-blocks',
+            priority: 20,
+            materials: <String>['*_LOG', '*_SLAB', 'COBBLESTONE', 'STONE'],
+            clips: <GlossRealDropAnimationClip>[
+              ...base,
+              _materialPulseClip(
+                GlossRealDropAnimationTrigger.settle,
+                radianceMap,
+                random,
+              ),
+            ],
+          ),
+        )
+        ..add(
+          GlossRealDropAnimationProfile(
+            id: 'rolling-fallback',
+            materials: <String>['*'],
+            clips: base,
+          ),
+        );
+    case RealDropShowcaseArchetype.buoyant:
+      profiles
+        ..add(
+          GlossRealDropAnimationProfile(
+            id: 'buoyant-lights',
+            priority: 30,
+            materials: <String>['*_LANTERN', '*_CANDLE', 'SEA_LANTERN'],
+            clips: <GlossRealDropAnimationClip>[
+              ...base,
+              _materialPulseClip(
+                GlossRealDropAnimationTrigger.enterFluid,
+                radianceMap,
+                random,
+              ),
+            ],
+          ),
+        )
+        ..add(
+          GlossRealDropAnimationProfile(
+            id: 'buoyant-fallback',
+            materials: <String>['*'],
+            clips: base,
+          ),
+        );
+    case RealDropShowcaseArchetype.hoverRelease:
+      profiles
+        ..add(
+          GlossRealDropAnimationProfile(
+            id: 'hover-treasure',
+            priority: 25,
+            materials: <String>['DIAMOND*', '*_PICKAXE', 'TRIDENT'],
+            clips: <GlossRealDropAnimationClip>[
+              ...base,
+              _materialPulseClip(
+                GlossRealDropAnimationTrigger.spawn,
+                treasureMap,
+                random,
+              ),
+            ],
+          ),
+        )
+        ..add(
+          GlossRealDropAnimationProfile(
+            id: 'hover-fallback',
+            materials: <String>['*'],
+            clips: base,
+          ),
+        );
+    case RealDropShowcaseArchetype.materialReactive:
+      profiles
+        ..add(
+          GlossRealDropAnimationProfile(
+            id: 'reactive-lights',
+            priority: 40,
+            materials: <String>['*_LANTERN', '*_CANDLE', 'SEA_LANTERN'],
+            clips: <GlossRealDropAnimationClip>[
+              ...base,
+              _materialPulseClip(
+                GlossRealDropAnimationTrigger.impact,
+                radianceMap,
+                random,
+              ),
+            ],
+          ),
+        )
+        ..add(
+          GlossRealDropAnimationProfile(
+            id: 'reactive-treasure',
+            priority: 30,
+            materials: <String>['DIAMOND*', '*_PICKAXE', 'TRIDENT'],
+            clips: <GlossRealDropAnimationClip>[
+              ...base,
+              _materialPulseClip(
+                GlossRealDropAnimationTrigger.settle,
+                treasureMap,
+                random,
+              ),
+            ],
+          ),
+        )
+        ..add(
+          GlossRealDropAnimationProfile(
+            id: 'reactive-fallback',
+            materials: <String>['*'],
+            clips: base,
+          ),
+        );
+  }
+  return GlossRealDropAnimation(
+    enabled: true,
+    materialProperties: maps,
+    profiles: profiles,
+  );
+}
+
+List<GlossRealDropAnimationClip> _dropAnimationClips(
+  RealDropShowcaseArchetype archetype,
+  math.Random random,
+) => switch (archetype) {
+  RealDropShowcaseArchetype.ricochet => <GlossRealDropAnimationClip>[
+    _spawnRevealClip(random),
+    _impactClip(random),
+    _bounceClip(random),
+    _airborneClip(random),
+  ],
+  RealDropShowcaseArchetype.groundRoll => <GlossRealDropAnimationClip>[
+    _spawnRevealClip(random),
+    _rollingClip(random),
+    _startRollClip(random),
+    _settleClip(random),
+  ],
+  RealDropShowcaseArchetype.buoyant => <GlossRealDropAnimationClip>[
+    _spawnRevealClip(random),
+    _enterFluidClip(random),
+    _submergedClip(random),
+    _exitFluidClip(random),
+  ],
+  RealDropShowcaseArchetype.hoverRelease => <GlossRealDropAnimationClip>[
+    _hoverReleaseClip(random),
+    _settleClip(random),
+  ],
+  RealDropShowcaseArchetype.materialReactive => <GlossRealDropAnimationClip>[
+    _spawnRevealClip(random),
+    _impactClip(random),
+    _settleClip(random),
+  ],
+};
+
+GlossRealDropAnimationClip _spawnRevealClip(math.Random random) {
+  final double duration = (14 + random.nextInt(9)).toDouble();
+  final double peak = _round2(duration * 0.55);
+  final double start = _band(random, (0.25, 0.65), 2);
+  return GlossRealDropAnimationClip(
+    trigger: GlossRealDropAnimationTrigger.spawn,
+    durationTicks: duration,
+    tracks: <GlossRealDropAnimationTrack>[
+      for (final GlossRealDropAnimationTarget target
+          in const <GlossRealDropAnimationTarget>[
+            GlossRealDropAnimationTarget.scaleX,
+            GlossRealDropAnimationTarget.scaleY,
+            GlossRealDropAnimationTarget.scaleZ,
+          ])
+        _track(
+          target,
+          GlossRealDropAnimationBlend.multiply,
+          <GlossRealDropAnimationKeyframe>[
+            _key(0, start),
+            _key(peak, 1.12, easing: GlossRealDropAnimationEasing.backOut),
+            _key(duration, 1, easing: GlossRealDropAnimationEasing.easeOut),
+          ],
+        ),
+      _track(
+        GlossRealDropAnimationTarget.offsetY,
+        GlossRealDropAnimationBlend.add,
+        <GlossRealDropAnimationKeyframe>[
+          _key(0, _band(random, (0.3, 0.75), 2)),
+          _key(duration, 0, easing: GlossRealDropAnimationEasing.easeOut),
+        ],
+      ),
+    ],
+  );
+}
+
+GlossRealDropAnimationClip _hoverReleaseClip(math.Random random) {
+  final double holdStart = (7 + random.nextInt(4)).toDouble();
+  final double release = holdStart + 24 + random.nextInt(10);
+  final double duration = release + 10;
+  final double small = _band(random, (0.12, 0.3), 2);
+  return GlossRealDropAnimationClip(
+    trigger: GlossRealDropAnimationTrigger.spawn,
+    durationTicks: duration,
+    tracks: <GlossRealDropAnimationTrack>[
+      for (final GlossRealDropAnimationTarget target
+          in const <GlossRealDropAnimationTarget>[
+            GlossRealDropAnimationTarget.scaleX,
+            GlossRealDropAnimationTarget.scaleY,
+            GlossRealDropAnimationTarget.scaleZ,
+          ])
+        _track(
+          target,
+          GlossRealDropAnimationBlend.multiply,
+          <GlossRealDropAnimationKeyframe>[
+            _key(0, _band(random, (2.4, 4.2), 2)),
+            _key(holdStart, small, easing: GlossRealDropAnimationEasing.easeIn),
+            _key(release, small, easing: GlossRealDropAnimationEasing.hold),
+            _key(duration, 1, easing: GlossRealDropAnimationEasing.backOut),
+          ],
+        ),
+      _track(
+        GlossRealDropAnimationTarget.offsetY,
+        GlossRealDropAnimationBlend.add,
+        <GlossRealDropAnimationKeyframe>[
+          _key(0, 0),
+          _key(holdStart, _band(random, (1.0, 1.8), 2)),
+          _key(
+            release,
+            _band(random, (1.0, 1.8), 2),
+            easing: GlossRealDropAnimationEasing.hold,
+          ),
+          _key(duration, 0, easing: GlossRealDropAnimationEasing.easeInOut),
+        ],
+      ),
+      _track(
+        GlossRealDropAnimationTarget.physics,
+        GlossRealDropAnimationBlend.replace,
+        <GlossRealDropAnimationKeyframe>[
+          _key(0, 1, easing: GlossRealDropAnimationEasing.hold),
+          _key(holdStart, 0, easing: GlossRealDropAnimationEasing.hold),
+          _key(release, 0, easing: GlossRealDropAnimationEasing.hold),
+          _key(release + 1, 1),
+          _key(duration, 1),
+        ],
+      ),
+      _track(
+        GlossRealDropAnimationTarget.rotationX,
+        GlossRealDropAnimationBlend.add,
+        <GlossRealDropAnimationKeyframe>[
+          _key(0, 0),
+          _key(release, 1080, easing: GlossRealDropAnimationEasing.easeInOut),
+          _key(duration, 1440, easing: GlossRealDropAnimationEasing.easeOut),
+        ],
+      ),
+    ],
+  );
+}
+
+GlossRealDropAnimationClip _impactClip(math.Random random) {
+  final double duration = (10 + random.nextInt(7)).toDouble();
+  final double peak = _round2(duration * 0.35);
+  final double squash = _band(random, (0.55, 0.78), 2);
+  final double widen = _band(random, (1.12, 1.32), 2);
+  return GlossRealDropAnimationClip(
+    trigger: GlossRealDropAnimationTrigger.impact,
+    durationTicks: duration,
+    tracks: <GlossRealDropAnimationTrack>[
+      _pulseScaleTrack(
+        GlossRealDropAnimationTarget.scaleX,
+        peak,
+        duration,
+        widen,
+      ),
+      _pulseScaleTrack(
+        GlossRealDropAnimationTarget.scaleY,
+        peak,
+        duration,
+        squash,
+      ),
+      _pulseScaleTrack(
+        GlossRealDropAnimationTarget.scaleZ,
+        peak,
+        duration,
+        widen,
+      ),
+      _track(
+        GlossRealDropAnimationTarget.offsetY,
+        GlossRealDropAnimationBlend.add,
+        <GlossRealDropAnimationKeyframe>[
+          _key(0, 0),
+          _key(peak, _band(random, (0.08, 0.2), 2)),
+          _key(duration, 0, easing: GlossRealDropAnimationEasing.easeOut),
+        ],
+      ),
+    ],
+  );
+}
+
+GlossRealDropAnimationClip _bounceClip(math.Random random) {
+  final double duration = (12 + random.nextInt(8)).toDouble();
+  return GlossRealDropAnimationClip(
+    trigger: GlossRealDropAnimationTrigger.bounce,
+    durationTicks: duration,
+    tracks: <GlossRealDropAnimationTrack>[
+      _track(
+        GlossRealDropAnimationTarget.rotationZ,
+        GlossRealDropAnimationBlend.add,
+        <GlossRealDropAnimationKeyframe>[
+          _key(0, 0),
+          _key(
+            duration,
+            random.nextBool() ? 360 : -360,
+            easing: GlossRealDropAnimationEasing.easeOut,
+          ),
+        ],
+      ),
+      _pulseScaleTrack(
+        GlossRealDropAnimationTarget.scaleY,
+        _round2(duration * 0.3),
+        duration,
+        _band(random, (1.15, 1.35), 2),
+      ),
+    ],
+  );
+}
+
+GlossRealDropAnimationClip _airborneClip(math.Random random) {
+  final double duration = (24 + random.nextInt(17)).toDouble();
+  return GlossRealDropAnimationClip(
+    trigger: GlossRealDropAnimationTrigger.airborne,
+    durationTicks: duration,
+    loop: true,
+    tracks: <GlossRealDropAnimationTrack>[
+      _track(
+        GlossRealDropAnimationTarget.rotationY,
+        GlossRealDropAnimationBlend.add,
+        <GlossRealDropAnimationKeyframe>[
+          _key(0, 0),
+          _key(duration, random.nextBool() ? 360 : -360),
+        ],
+      ),
+    ],
+  );
+}
+
+GlossRealDropAnimationClip _rollingClip(math.Random random) {
+  final double duration = (18 + random.nextInt(13)).toDouble();
+  return GlossRealDropAnimationClip(
+    trigger: GlossRealDropAnimationTrigger.rolling,
+    durationTicks: duration,
+    loop: true,
+    tracks: <GlossRealDropAnimationTrack>[
+      _track(
+        GlossRealDropAnimationTarget.rotationX,
+        GlossRealDropAnimationBlend.add,
+        <GlossRealDropAnimationKeyframe>[_key(0, 0), _key(duration, 360)],
+      ),
+      _track(
+        GlossRealDropAnimationTarget.offsetY,
+        GlossRealDropAnimationBlend.add,
+        <GlossRealDropAnimationKeyframe>[
+          _key(0, 0),
+          _key(duration / 2, _band(random, (0.04, 0.12), 2)),
+          _key(duration, 0),
+        ],
+      ),
+    ],
+  );
+}
+
+GlossRealDropAnimationClip _startRollClip(math.Random random) {
+  final double duration = (8 + random.nextInt(7)).toDouble();
+  return GlossRealDropAnimationClip(
+    trigger: GlossRealDropAnimationTrigger.startRoll,
+    durationTicks: duration,
+    tracks: <GlossRealDropAnimationTrack>[
+      _pulseScaleTrack(
+        GlossRealDropAnimationTarget.scaleZ,
+        duration / 2,
+        duration,
+        _band(random, (1.12, 1.28), 2),
+      ),
+    ],
+  );
+}
+
+GlossRealDropAnimationClip _settleClip(math.Random random) {
+  final double duration = (12 + random.nextInt(9)).toDouble();
+  final double peak = _round2(duration * 0.4);
+  return GlossRealDropAnimationClip(
+    trigger: GlossRealDropAnimationTrigger.settle,
+    durationTicks: duration,
+    tracks: <GlossRealDropAnimationTrack>[
+      _pulseScaleTrack(
+        GlossRealDropAnimationTarget.scaleX,
+        peak,
+        duration,
+        _band(random, (1.08, 1.22), 2),
+      ),
+      _pulseScaleTrack(
+        GlossRealDropAnimationTarget.scaleY,
+        peak,
+        duration,
+        _band(random, (0.82, 0.94), 2),
+      ),
+      _pulseScaleTrack(
+        GlossRealDropAnimationTarget.scaleZ,
+        peak,
+        duration,
+        _band(random, (1.08, 1.22), 2),
+      ),
+    ],
+  );
+}
+
+GlossRealDropAnimationClip _enterFluidClip(math.Random random) {
+  final double duration = (14 + random.nextInt(9)).toDouble();
+  final double peak = _round2(duration * 0.4);
+  return GlossRealDropAnimationClip(
+    trigger: GlossRealDropAnimationTrigger.enterFluid,
+    durationTicks: duration,
+    tracks: <GlossRealDropAnimationTrack>[
+      _track(
+        GlossRealDropAnimationTarget.offsetY,
+        GlossRealDropAnimationBlend.add,
+        <GlossRealDropAnimationKeyframe>[
+          _key(0, 0),
+          _key(peak, _band(random, (0.18, 0.38), 2)),
+          _key(duration, 0, easing: GlossRealDropAnimationEasing.easeOut),
+        ],
+      ),
+      _pulseScaleTrack(
+        GlossRealDropAnimationTarget.scaleX,
+        peak,
+        duration,
+        _band(random, (1.16, 1.35), 2),
+      ),
+      _pulseScaleTrack(
+        GlossRealDropAnimationTarget.scaleZ,
+        peak,
+        duration,
+        _band(random, (1.16, 1.35), 2),
+      ),
+    ],
+  );
+}
+
+GlossRealDropAnimationClip _submergedClip(math.Random random) {
+  final double duration = (28 + random.nextInt(17)).toDouble();
+  return GlossRealDropAnimationClip(
+    trigger: GlossRealDropAnimationTrigger.submerged,
+    durationTicks: duration,
+    loop: true,
+    tracks: <GlossRealDropAnimationTrack>[
+      _track(
+        GlossRealDropAnimationTarget.offsetY,
+        GlossRealDropAnimationBlend.add,
+        <GlossRealDropAnimationKeyframe>[
+          _key(0, 0),
+          _key(duration / 2, _band(random, (0.1, 0.24), 2)),
+          _key(duration, 0),
+        ],
+      ),
+      _track(
+        GlossRealDropAnimationTarget.rotationY,
+        GlossRealDropAnimationBlend.add,
+        <GlossRealDropAnimationKeyframe>[_key(0, 0), _key(duration, 360)],
+      ),
+    ],
+  );
+}
+
+GlossRealDropAnimationClip _exitFluidClip(math.Random random) {
+  final double duration = (10 + random.nextInt(7)).toDouble();
+  return GlossRealDropAnimationClip(
+    trigger: GlossRealDropAnimationTrigger.exitFluid,
+    durationTicks: duration,
+    tracks: <GlossRealDropAnimationTrack>[
+      _track(
+        GlossRealDropAnimationTarget.offsetY,
+        GlossRealDropAnimationBlend.add,
+        <GlossRealDropAnimationKeyframe>[
+          _key(0, _band(random, (0.16, 0.32), 2)),
+          _key(duration, 0, easing: GlossRealDropAnimationEasing.easeOut),
+        ],
+      ),
+    ],
+  );
+}
+
+GlossRealDropAnimationClip _materialPulseClip(
+  GlossRealDropAnimationTrigger trigger,
+  String materialMap,
+  math.Random random,
+) {
+  final double duration = (12 + random.nextInt(9)).toDouble();
+  final double peak = _round2(duration * 0.3);
+  final double hold = _round2(duration * 0.62);
+  return GlossRealDropAnimationClip(
+    trigger: trigger,
+    durationTicks: duration,
+    tracks: <GlossRealDropAnimationTrack>[
+      for (final GlossRealDropAnimationTarget target
+          in const <GlossRealDropAnimationTarget>[
+            GlossRealDropAnimationTarget.glow,
+            GlossRealDropAnimationTarget.lightLevel,
+          ])
+        _track(
+          target,
+          GlossRealDropAnimationBlend.replace,
+          <GlossRealDropAnimationKeyframe>[
+            _key(0, 0),
+            _key(
+              peak,
+              0,
+              materialMap: materialMap,
+              easing: GlossRealDropAnimationEasing.easeOut,
+            ),
+            _key(
+              hold,
+              0,
+              materialMap: materialMap,
+              easing: GlossRealDropAnimationEasing.hold,
+            ),
+            _key(duration, 0, easing: GlossRealDropAnimationEasing.easeOut),
+          ],
+        ),
+    ],
+  );
+}
+
+GlossRealDropAnimationTrack _pulseScaleTrack(
+  GlossRealDropAnimationTarget target,
+  double peak,
+  double duration,
+  double value,
+) => _track(
+  target,
+  GlossRealDropAnimationBlend.multiply,
+  <GlossRealDropAnimationKeyframe>[
+    _key(0, 1),
+    _key(peak, value, easing: GlossRealDropAnimationEasing.backOut),
+    _key(duration, 1, easing: GlossRealDropAnimationEasing.easeOut),
+  ],
+);
+
+GlossRealDropAnimationTrack _track(
+  GlossRealDropAnimationTarget target,
+  GlossRealDropAnimationBlend blend,
+  List<GlossRealDropAnimationKeyframe> keyframes,
+) => GlossRealDropAnimationTrack(
+  target: target,
+  blend: blend,
+  keyframes: keyframes,
+);
+
+GlossRealDropAnimationKeyframe _key(
+  double tick,
+  double value, {
+  String materialMap = '',
+  GlossRealDropAnimationEasing easing = GlossRealDropAnimationEasing.linear,
+}) => GlossRealDropAnimationKeyframe(
+  tick: tick,
+  value: value,
+  materialMap: materialMap,
+  easing: easing,
+);
+
+double _argb(String color) {
+  final String digits = color.startsWith('#') ? color.substring(1) : color;
+  return (0xFF000000 | int.parse(digits, radix: 16)).toDouble();
+}
+
+double _band(math.Random random, (double, double) range, int decimals) {
+  final double value = range.$1 + random.nextDouble() * (range.$2 - range.$1);
+  if (decimals == 0) return value.roundToDouble();
+  final double factor = math.pow(10, decimals).toDouble();
+  return (value * factor).roundToDouble() / factor;
+}
+
+double _round2(double value) => (value * 100).roundToDouble() / 100;
+
+HuiButtonData _randomButtonData(
+  EditorStore store,
+  math.Random random, {
+  required Vec3 componentOffset,
+}) {
+  final HuiButtonData data = _buttonDataForRecipe(
+    store,
+    random,
+    random.nextInt(6),
+    componentOffset,
+  );
+  data.icon = _randomIcon(store, random);
+  return data;
+}
+
+HuiButtonData _buttonDataForRecipe(
+  EditorStore store,
+  math.Random random,
+  int recipe,
+  Vec3 componentOffset,
+) {
+  final ShowcaseMood mood = showcasePick(random, showcaseMoods);
+  final bool menuAnchored = random.nextBool();
+  final Vec3 hitboxOffset = menuAnchored
+      ? Vec3(componentOffset.x, componentOffset.y, componentOffset.z + 0.02)
+      : Vec3(0, 0, 0.02);
+  final String trigger = showcasePick(random, huiActionTriggers);
+  final String alternateTrigger = trigger == 'right_click'
+      ? 'shift_right_click'
+      : 'right_click';
+  final List<HuiAction> actions = switch (recipe % 6) {
+    0 => <HuiAction>[
+      _randomSoundAction(store, random, trigger),
+      random.nextBool()
+          ? HuiCommandAction('/spawn', 'player', trigger)
+          : HuiCommandAction('time query daytime', 'server', trigger),
+    ],
+    1 => <HuiAction>[
+      _randomSoundAction(store, random, trigger),
+      HuiTeleportAction(
+        showcasePick(random, <String>[
+          'minecraft:overworld',
+          'minecraft:the_nether',
+          'minecraft:the_end',
+        ]),
+        (random.nextInt(401) - 200).toDouble(),
+        (64 + random.nextInt(48)).toDouble(),
+        (random.nextInt(401) - 200).toDouble(),
+        (random.nextInt(361) - 180).toDouble(),
+        (random.nextInt(121) - 60).toDouble(),
+        trigger,
+      ),
+    ],
+    2 => <HuiAction>[
+      HuiMessageAction(
+        '<gradient:${mood.primary}:${mood.secondary}>'
+        '${showcasePick(random, showcaseHeadlines)}</gradient>',
+        trigger,
+      ),
+      HuiConnectAction(
+        showcasePick(random, <String>[
+          'lobby',
+          'survival-1',
+          'events',
+          'creative',
+        ]),
+        trigger,
+      ),
+    ],
+    3 => <HuiAction>[
+      HuiMessageAction(
+        '<gray>${showcasePick(random, showcaseEvents)}</gray>',
+        trigger,
+      ),
+      _randomNavigationAction(store, random, trigger),
+    ],
+    4 => <HuiAction>[
+      _randomSoundAction(store, random, trigger),
+      HuiMessageAction(
+        '<${mood.primary}>${showcasePick(random, showcaseStatusWords)}</${mood.primary}>',
+        trigger,
+      ),
+      HuiCommandAction('/help', 'player', alternateTrigger),
+    ],
+    _ => <HuiAction>[
+      HuiMessageAction(
+        '<white>${showcasePick(random, showcaseHeadlines)}</white>',
+        trigger,
+      ),
+      _randomSoundAction(store, random, alternateTrigger),
+      _randomNavigationAction(store, random, trigger),
+    ],
+  };
+  final List<String> iconTypes = <String>[
+    'item',
+    'block',
+    'text',
+    'playerHead',
+    'entity',
+    ..._availableAssetIconTypes(store),
+  ];
+  return HuiButtonData(
+    0.04 + random.nextDouble() * 0.16,
+    actions,
+    _randomIcon(
+      store,
+      random,
+      preferredType: iconTypes[recipe % iconTypes.length],
+    ),
+    random.nextInt(4) != 0
+        ? HuiHitbox(
+            0.45 + random.nextDouble() * 0.1,
+            0.18 + random.nextDouble() * 0.08,
+            hitboxOffset,
+            menuAnchored ? HuiHitboxAnchor.menu : HuiHitboxAnchor.button,
+          )
+        : null,
+    random.nextInt(11),
+    _randomHoverEasing(random),
+  );
+}
+
+HuiSoundAction _randomSoundAction(
+  EditorStore store,
+  math.Random random,
+  String trigger,
+) => HuiSoundAction(
+  _sound(store, random),
+  showcasePick(random, huiSoundSources),
+  _round2(0.55 + random.nextDouble() * 1.25),
+  _round2(0.55 + random.nextDouble() * 1.4),
+  trigger,
+);
+
+HuiNavigateAction _randomNavigationAction(
+  EditorStore store,
+  math.Random random,
+  String trigger,
+) {
+  final List<String> targets = <String>[
+    for (final WorkspaceDoc document in store.workspace.docs)
+      if (DocumentTypeRegistry.of(document.kind) is MenuDocumentType &&
+          document.runtimeId != null &&
+          document.id != store.workspace.activeId)
+        document.runtimeId!,
+  ];
+  if (targets.isNotEmpty && random.nextBool()) {
+    return HuiNavigateAction(
+      showcasePick(random, targets),
+      random.nextBool() ? 'push' : 'replace',
+      trigger,
+    );
+  }
+  if (random.nextInt(4) == 0) {
+    // Page mode pages the surface already open, so its target is a pager
+    // token, not a menu id.
+    return HuiNavigateAction(
+      showcasePick(random, <String>['next', 'prev']),
+      'page',
+      trigger,
+    );
+  }
+  return HuiNavigateAction(
+    '',
+    showcasePick(random, <String>['back', 'home', 'close']),
+    trigger,
+  );
+}
+
+HuiToggleData _randomToggleData(EditorStore store, math.Random random) {
+  final (String, String) labels = showcasePick(random, _toggleLabels);
+  final (String, String) condition = showcasePick(random, <(String, String)>[
+    ('%player_is_op%', 'yes'),
+    ('%player_world%', 'world'),
+    ('%player_has_permission_gloss.vip%', 'true'),
+  ]);
+  final String trigger = showcasePick(random, huiActionTriggers);
+  final HuiIcon trueIcon = _randomIcon(store, random);
+  final HuiIcon falseIcon = _randomIcon(store, random);
+  return HuiToggleData(
+    0.05 + random.nextDouble() * 0.1,
+    condition.$1,
+    condition.$2,
+    <HuiAction>[
+      HuiMessageAction('<green>${labels.$1}</green>', trigger),
+      _randomSoundAction(store, random, trigger),
+    ],
+    <HuiAction>[
+      HuiMessageAction('<red>${labels.$2}</red>', trigger),
+      _randomSoundAction(store, random, trigger),
+    ],
+    trueIcon,
+    falseIcon,
+    HuiHitbox(
+      0.45 + random.nextDouble() * 0.1,
+      0.18 + random.nextDouble() * 0.08,
+      Vec3(0, 0, random.nextDouble() * 0.06),
+      HuiHitboxAnchor.button,
+    ),
+    random.nextInt(11),
+    _randomHoverEasing(random),
+  );
+}
+
+const List<(String, String)> _toggleLabels = <(String, String)>[
+  ('Lodge lights', 'Lodge dark'),
+  ('Coffee on', 'Coffee off'),
+  ('Owls watching', 'Owls asleep'),
+  ('Curtains open', 'Curtains shut'),
+  ('Radio on', 'Radio off'),
+  ('Tools', 'Tools'),
+];
+
+HuiHoverEasing _randomHoverEasing(math.Random random) =>
+    HuiHoverEasing.values[random.nextInt(HuiHoverEasing.values.length)];
+
+HuiIcon _randomIcon(
+  EditorStore store,
+  math.Random random, {
+  String? preferredType,
+}) {
+  final ShowcaseMood mood = showcasePick(random, showcaseMoods);
+  final List<String> availableTypes = <String>[
+    'text',
+    'item',
+    'block',
+    'entity',
+    'playerHead',
+    ..._availableAssetIconTypes(store),
+  ];
+  final String selected =
+      preferredType != null && availableTypes.contains(preferredType)
+      ? preferredType
+      : showcasePick(random, availableTypes);
+  return _randomIconOfType(store, random, mood, selected);
+}
+
+List<String> _availableAssetIconTypes(EditorStore store) => <String>[
+  if ((store.images?.paths.length ?? 0) >= 1) 'textImage',
+  if ((store.images?.paths.length ?? 0) >= 2) 'animatedTextImage',
+  if (store.catalogs.customItems.isNotEmpty) 'customItem',
+];
+
+List<HuiIcon> _availableAssetIcons(
+  EditorStore store,
+  math.Random random,
+  ShowcaseMood mood,
+) {
+  final List<String> images = store.images?.paths.toList() ?? <String>[];
+  images.sort();
+  final List<CustomItemEntry> customItems = store.catalogs.customItems.items;
+  final CustomItemEntry? customItem = customItems.isEmpty
+      ? null
+      : customItems[random.nextInt(customItems.length)];
+  final List<String> frames = List<String>.of(images)..shuffle(random);
+  return <HuiIcon>[
+    if (images.isNotEmpty)
+      HuiTextImageIcon(
+        images[random.nextInt(images.length)],
+        showcaseDisplayStyle(random, mood),
+      ),
+    if (images.length >= 2)
+      HuiAnimatedImageIcon(
+        frames.take(math.min(4, frames.length)).toList(),
+        2 + random.nextInt(10),
+        showcaseDisplayStyle(random, mood),
+      ),
+    ?customItem == null
+        ? null
+        : HuiCustomItemIcon(
+            customItem.provider,
+            customItem.id,
+            1,
+            showcaseDisplayStyle(random, mood),
+          ),
+  ];
+}
+
+HuiIcon _randomIconOfType(
+  EditorStore store,
+  math.Random random,
+  ShowcaseMood mood,
+  String type,
+) {
+  final HuiIcon icon = switch (type) {
+    'item' => HuiItemIcon(
+      _material(store, random),
+      1 + random.nextInt(4),
+      random.nextInt(8),
+      showcaseDisplayStyle(random, mood),
+    ),
+    'block' => HuiBlockIcon(
+      _blockMaterial(random),
+      showcaseDisplayStyle(random, mood),
+    ),
+    'entity' => HuiEntityIcon(
+      showcasePick(random, huiSpawnableLivingEntityTypes),
+      0.55 + random.nextDouble() * 0.4,
+      0.55 + random.nextDouble() * 0.4,
+    ),
+    'playerHead' => HuiPlayerHeadIcon(
+      showcasePick(random, <String>[
+        '%player_name%',
+        '%player%',
+        '{{player.name}}',
+        'Notch',
+      ]),
+      showcaseDisplayStyle(random, mood),
+      random.nextBool() ? null : 20 + random.nextInt(41),
+    ),
+    'textImage' ||
+    'animatedTextImage' ||
+    'customItem' => _availableAssetIcons(store, random, mood).firstWhere(
+      (HuiIcon icon) => icon.type == type,
+      orElse: () => HuiTextIcon(
+        '${mood.legacy}${showcaseAlignment(random, showcasePick(random, showcaseStatusWords)).text}',
+        showcaseDisplayStyle(random, mood),
+        10,
+      ),
+    ),
+    _ => HuiTextIcon(
+      '${mood.legacy}&l${showcaseAlignment(random, showcasePick(random, showcaseStatusWords)).text}\n'
+      '&7{{ player.name }}',
+      showcaseDisplayStyle(random, mood),
+      5 + random.nextInt(26),
+    ),
+  };
+  if (icon is HuiTextIcon) {
+    icon.box = showcaseBox(random, mood);
+  }
+  return icon;
+}
+
+String _material(EditorStore store, math.Random random) {
+  final List<String> known = store.catalogs.materialKeys.toList();
+  if (known.isNotEmpty) return known[random.nextInt(known.length)];
+  return showcasePick(
+    random,
+    showcaseDrops.map((ShowcaseDrop drop) => drop.material).toList(),
+  );
+}
+
+String _blockMaterial(math.Random random) {
+  final List<String> blocks = showcaseBlockDecorations
+      .where(huiIsBlockLikeMaterial)
+      .toList();
+  return blocks.isEmpty ? 'stone' : showcasePick(random, blocks);
+}
+
+String _sound(EditorStore store, math.Random random) {
+  final List<String> known = store.catalogs.soundKeys.toList();
+  if (known.isNotEmpty) return known[random.nextInt(known.length)];
+  const List<String> fallback = <String>[
+    'ui.button.click',
+    'block.note_block.harp',
+    'entity.experience_orb.pickup',
+  ];
+  return fallback[random.nextInt(fallback.length)];
+}
+
+/// Legacy format codes a decoration can carry on top of its colour.
+const List<String> _formatCodes = <String>['&l', '&o', '&n', '&l&o', ''];
+
+String showcaseEasterEgg(math.Random random) =>
+    showcasePick(random, showcaseEasterEggs);
+
+String showcaseBoardEasterEgg(math.Random random) =>
+    showcasePick(random, showcaseBoardEasterEggs);
+
+final class _PreviewFurnaceTheme {
+  const _PreviewFurnaceTheme({
+    required this.panelColor,
+    required this.wellColor,
+    required this.fill,
+    required this.pulse,
+    required this.chase,
+    required this.idle,
+    required this.flame0,
+    required this.flame1,
+    required this.flame2,
+    required this.stateColor,
+    required this.surgeColor,
+    required this.accent,
+  });
+
+  final String panelColor;
+  final String wellColor;
+  final String fill;
+  final String pulse;
+  final String chase;
+  final String idle;
+  final String flame0;
+  final String flame1;
+  final String flame2;
+  final String stateColor;
+  final String surgeColor;
+  final String accent;
+}
+
+const List<_PreviewFurnaceTheme> _previewFurnaceThemes = <_PreviewFurnaceTheme>[
+  _PreviewFurnaceTheme(
+    panelColor: '#E014111B',
+    wellColor: '#FF15151B',
+    fill: '#FFF2A535',
+    pulse: '#FFFFD978',
+    chase: '#FF9A5E22',
+    idle: '#FF2A2A33',
+    flame0: '#FFE2641E',
+    flame1: '#FFF2A535',
+    flame2: '#FFF7D14C',
+    stateColor: '<#F2A535>',
+    surgeColor: '<#FFD978>',
+    accent: '#F2A535',
+  ),
+  _PreviewFurnaceTheme(
+    panelColor: '#E0101822',
+    wellColor: '#FF101820',
+    fill: '#FF43D9FF',
+    pulse: '#FFB8F5FF',
+    chase: '#FF25799A',
+    idle: '#FF202C36',
+    flame0: '#FF356BFF',
+    flame1: '#FF43D9FF',
+    flame2: '#FFB8F5FF',
+    stateColor: '<#43D9FF>',
+    surgeColor: '<#B8F5FF>',
+    accent: '#43D9FF',
+  ),
+  _PreviewFurnaceTheme(
+    panelColor: '#E01C1020',
+    wellColor: '#FF1B1020',
+    fill: '#FFFF55CC',
+    pulse: '#FFFFB8EA',
+    chase: '#FF9A357E',
+    idle: '#FF302238',
+    flame0: '#FFAA35FF',
+    flame1: '#FFFF55CC',
+    flame2: '#FFFFB8EA',
+    stateColor: '<#FF55CC>',
+    surgeColor: '<#FFB8EA>',
+    accent: '#FF55CC',
+  ),
+  _PreviewFurnaceTheme(
+    panelColor: '#E0101F19',
+    wellColor: '#FF102019',
+    fill: '#FF55E68A',
+    pulse: '#FFB9FFD2',
+    chase: '#FF2B8D55',
+    idle: '#FF20362A',
+    flame0: '#FF31B36A',
+    flame1: '#FF55E68A',
+    flame2: '#FFB9FFD2',
+    stateColor: '<#55E68A>',
+    surgeColor: '<#B9FFD2>',
+    accent: '#55E68A',
+  ),
+  // Palmer House: lacquered black panel, curtain reds.
+  _PreviewFurnaceTheme(
+    panelColor: '#E0140A0E',
+    wellColor: '#FF190C12',
+    fill: '#FFFF2D4E',
+    pulse: '#FFFFB3C4',
+    chase: '#FF8C1B2E',
+    idle: '#FF2A1620',
+    flame0: '#FFB01030',
+    flame1: '#FFFF2D4E',
+    flame2: '#FFFFB3C4',
+    stateColor: '<#FF2D4E>',
+    surgeColor: '<#FFB3C4>',
+    accent: '#FF2D4E',
+  ),
+  // Ghostwood: mill green under sodium light.
+  _PreviewFurnaceTheme(
+    panelColor: '#E00E1A12',
+    wellColor: '#FF0F1B14',
+    fill: '#FF2F8F5B',
+    pulse: '#FFBFF0C8',
+    chase: '#FF1C5B39',
+    idle: '#FF1C2A22',
+    flame0: '#FF1E6B44',
+    flame1: '#FF2F8F5B',
+    flame2: '#FFBFF0C8',
+    stateColor: '<#2F8F5B>',
+    surgeColor: '<#BFF0C8>',
+    accent: '#2F8F5B',
+  ),
+  // Great Northern: cold blue snowlight.
+  _PreviewFurnaceTheme(
+    panelColor: '#E00E1622',
+    wellColor: '#FF101A26',
+    fill: '#FF3C7ACF',
+    pulse: '#FFCFE6FF',
+    chase: '#FF244C82',
+    idle: '#FF1E2836',
+    flame0: '#FF27548F',
+    flame1: '#FF3C7ACF',
+    flame2: '#FFCFE6FF',
+    stateColor: '<#3C7ACF>',
+    surgeColor: '<#CFE6FF>',
+    accent: '#3C7ACF',
+  ),
+  // Owl Cave: lamp-oil amber on cave rock.
+  _PreviewFurnaceTheme(
+    panelColor: '#E0181206',
+    wellColor: '#FF1B1509',
+    fill: '#FF8A6A2F',
+    pulse: '#FFF2D89B',
+    chase: '#FF5C451D',
+    idle: '#FF2A2418',
+    flame0: '#FF6E4F17',
+    flame1: '#FF8A6A2F',
+    flame2: '#FFF2D89B',
+    stateColor: '<#8A6A2F>',
+    surgeColor: '<#F2D89B>',
+    accent: '#F2D89B',
+  ),
+];
+
+double _round(double value) => (value * 100).roundToDouble() / 100;
+
+GlossInventoryDoc buildRandomInventoryShowcase(
+  GlossInventoryDoc current,
+  math.Random random,
+) {
+  final GlossInventoryDoc doc = cloneGlossInventoryDoc(
+    buildShowcaseGlossInventory(),
+  );
+  doc.revision = current.revision;
+  doc.title = '&8${showcasePick(random, showcaseServerNames)}';
+  return doc;
+}
+
+GlossNameplateDoc buildRandomNameplateShowcase(
+  GlossNameplateDoc current,
+  math.Random random,
+) {
+  final GlossNameplateDoc doc = cloneGlossNameplateDoc(
+    buildDefaultGlossNameplate(),
+  );
+  doc.revision = current.revision;
+  final String color = showcasePick(random, <String>[
+    '&a',
+    '&b',
+    '&6',
+    '&d',
+    '&e',
+  ]);
+  doc.presentation.lines = <GlossNameplateLine>[
+    GlossNameplateLine(
+      text: '$color${showcasePick(random, showcaseServerNames)}',
+    ),
+    GlossNameplateLine(text: '&f{{ subject.name }}'),
+    GlossNameplateLine(
+      text: "{{ bar(subject.health, subject.maxHealth, 10, '&c|', '&8|') }}",
+      show: 'subject.health < subject.maxHealth',
+    ),
+  ];
+  doc.presentation.offset = 0.2 + random.nextInt(6) * 0.1;
+  doc.variants = <GlossNameplateVariant>[
+    GlossNameplateVariant(
+      id: 'staff',
+      priority: 10,
+      presentation: doc.presentation.copy()
+        ..lines = <GlossNameplateLine>[
+          GlossNameplateLine(text: '&c[Staff] &f{{ subject.name }}'),
+          GlossNameplateLine(
+            text: '&7${showcasePick(random, showcaseStatusWords)}',
+          ),
+        ],
+    )..permission = 'gloss.nameplate.staff',
+  ];
+  return doc;
+}
+
+GlossNametagDoc buildRandomNametagShowcase(
+  GlossNametagDoc current,
+  math.Random random,
+) {
+  final GlossNametagDoc doc = cloneGlossNametagDoc(buildDefaultGlossNametag());
+  doc.revision = current.revision;
+  doc.presentation.color = showcasePick(random, <String>[
+    'aqua',
+    'gold',
+    'green',
+    'light_purple',
+    'yellow',
+  ]);
+  doc.presentation.prefix =
+      '${showcasePick(random, <String>['&a', '&b', '&6', '&d'])}[${showcasePick(random, showcaseStatusWords)}] ';
+  doc.presentation.suffix = random.nextBool() ? ' &7| Builder' : '';
+  doc.variants.first.presentation.prefix =
+      '&c[${showcasePick(random, <String>['Staff', 'Guide', 'Mod'])}] ';
+  return doc;
+}
+
+GlossMarkerDoc buildRandomMarkerShowcase(
+  GlossMarkerDoc current,
+  math.Random random,
+) {
+  final GlossMarkerDoc doc = cloneGlossMarkerDoc(buildDefaultGlossMarker());
+  doc.revision = current.revision;
+  doc.label = '&6${showcasePick(random, showcaseWorlds)}';
+  doc.anchor.x = (random.nextInt(200) - 100).toDouble();
+  doc.anchor.z = (random.nextInt(200) - 100).toDouble();
+  doc.beam.enabled = random.nextBool();
+  return doc;
+}

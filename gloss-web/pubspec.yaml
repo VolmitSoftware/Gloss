@@ -1,0 +1,51 @@
+name: gloss_editor
+description: "Visual web editor for Gloss menu configurations."
+version: 4.0.1
+publish_to: 'none'
+
+environment:
+  sdk: ^3.13.0
+
+dependencies:
+  web: ^1.1.1
+  jaspr: ^0.23.1
+  # Local checkout (or symlink) at .deps/arcane_jaspr — portable for CI.
+  arcane_jaspr:
+    path: .deps/arcane_jaspr
+  arcane_jaspr_ascii:
+    path: .deps/arcane_jaspr/packages/arcane_jaspr_ascii
+  fast_log: ^1.0.7
+  archive: ^4.0.2
+  crypto: ^3.0.7
+  http: ^1.6.0
+  image: ^4.9.1
+  timezone: ^0.11.1
+
+dev_dependencies:
+  build_daemon: 4.1.4 # pinned: jaspr_cli <-> build_runner protocol
+  build_runner: 2.15.1
+  build_web_compilers: ^4.4.18
+  jaspr_builder: ^0.23.1
+  jaspr_cli: ^0.23.2
+  lints: ^6.1.0
+  test: ^1.25.0
+
+# arcane_jaspr_ascii declares the hosted arcane_jaspr; the override keeps
+# resolution on the local path checkout.
+dependency_overrides:
+  arcane_jaspr_shadcn:
+    path: .deps/arcane_jaspr/packages/arcane_jaspr_shadcn
+  arcane_jaspr:
+    path: .deps/arcane_jaspr
+
+jaspr:
+  mode: client
+  # The only mode jaspr_builder supports for a client build, and the one it
+  # already takes in this project — stated so every build stops warning that
+  # the unset option "null" is unsupported in client mode.
+  styles: standalone
+
+scripts:
+  serve: jaspr serve
+  build: jaspr build
+  clean: jaspr clean

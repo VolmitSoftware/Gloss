@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en-US" dir="ltr" class="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+  <title>Gloss Editor</title>
+  <meta name="description" content="Visual web editor for creating and previewing Gloss menu configurations.">
+  <meta id="gloss-theme-color" name="theme-color" content="#111310">
+  <meta property="og:title" content="Gloss Editor">
+  <meta property="og:description" content="Visual web editor for creating and previewing Gloss menu configurations.">
+  <meta property="og:image" content="assets/brand/icon-512x512.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:site" content="@VolmitSoftware">
+  <link id="hui-manifest" rel="manifest">
+  <link rel="apple-touch-icon" sizes="180x180" href="assets/brand/apple-touch-icon.png">
+  <link rel="icon" href="favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/brand/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="assets/brand/favicon-16x16.png">
+
+  <script>
+    // Pre-paint theme stamp: mirror what the Dart bundle will apply, so there is
+    // no light/dark flash before boot. Allowlist, never blocklist.
+    (function () {
+      var mode = 'dark';
+      var locale = 'en_US';
+      var localeTags = {
+        en_US: 'en-US', de_DE: 'de-DE', es_ES: 'es-ES', fi_FI: 'fi-FI',
+        fr_FR: 'fr-FR', he_IL: 'he-IL', it_IT: 'it-IT', 'ja-JP': 'ja-JP',
+        ko_KR: 'ko-KR', lt_LT: 'lt-LT', nl_NL: 'nl-NL', pl_PL: 'pl-PL',
+        pt_PT: 'pt-PT', ru_RU: 'ru-RU', tr_TR: 'tr-TR', vi_VI: 'vi-VN',
+        zh_CN: 'zh-CN', zh_TW: 'zh-TW'
+      };
+      var localeLanguages = {
+        en: 'en_US', de: 'de_DE', es: 'es_ES', fi: 'fi_FI', fr: 'fr_FR',
+        he: 'he_IL', it: 'it_IT', ja: 'ja-JP', ko: 'ko_KR', lt: 'lt_LT',
+        nl: 'nl_NL', pl: 'pl_PL', pt: 'pt_PT', ru: 'ru_RU', tr: 'tr_TR',
+        vi: 'vi_VI', zh: 'zh_CN'
+      };
+      var resolveLocale = function (candidate) {
+        var normalized = (candidate || '').replace('_', '-').toLowerCase();
+        for (var code in localeTags) {
+          if (code.replace('_', '-').toLowerCase() === normalized ||
+              localeTags[code].toLowerCase() === normalized) { return code; }
+        }
+        var parts = normalized.split('-');
+        if (parts[0] === 'zh' &&
+            (parts.indexOf('tw') >= 0 || parts.indexOf('hk') >= 0 ||
+             parts.indexOf('mo') >= 0 || parts.indexOf('hant') >= 0)) {
+          return 'zh_TW';
+        }
+        return localeLanguages[normalized.split('-')[0]] || null;
+      };
+      var storedLocale = null;
+      try {
+        var stored = window.localStorage.getItem('gloss.theme')
+          || window.localStorage.getItem('holoui.theme');
+        if (stored === 'light' || stored === 'dark') { mode = stored; }
+        storedLocale = window.localStorage.getItem('gloss.locale');
+      } catch (e) { /* private mode */ }
+      var resolvedStoredLocale = resolveLocale(storedLocale);
+      locale = resolvedStoredLocale || locale;
+      if (!resolvedStoredLocale) {
+        var preferredLocales = window.navigator.languages &&
+          window.navigator.languages.length > 0
+          ? window.navigator.languages
+          : [window.navigator.language];
+        for (var index = 0; index < preferredLocales.length; index++) {
+          var preferredLocale = resolveLocale(preferredLocales[index]);
+          if (preferredLocale) {
+            locale = preferredLocale;
+            break;
+          }
+        }
+      }
+      var root = document.documentElement;
+      root.classList.remove('light', 'dark');
+      root.classList.add(mode);
+      document.getElementById('gloss-theme-color').setAttribute(
+        'content', mode === 'light' ? '#f6f5f0' : '#111310'
+      );
+      root.lang = localeTags[locale];
+      root.dir = locale === 'he_IL' ? 'rtl' : 'ltr';
+      document.getElementById('hui-manifest').setAttribute(
+        'href', '/manifests/' + locale + '.webmanifest'
+      );
+    })();
+  </script>
+
+  <link rel="preload" href="assets/fonts/geist/Geist-Regular.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="assets/fonts/geist/Geist-SemiBold.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="assets/fonts/minecraft/Minecraft-Regular.ttf" as="font" type="font/ttf" crossorigin>
+
+  <link rel="stylesheet" href="styles/01-foundations.css">
+  <link rel="stylesheet" href="styles/02-shell.css">
+  <link rel="stylesheet" href="styles/03-canvas.css">
+  <link rel="stylesheet" href="styles/04-inspector.css">
+  <link rel="stylesheet" href="styles/05-panels-dialogs.css">
+  <link rel="stylesheet" href="styles/06-motion.css">
+  <link rel="stylesheet" href="styles/07-preview.css">
+  <link rel="stylesheet" href="styles/08-preview-card.css">
+  <link rel="stylesheet" href="styles/09-workspace.css">
+  <link rel="stylesheet" href="styles/10-gloss.css">
+  <link rel="stylesheet" href="styles/11-tooltip-overlay.css">
+  <link rel="stylesheet" href="styles/12-gloss-fidelity.css">
+  <link rel="stylesheet" href="styles/13-mc-stage.css">
+
+  <style>
+    html, body { margin: 0; padding: 0; min-height: 100vh; }
+    html.dark body { background: #111310; color: #e8ebe3; }
+    html.light body { background: #f6f5f0; color: #242822; }
+    .hui-boot { position: fixed; inset: 0; display: grid; place-items: center; z-index: 999; }
+    .hui-boot-spinner { width: 28px; height: 28px; border-radius: 50%;
+      border: 2px solid rgba(128,128,128,.25); border-top-color: currentColor;
+      animation: hui-boot-spin 800ms linear infinite; }
+    @keyframes hui-boot-spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div class="hui-boot" id="loading"><div class="hui-boot-spinner"></div></div>
+  <div id="app"></div>
+  <script defer src="tooltip-overlay.js"></script>
+  <script defer src="vendor/re2js/re2js.js"></script>
+  <script defer src="channel-filters.js"></script>
+  <script defer src="main.client.dart.js"></script>
+</body>
+</html>

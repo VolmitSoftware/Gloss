@@ -1,0 +1,1292 @@
+library;
+
+import 'dart:convert';
+import 'dart:math' as math;
+
+import 'package:gloss_editor/config/gloss_templates.dart';
+import 'package:gloss_editor/config/showcase_flavor.dart';
+import 'package:gloss_editor/doctype/doctype.dart';
+import 'package:gloss_editor/logic/animation_validation.dart';
+import 'package:gloss_editor/logic/bubble_validation.dart';
+import 'package:gloss_editor/logic/gloss_text.dart';
+import 'package:gloss_editor/logic/motd_validation.dart';
+import 'package:gloss_editor/logic/preview_card_edit.dart';
+import 'package:gloss_editor/logic/preview_card_scene.dart';
+import 'package:gloss_editor/logic/preview_sim.dart';
+import 'package:gloss_editor/logic/preview_variant_resolver.dart';
+import 'package:gloss_editor/logic/real_drop_labels.dart';
+import 'package:gloss_editor/logic/real_drop_stage.dart';
+import 'package:gloss_editor/logic/real_drop_validation.dart';
+import 'package:gloss_editor/logic/tablist_validation.dart';
+import 'package:gloss_editor/logic/validation.dart';
+import 'package:gloss_editor/model/model.dart';
+import 'package:gloss_editor/services/showcase_effects.dart';
+import 'package:gloss_editor/services/showcase_randomizer.dart';
+import 'package:gloss_editor/state/editor_store.dart';
+import 'package:gloss_editor/state/workspace.dart';
+import 'package:test/test.dart';
+
+extension on GlossScoreboardDoc {
+  String get title => presentation.title;
+  List<String> get lines => <String>[
+    for (final GlossScoreboardLine line in presentation.lines) line.text,
+  ];
+  bool get hideNumbers => presentation.hideNumbers;
+}
+
+extension on GlossTablistDoc {
+  bool get useHeaderFooter => headerFooter.enabled;
+  bool get groupListNames => listNames.enabled;
+  String get header => headerFooter.presentation.header;
+  String get footer => headerFooter.presentation.footer;
+  Map<String, String> get nameFormats => <String, String>{
+    'default': listNames.presentation.format,
+    for (final GlossTablistListNameVariant variant in listNames.variants)
+      (variant.id == 'operator' ? '_op' : variant.id):
+          variant.presentation.format,
+  };
+  Map<String, String> get effectiveNameFormats => nameFormats;
+}
+
+final class _FakeStorage {
+  final Map<String, String> values = <String, String>{};
+
+  String? read(String key) => values[key];
+
+  bool write(String key, String value) {
+    values[key] = value;
+    return true;
+  }
+}
+
+EditorStore _store() {
+  final _FakeStorage storage = _FakeStorage();
+  return EditorStore(
+    workspace: Workspace(read: storage.read, write: storage.write),
+    autosaveDelay: Duration.zero,
+  );
+}
+
+String _previewSceneSignature(PreviewCardScene scene) => scene.items
+    .map(
+      (CardItem item) => switch (item) {
+        CardCell() => 'cell:${item.color}',
+        CardLabel() =>
+          'label:${item.text.map((StyledTextRun run) => run.text).join()}',
+        CardPanel() => 'panel:${item.color}',
+        CardSlot() => 'slot:${item.index}:${item.item?.material}',
+      },
+    )
+    .join('|');
+
+String _glossLineSignature(GlossLineRender render) => render.pieces
+    .map(
+      (GlossTextPiece piece) => switch (piece) {
+        GlossTextRun() => 'text:${piece.span.text}:${piece.span.color}',
+        GlossPlaceholderChip() =>
+          'placeholder:${piece.token}:${piece.style.color}',
+        GlossMetricChip() => 'metric:${piece.token}:${piece.style.color}',
+      },
+    )
+    .join('|');
+
+void main() {
+  test('every runtime document kind randomizes in place without errors', () {
+    for (final DocumentTypeAdapter type in DocumentTypeRegistry.all) {
+      if (!canRandomizeShowcase(type)) continue;
+      final EditorStore store = _store();
+      type.createNew(store);
+      final WorkspaceDoc before = store.workspace.active!;
+      final int count = store.workspace.docs.length;
+
+      expect(
+        randomizeShowcaseDocument(store, before.id, random: math.Random(31)),
+        isTrue,
+        reason: type.noun,
+      );
+      expect(store.workspace.docs, hasLength(count), reason: type.noun);
+      expect(store.workspace.activeId, before.id, reason: type.noun);
+      expect(store.workspace.active!.runtimeId, before.runtimeId);
+      expect(store.workspace.active!.folderId, before.folderId);
+      expect(
+        store.issues.where(
+          (HuiIssue issue) => issue.severity == HuiSeverity.error,
+        ),
+        isEmpty,
+        reason: type.noun,
+      );
+      expect(store.canUndo, isTrue, reason: type.noun);
+      expect(
+        store.canvasFitRequest,
+        type is MenuDocumentType || type is ContainerPreviewDocumentType
+            ? 1
+            : 0,
+        reason: type.noun,
+      );
+    }
+  });
+
+  test('a template document asks the canvas to fit its components', () {
+    final EditorStore menuStore = _store();
+    menuStore.createDocumentFromMenu('gallery', HuiMenu());
+    expect(menuStore.canvasFitRequest, 1);
+
+    final EditorStore previewStore = _store();
+    previewStore.createDocumentFromPreview('chests', HuiPreviewDoc());
+    expect(previewStore.canvasFitRequest, 1);
+  });
+
+  test('authoring catalogs do not offer or apply showcase randomization', () {
+    for (final DocumentTypeAdapter type in DocumentTypeRegistry.all) {
+      if (type.hasRuntimePreview) continue;
+      final EditorStore store = _store();
+      type.createNew(store);
+      final WorkspaceDoc document = store.workspace.active!;
+      final String before = document.json;
+      expect(canRandomizeShowcase(type), isFalse, reason: type.noun);
+      if (type is! PanelDocumentType) {
+        expect(canRandomizeShowcase(type, linkedPanel: true), isFalse,
+            reason: type.noun);
+      }
+      expect(randomizeShowcaseDocument(store, document.id), isFalse,
+          reason: type.noun);
+      expect(store.workspace.active!.json, before, reason: type.noun);
+      expect(store.canUndo, isFalse, reason: type.noun);
+    }
+  });
+
+  test('damage indicators randomize in place as the default singleton', () {
+    final EditorStore store = _store();
+    DocumentTypes.damageIndicators.createNew(store);
+    final WorkspaceDoc before = store.workspace.active!;
+    final String json = before.json;
+    expect(canRandomizeShowcase(DocumentTypes.damageIndicators), isTrue);
+    expect(
+      randomizeShowcaseDocument(store, before.id, random: math.Random(31)),
+      isTrue,
+    );
+    store.flushAutosave();
+    expect(store.workspace.active!.id, before.id);
+    expect(store.workspace.active!.runtimeId, glossDamageIndicatorsDefaultId);
+    expect(store.workspace.active!.json, isNot(json));
+    expect(store.canUndo, isTrue);
+  });
+
+  test('seeded showcase builders are deterministic and visibly vary', () {
+    final EditorStore store = _store()..newDocument();
+    final String first = encodeHuiMenu(
+      buildRandomMenuShowcase(store, math.Random(9)),
+    );
+    final String repeated = encodeHuiMenu(
+      buildRandomMenuShowcase(store, math.Random(9)),
+    );
+    final String different = encodeHuiMenu(
+      buildRandomMenuShowcase(store, math.Random(10)),
+    );
+    expect(repeated, first);
+    expect(different, isNot(first));
+  });
+
+  test('container showcase spans every target with distinct live layouts', () {
+    final String first = encodeHuiPreviewDoc(
+      buildRandomPreviewShowcase(math.Random(9)),
+    );
+    final String repeated = encodeHuiPreviewDoc(
+      buildRandomPreviewShowcase(math.Random(9)),
+    );
+    final String different = encodeHuiPreviewDoc(
+      buildRandomPreviewShowcase(math.Random(10)),
+    );
+    expect(repeated, first);
+    expect(different, isNot(first));
+
+    final Set<String> categories = <String>{};
+    final Set<String> documents = <String>{};
+    final Set<String> animatedCategories = <String>{};
+    final Set<String> elementTypes = <String>{};
+    for (int seed = 0; seed < 256; seed++) {
+      final HuiPreviewDoc doc = buildRandomPreviewShowcase(math.Random(seed));
+      final String category = previewAutoSimCategory(doc);
+      categories.add(category);
+      documents.add(encodeHuiPreviewDoc(doc));
+      elementTypes.addAll(
+        doc.elements.map((HuiPreviewElement element) => element.type),
+      );
+      expect(
+        doc.elements.map((HuiPreviewElement element) => element.type).toSet(),
+        containsAll(<String>['panel', 'cell', 'label']),
+        reason: 'seed $seed, category $category',
+      );
+      final String code = encodeHuiPreviewDoc(doc);
+      expect(code, contains('repeat'));
+      expect(code, anyOf(contains('time'), contains('cookTime')));
+
+      final PreviewSim sim = PreviewSim(category);
+      sim.vars = PreviewSim.parseVars(previewVarsForMaterial(doc, null));
+      final List<String> errors = <String>[];
+      final PreviewCardScene before = buildCardScene(
+        doc,
+        sim,
+        onError: errors.add,
+      );
+      sim.tick(20);
+      final PreviewCardScene after = buildCardScene(
+        doc,
+        sim,
+        onError: errors.add,
+      );
+      expect(errors, isEmpty, reason: 'seed $seed, category $category');
+      expect(before.items, isNotEmpty);
+      if (_previewSceneSignature(before) != _previewSceneSignature(after)) {
+        animatedCategories.add(category);
+      }
+    }
+    expect(categories, previewSimCategories.toSet());
+    expect(animatedCategories, previewSimCategories.toSet());
+    expect(elementTypes, previewElementTypes.toSet());
+    expect(documents.length, greaterThan(225));
+  });
+
+  test('menu showcase stays validation-clean across random seeds', () {
+    for (final MenuShowcaseArchetype archetype
+        in MenuShowcaseArchetype.values) {
+      for (int seed = 0; seed < 32; seed++) {
+        final EditorStore store = _store()..newDocument();
+        store.replaceMenu(
+          'Randomize menu',
+          buildRandomMenuShowcase(
+            store,
+            math.Random(seed),
+            archetype: archetype,
+          ),
+        );
+        expect(
+          store.issues.where(
+            (HuiIssue issue) => issue.severity != HuiSeverity.info,
+          ),
+          isEmpty,
+          reason: '${archetype.name} seed $seed',
+        );
+      }
+    }
+  });
+
+  test('menu archetypes keep their labels, actions and layout coherent', () {
+    final EditorStore store = _store()..newDocument();
+    final Set<String> componentTypes = <String>{};
+    final Set<String> actionTypes = <String>{};
+    for (final MenuShowcaseArchetype archetype
+        in MenuShowcaseArchetype.values) {
+      final HuiMenu menu = buildRandomMenuShowcase(
+        store,
+        math.Random(50 + archetype.index),
+        archetype: archetype,
+      );
+      expect(menu.lockPosition, isFalse, reason: archetype.name);
+      expect(menu.followPlayer, isTrue, reason: archetype.name);
+      expect(menu.closeOnDeath, isTrue, reason: archetype.name);
+      expect(menu.closeOnTeleport, isTrue, reason: archetype.name);
+      expect(
+        menu.components.map((HuiComponent component) => component.id).toSet(),
+        hasLength(menu.components.length),
+        reason: archetype.name,
+      );
+      expect(
+        menu.components
+            .map((HuiComponent component) => component.offset)
+            .toSet(),
+        hasLength(menu.components.length),
+        reason: archetype.name,
+      );
+
+      final List<HuiComponent> clickables = menu.components
+          .where(
+            (HuiComponent component) =>
+                component.data is HuiButtonData ||
+                component.data is HuiToggleData,
+          )
+          .toList();
+      for (int first = 0; first < clickables.length; first++) {
+        for (int second = first + 1; second < clickables.length; second++) {
+          final Vec3 a = clickables[first].offset;
+          final Vec3 b = clickables[second].offset;
+          final double distance = math.sqrt(
+            math.pow(a.x - b.x, 2) + math.pow(a.y - b.y, 2),
+          );
+          expect(distance, greaterThanOrEqualTo(0.75), reason: archetype.name);
+        }
+      }
+
+      final Set<String> backgrounds = <String>{};
+      for (final HuiComponent component in menu.components) {
+        componentTypes.add(component.data.type);
+        final List<HuiIcon> icons = switch (component.data) {
+          HuiRuntimeComponentData() => const <HuiIcon>[],
+
+          final HuiButtonData button => <HuiIcon>[?button.icon],
+          final HuiDecorationData decoration => <HuiIcon>[?decoration.icon],
+          final HuiToggleData toggle => <HuiIcon>[
+            ?toggle.trueIcon,
+            ?toggle.falseIcon,
+          ],
+        };
+        for (final HuiIcon icon in icons) {
+          expect(
+            icon.style,
+            isNotNull,
+            reason: '${archetype.name}:${component.id}',
+          );
+          expect(icon.style!.billboard, 'fixed');
+          backgrounds.add(icon.style!.backgroundArgb);
+        }
+        final List<HuiAction> actions = switch (component.data) {
+          final HuiButtonData button => button.actions,
+          final HuiToggleData toggle => <HuiAction>[
+            ...toggle.trueActions,
+            ...toggle.falseActions,
+          ],
+          HuiDecorationData() ||
+          HuiRuntimeComponentData() => const <HuiAction>[],
+        };
+        actionTypes.addAll(actions.map((HuiAction action) => action.type));
+        expect(
+          actions.every((HuiAction action) => action.trigger == 'any'),
+          isTrue,
+          reason: '${archetype.name}:${component.id}',
+        );
+        expect(
+          actions.whereType<HuiSoundAction>().every(
+            (HuiSoundAction action) => action.source == 'player',
+          ),
+          isTrue,
+          reason: '${archetype.name}:${component.id}',
+        );
+      }
+      expect(backgrounds, hasLength(1), reason: archetype.name);
+      for (final HuiComponent component in clickables) {
+        final HuiHitbox? hitbox = switch (component.data) {
+          final HuiButtonData button => button.hitbox,
+          final HuiToggleData toggle => toggle.hitbox,
+          HuiDecorationData() || HuiRuntimeComponentData() => null,
+        };
+        expect(hitbox, isNotNull, reason: '${archetype.name}:${component.id}');
+        expect(hitbox!.anchor, HuiHitboxAnchor.button);
+      }
+
+      switch (archetype) {
+        case MenuShowcaseArchetype.networkHub:
+          const Map<String, String> servers = <String, String>{
+            'connect-lobby': 'lobby',
+            'connect-survival-1': 'survival-1',
+            'connect-creative': 'creative',
+            'connect-events': 'events',
+          };
+          for (final MapEntry<String, String> server in servers.entries) {
+            final HuiButtonData button =
+                menu.componentById(server.key)!.data as HuiButtonData;
+            expect(
+              button.actions.whereType<HuiConnectAction>().single.server,
+              server.value,
+            );
+            expect(
+              (button.icon! as HuiTextIcon).text.toLowerCase(),
+              contains(server.key.split('-')[1]),
+            );
+          }
+        case MenuShowcaseArchetype.wayfinder:
+          const Map<String, String> worlds = <String, String>{
+            'travel-spawn': 'minecraft:overworld',
+            'travel-ghostwood': 'minecraft:overworld',
+            'travel-nether-hub': 'minecraft:the_nether',
+            'travel-end-gateway': 'minecraft:the_end',
+          };
+          for (final MapEntry<String, String> destination in worlds.entries) {
+            final HuiButtonData button =
+                menu.componentById(destination.key)!.data as HuiButtonData;
+            expect(
+              button.actions.whereType<HuiTeleportAction>().single.world,
+              destination.value,
+            );
+          }
+        case MenuShowcaseArchetype.playerTools:
+          final HuiButtonData spawn =
+              menu.componentById('command-spawn')!.data as HuiButtonData;
+          final HuiButtonData help =
+              menu.componentById('command-help')!.data as HuiButtonData;
+          final HuiButtonData daylight =
+              menu.componentById('command-daylight')!.data as HuiButtonData;
+          expect(
+            spawn.actions.whereType<HuiCommandAction>().single.command,
+            '/spawn',
+          );
+          expect(
+            help.actions.whereType<HuiCommandAction>().single.command,
+            '/help',
+          );
+          expect(
+            daylight.actions.whereType<HuiCommandAction>().single.source,
+            'server',
+          );
+          final HuiToggleData status = menu.components
+              .map((HuiComponent component) => component.data)
+              .whereType<HuiToggleData>()
+              .single;
+          const Map<String, (String, String)> labels =
+              <String, (String, String)>{
+                '%player_is_op%': ('Staff access', 'Player access'),
+                '%player_world%': ('Overworld', 'Other world'),
+                '%player_has_permission_gloss.vip%': (
+                  'VIP access',
+                  'Standard access',
+                ),
+              };
+          expect(
+            (status.trueIcon! as HuiTextIcon).text,
+            contains(labels[status.condition]!.$1),
+          );
+          expect(
+            (status.falseIcon! as HuiTextIcon).text,
+            contains(labels[status.condition]!.$2),
+          );
+        case MenuShowcaseArchetype.menuNavigator:
+          final Set<String> modes = menu.components
+              .map((HuiComponent component) => component.data)
+              .whereType<HuiButtonData>()
+              .expand((HuiButtonData button) => button.actions)
+              .whereType<HuiNavigateAction>()
+              .map((HuiNavigateAction action) => action.mode)
+              .toSet();
+          expect(modes, contains('back'));
+          expect(
+            modes.every(<String>{'push', 'home', 'back', 'close'}.contains),
+            isTrue,
+          );
+      }
+    }
+    expect(componentTypes, huiEditorComponentTypes.toSet());
+    expect(actionTypes, huiEditorActionTypes.toSet());
+  });
+
+  test(
+    'random animations cover every procedural text effect with valid authored expressions',
+    () {
+      final Set<int> lengths = <int>{};
+      final Set<int> intervals = <int>{};
+      final Set<String> modes = <String>{};
+      final Set<String> effects = <String>{};
+      for (int seed = 0; seed < 512; seed++) {
+        final GlossAnimationDoc animation = buildRandomAnimationShowcase(
+          GlossAnimationDoc(revision: 9),
+          math.Random(seed),
+        );
+        expect(animation.revision, 9, reason: 'seed $seed');
+        expect(
+          glossAnimationModes,
+          contains(animation.mode),
+          reason: 'seed $seed',
+        );
+        expect(
+          animation.frameIntervalMs,
+          inInclusiveRange(glossMinFrameIntervalMs, glossMaxFrameIntervalMs),
+          reason: 'seed $seed',
+        );
+        expect(animation.frames, isNotEmpty);
+        expect(animation.frames.length, lessThanOrEqualTo(80));
+        expect(
+          animation.frames,
+          everyElement(isNotEmpty),
+          reason: 'seed $seed',
+        );
+        expect(validateAnimationDoc(animation), isEmpty, reason: 'seed $seed');
+        lengths.add(animation.frames.length);
+        intervals.add(animation.frameIntervalMs);
+        modes.add(animation.mode);
+        effects.add(_randomAnimationEffectId(animation));
+      }
+      expect(
+        showcaseAnimationEffectIds.toSet(),
+        shippedGlossAnimationBuilders.keys.toSet(),
+      );
+      expect(effects, showcaseProceduralTextEffectIds.toSet());
+      expect(
+        intervals.length,
+        greaterThan(1),
+        reason: 'the pool holds more than one animation shape',
+      );
+      expect(lengths, contains(1));
+      expect(lengths.any((int length) => length > 1), isTrue);
+      expect(modes, glossAnimationModes.toSet());
+    },
+  );
+
+  test('random MOTD documents author links, samples, counts and versions', () {
+    bool anyLinks = false;
+    bool anyTyped = false;
+    bool anyLabelled = false;
+    bool anySample = false;
+    bool anyCount = false;
+    bool anyVersion = false;
+    for (int seed = 0; seed < 64; seed++) {
+      final GlossMotdDoc doc = buildRandomMotdShowcase(
+        GlossMotdDoc(),
+        math.Random(seed),
+      );
+      expect(doc.links.length, lessThanOrEqualTo(glossMotdMaxLinks));
+      anyLinks = anyLinks || doc.links.isNotEmpty;
+      anyTyped =
+          anyTyped || doc.links.any((GlossMotdLink link) => !link.isLabelled);
+      anyLabelled =
+          anyLabelled || doc.links.any((GlossMotdLink link) => link.isLabelled);
+      for (final GlossMotdEntry entry in doc.entries) {
+        expect(entry.sample.length, lessThanOrEqualTo(glossMotdMaxSampleLines));
+        anySample = anySample || entry.sample.isNotEmpty;
+        anyCount = anyCount || entry.online != null || entry.max != null;
+        anyVersion = anyVersion || entry.version != null;
+      }
+      expect(
+        validateMotdDoc(
+          doc,
+        ).where((HuiIssue issue) => issue.severity == HuiSeverity.error),
+        isEmpty,
+        reason: 'seed $seed',
+      );
+    }
+    expect(anyLinks, isTrue);
+    expect(anyTyped, isTrue);
+    expect(anyLabelled, isTrue);
+    expect(anySample, isTrue);
+    expect(anyCount, isTrue);
+    expect(anyVersion, isTrue);
+  });
+
+  test('random MOTD and scoreboard are complete fake server examples', () {
+    final GlossAnimationResolver animations = _store().workspaceAnimations;
+    final GlossMotdDoc motd = buildRandomMotdShowcase(
+      GlossMotdDoc(revision: 7),
+      math.Random(4),
+    );
+    expect(motd.revision, 7);
+    expect(motd.entries.length, greaterThanOrEqualTo(3));
+    expect(
+      motd.entries.any((GlossMotdEntry entry) => entry.lines.length == 1),
+      isTrue,
+    );
+    expect(
+      motd.entries.any((GlossMotdEntry entry) => entry.lines.length == 2),
+      isTrue,
+    );
+    expect(
+      motd.entries.every(
+        (GlossMotdEntry entry) => entry.lines.any(
+          (String line) =>
+              renderGlossLine(line, animations: animations).isAnimated,
+        ),
+      ),
+      isTrue,
+      reason: 'every entry should contain authored animation',
+    );
+    expect(
+      motd.entries.expand((GlossMotdEntry entry) => entry.lines).join(),
+      isNot(contains('%')),
+      reason: 'server-list pings have no player for PlaceholderAPI',
+    );
+
+    final EditorStore motdStore = _store();
+    DocumentTypes.motd.createNew(motdStore);
+    final String motdId = motdStore.workspace.activeId!;
+    expect(
+      randomizeShowcaseDocument(motdStore, motdId, random: math.Random(4)),
+      isTrue,
+    );
+    final String animatedLine = motdStore.motdDoc!.entries.first.lines.first;
+    final GlossLineRender firstFrame = renderGlossLine(
+      animatedLine,
+      animations: motdStore.workspaceAnimations,
+      nowMs: 0,
+    );
+    final GlossLineRender secondFrame = renderGlossLine(
+      animatedLine,
+      animations: motdStore.workspaceAnimations,
+      nowMs: 500,
+    );
+    expect(firstFrame.isAnimated, isTrue);
+    expect(secondFrame.isAnimated, isTrue);
+    final List<int> firstColors = firstFrame.pieces
+        .whereType<GlossTextRun>()
+        .map((GlossTextRun run) => run.span.color)
+        .toList();
+    final List<int> secondColors = secondFrame.pieces
+        .whereType<GlossTextRun>()
+        .map((GlossTextRun run) => run.span.color)
+        .toList();
+    expect(
+      firstColors,
+      isNot(secondColors),
+      reason: 'the shipped rainbow advances through its smooth RGB gradient',
+    );
+
+    final GlossScoreboardDoc scoreboard = buildRandomScoreboardShowcase(
+      GlossScoreboardDoc(revision: 11),
+      math.Random(4),
+    );
+    expect(scoreboard.revision, 11);
+    expect(scoreboard.lines.length, inInclusiveRange(8, glossBoardMaxLines));
+    expect(
+      scoreboard.lines.any((String line) => renderGlossLine(line).isAnimated),
+      isTrue,
+    );
+    expect(
+      scoreboard.lines.any((String line) => line.contains('{{ player.name }}')),
+      isTrue,
+    );
+    expect(scoreboard.hideNumbers, isTrue);
+    expect(scoreboard.lines.join('\n'), contains("papi('vault_prefix',"));
+    expect(scoreboard.lines.join('\n'), contains("metric('react.tick-ms',"));
+    expect(scoreboard.lines.join('\n'), contains('{{'));
+
+    final GlossHologramDoc hologram = buildRandomHologramShowcase(
+      GlossHologramDoc(revision: 3),
+      math.Random(4),
+    );
+    expect(hologram.lines.join('\n'), contains('{{ player.name }}'));
+    expect(hologram.lines.join('\n'), contains('server.tps'));
+
+    final GlossBubbleStyleDoc bubble = buildRandomBubbleShowcase(
+      GlossBubbleStyleDoc(revision: 5),
+      math.Random(4),
+    );
+    expect(bubble.effectiveWordWrapChars, inInclusiveRange(36, 108));
+    expect(bubble.effectiveMaxAliveMs, inInclusiveRange(4000, 12000));
+    expect(bubble.effectivePrefix, isNotEmpty);
+    final String motion = bubble.motion.toJson().toString();
+    expect(motion, anyOf(contains('smoothstep'), contains('pow(')));
+    expect(motion, anyOf(contains('sin('), contains('* t')));
+    expect(bubble.shimmer.spawn || bubble.shimmer.flyAway, isTrue);
+    expect(bubble.shimmer.colorIsValid, isTrue);
+    expect(
+      bubble.shimmer.effectiveFlyAwayLeadMs,
+      greaterThanOrEqualTo(bubble.shimmer.effectiveDurationMs),
+    );
+
+    final GlossTablistDoc tablist = buildRandomTablistShowcase(
+      GlossTablistDoc(revision: 6),
+      math.Random(4),
+      archetype: TablistShowcaseArchetype.staff,
+    );
+    expect(tablist.useHeaderFooter, isTrue);
+    expect(tablist.groupListNames, isTrue);
+    expect(tablist.header.split('\n').length, inInclusiveRange(3, 5));
+    expect(tablist.footer.split('\n').length, inInclusiveRange(2, 5));
+    expect(
+      renderGlossLine(
+        '${tablist.header}\n${tablist.footer}',
+        animations: _store().workspaceAnimations,
+      ).isAnimated,
+      isTrue,
+    );
+    expect(
+      tablist.effectiveNameFormats.keys,
+      containsAll(<String>[
+        'default',
+        '_op',
+        'owner',
+        'developer',
+        'moderator',
+        'vip',
+        'builder',
+      ]),
+    );
+  });
+
+  test('generated scoreboard ticker matches its default surface refresh', () {
+    const int epochMs = 1787426000000;
+    final GlossScoreboardDoc scoreboard = buildRandomScoreboardShowcase(
+      GlossScoreboardDoc(),
+      math.Random(4),
+    );
+    final String scoreboardTicker = scoreboard.lines.singleWhere(
+      (String line) => line.contains('select(['),
+    );
+    expect(scoreboardTicker, contains('floor(time.seconds)'));
+    expect(scoreboardTicker, isNot(contains('time.seconds *')));
+    expect(
+      _glossLineSignature(renderGlossLine(scoreboardTicker, nowMs: epochMs)),
+      isNot(
+        _glossLineSignature(
+          renderGlossLine(scoreboardTicker, nowMs: epochMs + 1000),
+        ),
+      ),
+    );
+  });
+
+  test('tablist recipes cover every procedural text effect safely', () {
+    final GlossAnimationResolver animations = _store().workspaceAnimations;
+    final Set<String> effectIds = <String>{};
+    for (int seed = 0; seed < 512; seed++) {
+      final ShowcaseEffect effect = showcaseTablistAnimation(
+        math.Random(seed),
+        showcaseMoods[seed % showcaseMoods.length],
+      );
+      effectIds.add(effect.id);
+      expect(
+        renderGlossLine(effect.text, animations: animations).expressionErrors,
+        isEmpty,
+        reason: 'seed $seed, ${effect.id}: ${effect.text}',
+      );
+    }
+    expect(effectIds, showcaseProceduralTextEffectIds.toSet());
+  });
+
+  test('procedural alignment covers every accepted mode', () {
+    final Set<String> modes = <String>{};
+    for (int seed = 0; seed < 256; seed++) {
+      final ShowcaseEffect effect = showcaseAlignment(
+        math.Random(seed),
+        'GLOSS',
+      );
+      final RegExpMatch match = RegExp(
+        r"align\('GLOSS', \d+, '(left|center|middle|right)'\)",
+      ).firstMatch(effect.text)!;
+      modes.add(match.group(1)!);
+      expect(renderGlossLine(effect.text).expressionErrors, isEmpty);
+    }
+    expect(modes, <String>{'left', 'center', 'middle', 'right'});
+  });
+
+  test(
+    'tablist archetypes are distinct, bounded, valid and always visible',
+    () {
+      final GlossAnimationResolver animations = _store().workspaceAnimations;
+      final Set<String> fingerprints = <String>{};
+      for (final TablistShowcaseArchetype archetype
+          in TablistShowcaseArchetype.values) {
+        final GlossTablistDoc tablist = buildRandomTablistShowcase(
+          GlossTablistDoc(revision: 9),
+          math.Random(73),
+          archetype: archetype,
+        );
+        fingerprints.add(
+          '${tablist.header.split('\n').length}:'
+          '${tablist.footer.split('\n').length}:'
+          '${tablist.nameFormats.length}:'
+          '${tablist.header}:${tablist.footer}',
+        );
+        expect(tablist.revision, 9);
+        expect(tablist.useHeaderFooter, isTrue);
+        expect(tablist.groupListNames, isTrue);
+        expect(tablist.header.split('\n').length, inInclusiveRange(1, 5));
+        expect(tablist.footer.split('\n').length, inInclusiveRange(1, 5));
+        expect(tablist.nameFormats.length, inInclusiveRange(1, 7));
+        expect(tablist.nameFormats, contains('default'));
+        expect(
+          tablist.nameFormats.values.every(
+            (String format) => format.contains(r'$player'),
+          ),
+          isTrue,
+        );
+        expect(
+          validateTablistDoc(
+            tablist,
+            animations: animations,
+          ).where((HuiIssue issue) => issue.severity != HuiSeverity.info),
+          isEmpty,
+          reason: archetype.name,
+        );
+        expect(
+          utf8.encode(encodeGlossTablistDoc(tablist)).length,
+          lessThan(64 * 1024),
+        );
+        expect(
+          encodeGlossTablistDoc(
+            decodeGlossTablistDoc(encodeGlossTablistDoc(tablist)),
+          ),
+          encodeGlossTablistDoc(tablist),
+        );
+      }
+      expect(fingerprints, hasLength(TablistShowcaseArchetype.values.length));
+    },
+  );
+
+  test('tablist randomization replays its seed from an authored document', () {
+    final GlossTablistDoc first = buildRandomTablistShowcase(
+      GlossTablistDoc(),
+      math.Random(44),
+    );
+    final GlossTablistDoc second = buildRandomTablistShowcase(
+      first,
+      math.Random(44),
+    );
+    expect(encodeGlossTablistDoc(second), encodeGlossTablistDoc(first));
+  });
+
+  test('random bubbles demonstrate diverse procedural motion safely', () {
+    final Set<String> expressions = <String>{};
+    final Set<String> shimmers = <String>{};
+    for (int seed = 0; seed < 128; seed++) {
+      final GlossBubbleStyleDoc bubble = buildRandomBubbleShowcase(
+        GlossBubbleStyleDoc(),
+        math.Random(seed),
+      );
+      final Map<String, dynamic> motion = bubble.motion.toJson();
+      expressions.add(motion.toString());
+      shimmers.add(bubble.shimmer.toJson().toString());
+      expect(
+        validateBubbleStyleDoc(
+          bubble,
+        ).where((HuiIssue issue) => issue.severity == HuiSeverity.error),
+        isEmpty,
+        reason: 'seed $seed',
+      );
+    }
+    final String combined = expressions.join('\n');
+    expect(expressions.length, greaterThan(100));
+    expect(combined, contains('smoothstep'));
+    expect(combined, contains('pow('));
+    expect(combined, contains('sin('));
+    expect(combined, contains('cos('));
+    expect(combined, contains('stackIndex'));
+    expect(combined, contains('lineCount'));
+    expect(combined, contains('seed'));
+    expect(shimmers.length, greaterThan(100));
+  });
+
+  test('procedural showcases vary and scatter every named easter egg', () {
+    final Set<String> seenNames = <String>{};
+    final Set<String> scoreboards = <String>{};
+    final Set<String> motds = <String>{};
+    for (int seed = 0; seed < 128; seed++) {
+      final GlossScoreboardDoc scoreboard = buildRandomScoreboardShowcase(
+        GlossScoreboardDoc(),
+        math.Random(seed),
+      );
+      final GlossMotdDoc motd = buildRandomMotdShowcase(
+        GlossMotdDoc(),
+        math.Random(seed),
+      );
+      final String all = <String>[
+        scoreboard.title,
+        ...scoreboard.lines,
+        for (final GlossMotdEntry entry in motd.entries) ...entry.lines,
+      ].join('\n');
+      for (final String name in <String>[
+        'Magic_Psycho',
+        'SwiftSwamp',
+        'Cyberpwn',
+        'Puretie',
+      ]) {
+        if (all.contains(name)) seenNames.add(name);
+      }
+      scoreboards.add(encodeGlossScoreboardDoc(scoreboard));
+      motds.add(encodeGlossMotdDoc(motd));
+    }
+    expect(
+      seenNames,
+      containsAll(<String>[
+        'Magic_Psycho',
+        'SwiftSwamp',
+        'Cyberpwn',
+        'Puretie',
+      ]),
+    );
+    expect(scoreboards.length, greaterThan(100));
+    expect(motds.length, greaterThan(100));
+  });
+
+  test('seeded scoreboard samples remain complete at full width', () {
+    final EditorStore store = _store();
+    for (int seed = 0; seed < 256; seed++) {
+      final GlossScoreboardDoc scoreboard = buildRandomScoreboardShowcase(
+        GlossScoreboardDoc(),
+        math.Random(seed),
+      );
+      for (int index = 0; index < scoreboard.lines.length; index++) {
+        final String line = scoreboard.lines[index];
+        final GlossScoreboardLineMeasure measure = measureGlossScoreboardLine(
+          line,
+          store.workspaceAnimations,
+          emoji: store.workspaceEmoji,
+        );
+        expect(
+          measure.truncated,
+          isFalse,
+          reason:
+              'seed $seed, line $index: $line rendered '
+              '${measure.visibleLength} visible characters from '
+              '${measure.encodedLength} encoded characters',
+        );
+      }
+    }
+  });
+
+  test(
+    'component randomization preserves identity, position and data type',
+    () {
+      final EditorStore store = _store()..newDocument();
+      final HuiComponent before = store.menu.components.first.copy();
+      expect(
+        randomizeMenuComponent(store, before.id, random: math.Random(12)),
+        isTrue,
+      );
+      final HuiComponent after = store.menu.componentById(before.id)!;
+      expect(after.id, before.id);
+      expect(after.offset, before.offset);
+      expect(after.data.type, before.data.type);
+      expect(after.data.toJson(), isNot(before.data.toJson()));
+      expect(store.canUndo, isTrue);
+    },
+  );
+
+  test('the persisted erase marker keeps a reload genuinely empty', () {
+    final _FakeStorage storage = _FakeStorage();
+    storage.values[EditorStore.emptyWorkspaceKey] = 'true';
+    final EditorStore store = EditorStore(
+      workspace: Workspace(read: storage.read, write: storage.write),
+      autosaveDelay: Duration.zero,
+    );
+    expect(store.workspace.docs, isEmpty);
+    expect(store.workspace.active, isNull);
+    expect(store.hasActiveDocument, isFalse);
+    expect(store.menu.components, isEmpty);
+
+    expect(store.newDocument(), isTrue);
+    expect(store.hasActiveDocument, isTrue);
+    expect(storage.values[EditorStore.emptyWorkspaceKey], 'false');
+  });
+
+  test('randomized drop settings stay in range and vary everywhere', () {
+    final Set<String> encoded = <String>{};
+    final Set<String> landings = <String>{};
+    final Set<bool> tumbles = <bool>{};
+    final Set<bool> labelled = <bool>{};
+    final Set<String> billboards = <String>{};
+    final Set<String> formats = <String>{};
+    final Set<String> bundleEntries = <String>{};
+    final Set<bool> verticalBundles = <bool>{};
+    final Set<bool> itemDisplayNames = <bool>{};
+    final Set<String> renamed = <String>{};
+    final Set<String> variantFormats = <String>{};
+    for (int seed = 0; seed < 128; seed++) {
+      final GlossRealDropSettingsDoc doc = buildRandomRealDropShowcase(
+        buildDefaultGlossRealDrops(),
+        math.Random(seed),
+      );
+      expect(
+        validateRealDropSettingsDoc(doc),
+        isEmpty,
+        reason: 'seed $seed: ${encodeGlossRealDropSettingsDoc(doc)}',
+      );
+      // A randomized document has to stay presentable, not just legal.
+      final DropStageTimeline stage = DropStageTimeline(
+        doc,
+        showcaseDrops.first,
+      );
+      expect(stage.visualCount, greaterThan(0), reason: 'seed $seed');
+      expect(stage.frameAt(0).carrierY.isFinite, isTrue, reason: 'seed $seed');
+
+      encoded.add(encodeGlossRealDropSettingsDoc(doc));
+      landings.add(doc.presentation.landing.mode);
+      tumbles.add(doc.presentation.motion.tumble);
+      labelled.add(doc.presentation.labels.enabled);
+      billboards.add(doc.presentation.labels.style.billboard);
+      final GlossRealDropLabels labels = doc.presentation.labels;
+      formats.add(labels.format);
+      bundleEntries.add(labels.bundle.entryFormat);
+      verticalBundles.add(labels.bundle.vertical);
+      itemDisplayNames.add(labels.useItemDisplayNames);
+      renamed.addAll(labels.names.keys);
+      for (final GlossRealDropVariant variant in doc.variants) {
+        variantFormats.add(variant.presentation.labels.format);
+      }
+      final String label = glossDropLabel(
+        labels,
+        material: showcaseDrops.first.registryName,
+        count: 2,
+      );
+      expect(label, isNot(contains('{type}')), reason: 'seed $seed');
+      expect(label, isNot(contains('{count}')), reason: 'seed $seed');
+    }
+    expect(encoded.length, greaterThan(120), reason: 'every press differs');
+    expect(landings, containsAll(<String>['NATURAL', 'FLAT', 'UPRIGHT']));
+    expect(tumbles, <bool>{true, false});
+    expect(labelled, <bool>{true, false});
+    expect(billboards.length, greaterThan(2));
+    expect(formats.length, greaterThan(5), reason: 'label wording varies');
+    expect(bundleEntries.length, greaterThan(2));
+    expect(verticalBundles, <bool>{true, false});
+    expect(itemDisplayNames, <bool>{true, false});
+    expect(renamed.length, greaterThan(3), reason: 'per-material names vary');
+    expect(
+      variantFormats.difference(formats),
+      isNot(isEmpty),
+      reason: 'variants word their own labels',
+    );
+  });
+
+  test('real-drop archetypes generate distinct complete behavior graphs', () {
+    final Set<int> profileCounts = <int>{};
+    final Set<int> materialMapCounts = <int>{};
+    final Set<String> scriptShapes = <String>{};
+    final Set<GlossRealDropAnimationTrigger> triggers =
+        <GlossRealDropAnimationTrigger>{};
+    final Set<GlossRealDropAnimationTarget> targets =
+        <GlossRealDropAnimationTarget>{};
+
+    for (
+      int index = 0;
+      index < RealDropShowcaseArchetype.values.length;
+      index++
+    ) {
+      final RealDropShowcaseArchetype archetype =
+          RealDropShowcaseArchetype.values[index];
+      final GlossRealDropSettingsDoc doc = buildRandomRealDropShowcase(
+        buildDefaultGlossRealDrops(),
+        math.Random(700 + index),
+        archetype: archetype,
+      );
+      final GlossRealDropPhysics physics = doc.presentation.physics!;
+      final GlossRealDropScript script = doc.presentation.script!;
+      final GlossRealDropAnimation animation = doc.presentation.animation!;
+
+      expect(validateRealDropSettingsDoc(doc), isEmpty, reason: archetype.name);
+      expect(physics.enabled, isTrue, reason: archetype.name);
+      expect(script.enabled, isTrue, reason: archetype.name);
+      expect(script.vars, isNotEmpty, reason: archetype.name);
+      expect(animation.enabled, isTrue, reason: archetype.name);
+      expect(animation.materialProperties, isNotEmpty, reason: archetype.name);
+      expect(animation.profiles, isNotEmpty, reason: archetype.name);
+
+      profileCounts.add(animation.profiles.length);
+      materialMapCounts.add(animation.materialProperties.length);
+      scriptShapes.add(
+        script.vars.map((GlossRealDropScriptVar value) => value.name).join(','),
+      );
+      for (final GlossRealDropAnimationProfile profile in animation.profiles) {
+        expect(profile.materials, isNotEmpty, reason: profile.id);
+        expect(profile.clips, isNotEmpty, reason: profile.id);
+        expect(profile.clips.length, lessThanOrEqualTo(5), reason: profile.id);
+        for (final GlossRealDropAnimationClip clip in profile.clips) {
+          triggers.add(clip.trigger);
+          expect(clip.durationTicks, greaterThan(0), reason: profile.id);
+          expect(clip.tracks, isNotEmpty, reason: profile.id);
+          expect(clip.tracks.length, lessThanOrEqualTo(6), reason: profile.id);
+          for (final GlossRealDropAnimationTrack track in clip.tracks) {
+            targets.add(track.target);
+            expect(track.keyframes, isNotEmpty, reason: track.target.wire);
+            expect(
+              track.keyframes.length,
+              lessThanOrEqualTo(5),
+              reason: track.target.wire,
+            );
+          }
+        }
+      }
+
+      for (final bool water in <bool>[false, true]) {
+        final DropStageTimeline stage = DropStageTimeline(
+          doc,
+          showcaseDrops[index],
+          environment: DropStageEnvironment(water: water),
+        );
+        for (final int milliseconds in <int>[0, 500, 1500]) {
+          final DropStageFrame frame = stage.frameAt(milliseconds);
+          expect(frame.carrierY.isFinite, isTrue, reason: archetype.name);
+          expect(frame.carrierZ.isFinite, isTrue, reason: archetype.name);
+          expect(frame.scriptFailures, isEmpty, reason: archetype.name);
+        }
+      }
+    }
+
+    expect(profileCounts, containsAll(<int>[1, 2, 3]));
+    expect(materialMapCounts, <int>{1, 2});
+    expect(scriptShapes, hasLength(RealDropShowcaseArchetype.values.length));
+    expect(
+      triggers,
+      containsAll(<GlossRealDropAnimationTrigger>[
+        GlossRealDropAnimationTrigger.spawn,
+        GlossRealDropAnimationTrigger.impact,
+        GlossRealDropAnimationTrigger.bounce,
+        GlossRealDropAnimationTrigger.rolling,
+        GlossRealDropAnimationTrigger.enterFluid,
+        GlossRealDropAnimationTrigger.submerged,
+        GlossRealDropAnimationTrigger.settle,
+      ]),
+    );
+    expect(
+      targets,
+      containsAll(<GlossRealDropAnimationTarget>[
+        GlossRealDropAnimationTarget.offsetY,
+        GlossRealDropAnimationTarget.rotationX,
+        GlossRealDropAnimationTarget.rotationY,
+        GlossRealDropAnimationTarget.scaleX,
+        GlossRealDropAnimationTarget.scaleY,
+        GlossRealDropAnimationTarget.scaleZ,
+        GlossRealDropAnimationTarget.glow,
+        GlossRealDropAnimationTarget.physics,
+        GlossRealDropAnimationTarget.lightLevel,
+      ]),
+    );
+  });
+
+  test('real-drop randomization replaces stale authored behavior', () {
+    final GlossRealDropSettingsDoc stale = buildDefaultGlossRealDrops()
+      ..presentation.physics = GlossRealDropPhysics(
+        enabled: false,
+        gravityMultiplier: 0.01,
+        extras: <String, dynamic>{'stalePhysics': true},
+      )
+      ..presentation.script = GlossRealDropScript(
+        enabled: false,
+        vars: <GlossRealDropScriptVar>[
+          GlossRealDropScriptVar(name: 'staleVar', expression: '1'),
+        ],
+        extras: <String, dynamic>{'staleScript': true},
+      )
+      ..presentation.animation = GlossRealDropAnimation(
+        enabled: false,
+        materialProperties:
+            <String, Map<String, GlossRealDropMaterialProperties>>{
+              'staleMap': <String, GlossRealDropMaterialProperties>{
+                '*': GlossRealDropMaterialProperties(glow: 1),
+              },
+            },
+        profiles: <GlossRealDropAnimationProfile>[
+          GlossRealDropAnimationProfile(id: 'staleProfile'),
+        ],
+        extras: <String, dynamic>{'staleAnimation': true},
+      );
+
+    final GlossRealDropSettingsDoc generated = buildRandomRealDropShowcase(
+      stale,
+      math.Random(91),
+      archetype: RealDropShowcaseArchetype.groundRoll,
+    );
+
+    expect(validateRealDropSettingsDoc(generated), isEmpty);
+    expect(generated.presentation.physics!.enabled, isTrue);
+    expect(generated.presentation.physics!.gravityMultiplier, isNot(0.01));
+    expect(generated.presentation.physics!.extras, isEmpty);
+    expect(
+      generated.presentation.script!.vars.map(
+        (GlossRealDropScriptVar value) => value.name,
+      ),
+      isNot(contains('staleVar')),
+    );
+    expect(generated.presentation.script!.extras, isEmpty);
+    expect(
+      generated.presentation.animation!.materialProperties,
+      isNot(contains('staleMap')),
+    );
+    expect(
+      generated.presentation.animation!.profiles.map(
+        (GlossRealDropAnimationProfile value) => value.id,
+      ),
+      isNot(contains('staleProfile')),
+    );
+    expect(generated.presentation.animation!.extras, isEmpty);
+    expect(stale.presentation.animation!.profiles.single.id, 'staleProfile');
+  });
+
+  test('generated copy comes from the themed pools and keeps the credits', () {
+    final Set<String> servers = <String>{};
+    final Set<String> moods = <String>{};
+    for (int seed = 0; seed < 96; seed++) {
+      final GlossScoreboardDoc board = buildRandomScoreboardShowcase(
+        GlossScoreboardDoc(),
+        math.Random(seed),
+      );
+      final String plainTitle = board.title
+          .replaceAll(RegExp(r'&[0-9a-fk-or]'), '')
+          .trim();
+      expect(
+        showcaseServerNames.map((String name) => name.toUpperCase()),
+        contains(plainTitle),
+        reason: 'seed $seed board title "$plainTitle"',
+      );
+      servers.add(plainTitle);
+
+      final GlossTablistDoc tablist = buildRandomTablistShowcase(
+        GlossTablistDoc(),
+        math.Random(seed),
+      );
+      expect(
+        showcaseServerNames.any((String name) => tablist.header.contains(name)),
+        isTrue,
+        reason: 'seed $seed tablist header',
+      );
+      for (final ShowcaseMood mood in showcaseMoods) {
+        if (tablist.header.contains(mood.primary)) moods.add(mood.name);
+      }
+    }
+    expect(servers.length, greaterThan(8), reason: 'the pool is actually used');
+
+    // The four real handles are the one thing the theme never replaces.
+    for (final String credit in showcaseCredits) {
+      expect(
+        showcaseEasterEggs.where((String egg) => egg.contains(credit)),
+        isNotEmpty,
+        reason: credit,
+      );
+      expect(
+        showcaseBoardEasterEggs.where((String egg) => egg.contains(credit)),
+        isNotEmpty,
+        reason: credit,
+      );
+    }
+  });
+
+  test('the mock tablist is the town, and the credits are in it', () {
+    for (final String credit in showcaseCredits) {
+      expect(showcaseTownspeople, isNot(contains(credit)));
+    }
+    expect(showcaseTownspeople.toSet(), hasLength(showcaseTownspeople.length));
+    expect(showcaseTownspeople.length, greaterThan(20));
+  });
+
+  test('every runtime kind has a teaching template', () {
+    for (final DocumentTypeAdapter type in DocumentTypeRegistry.all) {
+      if (!type.hasRuntimePreview || type.kind == WorkspaceDocKind.panel) {
+        continue;
+      }
+      expect(
+        type.templateSections.expand(
+          (DocumentTemplateSection section) => section.templates,
+        ),
+        isNotEmpty,
+        reason: type.noun,
+      );
+    }
+    expect(
+      DocumentTypes.menu.templateSections
+          .expand((DocumentTemplateSection section) => section.templates)
+          .map((DocumentTemplate template) => template.id),
+      contains('feature-gallery'),
+    );
+    expect(
+      DocumentTypes.containerPreview.templateSections
+          .expand((DocumentTemplateSection section) => section.templates)
+          .map((DocumentTemplate template) => template.id),
+      contains('all-elements'),
+    );
+  });
+}
+
+String _randomAnimationEffectId(GlossAnimationDoc animation) {
+  if (animation.frames.length > 1) return 'rainbow';
+  final String frame = animation.frames.single;
+  const Map<String, String> helpers = <String, String>{
+    'align': 'align(',
+    'marquee': 'marquee(',
+    'timeline': 'timeline(',
+    'typewriter': 'typewriter(',
+    'flash': 'flash(',
+    'wipe': 'wipe(',
+    'scanner': 'scanner(',
+    'decode': 'scramble(',
+    'odometer': 'odometer(',
+    'wave': 'wave(',
+  };
+  for (final MapEntry<String, String> helper in helpers.entries) {
+    if (frame.contains(helper.value)) return helper.key;
+  }
+  throw StateError('Unknown randomized animation frame: $frame');
+}

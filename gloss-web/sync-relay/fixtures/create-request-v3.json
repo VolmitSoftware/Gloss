@@ -1,0 +1,30 @@
+{
+  "protocol": 3,
+  "expiresInSeconds": 3600,
+  "snapshot": {
+    "format": "gloss-sync-project",
+    "version": 3,
+    "kind": "menu",
+    "subjectId": "main",
+    "documents": [
+      {
+        "kind": "menu",
+        "id": "main",
+        "json": "{\"components\":[]}",
+        "baseRevision": "sha256:ac46fd24bd501fa7297f0a2945bcc7f5d655b9bcf8bfbf16718a9d25c0c2c018"
+      }
+    ],
+    "images": [],
+    "constraints": {
+      "subjectId": "main",
+      "documentKinds": [
+        "menu"
+      ],
+      "createDocumentKinds": [],
+      "newImagePrefix": "sync/menus/main/",
+      "allowDeletes": false
+    },
+    "warnings": [],
+    "baseRevision": "sha256:b98a5a9bbe1ff750e059e2e8f5d23878b8f35833cbf69905387800a5dac43349"
+  }
+}

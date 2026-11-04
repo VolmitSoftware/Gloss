@@ -1,0 +1,532 @@
+library;
+
+import '../model/gloss_doc.dart';
+import '../model/gloss_real_drop_animation.dart';
+import '../model/gloss_real_drops.dart';
+import 'preview_expr.dart';
+import 'particle_layer_validation.dart';
+import 'real_drop_script.dart';
+import 'validation.dart';
+import 'display_refresh_validation.dart';
+import 'hologram_box_validation.dart';
+import 'gloss_show.dart';
+
+List<HuiIssue> validateRealDropSettingsDoc(GlossRealDropSettingsDoc doc) {
+  final List<HuiIssue> issues = <HuiIssue>[
+    ...validateGlossShow(doc.show),
+  ];
+  final HuiIssue? revisionIssue = glossRevisionIssue(doc.revision);
+  if (revisionIssue != null) issues.add(revisionIssue);
+  issues.addAll(_atPresentation(doc.presentation, r'$.presentation'));
+
+  final Set<String> ids = <String>{};
+  for (int index = 0; index < doc.variants.length; index++) {
+    final GlossRealDropVariant variant = doc.variants[index];
+    final String path =
+        r'$.variants['
+        '$index]';
+    final String id = variant.id.trim();
+    if (id.isEmpty) {
+      _error(issues, '$path.id', 'Variant ids must not be blank.');
+    } else if (!_validVariantId.hasMatch(id)) {
+      _error(
+        issues,
+        '$path.id',
+        'Variant ids accept only letters, numbers, dots, hyphens and underscores.',
+      );
+    } else if (!ids.add(id)) {
+      _error(issues, '$path.id', 'Variant id "{id}" is duplicated.', {
+        'id': id,
+      });
+    }
+    _range(issues, '$path.priority', variant.priority, -10000, 10000);
+    _condition(issues, '$path.when', variant.when);
+    issues.addAll(_atPresentation(variant.presentation, '$path.presentation'));
+  }
+  _condition(issues, r'$.audience.when', doc.audience.when);
+  return issues;
+}
+
+final RegExp _validVariantId = RegExp(r'^[A-Za-z0-9._-]+$');
+
+List<HuiIssue> _atPresentation(
+  GlossRealDropPresentation presentation,
+  String prefix,
+) => <HuiIssue>[
+  for (final HuiIssue issue in _validatePresentation(presentation))
+    HuiIssue(
+      severity: issue.severity,
+      path: issue.path == r'$' ? prefix : '$prefix${issue.path.substring(1)}',
+      message: issue.message,
+      fix: issue.fix,
+    ),
+];
+
+List<HuiIssue> _validatePresentation(GlossRealDropPresentation doc) {
+  final List<HuiIssue> issues = <HuiIssue>[];
+  issues.addAll(validateDisplayRefresh(doc.labels.refresh, path: r'$.labels.refresh'));
+  issues.addAll(validateParticleLayers(doc.particleLayers));
+  issues.addAll(validateGlossShow(doc.labels.show, path: r'$.labels.show'));
+
+  _range(
+    issues,
+    r'$.limits.updateIntervalTicks',
+    doc.limits.updateIntervalTicks,
+    1,
+    20,
+  );
+  _range(
+    issues,
+    r'$.limits.settledPollIntervalTicks',
+    doc.limits.settledPollIntervalTicks,
+    2,
+    200,
+  );
+  _range(
+    issues,
+    r'$.limits.maxVisualsPerStack',
+    doc.limits.maxVisualsPerStack,
+    1,
+    5,
+  );
+  _range(
+    issues,
+    r'$.limits.maxVisualsPerChunk',
+    doc.limits.maxVisualsPerChunk,
+    8,
+    1024,
+  );
+  _range(issues, r'$.limits.viewRange', doc.limits.viewRange, 4, 128);
+  _range(issues, r'$.limits.spread', doc.limits.spread, 0, 1);
+  _range(issues, r'$.scale.defaultScale', doc.scale.defaultScale, 0.05, 2);
+  _range(issues, r'$.scale.flatItems', doc.scale.flatItems, 0.05, 2);
+  _range(issues, r'$.scale.thinBlocks', doc.scale.thinBlocks, 0.05, 2);
+  _range(
+    issues,
+    r'$.motion.speedMultiplier',
+    doc.motion.speedMultiplier,
+    0.1,
+    4,
+  );
+  _range(
+    issues,
+    r'$.motion.degreesPerSecondX',
+    doc.motion.degreesPerSecondX,
+    -1440,
+    1440,
+  );
+  _range(
+    issues,
+    r'$.motion.degreesPerSecondY',
+    doc.motion.degreesPerSecondY,
+    -1440,
+    1440,
+  );
+  _range(
+    issues,
+    r'$.motion.degreesPerSecondZ',
+    doc.motion.degreesPerSecondZ,
+    -1440,
+    1440,
+  );
+  _range(issues, r'$.motion.variance', doc.motion.variance, 0, 1);
+  _range(
+    issues,
+    r'$.motion.velocityInfluence',
+    doc.motion.velocityInfluence,
+    0,
+    4,
+  );
+  _range(
+    issues,
+    r'$.motion.submergedSpinMultiplier',
+    doc.motion.submergedSpinMultiplier,
+    0,
+    1,
+  );
+  _range(
+    issues,
+    r'$.motion.groundRollMultiplier',
+    doc.motion.groundRollMultiplier,
+    0,
+    4,
+  );
+  _range(issues, r'$.landing.tiltDegrees', doc.landing.tiltDegrees, 0, 45);
+  _range(
+    issues,
+    r'$.landing.transitionTicks',
+    doc.landing.transitionTicks,
+    0,
+    20,
+  );
+  _range(issues, r'$.landing.faceAttraction', doc.landing.faceAttraction, 0, 1);
+  _range(
+    issues,
+    r'$.landing.movingFaceAttraction',
+    doc.landing.movingFaceAttraction,
+    0,
+    1,
+  );
+  _range(
+    issues,
+    r'$.landing.alignmentDegrees',
+    doc.landing.alignmentDegrees,
+    0.05,
+    10,
+  );
+  _range(
+    issues,
+    r'$.landing.settleDelayTicks',
+    doc.landing.settleDelayTicks,
+    0,
+    100,
+  );
+  _choice(issues, r'$.landing.mode', doc.landing.mode, const <String>{
+    'NATURAL',
+    'FLAT',
+    'UPRIGHT',
+  });
+  _range(issues, r'$.labels.yOffset', doc.labels.yOffset, -4, 16);
+  _labelNames(issues, doc.labels.names);
+  _range(
+    issues,
+    r'$.labels.bundle.entryLimit',
+    doc.labels.bundle.entryLimit,
+    1,
+    10,
+  );
+  issues.addAll(
+    validateIconDisplayStyle(doc.labels.style, path: r'$.labels.style'),
+  );
+  issues.addAll(validateHologramBox(doc.labels.box, path: r'$.labels.box'));
+  _physics(issues, doc.physics);
+  _script(issues, doc.script);
+  _animation(issues, doc.animation);
+  return issues;
+}
+
+void _condition(List<HuiIssue> issues, String path, String source) {
+  try {
+    final PExpr expression = parsePreviewExpr(source);
+    if (isConstantExpr(expression)) {
+      final Object value = evalPreviewExpr(expression, _EmptyConditionScope());
+      if (value is! bool) {
+        _error(issues, path, 'A condition must evaluate to true or false.');
+      }
+    }
+  } on PExprException catch (error) {
+    _error(issues, path, 'Invalid condition: {error}', <String, Object?>{
+      'error': error.message,
+    });
+  }
+}
+
+final class _EmptyConditionScope extends PExprScope {
+  @override
+  Object? call(String name, List<Object?> args) => null;
+
+  @override
+  Object? variable(String dottedName) => null;
+}
+
+void _animation(List<HuiIssue> issues, GlossRealDropAnimation? animation) {
+  if (animation == null) return;
+  animation.materialProperties.forEach((
+    String mapName,
+    Map<String, GlossRealDropMaterialProperties> entries,
+  ) {
+    final String mapPath = '\$.animation.materialProperties.$mapName';
+    if (mapName.trim().isEmpty) {
+      _error(issues, mapPath, 'Material property map names must not be blank.');
+    }
+    entries.forEach((String pattern, GlossRealDropMaterialProperties value) {
+      final String path = '$mapPath.$pattern';
+      if (pattern.trim().isEmpty) {
+        _error(issues, path, 'Material patterns must not be blank.');
+      }
+      _range(issues, '$path.glow', value.glow, 0, 4294967295);
+      _range(issues, '$path.lightLevel', value.lightLevel, 0, 15);
+    });
+  });
+
+  final Set<String> profileIds = <String>{};
+  for (
+    int profileIndex = 0;
+    profileIndex < animation.profiles.length;
+    profileIndex++
+  ) {
+    final GlossRealDropAnimationProfile profile =
+        animation.profiles[profileIndex];
+    final String path = '\$.animation.profiles[$profileIndex]';
+    final String id = profile.id.trim();
+    if (id.isEmpty) {
+      _error(issues, '$path.id', 'Animation profile ids must not be blank.');
+    } else if (!profileIds.add(id)) {
+      _error(
+        issues,
+        '$path.id',
+        'Animation profile "{id}" is declared twice.',
+        <String, Object?>{'id': id},
+      );
+    }
+    _range(issues, '$path.priority', profile.priority, -10000, 10000);
+    for (
+      int materialIndex = 0;
+      materialIndex < profile.materials.length;
+      materialIndex++
+    ) {
+      if (profile.materials[materialIndex].trim().isEmpty) {
+        _error(
+          issues,
+          '$path.materials[$materialIndex]',
+          'Animation material patterns must not be blank.',
+        );
+      }
+    }
+    for (int clipIndex = 0; clipIndex < profile.clips.length; clipIndex++) {
+      _animationClip(
+        issues,
+        animation,
+        profile.clips[clipIndex],
+        '$path.clips[$clipIndex]',
+      );
+    }
+  }
+}
+
+void _animationClip(
+  List<HuiIssue> issues,
+  GlossRealDropAnimation animation,
+  GlossRealDropAnimationClip clip,
+  String path,
+) {
+  _range(issues, '$path.durationTicks', clip.durationTicks, 0, 1000000);
+  for (int trackIndex = 0; trackIndex < clip.tracks.length; trackIndex++) {
+    final GlossRealDropAnimationTrack track = clip.tracks[trackIndex];
+    final String trackPath = '$path.tracks[$trackIndex]';
+    final bool validBlend = switch (track.blend) {
+      GlossRealDropAnimationBlend.replace => true,
+      GlossRealDropAnimationBlend.add =>
+        track.target == GlossRealDropAnimationTarget.offsetX ||
+            track.target == GlossRealDropAnimationTarget.offsetY ||
+            track.target == GlossRealDropAnimationTarget.offsetZ ||
+            track.target == GlossRealDropAnimationTarget.rotationX ||
+            track.target == GlossRealDropAnimationTarget.rotationY ||
+            track.target == GlossRealDropAnimationTarget.rotationZ,
+      GlossRealDropAnimationBlend.multiply =>
+        track.target == GlossRealDropAnimationTarget.scaleX ||
+            track.target == GlossRealDropAnimationTarget.scaleY ||
+            track.target == GlossRealDropAnimationTarget.scaleZ,
+    };
+    if (!validBlend) {
+      _error(
+        issues,
+        '$trackPath.blend',
+        '{blend} is not valid for {target}.',
+        <String, Object?>{
+          'blend': track.blend.wire,
+          'target': track.target.wire,
+        },
+      );
+    }
+    if (track.keyframes.isEmpty) {
+      _error(
+        issues,
+        '$trackPath.keyframes',
+        'Animation track {target} has no keyframes.',
+        <String, Object?>{'target': track.target.wire},
+      );
+      continue;
+    }
+    final Set<double> ticks = <double>{};
+    for (
+      int frameIndex = 0;
+      frameIndex < track.keyframes.length;
+      frameIndex++
+    ) {
+      final GlossRealDropAnimationKeyframe frame = track.keyframes[frameIndex];
+      final String framePath = '$trackPath.keyframes[$frameIndex]';
+      if (!frame.tick.isFinite ||
+          frame.tick < 0 ||
+          frame.tick > clip.durationTicks) {
+        _error(
+          issues,
+          '$framePath.tick',
+          'Keyframe tick must be inside the clip duration.',
+        );
+      }
+      if (!ticks.add(frame.tick)) {
+        _error(
+          issues,
+          '$framePath.tick',
+          'Two keyframes cannot occupy tick {tick}.',
+          <String, Object?>{'tick': frame.tick},
+        );
+      }
+      if (!frame.value.isFinite) {
+        _error(issues, '$framePath.value', 'Keyframe values must be finite.');
+      }
+      if (frame.materialMap.isNotEmpty) {
+        final bool supported =
+            track.target == GlossRealDropAnimationTarget.glow ||
+            track.target == GlossRealDropAnimationTarget.lightLevel;
+        if (!supported) {
+          _error(
+            issues,
+            '$framePath.materialMap',
+            'Material maps only support GLOW and LIGHT_LEVEL tracks.',
+          );
+        } else if (!animation.materialProperties.containsKey(
+          frame.materialMap,
+        )) {
+          _error(
+            issues,
+            '$framePath.materialMap',
+            'Material property map "{name}" does not exist.',
+            <String, Object?>{'name': frame.materialMap},
+          );
+        }
+      }
+    }
+  }
+}
+
+void _error(
+  List<HuiIssue> issues,
+  String path,
+  String message, [
+  Map<String, Object?> messageArguments = const <String, Object?>{},
+]) {
+  issues.add(
+    HuiIssue(
+      severity: HuiSeverity.error,
+      path: path,
+      message: message,
+      messageArguments: messageArguments,
+      fix: 'Correct the animation contract before exporting this document.',
+    ),
+  );
+}
+
+/// `labels.names` entries the server drops at load: a blank material or a
+/// blank name never reaches a label.
+void _labelNames(List<HuiIssue> issues, Map<String, String> names) {
+  names.forEach((String material, String name) {
+    if (material.trim().isNotEmpty && name.trim().isNotEmpty) return;
+    issues.add(
+      HuiIssue(
+        severity: HuiSeverity.warning,
+        path: material.trim().isEmpty
+            ? r'$.labels.names'
+            : '\$.labels.names.$material',
+        message: 'Gloss ignores a name entry with a blank material or name.',
+        fix: 'Fill in both the material and the name, or remove the entry.',
+      ),
+    );
+  });
+}
+
+/// The physics block's four clamps. Warnings, like every other clamp in this
+/// file: the server silently pins an out-of-range number at load rather than
+/// refusing the document, so the file is still valid and the author is only
+/// told the value will not survive.
+void _physics(List<HuiIssue> issues, GlossRealDropPhysics? physics) {
+  if (physics == null) return;
+  _range(
+    issues,
+    r'$.physics.gravityMultiplier',
+    physics.gravityMultiplier,
+    0,
+    4,
+  );
+  _range(issues, r'$.physics.bounce', physics.bounce, 0, 0.9);
+  _range(issues, r'$.physics.waterBuoyancy', physics.waterBuoyancy, 0, 1);
+  _range(issues, r'$.physics.waterDrag', physics.waterDrag, 0, 1);
+}
+
+/// Every expression in the script block, compiled and type-checked the way the
+/// server does at load.
+///
+/// These are errors, not warnings, and they are raised whether or not
+/// `script.enabled` is set: a problem in any expression refuses the whole
+/// document, so a broken expression behind a switch that is off still means the
+/// file will not load. The message is the server's own, so the console line an
+/// operator would see and the line the inspector shows are the same sentence.
+void _script(List<HuiIssue> issues, GlossRealDropScript? script) {
+  if (script == null) return;
+  for (final RealDropScriptIssue issue in RealDropScriptPlan.compile(
+    script,
+  ).issues) {
+    final String? pluralKey = issue.pluralKey;
+    final int? pluralCount = issue.pluralCount;
+    final String? oneEnglish = issue.oneEnglish;
+    if (pluralKey != null && pluralCount != null && oneEnglish != null) {
+      issues.add(
+        HuiIssue.plural(
+          severity: HuiSeverity.error,
+          path: issue.path,
+          pluralKey: pluralKey,
+          count: pluralCount,
+          oneEnglish: oneEnglish,
+          otherEnglish: issue.englishMessage,
+          messageArguments: issue.messageArguments,
+          fix: 'Gloss refuses the whole document until this expression parses.',
+        ),
+      );
+    } else {
+      issues.add(
+        HuiIssue(
+          severity: HuiSeverity.error,
+          path: issue.path,
+          message: issue.englishMessage,
+          messageArguments: issue.messageArguments,
+          fix: 'Gloss refuses the whole document until this expression parses.',
+        ),
+      );
+    }
+  }
+}
+
+void _range(
+  List<HuiIssue> issues,
+  String path,
+  num value,
+  num minimum,
+  num maximum,
+) {
+  if (value >= minimum && value <= maximum) return;
+  issues.add(
+    HuiIssue(
+      severity: HuiSeverity.warning,
+      path: path,
+      message: "Gloss clamps this value to {minimum}..{maximum} at load time.",
+      messageArguments: <String, Object?>{
+        'minimum': minimum,
+        'maximum': maximum,
+      },
+      fix: 'Choose a value inside the supported range.',
+    ),
+  );
+}
+
+void _choice(
+  List<HuiIssue> issues,
+  String path,
+  String value,
+  Set<String> allowed,
+) {
+  if (allowed.contains(value.toUpperCase())) return;
+  issues.add(
+    HuiIssue(
+      severity: HuiSeverity.warning,
+      path: path,
+      message: "Gloss does not recognize \"{value}\" and uses {first}.",
+      messageArguments: <String, Object?>{
+        'value': value,
+        'first': allowed.first,
+      },
+      fix: "Choose {join}.",
+      fixArguments: <String, Object?>{'join': allowed.join(', ')},
+    ),
+  );
+}
