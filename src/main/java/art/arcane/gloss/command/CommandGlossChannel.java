@@ -6,6 +6,7 @@ import art.arcane.gloss.chat.ChannelRuntime;
 import art.arcane.gloss.chat.ChannelService;
 import art.arcane.gloss.locale.GlossLocalization;
 import art.arcane.gloss.locale.GlossMessages;
+import art.arcane.gloss.util.common.TextUtils;
 import art.arcane.volmlib.util.collection.KList;
 import art.arcane.volmlib.util.director.DirectorParameterHandler;
 import art.arcane.volmlib.util.director.annotations.Director;
@@ -17,6 +18,7 @@ import org.bukkit.command.CommandSender;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 /** {@code /gloss channel} — inspects and restores the {@code channels/} documents. */
 @Director(name = "channel", aliases = {"channels"}, description = "Chat channels",
@@ -41,15 +43,15 @@ public class CommandGlossChannel {
         List<ChannelRuntime> loaded = channels == null ? List.of() : channels.channels();
         DirectorMiniMenu.Theme theme = GlossCommandService.menuTheme();
         List<String> lines = new ArrayList<>();
-        lines.add(DirectorMiniMenu.banner(GlossLocalization.globalText(GlossMessages.CHANNELS_LIST_HEADER,
+        lines.add(GlossCommandPager.messageBanner(GlossLocalization.globalText(GlossMessages.CHANNELS_LIST_HEADER,
             GlossLocalization.args(MessageArgument.trusted("count", loaded.size()))), theme));
         if (loaded.isEmpty()) {
-            lines.add(GlossLocalization.globalText(GlossMessages.CHANNELS_LIST_EMPTY));
+            lines.add(TextUtils.toMiniMessage(GlossLocalization.globalText(GlossMessages.CHANNELS_LIST_EMPTY)));
         }
         for (ChannelRuntime channel : loaded) {
-            lines.add("&7- &f" + channel.id() + " &7(" + channel.name() + ", "
-                + channel.scope().name().toLowerCase(java.util.Locale.ROOT)
-                + (channel.isDefault() ? ", default" : "") + ")");
+            lines.add(GlossCommandPager.entry(channel.id(), channel.name() + ", "
+                + channel.scope().name().toLowerCase(Locale.ROOT)
+                + (channel.isDefault() ? ", default" : ""), theme));
         }
         lines.add(DirectorMiniMenu.bar(theme));
         DirectorMiniMenu.deliver(sender, lines);
@@ -75,14 +77,17 @@ public class CommandGlossChannel {
         DirectorMiniMenu.Theme theme = GlossCommandService.menuTheme();
         List<String> lines = new ArrayList<>();
         lines.add(DirectorMiniMenu.banner(channel.id(), theme));
-        lines.add("&7scope &f" + channel.scope().name().toLowerCase(java.util.Locale.ROOT)
-            + (channel.scope() == ChannelDoc.Scope.RADIUS ? " &7radius &f" + doc.channel().radius() : ""));
-        lines.add("&7aliases &f" + (channel.aliases().isEmpty() ? "-" : String.join(", ", channel.aliases())));
-        lines.add("&7permission &f" + (doc.channel().permission().isEmpty() ? "-" : doc.channel().permission()));
-        lines.add("&7format &f" + doc.format());
-        lines.add("&7filters &f" + doc.filters().size() + " &7variants &f" + doc.variants().size());
-        lines.add("&7throttle &f" + doc.throttle().minIntervalTicks() + "t &7repeats &f"
-            + doc.throttle().maxRepeats() + " &7in &f" + doc.throttle().repeatWindowTicks() + "t");
+        lines.add(GlossCommandPager.entry("scope", channel.scope().name().toLowerCase(Locale.ROOT)
+            + (channel.scope() == ChannelDoc.Scope.RADIUS ? " · radius " + doc.channel().radius() : ""), theme));
+        lines.add(GlossCommandPager.entry("aliases",
+            channel.aliases().isEmpty() ? "-" : String.join(", ", channel.aliases()), theme));
+        lines.add(GlossCommandPager.entry("permission",
+            doc.channel().permission().isEmpty() ? "-" : doc.channel().permission(), theme));
+        lines.add(GlossCommandPager.entry("format", doc.format(), theme));
+        lines.add(GlossCommandPager.entry("filters", String.valueOf(doc.filters().size()), theme));
+        lines.add(GlossCommandPager.entry("variants", String.valueOf(doc.variants().size()), theme));
+        lines.add(GlossCommandPager.entry("throttle", doc.throttle().minIntervalTicks() + "t · repeats "
+            + doc.throttle().maxRepeats() + " in " + doc.throttle().repeatWindowTicks() + "t", theme));
         lines.add(DirectorMiniMenu.bar(theme));
         DirectorMiniMenu.deliver(sender, lines);
     }

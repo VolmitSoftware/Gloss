@@ -1,6 +1,8 @@
 package art.arcane.gloss.command;
 
 import art.arcane.volmlib.util.director.help.DirectorMiniMenu;
+import net.kyori.adventure.text.minimessage.MiniMessage;
+import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.junit.Test;
 
 import java.util.ArrayList;
@@ -91,6 +93,25 @@ public class GlossCommandPagerTest {
     assertTrue(footer.contains("/gloss emoji list page=1"));
     assertTrue(footer.contains("Page 3 ❭"));
     assertTrue(footer.contains("/gloss emoji list page=3"));
+  }
+
+  @Test
+  public void entriesShowAuthoredTextLiterally() {
+    String format = "<hover:show_text:'card'>&7[{{ group }}]</hover> §a{{ message }}";
+    String line = GlossCommandPager.entry("format", format, THEME);
+
+    assertEquals("⇀ format <hover:show_text:'card'>&7[{{ group }}]</hover> &a{{ message }}",
+        PlainTextComponentSerializer.plainText().serialize(MiniMessage.miniMessage().deserialize(line)));
+  }
+
+  @Test
+  public void messageBannersDropLegacyCodes() {
+    String banner = GlossCommandPager.messageBanner("&dChannels &7(2) §a&#ff8800!", THEME);
+    String text = PlainTextComponentSerializer.plainText().serialize(MiniMessage.miniMessage().deserialize(banner));
+
+    assertTrue(text.contains("Channels (2) !"));
+    assertFalse(text.contains("&"));
+    assertFalse(text.contains("§"));
   }
 
   private static List<String> entries(int count, String details) {

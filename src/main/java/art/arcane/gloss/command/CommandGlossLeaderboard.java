@@ -45,18 +45,18 @@ public class CommandGlossLeaderboard {
         List<String> ids = boards == null ? List.of() : boards.ids();
         DirectorMiniMenu.Theme theme = GlossCommandService.menuTheme();
         List<String> lines = new ArrayList<>();
-        lines.add(DirectorMiniMenu.banner(GlossLocalization.globalText(
+        lines.add(GlossCommandPager.messageBanner(GlossLocalization.globalText(
             GlossMessages.LEADERBOARDS_LIST_HEADER,
             GlossLocalization.args(MessageArgument.trusted("count", ids.size()))), theme));
         if (ids.isEmpty()) {
-            lines.add(GlossLocalization.globalText(GlossMessages.LEADERBOARDS_LIST_EMPTY));
+            lines.add(TextUtils.toMiniMessage(GlossLocalization.globalText(GlossMessages.LEADERBOARDS_LIST_EMPTY)));
         }
         for (String id : ids) {
             LeaderboardView view = boards.view(id);
             LeaderboardDoc doc = boards.document(id);
-            lines.add("&7- &f" + id + " &7(" + doc.source().type().name().toLowerCase(Locale.ROOT)
+            lines.add(GlossCommandPager.entry(id, doc.source().type().name().toLowerCase(Locale.ROOT)
                 + ", " + (view == null ? 0 : view.size()) + " ranked, resets "
-                + doc.reset().name().toLowerCase(Locale.ROOT) + ")");
+                + doc.reset().name().toLowerCase(Locale.ROOT), theme));
         }
         lines.add(DirectorMiniMenu.bar(theme));
         DirectorMiniMenu.deliver(sender, lines);

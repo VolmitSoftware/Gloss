@@ -5,6 +5,7 @@ import art.arcane.gloss.locale.GlossLocalization;
 import art.arcane.gloss.locale.GlossMessages;
 import art.arcane.gloss.strings.StringsCatalog;
 import art.arcane.gloss.strings.StringsService;
+import art.arcane.gloss.util.common.TextUtils;
 import art.arcane.volmlib.util.collection.KList;
 import art.arcane.volmlib.util.director.DirectorParameterHandler;
 import art.arcane.volmlib.util.director.annotations.Director;
@@ -41,16 +42,16 @@ public class CommandGlossStrings {
         List<String> locales = strings == null ? List.of() : strings.locales();
         DirectorMiniMenu.Theme theme = GlossCommandService.menuTheme();
         List<String> lines = new ArrayList<>();
-        lines.add(DirectorMiniMenu.banner(GlossLocalization.globalText(GlossMessages.STRINGS_LIST_HEADER,
+        lines.add(GlossCommandPager.messageBanner(GlossLocalization.globalText(GlossMessages.STRINGS_LIST_HEADER,
             GlossLocalization.args(MessageArgument.trusted("count", locales.size()))), theme));
         if (locales.isEmpty()) {
-            lines.add(GlossLocalization.globalText(GlossMessages.STRINGS_LIST_EMPTY));
+            lines.add(TextUtils.toMiniMessage(GlossLocalization.globalText(GlossMessages.STRINGS_LIST_EMPTY)));
         }
         StringsCatalog catalog = strings == null ? StringsCatalog.EMPTY : strings.catalog();
         for (String locale : locales) {
             String fallback = catalog.fallbackOf(locale);
-            lines.add("&7- &f" + locale + " &7(" + catalog.entries(locale).size() + " keys"
-                + (fallback.isEmpty() ? "" : ", falls back to " + fallback) + ")");
+            lines.add(GlossCommandPager.entry(locale, catalog.entries(locale).size() + " keys"
+                + (fallback.isEmpty() ? "" : ", falls back to " + fallback), theme));
         }
         lines.add(DirectorMiniMenu.bar(theme));
         DirectorMiniMenu.deliver(sender, lines);
@@ -74,11 +75,11 @@ public class CommandGlossStrings {
         }
         DirectorMiniMenu.Theme theme = GlossCommandService.menuTheme();
         List<String> lines = new ArrayList<>();
-        lines.add(DirectorMiniMenu.banner(GlossLocalization.globalText(GlossMessages.STRINGS_MISSING_HEADER,
+        lines.add(GlossCommandPager.messageBanner(GlossLocalization.globalText(GlossMessages.STRINGS_MISSING_HEADER,
             GlossLocalization.args(MessageArgument.untrusted("locale", locale),
                 MessageArgument.trusted("count", missing.size()))), theme));
         for (String key : missing.subList(0, Math.min(missing.size(), MAX_LISTED_KEYS))) {
-            lines.add("&7- &f" + key);
+            lines.add(GlossCommandPager.entry(key, null, theme));
         }
         lines.add(DirectorMiniMenu.bar(theme));
         DirectorMiniMenu.deliver(sender, lines);

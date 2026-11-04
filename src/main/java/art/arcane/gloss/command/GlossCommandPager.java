@@ -3,12 +3,14 @@ package art.arcane.gloss.command;
 import art.arcane.gloss.locale.GlossLocalization;
 import art.arcane.gloss.locale.GlossMessages;
 import art.arcane.volmlib.util.director.help.DirectorMiniMenu;
+import art.arcane.volmlib.util.format.ColorFormatter;
 import art.arcane.volmlib.util.localization.LanguageAudience;
 import art.arcane.volmlib.util.localization.MessageArgs;
 import art.arcane.volmlib.util.localization.MessageArgument;
 import art.arcane.volmlib.util.localization.TextKey;
 import art.arcane.volmlib.util.plugin.ComponentMessenger;
 import art.arcane.volmlib.util.plugin.ComponentText;
+import org.bukkit.ChatColor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
@@ -89,13 +91,21 @@ final class GlossCommandPager {
         StringBuilder line = new StringBuilder();
         line.append("<").append(theme.muted()).append(">⇀</").append(theme.muted()).append("> ")
                 .append("<gradient:").append(theme.primaryLeft()).append(":").append(theme.primaryRight()).append(">")
-                .append(DirectorMiniMenu.escapeText(label)).append("</gradient>");
+                .append(literal(label)).append("</gradient>");
         if (details != null && !details.isBlank()) {
             line.append(" <").append(theme.description()).append(">")
-                    .append(DirectorMiniMenu.escapeText(details))
+                    .append(literal(details))
                     .append("</").append(theme.description()).append(">");
         }
         return line.toString();
+    }
+
+    static String messageBanner(String message, DirectorMiniMenu.Theme theme) {
+        return DirectorMiniMenu.banner(ColorFormatter.stripColor(ColorFormatter.translateColors(message)), theme);
+    }
+
+    private static String literal(String text) {
+        return DirectorMiniMenu.escapeText(text).replace(ChatColor.COLOR_CHAR, '&');
     }
 
     private static List<ComponentText> render(List<MessageRow> rows) {
