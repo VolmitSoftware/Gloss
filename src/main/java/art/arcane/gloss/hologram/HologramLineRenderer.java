@@ -20,6 +20,7 @@ import art.arcane.volmlib.util.bukkit.registry.RegistryUtil;
 import com.github.retrooper.packetevents.protocol.entity.type.EntityType;
 import com.github.retrooper.packetevents.protocol.entity.type.EntityTypes;
 import com.github.retrooper.packetevents.util.Vector3f;
+import net.kyori.adventure.text.Component;
 import org.bukkit.Location;
 import org.bukkit.util.Vector;
 import org.bukkit.Material;
@@ -32,12 +33,13 @@ import java.util.List;
 
 /**
  * Object lines drawn as packet display entities in the hologram's authored row order: an item, a head,
- * a block or a raw entity, each one row tall at its authored scale.
+ * a block, a raw entity or a scaled text line, each centered in the rows its authored scale reserves.
  */
 final class HologramLineRenderer {
     private static final byte HEAD_DISPLAY_CONTEXT = 8;
     /** Height of one rendered text row at scale one; the same value the box layout measures with. */
     static final double TEXT_ROW_HEIGHT = TextDisplayLayout.ROW_PIXELS * (double) TextDisplayLayout.PIXEL_SIZE;
+    static final float OBJECT_DEPTH = 0.02F;
 
     private HologramLineRenderer() {
     }
@@ -62,7 +64,7 @@ final class HologramLineRenderer {
         for (HologramLine line : lines) {
             double height = rows(line, textScaleY) * rowHeight;
             offset -= height / 2.0D;
-            if (!line.isText()) {
+            if (line.drawnAsObject()) {
                 DisplayEntity display = display(plugin, hologramId, line, anchor, offset, style);
                 if (display != null) {
                     built.add(new ObjectLine(line, display, height, offset));
@@ -74,8 +76,15 @@ final class HologramLineRenderer {
     }
 
     static int rows(HologramLine line, float textScaleY) {
-        return line.isText() ? line.text().split("\n", -1).length
+        if (line.isScaledText()) {
+            return Math.max(1, (int) Math.ceil(line.textRows() * line.scale() - 1.0E-9D));
+        }
+        return line.isText() ? line.textRows()
             : Math.max(1, (int) Math.ceil(reservedHeight(line) / (TEXT_ROW_HEIGHT * textScaleY)));
+    }
+
+    static double scaledTextHeight(HologramLine line, IconDisplayStyle style) {
+        return line.textRows() * TEXT_ROW_HEIGHT * style.scaleY() * line.scale();
     }
 
     static double objectHeight(HologramLine line) {
@@ -126,7 +135,7 @@ final class HologramLineRenderer {
                 (byte) 0, HEAD_DISPLAY_CONTEXT);
             case BLOCK -> blockDisplay(hologramId, line.value(), anchor, scale);
             case ENTITY -> entityDisplay(hologramId, line.value(), position, line.scale());
-            case TEXT -> null;
+            case TEXT -> scaledTextDisplay(line, anchor, style);
         };
         if (display != null && line.kind() != HologramLine.Kind.ENTITY) {
             configureObjectLayout(display, scale, offsetY, style);
@@ -137,9 +146,20 @@ final class HologramLineRenderer {
     static void configureObjectLayout(DisplayEntity display, float scale, double offsetY, IconDisplayStyle style) {
         Vector3f translation = display.translation();
         display.translation(new Vector3f(translation.getX(), translation.getY() + (float) offsetY,
-            translation.getZ() + scale / 2F + 0.02F));
+            translation.getZ() + OBJECT_DEPTH));
         display.billboard(style.billboard().metadataValue());
         display.brightness(style.packedBrightness());
+    }
+
+    private static DisplayEntity scaledTextDisplay(HologramLine line, Location anchor, IconDisplayStyle style) {
+        float scale = (float) line.scale();
+        DisplayEntity display = DisplayEntity.Builder.textDisplay(Component.empty(), anchor,
+            style.scaleX() * scale, style.scaleY() * scale, style.scaleZ() * scale,
+            style.billboard().metadataValue(), style.textFlags(), 0, (byte) (style.textOpacity() & 0xFF));
+        TextDisplayStyle.apply(display, style);
+        display.backgroundColor(0);
+        display.translation(new Vector3f(0F, (float) (-scaledTextHeight(line, style) / 2D), 0F));
+        return display;
     }
 
     private static DisplayEntity blockDisplay(String hologramId, String key, Location position, float scale) {

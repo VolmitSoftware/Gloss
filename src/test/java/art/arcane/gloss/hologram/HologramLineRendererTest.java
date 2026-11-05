@@ -139,7 +139,7 @@ class HologramLineRendererTest {
     }
 
     @Test
-    void itemRowsStayInTheBillboardTransformAheadOfTheBackgroundPlane() {
+    void objectRowsStayInTheBillboardTransformLevelWithTheText() {
         PacketEventsStub.install();
         try {
             Location anchor = new Location(null, 4D, 64D, 8D, 30F, 15F);
@@ -152,7 +152,36 @@ class HologramLineRendererTest {
             assertEquals(anchor.getY(), rendered.location().getY());
             assertEquals(style.billboard().metadataValue(), rendered.billboard());
             assertEquals(rowCenter, rendered.translation().getY(), 1.0E-6D);
-            assertTrue(rendered.translation().getZ() - 0.6D / 2D > 0D);
+            assertEquals(HologramLineRenderer.OBJECT_DEPTH, rendered.translation().getZ(), 1.0E-6D);
+        } finally {
+            PacketEventsStub.uninstall();
+        }
+    }
+
+    @Test
+    void scaledTextReservesWholeRowsAndCentersItsOwnDisplayInThem() {
+        PacketEventsStub.install();
+        try {
+            HologramLine title = new HologramLine(HologramLine.Kind.TEXT, "Title", null, ShowCondition.ALWAYS, 1.5D);
+            HologramLine plain = HologramLine.text("Below");
+            IconDisplayStyle style = IconDisplayStyle.hologramDefaults().withScale(1F, 1.2F, 1F);
+            List<HologramLineRenderer.ObjectLine> objects = HologramLineRenderer.build(null, "scaled",
+                List.of(title, plain), new Location(null, 0D, 64D, 0D), style);
+            double rowHeight = 0.25D * 1.2D;
+            double textHeight = rowHeight * 1.5D;
+            DisplayEntity display = objects.getFirst().display();
+
+            assertTrue(title.drawnAsObject());
+            assertTrue(!plain.drawnAsObject());
+            assertEquals(2, HologramLineRenderer.rows(title, 1.2F));
+            assertEquals(1, objects.size());
+            assertEquals(2D * rowHeight, objects.getFirst().centerY(), 1.0E-6D);
+            assertEquals(2D * rowHeight - textHeight / 2D, display.translation().getY(), 1.0E-6D);
+            assertEquals(HologramLineRenderer.OBJECT_DEPTH, display.translation().getZ(), 1.0E-6D);
+            assertEquals(1.5F, display.scale().getX(), 1.0E-6F);
+            assertEquals(1.8F, display.scale().getY(), 1.0E-6F);
+            assertEquals(0, display.backgroundColor());
+            assertEquals(style.billboard().metadataValue(), display.billboard());
         } finally {
             PacketEventsStub.uninstall();
         }

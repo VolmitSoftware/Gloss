@@ -32,6 +32,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.entity.TextDisplay;
 import org.bukkit.util.Vector;
 import com.github.retrooper.packetevents.util.Vector3f;
+import net.kyori.adventure.text.Component;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -56,11 +57,14 @@ final class PersistentHologram implements AnchoredHologram {
      */
     private record LineSet(List<HologramLine> source, List<String> lines, List<ShowCondition> conditions,
                            List<HologramLine> objects, int flags, long generation, boolean fastRefresh,
-                           boolean conditional, boolean rawEntities) {
+                           boolean conditional, boolean rawEntities, boolean scaledText) {
+        boolean viewerObjects() {
+            return rawEntities || scaledText;
+        }
     }
 
     private static final LineSet EMPTY_LINES = new LineSet(List.of(), List.of(), List.of(), List.of(),
-        0, 0L, false, false, false);
+        0, 0L, false, false, false, false);
 
     private record AnchorState(String worldName, double x, double y, double z, long generation) {
     }
@@ -106,6 +110,10 @@ final class PersistentHologram implements AnchoredHologram {
     private record SpawnedObjects(Player player, String pageKey, int[] entityIds, DisplayEntityGroup group) {
     }
 
+    private record ScaledTextRender(long lineGeneration, long emojiGeneration, long renderGeneration,
+                                    long animationGeneration, long refreshAfterMs, boolean dynamic, String text) {
+    }
+
     private final HologramService service;
     private final String id;
     private final String animatorGroup;
@@ -125,6 +133,7 @@ final class PersistentHologram implements AnchoredHologram {
     private final Map<String, LineSet> pageSets = new ConcurrentHashMap<>();
     private final Map<String, List<HologramLineRenderer.ObjectLine>> objectsByPage = new ConcurrentHashMap<>();
     private final Map<UUID, SpawnedObjects> objectViewers = new ConcurrentHashMap<>();
+    private final Map<UUID, Map<Integer, ScaledTextRender>> scaledTexts = new ConcurrentHashMap<>();
     private final Map<Long, StaticSegments> staticSegmentsByGeneration = new ConcurrentHashMap<>();
     private final AtomicLong lineGenerations = new AtomicLong();
     private volatile List<HologramDoc.Variant> variants = List.of();
@@ -506,8 +515,9 @@ final class PersistentHologram implements AnchoredHologram {
         boolean conditional = false;
         boolean fastRefresh = false;
         boolean rawEntities = false;
+        boolean scaledText = false;
         for (HologramLine line : source) {
-            if (!line.isText()) {
+            if (line.drawnAsObject()) {
                 objects.add(line);
                 rawEntities |= line.kind() == HologramLine.Kind.ENTITY;
                 int rows = HologramLineRenderer.rows(line, scaleY);
@@ -516,6 +526,8 @@ final class PersistentHologram implements AnchoredHologram {
                     conditions.add(ShowCondition.ALWAYS);
                 }
                 conditional |= !line.show().isAlwaysVisible();
+                scaledText |= line.isScaledText();
+                fastRefresh |= line.isScaledText() && TextPipeline.requiresFastRefresh(line.text());
                 continue;
             }
             text.add(line.text());
@@ -525,7 +537,8 @@ final class PersistentHologram implements AnchoredHologram {
         }
         List<String> lines = List.copyOf(text);
         return new LineSet(List.copyOf(source), lines, List.copyOf(conditions), List.copyOf(objects),
-            HologramMath.classify(lines), lineGenerations.incrementAndGet(), fastRefresh, conditional, rawEntities);
+            HologramMath.classify(lines), lineGenerations.incrementAndGet(), fastRefresh, conditional, rawEntities,
+            scaledText);
     }
 
     private boolean replaceLine(int index, String line) {
@@ -693,6 +706,7 @@ final class PersistentHologram implements AnchoredHologram {
             objects.group().disconnected();
         }
         objectsByPage.keySet().removeIf(key -> key.endsWith("@" + playerId));
+        forgetScaledText(playerId);
         invalidateViewer(playerId, false);
     }
 
@@ -1777,7 +1791,7 @@ final class PersistentHologram implements AnchoredHologram {
             despawnObjectLines(viewerId, null);
             return;
         }
-        String objectKey = presentation.lines().rawEntities()
+        String objectKey = presentation.lines().viewerObjects()
             ? presentation.key() + "@" + viewerId : presentation.key();
         List<HologramLineRenderer.ObjectLine> lines = objectsByPage.computeIfAbsent(objectKey,
             ignored -> buildObjectLines(presentation.lines(), anchor, presentation.style()));
@@ -1794,6 +1808,7 @@ final class PersistentHologram implements AnchoredHologram {
         SpawnedObjects current = objectViewers.get(viewerId);
         if (current != null && current.player() == player && Arrays.equals(current.entityIds(), entityIds)) {
             current.group().refresh();
+            refreshScaledText(viewerId, player, presentation.lines(), visible, true);
             if (presentation.lines().rawEntities()) {
                 updateRawObjectPositions(player, anchor, presentation.style(), visible, current.group().visible());
             }
@@ -1806,6 +1821,7 @@ final class PersistentHologram implements AnchoredHologram {
         if (presentation.lines().rawEntities()) {
             updateRawObjectPositions(player, anchor, presentation.style(), visible, false);
         }
+        refreshScaledText(viewerId, player, presentation.lines(), visible, false);
         DisplayEntityGroup group = DisplayEntityManager.group(player, VisibilityGovernor.Surface.HOLOGRAM);
         objectViewers.put(viewerId, new SpawnedObjects(player, objectKey, entityIds, group));
         group.batch(() -> {
@@ -1838,7 +1854,83 @@ final class PersistentHologram implements AnchoredHologram {
         }
     }
 
+    private void refreshScaledText(UUID viewerId, Player player, LineSet snapshot,
+                                   List<HologramLineRenderer.ObjectLine> visible, boolean spawned) {
+        if (!snapshot.scaledText()) {
+            return;
+        }
+        Map<Integer, ScaledTextRender> rendered = scaledTexts.computeIfAbsent(viewerId,
+            ignored -> new ConcurrentHashMap<>());
+        TextPipeline pipeline = service.plugin().text();
+        long nowMs = System.currentTimeMillis();
+        long emojiGeneration = TextPipeline.emojiGeneration();
+        long renderGeneration = pipeline.renderGeneration();
+        long animationGeneration = service.animationGeneration();
+        List<PacketWrapper<?>> updates = new ArrayList<>();
+        for (HologramLineRenderer.ObjectLine line : visible) {
+            if (!line.source().isScaledText()) {
+                continue;
+            }
+            DisplayEntity display = line.display();
+            ScaledTextRender cached = rendered.get(display.id());
+            if (cached != null && cached.lineGeneration() == snapshot.generation()
+                && cached.emojiGeneration() == emojiGeneration && cached.renderGeneration() == renderGeneration
+                && cached.animationGeneration() == animationGeneration
+                && (!cached.dynamic() || nowMs < cached.refreshAfterMs())) {
+                continue;
+            }
+            String raw = line.source().text();
+            boolean dynamic = TextPipeline.viewerSpecific(raw) || TextPipeline.containsExpression(raw)
+                || HologramMath.containsRegisteredFunction(raw, pipeline::hasFunction);
+            AnimationTemplate template = service.animator().compileTemplate(List.of(raw),
+                value -> pipeline.renderParticleText(player, value).text());
+            String sub = scaledTextSub(viewerId, display.id());
+            String text;
+            if (template != null) {
+                text = template.compose(nowMs);
+                service.animator().publish(scaledTextGroup(), sub,
+                    new HologramAnimator.Target(display.id(), template, List.of(player)));
+            } else {
+                service.animator().remove(scaledTextGroup(), sub);
+                text = pipeline.renderParticleText(player, raw).text();
+            }
+            rendered.put(display.id(), new ScaledTextRender(snapshot.generation(), emojiGeneration,
+                renderGeneration, animationGeneration, nowMs + refresh.contentInterval(refreshTicks) * 50L,
+                dynamic, text));
+            if (cached != null && text.equals(cached.text())) {
+                continue;
+            }
+            Component component = TextUtils.parse(text);
+            display.text(component);
+            if (spawned) {
+                updates.add(DisplayEntity.textUpdate(display.id(), component));
+            }
+        }
+        if (!updates.isEmpty()) {
+            PacketUtils.send(player, updates);
+        }
+    }
+
+    private String scaledTextGroup() {
+        return animatorGroup + "#scaled";
+    }
+
+    private static String scaledTextSub(UUID viewerId, int entityId) {
+        return viewerId + ":" + entityId;
+    }
+
+    private void forgetScaledText(UUID viewerId) {
+        Map<Integer, ScaledTextRender> removed = scaledTexts.remove(viewerId);
+        if (removed == null) {
+            return;
+        }
+        for (Integer entityId : removed.keySet()) {
+            service.animator().remove(scaledTextGroup(), scaledTextSub(viewerId, entityId));
+        }
+    }
+
     private void despawnObjectLines(UUID viewerId, String retainedKey) {
+        forgetScaledText(viewerId);
         SpawnedObjects removed = objectViewers.remove(viewerId);
         if (removed != null && !removed.pageKey().equals(retainedKey) && removed.pageKey().endsWith("@" + viewerId)) {
             objectsByPage.remove(removed.pageKey());
@@ -1854,6 +1946,8 @@ final class PersistentHologram implements AnchoredHologram {
             despawnObjectLines(viewerId, null);
         }
         objectsByPage.clear();
+        scaledTexts.clear();
+        service.animator().removeGroup(scaledTextGroup());
         objectAnchor = null;
         objectLinesGeneration = Long.MIN_VALUE;
     }

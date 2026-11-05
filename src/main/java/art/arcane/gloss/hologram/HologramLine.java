@@ -73,6 +73,18 @@ public record HologramLine(Kind kind, String value, MenuIconData item, ShowCondi
         return kind == Kind.TEXT;
     }
 
+    public boolean isScaledText() {
+        return kind == Kind.TEXT && scale != DEFAULT_SCALE;
+    }
+
+    public boolean drawnAsObject() {
+        return kind != Kind.TEXT || scale != DEFAULT_SCALE;
+    }
+
+    public int textRows() {
+        return kind == Kind.TEXT ? value.split("\n", -1).length : 0;
+    }
+
     public static final class Adapter implements TypeAdapterFactory {
         @Override
         @SuppressWarnings("unchecked")
