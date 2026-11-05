@@ -1,0 +1,1543 @@
+/* Gloss document surfaces: hologram stage, animation player, scoreboard mock,
+   and the shared pipeline-text chrome. */
+
+/* Centre-cell visibility is not per kind any more: the shell mounts exactly
+   one surface cell and 09-workspace.css shows it. Nothing in this file styles
+   a cell — every rule below is inside one. */
+
+/* --- shared pipeline text ------------------------------------------------ */
+
+.hui-gloss-line { white-space: pre; }
+
+.hui-gloss-chip {
+  display: inline-block;
+  padding: 0 0.35em;
+  margin: 0 0.1em;
+  border: 1px dashed color-mix(in srgb, var(--color-primary) 55%, transparent);
+  border-radius: 0;
+  background: color-mix(in srgb, var(--color-primary) 12%, transparent);
+  color: var(--color-primary);
+  font-size: 0.82em;
+  line-height: 1.5;
+  vertical-align: baseline;
+  white-space: nowrap;
+}
+
+.hui-gloss-preview-viewport {
+  position: relative;
+  display: flex;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  align-items: center;
+  justify-content: center;
+}
+
+.hui-gloss-preview-viewport.is-end { justify-content: flex-end; }
+.hui-gloss-preview-viewport.is-top { align-items: flex-start; }
+.hui-gloss-preview-viewport.is-bottom { align-items: flex-end; }
+
+.hui-gloss-preview-content {
+  min-width: 0;
+  max-width: 100%;
+  transform: scale(var(--hui-gloss-preview-scale, 1));
+  transform-origin: center;
+  transition: transform var(--hui-dur-2) var(--hui-ease-out);
+}
+
+.hui-gloss-preview-viewport.is-end .hui-gloss-preview-content { transform-origin: right center; }
+.hui-gloss-preview-viewport.is-top .hui-gloss-preview-content { transform-origin: center top; }
+.hui-gloss-preview-viewport.is-bottom .hui-gloss-preview-content { transform-origin: center bottom; }
+
+.hui-gloss-preview-controls {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 0;
+  padding: 2px;
+  border: 1px solid var(--color-border);
+  border-radius: 0;
+  background: var(--color-card);
+  box-shadow: none;
+}
+
+:where(
+    .hui-gloss-preview-controls,
+    .hui-mc-controls,
+    .hui-gloss-game-controls,
+    .hui-scoreboard-view-controls,
+    .hui-tablist-view-controls,
+    .hui-motd-controls,
+    .hui-bubble-controls,
+    .hui-damage-indicator-controls
+  ) .arcane-button {
+  height: 28px !important;
+  min-height: 28px;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+:where(
+    .hui-gloss-preview-controls,
+    .hui-mc-controls,
+    .hui-gloss-game-controls,
+    .hui-scoreboard-view-controls,
+    .hui-tablist-view-controls,
+    .hui-motd-controls,
+    .hui-bubble-controls,
+    .hui-damage-indicator-controls
+  ) .arcane-button:hover:not(:disabled),
+:where(
+    .hui-gloss-preview-controls,
+    .hui-mc-controls,
+    .hui-gloss-game-controls,
+    .hui-scoreboard-view-controls,
+    .hui-tablist-view-controls,
+    .hui-motd-controls,
+    .hui-bubble-controls,
+    .hui-damage-indicator-controls
+  ) .arcane-button:focus-visible {
+  background: var(--hui-panel-soft) !important;
+}
+
+:where(
+    .hui-gloss-preview-controls,
+    .hui-mc-controls,
+    .hui-gloss-game-controls,
+    .hui-scoreboard-view-controls,
+    .hui-tablist-view-controls,
+    .hui-motd-controls,
+    .hui-bubble-controls,
+    .hui-damage-indicator-controls
+  ) .arcane-button[aria-pressed="true"] {
+  background: var(--hui-panel-soft) !important;
+  box-shadow: inset 0 -2px 0 var(--hui-accent) !important;
+}
+
+.hui-gloss-preview-percent,
+.hui-hologram-zoom {
+  min-width: 42px;
+  color: var(--color-muted-foreground);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- hologram stage ------------------------------------------------------ */
+
+.hui-hologram-stage.is-empty {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background:
+    radial-gradient(120% 90% at 50% 20%,
+      color-mix(in srgb, var(--color-primary) 7%, transparent), transparent 60%),
+    var(--color-background);
+}
+
+.hui-hologram-billboard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-family: var(--hui-mc-font);
+  pointer-events: none;
+  text-align: center;
+  isolation: isolate;
+}
+
+.hui-particle-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.hui-particle-dot {
+  position: absolute;
+  z-index: 2;
+  display: block;
+  border-radius: 50%;
+  background: var(--hui-particle-color);
+  box-shadow: 0 0 4px var(--hui-particle-color);
+  opacity: .92;
+}
+
+.hui-particle-dot.is-behind {
+  z-index: -1;
+  opacity: .66;
+}
+
+.hui-particle-dot.is-center { opacity: .8; }
+
+.hui-display-text,
+.hui-hologram-line,
+.hui-bubble-block > .hui-gloss-line,
+.hui-damage-indicator-number > .hui-gloss-line {
+  position: relative;
+  z-index: 0;
+}
+
+.hui-hologram-line {
+  background: transparent;
+  padding: 0;
+  color: #ffffff;
+  white-space: pre;
+}
+
+.hui-hologram-anchor {
+  width: 8px;
+  height: 8px;
+  transform: rotate(45deg);
+  background: color-mix(in srgb, var(--color-primary) 80%, transparent);
+  pointer-events: none;
+}
+
+/* --- hologram inspector -------------------------------------------------- */
+
+.hui-hologram-lines-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.hui-hologram-line-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 4px 8px;
+  min-width: 0;
+}
+
+.hui-hologram-line-preview {
+  grid-column: 1 / -1;
+  font-family: var(--hui-mc-font);
+  font-size: 13px;
+  padding: 2px 6px;
+  border-radius: 0;
+  background: color-mix(in srgb, #000 24%, var(--color-card));
+  overflow-x: auto;
+}
+
+/* --- animation player ----------------------------------------------------- */
+
+.hui-animation-player {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  height: 100%;
+  padding: 18px;
+  overflow-y: auto;
+  background: var(--color-background);
+}
+
+.hui-animation-frame-stage {
+  display: grid;
+  place-items: center;
+  gap: 10px;
+  min-height: 180px;
+  border: 1px solid var(--color-border);
+  border-radius: 0;
+  padding: 26px 18px;
+  background:
+    radial-gradient(90% 120% at 50% 0%,
+      color-mix(in srgb, var(--color-primary) 8%, transparent), transparent 65%),
+    color-mix(in srgb, #000 22%, var(--color-card));
+}
+
+.hui-animation-frame-large {
+  font-family: var(--hui-mc-font);
+  font-size: 30px;
+  line-height: 1.3;
+  color: #ffffff;
+}
+
+.hui-animation-frame-meta {
+  font-size: 11px;
+  color: var(--color-muted-foreground);
+}
+
+.hui-animation-transport {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.hui-animation-scrub {
+  flex: 1;
+  accent-color: var(--color-primary);
+  min-width: 0;
+}
+
+.hui-animation-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.hui-animation-strip-frame {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 0;
+  background: color-mix(in srgb, #000 18%, var(--color-card));
+  font-family: var(--hui-mc-font);
+  font-size: 13px;
+  color: #ffffff;
+  cursor: pointer;
+}
+
+.hui-animation-strip-frame.is-active {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 1px var(--color-primary);
+}
+
+.hui-animation-strip-index {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--color-muted-foreground);
+}
+
+/* --- scoreboard sidebar mock ---------------------------------------------- */
+
+.hui-scoreboard-stage {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--color-background);
+  container-type: inline-size;
+}
+
+/* A hint of in-game backdrop so the right-anchored overlay reads as one. */
+.hui-scoreboard-sky {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 28px;
+  overflow: auto;
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--color-primary) 9%, transparent),
+      transparent 55%),
+    color-mix(in srgb, #000 14%, var(--color-background));
+}
+
+.hui-scoreboard-sky.is-scene {
+  background:
+    linear-gradient(rgba(4, 7, 8, 0.32), rgba(4, 7, 8, 0.32)),
+    url('../assets/mc/26.2/world_still.png') center / cover no-repeat;
+}
+
+.hui-scoreboard-view-controls {
+  position: absolute;
+  left: 12px;
+  top: 12px;
+  z-index: 5;
+}
+
+/* Vanilla sidebar: darkened rows, title centered, scores right in dim red. */
+.hui-scoreboard-sidebar {
+  width: max-content;
+  min-width: min(180px, 100%);
+  max-width: 100%;
+  font-family: var(--hui-mc-font);
+  font-size: clamp(13px, 1.05cqi, 17px);
+  line-height: 1.3;
+  color: #ffffff;
+}
+
+.hui-scoreboard-title {
+  background: rgba(0, 0, 0, 0.4);
+  text-align: center;
+  padding: 2px 8px;
+  white-space: pre;
+  overflow: hidden;
+}
+
+.hui-scoreboard-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  background: rgba(0, 0, 0, 0.3);
+  padding: 1px 8px 1px 6px;
+  white-space: pre;
+}
+
+.hui-scoreboard-row-text { min-width: 0; overflow: hidden; }
+
+.hui-scoreboard-score {
+  color: #ff5555;
+  font-size: inherit;
+  flex: none;
+}
+
+.hui-scoreboard-readout {
+  padding: 8px 12px 10px;
+  font-size: 11px;
+  color: var(--color-muted-foreground);
+}
+
+.hui-gloss-chip.is-missing {
+  border-color: color-mix(in srgb, var(--color-destructive) 65%, transparent);
+  background: color-mix(in srgb, var(--color-destructive) 12%, transparent);
+  color: var(--color-destructive);
+}
+
+/* |metric.<key>| — a live sample from another Volmit plugin, so the editor
+   shows the token rather than a number it cannot read. */
+.hui-gloss-chip.is-metric {
+  border-style: dotted;
+  border-color: color-mix(in srgb, var(--color-muted-foreground) 65%, transparent);
+  background: color-mix(in srgb, var(--color-muted-foreground) 10%, transparent);
+  color: var(--color-muted-foreground);
+}
+
+.hui-hologram-line-row.is-beyond-render { opacity: 0.55; }
+
+.hui-scoreboard-group-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+/* --- MOTD server-list mock ------------------------------------------------ */
+
+.hui-motd-stage {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--color-background);
+  container-type: inline-size;
+}
+
+.hui-motd-stage > .hui-gloss-game {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: auto;
+}
+
+.hui-motd-request {
+  flex: 0 0 auto;
+  max-height: 45%;
+  min-width: 0;
+  overflow: auto;
+  overflow-wrap: anywhere;
+  padding: 12px 16px;
+}
+
+/* The multiplayer screen: dirt-dark backdrop, one hovered server row. */
+.hui-motd-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  padding: 28px;
+  overflow: auto;
+  background:
+    radial-gradient(110% 80% at 50% 0%,
+      color-mix(in srgb, var(--color-primary) 7%, transparent), transparent 60%),
+    color-mix(in srgb, #000 30%, var(--color-background));
+}
+
+.hui-motd-stage .hui-gloss-preview-content { width: min(900px, 78cqi); }
+
+.hui-motd-row {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+  width: min(760px, 100%);
+  padding: 6px;
+  border: 1px solid color-mix(in srgb, #fff 22%, transparent);
+  background: rgba(0, 0, 0, 0.55);
+  font-family: var(--hui-mc-font);
+  color: #ffffff;
+}
+
+.hui-motd-icon {
+  flex: none;
+  width: 64px;
+  height: 64px;
+  display: grid;
+  place-items: center;
+  background:
+    linear-gradient(135deg,
+      color-mix(in srgb, var(--color-primary) 55%, #222),
+      color-mix(in srgb, var(--color-primary) 20%, #111));
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.hui-motd-icon-glyph {
+  font-size: 26px;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.hui-motd-icon.has-favicon {
+  background: #000000;
+}
+
+.hui-motd-icon img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.hui-motd-row-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 1px;
+}
+
+.hui-motd-row-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.hui-motd-server-name { font-size: 15px; }
+
+.hui-motd-row-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+}
+
+.hui-motd-players {
+  font-size: 12px;
+  color: #aaaaaa;
+}
+
+/* The count owns the hover list, the way the client hangs it off the count. */
+.hui-motd-count {
+  position: relative;
+  display: inline-flex;
+}
+
+/* Rich tooltip content shares the editor's viewport-level overlay. */
+.hui-motd-sample {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  font-family: var(--hui-mc-font);
+}
+
+.hui-motd-count:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.hui-motd-sample-line {
+  font-size: 12px;
+  line-height: 1.3;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: #aaaaaa;
+}
+
+.hui-motd-sample-line .hui-gloss-line {
+  white-space: inherit;
+}
+
+.hui-motd-ping {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 1px;
+  height: 12px;
+}
+
+.hui-motd-ping-bar {
+  width: 3px;
+  background: rgba(85, 255, 85, 0.25);
+}
+
+.hui-motd-ping-bar:nth-child(1) { height: 4px; }
+.hui-motd-ping-bar:nth-child(2) { height: 6px; }
+.hui-motd-ping-bar:nth-child(3) { height: 8px; }
+.hui-motd-ping-bar:nth-child(4) { height: 10px; }
+.hui-motd-ping-bar:nth-child(5) { height: 12px; }
+
+.hui-motd-ping-bar.is-filled { background: #55ff55; }
+
+.hui-motd-line {
+  font-size: 14px;
+  line-height: 1.35;
+  white-space: pre;
+  overflow: hidden;
+  color: #aaaaaa;
+}
+
+.hui-motd-line.is-blank {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-muted-foreground);
+}
+
+.hui-motd-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.hui-motd-entry-chips {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.hui-motd-entry-chip {
+  min-width: 26px;
+  padding: 3px 6px;
+  border: 0;
+  border-radius: 0;
+  background: color-mix(in srgb, #000 18%, var(--color-card));
+  color: var(--color-foreground);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.hui-motd-entry-chip.is-active {
+  background: var(--hui-panel-soft);
+  box-shadow: inset 0 -2px 0 var(--color-primary);
+}
+
+.hui-motd-readout {
+  padding: 8px 12px 10px;
+  font-size: 11px;
+  color: var(--color-muted-foreground);
+}
+
+/* --- MOTD inspector ------------------------------------------------------- */
+
+.hui-motd-entry-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  margin-bottom: 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 0;
+  background: color-mix(in srgb, #000 8%, var(--color-card));
+}
+
+.hui-motd-entry-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.hui-motd-entry-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-muted-foreground);
+}
+
+.hui-motd-entry-actions {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.hui-motd-link-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 0;
+  background: color-mix(in srgb, #000 8%, var(--color-card));
+}
+
+.hui-motd-ping-extras {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* --- emoji glyph grid ------------------------------------------------------ */
+
+.hui-emoji-stage {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  height: 100%;
+  padding: 18px;
+  overflow-y: auto;
+  background: var(--color-background);
+}
+
+.hui-emoji-chat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 0;
+  background: color-mix(in srgb, #000 24%, var(--color-card));
+  font-family: var(--hui-mc-font);
+  font-size: 14px;
+  color: #ffffff;
+}
+
+.hui-emoji-chat-line { white-space: pre-wrap; }
+
+.hui-emoji-chat-line.is-raw { color: #888888; }
+
+.hui-emoji-chat-speaker { color: #aaaaaa; }
+
+.hui-emoji-chat-meta {
+  margin-top: 4px;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  color: var(--color-muted-foreground);
+}
+
+.hui-emoji-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.hui-emoji-count {
+  flex: none;
+  font-size: 11px;
+  color: var(--color-muted-foreground);
+}
+
+.hui-emoji-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 8px;
+}
+
+.hui-emoji-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 6px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 0;
+  background: color-mix(in srgb, #000 12%, var(--color-card));
+  color: var(--color-foreground);
+  cursor: pointer;
+  min-width: 0;
+}
+
+.hui-emoji-cell.is-catalog {
+  cursor: default;
+  opacity: 0.75;
+}
+
+.hui-emoji-cell.is-disabled { opacity: 0.4; }
+
+.hui-emoji-cell.is-open {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 1px var(--color-primary);
+}
+
+.hui-emoji-cell-glyph {
+  font-size: 26px;
+  line-height: 1.2;
+}
+
+.hui-emoji-cell-name {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--color-muted-foreground);
+}
+
+.hui-emoji-cell-trigger {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  padding: 0 4px;
+  border-radius: 0;
+  background: transparent;
+  color: var(--color-primary);
+}
+
+.hui-emoji-readout {
+  font-size: 11px;
+  color: var(--color-muted-foreground);
+}
+
+/* --- emoji inspector ------------------------------------------------------- */
+
+.hui-emoji-resolved {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border-radius: 0;
+  background: color-mix(in srgb, #000 24%, var(--color-card));
+}
+
+.hui-emoji-resolved-glyph {
+  font-size: 22px;
+  line-height: 1.2;
+  color: #ffffff;
+}
+
+.hui-emoji-resolved-note {
+  font-size: 10px;
+  color: var(--color-muted-foreground);
+}
+
+/* --- chat-bubble stack mock ------------------------------------------------ */
+
+.hui-bubble-stage {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--color-background);
+}
+
+.hui-bubble-stage > .hui-mc-stage { flex: 1; min-height: 0; }
+
+.hui-bubble-block {
+  background: transparent;
+  padding: 0;
+  font-family: var(--hui-mc-font);
+  font-size: 14px;
+  line-height: 1.2;
+  color: #ffffff;
+  white-space: pre;
+  text-align: left;
+  will-change: transform, opacity;
+  pointer-events: none;
+}
+
+.hui-bubble-motion-presets,
+.hui-bubble-motion-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.hui-bubble-motion-presets {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.hui-bubble-motion-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.hui-bubble-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px 10px;
+}
+
+.hui-bubble-readout-inline {
+  font-size: 11px;
+  color: var(--color-muted-foreground);
+}
+
+/* --- damage indicators ---------------------------------------------------- */
+
+.hui-damage-indicator-stage {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--color-background);
+}
+
+.hui-damage-indicator-sky {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 240px;
+  overflow: hidden;
+}
+
+.hui-damage-indicator-empty-state {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  width: 100%;
+  height: 100%;
+  min-height: 240px;
+  place-items: center;
+  pointer-events: none;
+  color: var(--color-muted-foreground);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.hui-damage-indicator-empty-state span {
+  padding: 6px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--color-card) 88%, transparent);
+}
+
+.hui-damage-indicator-number {
+  color: #fff;
+  font-family: var(--hui-mc-font);
+  font-size: 22px;
+  line-height: 1;
+  white-space: nowrap;
+  transform-origin: center;
+  text-shadow: 2px 2px 0 rgba(0, 0, 0, .72);
+  will-change: transform, opacity;
+}
+
+.hui-damage-indicator-origin {
+  position: relative;
+  width: 7px;
+  height: 7px;
+  border: 1px solid rgba(255, 255, 255, .5);
+  background: rgba(0, 0, 0, .4);
+  transform: translate(-50%, -50%) rotate(45deg);
+}
+
+/* The caption lives inside the diamond, which is the box turned 45deg, so it
+   inherits that turn: anchoring it on the box's top-right corner (the
+   diamond's right vertex) and turning it back -45deg about that corner
+   leaves it horizontal, and the translate after the turn is in its own
+   upright frame, so it clears the vertex and centres on it. */
+.hui-damage-indicator-origin span {
+  position: absolute;
+  left: 100%;
+  top: 0;
+  color: rgba(255, 255, 255, .56);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: .04em;
+  transform-origin: 0 0;
+  transform: rotate(-45deg) translate(6px, -50%);
+  white-space: nowrap;
+}
+
+.hui-damage-indicator-controls {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--color-border);
+  background: color-mix(in srgb, var(--color-card) 94%, transparent);
+}
+
+.hui-damage-indicator-kind { display: flex; gap: 0; }
+
+.hui-damage-indicator-kind .arcane-button[aria-pressed="true"] {
+  box-shadow: inset 0 0 0 1px var(--hui-accent) !important;
+}
+
+.hui-damage-indicator-amount {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-muted-foreground);
+  font-size: 11px;
+}
+
+.hui-damage-indicator-amount-field { width: 82px; }
+
+.hui-damage-indicator-readout {
+  flex: 1 1 100%;
+  color: var(--color-muted-foreground);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.hui-damage-indicator-format-preview {
+  min-height: 32px;
+  margin-top: 6px;
+  padding: 7px 9px;
+  border: 1px solid var(--color-border);
+  background: rgba(0, 0, 0, .72);
+  color: #fff;
+  font-family: var(--hui-mc-font);
+  text-shadow: 1px 1px 0 #000;
+}
+
+.hui-damage-indicator-world-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* --- tab-screen mock ------------------------------------------------------- */
+
+.hui-tablist-stage {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--color-background);
+  container-type: inline-size;
+}
+
+.hui-tablist-sky {
+  flex: 1;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 28px;
+  overflow: auto;
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--color-primary) 9%, transparent),
+      transparent 55%),
+    color-mix(in srgb, #000 14%, var(--color-background));
+}
+
+.hui-tablist-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  padding: 8px 10px;
+  background: rgba(0, 0, 0, 0.4);
+  font-family: var(--hui-mc-font);
+  color: #ffffff;
+}
+
+.hui-tablist-stage .hui-gloss-preview-content { width: min(880px, 74cqi); }
+
+.hui-tablist-header,
+.hui-tablist-footer {
+  text-align: center;
+  font-size: 15px;
+  line-height: 1.4;
+}
+
+.hui-tablist-pipeline-line { white-space: pre; }
+
+.hui-tablist-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 2px 8px;
+  width: 100%;
+}
+
+.hui-tablist-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 1px 4px;
+  background: rgba(255, 255, 255, 0.12);
+  font-size: 13px;
+  min-width: 0;
+}
+
+.hui-tablist-row-face {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  background:
+    linear-gradient(135deg,
+      color-mix(in srgb, var(--color-primary) 40%, #6b5335),
+      #4a3a24);
+}
+
+.hui-tablist-row-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: pre;
+}
+
+.hui-tablist-row-ping {
+  flex: none;
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 1px;
+  height: 10px;
+}
+
+.hui-tablist-ping-bar {
+  width: 2px;
+  background: rgba(85, 255, 85, 0.25);
+}
+
+.hui-tablist-ping-bar:nth-child(1) { height: 3px; }
+.hui-tablist-ping-bar:nth-child(2) { height: 5px; }
+.hui-tablist-ping-bar:nth-child(3) { height: 7px; }
+.hui-tablist-ping-bar:nth-child(4) { height: 8px; }
+.hui-tablist-ping-bar:nth-child(5) { height: 10px; }
+
+.hui-tablist-ping-bar.is-filled { background: #55ff55; }
+
+.hui-tablist-readout {
+  padding: 8px 12px 10px;
+  font-size: 11px;
+  color: var(--color-muted-foreground);
+}
+
+/* --- tablist inspector ----------------------------------------------------- */
+
+.hui-tablist-token-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.hui-tablist-token-chip { cursor: pointer; }
+
+.hui-real-drops-stage {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-height: 420px;
+  overflow: hidden;
+}
+
+.hui-real-drops-stage.is-empty {
+  background: linear-gradient(#141c24 0 58%, #1b2419 58% 100%);
+}
+
+.hui-real-drops-stage > .hui-mc-stage { flex: 1 1 auto; min-height: 0; }
+
+.hui-entity-overlay-stage {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  overflow-y: auto;
+}
+.hui-entity-overlay-sky {
+  position: relative;
+  flex: 1 0 400px;
+  min-height: 400px;
+  overflow: hidden;
+}
+.hui-entity-overlay-scene { position: absolute; inset: 0; overflow: hidden; }
+.hui-entity-overlay-label {
+  width: max-content;
+  max-width: none;
+  padding: 0;
+  background: transparent;
+  text-align: center;
+  font-family: var(--hui-mc-font);
+  font-size: 16px;
+  line-height: 20px;
+}
+.hui-entity-overlay-label .hui-gloss-line { display: block; white-space: pre-wrap; overflow-wrap: anywhere; }
+.hui-entity-overlay-hidden {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  top: 18px;
+  padding: 8px;
+  background: #171717;
+  color: #f5f5f5;
+  text-align: center;
+}
+.hui-entity-overlay-sample-note {
+  position: absolute;
+  bottom: 10px;
+  left: 12px;
+  padding: 3px 6px;
+  color: #f5f5f5;
+  background: #171717;
+  font-size: 11px;
+}
+.hui-entity-overlay-controls {
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 auto;
+  gap: 12px;
+  padding: 12px;
+  border-top: 1px solid var(--hui-border);
+  background: var(--hui-surface);
+  color: var(--hui-text);
+}
+.hui-entity-overlay-control-row { display: flex; flex-wrap: wrap; align-items: end; gap: 10px; }
+.hui-entity-overlay-control-row > strong { align-self: center; margin-right: auto; font-size: 12px; }
+.hui-entity-overlay-sample-number,
+.hui-entity-overlay-sample-name { display: flex; flex-direction: column; gap: 5px; font-size: 11px; min-width: 0; }
+.hui-entity-overlay-sample-number { flex: 1 1 100px; max-width: 135px; }
+.hui-entity-overlay-sample-name { flex: 2 1 160px; }
+.hui-entity-overlay-controls .arcane-button[aria-pressed="true"] {
+  background: color-mix(in srgb, var(--hui-accent) 15%, var(--hui-surface));
+  box-shadow: inset 0 0 0 1px var(--hui-accent);
+}
+@media (max-width: 640px) {
+  .hui-entity-overlay-sky { flex-basis: 450px; min-height: 450px; }
+  .hui-entity-overlay-controls .arcane-button { min-height: 40px; height: auto; }
+  .hui-entity-overlay-sample-number { max-width: none; }
+  .hui-entity-overlay-sample-name { flex-basis: 100%; }
+}
+
+.hui-real-drops-controls {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--border);
+  background: color-mix(in srgb, var(--background) 92%, transparent);
+}
+
+.hui-real-drops-readout-inline {
+  flex: 1 1 100%;
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+
+.hui-real-drops-timeline {
+  display: grid;
+  flex: 1 1 420px;
+  grid-template-columns: minmax(84px, auto) minmax(120px, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  min-width: 240px;
+}
+
+.hui-real-drops-phase {
+  padding: 3px 8px;
+  border: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--muted) 54%, transparent);
+  color: var(--muted-foreground);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.hui-real-drops-phase.is-rolling,
+.hui-real-drops-phase.is-settling {
+  border-color: color-mix(in srgb, var(--hui-warning) 62%, var(--border));
+  background: color-mix(in srgb, var(--hui-warning) 13%, var(--background));
+  color: color-mix(in srgb, var(--hui-warning) 74%, white);
+}
+
+.hui-real-drops-phase.is-settled {
+  border-color: color-mix(in srgb, var(--hui-success) 62%, var(--border));
+  background: color-mix(in srgb, var(--hui-success) 13%, var(--background));
+  color: color-mix(in srgb, var(--hui-success) 74%, white);
+}
+
+.hui-real-drops-phase.is-submerged {
+  border-color: color-mix(in srgb, #4eb6e8 62%, var(--border));
+  background: color-mix(in srgb, #4eb6e8 13%, var(--background));
+  color: color-mix(in srgb, #4eb6e8 74%, white);
+}
+
+.hui-real-drops-scrubber { width: 100%; }
+
+.hui-real-drops-time {
+  min-width: 82px;
+  color: var(--muted-foreground);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.hui-drop-animation-group,
+.hui-drop-animation-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.hui-drop-animation-group { margin-top: 10px; }
+
+.hui-drop-animation-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--muted) 20%, transparent);
+}
+
+.hui-drop-animation-card.is-clip {
+  background: color-mix(in srgb, var(--muted) 32%, transparent);
+}
+
+.hui-drop-animation-card.is-track {
+  background: color-mix(in srgb, var(--background) 58%, transparent);
+}
+
+.hui-drop-animation-card > summary {
+  cursor: pointer;
+  padding: 8px 10px;
+  color: var(--foreground);
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.hui-drop-animation-card-body { padding: 0 10px 10px; }
+
+.hui-drop-animation-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
+  border-radius: var(--radius-sm);
+}
+
+.hui-drop-animation-row.is-material {
+  grid-template-columns: minmax(100px, 1fr) repeat(2, minmax(76px, .6fr)) auto;
+}
+
+.hui-drop-animation-row.is-keyframe {
+  grid-template-columns: repeat(4, minmax(80px, 1fr)) auto;
+}
+
+.hui-drop-animation-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* The camera has no affordance of its own — the stage looks the same whether
+   or not it can be flown — so the row says out loud that it can. */
+.hui-real-drops-hint {
+  flex: 1 0 auto;
+  text-align: right;
+  color: color-mix(in srgb, var(--muted-foreground) 78%, transparent);
+  font-size: 11px;
+}
+
+.hui-tablist-format-row {
+  display: grid;
+  grid-template-columns: minmax(72px, 0.4fr) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.hui-tablist-live-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 10px;
+  padding: 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 0;
+  background: color-mix(in srgb, #000 18%, var(--color-card));
+}
+
+.hui-tablist-live-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.hui-tablist-live-meta {
+  font-size: 10px;
+  color: var(--color-muted-foreground);
+}
+
+.hui-tablist-live-name {
+  font-family: var(--hui-mc-font);
+  font-size: 13px;
+  color: #ffffff;
+  white-space: pre;
+}
+
+@media (max-width: 700px) {
+  .hui-scoreboard-sky,
+  .hui-motd-screen,
+  .hui-tablist-sky { padding: 14px; }
+
+  .hui-scoreboard-sidebar,
+  .hui-motd-stage .hui-gloss-preview-content,
+  .hui-tablist-stage .hui-gloss-preview-content { width: 100%; }
+
+  .hui-scoreboard-sidebar { font-size: clamp(13px, 4cqi, 17px); }
+  .hui-motd-screen { padding: 16px 12px; }
+  .hui-motd-icon { width: 48px; height: 48px; }
+  .hui-motd-row-head { flex-wrap: wrap; gap: 4px 10px; }
+  .hui-tablist-grid { grid-template-columns: 1fr; }
+  .hui-tablist-header,
+  .hui-tablist-footer { font-size: 13px; }
+  .hui-drop-animation-row.is-material,
+  .hui-drop-animation-row.is-keyframe { grid-template-columns: minmax(0, 1fr); }
+}
+
+@media (pointer: coarse), (max-width: 700px) {
+  :where(
+      .hui-gloss-preview-controls,
+      .hui-mc-controls,
+      .hui-gloss-game-controls,
+      .hui-scoreboard-view-controls,
+      .hui-tablist-view-controls,
+      .hui-motd-controls,
+      .hui-bubble-controls,
+      .hui-damage-indicator-controls
+    ) .arcane-button {
+    min-width: 40px;
+    height: 40px !important;
+    min-height: 40px;
+  }
+}
+
+@media (max-width: 420px) {
+  .hui-bubble-motion-presets { grid-template-columns: minmax(0, 1fr); }
+
+  .hui-gloss-preview-controls { top: 8px; right: 8px; }
+
+  .hui-gloss-preview-percent,
+  .hui-hologram-zoom { min-width: 34px; }
+
+  .hui-scoreboard-readout,
+  .hui-motd-readout,
+  .hui-bubble-controls,
+  .hui-damage-indicator-controls,
+  .hui-tablist-readout { max-height: 62px; overflow-y: auto; }
+
+  .hui-animation-player,
+  .hui-emoji-stage { padding: 12px; }
+  .hui-animation-frame-large { font-size: clamp(20px, 8vw, 30px); }
+}
+
+.hui-entity-overlay-line-select { display: flex; align-items: center; gap: 2px; min-width: 0; }
+.hui-entity-overlay-line-select > button:first-child { flex: 1; min-width: 0; justify-content: flex-start; }
+.hui-entity-overlay-line-select [aria-pressed="true"] { background: var(--accent); outline: 1px solid var(--border); }
+.hui-entity-overlay-line-editor { display: flex; flex-direction: column; gap: 10px; }
+.hui-entity-overlay-text { position: relative; }
+.hui-entity-overlay-text .hui-mc-span { text-shadow: inherit; }
+
+.hui-inventory-stage,
+.hui-nameplate-stage,
+.hui-nametag-stage,
+.hui-marker-stage {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.hui-inventory-screen {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: min(420px, 100%);
+  padding: 16px 18px;
+  border: 3px solid #373737;
+  background: #c6c6c6;
+  box-shadow: inset 2px 2px #fff, inset -2px -2px #555;
+  color: #3f3f3f;
+}
+
+.hui-inventory-title { font-family: var(--hui-mc-font); font-size: 18px; }
+
+.hui-inventory-grid {
+  display: grid;
+  gap: 4px;
+}
+
+.hui-inventory-slot {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  aspect-ratio: 1;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #565656;
+  background: #8b8b8b;
+  box-shadow: inset -1px -1px #fff;
+  font-family: var(--hui-mc-font);
+  font-size: 0.72rem;
+}
+
+.hui-inventory-slot img { width: 80%; height: 80%; object-fit: contain; image-rendering: pixelated; }
+.hui-inventory-count { position: absolute; right: 2px; bottom: 0; color: #fff; font-size: 16px; text-shadow: 2px 2px #333; }
+.hui-inventory-missing { padding: 2px; overflow-wrap: anywhere; font-size: 9px; }
+
+.hui-nameplate-stack,
+.hui-nametag-line,
+.hui-marker-pin {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px;
+  border: 1px solid var(--hui-border-soft);
+  background: color-mix(in srgb, var(--hui-panel) 88%, transparent);
+}
+
+.hui-identity-billboard {
+  font-family: var(--hui-mc-font);
+  font-size: 19.2px;
+  line-height: 24px;
+  text-align: center;
+  white-space: pre;
+  color: white;
+  text-shadow: 2px 2px #0009;
+}
+
+.hui-identity-billboard > div {
+  width: fit-content;
+  margin-inline: auto;
+  padding-inline: 2px;
+  background: #0006;
+}
+
+.hui-identity-rules,
+.hui-identity-variant {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.hui-identity-variant {
+  padding: 12px;
+  border: 1px solid var(--hui-border);
+  border-radius: 6px;
+}
+
+.hui-gloss-game-controls:has([aria-label="Preview permissions"]) {
+  flex-wrap: wrap;
+  max-width: calc(100% - 24px);
+}
+
+.hui-gloss-game-controls [aria-label="Preview permissions"] {
+  width: min(260px, 100%);
+}

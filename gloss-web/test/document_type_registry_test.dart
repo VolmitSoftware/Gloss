@@ -1,0 +1,117 @@
+import 'package:gloss_editor/doctype/document_type.dart';
+import 'package:gloss_editor/doctype/document_type_registry.dart';
+import 'package:test/test.dart';
+
+void main() {
+  test('detectTransferable routes every runtime document shape', () {
+    final Map<String, Object> samples = <String, Object>{
+      'menu': <String, Object>{'components': <Object>[]},
+      'preview': <String, Object>{'elements': <Object>[]},
+      'hologram': <String, Object>{
+        'schemaVersion': 3,
+        'anchor': <String, Object>{
+          'world': 'world',
+          'position': <num>[0, 64, 0],
+        },
+        'lines': <Object>[],
+      },
+      'animation': <String, Object>{'schemaVersion': 1, 'frames': <Object>[]},
+      'scoreboard': <String, Object>{
+        'schemaVersion': 2,
+        'select': <String, Object>{},
+        'presentation': <String, Object>{'title': '&dBoard'},
+        'variants': <Object>[],
+      },
+      'surface': <String, Object>{
+        'schemaVersion': 1,
+        'surface': 'bossbar',
+        'select': <String, Object>{},
+        'presentation': <String, Object>{'title': '&6Boss'},
+        'variants': <Object>[],
+      },
+      'motd': <String, Object>{'schemaVersion': 1, 'entries': <Object>[]},
+      'connections': <String, Object>{
+        'schemaVersion': 1,
+        'join': <String, Object>{
+          'presentation': <String, Object>{'text': '&a+'},
+        },
+      },
+      'emoji': <String, Object>{'schemaVersion': 1, 'emoji': 'U+2764;'},
+      'bubble-style': <String, Object>{'schemaVersion': 4, 'wordWrapChars': 32},
+      'tablist': <String, Object>{
+        'schemaVersion': 2,
+        'headerFooter': <String, Object>{},
+        'listNames': <String, Object>{},
+      },
+      'damage-indicators': <String, Object>{
+        'schemaVersion': 3,
+        'limits': <String, Object>{},
+        'damage': <String, Object>{},
+        'healing': <String, Object>{},
+        'audience': <String, Object>{'when': 'true'},
+      },
+      'inventory': <String, Object>{
+        'schemaVersion': 1,
+        'resolution': '9x3',
+        'mask': <String>['###'],
+      },
+      'nameplate': <String, Object>{
+        'schemaVersion': 1,
+        'select': <String, Object>{},
+        'presentation': <String, Object>{
+          'lines': <Object>[
+            <String, Object>{'text': 'name'},
+          ],
+        },
+        'variants': <Object>[],
+      },
+      'nametag': <String, Object>{
+        'schemaVersion': 1,
+        'select': <String, Object>{},
+        'presentation': <String, Object>{'prefix': '&7'},
+        'variants': <Object>[],
+      },
+      'marker': <String, Object>{
+        'schemaVersion': 1,
+        'anchor': <String, Object>{'world': 'world', 'x': 0, 'y': 64, 'z': 0},
+        'label': 'pin',
+      },
+    };
+
+    for (final MapEntry<String, Object> sample in samples.entries) {
+      final DocumentTypeAdapter type = DocumentTypeRegistry.detectTransferable(
+        sample.value,
+      );
+      final String expected = sample.key == 'preview'
+          ? 'container-preview'
+          : sample.key;
+      expect(type.syncWireKind, expected, reason: sample.key);
+    }
+  });
+
+  test('line-only presentations distinguish typed scoreboards from nameplates', () {
+    for (final int schemaVersion in <int>[1, 2]) {
+      final Map<String, Object> source = <String, Object>{
+        'schemaVersion': schemaVersion,
+        'select': <String, Object>{},
+        'presentation': <String, Object>{
+          'lines': <Object>[
+            <String, Object>{'text': 'Player'},
+          ],
+        },
+        'variants': <Object>[],
+      };
+      expect(
+        DocumentTypeRegistry.detectTransferable(source).syncWireKind,
+        schemaVersion == 1 ? 'nameplate' : 'scoreboard',
+      );
+    }
+  });
+
+  test('detectTransferable keeps malformed unmarked JSON on menu fallback', () {
+    final DocumentTypeAdapter type = DocumentTypeRegistry.detectTransferable(
+      <String, Object>{'unknown': true},
+    );
+    expect(type.syncWireKind, 'menu');
+  });
+}

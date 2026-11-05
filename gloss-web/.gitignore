@@ -1,0 +1,33 @@
+# Dart / Jaspr
+.dart_tool/
+build/
+pubspec.lock
+!/pubspec.lock
+.deps/
+.codegraph/
+.qa/
+
+# OS / IDE
+.DS_Store
+.idea/
+
+# Packaging output
+builder_static.zip
+/vaquita-macos-arm64.dmg
+
+# Firebase tooling
+.firebase/
+firebase-debug.log
+firebase-debug.*.log
+
+# Local credentials
+service-account.json
+.env
+.env.*
+gha-creds-*.json
+
+# Optional browser/demo test dependencies
+node_modules/
+
+# Agent tooling scratch
+.superpowers/

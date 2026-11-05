@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 3,
+  "revision": 1,
+  "show": true,
+  "headerFooter": {
+    "enabled": true,
+    "show": true,
+    "presentation": {
+      "header": "&d&lGloss",
+      "footer": "&7VolmitSoftware.com"
+    },
+    "variants": []
+  },
+  "listNames": {
+    "enabled": true,
+    "show": true,
+    "presentation": {
+      "format": "$player"
+    },
+    "variants": [
+      {
+        "id": "operator",
+        "priority": 100,
+        "when": "subject.op",
+        "presentation": {
+          "format": "&6$player"
+        }
+      }
+    ]
+  }
+}

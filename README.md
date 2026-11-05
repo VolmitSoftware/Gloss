@@ -44,6 +44,19 @@ Container-preview discovery uses a fair, deduplicated queue capped at ten player
 
 Java 25 is required. The local `VolmLib` sibling checkout is resolved automatically as a composite build; pass `-PuseLocalVolmLib=false` to resolve it remotely instead.
 
+## Web editor
+
+The Dart/Jaspr editor lives in [`gloss-web/`](gloss-web/README.md) and is hosted at
+[gloss.volmitsoftware.com](https://gloss.volmitsoftware.com/). It builds independently
+of Gradle and tests its format contracts against this repository's plugin sources.
+See its README for local development, relay tests, deployment credentials, and
+the initial Hosting cutover.
+
+The [Hosting workflow](.github/workflows/gloss-web-firebase-hosting.yml) validates
+relevant pull requests and deploys after relevant pushes to `master`, including
+editor changes and plugin source, test-resource, or schema changes. Relay hosting
+remains separate.
+
 ## Data layout
 
 Gloss never creates a folder it has nothing to put in. Only the commented `gloss.toml`, the sparse

@@ -1,0 +1,30 @@
+{
+  "protocol": 3,
+  "baseRevision": "sha256:6d7f76b8c8b0cc2eac71dcec9f497e73e5a5719e7bc6a68d2337611dcf18e0dd",
+  "snapshot": {
+    "format": "gloss-sync-project",
+    "version": 3,
+    "kind": "menu",
+    "subjectId": "main",
+    "documents": [
+      {
+        "kind": "menu",
+        "id": "main",
+        "json": "{\"components\":[],\"followPlayer\":true}",
+        "baseRevision": "sha256:ac46fd24bd501fa7297f0a2945bcc7f5d655b9bcf8bfbf16718a9d25c0c2c018"
+      }
+    ],
+    "images": [],
+    "constraints": {
+      "subjectId": "main",
+      "documentKinds": [
+        "menu"
+      ],
+      "createDocumentKinds": [],
+      "newImagePrefix": "sync/menus/main/",
+      "allowDeletes": false
+    },
+    "warnings": [],
+    "baseRevision": "sha256:d11e5c86a380342da13626df475fc4b4276097b1a2dc6afd6bfe73f11706e00e"
+  }
+}

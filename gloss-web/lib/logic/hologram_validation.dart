@@ -1,0 +1,226 @@
+/// Validation for Gloss hologram documents.
+///
+/// Severity contract, matching the rest of the editor: an `error` is
+/// something the plugin's parser or constructor would reject — the file will
+/// not load in game (`HologramDoc.java:35-44`, `DocumentEnvelope.java`); a
+/// `warning` loads but almost certainly is not what the author meant.
+library;
+
+import '../model/gloss_doc.dart';
+import '../model/gloss_hologram.dart';
+import '../model/json_codec.dart';
+import 'gloss_text.dart';
+import 'gloss_particle_text.dart';
+import 'particle_layer_validation.dart';
+import 'validation.dart';
+import 'display_refresh_validation.dart';
+import 'presentation_variants.dart';
+import 'hologram_box_validation.dart';
+import 'gloss_show.dart';
+
+List<HuiIssue> validateHologramDoc(
+  GlossHologramDoc doc, {
+  GlossAnimationResolver animations = const GlossNoAnimations(),
+}) {
+  final List<HuiIssue> issues = <HuiIssue>[
+    ...validateDisplayRefresh(doc.refresh),
+    ...validateGlossShow(doc.extras['show']),
+  ];
+
+  issues.addAll(validatePresentationVariants(doc.variants));
+  for (final (int index, Object? line) in doc.lines.indexed) {
+    if (line is Map) {
+      issues.addAll(
+        validateGlossShow(line['show'], path: '\$.lines[$index].show'),
+      );
+    }
+  }
+  for (final (int index, Object? raw) in huiReadList(
+    doc.extras['pages'],
+  ).indexed) {
+    if (raw is! Map) continue;
+    issues.addAll(
+      validateGlossShow(raw['show'], path: '\$.pages[$index].show'),
+    );
+    for (final (int lineIndex, Object? line) in huiReadList(
+      raw['lines'],
+    ).indexed) {
+      if (line is Map) {
+        issues.addAll(
+          validateGlossShow(
+            line['show'],
+            path: '\$.pages[$index].lines[$lineIndex].show',
+          ),
+        );
+      }
+    }
+  }
+
+  for (final HuiIssue? issue in <HuiIssue?>[
+    runtimeRangeIssue(r'$.viewDistance', doc.viewDistance, 4, 128),
+    runtimeRangeIssue(r'$.refreshTicks', doc.refreshTicks, 1, 200),
+  ]) {
+    if (issue != null) issues.add(issue);
+  }
+  issues.addAll(validateIconDisplayStyle(doc.style, path: r'$.style'));
+  issues.addAll(validateHologramBox(doc.box));
+  final HuiIssue? revisionIssue = glossRevisionIssue(doc.revision);
+  if (revisionIssue != null) {
+    issues.add(revisionIssue);
+  }
+  issues.addAll(
+    validateParticleLayers(doc.particleLayers, path: r'$.particleLayers'),
+  );
+
+  if (!doc.anchorPresent) {
+    issues.add(
+      const HuiIssue(
+        severity: HuiSeverity.error,
+        path: r'$.anchor',
+        message:
+            'The anchor object is missing; Gloss rejects a hologram without '
+            'one.',
+        fix: 'Add "anchor": {"world": ..., "position": [x, y, z]}.',
+      ),
+    );
+  } else {
+    if (doc.anchor.world.trim().isEmpty) {
+      issues.add(
+        const HuiIssue(
+          severity: HuiSeverity.error,
+          path: r'$.anchor.world',
+          message:
+              'The anchor world is empty; Gloss rejects a hologram without '
+              'one.',
+          fix: 'Name the world the hologram stands in, e.g. "world".',
+        ),
+      );
+    }
+    if (!doc.anchor.positionIsValidTriple) {
+      issues.add(
+        const HuiIssue(
+          severity: HuiSeverity.error,
+          path: r'$.anchor.position',
+          message:
+              'The anchor position must be exactly three finite numbers '
+              '[x, y, z]; Gloss rejects anything else.',
+          fix: 'Write the position as [x, y, z].',
+        ),
+      );
+    }
+  }
+
+  issues.addAll(
+    <HuiIssue?>[
+      _angleIssue(r'$.yaw', 'yaw', doc.yaw, glossHologramMaxYawDegrees),
+      _angleIssue(r'$.pitch', 'pitch', doc.pitch, glossHologramMaxPitchDegrees),
+    ].whereType<HuiIssue>(),
+  );
+
+  if (doc.style.billboard == 'center' && (doc.yaw != 0 || doc.pitch != 0)) {
+    issues.add(
+      const HuiIssue(
+        severity: HuiSeverity.warning,
+        path: r'$.style.billboard',
+        message:
+            'CENTER turns on both axes, so this yaw and pitch never reach '
+            'the screen: every viewer sees the hologram square-on anyway.',
+        fix:
+            'Switch to FIXED to use both angles, VERTICAL to keep the pitch, '
+            'or HORIZONTAL to keep the yaw.',
+      ),
+    );
+  }
+
+  final Object? pages = doc.extras['pages'];
+  final bool hasPageLines =
+      pages is List &&
+      pages.any(
+        (Object? page) =>
+            page is Map &&
+            page['lines'] is List &&
+            (page['lines'] as List).isNotEmpty,
+      );
+  if (doc.lines.isEmpty && !hasPageLines) {
+    issues.add(
+      const HuiIssue(
+        severity: HuiSeverity.warning,
+        path: r'$.lines',
+        message:
+            'The hologram has no lines. Gloss accepts the file but renders '
+            'nothing at the anchor.',
+        fix: 'Add at least one line of text.',
+      ),
+    );
+  }
+
+  final String? particleSpanError = glossParticleTextSyntaxError(
+    doc.textLines.join('\n'),
+  );
+  if (particleSpanError != null) {
+    issues.add(
+      HuiIssue(
+        severity: HuiSeverity.error,
+        path: r'$.lines',
+        message: 'Invalid particle text span: {error}',
+        messageArguments: <String, Object?>{'error': particleSpanError},
+        fix: 'Correct the value before exporting.',
+      ),
+    );
+  }
+
+  for (int index = 0; index < doc.lines.length; index++) {
+    for (final String reference in glossLineMissingAnimationRefs(
+      glossHologramLineText(doc.lines[index]),
+      animations,
+    )) {
+      issues.add(
+        HuiIssue(
+          severity: HuiSeverity.warning,
+          path: 'lines[$index]',
+          message:
+              "|{reference}| names an animation document this workspace does not have; the text will show literally in game.",
+          messageArguments: <String, Object?>{'reference': reference},
+          fix:
+              'Create the animation document or pick an existing one from '
+              'the reference picker.',
+        ),
+      );
+    }
+  }
+
+  final HuiIssue? metrics = glossMetricInfo(doc.textLines);
+  if (metrics != null) issues.add(metrics);
+  issues.addAll(
+    glossTextExpressionIssues(<({String path, String text})>[
+      for (int index = 0; index < doc.lines.length; index++)
+        (path: 'lines[$index]', text: glossHologramLineText(doc.lines[index])),
+    ]),
+  );
+
+  return issues;
+}
+
+/// An angle the plugin's constructor would throw on: `HologramDoc.requireAngle`
+/// demands a finite value within the axis limit (`HologramDoc.java:84-92`).
+HuiIssue? _angleIssue(String path, String axis, double value, double limit) {
+  if (value.isFinite && value.abs() <= limit) return null;
+  return HuiIssue(
+    severity: HuiSeverity.error,
+    path: path,
+    message:
+        "A {axis} of {value} is out of range; Gloss rejects the whole file unless it is between -{limit} and {limit2} degrees.",
+    messageArguments: <String, Object?>{
+      'axis': axis,
+      'value': value,
+      'limit': limit,
+      'limit2': limit,
+    },
+    fix: "Use a {axis} between -{toInt} and {toInt2}.",
+    fixArguments: <String, Object?>{
+      'axis': axis,
+      'toInt': limit.toInt(),
+      'toInt2': limit.toInt(),
+    },
+  );
+}
