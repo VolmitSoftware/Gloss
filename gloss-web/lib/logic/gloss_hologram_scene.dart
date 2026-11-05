@@ -463,6 +463,7 @@ final class HologramPreviewLine {
   final double height;
   final double centerY;
   bool get isText => kind == 'text';
+  bool get isScaledText => isText && scale != 1;
   String get value =>
       source is Map ? (source as Map)[kind]?.toString() ?? '' : '';
   double get scale => source is Map && (source as Map)['scale'] is num
@@ -500,10 +501,16 @@ List<HologramPreviewLine> hologramPreviewLines(
     final double scale = source is Map && source['scale'] is num
         ? (source['scale'] as num).toDouble()
         : 1;
-    final double height = kind == 'entity'
-        ? (entityHeight?.call((source as Map)['entity'].toString()) ?? 1) *
-              scale.clamp(.0625, 16)
-        : scale;
+    final int textRows = kind == 'text'
+        ? glossHologramLineText(source).split('\n').length
+        : 0;
+    final double height = switch (kind) {
+      'entity' =>
+        (entityHeight?.call((source as Map)['entity'].toString()) ?? 1) *
+            scale.clamp(.0625, 16),
+      'text' => textRows * rowHeight * scale,
+      _ => scale,
+    };
     final double width = kind == 'entity'
         ? (entityWidth?.call((source as Map)['entity'].toString()) ?? 0) *
               scale.clamp(.0625, 16)
@@ -511,9 +518,11 @@ List<HologramPreviewLine> hologramPreviewLines(
     final double reservedHeight = kind == 'entity'
         ? math.sqrt(height * height + 2 * width * width)
         : height;
-    final int rows = kind == 'text'
-        ? glossHologramLineText(source).split('\n').length
-        : math.max(1, (reservedHeight / rowHeight).ceil());
+    final int rows = kind != 'text'
+        ? math.max(1, (reservedHeight / rowHeight).ceil())
+        : scale == 1
+        ? textRows
+        : math.max(1, (textRows * scale - 1e-9).ceil());
     totalRows += rows;
     measured.add((source: source, kind: kind, rows: rows, height: height));
   }
@@ -551,7 +560,7 @@ List<GlossLineRender> hologramRenderedLines(
     entityHeight: entityHeight,
     entityWidth: entityWidth,
   ))
-    if (line.isText)
+    if (line.isText && !line.isScaledText)
       for (final String text in glossHologramLineText(line.source).split('\n'))
         renderGlossLine(
           text,

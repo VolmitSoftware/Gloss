@@ -243,7 +243,7 @@ class _HologramViewState extends State<HologramView> {
         McVec3(0, line.centerY, entityDepth),
       );
       final McMat4 center = origin.multiply(
-        McMat4.translation(0, line.centerY, scale / 2 + .02),
+        McMat4.translation(0, line.centerY, .02),
       );
       final McMat4 transform = center
           .multiply(McMat4.scale(scale, scale, scale))
@@ -426,6 +426,15 @@ class _HologramViewState extends State<HologramView> {
     final int zoomPercent = (homeDistance / _stage.camera.distance * 100)
         .round();
 
+    final List<HologramPreviewLine> scaledText = <HologramPreviewLine>[
+      for (final HologramPreviewLine line in hologramPreviewLines(
+        doc,
+        nowMs: nowMs,
+        entityHeight: _entityHeight,
+        entityWidth: _entityWidth,
+      ))
+        if (line.isScaledText) line,
+    ];
     final bool shows =
         placement != null && glossShowMatches(doc.extras['show'], nowMs: nowMs);
     final List<Widget> overlay = <Widget>[
@@ -435,6 +444,13 @@ class _HologramViewState extends State<HologramView> {
           yawDeg: doc.yaw,
           pitchDeg: doc.pitch,
           child: _billboard(lines, doc, nowMs ~/ 50),
+        ),
+      if (shows && scaledText.isNotEmpty)
+        _anchored(
+          billboard: _billboardMode(doc.style.billboard),
+          yawDeg: doc.yaw,
+          pitchDeg: doc.pitch,
+          child: _scaledText(scaledText, doc, animations, nowMs),
         ),
       if (shows)
         _anchored(billboard: McBillboardMode.center, child: _anchorMarker),
@@ -617,6 +633,82 @@ class _HologramViewState extends State<HologramView> {
             ],
           ),
         ),
+      ],
+    );
+  }
+
+  Widget _scaledText(
+    List<HologramPreviewLine> scaled,
+    GlossHologramDoc doc,
+    GlossAnimationResolver animations,
+    int nowMs,
+  ) {
+    final double plateScaleX = doc.style.scaleY == 0
+        ? 1
+        : doc.style.scaleX / doc.style.scaleY;
+    return dom.div(
+      classes: 'hui-hologram-scaled',
+      styles: const dom.Styles(
+        raw: <String, String>{
+          'position': 'relative',
+          'width': '0',
+          'height': '0',
+        },
+      ),
+      <Widget>[
+        for (final HologramPreviewLine line in scaled)
+          (() {
+            final double linePx =
+                glossHologramLineHeightBlocks *
+                huiPreviewPxPerBlock *
+                doc.style.scaleY *
+                line.scale;
+            final double bottomPx =
+                (line.centerY - line.height / 2) * huiPreviewPxPerBlock;
+            return dom.div(
+              classes: 'hui-hologram-billboard',
+              styles: dom.Styles(
+                raw: <String, String>{
+                  'position': 'absolute',
+                  'left': '0',
+                  'bottom': '${bottomPx.toStringAsFixed(3)}px',
+                  'font-size': '${(linePx * 8 / 10).toStringAsFixed(2)}px',
+                  'line-height': '${linePx.toStringAsFixed(2)}px',
+                  'white-space': 'pre',
+                  'text-align': doc.style.textAlignment,
+                  'opacity': (doc.style.textOpacity.clamp(0, 255) / 255)
+                      .toString(),
+                  'text-shadow': doc.style.shadow
+                      ? '${linePx / 10}px ${linePx / 10}px rgba(0,0,0,.65)'
+                      : 'none',
+                  'transform':
+                      'translateX(-50%) scaleX(${plateScaleX.toStringAsFixed(5)})',
+                },
+              ),
+              <Widget>[
+                for (final String row in glossHologramLineText(
+                  line.source,
+                ).split('\n'))
+                  dom.div(
+                    classes: 'hui-hologram-line',
+                    styles: dom.Styles(
+                      raw: <String, String>{'min-height': '${linePx}px'},
+                    ),
+                    <Widget>[
+                      GlossTextLine(
+                        render: renderGlossLine(
+                          row,
+                          animations: animations,
+                          emoji: _store.workspaceEmoji,
+                          nowMs: nowMs,
+                          richText: true,
+                        ),
+                      ),
+                    ],
+                  ),
+              ],
+            );
+          })(),
       ],
     );
   }

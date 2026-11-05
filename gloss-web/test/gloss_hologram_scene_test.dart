@@ -77,6 +77,28 @@ void main() {
     expect(doc.toJson(), before);
   });
 
+  test('scaled text reserves whole rows and leaves them blank in the stack', () {
+    final GlossHologramDoc doc = _doc();
+    doc.style.scaleY = 1.2;
+    doc.lines = <Object?>[
+      <String, Object?>{'text': 'Title', 'scale': 1.5},
+      'Below',
+    ];
+    final List<HologramPreviewLine> lines = hologramPreviewLines(doc);
+    const double row = .25 * 1.2;
+    expect(lines[0].isScaledText, isTrue);
+    expect(lines[1].isScaledText, isFalse);
+    expect(lines.map((HologramPreviewLine line) => line.rows), <int>[2, 1]);
+    expect(lines[0].centerY, closeTo(2 * row, 1e-9));
+    expect(lines[0].height, closeTo(row * 1.5, 1e-9));
+    final List<GlossLineRender> text = hologramRenderedLines(doc);
+    expect(text.map((GlossLineRender line) => line.plainText), <String>[
+      '',
+      '',
+      'Below',
+    ]);
+  });
+
   test(
     'scaled box padding expands outside unchanged mixed row coordinates',
     () {
